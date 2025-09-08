@@ -1,0 +1,3 @@
+"""
+Paper Trading Simulator Module
+"""

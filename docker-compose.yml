@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database for production
+  database:
+    image: postgres:15
+    container_name: trading_system_db
+    environment:
+      POSTGRES_DB: trading_system
+      POSTGRES_USER: trader
+      POSTGRES_PASSWORD: trader_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    networks:
+      - trading_network
+
+  # Trading system application
+  trading_system:
+    build: .
+    container_name: trading_system_app
+    depends_on:
+      - database
+    environment:
+      - DATABASE_URL=postgresql://trader:trader_password@database:5432/trading_system
+      - FLASK_ENV=production
+      - PYTHONPATH=/app
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - trading_network
+    command: python run.py --mode production --config production
+
+  # Redis for caching (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: trading_system_redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - trading_network
+
+volumes:
+  postgres_data:
+
+networks:
+  trading_network:
+    driver: bridge

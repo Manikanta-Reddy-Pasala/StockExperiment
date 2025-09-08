@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+
+{% block title %}Alerts{% endblock %}
+
+{% block content %}
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card border-danger border-2 shadow-sm">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title text-muted">Unread Alerts</h6>
+                        <h3 class="text-danger fw-bold" id="unread-alerts">12</h3>
+                    </div>
+                    <div class="bg-danger bg-opacity-10 rounded-circle p-3">
+                        <i class="bi bi-bell text-danger fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-primary border-2 shadow-sm">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title text-muted">Critical</h6>
+                        <h3 class="text-primary fw-bold" id="critical-alerts">3</h3>
+                    </div>
+                    <div class="bg-primary bg-opacity-10 rounded-circle p-3">
+                        <i class="bi bi-exclamation-triangle text-primary fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-warning border-2 shadow-sm">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title text-muted">Warnings</h6>
+                        <h3 class="text-warning fw-bold" id="warning-alerts">7</h3>
+                    </div>
+                    <div class="bg-warning bg-opacity-10 rounded-circle p-3">
+                        <i class="bi bi-exclamation-circle text-warning fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-info border-2 shadow-sm">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title text-muted">Info</h6>
+                        <h3 class="text-info fw-bold" id="info-alerts">15</h3>
+                    </div>
+                    <div class="bg-info bg-opacity-10 rounded-circle p-3">
+                        <i class="bi bi-info-circle text-info fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">Alerts</h5>
+        <div class="d-flex align-items-center">
+            <select class="form-select form-select-sm me-2" id="severity-filter">
+                <option value="all">All Severities</option>
+                <option value="critical">Critical</option>
+                <option value="warning">Warning</option>
+                <option value="info">Info</option>
+            </select>
+            <select class="form-select form-select-sm me-2" id="status-filter">
+                <option value="all">All Status</option>
+                <option value="new">Unread</option>
+                <option value="read">Read</option>
+            </select>
+            <button class="btn btn-sm btn-outline-primary me-2" id="refresh-alerts">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+            <button class="btn btn-sm btn-outline-danger" id="clear-alerts">
+                <i class="bi bi-trash"></i> Clear All
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover" id="alerts-table">
+                <thead class="table-light">
+                    <tr>
+                        <th>Time</th>
+                        <th>Type</th>
+                        <th>Message</th>
+                        <th>Severity</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Alerts will be populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mt-2">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">Alert Trends</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="alerts-trend-chart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">Alert Distribution</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="alerts-distribution-chart" height="150"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Fetch alerts
+    async function fetchAlerts() {
+        try {
+            const response = await fetch('/api/alerts');
+            const alerts = await response.json();
+            
+            // Update summary cards
+            document.getElementById('unread-alerts').textContent = alerts.filter(alert => alert.status === 'new').length;
+            document.getElementById('critical-alerts').textContent = alerts.filter(alert => alert.severity === 'critical').length;
+            document.getElementById('warning-alerts').textContent = alerts.filter(alert => alert.severity === 'warning').length;
+            document.getElementById('info-alerts').textContent = alerts.filter(alert => alert.severity === 'info').length;
+            
+            const table = document.getElementById('alerts-table').getElementsByTagName('tbody')[0];
+            table.innerHTML = '';
+            
+            // Sort alerts by time (newest first)
+            alerts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            
+            alerts.forEach(alert => {
+                const row = table.insertRow();
+                row.insertCell(0).textContent = new Date(alert.timestamp).toLocaleString();
+                row.insertCell(1).textContent = alert.type;
+                row.insertCell(2).textContent = alert.message;
+                
+                const severityCell = row.insertCell(3);
+                severityCell.textContent = alert.severity.charAt(0).toUpperCase() + alert.severity.slice(1);
+                severityCell.className = getSeverityClass(alert.severity);
+                
+                const statusCell = row.insertCell(4);
+                statusCell.textContent = alert.status.charAt(0).toUpperCase() + alert.status.slice(1);
+                statusCell.className = alert.status === 'new' ? 'text-danger fw-bold' : 'text-muted';
+                
+                // Action buttons
+                const actionCell = row.insertCell(5);
+                const markReadBtn = document.createElement('button');
+                markReadBtn.className = 'btn btn-sm btn-outline-primary me-1';
+                markReadBtn.innerHTML = '<i class="bi bi-check"></i>';
+                markReadBtn.title = 'Mark as Read';
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn btn-sm btn-outline-danger';
+                deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+                deleteBtn.title = 'Delete';
+                
+                actionCell.appendChild(markReadBtn);
+                actionCell.appendChild(deleteBtn);
+            });
+        } catch (error) {
+            console.error('Error fetching alerts:', error);
+        }
+    }
+    
+    // Get CSS class for severity
+    function getSeverityClass(severity) {
+        switch (severity) {
+            case 'critical':
+                return 'text-danger fw-bold';
+            case 'warning':
+                return 'text-warning fw-bold';
+            case 'info':
+                return 'text-info';
+            default:
+                return '';
+        }
+    }
+    
+    // Initialize alerts trend chart
+    function initAlertsTrendChart() {
+        const ctx = document.getElementById('alerts-trend-chart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                datasets: [{
+                    label: 'Critical Alerts',
+                    data: [1, 2, 0, 1, 3, 2, 1],
+                    borderColor: 'rgb(220, 53, 69)',
+                    backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                    tension: 0.3,
+                    fill: true
+                }, {
+                    label: 'Warning Alerts',
+                    data: [2, 1, 3, 2, 1, 0, 2],
+                    borderColor: 'rgb(255, 193, 7)',
+                    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Number of Alerts'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Day'
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Initialize alerts distribution chart
+    function initAlertsDistributionChart() {
+        const ctx = document.getElementById('alerts-distribution-chart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Order Execution', 'Price Alerts', 'Risk Management', 'System', 'Data Quality'],
+                datasets: [{
+                    data: [35, 25, 20, 12, 8],
+                    backgroundColor: [
+                        'rgba(13, 110, 253, 0.8)',
+                        'rgba(40, 167, 69, 0.8)',
+                        'rgba(255, 193, 7, 0.8)',
+                        'rgba(108, 117, 125, 0.8)',
+                        'rgba(220, 53, 69, 0.8)'
+                    ],
+                    borderColor: [
+                        'rgba(13, 110, 253, 1)',
+                        'rgba(40, 167, 69, 1)',
+                        'rgba(255, 193, 7, 1)',
+                        'rgba(108, 117, 125, 1)',
+                        'rgba(220, 53, 69, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                    }
+                }
+            }
+        });
+    }
+    
+    // Event listeners
+    document.getElementById('severity-filter').addEventListener('change', fetchAlerts);
+    document.getElementById('status-filter').addEventListener('change', fetchAlerts);
+    document.getElementById('refresh-alerts').addEventListener('click', fetchAlerts);
+    
+    document.getElementById('clear-alerts').addEventListener('click', function() {
+        if (confirm('Are you sure you want to clear all alerts?')) {
+            // In a real implementation, this would make an API call to clear alerts
+            alert('Alerts cleared!');
+            fetchAlerts();
+        }
+    });
+    
+    // Fetch data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        fetchAlerts();
+        initAlertsTrendChart();
+        initAlertsDistributionChart();
+        // Refresh every 30 seconds
+        setInterval(fetchAlerts, 30000);
+    });
+</script>
+{% endblock %}

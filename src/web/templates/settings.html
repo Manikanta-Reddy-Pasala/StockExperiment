@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">System Configuration</h5>
+            </div>
+            <div class="card-body">
+                <form id="system-config-form">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <h5 class="mt-2">Trading Parameters</h5>
+                            <hr>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="trading-mode" class="form-label">Trading Mode</label>
+                            <select class="form-select" id="trading-mode">
+                                <option value="development">Development (Paper Trading)</option>
+                                <option value="production">Production (Live Trading)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="market-open" class="form-label">Market Open Time</label>
+                            <input type="time" class="form-control" id="market-open" value="09:15">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="market-close" class="form-label">Market Close Time</label>
+                            <input type="time" class="form-control" id="market-close" value="15:30">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="execution-mode" class="form-label">Execution Mode</label>
+                            <select class="form-select" id="execution-mode">
+                                <option value="market">Market Order</option>
+                                <option value="limit">Limit Order</option>
+                                <option value="smart">Smart Order</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-12">
+                            <h5 class="mt-4">Risk Management</h5>
+                            <hr>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="max-capital-per-trade" class="form-label">Max Capital Per Trade (%)</label>
+                            <input type="number" class="form-control" id="max-capital-per-trade" step="0.01" value="1.00">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="max-concurrent-trades" class="form-label">Max Concurrent Trades</label>
+                            <input type="number" class="form-control" id="max-concurrent-trades" value="10">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="daily-loss-limit" class="form-label">Daily Loss Limit (%)</label>
+                            <input type="number" class="form-control" id="daily-loss-limit" step="0.01" value="2.00">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="single-name-exposure" class="form-label">Single Name Exposure Limit (%)</label>
+                            <input type="number" class="form-control" id="single-name-exposure" step="0.01" value="5.00">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="stop-loss-percent" class="form-label">Default Stop Loss (%)</label>
+                            <input type="number" class="form-control" id="stop-loss-percent" step="0.01" value="5.00">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="take-profit-percent" class="form-label">Default Take Profit (%)</label>
+                            <input type="number" class="form-control" id="take-profit-percent" step="0.01" value="10.00">
+                        </div>
+                        
+                        <div class="col-md-12">
+                            <h5 class="mt-4">Notification Settings</h5>
+                            <hr>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="email-notifications" class="form-label">Email Notifications</label>
+                            <select class="form-select" id="email-notifications">
+                                <option value="all">All Events</option>
+                                <option value="critical">Critical Only</option>
+                                <option value="none">None</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="sms-notifications" class="form-label">SMS Notifications</label>
+                            <select class="form-select" id="sms-notifications">
+                                <option value="critical">Critical Only</option>
+                                <option value="none">None</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-12 mb-3">
+                            <label for="notification-email" class="form-label">Notification Email</label>
+                            <input type="email" class="form-control" id="notification-email" value="trader@example.com">
+                        </div>
+                        
+                        <div class="col-md-12">
+                            <h5 class="mt-4">Data Sources</h5>
+                            <hr>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="primary-data-source" class="form-label">Primary Data Source</label>
+                            <select class="form-select" id="primary-data-source">
+                                <option value="zerodha">Zerodha Kite Connect</option>
+                                <option value="yfinance">yFinance</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="backup-data-source" class="form-label">Backup Data Source</label>
+                            <select class="form-select" id="backup-data-source">
+                                <option value="yfinance">yFinance</option>
+                                <option value="simulator">Simulator</option>
+                                <option value="none">None</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-end mt-4">
+                        <button type="button" class="btn btn-outline-secondary me-2" id="reset-config">
+                            <i class="bi bi-arrow-counterclockwise"></i> Reset
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Save Configuration
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">System Status</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="flex-grow-1">
+                        <h6 class="mb-0">Market Connection</h6>
+                        <small class="text-muted">Zerodha Kite Connect</small>
+                    </div>
+                    <span class="badge bg-success">Connected</span>
+                </div>
+                
+                <div class="d-flex align-items-center mb-3">
+                    <div class="flex-grow-1">
+                        <h6 class="mb-0">Database</h6>
+                        <small class="text-muted">SQLite</small>
+                    </div>
+                    <span class="badge bg-success">Connected</span>
+                </div>
+                
+                <div class="d-flex align-items-center mb-3">
+                    <div class="flex-grow-1">
+                        <h6 class="mb-0">Scheduler</h6>
+                        <small class="text-muted">Job Scheduler</small>
+                    </div>
+                    <span class="badge bg-success">Running</span>
+                </div>
+                
+                <div class="d-flex align-items-center mb-3">
+                    <div class="flex-grow-1">
+                        <h6 class="mb-0">Risk Manager</h6>
+                        <small class="text-muted">Risk Controls</small>
+                    </div>
+                    <span class="badge bg-success">Active</span>
+                </div>
+                
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="mb-0">Data Provider</h6>
+                        <small class="text-muted">yFinance</small>
+                    </div>
+                    <span class="badge bg-warning">Degraded</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">System Actions</h5>
+            </div>
+            <div class="card-body">
+                <button class="btn btn-outline-primary w-100 mb-2" id="test-email">
+                    <i class="bi bi-envelope"></i> Test Email Configuration
+                </button>
+                <button class="btn btn-outline-secondary w-100 mb-2" id="backup-config">
+                    <i class="bi bi-download"></i> Backup Configuration
+                </button>
+                <button class="btn btn-outline-info w-100 mb-2" id="export-data">
+                    <i class="bi bi-box-arrow-up"></i> Export Trading Data
+                </button>
+                <button class="btn btn-outline-warning w-100 mb-2" id="clear-cache">
+                    <i class="bi bi-trash"></i> Clear Data Cache
+                </button>
+                <button class="btn btn-outline-danger w-100" id="reset-system">
+                    <i class="bi bi-arrow-counterclockwise"></i> Factory Reset
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Fetch current settings
+    async function fetchSettings() {
+        try {
+            const response = await fetch('/api/settings');
+            const settings = await response.json();
+            
+            // Populate form with current settings
+            // In a real implementation, you would map the settings to form fields
+            console.log('Current settings:', settings);
+        } catch (error) {
+            console.error('Error fetching settings:', error);
+        }
+    }
+    
+    // Handle form submission
+    document.getElementById('system-config-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Collect form data
+        const formData = new FormData(this);
+        const settings = Object.fromEntries(formData.entries());
+        
+        // In a real implementation, you would send this to the server
+        console.log('Saving settings:', settings);
+        alert('Settings saved successfully!');
+    });
+    
+    // Event listeners for action buttons
+    document.getElementById('test-email').addEventListener('click', function() {
+        alert('Email configuration test initiated!');
+    });
+    
+    document.getElementById('backup-config').addEventListener('click', function() {
+        alert('Configuration backup initiated!');
+    });
+    
+    document.getElementById('export-data').addEventListener('click', function() {
+        alert('Trading data export initiated!');
+    });
+    
+    document.getElementById('clear-cache').addEventListener('click', function() {
+        if (confirm('Are you sure you want to clear the data cache?')) {
+            alert('Data cache cleared!');
+        }
+    });
+    
+    document.getElementById('reset-config').addEventListener('click', function() {
+        if (confirm('Are you sure you want to reset all settings to defaults?')) {
+            alert('Configuration reset to defaults!');
+        }
+    });
+    
+    document.getElementById('reset-system').addEventListener('click', function() {
+        if (confirm('WARNING: This will reset the entire system to factory defaults. All data will be lost. Are you sure?')) {
+            alert('System reset initiated!');
+        }
+    });
+    
+    // Fetch data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        fetchSettings();
+    });
+</script>
+{% endblock %}

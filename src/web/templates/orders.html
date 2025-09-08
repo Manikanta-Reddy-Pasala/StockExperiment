@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Orders{% endblock %}
+
+{% block content %}
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card border-primary border-2 shadow-sm">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title text-muted">Total Orders</h6>
+                        <h3 class="text-primary fw-bold" id="total-orders">0</h3>
+                    </div>
+                    <div class="bg-primary bg-opacity-10 rounded-circle p-3">
+                        <i class="bi bi-list-task text-primary fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-success border-2 shadow-sm">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title text-muted">Completed</h6>
+                        <h3 class="text-success fw-bold" id="completed-orders">0</h3>
+                    </div>
+                    <div class="bg-success bg-opacity-10 rounded-circle p-3">
+                        <i class="bi bi-check-circle text-success fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-warning border-2 shadow-sm">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title text-muted">Pending</h6>
+                        <h3 class="text-warning fw-bold" id="pending-orders">0</h3>
+                    </div>
+                    <div class="bg-warning bg-opacity-10 rounded-circle p-3">
+                        <i class="bi bi-clock-history text-warning fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-danger border-2 shadow-sm">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title text-muted">Failed</h6>
+                        <h3 class="text-danger fw-bold" id="failed-orders">0</h3>
+                    </div>
+                    <div class="bg-danger bg-opacity-10 rounded-circle p-3">
+                        <i class="bi bi-x-circle text-danger fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">Order History</h5>
+        <div class="d-flex">
+            <select class="form-select form-select-sm me-2" id="status-filter">
+                <option value="all">All Orders</option>
+                <option value="complete">Completed</option>
+                <option value="placed">Placed</option>
+                <option value="rejected">Rejected</option>
+                <option value="cancelled">Cancelled</option>
+            </select>
+            <button class="btn btn-sm btn-outline-primary" id="refresh-orders">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover" id="orders-table">
+                <thead class="table-light">
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Symbol</th>
+                        <th>Type</th>
+                        <th>Transaction</th>
+                        <th>Quantity</th>
+                        <th>Filled</th>
+                        <th>Status</th>
+                        <th>Price</th>
+                        <th>Created At</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Orders will be populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Fetch orders
+    async function fetchOrders() {
+        try {
+            const response = await fetch('/api/orders');
+            const orders = await response.json();
+            
+            // Update summary cards
+            document.getElementById('total-orders').textContent = orders.length;
+            document.getElementById('completed-orders').textContent = orders.filter(o => o.status === 'COMPLETE').length;
+            document.getElementById('pending-orders').textContent = orders.filter(o => o.status === 'PLACED' || o.status === 'PARTIAL').length;
+            document.getElementById('failed-orders').textContent = orders.filter(o => o.status === 'CANCELLED' || o.status === 'REJECTED').length;
+            
+            const table = document.getElementById('orders-table').getElementsByTagName('tbody')[0];
+            table.innerHTML = '';
+            
+            orders.forEach(order => {
+                const row = table.insertRow();
+                row.insertCell(0).textContent = order.order_id.substring(0, 8) + '...';
+                row.insertCell(0).title = order.order_id; // Show full ID on hover
+                row.insertCell(1).textContent = order.symbol;
+                row.insertCell(2).textContent = order.type;
+                row.insertCell(3).textContent = order.transaction;
+                row.insertCell(4).textContent = order.quantity;
+                row.insertCell(5).textContent = order.filled;
+                
+                const statusCell = row.insertCell(6);
+                statusCell.textContent = order.status;
+                if (order.status === 'COMPLETE') {
+                    statusCell.className = 'text-success';
+                } else if (order.status === 'PLACED' || order.status === 'PARTIAL') {
+                    statusCell.className = 'text-warning';
+                } else if (order.status === 'CANCELLED' || order.status === 'REJECTED') {
+                    statusCell.className = 'text-danger';
+                }
+                
+                row.insertCell(7).textContent = order.price ? '₹' + order.price.toFixed(2) : '-';
+                row.insertCell(8).textContent = new Date(order.created_at).toLocaleString();
+                
+                // Action button
+                const actionCell = row.insertCell(9);
+                const viewBtn = document.createElement('button');
+                viewBtn.className = 'btn btn-sm btn-outline-primary';
+                viewBtn.innerHTML = '<i class="bi bi-eye"></i>';
+                viewBtn.title = 'View Details';
+                actionCell.appendChild(viewBtn);
+            });
+        } catch (error) {
+            console.error('Error fetching orders:', error);
+        }
+    }
+    
+    // Event listeners
+    document.getElementById('status-filter').addEventListener('change', fetchOrders);
+    document.getElementById('refresh-orders').addEventListener('click', fetchOrders);
+    
+    // Fetch data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        fetchOrders();
+        // Refresh every 30 seconds
+        setInterval(fetchOrders, 30000);
+    });
+</script>
+{% endblock %}

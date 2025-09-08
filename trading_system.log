@@ -1,0 +1,350 @@
+2025-09-09 00:06:47,227 - src.main - INFO - Logging initialized with level DEBUG
+2025-09-09 00:06:47,227 - src.main - INFO - Starting Automated Trading System in development mode
+2025-09-09 00:06:47,227 - src.main - INFO - Initializing components in development mode
+2025-09-09 00:06:47,230 - src.main - INFO - Database initialized
+2025-09-09 00:06:47,230 - src.main - INFO - Data provider manager initialized
+2025-09-09 00:06:47,230 - src.main - INFO - Initialized Simulator for development
+2025-09-09 00:18:45,061 - src.main - INFO - Logging initialized with level DEBUG
+2025-09-09 00:18:45,061 - src.main - INFO - Starting Automated Trading System in development mode
+2025-09-09 00:18:45,062 - src.main - INFO - Initializing components in development mode
+2025-09-09 00:18:45,065 - src.main - INFO - Database initialized
+2025-09-09 00:18:45,065 - src.main - INFO - Data provider manager initialized
+2025-09-09 00:18:45,065 - src.main - INFO - Initialized Simulator for development
+2025-09-09 00:18:45,065 - src.main - INFO - All components initialized
+2025-09-09 00:18:45,074 - src.main - INFO - Setting up trading workflow
+2025-09-09 00:18:45,074 - src.main - INFO - Scheduler started
+2025-09-09 00:18:45,075 - email_alerts.email_alerts - WARNING - Cannot send email: No recipients or sender email configured
+2025-09-09 00:18:45,075 - src.main - INFO - Starting web interface for development
+2025-09-09 00:18:46,272 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://localhost:5000
+2025-09-09 00:18:46,272 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-09-09 00:18:46,273 - werkzeug - INFO -  * Restarting with stat
+2025-09-09 00:18:47,150 - src.main - INFO - Logging initialized with level DEBUG
+2025-09-09 00:18:47,150 - src.main - INFO - Starting Automated Trading System in development mode
+2025-09-09 00:18:47,150 - src.main - INFO - Initializing components in development mode
+2025-09-09 00:18:47,154 - src.main - INFO - Database initialized
+2025-09-09 00:18:47,154 - src.main - INFO - Data provider manager initialized
+2025-09-09 00:18:47,154 - src.main - INFO - Initialized Simulator for development
+2025-09-09 00:18:47,154 - src.main - INFO - All components initialized
+2025-09-09 00:18:47,162 - src.main - INFO - Setting up trading workflow
+2025-09-09 00:18:47,163 - src.main - INFO - Scheduler started
+2025-09-09 00:18:47,163 - email_alerts.email_alerts - WARNING - Cannot send email: No recipients or sender email configured
+2025-09-09 00:18:47,163 - src.main - INFO - Starting web interface for development
+2025-09-09 00:18:47,229 - werkzeug - WARNING -  * Debugger is active!
+2025-09-09 00:18:47,234 - werkzeug - INFO -  * Debugger PIN: 192-285-858
+2025-09-09 00:19:59,903 - src.main - INFO - Logging initialized with level DEBUG
+2025-09-09 00:19:59,903 - src.main - INFO - Starting Automated Trading System in development mode
+2025-09-09 00:19:59,904 - src.main - INFO - Initializing components in development mode
+2025-09-09 00:19:59,907 - src.main - INFO - Database initialized
+2025-09-09 00:19:59,907 - src.main - INFO - Data provider manager initialized
+2025-09-09 00:19:59,907 - src.main - INFO - Initialized Simulator for development
+2025-09-09 00:19:59,907 - src.main - INFO - All components initialized
+2025-09-09 00:19:59,915 - src.main - INFO - Setting up trading workflow
+2025-09-09 00:19:59,916 - src.main - INFO - Scheduler started
+2025-09-09 00:19:59,916 - email_alerts.email_alerts - WARNING - Cannot send email: No recipients or sender email configured
+2025-09-09 00:19:59,916 - src.main - INFO - Starting web interface for development
+2025-09-09 00:19:59,989 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://localhost:5001
+2025-09-09 00:19:59,989 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-09-09 00:19:59,990 - werkzeug - INFO -  * Restarting with stat
+2025-09-09 00:20:00,437 - src.main - INFO - Logging initialized with level DEBUG
+2025-09-09 00:20:00,437 - src.main - INFO - Starting Automated Trading System in development mode
+2025-09-09 00:20:00,438 - src.main - INFO - Initializing components in development mode
+2025-09-09 00:20:00,441 - src.main - INFO - Database initialized
+2025-09-09 00:20:00,441 - src.main - INFO - Data provider manager initialized
+2025-09-09 00:20:00,442 - src.main - INFO - Initialized Simulator for development
+2025-09-09 00:20:00,442 - src.main - INFO - All components initialized
+2025-09-09 00:20:00,449 - src.main - INFO - Setting up trading workflow
+2025-09-09 00:20:00,450 - src.main - INFO - Scheduler started
+2025-09-09 00:20:00,450 - email_alerts.email_alerts - WARNING - Cannot send email: No recipients or sender email configured
+2025-09-09 00:20:00,450 - src.main - INFO - Starting web interface for development
+2025-09-09 00:20:00,490 - werkzeug - WARNING -  * Debugger is active!
+2025-09-09 00:20:00,495 - werkzeug - INFO -  * Debugger PIN: 192-285-858
+2025-09-09 00:20:14,012 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:20:14] "[35m[1mHEAD / HTTP/1.1[0m" 500 -
+2025-09-09 00:21:58,175 - src.main - INFO - Logging initialized with level DEBUG
+2025-09-09 00:21:58,175 - src.main - INFO - Starting Automated Trading System in development mode
+2025-09-09 00:21:58,175 - src.main - INFO - Initializing components in development mode
+2025-09-09 00:21:58,179 - src.main - INFO - Database initialized
+2025-09-09 00:21:58,179 - src.main - INFO - Data provider manager initialized
+2025-09-09 00:21:58,179 - src.main - INFO - Initialized Simulator for development
+2025-09-09 00:21:58,179 - src.main - INFO - All components initialized
+2025-09-09 00:21:58,186 - src.main - INFO - Setting up trading workflow
+2025-09-09 00:21:58,187 - src.main - INFO - Scheduler started
+2025-09-09 00:21:58,187 - email_alerts.email_alerts - WARNING - Cannot send email: No recipients or sender email configured
+2025-09-09 00:21:58,187 - src.main - INFO - Starting web interface for development
+2025-09-09 00:21:58,261 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://localhost:5001
+2025-09-09 00:21:58,261 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-09-09 00:21:58,262 - werkzeug - INFO -  * Restarting with stat
+2025-09-09 00:21:58,782 - src.main - INFO - Logging initialized with level DEBUG
+2025-09-09 00:21:58,782 - src.main - INFO - Starting Automated Trading System in development mode
+2025-09-09 00:21:58,782 - src.main - INFO - Initializing components in development mode
+2025-09-09 00:21:58,786 - src.main - INFO - Database initialized
+2025-09-09 00:21:58,786 - src.main - INFO - Data provider manager initialized
+2025-09-09 00:21:58,786 - src.main - INFO - Initialized Simulator for development
+2025-09-09 00:21:58,786 - src.main - INFO - All components initialized
+2025-09-09 00:21:58,794 - src.main - INFO - Setting up trading workflow
+2025-09-09 00:21:58,795 - src.main - INFO - Scheduler started
+2025-09-09 00:21:58,795 - email_alerts.email_alerts - WARNING - Cannot send email: No recipients or sender email configured
+2025-09-09 00:21:58,795 - src.main - INFO - Starting web interface for development
+2025-09-09 00:21:58,838 - werkzeug - WARNING -  * Debugger is active!
+2025-09-09 00:21:58,844 - werkzeug - INFO -  * Debugger PIN: 192-285-858
+2025-09-09 00:22:07,107 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:22:07] "GET / HTTP/1.1" 200 -
+2025-09-09 00:22:07,147 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:22:07] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
+2025-09-09 00:22:07,493 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:22:07] "[33mGET /api/dashboard/metrics HTTP/1.1[0m" 404 -
+2025-09-09 00:22:07,767 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:22:07] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2025-09-09 00:22:12,184 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:22:12] "GET /orders HTTP/1.1" 200 -
+2025-09-09 00:22:12,230 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:22:12] "GET /api/orders HTTP/1.1" 200 -
+2025-09-09 00:22:13,484 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:22:13] "GET /strategies HTTP/1.1" 200 -
+2025-09-09 00:22:13,508 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:22:13] "[33mGET /api/strategies HTTP/1.1[0m" 404 -
+2025-09-09 00:22:29,672 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:22:29] "GET /reports HTTP/1.1" 200 -
+2025-09-09 00:22:29,690 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:22:29] "[33mGET /api/reports/performance HTTP/1.1[0m" 404 -
+2025-09-09 00:22:36,567 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:22:36] "GET /alerts HTTP/1.1" 200 -
+2025-09-09 00:22:36,587 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:22:36] "[33mGET /api/alerts HTTP/1.1[0m" 404 -
+2025-09-09 00:22:39,565 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:22:39] "GET /settings HTTP/1.1" 200 -
+2025-09-09 00:22:39,586 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:22:39] "[33mGET /api/settings HTTP/1.1[0m" 404 -
+2025-09-09 00:23:03,333 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:23:03] "GET /alerts HTTP/1.1" 200 -
+2025-09-09 00:23:03,353 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:23:03] "[33mGET /api/alerts HTTP/1.1[0m" 404 -
+2025-09-09 00:23:04,314 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:23:04] "GET / HTTP/1.1" 200 -
+2025-09-09 00:23:04,337 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:23:04] "[33mGET /api/dashboard/metrics HTTP/1.1[0m" 404 -
+2025-09-09 00:23:08,843 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:23:08] "HEAD / HTTP/1.1" 200 -
+2025-09-09 00:23:34,341 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:23:34] "[33mGET /api/dashboard/metrics HTTP/1.1[0m" 404 -
+2025-09-09 00:24:01,493 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:24:01] "GET /positions HTTP/1.1" 200 -
+2025-09-09 00:24:01,527 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:24:01] "GET /api/positions HTTP/1.1" 200 -
+2025-09-09 00:24:03,222 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:24:03] "GET /orders HTTP/1.1" 200 -
+2025-09-09 00:24:03,246 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:24:03] "GET /api/orders HTTP/1.1" 200 -
+2025-09-09 00:24:04,387 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:24:04] "GET /strategies HTTP/1.1" 200 -
+2025-09-09 00:24:04,404 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:24:04] "[33mGET /api/strategies HTTP/1.1[0m" 404 -
+2025-09-09 00:24:13,033 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:24:13] "GET /reports HTTP/1.1" 200 -
+2025-09-09 00:24:13,054 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:24:13] "[33mGET /api/reports/performance HTTP/1.1[0m" 404 -
+2025-09-09 00:24:27,958 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:24:27] "GET /strategies HTTP/1.1" 200 -
+2025-09-09 00:24:27,986 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:24:27] "[33mGET /api/strategies HTTP/1.1[0m" 404 -
+2025-09-09 00:24:29,001 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:24:29] "GET /orders HTTP/1.1" 200 -
+2025-09-09 00:24:29,020 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:24:29] "GET /api/orders HTTP/1.1" 200 -
+2025-09-09 00:24:29,620 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:24:29] "GET /positions HTTP/1.1" 200 -
+2025-09-09 00:24:29,638 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:24:29] "GET /api/positions HTTP/1.1" 200 -
+2025-09-09 00:24:30,219 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:24:30] "GET / HTTP/1.1" 200 -
+2025-09-09 00:24:30,236 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:24:30] "[33mGET /api/dashboard/metrics HTTP/1.1[0m" 404 -
+2025-09-09 00:24:38,187 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:24:38] "GET /positions HTTP/1.1" 200 -
+2025-09-09 00:24:38,205 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:24:38] "GET /api/positions HTTP/1.1" 200 -
+2025-09-09 00:24:39,367 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:24:39] "GET /strategies HTTP/1.1" 200 -
+2025-09-09 00:24:39,386 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:24:39] "[33mGET /api/strategies HTTP/1.1[0m" 404 -
+2025-09-09 00:24:50,506 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:24:50] "GET /reports HTTP/1.1" 200 -
+2025-09-09 00:24:50,523 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:24:50] "[33mGET /api/reports/performance HTTP/1.1[0m" 404 -
+2025-09-09 00:28:13,927 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:28:13] "GET /reports HTTP/1.1" 200 -
+2025-09-09 00:28:13,975 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:28:13] "[33mGET /api/reports/performance HTTP/1.1[0m" 404 -
+2025-09-09 00:28:16,208 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:28:16] "GET /positions HTTP/1.1" 200 -
+2025-09-09 00:28:16,236 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:28:16] "GET /api/positions HTTP/1.1" 200 -
+2025-09-09 00:28:16,801 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:28:16] "GET / HTTP/1.1" 200 -
+2025-09-09 00:28:16,819 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:28:16] "[33mGET /api/dashboard/metrics HTTP/1.1[0m" 404 -
+2025-09-09 00:28:28,743 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:28:28] "GET /positions HTTP/1.1" 200 -
+2025-09-09 00:28:28,774 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:28:28] "GET /api/positions HTTP/1.1" 200 -
+2025-09-09 00:28:29,387 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:28:29] "GET /orders HTTP/1.1" 200 -
+2025-09-09 00:28:29,409 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:28:29] "GET /api/orders HTTP/1.1" 200 -
+2025-09-09 00:28:30,535 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:28:30] "GET /strategies HTTP/1.1" 200 -
+2025-09-09 00:28:30,555 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:28:30] "[33mGET /api/strategies HTTP/1.1[0m" 404 -
+2025-09-09 00:28:32,620 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:28:32] "GET /reports HTTP/1.1" 200 -
+2025-09-09 00:28:32,639 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:28:32] "[33mGET /api/reports/performance HTTP/1.1[0m" 404 -
+2025-09-09 00:28:33,727 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:28:33] "GET /orders HTTP/1.1" 200 -
+2025-09-09 00:28:33,751 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:28:33] "GET /api/orders HTTP/1.1" 200 -
+2025-09-09 00:30:55,652 - werkzeug - INFO -  * Detected change in '/Users/manip/Documents/codeRepo/poc/StockExperiment/src/web/app.py', reloading
+2025-09-09 00:30:55,766 - werkzeug - INFO -  * Restarting with stat
+2025-09-09 00:30:56,575 - src.main - INFO - Logging initialized with level DEBUG
+2025-09-09 00:30:56,575 - src.main - INFO - Starting Automated Trading System in development mode
+2025-09-09 00:30:56,575 - src.main - INFO - Initializing components in development mode
+2025-09-09 00:30:56,582 - src.main - INFO - Database initialized
+2025-09-09 00:30:56,582 - src.main - INFO - Data provider manager initialized
+2025-09-09 00:30:56,582 - src.main - INFO - Initialized Simulator for development
+2025-09-09 00:30:56,582 - src.main - INFO - All components initialized
+2025-09-09 00:30:56,589 - src.main - INFO - Setting up trading workflow
+2025-09-09 00:30:56,590 - src.main - INFO - Scheduler started
+2025-09-09 00:30:56,590 - email_alerts.email_alerts - WARNING - Cannot send email: No recipients or sender email configured
+2025-09-09 00:30:56,590 - src.main - INFO - Starting web interface for development
+2025-09-09 00:30:56,663 - werkzeug - WARNING -  * Debugger is active!
+2025-09-09 00:30:56,672 - werkzeug - INFO -  * Debugger PIN: 192-285-858
+2025-09-09 00:31:50,998 - werkzeug - INFO -  * Detected change in '/Users/manip/Documents/codeRepo/poc/StockExperiment/src/selector/selector_engine.py', reloading
+2025-09-09 00:31:51,110 - werkzeug - INFO -  * Restarting with stat
+2025-09-09 00:31:51,699 - src.main - INFO - Logging initialized with level DEBUG
+2025-09-09 00:31:51,699 - src.main - INFO - Starting Automated Trading System in development mode
+2025-09-09 00:31:51,699 - src.main - INFO - Initializing components in development mode
+2025-09-09 00:31:51,704 - src.main - INFO - Database initialized
+2025-09-09 00:31:51,704 - src.main - INFO - Data provider manager initialized
+2025-09-09 00:31:51,704 - src.main - INFO - Initialized Simulator for development
+2025-09-09 00:31:51,704 - src.main - INFO - All components initialized
+2025-09-09 00:31:51,711 - src.main - INFO - Setting up trading workflow
+2025-09-09 00:31:51,711 - src.main - INFO - Scheduler started
+2025-09-09 00:31:51,712 - email_alerts.email_alerts - WARNING - Cannot send email: No recipients or sender email configured
+2025-09-09 00:31:51,712 - src.main - INFO - Starting web interface for development
+2025-09-09 00:31:51,778 - werkzeug - WARNING -  * Debugger is active!
+2025-09-09 00:31:51,785 - werkzeug - INFO -  * Debugger PIN: 192-285-858
+2025-09-09 00:32:13,430 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:32:13] "GET /orders HTTP/1.1" 200 -
+2025-09-09 00:32:13,477 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:32:13] "GET /api/orders HTTP/1.1" 200 -
+2025-09-09 00:32:14,570 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:32:14] "GET / HTTP/1.1" 200 -
+2025-09-09 00:32:14,620 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:32:14] "GET /api/dashboard/metrics HTTP/1.1" 200 -
+2025-09-09 00:32:17,490 - werkzeug - INFO -  * Detected change in '/Users/manip/Documents/codeRepo/poc/StockExperiment/src/data_provider/yfinance_provider.py', reloading
+2025-09-09 00:32:17,589 - werkzeug - INFO -  * Restarting with stat
+2025-09-09 00:32:18,144 - src.main - INFO - Logging initialized with level DEBUG
+2025-09-09 00:32:18,144 - src.main - INFO - Starting Automated Trading System in development mode
+2025-09-09 00:32:18,144 - src.main - INFO - Initializing components in development mode
+2025-09-09 00:32:18,150 - src.main - INFO - Database initialized
+2025-09-09 00:32:18,150 - src.main - INFO - Data provider manager initialized
+2025-09-09 00:32:18,150 - src.main - INFO - Initialized Simulator for development
+2025-09-09 00:32:18,150 - src.main - INFO - All components initialized
+2025-09-09 00:32:18,157 - src.main - INFO - Setting up trading workflow
+2025-09-09 00:32:18,158 - src.main - INFO - Scheduler started
+2025-09-09 00:32:18,158 - email_alerts.email_alerts - WARNING - Cannot send email: No recipients or sender email configured
+2025-09-09 00:32:18,158 - src.main - INFO - Starting web interface for development
+2025-09-09 00:32:18,224 - werkzeug - WARNING -  * Debugger is active!
+2025-09-09 00:32:18,228 - werkzeug - INFO -  * Debugger PIN: 192-285-858
+2025-09-09 00:32:29,497 - werkzeug - INFO -  * Detected change in '/Users/manip/Documents/codeRepo/poc/StockExperiment/src/selector/momentum_strategy.py', reloading
+2025-09-09 00:32:29,585 - werkzeug - INFO -  * Restarting with stat
+2025-09-09 00:32:30,132 - src.main - INFO - Logging initialized with level DEBUG
+2025-09-09 00:32:30,132 - src.main - INFO - Starting Automated Trading System in development mode
+2025-09-09 00:32:30,132 - src.main - INFO - Initializing components in development mode
+2025-09-09 00:32:30,138 - src.main - INFO - Database initialized
+2025-09-09 00:32:30,138 - src.main - INFO - Data provider manager initialized
+2025-09-09 00:32:30,138 - src.main - INFO - Initialized Simulator for development
+2025-09-09 00:32:30,138 - src.main - INFO - All components initialized
+2025-09-09 00:32:30,144 - src.main - INFO - Setting up trading workflow
+2025-09-09 00:32:30,145 - src.main - INFO - Scheduler started
+2025-09-09 00:32:30,145 - email_alerts.email_alerts - WARNING - Cannot send email: No recipients or sender email configured
+2025-09-09 00:32:30,145 - src.main - INFO - Starting web interface for development
+2025-09-09 00:32:30,213 - werkzeug - WARNING -  * Debugger is active!
+2025-09-09 00:32:30,219 - werkzeug - INFO -  * Debugger PIN: 192-285-858
+2025-09-09 00:32:39,327 - src.main - INFO - Logging initialized with level DEBUG
+2025-09-09 00:32:39,327 - src.main - INFO - Starting Automated Trading System in development mode
+2025-09-09 00:32:39,327 - src.main - INFO - Initializing components in development mode
+2025-09-09 00:32:39,333 - src.main - INFO - Database initialized
+2025-09-09 00:32:39,333 - src.main - INFO - Data provider manager initialized
+2025-09-09 00:32:39,333 - src.main - INFO - Initialized Simulator for development
+2025-09-09 00:32:39,333 - src.main - INFO - All components initialized
+2025-09-09 00:32:39,341 - src.main - INFO - Setting up trading workflow
+2025-09-09 00:32:39,342 - src.main - INFO - Scheduler started
+2025-09-09 00:32:39,342 - email_alerts.email_alerts - WARNING - Cannot send email: No recipients or sender email configured
+2025-09-09 00:32:39,342 - src.main - INFO - Starting web interface for development
+2025-09-09 00:32:44,644 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:32:44] "GET /api/dashboard/metrics HTTP/1.1" 200 -
+2025-09-09 00:32:53,563 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:32:53] "GET /positions HTTP/1.1" 200 -
+2025-09-09 00:32:53,584 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:32:53] "GET /api/positions HTTP/1.1" 200 -
+2025-09-09 00:33:07,596 - src.main - INFO - Logging initialized with level DEBUG
+2025-09-09 00:33:07,596 - src.main - INFO - Starting Automated Trading System in development mode
+2025-09-09 00:33:07,596 - src.main - INFO - Initializing components in development mode
+2025-09-09 00:33:07,601 - src.main - INFO - Database initialized
+2025-09-09 00:33:07,601 - src.main - INFO - Data provider manager initialized
+2025-09-09 00:33:07,601 - src.main - INFO - Initialized Simulator for development
+2025-09-09 00:33:07,601 - src.main - INFO - All components initialized
+2025-09-09 00:33:07,608 - src.main - INFO - Setting up trading workflow
+2025-09-09 00:33:07,609 - src.main - INFO - Scheduler started
+2025-09-09 00:33:07,609 - email_alerts.email_alerts - WARNING - Cannot send email: No recipients or sender email configured
+2025-09-09 00:33:07,609 - src.main - INFO - Starting web interface for development
+2025-09-09 00:33:07,673 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://localhost:5001
+2025-09-09 00:33:07,673 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-09-09 00:33:07,673 - werkzeug - INFO -  * Restarting with stat
+2025-09-09 00:33:08,150 - src.main - INFO - Logging initialized with level DEBUG
+2025-09-09 00:33:08,150 - src.main - INFO - Starting Automated Trading System in development mode
+2025-09-09 00:33:08,150 - src.main - INFO - Initializing components in development mode
+2025-09-09 00:33:08,154 - src.main - INFO - Database initialized
+2025-09-09 00:33:08,154 - src.main - INFO - Data provider manager initialized
+2025-09-09 00:33:08,154 - src.main - INFO - Initialized Simulator for development
+2025-09-09 00:33:08,154 - src.main - INFO - All components initialized
+2025-09-09 00:33:08,161 - src.main - INFO - Setting up trading workflow
+2025-09-09 00:33:08,162 - src.main - INFO - Scheduler started
+2025-09-09 00:33:08,162 - email_alerts.email_alerts - WARNING - Cannot send email: No recipients or sender email configured
+2025-09-09 00:33:08,162 - src.main - INFO - Starting web interface for development
+2025-09-09 00:33:08,199 - werkzeug - WARNING -  * Debugger is active!
+2025-09-09 00:33:08,207 - werkzeug - INFO -  * Debugger PIN: 835-027-362
+2025-09-09 00:33:10,532 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:33:10] "GET / HTTP/1.1" 200 -
+2025-09-09 00:33:10,590 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:33:10] "GET /api/dashboard/metrics HTTP/1.1" 200 -
+2025-09-09 00:33:12,884 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:33:12] "GET /positions HTTP/1.1" 200 -
+2025-09-09 00:33:12,903 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:33:12] "GET /api/positions HTTP/1.1" 200 -
+2025-09-09 00:33:13,985 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:33:13] "GET /orders HTTP/1.1" 200 -
+2025-09-09 00:33:14,003 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:33:14] "GET /api/orders HTTP/1.1" 200 -
+2025-09-09 00:33:14,683 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:33:14] "GET /strategies HTTP/1.1" 200 -
+2025-09-09 00:33:14,700 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:33:14] "[33mGET /api/strategies HTTP/1.1[0m" 404 -
+2025-09-09 00:33:16,062 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:33:16] "GET /reports HTTP/1.1" 200 -
+2025-09-09 00:33:16,081 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:33:16] "[33mGET /api/reports/performance HTTP/1.1[0m" 404 -
+2025-09-09 00:33:16,668 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:33:16] "GET /alerts HTTP/1.1" 200 -
+2025-09-09 00:33:16,690 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:33:16] "[33mGET /api/alerts HTTP/1.1[0m" 404 -
+2025-09-09 00:33:17,256 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:33:17] "GET /settings HTTP/1.1" 200 -
+2025-09-09 00:33:17,274 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:33:17] "[33mGET /api/settings HTTP/1.1[0m" 404 -
+2025-09-09 00:33:19,631 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:33:19] "GET /reports HTTP/1.1" 200 -
+2025-09-09 00:33:19,660 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:33:19] "[33mGET /api/reports/performance HTTP/1.1[0m" 404 -
+2025-09-09 00:33:21,826 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:33:21] "GET / HTTP/1.1" 200 -
+2025-09-09 00:33:21,862 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:33:21] "GET /api/dashboard/metrics HTTP/1.1" 200 -
+2025-09-09 00:33:39,593 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:33:39] "GET /positions HTTP/1.1" 200 -
+2025-09-09 00:33:39,626 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:33:39] "GET /api/positions HTTP/1.1" 200 -
+2025-09-09 00:33:40,367 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:33:40] "GET /orders HTTP/1.1" 200 -
+2025-09-09 00:33:40,386 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:33:40] "GET /api/orders HTTP/1.1" 200 -
+2025-09-09 00:34:23,388 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:34:23] "GET /positions HTTP/1.1" 200 -
+2025-09-09 00:34:23,421 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:34:23] "GET /api/positions HTTP/1.1" 200 -
+2025-09-09 00:34:43,615 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:34:43] "GET / HTTP/1.1" 200 -
+2025-09-09 00:34:43,681 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:34:43] "GET /api/dashboard/metrics HTTP/1.1" 200 -
+2025-09-09 00:35:13,677 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:35:13] "GET /api/dashboard/metrics HTTP/1.1" 200 -
+2025-09-09 00:35:26,281 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:35:26] "GET /positions HTTP/1.1" 200 -
+2025-09-09 00:35:26,380 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:35:26] "GET /api/positions HTTP/1.1" 200 -
+2025-09-09 00:35:27,371 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:35:27] "GET /orders HTTP/1.1" 200 -
+2025-09-09 00:35:27,388 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:35:27] "GET /api/orders HTTP/1.1" 200 -
+2025-09-09 00:35:28,156 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:35:28] "GET /strategies HTTP/1.1" 200 -
+2025-09-09 00:35:28,176 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:35:28] "[33mGET /api/strategies HTTP/1.1[0m" 404 -
+2025-09-09 00:35:29,606 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:35:29] "GET /reports HTTP/1.1" 200 -
+2025-09-09 00:35:29,626 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:35:29] "[33mGET /api/reports/performance HTTP/1.1[0m" 404 -
+2025-09-09 00:35:31,018 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:35:31] "GET /alerts HTTP/1.1" 200 -
+2025-09-09 00:35:31,037 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:35:31] "[33mGET /api/alerts HTTP/1.1[0m" 404 -
+2025-09-09 00:35:32,447 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:35:32] "GET /settings HTTP/1.1" 200 -
+2025-09-09 00:35:32,470 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 00:35:32] "[33mGET /api/settings HTTP/1.1[0m" 404 -
+2025-09-09 00:35:59,117 - werkzeug - INFO -  * Detected change in '/Users/manip/Documents/codeRepo/poc/StockExperiment/src/datastore/models.py', reloading
+2025-09-09 00:35:59,255 - werkzeug - INFO -  * Restarting with stat
+2025-09-09 00:36:00,112 - src.main - INFO - Logging initialized with level DEBUG
+2025-09-09 00:36:00,112 - src.main - INFO - Starting Automated Trading System in development mode
+2025-09-09 00:36:00,112 - src.main - INFO - Initializing components in development mode
+2025-09-09 00:36:00,121 - src.main - INFO - Database initialized
+2025-09-09 00:36:00,121 - src.main - INFO - Data provider manager initialized
+2025-09-09 00:36:00,121 - src.main - INFO - Initialized Simulator for development
+2025-09-09 00:36:00,121 - src.main - INFO - All components initialized
+2025-09-09 00:36:00,129 - src.main - INFO - Setting up trading workflow
+2025-09-09 00:36:00,130 - src.main - INFO - Scheduler started
+2025-09-09 00:36:00,130 - email_alerts.email_alerts - WARNING - Cannot send email: No recipients or sender email configured
+2025-09-09 00:36:00,130 - src.main - INFO - Starting web interface for development
+2025-09-09 00:36:00,194 - werkzeug - WARNING -  * Debugger is active!
+2025-09-09 00:36:00,201 - werkzeug - INFO -  * Debugger PIN: 835-027-362
+2025-09-09 00:36:15,458 - werkzeug - INFO -  * Detected change in '/Users/manip/Documents/codeRepo/poc/StockExperiment/src/web/app.py', reloading
+2025-09-09 00:36:15,551 - werkzeug - INFO -  * Restarting with stat
+2025-09-09 00:36:16,229 - src.main - INFO - Logging initialized with level DEBUG
+2025-09-09 00:36:16,229 - src.main - INFO - Starting Automated Trading System in development mode
+2025-09-09 00:36:16,229 - src.main - INFO - Initializing components in development mode
+2025-09-09 00:36:16,235 - src.main - INFO - Database initialized
+2025-09-09 00:36:16,235 - src.main - INFO - Data provider manager initialized
+2025-09-09 00:36:16,235 - src.main - INFO - Initialized Simulator for development
+2025-09-09 00:36:16,235 - src.main - INFO - All components initialized
+2025-09-09 00:36:16,242 - src.main - INFO - Setting up trading workflow
+2025-09-09 00:36:16,243 - src.main - INFO - Scheduler started
+2025-09-09 00:36:16,243 - email_alerts.email_alerts - WARNING - Cannot send email: No recipients or sender email configured
+2025-09-09 00:36:16,243 - src.main - INFO - Starting web interface for development
+2025-09-09 00:36:16,299 - werkzeug - WARNING -  * Debugger is active!
+2025-09-09 00:36:16,306 - werkzeug - INFO -  * Debugger PIN: 835-027-362
+2025-09-09 00:36:37,648 - werkzeug - INFO -  * Detected change in '/Users/manip/Documents/codeRepo/poc/StockExperiment/src/web/app.py', reloading
+2025-09-09 00:36:37,757 - werkzeug - INFO -  * Restarting with stat
+2025-09-09 00:36:38,517 - src.main - INFO - Logging initialized with level DEBUG
+2025-09-09 00:36:38,517 - src.main - INFO - Starting Automated Trading System in development mode
+2025-09-09 00:36:38,517 - src.main - INFO - Initializing components in development mode
+2025-09-09 00:36:38,523 - src.main - INFO - Database initialized
+2025-09-09 00:36:38,523 - src.main - INFO - Data provider manager initialized
+2025-09-09 00:36:38,523 - src.main - INFO - Initialized Simulator for development
+2025-09-09 00:36:38,523 - src.main - INFO - All components initialized
+2025-09-09 00:36:38,530 - src.main - INFO - Setting up trading workflow
+2025-09-09 00:36:38,531 - src.main - INFO - Scheduler started
+2025-09-09 00:36:38,531 - email_alerts.email_alerts - WARNING - Cannot send email: No recipients or sender email configured
+2025-09-09 00:36:38,532 - src.main - INFO - Starting web interface for development
+2025-09-09 00:36:38,585 - src.main - ERROR - Failed to start web interface: View function mapping is overwriting an existing endpoint function: selected_stocks
+2025-09-09 00:40:40,475 - src.main - INFO - Logging initialized with level DEBUG
+2025-09-09 00:40:40,476 - src.main - INFO - Starting Automated Trading System in development mode
+2025-09-09 00:40:40,476 - src.main - INFO - Initializing components in development mode
+2025-09-09 00:40:40,481 - src.main - INFO - Database initialized
+2025-09-09 00:40:40,481 - src.main - INFO - Data provider manager initialized
+2025-09-09 00:40:40,481 - src.main - INFO - Initialized Simulator for development
+2025-09-09 00:40:40,482 - src.main - INFO - All components initialized
+2025-09-09 00:40:40,488 - src.main - INFO - Setting up trading workflow
+2025-09-09 00:40:40,489 - src.main - INFO - Scheduler started
+2025-09-09 00:40:40,489 - email_alerts.email_alerts - WARNING - Cannot send email: No recipients or sender email configured
+2025-09-09 00:40:40,489 - src.main - INFO - Starting web interface for development
+2025-09-09 00:40:40,544 - src.main - ERROR - Failed to start web interface: View function mapping is overwriting an existing endpoint function: selected_stocks

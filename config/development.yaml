@@ -1,0 +1,32 @@
+# Development environment configuration
+
+# Inherit from base configuration
+extends: "base"
+
+# Override settings for development
+system:
+  log_level: "DEBUG"
+
+trading:
+  modes:
+    development:
+      live_trading: false
+
+# Database settings for development
+database:
+  host: "localhost"
+  port: 5432
+  name: "trading_system_dev"
+  user: "trader_dev"
+
+# Web interface settings for development
+web:
+  host: "localhost"
+  port: 5001
+  debug: true
+
+# Risk management (more relaxed for development)
+risk:
+  max_capital_per_trade: 0.02  # 2% of equity
+  max_concurrent_trades: 5
+  daily_loss_limit: 0.05  # 5% of equity
