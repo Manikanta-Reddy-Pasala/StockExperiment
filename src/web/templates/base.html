@@ -85,7 +85,7 @@
         .dark-theme .table td {
             background-color: #1e1e1e;
             border-color: #444;
-            color: #e0e0e0;
+            color: #e0e0e0 !important;
         }
         .dark-theme .table-hover tbody tr:hover {
             color: #e0e0e0;
@@ -194,6 +194,14 @@
         .dark-theme .badge.bg-primary {
             background-color: #81b3ff !important;
         }
+        /* Dark theme styles for active nav link */
+        .dark-theme .nav-link.active, .dark-theme .nav-link.active:hover, .dark-theme .nav-link.active:focus {
+            background-color: #0d6efd !important;
+            color: white !important;
+        }
+        .dark-theme .nav-link:hover {
+            background-color: #2d2d2d;
+        }
     </style>
 </head>
 <body>
@@ -250,7 +258,7 @@
             <!-- Main content -->
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">{% block page_title %}Dashboard{% endblock %}</h1>
+                    <h1 class="h2">{% block page_title %}{{ self.title() }}{% endblock %}</h1>
                     <div class="btn-toolbar mb-2 mb-md-0">
                         <div class="btn-group me-2">
                             <button type="button" class="btn btn-sm btn-outline-secondary" id="theme-toggle">
@@ -299,6 +307,42 @@
                     icon.classList.add('bi-moon');
                     themeToggle.innerHTML = '<i class="bi bi-moon"></i> Dark Mode';
                 }
+            });
+            
+            // Handle active state for navigation links
+            const navLinks = document.querySelectorAll('.nav-link');
+            const currentPage = window.location.pathname;
+            
+            // Remove active class from all links first
+            navLinks.forEach(navLink => {
+                navLink.classList.remove('active');
+            });
+            
+            // Set the active link based on current page
+            navLinks.forEach(link => {
+                // For the dashboard link, we need to check both '/' and '/dashboard' (if that's a valid route)
+                if (link.getAttribute('href') === '/' && currentPage === '/') {
+                    link.classList.add('active');
+                } 
+                // For other links, check if the href matches the beginning of the current path
+                else if (currentPage.startsWith(link.getAttribute('href')) && link.getAttribute('href') !== '/') {
+                    link.classList.add('active');
+                }
+                // Fallback for exact matches
+                else if (link.getAttribute('href') === currentPage) {
+                    link.classList.add('active');
+                }
+                
+                // Add click event to update active state
+                link.addEventListener('click', function(e) {
+                    // Remove active class from all links
+                    navLinks.forEach(navLink => {
+                        navLink.classList.remove('active');
+                    });
+                    
+                    // Add active class to clicked link
+                    this.classList.add('active');
+                });
             });
         });
     </script>

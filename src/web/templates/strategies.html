@@ -375,6 +375,8 @@
     document.addEventListener('DOMContentLoaded', function() {
         fetchStrategies();
         initStrategyChart();
+        // Refresh every 30 seconds
+        setInterval(fetchStrategies, 30000);
     });
 </script>
 {% endblock %}

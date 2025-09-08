@@ -639,11 +639,24 @@
         alert('Equity curve refreshed!');
     });
     
+    // Fetch reports data
+    async function fetchReportsData() {
+        try {
+            // In a real implementation, this would fetch updated data from the server
+            console.log('Fetching updated reports data...');
+            // This is where you would update the various charts and tables with fresh data
+        } catch (error) {
+            console.error('Error fetching reports data:', error);
+        }
+    }
+    
     // Fetch data when page loads
     document.addEventListener('DOMContentLoaded', function() {
         initEquityCurveChart();
         initSectorExposureChart();
         initStrategyComparisonChart();
+        // Refresh every 30 seconds
+        setInterval(fetchReportsData, 30000);
     });
 </script>
 {% endblock %}
