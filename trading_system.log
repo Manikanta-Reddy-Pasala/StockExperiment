@@ -348,3 +348,15 @@
 2025-09-09 00:40:40,489 - email_alerts.email_alerts - WARNING - Cannot send email: No recipients or sender email configured
 2025-09-09 00:40:40,489 - src.main - INFO - Starting web interface for development
 2025-09-09 00:40:40,544 - src.main - ERROR - Failed to start web interface: View function mapping is overwriting an existing endpoint function: selected_stocks
+2025-09-09 00:49:56,297 - src.main - INFO - Logging initialized with level DEBUG
+2025-09-09 00:49:56,297 - src.main - INFO - Starting Automated Trading System in development mode
+2025-09-09 00:49:56,297 - src.main - INFO - Initializing components in development mode
+2025-09-09 00:49:56,304 - src.main - INFO - Database initialized
+2025-09-09 00:49:56,304 - src.main - INFO - Data provider manager initialized
+2025-09-09 00:49:56,304 - src.main - INFO - Initialized Simulator for development
+2025-09-09 00:49:56,304 - src.main - INFO - All components initialized
+2025-09-09 00:49:56,313 - src.main - INFO - Setting up trading workflow
+2025-09-09 00:49:56,316 - src.main - INFO - Scheduler started
+2025-09-09 00:49:56,316 - email_alerts.email_alerts - WARNING - Cannot send email: No recipients or sender email configured
+2025-09-09 00:49:56,316 - src.main - INFO - Starting web interface for development
+2025-09-09 00:49:56,373 - src.main - ERROR - Failed to start web interface: View function mapping is overwriting an existing endpoint function: selected_stocks
