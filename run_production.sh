@@ -53,5 +53,5 @@ print('Database tables created successfully')
 
 # Start the application in production mode
 echo "Starting application in production mode..."
-echo "Access the web interface at http://localhost:5000"
+echo "Access the web interface at http://localhost:8000"
 python run.py --mode production --config production

@@ -3,6 +3,30 @@
 {% block title %}Positions{% endblock %}
 
 {% block content %}
+<style>
+    .chart-container {
+        position: relative;
+        height: 200px;
+        width: 100%;
+        margin: 0 auto;
+    }
+    .allocation-card {
+        transition: transform 0.2s ease-in-out;
+        height: 100%;
+    }
+    .allocation-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+    .chart-wrapper {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100%;
+        padding: 10px;
+    }
+</style>
+
 <div class="row g-4 mb-4">
     <div class="col-md-4">
         <div class="card border-success border-2 shadow-sm">
@@ -89,13 +113,17 @@
 </div>
 
 <div class="row g-4 mt-2">
-    <div class="col-md-12">
-        <div class="card shadow-sm">
+    <div class="col-md-4 mx-auto">
+        <div class="card shadow-sm allocation-card">
             <div class="card-header bg-white">
                 <h5 class="card-title mb-0">Portfolio Allocation</h5>
             </div>
             <div class="card-body">
-                <canvas id="allocation-chart" height="100"></canvas>
+                <div class="chart-wrapper">
+                    <div class="chart-container">
+                        <canvas id="allocation-chart"></canvas>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -157,35 +185,107 @@
     // Initialize allocation chart
     function initAllocationChart() {
         const ctx = document.getElementById('allocation-chart').getContext('2d');
+        
+        // Check if dark mode is enabled
+        const isDarkMode = document.body.classList.contains('dark-theme');
+        
+        // Define colors based on theme
+        const backgroundColors = isDarkMode ? [
+            'rgba(37, 139, 255, 0.9)',    // Brighter blue
+            'rgba(76, 201, 100, 0.9)',    // Brighter green
+            'rgba(255, 215, 0, 0.9)',     // Brighter yellow
+            'rgba(255, 107, 107, 0.9)',   // Brighter red
+            'rgba(169, 169, 169, 0.9)'    // Brighter gray
+        ] : [
+            'rgba(13, 110, 253, 0.8)',
+            'rgba(40, 167, 69, 0.8)',
+            'rgba(255, 193, 7, 0.8)',
+            'rgba(220, 53, 69, 0.8)',
+            'rgba(108, 117, 125, 0.8)'
+        ];
+        
+        const borderColors = isDarkMode ? [
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)'
+        ] : [
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)'
+        ];
+        
         const chart = new Chart(ctx, {
             type: 'doughnut',
             data: {
                 labels: ['RELIANCE', 'TCS', 'INFY', 'HDFC', 'ICICI'],
                 datasets: [{
                     data: [30, 25, 20, 15, 10],
-                    backgroundColor: [
-                        'rgba(13, 110, 253, 0.8)',
-                        'rgba(40, 167, 69, 0.8)',
-                        'rgba(255, 193, 7, 0.8)',
-                        'rgba(220, 53, 69, 0.8)',
-                        'rgba(108, 117, 125, 0.8)'
-                    ],
-                    borderColor: [
-                        'rgba(13, 110, 253, 1)',
-                        'rgba(40, 167, 69, 1)',
-                        'rgba(255, 193, 7, 1)',
-                        'rgba(220, 53, 69, 1)',
-                        'rgba(108, 117, 125, 1)'
-                    ],
-                    borderWidth: 1
+                    backgroundColor: backgroundColors,
+                    borderColor: borderColors,
+                    borderWidth: 2,
+                    hoverOffset: 10,
+                    borderRadius: 3
                 }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: true,
+                cutout: '70%',
                 plugins: {
                     legend: {
-                        position: 'right',
+                        position: 'bottom',
+                        labels: {
+                            padding: 10,
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            font: {
+                                size: 10
+                            },
+                            color: isDarkMode ? '#e0e0e0' : '#000'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: isDarkMode ? 'rgba(40, 40, 40, 0.9)' : 'rgba(0, 0, 0, 0.8)',
+                        titleFont: {
+                            size: 12
+                        },
+                        bodyFont: {
+                            size: 11
+                        },
+                        padding: 8,
+                        callbacks: {
+                            label: function(context) {
+                                return context.label + ': ' + context.parsed + '%';
+                            }
+                        },
+                        titleColor: isDarkMode ? '#ffffff' : '#ffffff',
+                        bodyColor: isDarkMode ? '#e0e0e0' : '#ffffff'
+                    },
+                    datalabels: {
+                        color: isDarkMode ? '#ffffff' : '#fff',
+                        formatter: (value, ctx) => {
+                            let sum = 0;
+                            let dataArr = ctx.chart.data.datasets[0].data;
+                            dataArr.map(data => {
+                                sum += data;
+                            });
+                            let percentage = (value * 100 / sum).toFixed(1) + "%";
+                            return percentage;
+                        },
+                        font: {
+                            weight: 'bold',
+                            size: 12
+                        }
                     }
+                },
+                animation: {
+                    animateRotate: true,
+                    animateScale: true,
+                    duration: 800
                 }
             }
         });

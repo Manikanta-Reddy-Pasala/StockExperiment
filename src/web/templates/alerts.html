@@ -3,6 +3,30 @@
 {% block title %}Alerts{% endblock %}
 
 {% block content %}
+<style>
+    .chart-container {
+        position: relative;
+        height: 200px;
+        width: 100%;
+        margin: 0 auto;
+    }
+    .alert-card {
+        transition: transform 0.2s ease-in-out;
+        height: 100%;
+    }
+    .alert-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+    .chart-wrapper {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100%;
+        padding: 10px;
+    }
+</style>
+
 <div class="row g-4 mb-4">
     <div class="col-md-3">
         <div class="card border-danger border-2 shadow-sm">
@@ -122,12 +146,16 @@
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card shadow-sm">
+        <div class="card shadow-sm alert-card">
             <div class="card-header bg-white">
                 <h5 class="card-title mb-0">Alert Distribution</h5>
             </div>
             <div class="card-body">
-                <canvas id="alerts-distribution-chart" height="150"></canvas>
+                <div class="chart-wrapper">
+                    <div class="chart-container">
+                        <canvas id="alerts-distribution-chart"></canvas>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -205,6 +233,19 @@
     // Initialize alerts trend chart
     function initAlertsTrendChart() {
         const ctx = document.getElementById('alerts-trend-chart').getContext('2d');
+        
+        // Check if dark mode is enabled
+        const isDarkMode = document.body.classList.contains('dark-theme');
+        
+        // Define colors based on theme
+        const criticalBorderColor = isDarkMode ? 'rgb(255, 107, 107)' : 'rgb(220, 53, 69)';
+        const criticalBgColor = isDarkMode ? 'rgba(255, 107, 107, 0.2)' : 'rgba(220, 53, 69, 0.1)';
+        const warningBorderColor = isDarkMode ? 'rgb(255, 215, 0)' : 'rgb(255, 193, 7)';
+        const warningBgColor = isDarkMode ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255, 193, 7, 0.1)';
+        const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+        const textColor = isDarkMode ? '#e0e0e0' : '#000';
+        const tooltipBgColor = isDarkMode ? 'rgba(40, 40, 40, 0.9)' : 'rgba(0, 0, 0, 0.8)';
+        
         const chart = new Chart(ctx, {
             type: 'line',
             data: {
@@ -212,15 +253,15 @@
                 datasets: [{
                     label: 'Critical Alerts',
                     data: [1, 2, 0, 1, 3, 2, 1],
-                    borderColor: 'rgb(220, 53, 69)',
-                    backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                    borderColor: criticalBorderColor,
+                    backgroundColor: criticalBgColor,
                     tension: 0.3,
                     fill: true
                 }, {
                     label: 'Warning Alerts',
                     data: [2, 1, 3, 2, 1, 0, 2],
-                    borderColor: 'rgb(255, 193, 7)',
-                    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                    borderColor: warningBorderColor,
+                    backgroundColor: warningBgColor,
                     tension: 0.3,
                     fill: true
                 }]
@@ -230,6 +271,21 @@
                 plugins: {
                     legend: {
                         position: 'top',
+                        labels: {
+                            color: textColor
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: tooltipBgColor,
+                        titleFont: {
+                            size: 12
+                        },
+                        bodyFont: {
+                            size: 11
+                        },
+                        padding: 8,
+                        titleColor: isDarkMode ? '#ffffff' : '#ffffff',
+                        bodyColor: isDarkMode ? '#e0e0e0' : '#ffffff'
                     }
                 },
                 scales: {
@@ -237,13 +293,27 @@
                         beginAtZero: true,
                         title: {
                             display: true,
-                            text: 'Number of Alerts'
+                            text: 'Number of Alerts',
+                            color: textColor
+                        },
+                        grid: {
+                            color: gridColor
+                        },
+                        ticks: {
+                            color: textColor
                         }
                     },
                     x: {
                         title: {
                             display: true,
-                            text: 'Day'
+                            text: 'Day',
+                            color: textColor
+                        },
+                        grid: {
+                            color: gridColor
+                        },
+                        ticks: {
+                            color: textColor
                         }
                     }
                 }
@@ -254,35 +324,107 @@
     // Initialize alerts distribution chart
     function initAlertsDistributionChart() {
         const ctx = document.getElementById('alerts-distribution-chart').getContext('2d');
+        
+        // Check if dark mode is enabled
+        const isDarkMode = document.body.classList.contains('dark-theme');
+        
+        // Define colors based on theme
+        const backgroundColors = isDarkMode ? [
+            'rgba(37, 139, 255, 0.9)',    // Brighter blue
+            'rgba(76, 201, 100, 0.9)',    // Brighter green
+            'rgba(255, 215, 0, 0.9)',     // Brighter yellow
+            'rgba(169, 169, 169, 0.9)',   // Brighter gray
+            'rgba(255, 107, 107, 0.9)'    // Brighter red
+        ] : [
+            'rgba(13, 110, 253, 0.8)',
+            'rgba(40, 167, 69, 0.8)',
+            'rgba(255, 193, 7, 0.8)',
+            'rgba(108, 117, 125, 0.8)',
+            'rgba(220, 53, 69, 0.8)'
+        ];
+        
+        const borderColors = isDarkMode ? [
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)'
+        ] : [
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)'
+        ];
+        
         const chart = new Chart(ctx, {
             type: 'doughnut',
             data: {
                 labels: ['Order Execution', 'Price Alerts', 'Risk Management', 'System', 'Data Quality'],
                 datasets: [{
                     data: [35, 25, 20, 12, 8],
-                    backgroundColor: [
-                        'rgba(13, 110, 253, 0.8)',
-                        'rgba(40, 167, 69, 0.8)',
-                        'rgba(255, 193, 7, 0.8)',
-                        'rgba(108, 117, 125, 0.8)',
-                        'rgba(220, 53, 69, 0.8)'
-                    ],
-                    borderColor: [
-                        'rgba(13, 110, 253, 1)',
-                        'rgba(40, 167, 69, 1)',
-                        'rgba(255, 193, 7, 1)',
-                        'rgba(108, 117, 125, 1)',
-                        'rgba(220, 53, 69, 1)'
-                    ],
-                    borderWidth: 1
+                    backgroundColor: backgroundColors,
+                    borderColor: borderColors,
+                    borderWidth: 2,
+                    hoverOffset: 10,
+                    borderRadius: 3
                 }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: true,
+                cutout: '70%',
                 plugins: {
                     legend: {
-                        position: 'right',
+                        position: 'bottom',
+                        labels: {
+                            padding: 10,
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            font: {
+                                size: 10
+                            },
+                            color: isDarkMode ? '#e0e0e0' : '#000'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: isDarkMode ? 'rgba(40, 40, 40, 0.9)' : 'rgba(0, 0, 0, 0.8)',
+                        titleFont: {
+                            size: 12
+                        },
+                        bodyFont: {
+                            size: 11
+                        },
+                        padding: 8,
+                        callbacks: {
+                            label: function(context) {
+                                return context.label + ': ' + context.parsed + '%';
+                            }
+                        },
+                        titleColor: isDarkMode ? '#ffffff' : '#ffffff',
+                        bodyColor: isDarkMode ? '#e0e0e0' : '#ffffff'
+                    },
+                    datalabels: {
+                        color: isDarkMode ? '#ffffff' : '#fff',
+                        formatter: (value, ctx) => {
+                            let sum = 0;
+                            let dataArr = ctx.chart.data.datasets[0].data;
+                            dataArr.map(data => {
+                                sum += data;
+                            });
+                            let percentage = (value * 100 / sum).toFixed(1) + "%";
+                            return percentage;
+                        },
+                        font: {
+                            weight: 'bold',
+                            size: 12
+                        }
                     }
+                },
+                animation: {
+                    animateRotate: true,
+                    animateScale: true,
+                    duration: 800
                 }
             }
         });

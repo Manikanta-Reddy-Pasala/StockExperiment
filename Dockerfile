@@ -28,7 +28,7 @@ COPY . .
 RUN mkdir -p logs
 
 # Expose port
-EXPOSE 5000
+EXPOSE 8000
 
 # Run the application
 CMD ["python", "run.py", "--mode", "production", "--config", "production"]

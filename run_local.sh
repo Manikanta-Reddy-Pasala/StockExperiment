@@ -33,6 +33,14 @@ if [ ! -d "logs" ]; then
     mkdir logs
 fi
 
+# Kill any existing processes on port 5001
+echo "Checking for processes on port 5001..."
+if lsof -i :5001 > /dev/null 2>&1; then
+    echo "Killing existing processes on port 5001..."
+    lsof -ti :5001 | xargs kill -9
+    sleep 2
+fi
+
 # Run database migrations/initialization
 echo "Initializing database..."
 python -c "
@@ -46,5 +54,5 @@ print('Database tables created successfully')
 
 # Start the application in development mode
 echo "Starting application in development mode..."
-echo "Access the web interface at http://localhost:5000"
+echo "Access the web interface at http://localhost:5001"
 python run.py --mode development --config development

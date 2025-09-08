@@ -85,7 +85,8 @@ docker-compose up
 
 ### Accessing the Web Interface
 
-Open your browser and navigate to: http://localhost:5000
+For development mode: http://localhost:5001
+For production mode: http://localhost:8000
 
 ### Environment Variables
 

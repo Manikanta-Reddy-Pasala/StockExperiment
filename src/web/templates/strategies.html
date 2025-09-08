@@ -3,9 +3,33 @@
 {% block title %}Strategies{% endblock %}
 
 {% block content %}
+<style>
+    .chart-container {
+        position: relative;
+        height: 200px;
+        width: 100%;
+        margin: 0 auto;
+    }
+    .strategy-card {
+        transition: transform 0.2s ease-in-out;
+        height: 100%;
+    }
+    .strategy-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+    .chart-wrapper {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100%;
+        padding: 10px;
+    }
+</style>
+
 <div class="row g-4 mb-4">
     <div class="col-md-4">
-        <div class="card border-primary border-2 shadow-sm">
+        <div class="card border-primary border-2 shadow-sm strategy-card">
             <div class="card-body text-center">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
@@ -20,7 +44,7 @@
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card border-success border-2 shadow-sm">
+        <div class="card border-success border-2 shadow-sm strategy-card">
             <div class="card-body text-center">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
@@ -35,7 +59,7 @@
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card border-info border-2 shadow-sm">
+        <div class="card border-info border-2 shadow-sm strategy-card">
             <div class="card-body text-center">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
@@ -80,12 +104,16 @@
         </div>
     </div>
     <div class="col-md-6">
-        <div class="card shadow-sm">
+        <div class="card shadow-sm strategy-card">
             <div class="card-header bg-white">
                 <h5 class="card-title mb-0">Strategy Performance</h5>
             </div>
             <div class="card-body">
-                <canvas id="strategy-performance-chart" height="200"></canvas>
+                <div class="chart-wrapper">
+                    <div class="chart-container">
+                        <canvas id="strategy-performance-chart"></canvas>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -220,6 +248,23 @@
     // Initialize strategy performance chart
     function initStrategyChart() {
         const ctx = document.getElementById('strategy-performance-chart').getContext('2d');
+        
+        // Check if dark mode is enabled
+        const isDarkMode = document.body.classList.contains('dark-theme');
+        
+        // Define colors based on theme
+        const momentumBorderColor = isDarkMode ? 'rgb(37, 139, 255)' : 'rgb(13, 110, 253)';
+        const momentumBgColor = isDarkMode ? 'rgba(37, 139, 255, 0.2)' : 'rgba(13, 110, 253, 0.1)';
+        const momentumPointColor = isDarkMode ? 'rgb(37, 139, 255)' : 'rgb(13, 110, 253)';
+        
+        const breakoutBorderColor = isDarkMode ? 'rgb(76, 201, 100)' : 'rgb(40, 167, 69)';
+        const breakoutBgColor = isDarkMode ? 'rgba(76, 201, 100, 0.2)' : 'rgba(40, 167, 69, 0.1)';
+        const breakoutPointColor = isDarkMode ? 'rgb(76, 201, 100)' : 'rgb(40, 167, 69)';
+        
+        const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+        const textColor = isDarkMode ? '#e0e0e0' : '#000';
+        const tooltipBgColor = isDarkMode ? 'rgba(40, 40, 40, 0.9)' : 'rgba(0, 0, 0, 0.8)';
+        
         const chart = new Chart(ctx, {
             type: 'line',
             data: {
@@ -227,24 +272,51 @@
                 datasets: [{
                     label: 'Momentum Strategy',
                     data: [12, 19, 15, 18, 22, 25, 20, 24, 28],
-                    borderColor: 'rgb(13, 110, 253)',
-                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    borderColor: momentumBorderColor,
+                    backgroundColor: momentumBgColor,
                     tension: 0.3,
-                    fill: true
+                    fill: true,
+                    pointRadius: 3,
+                    pointBackgroundColor: momentumPointColor,
+                    pointBorderColor: isDarkMode ? '#121212' : '#fff',
+                    pointBorderWidth: 1
                 }, {
                     label: 'Breakout Strategy',
                     data: [8, 12, 10, 14, 16, 18, 15, 17, 20],
-                    borderColor: 'rgb(40, 167, 69)',
-                    backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                    borderColor: breakoutBorderColor,
+                    backgroundColor: breakoutBgColor,
                     tension: 0.3,
-                    fill: true
+                    fill: true,
+                    pointRadius: 3,
+                    pointBackgroundColor: breakoutPointColor,
+                    pointBorderColor: isDarkMode ? '#121212' : '#fff',
+                    pointBorderWidth: 1
                 }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: true,
                 plugins: {
                     legend: {
                         position: 'top',
+                        labels: {
+                            font: {
+                                size: 11
+                            },
+                            color: textColor
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: tooltipBgColor,
+                        titleFont: {
+                            size: 12
+                        },
+                        bodyFont: {
+                            size: 11
+                        },
+                        padding: 8,
+                        titleColor: isDarkMode ? '#ffffff' : '#ffffff',
+                        bodyColor: isDarkMode ? '#e0e0e0' : '#ffffff'
                     }
                 },
                 scales: {
@@ -252,15 +324,39 @@
                         beginAtZero: true,
                         title: {
                             display: true,
-                            text: 'Return (%)'
+                            text: 'Return (%)',
+                            font: {
+                                size: 11
+                            },
+                            color: textColor
+                        },
+                        grid: {
+                            color: gridColor
+                        },
+                        ticks: {
+                            color: textColor
                         }
                     },
                     x: {
                         title: {
                             display: true,
-                            text: 'Month'
+                            text: 'Month',
+                            font: {
+                                size: 11
+                            },
+                            color: textColor
+                        },
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            color: textColor
                         }
                     }
+                },
+                animation: {
+                    duration: 800,
+                    easing: 'easeInOutQuart'
                 }
             }
         });

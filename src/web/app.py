@@ -71,7 +71,7 @@ def create_app():
             return jsonify({'error': str(e)}), 500
     
     @app.route('/api/selected_stocks')
-    def selected_stocks():
+    def api_selected_stocks():
         """API endpoint for selected stocks."""
         try:
             period = request.args.get('period', 'week')
@@ -290,6 +290,31 @@ def create_app():
         """Strategies page."""
         return render_template('strategies.html')
     
+    @app.route('/api/strategies')
+    def api_strategies():
+        """API endpoint for strategies."""
+        try:
+            # For now, we'll simulate the data
+            # In a real implementation, this would query the Strategy table
+            strategies_data = [
+                {
+                    'id': 1,
+                    'name': 'Momentum Strategy',
+                    'description': 'Selects stocks based on price momentum',
+                    'is_active': True
+                },
+                {
+                    'id': 2,
+                    'name': 'Breakout Strategy',
+                    'description': 'Selects stocks breaking out of resistance levels',
+                    'is_active': True
+                }
+            ]
+            
+            return jsonify(strategies_data)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
     @app.route('/selected_stocks')
     def selected_stocks():
         """Selected stocks page."""
@@ -305,14 +330,73 @@ def create_app():
         """Alerts page."""
         return render_template('alerts.html')
     
+    @app.route('/api/alerts')
+    def api_alerts():
+        """API endpoint for alerts."""
+        try:
+            # For now, we'll simulate the data
+            # In a real implementation, this would query the alerts system
+            alerts_data = [
+                {
+                    'id': 1,
+                    'timestamp': '2025-09-09T10:30:00',
+                    'type': 'Order Execution',
+                    'message': 'Order executed successfully for RELIANCE.NS',
+                    'severity': 'info',
+                    'status': 'new'
+                },
+                {
+                    'id': 2,
+                    'timestamp': '2025-09-09T09:45:00',
+                    'type': 'Price Alert',
+                    'message': 'TCS.NS has broken above resistance level',
+                    'severity': 'warning',
+                    'status': 'new'
+                },
+                {
+                    'id': 3,
+                    'timestamp': '2025-09-08T11:15:00',
+                    'type': 'Risk Management',
+                    'message': 'Position size limit exceeded for INFY.NS',
+                    'severity': 'critical',
+                    'status': 'read'
+                }
+            ]
+            
+            return jsonify(alerts_data)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
     @app.route('/settings')
     def settings():
         """Settings page."""
         return render_template('settings.html')
+    
+    @app.route('/api/settings')
+    def api_settings():
+        """API endpoint for settings."""
+        try:
+            # For now, we'll simulate the data
+            # In a real implementation, this would query the Configuration table
+            settings_data = {
+                'trading_mode': 'development',
+                'market_open': '09:15',
+                'market_close': '15:30',
+                'max_capital_per_trade': 1.0,
+                'max_concurrent_trades': 10,
+                'daily_loss_limit': 2.0,
+                'single_name_exposure': 5.0,
+                'stop_loss_percent': 5.0,
+                'take_profit_percent': 10.0
+            }
+            
+            return jsonify(settings_data)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
     
     return app
 
 
 if __name__ == '__main__':
     app = create_app()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5001)

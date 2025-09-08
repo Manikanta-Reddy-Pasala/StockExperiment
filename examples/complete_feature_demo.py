@@ -143,7 +143,8 @@ def demo_complete_features():
     print("  Production: ./run_production.sh")
     print("  With Docker: docker-compose up")
     print("\nTo access the web interface:")
-    print("  Open http://localhost:5000 in your browser")
+    print("  Development mode: http://localhost:5001")
+    print("  Production mode: http://localhost:8000")
 
 
 if __name__ == "__main__":

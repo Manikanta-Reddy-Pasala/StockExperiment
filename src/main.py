@@ -213,7 +213,7 @@ def main():
             app = create_app()
             app.run(
                 host=config.get('web', {}).get('host', 'localhost'),
-                port=config.get('web', {}).get('port', 5000),
+                port=config.get('web', {}).get('port', 5001),
                 debug=config.get('web', {}).get('debug', True)
             )
         except Exception as e:
