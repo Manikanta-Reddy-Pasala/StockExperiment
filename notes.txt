@@ -15,3 +15,7 @@ stock level percentage
 
 mid and small cap percentage 
 
+
+---
+
+before stragetiogies need to check simple validtaion on market cap limit check whatsapp message 
