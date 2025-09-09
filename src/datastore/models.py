@@ -1,12 +1,42 @@
 """
 Data Models for the Automated Trading System
 """
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text, ForeignKey, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from flask_login import UserMixin
 
 Base = declarative_base()
+
+
+class User(UserMixin, Base):
+    """User authentication and profile information."""
+    __tablename__ = 'users'
+    
+    id = Column(Integer, primary_key=True)
+    username = Column(String(80), unique=True, nullable=False)
+    email = Column(String(120), unique=True, nullable=False)
+    password_hash = Column(String(128), nullable=False)
+    first_name = Column(String(50))
+    last_name = Column(String(50))
+    is_active = Column(Boolean, default=True)
+    is_admin = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_login = Column(DateTime)
+    last_activity = Column(DateTime)
+    
+    # Relationships with other models
+    orders = relationship("Order", back_populates="user")
+    trades = relationship("Trade", back_populates="user")
+    positions = relationship("Position", back_populates="user")
+    strategies = relationship("Strategy", back_populates="user")
+    configurations = relationship("Configuration", back_populates="user")
+    logs = relationship("Log", back_populates="user")
+    selected_stocks = relationship("SelectedStock", back_populates="user")
+    
+    def __repr__(self):
+        return f'<User {self.username}>'
 
 
 class Instrument(Base):
@@ -54,6 +84,7 @@ class Order(Base):
     __tablename__ = 'orders'
     
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     order_id = Column(String(50), unique=True, nullable=False)
     parent_order_id = Column(String(50))
     exchange_order_id = Column(String(50))
@@ -79,7 +110,8 @@ class Order(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    # Relationship with trades
+    # Relationships
+    user = relationship("User", back_populates="orders")
     trades = relationship("Trade", back_populates="order")
 
 
@@ -88,6 +120,7 @@ class Trade(Base):
     __tablename__ = 'trades'
     
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     trade_id = Column(String(50), unique=True, nullable=False)
     order_id = Column(String(50), ForeignKey('orders.order_id'), nullable=False)
     exchange_order_id = Column(String(50))
@@ -102,7 +135,8 @@ class Trade(Base):
     trade_time = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
     
-    # Relationship with order
+    # Relationships
+    user = relationship("User", back_populates="trades")
     order = relationship("Order", back_populates="trades")
 
 
@@ -111,6 +145,7 @@ class Position(Base):
     __tablename__ = 'positions'
     
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     tradingsymbol = Column(String(50), nullable=False)
     exchange = Column(String(20))
     instrument_token = Column(String(50))
@@ -136,6 +171,9 @@ class Position(Base):
     sell_m2m = Column(Float)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship with user
+    user = relationship("User", back_populates="positions")
 
 
 class Strategy(Base):
@@ -143,12 +181,16 @@ class Strategy(Base):
     __tablename__ = 'strategies'
     
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     name = Column(String(100), nullable=False)
     description = Column(Text)
     parameters = Column(Text)  # JSON string of strategy parameters
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship with user
+    user = relationship("User", back_populates="strategies")
 
 
 class Configuration(Base):
@@ -156,11 +198,20 @@ class Configuration(Base):
     __tablename__ = 'configurations'
     
     id = Column(Integer, primary_key=True)
-    key = Column(String(100), unique=True, nullable=False)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True)  # NULL for global configs
+    key = Column(String(100), nullable=False)
     value = Column(Text)
     description = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship with user (optional for global configs)
+    user = relationship("User", back_populates="configurations")
+    
+    # Unique constraint: key should be unique per user (or globally if user_id is NULL)
+    __table_args__ = (
+        UniqueConstraint('user_id', 'key', name='_user_key_uc'),
+    )
 
 
 class Log(Base):
@@ -168,11 +219,15 @@ class Log(Base):
     __tablename__ = 'logs'
     
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True)  # NULL for system logs
     timestamp = Column(DateTime, default=datetime.utcnow)
     level = Column(String(20))
     module = Column(String(50))
     message = Column(Text)
     details = Column(Text)  # JSON string of additional details
+    
+    # Relationship with user (optional for system logs)
+    user = relationship("User", back_populates="logs")
 
 
 class SelectedStock(Base):
@@ -180,6 +235,7 @@ class SelectedStock(Base):
     __tablename__ = 'selected_stocks'
     
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     symbol = Column(String(50), nullable=False)
     selection_date = Column(DateTime, default=datetime.utcnow)
     selection_price = Column(Float)
@@ -189,3 +245,6 @@ class SelectedStock(Base):
     status = Column(String(20), default='Active')  # Active, Sold, Expired
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship with user
+    user = relationship("User", back_populates="selected_stocks")

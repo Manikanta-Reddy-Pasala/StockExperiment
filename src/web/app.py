@@ -1,17 +1,34 @@
 """
 Flask Web Application for the Automated Trading System
 """
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask_bcrypt import Bcrypt
 from datastore.database import get_database_manager
-from datastore.models import Log, Order, Trade, Position
+from datastore.models import Log, Order, Trade, Position, User, Strategy, SelectedStock, Configuration
 # Add import for charting
 from charting.db_charts import DatabaseCharts
+from trading_engine.multi_user_trading_engine import MultiUserTradingEngine
 from datetime import datetime
+import secrets
 
 
 def create_app():
     """Create Flask application."""
     app = Flask(__name__)
+    
+    # Generate a secret key for sessions
+    app.secret_key = secrets.token_hex(16)
+    
+    # Initialize Flask-Login
+    login_manager = LoginManager()
+    login_manager.init_app(app)
+    login_manager.login_view = 'login'
+    login_manager.login_message = 'Please log in to access this page.'
+    login_manager.login_message_category = 'info'
+    
+    # Initialize Flask-Bcrypt
+    bcrypt = Bcrypt(app)
     
     # Initialize database
     db_manager = get_database_manager()
@@ -19,12 +36,119 @@ def create_app():
     # Initialize charting
     charts = DatabaseCharts(db_manager)
     
+    @login_manager.user_loader
+    def load_user(user_id):
+        """Load user by ID for Flask-Login."""
+        with db_manager.get_session() as session:
+            user = session.query(User).get(int(user_id))
+            if user:
+                # Detach the user from the session to avoid issues
+                session.expunge(user)
+            return user
+    
+    # Authentication routes
+    @app.route('/login', methods=['GET', 'POST'])
+    def login():
+        """Login page."""
+        if request.method == 'POST':
+            username = request.form.get('username')
+            password = request.form.get('password')
+            remember = bool(request.form.get('remember'))
+            
+            if not username or not password:
+                flash('Please fill in all fields.', 'error')
+                return render_template('login.html')
+            
+            with db_manager.get_session() as db_session:
+                user = db_session.query(User).filter_by(username=username).first()
+                
+                if user and bcrypt.check_password_hash(user.password_hash, password):
+                    if user.is_active:
+                        login_user(user, remember=remember)
+                        user.last_login = datetime.utcnow()
+                        db_session.commit()
+                        
+                        # Redirect to next page or dashboard
+                        next_page = request.args.get('next')
+                        return redirect(next_page) if next_page else redirect(url_for('dashboard'))
+                    else:
+                        flash('Your account has been deactivated.', 'error')
+                else:
+                    flash('Invalid username or password.', 'error')
+        
+        return render_template('login.html')
+    
+    @app.route('/register', methods=['GET', 'POST'])
+    def register():
+        """Registration page."""
+        if request.method == 'POST':
+            username = request.form.get('username')
+            email = request.form.get('email')
+            password = request.form.get('password')
+            confirm_password = request.form.get('confirm_password')
+            first_name = request.form.get('first_name')
+            last_name = request.form.get('last_name')
+            
+            # Validation
+            if not all([username, email, password, confirm_password]):
+                flash('Please fill in all required fields.', 'error')
+                return render_template('register.html')
+            
+            if password != confirm_password:
+                flash('Passwords do not match.', 'error')
+                return render_template('register.html')
+            
+            if len(password) < 6:
+                flash('Password must be at least 6 characters long.', 'error')
+                return render_template('register.html')
+            
+            with db_manager.get_session() as db_session:
+                # Check if username or email already exists
+                existing_user = db_session.query(User).filter(
+                    (User.username == username) | (User.email == email)
+                ).first()
+                
+                if existing_user:
+                    if existing_user.username == username:
+                        flash('Username already exists.', 'error')
+                    else:
+                        flash('Email already registered.', 'error')
+                    return render_template('register.html')
+                
+                # Create new user
+                password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+                new_user = User(
+                    username=username,
+                    email=email,
+                    password_hash=password_hash,
+                    first_name=first_name,
+                    last_name=last_name
+                )
+                
+                db_session.add(new_user)
+                db_session.commit()
+                
+                flash('Registration successful! Please log in.', 'success')
+                return redirect(url_for('login'))
+        
+        return render_template('register.html')
+    
+    @app.route('/logout')
+    @login_required
+    def logout():
+        """Logout user."""
+        logout_user()
+        flash('You have been logged out successfully.', 'info')
+        return redirect(url_for('login'))
+    
     @app.route('/')
+    @login_required
     def dashboard():
         """Dashboard page."""
         return render_template('dashboard.html')
     
     @app.route('/api/portfolio_chart')
+    @login_required
     def portfolio_chart_data():
         """API endpoint for portfolio value chart data."""
         try:
@@ -35,6 +159,7 @@ def create_app():
             return jsonify({'error': str(e)}), 500
     
     @app.route('/api/dashboard/metrics')
+    @login_required
     def dashboard_metrics():
         """API endpoint for dashboard metrics."""
         try:
@@ -43,7 +168,10 @@ def create_app():
             
             # Get positions
             with db_manager.get_session() as session:
-                positions = session.query(Position).filter(Position.quantity != 0).all()
+                positions = session.query(Position).filter(
+                    Position.user_id == current_user.id,
+                    Position.quantity != 0
+                ).all()
                 positions_data = [{
                     'symbol': position.tradingsymbol,
                     'quantity': position.quantity,
@@ -54,7 +182,9 @@ def create_app():
             
             # Get recent orders
             with db_manager.get_session() as session:
-                orders = session.query(Order).order_by(Order.created_at.desc()).limit(10).all()
+                orders = session.query(Order).filter(
+                    Order.user_id == current_user.id
+                ).order_by(Order.created_at.desc()).limit(10).all()
                 orders_data = [{
                     'order_id': order.order_id,
                     'symbol': order.tradingsymbol,
@@ -71,63 +201,28 @@ def create_app():
             return jsonify({'error': str(e)}), 500
     
     @app.route('/api/selected_stocks')
+    @login_required
     def api_selected_stocks():
         """API endpoint for selected stocks."""
         try:
             period = request.args.get('period', 'week')
             
-            # For now, we'll simulate the data
-            # In a real implementation, this would query the SelectedStock table
-            stocks_data = [
-                {
-                    'symbol': 'RELIANCE.NS',
-                    'selection_date': '2025-09-05T10:30:00',
-                    'selection_price': 2750.50,
-                    'current_price': 2780.25,
-                    'quantity': 10,
-                    'status': 'Active'
-                },
-                {
-                    'symbol': 'TCS.NS',
-                    'selection_date': '2025-09-04T11:15:00',
-                    'selection_price': 3850.75,
-                    'current_price': 3825.50,
-                    'quantity': 5,
-                    'status': 'Active'
-                },
-                {
-                    'symbol': 'INFY.NS',
-                    'selection_date': '2025-09-03T09:45:00',
-                    'selection_price': 1620.00,
-                    'current_price': 1645.30,
-                    'quantity': 15,
-                    'status': 'Active'
-                },
-                {
-                    'symbol': 'HDFCBANK.NS',
-                    'selection_date': '2025-09-02T10:00:00',
-                    'selection_price': 1520.25,
-                    'current_price': 1510.75,
-                    'quantity': 20,
-                    'status': 'Active'
-                },
-                {
-                    'symbol': 'ICICIBANK.NS',
-                    'selection_date': '2025-09-01T10:30:00',
-                    'selection_price': 1025.50,
-                    'current_price': 1040.25,
-                    'quantity': 25,
-                    'status': 'Active'
-                },
-                {
-                    'symbol': 'AXISBANK.NS',
-                    'selection_date': '2025-08-28T11:00:00',
-                    'selection_price': 1120.75,
-                    'current_price': 1095.50,
-                    'quantity': 18,
-                    'status': 'Sold'
-                }
-            ]
+            with db_manager.get_session() as session:
+                selected_stocks = session.query(SelectedStock).filter(
+                    SelectedStock.user_id == current_user.id
+                ).order_by(SelectedStock.selection_date.desc()).all()
+                
+                stocks_data = [{
+                    'id': stock.id,
+                    'symbol': stock.symbol,
+                    'selection_date': stock.selection_date.isoformat(),
+                    'selection_price': stock.selection_price,
+                    'current_price': stock.current_price,
+                    'quantity': stock.quantity,
+                    'strategy_name': stock.strategy_name,
+                    'status': stock.status,
+                    'created_at': stock.created_at.isoformat()
+                } for stock in selected_stocks]
             
             return jsonify({
                 'stocks': stocks_data
@@ -136,6 +231,7 @@ def create_app():
             return jsonify({'error': str(e)}), 500
     
     @app.route('/api/pnl_chart')
+    @login_required
     def pnl_chart_data():
         """API endpoint for P&L chart data."""
         try:
@@ -146,6 +242,7 @@ def create_app():
             return jsonify({'error': str(e)}), 500
     
     @app.route('/api/trades_chart')
+    @login_required
     def trades_chart_data():
         """API endpoint for trades chart data."""
         try:
@@ -156,6 +253,7 @@ def create_app():
             return jsonify({'error': str(e)}), 500
     
     @app.route('/api/positions_chart')
+    @login_required
     def positions_chart_data():
         """API endpoint for positions chart data."""
         try:
@@ -165,6 +263,7 @@ def create_app():
             return jsonify({'error': str(e)}), 500
     
     @app.route('/api/orders_chart')
+    @login_required
     def orders_chart_data():
         """API endpoint for orders chart data."""
         try:
@@ -175,6 +274,7 @@ def create_app():
             return jsonify({'error': str(e)}), 500
     
     @app.route('/api/performance_summary')
+    @login_required
     def performance_summary():
         """API endpoint for performance summary."""
         try:
@@ -184,6 +284,7 @@ def create_app():
             return jsonify({'error': str(e)}), 500
     
     @app.route('/api/market_chart/<symbol>')
+    @login_required
     def market_chart_data(symbol):
         """API endpoint for market data chart."""
         try:
@@ -194,16 +295,20 @@ def create_app():
             return jsonify({'error': str(e)}), 500
     
     @app.route('/logs')
+    @login_required
     def logs():
         """Logs page."""
         return render_template('logs.html')
     
     @app.route('/api/logs')
+    @login_required
     def api_logs():
         """API endpoint for logs."""
         try:
             with db_manager.get_session() as session:
-                logs = session.query(Log).order_by(Log.timestamp.desc()).limit(100).all()
+                logs = session.query(Log).filter(
+                    Log.user_id == current_user.id
+                ).order_by(Log.timestamp.desc()).limit(100).all()
                 return jsonify([{
                     'id': log.id,
                     'timestamp': log.timestamp.isoformat(),
@@ -215,16 +320,20 @@ def create_app():
             return jsonify({'error': str(e)}), 500
     
     @app.route('/orders')
+    @login_required
     def orders():
         """Orders page."""
         return render_template('orders.html')
     
     @app.route('/api/orders')
+    @login_required
     def api_orders():
         """API endpoint for orders."""
         try:
             with db_manager.get_session() as session:
-                orders = session.query(Order).order_by(Order.created_at.desc()).limit(100).all()
+                orders = session.query(Order).filter(
+                    Order.user_id == current_user.id
+                ).order_by(Order.created_at.desc()).limit(100).all()
                 return jsonify([{
                     'id': order.id,
                     'order_id': order.order_id,
@@ -240,16 +349,20 @@ def create_app():
             return jsonify({'error': str(e)}), 500
     
     @app.route('/trades')
+    @login_required
     def trades():
         """Trades page."""
         return render_template('trades.html')
     
     @app.route('/api/trades')
+    @login_required
     def api_trades():
         """API endpoint for trades."""
         try:
             with db_manager.get_session() as session:
-                trades = session.query(Trade).order_by(Trade.trade_time.desc()).limit(100).all()
+                trades = session.query(Trade).filter(
+                    Trade.user_id == current_user.id
+                ).order_by(Trade.trade_time.desc()).limit(100).all()
                 return jsonify([{
                     'id': trade.id,
                     'trade_id': trade.trade_id,
@@ -263,16 +376,21 @@ def create_app():
             return jsonify({'error': str(e)}), 500
     
     @app.route('/positions')
+    @login_required
     def positions():
         """Positions page."""
         return render_template('positions.html')
     
     @app.route('/api/positions')
+    @login_required
     def api_positions():
         """API endpoint for positions."""
         try:
             with db_manager.get_session() as session:
-                positions = session.query(Position).filter(Position.quantity != 0).all()
+                positions = session.query(Position).filter(
+                    Position.user_id == current_user.id,
+                    Position.quantity != 0
+                ).all()
                 return jsonify([{
                     'id': position.id,
                     'tradingsymbol': position.tradingsymbol,
@@ -286,51 +404,53 @@ def create_app():
             return jsonify({'error': str(e)}), 500
     
     @app.route('/strategies')
+    @login_required
     def strategies():
         """Strategies page."""
         return render_template('strategies.html')
     
     @app.route('/api/strategies')
+    @login_required
     def api_strategies():
         """API endpoint for strategies."""
         try:
-            # For now, we'll simulate the data
-            # In a real implementation, this would query the Strategy table
-            strategies_data = [
-                {
-                    'id': 1,
-                    'name': 'Momentum Strategy',
-                    'description': 'Selects stocks based on price momentum',
-                    'is_active': True
-                },
-                {
-                    'id': 2,
-                    'name': 'Breakout Strategy',
-                    'description': 'Selects stocks breaking out of resistance levels',
-                    'is_active': True
-                }
-            ]
+            with db_manager.get_session() as session:
+                strategies = session.query(Strategy).filter(
+                    Strategy.user_id == current_user.id
+                ).all()
+                
+                strategies_data = [{
+                    'id': strategy.id,
+                    'name': strategy.name,
+                    'description': strategy.description,
+                    'is_active': strategy.is_active,
+                    'created_at': strategy.created_at.isoformat()
+                } for strategy in strategies]
             
             return jsonify(strategies_data)
         except Exception as e:
             return jsonify({'error': str(e)}), 500
     
     @app.route('/selected_stocks')
+    @login_required
     def selected_stocks():
         """Selected stocks page."""
         return render_template('selected_stocks.html')
     
     @app.route('/reports')
+    @login_required
     def reports():
         """Reports page."""
         return render_template('reports.html')
     
     @app.route('/alerts')
+    @login_required
     def alerts():
         """Alerts page."""
         return render_template('alerts.html')
     
     @app.route('/api/alerts')
+    @login_required
     def api_alerts():
         """API endpoint for alerts."""
         try:
@@ -368,29 +488,124 @@ def create_app():
             return jsonify({'error': str(e)}), 500
     
     @app.route('/settings')
+    @login_required
     def settings():
         """Settings page."""
         return render_template('settings.html')
     
     @app.route('/api/settings')
+    @login_required
     def api_settings():
         """API endpoint for settings."""
         try:
-            # For now, we'll simulate the data
-            # In a real implementation, this would query the Configuration table
-            settings_data = {
-                'trading_mode': 'development',
-                'market_open': '09:15',
-                'market_close': '15:30',
-                'max_capital_per_trade': 1.0,
-                'max_concurrent_trades': 10,
-                'daily_loss_limit': 2.0,
-                'single_name_exposure': 5.0,
-                'stop_loss_percent': 5.0,
-                'take_profit_percent': 10.0
-            }
+            with db_manager.get_session() as session:
+                # Get user-specific configurations
+                user_configs = session.query(Configuration).filter(
+                    Configuration.user_id == current_user.id
+                ).all()
+                
+                # Get global configurations (where user_id is NULL)
+                global_configs = session.query(Configuration).filter(
+                    Configuration.user_id.is_(None)
+                ).all()
+                
+                # Combine user and global configs (user configs override global ones)
+                settings_data = {}
+                
+                # First add global configs
+                for config in global_configs:
+                    settings_data[config.key] = config.value
+                
+                # Then override with user-specific configs
+                for config in user_configs:
+                    settings_data[config.key] = config.value
+                
+                # If no configs exist, return defaults
+                if not settings_data:
+                    settings_data = {
+                        'trading_mode': 'development',
+                        'market_open': '09:15',
+                        'market_close': '15:30',
+                        'max_capital_per_trade': 1.0,
+                        'max_concurrent_trades': 10,
+                        'daily_loss_limit': 2.0,
+                        'single_name_exposure': 5.0,
+                        'stop_loss_percent': 5.0,
+                        'take_profit_percent': 10.0
+                    }
             
             return jsonify(settings_data)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+    # Multi-user trading engine API endpoints
+    @app.route('/api/trading_engine/status')
+    @login_required
+    def trading_engine_status():
+        """API endpoint for trading engine status."""
+        try:
+            # This would need to be passed from the main application
+            # For now, we'll return a placeholder response
+            return jsonify({
+                'status': 'running',
+                'message': 'Multi-user trading engine is running',
+                'active_users': 0,
+                'mode': 'development'
+            })
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+    @app.route('/api/trading_engine/user_session')
+    @login_required
+    def user_trading_session():
+        """API endpoint for current user's trading session status."""
+        try:
+            # This would need to be passed from the main application
+            # For now, we'll return a placeholder response
+            return jsonify({
+                'user_id': current_user.id,
+                'username': current_user.username,
+                'is_active': True,
+                'last_activity': datetime.utcnow().isoformat(),
+                'trading_state': {
+                    'last_scan_time': None,
+                    'selected_stocks': [],
+                    'active_orders': [],
+                    'positions': {},
+                    'daily_pnl': 0.0,
+                    'risk_metrics': {}
+                }
+            })
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+    @app.route('/api/trading_engine/start_session', methods=['POST'])
+    @login_required
+    def start_trading_session():
+        """API endpoint to start a trading session for the current user."""
+        try:
+            # This would need to be passed from the main application
+            # For now, we'll return a placeholder response
+            return jsonify({
+                'status': 'success',
+                'message': f'Trading session started for user {current_user.username}',
+                'user_id': current_user.id
+            })
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+    @app.route('/api/trading_engine/stop_session', methods=['POST'])
+    @login_required
+    def stop_trading_session():
+        """API endpoint to stop a trading session for the current user."""
+        try:
+            # This would need to be passed from the main application
+            # For now, we'll return a placeholder response
+            return jsonify({
+                'status': 'success',
+                'message': f'Trading session stopped for user {current_user.username}',
+                'user_id': current_user.id
+            })
         except Exception as e:
             return jsonify({'error': str(e)}), 500
     
