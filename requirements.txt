@@ -1,18 +1,19 @@
 # Core dependencies
 flask==2.3.2
 requests==2.31.0
-pyyaml==6.0
-pandas==2.0.3
-numpy==1.24.3
+pyyaml==6.0.1
+pandas==2.2.0
+numpy==1.26.4
 sqlalchemy==2.0.19
-psycopg2-binary==2.9.7
+psycopg2-binary==2.9.9
 websocket-client==1.6.1
 schedule==1.2.0
 python-dateutil==2.8.2
 email-validator==2.0.0
-yfinance==0.2.18
-matplotlib==3.7.2
+yfinance==0.2.37
+matplotlib==3.8.3
 openai==0.27.8
+fyers-apiv3==3.1.7
 
 # Testing
 pytest==7.4.0

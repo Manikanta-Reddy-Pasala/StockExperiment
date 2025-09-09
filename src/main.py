@@ -12,7 +12,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from config_manager import get_config_manager
 from datastore.database import get_database_manager
-from broker.kite_connector import KiteConnector
+from broker.fyers_connector import FyersConnector
 from simulator.simulator import Simulator
 from selector.selector_engine import SelectorEngine
 from risk.risk_manager import RiskManager
@@ -75,12 +75,12 @@ def initialize_components(config: Dict[str, Any], mode: str):
     
     # Initialize broker connector
     if mode == 'production':
-        # In production, use real Kite connector
-        # Note: You would need to provide actual API keys
-        api_key = os.environ.get('KITE_API_KEY', 'your_api_key')
-        access_token = os.environ.get('KITE_ACCESS_TOKEN', 'your_access_token')
-        broker_connector = KiteConnector(api_key, access_token)
-        logger.info("Initialized KiteConnector for production")
+        # In production, use real Fyers connector
+        # Note: You would need to provide actual client_id and access_token
+        client_id = os.environ.get('FYERS_CLIENT_ID', 'your_client_id')
+        access_token = os.environ.get('FYERS_ACCESS_TOKEN', 'your_access_token')
+        broker_connector = FyersConnector(client_id=client_id, access_token=access_token)
+        logger.info("Initialized FyersConnector for production")
     else:
         # In development, use simulator
         broker_connector = Simulator()

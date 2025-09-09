@@ -363,9 +363,9 @@ if __name__ == "__main__":
     
     # Send a system health alert
     email_system.send_system_health_alert(
-        component="KiteConnector",
+        component="FyersConnector",
         status="DISCONNECTED",
-        details="Connection to Zerodha Kite API lost"
+        details="Connection to Fyers API lost"
     )
     
     # Send a test email
