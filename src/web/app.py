@@ -758,6 +758,37 @@ def create_app():
                 
         except Exception as e:
             return jsonify({'error': str(e)}), 500
+    
+    @app.route('/api/admin/users/<int:user_id>/reset-password', methods=['POST'])
+    @login_required
+    def api_reset_user_password(user_id):
+        """API endpoint for resetting a user's password (admin only)."""
+        if not current_user.is_admin:
+            return jsonify({'error': 'Access denied'}), 403
+        
+        try:
+            data = request.get_json()
+            new_password = data.get('password')
+            
+            if not new_password:
+                return jsonify({'error': 'New password is required'}), 400
+            
+            if len(new_password) < 6:
+                return jsonify({'error': 'Password must be at least 6 characters long'}), 400
+            
+            with db_manager.get_session() as session:
+                user = session.query(User).filter(User.id == user_id).first()
+                if not user:
+                    return jsonify({'error': 'User not found'}), 404
+                
+                # Update password
+                user.password_hash = bcrypt.generate_password_hash(new_password).decode('utf-8')
+                session.commit()
+                
+                return jsonify({'message': 'Password reset successfully'})
+                
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
     # Health check endpoint
     @app.route('/health')
