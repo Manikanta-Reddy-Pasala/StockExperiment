@@ -108,17 +108,59 @@ class FyersConnector(BrokerConnector):
 
     def get_instruments(self, exchange: Optional[str] = None) -> List[Dict[str, Any]]:
         """
-        Get instrument master data.
-        Note: Fyers provides a downloadable CSV for instruments. This is a dummy implementation.
+        Get instrument master data from Fyers symbol master files.
 
         Args:
-            exchange (str, optional): Exchange name
+            exchange (str, optional): Exchange name (e.g., "NSE", "BSE")
 
         Returns:
             List[Dict[str, Any]]: List of instruments
         """
-        # In a real implementation, this would download and parse the Fyers instrument file.
-        return []
+        import pandas as pd
+        import requests
+        from io import StringIO
+
+        urls = {
+            "NSE_CM": "https://public.fyers.in/sym_details/NSE_CM.csv",
+            "BSE_CM": "https://public.fyers.in/sym_details/BSE_CM.csv",
+            "NSE_FO": "https://public.fyers.in/sym_details/NSE_FO.csv",
+            "BSE_FO": "https://public.fyers.in/sym_details/BSE_FO.csv",
+        }
+
+        exchanges_to_download = []
+        if exchange:
+            if f"{exchange}_CM" in urls:
+                exchanges_to_download.append(urls[f"{exchange}_CM"])
+            if f"{exchange}_FO" in urls:
+                exchanges_to_download.append(urls[f"{exchange}_FO"])
+        else:
+            exchanges_to_download = list(urls.values())
+
+        all_instruments = []
+
+        headers = [
+            'fytoken', 'symbol_details', 'exchange_instrument_type', 'minimum_lot_size', 'tick_size',
+            'isin', 'trading_session', 'last_updated_date', 'expiry_date', 'symbol',
+            'exchange', 'segment', 'scrip_code', 'underlying_scrip_code', 'strike_price',
+            'option_type', 'underlying_fytoken'
+        ]
+
+        for url in exchanges_to_download:
+            try:
+                response = requests.get(url)
+                response.raise_for_status()
+
+                # Use StringIO to treat the string content as a file
+                csv_data = StringIO(response.text)
+
+                df = pd.read_csv(csv_data, header=None, names=headers)
+                all_instruments.extend(df.to_dict('records'))
+            except requests.exceptions.RequestException as e:
+                print(f"Error downloading instruments from {url}: {e}")
+            except Exception as e:
+                print(f"Error processing instruments from {url}: {e}")
+
+        return all_instruments
 
     def get_ltp(self, instrument_tokens: List[str]) -> Dict[str, Any]:
         """

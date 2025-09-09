@@ -1,10 +1,10 @@
 # Automated Trading System
 
-This is a Python-based automated trading system that selects momentum stocks and places, modifies, and exits trades on Indian exchanges through the Fyers API.
+This is a Python-based automated trading system that selects momentum stocks and places, modifies, and exits trades on Indian exchanges through the Zerodha Kite Connect API.
 
 ## Features
 
-- Integration with Fyers for market data and order execution
+- Integration with Zerodha Kite Connect for market data and order execution
 - Pluggable momentum stock selection engine with multiple strategies
 - Comprehensive risk management with position sizing and exposure controls
 - Dual-mode operation (development/simulation and production)
@@ -17,7 +17,7 @@ This is a Python-based automated trading system that selects momentum stocks and
 - Email alerting for critical events and system notifications
 - Manual override capabilities through web interface
 - Configuration management via web UI
-- **Dual data sources** (Fyers and yFinance with fallback capabilities)
+- **Dual data sources** (Zerodha Kite Connect and yFinance with fallback capabilities)
 - **Automated stop-loss functionality**
 - **Backtesting engine with ASOF_DATE override**
 - **Market-on-Open order support**
@@ -33,7 +33,7 @@ This is a Python-based automated trading system that selects momentum stocks and
 
 The system consists of the following core modules:
 
-1. **BrokerConnector**: Interface with Fyers API for market data and order execution
+1. **BrokerConnector**: Interface with Zerodha Kite Connect API for market data and order execution
 2. **DataStore**: Persistent storage for market data, trades, configurations, and logs
 3. **SelectorEngine**: Momentum stock selection with pluggable strategies
 4. **RiskManager**: Position sizing, exposure controls, and risk limits enforcement
@@ -44,7 +44,7 @@ The system consists of the following core modules:
 9. **ComplianceLogger**: Immutable audit trail for regulatory compliance
 10. **WebInterface**: Flask-based web application for UI and API endpoints
 11. **EmailAlerting**: Email notification system for critical events and reports
-12. **DataProvider**: Dual data source management (Fyers + yFinance)
+12. **DataProvider**: Dual data source management (Zerodha + yFinance)
 13. **Backtesting**: Strategy backtesting engine with performance metrics
 14. **Analytics**: Performance analytics and risk metrics
 15. **Logging**: Comprehensive trade execution logging
@@ -56,7 +56,7 @@ The system consists of the following core modules:
 1. Clone the repository
 2. Install dependencies: `pip install -r requirements.txt`
 3. Configure the system using files in the `config/` directory
-4. Set up environment variables for production mode (FYERS_CLIENT_ID, FYERS_ACCESS_TOKEN, OPENAI_API_KEY)
+4. Set up environment variables for production mode (KITE_API_KEY, KITE_ACCESS_TOKEN, OPENAI_API_KEY)
 5. Run the application: `python src/main.py`
 
 ## Usage
@@ -90,8 +90,8 @@ For production mode: http://localhost:8000
 
 ### Environment Variables
 
-- `FYERS_CLIENT_ID`: Fyers API Client ID (or App ID) for your trading app (production only).
-- `FYERS_ACCESS_TOKEN`: Fyers API Access Token. This needs to be generated via a browser-based login. See Fyers API documentation for more details. (production only)
+- `KITE_API_KEY`: Zerodha Kite Connect API key (production only)
+- `KITE_ACCESS_TOKEN`: Zerodha Kite Connect access token (production only)
 - `OPENAI_API_KEY`: OpenAI API key for ChatGPT validation (optional)
 - `DATABASE_URL`: Database connection URL (optional, defaults to SQLite)
 
@@ -99,7 +99,7 @@ For production mode: http://localhost:8000
 
 ### Dual Data Sources
 The system now supports two data sources:
-- Primary: Fyers API
+- Primary: Zerodha Kite Connect API
 - Secondary: yFinance with automatic fallback
 
 ### Automated Stop-Loss
