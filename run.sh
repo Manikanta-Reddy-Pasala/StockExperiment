@@ -45,24 +45,12 @@ print_status "Creating necessary directories..."
 mkdir -p logs
 mkdir -p init-scripts
 
-# Create .env file if it doesn't exist
+# Check if .env file exists
 if [ ! -f .env ]; then
-    print_status "Creating .env file with default values..."
-    cat > .env << EOF
-# Trading System Environment Variables
-FYERS_CLIENT_ID=your_client_id
-FYERS_ACCESS_TOKEN=your_access_token
-
-# Database Configuration
-POSTGRES_DB=trading_system
-POSTGRES_USER=trader
-POSTGRES_PASSWORD=trader_password
-
-# Application Configuration
-FLASK_ENV=production
-PYTHONPATH=/app
-EOF
-    print_warning "Created .env file with default values. Please update with your actual credentials."
+    print_error ".env file not found!"
+    print_status "Please create a .env file with your configuration."
+    print_status "You can copy the example from the repository or create one manually."
+    exit 1
 fi
 
 # Function to start the application
