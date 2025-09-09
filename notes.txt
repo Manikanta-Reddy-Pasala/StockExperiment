@@ -1,12 +1,7 @@
-use this instaed of zerodha
-
-https://fyers.in/products/api/
-
 
 ----------------
 
 check whatsapp pic for new strategey : volume spike startegy 
-
 
 
 ---
@@ -41,13 +36,6 @@ evey day or weekly we run this and get the list and record all picked up stocks 
 we need have dry run and actual run 
 
 
----
-
-we need to support multi user each user should have its own settinsg and reports and things 
-
-introduce login username and password based or gmail based login 
-
-we need to ask in teh setting to take his broker credenatils to execute or simply keep it to email alerts
 
 
 
