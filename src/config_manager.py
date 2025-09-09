@@ -9,13 +9,13 @@ from typing import Dict, Any
 class ConfigManager:
     """Manages configuration loading and access for the trading system."""
     
-    def __init__(self, environment: str = "development"):
+    def __init__(self, environment: str = "unified"):
         """
         Initialize the configuration manager.
         
         Args:
             environment (str): The environment to load configuration for 
-                             (development, production)
+                             (unified is the only supported environment now)
         """
         self.environment = environment
         self.config = {}
@@ -34,7 +34,7 @@ class ConfigManager:
             with open(base_config_path, 'r') as f:
                 self.config = yaml.safe_load(f) or {}
         
-        # Load environment-specific configuration
+        # Load unified configuration
         env_config_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), 
             "config", 
@@ -108,12 +108,13 @@ class ConfigManager:
 config_manager = None
 
 
-def get_config_manager(environment: str = "development") -> ConfigManager:
+def get_config_manager(environment: str = "unified") -> ConfigManager:
     """
     Get the global configuration manager instance.
     
     Args:
         environment (str): The environment to load configuration for
+                          (unified is the only supported environment now)
         
     Returns:
         ConfigManager: Configuration manager instance

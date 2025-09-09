@@ -6,6 +6,9 @@ WORKDIR /app
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV DATABASE_URL=postgresql://trader:trader_password@database:5432/trading_system
+ENV FLASK_ENV=production
+ENV PYTHONPATH=/app
 
 # Install system dependencies
 RUN apt-get update \

@@ -50,6 +50,36 @@ def setup_logging(config: Dict[str, Any]) -> logging.Logger:
     return logger
 
 
+def get_database_url(config: Dict[str, Any]) -> str:
+    """
+    Get database URL from environment variable or construct from configuration.
+    
+    Args:
+        config (Dict[str, Any]): Configuration dictionary
+        
+    Returns:
+        str: Database connection URL
+    """
+    # First check if DATABASE_URL environment variable is set
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url:
+        logging.getLogger(__name__).info(f"Using DATABASE_URL from environment: {database_url}")
+        return database_url
+    
+    # If not, construct from configuration
+    logging.getLogger(__name__).info("DATABASE_URL not found in environment, constructing from config")
+    db_config = config.get('database', {})
+    host = db_config.get('host', 'localhost')
+    port = db_config.get('port', 5432)
+    name = db_config.get('name', 'trading_system')
+    user = db_config.get('user', 'trader')
+    password = db_config.get('password', 'trader_password')
+    
+    constructed_url = f"postgresql://{user}:{password}@{host}:{port}/{name}"
+    logging.getLogger(__name__).info(f"Constructed database URL: {constructed_url}")
+    return constructed_url
+
+
 def initialize_components(config: Dict[str, Any], mode: str):
     """
     Initialize all system components.
@@ -64,10 +94,16 @@ def initialize_components(config: Dict[str, Any], mode: str):
     logger = logging.getLogger(__name__)
     logger.info(f"Initializing components in {mode} mode")
     
-    # Initialize database
-    db_manager = get_database_manager()
+    # Log environment variables for debugging
+    logger.info(f"DATABASE_URL environment variable: {os.environ.get('DATABASE_URL', 'NOT SET')}")
+    logger.info(f"FLASK_ENV environment variable: {os.environ.get('FLASK_ENV', 'NOT SET')}")
+    
+    # Initialize database with PostgreSQL URL
+    database_url = get_database_url(config)
+    logger.info(f"Using database URL: {database_url}")
+    db_manager = get_database_manager(database_url)
     db_manager.create_tables()
-    logger.info("Database initialized")
+    logger.info("Database initialized with PostgreSQL")
     
     # Initialize data provider manager
     data_manager = get_data_manager()
@@ -128,8 +164,8 @@ def main():
     )
     parser.add_argument(
         '--config', 
-        default='development',
-        help='Configuration environment (development, production, etc.)'
+        default='unified',
+        help='Configuration environment (unified is the only supported environment now)'
     )
     
     args = parser.parse_args()
@@ -141,6 +177,7 @@ def main():
     # Set up logging
     logger = setup_logging(config)
     logger.info(f"Starting Automated Trading System in {args.mode} mode")
+    logger.info(f"Configuration: {args.config}")
     
     # Initialize components
     components = initialize_components(config, args.mode)

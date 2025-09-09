@@ -1,10 +1,11 @@
-# Base configuration for the trading system
+# Unified configuration for the trading system
+
+# Inherit from base configuration
+extends: "base"
 
 # System settings
 system:
-  name: "Automated Trading System"
-  version: "1.0.0"
-  log_level: "INFO"
+  log_level: "DEBUG"
 
 # Trading settings
 trading:
@@ -39,11 +40,11 @@ momentum:
 
 # Database settings
 database:
-  host: "localhost"
+  host: "database"  # Docker service name
   port: 5432
   name: "trading_system"
   user: "trader"
-  password: "trader_password"  # Should be overridden in environment-specific configs
+  password: "trader_password"
 
 # Email settings
 email:
@@ -54,6 +55,6 @@ email:
 
 # Web interface
 web:
-  host: "localhost"
+  host: "0.0.0.0"
   port: 5001
-  debug: false
+  debug: true

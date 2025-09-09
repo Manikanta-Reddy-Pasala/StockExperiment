@@ -18,9 +18,13 @@ class DatabaseManager:
         Args:
             database_url (str, optional): Database connection URL
         """
-        if database_url is None:
-            # Default to SQLite for development
-            database_url = "sqlite:///trading_system.db"
+        # First check if DATABASE_URL environment variable is set
+        env_database_url = os.environ.get('DATABASE_URL')
+        if env_database_url:
+            database_url = env_database_url
+        elif database_url is None:
+            # Default to PostgreSQL with localhost if no environment variable
+            database_url = 'postgresql://trader:trader_password@localhost:5432/trading_system'
         
         self.engine = create_engine(database_url, echo=False)
         self.session_factory = sessionmaker(bind=self.engine)
@@ -70,6 +74,11 @@ def get_database_manager(database_url: str = None) -> DatabaseManager:
         DatabaseManager: Database manager instance
     """
     global db_manager
+    # Always check for DATABASE_URL environment variable first
+    env_database_url = os.environ.get('DATABASE_URL')
+    if env_database_url:
+        database_url = env_database_url
+    
     if db_manager is None:
         db_manager = DatabaseManager(database_url)
     return db_manager

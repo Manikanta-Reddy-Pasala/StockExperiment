@@ -34,6 +34,7 @@ if [ ! -d "logs" ]; then
 fi
 
 # Set environment variables for production
+export DATABASE_URL="postgresql://trader:trader_password@localhost:5432/trading_system"
 export FLASK_ENV=production
 export PYTHONPATH=$(pwd)
 
@@ -43,8 +44,8 @@ python -c "
 import sys
 import os
 sys.path.insert(0, 'src')
-# Use PostgreSQL for production if DATABASE_URL is set
-database_url = os.environ.get('DATABASE_URL', 'sqlite:///trading_system.db')
+# Always use PostgreSQL
+database_url = os.environ.get('DATABASE_URL')
 from datastore.database import get_database_manager
 db = get_database_manager(database_url)
 db.create_tables()

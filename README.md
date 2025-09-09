@@ -27,7 +27,9 @@ This is a Python-based automated trading system that selects momentum stocks and
 - **Matplotlib-based visualizations**
 - **ChatGPT validation for stock selections**
 - **Docker deployment support**
-- **Shell scripts for local and production running**
+- **PostgreSQL-only database (removed SQLite support)**
+- **Unified configuration environment**
+- **Docker Compose as the only deployment method**
 
 ## System Architecture
 
@@ -54,46 +56,30 @@ The system consists of the following core modules:
 ## Installation
 
 1. Clone the repository
-2. Install dependencies: `pip install -r requirements.txt`
-3. Configure the system using files in the `config/` directory
+2. Ensure Docker and Docker Compose are installed
+3. Configure the system using files in the `config/` directory (if needed)
 4. Set up environment variables for production mode (KITE_API_KEY, KITE_ACCESS_TOKEN, OPENAI_API_KEY)
-5. Run the application: `python src/main.py`
 
 ## Usage
 
-The system operates in two modes:
-
-1. **Development Mode**: Local execution with simulated order fills and P&L
-2. **Production Mode**: Live trading with real order execution and full risk controls
+The system is deployed using Docker Compose as the only supported method.
 
 ### Running the Application
 
-#### Local Development
-```bash
-./run_local.sh
-```
-
-#### Production
-```bash
-./run_production.sh
-```
-
-#### With Docker
 ```bash
 docker-compose up
 ```
 
 ### Accessing the Web Interface
 
-For development mode: http://localhost:5001
-For production mode: http://localhost:8000
+The web interface is available at: http://localhost:5001
 
 ### Environment Variables
 
 - `KITE_API_KEY`: Zerodha Kite Connect API key (production only)
 - `KITE_ACCESS_TOKEN`: Zerodha Kite Connect access token (production only)
 - `OPENAI_API_KEY`: OpenAI API key for ChatGPT validation (optional)
-- `DATABASE_URL`: Database connection URL (optional, defaults to SQLite)
+- `DATABASE_URL`: PostgreSQL database connection URL (required)
 
 ## New Features Implemented
 
@@ -133,7 +119,8 @@ Both database-based charts and Matplotlib visualizations for:
 ### ChatGPT Validation
 Stock selections are validated using ChatGPT for enhanced decision making.
 
-### Deployment Options
-Multiple deployment methods:
-- Shell scripts for local/production
-- Docker Compose for containerized deployment
+### Deployment
+Docker Compose is the only supported deployment method, ensuring consistent environments across all installations.
+
+### Unified Configuration
+The system now uses a single unified configuration file instead of separate development and production configurations, simplifying management and reducing complexity.

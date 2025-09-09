@@ -26,16 +26,16 @@ services:
       - database
     environment:
       - DATABASE_URL=postgresql://trader:trader_password@database:5432/trading_system
-      - FLASK_ENV=production
+      - FLASK_ENV=development
       - PYTHONPATH=/app
     ports:
-      - "8000:8000"
+      - "5001:5001"
     volumes:
       - ./logs:/app/logs
     restart: unless-stopped
     networks:
       - trading_network
-    command: python run.py --mode production --config production
+    command: python run.py --mode development --config unified
 
   # Redis for caching (optional)
   redis:

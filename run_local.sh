@@ -41,13 +41,21 @@ if lsof -i :5001 > /dev/null 2>&1; then
     sleep 2
 fi
 
+# Set environment variables for development PostgreSQL
+export DATABASE_URL="postgresql://trader_dev:trader_dev_password@localhost:5432/trading_system_dev"
+export FLASK_ENV=development
+export PYTHONPATH=$(pwd)
+
 # Run database migrations/initialization
 echo "Initializing database..."
 python -c "
 import sys
+import os
 sys.path.insert(0, 'src')
+# Always use PostgreSQL
+database_url = os.environ.get('DATABASE_URL')
 from datastore.database import get_database_manager
-db = get_database_manager()
+db = get_database_manager(database_url)
 db.create_tables()
 print('Database tables created successfully')
 "

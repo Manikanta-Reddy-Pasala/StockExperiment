@@ -23,15 +23,17 @@ def main():
     )
     parser.add_argument(
         '--config', 
-        default='development',
-        help='Configuration environment (development, production, etc.)'
+        default='unified',
+        help='Configuration environment (unified is the only supported environment now)'
     )
     
     args = parser.parse_args()
     
     # Run the main trading system
     try:
-        trading_system_main()
+        # Pass the arguments to the main function
+        import src.main
+        src.main.main()
     except KeyboardInterrupt:
         print("\nApplication stopped by user.")
     except Exception as e:
