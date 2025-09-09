@@ -76,18 +76,31 @@
         background-color: #ea868f;
         color: #000;
     }
+    /* Dark theme for modals */
     .dark-theme .modal-content {
         background-color: #1e1e1e;
         color: #e0e0e0;
         border: 1px solid #444;
     }
-    .dark-theme .modal-header {
-        background-color: #2d2d2d;
-        border-bottom: 1px solid #444;
-    }
+    .dark-theme .modal-header,
     .dark-theme .modal-footer {
         background-color: #2d2d2d;
-        border-top: 1px solid #444;
+        border-color: #444;
+    }
+    .dark-theme .modal-body .form-label,
+    .dark-theme .modal-body .form-check-label,
+    .dark-theme .modal-title {
+        color: #e0e0e0;
+    }
+    .dark-theme .modal-body .form-control,
+    .dark-theme .modal-body .form-select {
+        background-color: #2d2d2d;
+        color: #e0e0e0;
+        border-color: #444;
+    }
+    .dark-theme .modal-footer .btn-secondary:hover {
+        background-color: #5c636a;
+        border-color: #565e64;
     }
     .dark-theme .alert {
         background-color: #2d2d2d;
