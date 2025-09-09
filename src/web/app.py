@@ -609,6 +609,27 @@ def create_app():
         except Exception as e:
             return jsonify({'error': str(e)}), 500
     
+    # Health check endpoint
+    @app.route('/health')
+    def health_check():
+        """Health check endpoint for Docker."""
+        try:
+            # Check database connection
+            with db_manager.get_session() as session:
+                session.execute("SELECT 1")
+            
+            return jsonify({
+                'status': 'healthy',
+                'timestamp': datetime.utcnow().isoformat(),
+                'database': 'connected'
+            }), 200
+        except Exception as e:
+            return jsonify({
+                'status': 'unhealthy',
+                'timestamp': datetime.utcnow().isoformat(),
+                'error': str(e)
+            }), 500
+    
     return app
 
 

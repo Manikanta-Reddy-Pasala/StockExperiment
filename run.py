@@ -16,15 +16,15 @@ def main():
     """Main entry point for the application runner."""
     parser = argparse.ArgumentParser(description='Automated Trading System Runner')
     parser.add_argument(
-        '--mode', 
-        choices=['development', 'production'], 
-        default='development',
-        help='Running mode (development or production)'
+        '--multi-user',
+        action='store_true',
+        default=True,
+        help='Enable multi-user mode (default: True)'
     )
     parser.add_argument(
-        '--config', 
-        default='unified',
-        help='Configuration environment (unified is the only supported environment now)'
+        '--single-user',
+        action='store_true',
+        help='Disable multi-user mode (use single-user mode)'
     )
     
     args = parser.parse_args()

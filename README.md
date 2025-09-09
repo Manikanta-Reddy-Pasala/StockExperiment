@@ -1,126 +1,235 @@
 # Automated Trading System
 
-This is a Python-based automated trading system that selects momentum stocks and places, modifies, and exits trades on Indian exchanges through the Zerodha Kite Connect API.
+A multi-user automated trading system with Docker Compose deployment.
 
 ## Features
 
-- Integration with Zerodha Kite Connect for market data and order execution
-- Pluggable momentum stock selection engine with multiple strategies
-- Comprehensive risk management with position sizing and exposure controls
-- Dual-mode operation (development/simulation and production)
-- Compliance with SEBI retail algo trading regulations
-- Real-time monitoring, alerting, and reporting capabilities
-- Web-based user interface with real-time dashboard (Flask)
-- Detailed performance reporting (daily, weekly, and cumulative P&L)
-- Order execution tracking and status monitoring
-- Stock selection visualization and strategy insights
-- Email alerting for critical events and system notifications
-- Manual override capabilities through web interface
-- Configuration management via web UI
-- **Dual data sources** (Zerodha Kite Connect and yFinance with fallback capabilities)
-- **Automated stop-loss functionality**
-- **Backtesting engine with ASOF_DATE override**
-- **Market-on-Open order support**
-- **Performance analytics** (Sharpe/Sortino ratios, drawdown metrics)
-- **Complete trade logging**
-- **Database-based charting system**
-- **Matplotlib-based visualizations**
-- **ChatGPT validation for stock selections**
-- **Docker deployment support**
-- **PostgreSQL-only database (removed SQLite support)**
-- **Unified configuration environment**
-- **Docker Compose as the only deployment method**
+- **Multi-User Support**: Each user has isolated trading sessions and data
+- **Authentication**: Secure user registration and login system
+- **Trading Engine**: Automated trading with configurable strategies
+- **Web Interface**: Modern dashboard for monitoring and control
+- **Risk Management**: Built-in risk controls and position limits
+- **Compliance Logging**: Complete audit trail of all trading activities
+- **Real-time Monitoring**: Live updates on positions, orders, and performance
 
-## System Architecture
+## Quick Start
 
-The system consists of the following core modules:
+### Prerequisites
 
-1. **BrokerConnector**: Interface with Zerodha Kite Connect API for market data and order execution
-2. **DataStore**: Persistent storage for market data, trades, configurations, and logs
-3. **SelectorEngine**: Momentum stock selection with pluggable strategies
-4. **RiskManager**: Position sizing, exposure controls, and risk limits enforcement
-5. **OrderRouter**: Order placement, modification, and state management
-6. **Simulator**: Paper-trading engine for development mode
-7. **Scheduler**: Market-aware job scheduling with holiday awareness
-8. **Reporting & Alerts**: Dashboard metrics, reports, and alerting system
-9. **ComplianceLogger**: Immutable audit trail for regulatory compliance
-10. **WebInterface**: Flask-based web application for UI and API endpoints
-11. **EmailAlerting**: Email notification system for critical events and reports
-12. **DataProvider**: Dual data source management (Zerodha + yFinance)
-13. **Backtesting**: Strategy backtesting engine with performance metrics
-14. **Analytics**: Performance analytics and risk metrics
-15. **Logging**: Comprehensive trade execution logging
-16. **Visualization**: Database and Matplotlib-based charting
-17. **AI**: ChatGPT validation for stock selections
+- Docker and Docker Compose installed
+- Git (to clone the repository)
 
-## Installation
+### Installation
 
-1. Clone the repository
-2. Ensure Docker and Docker Compose are installed
-3. Configure the system using files in the `config/` directory (if needed)
-4. Set up environment variables for production mode (KITE_API_KEY, KITE_ACCESS_TOKEN, OPENAI_API_KEY)
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd StockExperiment
+   ```
 
-## Usage
+2. **Set up environment variables**:
+   ```bash
+   cp env.example .env
+   # Edit .env with your actual values
+   ```
 
-The system is deployed using Docker Compose as the only supported method.
+3. **Start the application**:
+   ```bash
+   ./run.sh
+   ```
 
-### Running the Application
+4. **Access the web interface**:
+   - Open your browser and go to `http://localhost:5001`
+   - Register a new account or login
+
+### Using the Run Script
+
+The `run.sh` script provides easy management of the trading system:
 
 ```bash
-docker-compose up
+# Start the system (default)
+./run.sh start
+
+# Stop the system
+./run.sh stop
+
+# Restart the system
+./run.sh restart
+
+# View logs
+./run.sh logs
+
+# Check status
+./run.sh status
+
+# Clean up everything (removes all data)
+./run.sh cleanup
 ```
 
-### Accessing the Web Interface
-
-The web interface is available at: http://localhost:5001
+## Configuration
 
 ### Environment Variables
 
-- `KITE_API_KEY`: Zerodha Kite Connect API key (production only)
-- `KITE_ACCESS_TOKEN`: Zerodha Kite Connect access token (production only)
-- `OPENAI_API_KEY`: OpenAI API key for ChatGPT validation (optional)
-- `DATABASE_URL`: PostgreSQL database connection URL (required)
+Create a `.env` file with the following variables:
 
-## New Features Implemented
+```bash
+# Fyers API Credentials (for live trading)
+FYERS_CLIENT_ID=your_client_id
+FYERS_ACCESS_TOKEN=your_access_token
 
-### Dual Data Sources
-The system now supports two data sources:
-- Primary: Zerodha Kite Connect API
-- Secondary: yFinance with automatic fallback
+# Database Configuration
+POSTGRES_DB=trading_system
+POSTGRES_USER=trader
+POSTGRES_PASSWORD=trader_password
 
-### Automated Stop-Loss
-Risk manager includes configurable stop-loss functionality with automatic position exit.
+# Application Configuration
+FLASK_ENV=production
+PYTHONPATH=/app
+```
 
-### Backtesting Engine
-Complete backtesting system with:
-- ASOF_DATE override for historical analysis
-- Multiple strategy support
-- Performance metrics (Sharpe/Sortino ratios, drawdown)
+### Trading Configuration
 
-### Interactive Trading Features
-- Market-on-Open order support
-- Enhanced order management
+Edit `config/unified.yaml` to configure:
 
-### Performance Analytics
-Comprehensive performance metrics including:
-- Sharpe and Sortino ratios
-- Maximum drawdown calculations
-- Win rate tracking
+- Market timings
+- Risk management parameters
+- Trading strategies
+- Email notifications
 
-### Trade Logging
-Complete execution logging for compliance and analysis.
+## Architecture
 
-### Visualization
-Both database-based charts and Matplotlib visualizations for:
-- Portfolio performance
-- Trade executions
-- Performance comparisons
+### Services
 
-### ChatGPT Validation
-Stock selections are validated using ChatGPT for enhanced decision making.
+- **trading_system**: Main application (Flask web app + trading engine)
+- **database**: PostgreSQL database for data persistence
+- **redis**: Redis for caching and session management
 
-### Deployment
-Docker Compose is the only supported deployment method, ensuring consistent environments across all installations.
+### Ports
 
-### Unified Configuration
-The system now uses a single unified configuration file instead of separate development and production configurations, simplifying management and reducing complexity.
+- **5001**: Web interface
+- **5432**: PostgreSQL database
+- **6379**: Redis cache
+
+## Development
+
+### Running in Development Mode
+
+The system runs in a unified environment. To modify the application:
+
+1. Make your changes to the source code
+2. Restart the system: `./run.sh restart`
+3. The changes will be automatically applied
+
+### Database Access
+
+To access the database directly:
+
+```bash
+# Connect to the database container
+docker exec -it trading_system_db psql -U trader -d trading_system
+```
+
+### Viewing Logs
+
+```bash
+# View all logs
+./run.sh logs
+
+# View specific service logs
+docker-compose logs -f trading_system
+docker-compose logs -f database
+```
+
+## API Endpoints
+
+### Authentication
+- `POST /login` - User login
+- `POST /register` - User registration
+- `GET /logout` - User logout
+
+### Trading Data
+- `GET /api/positions` - Get user positions
+- `GET /api/orders` - Get user orders
+- `GET /api/trades` - Get user trades
+- `GET /api/strategies` - Get user strategies
+
+### Trading Engine
+- `GET /api/trading_engine/status` - Get engine status
+- `GET /api/trading_engine/user_session` - Get user session status
+- `POST /api/trading_engine/start_session` - Start trading session
+- `POST /api/trading_engine/stop_session` - Stop trading session
+
+### Health Check
+- `GET /health` - System health status
+
+## Security
+
+- All API endpoints require authentication
+- User data is isolated by user ID
+- Passwords are hashed using bcrypt
+- Database connections use environment variables
+
+## Monitoring
+
+### Health Checks
+
+The system includes health checks for:
+- Database connectivity
+- Application status
+- Service availability
+
+### Logging
+
+All activities are logged including:
+- User authentication
+- Trading activities
+- System events
+- Error conditions
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Port already in use**:
+   ```bash
+   # Check what's using the port
+   lsof -i :5001
+   # Kill the process or change the port in docker-compose.yml
+   ```
+
+2. **Database connection issues**:
+   ```bash
+   # Check database status
+   docker-compose ps database
+   # View database logs
+   docker-compose logs database
+   ```
+
+3. **Application won't start**:
+   ```bash
+   # Check application logs
+   docker-compose logs trading_system
+   # Rebuild the container
+   docker-compose up --build
+   ```
+
+### Reset Everything
+
+To completely reset the system:
+
+```bash
+./run.sh cleanup
+./run.sh start
+```
+
+## Support
+
+For issues and questions:
+1. Check the logs: `./run.sh logs`
+2. Verify configuration in `.env` and `config/unified.yaml`
+3. Ensure Docker and Docker Compose are properly installed
+4. Check system resources (memory, disk space)
+
+## License
+
+[Add your license information here]

@@ -15,14 +15,8 @@ trading:
   pre_open_start: "09:00"
   pre_open_end: "09:15"
   
-  # Trading modes
-  modes:
-    development:
-      description: "Paper trading simulation mode"
-      live_trading: false
-    production:
-      description: "Live trading mode"
-      live_trading: true
+  # Trading mode
+  live_trading: false  # Set to true for live trading
 
 # Risk management defaults
 risk:

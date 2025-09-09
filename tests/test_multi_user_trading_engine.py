@@ -208,28 +208,30 @@ class TestMultiUserTradingEngine:
         """Test removing a user session."""
         with db_manager.get_session() as session:
             user = session.query(User).filter(User.id == test_users[0]).first()
+            user_id = user.id
             
             # Create user session
             user_session = trading_engine.create_user_session(user)
-            assert user.id in trading_engine.user_sessions
+            assert user_id in trading_engine.user_sessions
             
             # Remove user session
-            trading_engine.remove_user_session(user.id)
-            assert user.id not in trading_engine.user_sessions
+            trading_engine.remove_user_session(user_id)
+            assert user_id not in trading_engine.user_sessions
     
     def test_get_user_session(self, trading_engine, db_manager, test_users):
         """Test getting a user session."""
         with db_manager.get_session() as session:
             user = session.query(User).filter(User.id == test_users[0]).first()
+            user_id = user.id
             
             # Initially no session
-            assert trading_engine.get_user_session(user.id) is None
+            assert trading_engine.get_user_session(user_id) is None
             
             # Create user session
             user_session = trading_engine.create_user_session(user)
             
             # Now should be able to get it
-            retrieved_session = trading_engine.get_user_session(user.id)
+            retrieved_session = trading_engine.get_user_session(user_id)
             assert retrieved_session == user_session
     
     def test_get_active_users(self, trading_engine, db_manager, test_users):
@@ -237,6 +239,8 @@ class TestMultiUserTradingEngine:
         with db_manager.get_session() as session:
             user1 = session.query(User).filter(User.id == test_users[0]).first()
             user2 = session.query(User).filter(User.id == test_users[1]).first()
+            user1_id = user1.id
+            user2_id = user2.id
             
             # Create user sessions
             trading_engine.create_user_session(user1)

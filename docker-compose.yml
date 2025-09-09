@@ -1,7 +1,5 @@
-version: '3.8'
-
 services:
-  # PostgreSQL database for production
+  # PostgreSQL database
   database:
     image: postgres:15
     container_name: trading_system_db
@@ -17,27 +15,36 @@ services:
     restart: unless-stopped
     networks:
       - trading_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trader -d trading_system"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Trading system application
   trading_system:
     build: .
     container_name: trading_system_app
     depends_on:
-      - database
+      database:
+        condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://trader:trader_password@database:5432/trading_system
-      - FLASK_ENV=development
+      - FLASK_ENV=production
       - PYTHONPATH=/app
+      - FYERS_CLIENT_ID=${FYERS_CLIENT_ID:-your_client_id}
+      - FYERS_ACCESS_TOKEN=${FYERS_ACCESS_TOKEN:-your_access_token}
     ports:
       - "5001:5001"
     volumes:
       - ./logs:/app/logs
+      - ./config:/app/config
     restart: unless-stopped
     networks:
       - trading_network
-    command: python run.py --mode development --config unified
+    command: python run.py --multi-user
 
-  # Redis for caching (optional)
+  # Redis for caching and session management
   redis:
     image: redis:7-alpine
     container_name: trading_system_redis
@@ -46,6 +53,11 @@ services:
     restart: unless-stopped
     networks:
       - trading_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:

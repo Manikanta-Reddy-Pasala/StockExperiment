@@ -85,20 +85,19 @@ def get_database_url(config: Dict[str, Any]) -> str:
     return constructed_url
 
 
-def initialize_components(config: Dict[str, Any], mode: str, multi_user: bool = True):
+def initialize_components(config: Dict[str, Any], multi_user: bool = True):
     """
     Initialize all system components.
     
     Args:
         config (Dict[str, Any]): Configuration dictionary
-        mode (str): Running mode ('development' or 'production')
         multi_user (bool): Whether to initialize multi-user components
         
     Returns:
         dict: Dictionary of initialized components
     """
     logger = logging.getLogger(__name__)
-    logger.info(f"Initializing components in {mode} mode (multi_user={multi_user})")
+    logger.info(f"Initializing components (multi_user={multi_user})")
     
     # Log environment variables for debugging
     logger.info(f"DATABASE_URL environment variable: {os.environ.get('DATABASE_URL', 'NOT SET')}")
@@ -115,22 +114,16 @@ def initialize_components(config: Dict[str, Any], mode: str, multi_user: bool = 
     data_manager = get_data_manager()
     logger.info("Data provider manager initialized")
     
-    # Initialize broker connector
-    if mode == 'production':
-        # In production, use real Fyers connector if available
-        if FyersConnector is not None:
-            client_id = os.environ.get('FYERS_CLIENT_ID', 'your_client_id')
-            access_token = os.environ.get('FYERS_ACCESS_TOKEN', 'your_access_token')
-            broker_connector = FyersConnector(client_id=client_id, access_token=access_token)
-            logger.info("Initialized FyersConnector for production")
-        else:
-            # Fallback to simulator if FyersConnector is not available
-            broker_connector = Simulator()
-            logger.info("Initialized Simulator for production (FyersConnector not available)")
+    # Initialize broker connector - use Fyers if available, otherwise simulator
+    if FyersConnector is not None:
+        client_id = os.environ.get('FYERS_CLIENT_ID', 'your_client_id')
+        access_token = os.environ.get('FYERS_ACCESS_TOKEN', 'your_access_token')
+        broker_connector = FyersConnector(client_id=client_id, access_token=access_token)
+        logger.info("Initialized FyersConnector")
     else:
-        # In development, use simulator
+        # Fallback to simulator if FyersConnector is not available
         broker_connector = Simulator()
-        logger.info("Initialized Simulator for development")
+        logger.info("Initialized Simulator (FyersConnector not available)")
     
     # Initialize other components
     selector_engine = SelectorEngine()
@@ -142,10 +135,10 @@ def initialize_components(config: Dict[str, Any], mode: str, multi_user: bool = 
     compliance_logger = ComplianceLogger(db_manager)
     email_alerting = EmailAlertingSystem(config)
     
-    # Initialize scheduler based on mode
+    # Initialize scheduler based on multi_user flag
     if multi_user:
         # Initialize multi-user trading engine
-        trading_engine = MultiUserTradingEngine(config, mode)
+        trading_engine = MultiUserTradingEngine(config, 'production')  # Always use production mode for multi-user
         scheduler = MultiUserTradingScheduler(config, trading_engine)
         logger.info("Initialized MultiUserTradingEngine and MultiUserTradingScheduler")
     else:
@@ -179,17 +172,6 @@ def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Automated Trading System')
     parser.add_argument(
-        '--mode', 
-        choices=['development', 'production'], 
-        default='development',
-        help='Running mode (development or production)'
-    )
-    parser.add_argument(
-        '--config', 
-        default='unified',
-        help='Configuration environment (unified is the only supported environment now)'
-    )
-    parser.add_argument(
         '--multi-user',
         action='store_true',
         default=True,
@@ -207,21 +189,20 @@ def main():
     multi_user = args.multi_user and not args.single_user
     
     # Load configuration
-    config_manager = get_config_manager(args.config)
+    config_manager = get_config_manager('unified')
     config = config_manager.config
     
     # Set up logging
     logger = setup_logging(config)
-    logger.info(f"Starting Automated Trading System in {args.mode} mode (multi_user={multi_user})")
-    logger.info(f"Configuration: {args.config}")
+    logger.info(f"Starting Automated Trading System (multi_user={multi_user})")
     
     # Initialize components
-    components = initialize_components(config, args.mode, multi_user)
+    components = initialize_components(config, multi_user)
     
     # Log system start
     components['compliance_logger'].log_system_event(
         event_type="SYSTEM_START",
-        message=f"System started in {args.mode} mode (multi_user={multi_user})"
+        message=f"System started (multi_user={multi_user})"
     )
     
     # Set up trading workflow based on mode
@@ -294,20 +275,19 @@ def main():
     # Example: Send a test alert
     components['email_alerting'].send_test_email()
     
-    # For development mode, we might want to run the web interface
-    if args.mode == 'development':
-        logger.info("Starting web interface for development")
-        try:
-            # Import and start Flask app
-            from web.app import create_app
-            app = create_app()
-            app.run(
-                host=config.get('web', {}).get('host', 'localhost'),
-                port=config.get('web', {}).get('port', 5001),
-                debug=config.get('web', {}).get('debug', True)
-            )
-        except Exception as e:
-            logger.error(f"Failed to start web interface: {e}")
+    # Start the web interface
+    logger.info("Starting web interface")
+    try:
+        # Import and start Flask app
+        from web.app import create_app
+        app = create_app()
+        app.run(
+            host=config.get('web', {}).get('host', '0.0.0.0'),
+            port=config.get('web', {}).get('port', 5001),
+            debug=config.get('web', {}).get('debug', False)
+        )
+    except Exception as e:
+        logger.error(f"Failed to start web interface: {e}")
     
     # Keep the main thread alive
     try:
