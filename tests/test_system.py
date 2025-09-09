@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from src.config_manager import ConfigManager
-from src.broker.kite_connector import KiteConnector
+from src.broker.fyers_connector import FyersConnector
 from src.simulator.simulator import Simulator
 from src.selector.selector_engine import SelectorEngine
 from src.selector.momentum_strategy import MomentumStrategy
