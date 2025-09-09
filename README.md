@@ -30,7 +30,7 @@ A multi-user automated trading system with Docker Compose deployment.
 2. **Set up environment variables**:
    ```bash
    cp env.example .env
-   # Edit .env with your actual values
+   # Edit .env with your actual values (all configuration is done here)
    ```
 
 3. **Start the application**:
@@ -87,14 +87,16 @@ FLASK_ENV=production
 PYTHONPATH=/app
 ```
 
-### Trading Configuration
+### Configuration
 
-Edit `config/unified.yaml` to configure:
+All configuration is done through environment variables in the `.env` file:
 
 - Market timings
 - Risk management parameters
 - Trading strategies
 - Email notifications
+- Database settings
+- Broker API credentials
 
 ## Architecture
 
@@ -226,7 +228,7 @@ To completely reset the system:
 
 For issues and questions:
 1. Check the logs: `./run.sh logs`
-2. Verify configuration in `.env` and `config/unified.yaml`
+2. Verify configuration in `.env` file
 3. Ensure Docker and Docker Compose are properly installed
 4. Check system resources (memory, disk space)
 

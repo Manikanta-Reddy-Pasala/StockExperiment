@@ -1,68 +1,70 @@
 """
 Configuration Manager for the Automated Trading System
+Uses environment variables with sensible defaults
 """
 import os
-import yaml
 from typing import Dict, Any
 
 
 class ConfigManager:
-    """Manages configuration loading and access for the trading system."""
+    """Manages configuration using environment variables with defaults."""
     
-    def __init__(self, environment: str = "unified"):
-        """
-        Initialize the configuration manager.
-        
-        Args:
-            environment (str): The environment to load configuration for 
-                             (unified is the only supported environment now)
-        """
-        self.environment = environment
-        self.config = {}
-        self.load_config()
+    def __init__(self):
+        """Initialize the configuration manager."""
+        self.config = self._load_config()
     
-    def load_config(self):
-        """Load configuration from YAML files."""
-        # Load base configuration
-        base_config_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), 
-            "config", 
-            "base.yaml"
-        )
-        
-        if os.path.exists(base_config_path):
-            with open(base_config_path, 'r') as f:
-                self.config = yaml.safe_load(f) or {}
-        
-        # Load unified configuration
-        env_config_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), 
-            "config", 
-            f"{self.environment}.yaml"
-        )
-        
-        if os.path.exists(env_config_path):
-            with open(env_config_path, 'r') as f:
-                env_config = yaml.safe_load(f) or {}
-                self.config = self._merge_configs(self.config, env_config)
-    
-    def _merge_configs(self, base: Dict, override: Dict) -> Dict:
-        """
-        Recursively merge two configuration dictionaries.
-        
-        Args:
-            base (Dict): Base configuration
-            override (Dict): Override configuration
-            
-        Returns:
-            Dict: Merged configuration
-        """
-        for key, value in override.items():
-            if key in base and isinstance(base[key], dict) and isinstance(value, dict):
-                base[key] = self._merge_configs(base[key], value)
-            else:
-                base[key] = value
-        return base
+    def _load_config(self) -> Dict[str, Any]:
+        """Load configuration from environment variables with defaults."""
+        return {
+            'system': {
+                'name': os.getenv('SYSTEM_NAME', 'Automated Trading System'),
+                'version': os.getenv('SYSTEM_VERSION', '1.0.0'),
+                'log_level': os.getenv('LOG_LEVEL', 'INFO')
+            },
+            'trading': {
+                'market_open': os.getenv('MARKET_OPEN', '09:15'),
+                'market_close': os.getenv('MARKET_CLOSE', '15:30'),
+                'pre_open_start': os.getenv('PRE_OPEN_START', '09:00'),
+                'pre_open_end': os.getenv('PRE_OPEN_END', '09:15'),
+                'live_trading': os.getenv('LIVE_TRADING', 'false').lower() == 'true'
+            },
+            'risk': {
+                'max_capital_per_trade': float(os.getenv('MAX_CAPITAL_PER_TRADE', '0.01')),
+                'max_concurrent_trades': int(os.getenv('MAX_CONCURRENT_TRADES', '10')),
+                'daily_loss_limit': float(os.getenv('DAILY_LOSS_LIMIT', '0.02')),
+                'single_name_exposure_limit': float(os.getenv('SINGLE_NAME_EXPOSURE_LIMIT', '0.05'))
+            },
+            'momentum': {
+                'universe': os.getenv('MOMENTUM_UNIVERSE', 'NIFTY_100'),
+                'rebalance_cadence': os.getenv('MOMENTUM_REBALANCE_CADENCE', 'daily'),
+                'lookback_period': int(os.getenv('MOMENTUM_LOOKBACK_PERIOD', '20')),
+                'min_volume_filter': int(os.getenv('MOMENTUM_MIN_VOLUME_FILTER', '100000'))
+            },
+            'database': {
+                'url': os.getenv('DATABASE_URL', 'postgresql://trader:trader_password@database:5432/trading_system'),
+                'host': os.getenv('POSTGRES_HOST', 'database'),
+                'port': int(os.getenv('POSTGRES_PORT', '5432')),
+                'name': os.getenv('POSTGRES_DB', 'trading_system'),
+                'user': os.getenv('POSTGRES_USER', 'trader'),
+                'password': os.getenv('POSTGRES_PASSWORD', 'trader_password')
+            },
+            'web': {
+                'host': os.getenv('WEB_HOST', '0.0.0.0'),
+                'port': int(os.getenv('WEB_PORT', '5001')),
+                'debug': os.getenv('WEB_DEBUG', 'false').lower() == 'true'
+            },
+            'email': {
+                'smtp_host': os.getenv('SMTP_HOST', 'smtp.gmail.com'),
+                'smtp_port': int(os.getenv('SMTP_PORT', '587')),
+                'use_tls': os.getenv('SMTP_USE_TLS', 'true').lower() == 'true',
+                'username': os.getenv('SMTP_USERNAME', ''),
+                'password': os.getenv('SMTP_PASSWORD', '')
+            },
+            'broker': {
+                'fyers_client_id': os.getenv('FYERS_CLIENT_ID', 'your_client_id'),
+                'fyers_access_token': os.getenv('FYERS_ACCESS_TOKEN', 'your_access_token')
+            }
+        }
     
     def get(self, key_path: str, default: Any = None) -> Any:
         """
@@ -108,18 +110,14 @@ class ConfigManager:
 config_manager = None
 
 
-def get_config_manager(environment: str = "unified") -> ConfigManager:
+def get_config_manager() -> ConfigManager:
     """
     Get the global configuration manager instance.
     
-    Args:
-        environment (str): The environment to load configuration for
-                          (unified is the only supported environment now)
-        
     Returns:
         ConfigManager: Configuration manager instance
     """
     global config_manager
     if config_manager is None:
-        config_manager = ConfigManager(environment)
+        config_manager = ConfigManager()
     return config_manager

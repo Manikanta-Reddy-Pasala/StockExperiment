@@ -57,7 +57,7 @@ def setup_logging(config: Dict[str, Any]) -> logging.Logger:
 
 def get_database_url(config: Dict[str, Any]) -> str:
     """
-    Get database URL from environment variable or construct from configuration.
+    Get database URL from configuration.
     
     Args:
         config (Dict[str, Any]): Configuration dictionary
@@ -65,16 +65,14 @@ def get_database_url(config: Dict[str, Any]) -> str:
     Returns:
         str: Database connection URL
     """
-    # First check if DATABASE_URL environment variable is set
-    database_url = os.environ.get('DATABASE_URL')
+    database_url = config.get('database', {}).get('url')
     if database_url:
-        logging.getLogger(__name__).info(f"Using DATABASE_URL from environment: {database_url}")
+        logging.getLogger(__name__).info(f"Using database URL from config: {database_url}")
         return database_url
     
-    # If not, construct from configuration
-    logging.getLogger(__name__).info("DATABASE_URL not found in environment, constructing from config")
+    # Fallback: construct from individual components
     db_config = config.get('database', {})
-    host = db_config.get('host', 'localhost')
+    host = db_config.get('host', 'database')
     port = db_config.get('port', 5432)
     name = db_config.get('name', 'trading_system')
     user = db_config.get('user', 'trader')
@@ -116,8 +114,8 @@ def initialize_components(config: Dict[str, Any], multi_user: bool = True):
     
     # Initialize broker connector - use Fyers if available, otherwise simulator
     if FyersConnector is not None:
-        client_id = os.environ.get('FYERS_CLIENT_ID', 'your_client_id')
-        access_token = os.environ.get('FYERS_ACCESS_TOKEN', 'your_access_token')
+        client_id = config.get('broker', {}).get('fyers_client_id', 'your_client_id')
+        access_token = config.get('broker', {}).get('fyers_access_token', 'your_access_token')
         broker_connector = FyersConnector(client_id=client_id, access_token=access_token)
         logger.info("Initialized FyersConnector")
     else:
@@ -189,7 +187,7 @@ def main():
     multi_user = args.multi_user and not args.single_user
     
     # Load configuration
-    config_manager = get_config_manager('unified')
+    config_manager = get_config_manager()
     config = config_manager.config
     
     # Set up logging
