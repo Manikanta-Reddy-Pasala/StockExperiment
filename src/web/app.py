@@ -609,6 +609,156 @@ def create_app():
         except Exception as e:
             return jsonify({'error': str(e)}), 500
     
+    # Admin routes
+    @app.route('/admin/users')
+    @login_required
+    def admin_users():
+        """Admin page for managing users."""
+        if not current_user.is_admin:
+            flash('Access denied. Admin privileges required.', 'error')
+            return redirect(url_for('dashboard'))
+        return render_template('admin/users.html')
+    
+    @app.route('/api/admin/users')
+    @login_required
+    def api_admin_users():
+        """API endpoint for getting all users (admin only)."""
+        if not current_user.is_admin:
+            return jsonify({'error': 'Access denied'}), 403
+        
+        try:
+            with db_manager.get_session() as session:
+                users = session.query(User).all()
+                users_data = [{
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                    'is_active': user.is_active,
+                    'is_admin': user.is_admin,
+                    'created_at': user.created_at.isoformat() if user.created_at else None,
+                    'last_login': user.last_login.isoformat() if user.last_login else None
+                } for user in users]
+            
+            return jsonify(users_data)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+    @app.route('/api/admin/users', methods=['POST'])
+    @login_required
+    def api_create_user():
+        """API endpoint for creating a new user (admin only)."""
+        if not current_user.is_admin:
+            return jsonify({'error': 'Access denied'}), 403
+        
+        try:
+            data = request.get_json()
+            username = data.get('username')
+            email = data.get('email')
+            password = data.get('password')
+            first_name = data.get('first_name', '')
+            last_name = data.get('last_name', '')
+            is_admin = data.get('is_admin', False)
+            
+            if not all([username, email, password]):
+                return jsonify({'error': 'Username, email, and password are required'}), 400
+            
+            with db_manager.get_session() as session:
+                # Check if username or email already exists
+                existing_user = session.query(User).filter(
+                    (User.username == username) | (User.email == email)
+                ).first()
+                
+                if existing_user:
+                    return jsonify({'error': 'Username or email already exists'}), 400
+                
+                # Create new user
+                password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+                new_user = User(
+                    username=username,
+                    email=email,
+                    password_hash=password_hash,
+                    first_name=first_name,
+                    last_name=last_name,
+                    is_admin=is_admin,
+                    is_active=True
+                )
+                
+                session.add(new_user)
+                session.commit()
+                
+                return jsonify({
+                    'message': 'User created successfully',
+                    'user_id': new_user.id
+                }), 201
+                
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+    @app.route('/api/admin/users/<int:user_id>', methods=['PUT'])
+    @login_required
+    def api_update_user(user_id):
+        """API endpoint for updating a user (admin only)."""
+        if not current_user.is_admin:
+            return jsonify({'error': 'Access denied'}), 403
+        
+        try:
+            data = request.get_json()
+            
+            with db_manager.get_session() as session:
+                user = session.query(User).filter(User.id == user_id).first()
+                if not user:
+                    return jsonify({'error': 'User not found'}), 404
+                
+                # Update user fields
+                if 'username' in data:
+                    user.username = data['username']
+                if 'email' in data:
+                    user.email = data['email']
+                if 'first_name' in data:
+                    user.first_name = data['first_name']
+                if 'last_name' in data:
+                    user.last_name = data['last_name']
+                if 'is_active' in data:
+                    user.is_active = data['is_active']
+                if 'is_admin' in data:
+                    user.is_admin = data['is_admin']
+                if 'password' in data and data['password']:
+                    user.password_hash = bcrypt.generate_password_hash(data['password']).decode('utf-8')
+                
+                session.commit()
+                
+                return jsonify({'message': 'User updated successfully'})
+                
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+    @app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
+    @login_required
+    def api_delete_user(user_id):
+        """API endpoint for deleting a user (admin only)."""
+        if not current_user.is_admin:
+            return jsonify({'error': 'Access denied'}), 403
+        
+        try:
+            with db_manager.get_session() as session:
+                user = session.query(User).filter(User.id == user_id).first()
+                if not user:
+                    return jsonify({'error': 'User not found'}), 404
+                
+                # Don't allow deleting the current admin user
+                if user.id == current_user.id:
+                    return jsonify({'error': 'Cannot delete your own account'}), 400
+                
+                session.delete(user)
+                session.commit()
+                
+                return jsonify({'message': 'User deleted successfully'})
+                
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
     # Health check endpoint
     @app.route('/health')
     def health_check():

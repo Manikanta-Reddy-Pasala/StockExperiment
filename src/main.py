@@ -108,6 +108,14 @@ def initialize_components(config: Dict[str, Any], multi_user: bool = True):
     db_manager.create_tables()
     logger.info("Database initialized with PostgreSQL")
     
+    # Create admin user
+    try:
+        from admin_setup import create_admin_user
+        create_admin_user()
+        logger.info("Admin user setup completed")
+    except Exception as e:
+        logger.error(f"Failed to create admin user: {e}")
+    
     # Initialize data provider manager
     data_manager = get_data_manager()
     logger.info("Data provider manager initialized")
