@@ -102,11 +102,33 @@ def initialize_components(config: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Failed to create admin user: {e}")
     
+    # Initialize FYERS connector for data provider
+    fyers_connector = None
+    if FyersConnector:
+        try:
+            client_id = config.get('broker', {}).get('fyers_client_id', 'your_client_id')
+            access_token = config.get('broker', {}).get('fyers_access_token', 'your_access_token')
+            fyers_connector = FyersConnector(client_id=client_id, access_token=access_token)
+            logger.info("FYERS connector initialized for data provider")
+        except Exception as e:
+            logger.warning(f"Failed to initialize FYERS connector: {e}")
+    
+    # Initialize enhanced data provider manager with FYERS connector
+    try:
+        from data_sources.fyers_provider import get_enhanced_data_provider_manager
+        data_provider_manager = get_enhanced_data_provider_manager(fyers_connector)
+        logger.info("Enhanced data provider manager initialized")
+    except Exception as e:
+        logger.error(f"Failed to initialize data provider manager: {e}")
+        data_provider_manager = None
+    
     logger.info("New trading system components initialized")
     
     return {
         'config': config,
-        'db_manager': db_manager
+        'db_manager': db_manager,
+        'fyers_connector': fyers_connector,
+        'data_provider_manager': data_provider_manager
     }
 
 

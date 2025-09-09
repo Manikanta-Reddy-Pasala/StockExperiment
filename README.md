@@ -11,6 +11,9 @@ A multi-user automated trading system with Docker Compose deployment.
 - **Risk Management**: Built-in risk controls and position limits
 - **Compliance Logging**: Complete audit trail of all trading activities
 - **Real-time Monitoring**: Live updates on positions, orders, and performance
+- **Multiple Data Sources**: Yahoo Finance + FYERS API for Indian stocks
+- **Email Alerts**: Stock pick notifications and portfolio alerts
+- **Order Management**: Buy/sell orders with stop-loss and take-profit
 
 ## Quick Start
 
@@ -29,8 +32,8 @@ A multi-user automated trading system with Docker Compose deployment.
 
 2. **Set up environment variables**:
    ```bash
-   cp env.example .env
-   # Edit .env with your actual values (all configuration is done here)
+   # Create .env file with your configuration
+   # See Configuration section below for required variables
    ```
 
 3. **Start the application**:
@@ -223,6 +226,52 @@ To completely reset the system:
 ./run.sh cleanup
 ./run.sh start
 ```
+
+## Configuration
+
+Create a `.env` file in the root directory with the following configuration:
+
+```bash
+# Database Configuration
+DATABASE_URL=postgresql://trader:trader_password@localhost:5432/trading_system
+
+# Flask Configuration
+FLASK_ENV=production
+SECRET_KEY=your_secret_key_here
+
+# FYERS API Configuration (for Indian stock data)
+FYERS_CLIENT_ID=your_fyers_client_id
+FYERS_ACCESS_TOKEN=your_fyers_access_token
+
+# Email Configuration (for alerts)
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SENDER_EMAIL=your_email@gmail.com
+SENDER_PASSWORD=your_app_password
+
+# OpenAI API (for ChatGPT integration)
+OPENAI_API_KEY=your_openai_api_key
+
+# Admin User Configuration
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=admin123
+ADMIN_EMAIL=admin@example.com
+
+# System Configuration
+LOG_LEVEL=INFO
+```
+
+### Data Sources
+
+The system supports multiple data sources for Indian stocks:
+
+1. **Yahoo Finance** - Free, always available (fallback)
+2. **FYERS API** - Premium Indian stock data (primary for Indian stocks)
+
+**FYERS API Setup:**
+1. Get your FYERS API credentials from [FYERS Developer Portal](https://api-docs.fyers.in/)
+2. Add your `FYERS_CLIENT_ID` and `FYERS_ACCESS_TOKEN` to the `.env` file
+3. The system will automatically use FYERS for Indian stocks and fall back to Yahoo Finance if needed
 
 ## Support
 

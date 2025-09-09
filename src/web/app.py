@@ -956,9 +956,9 @@ def create_app():
     @app.route('/api/data/stock-data', methods=['POST'])
     @login_required
     def get_stock_data():
-        """Get stock data from multiple sources."""
+        """Get stock data from multiple sources including FYERS API."""
         try:
-            from data_sources.data_provider import get_data_provider_manager
+            from data_sources.fyers_provider import get_enhanced_data_provider_manager
             
             data = request.get_json()
             symbol = data.get('symbol')
@@ -966,7 +966,9 @@ def create_app():
             if not symbol:
                 return jsonify({'error': 'Symbol required'}), 400
             
-            provider_manager = get_data_provider_manager()
+            # Get FYERS connector from app context if available
+            fyers_connector = getattr(app, 'fyers_connector', None)
+            provider_manager = get_enhanced_data_provider_manager(fyers_connector)
             stock_data = provider_manager.get_stock_data(symbol)
             
             if not stock_data:
@@ -986,7 +988,7 @@ def create_app():
     def get_current_price():
         """Get current price for a stock."""
         try:
-            from data_sources.data_provider import get_data_provider_manager
+            from data_sources.fyers_provider import get_enhanced_data_provider_manager
             
             data = request.get_json()
             symbol = data.get('symbol')
@@ -994,7 +996,9 @@ def create_app():
             if not symbol:
                 return jsonify({'error': 'Symbol required'}), 400
             
-            provider_manager = get_data_provider_manager()
+            # Get FYERS connector from app context if available
+            fyers_connector = getattr(app, 'fyers_connector', None)
+            provider_manager = get_enhanced_data_provider_manager(fyers_connector)
             price = provider_manager.get_current_price(symbol)
             
             if price is None:
@@ -1015,9 +1019,11 @@ def create_app():
     def get_data_providers():
         """Get list of available data providers."""
         try:
-            from data_sources.data_provider import get_data_provider_manager
+            from data_sources.fyers_provider import get_enhanced_data_provider_manager
             
-            provider_manager = get_data_provider_manager()
+            # Get FYERS connector from app context if available
+            fyers_connector = getattr(app, 'fyers_connector', None)
+            provider_manager = get_enhanced_data_provider_manager(fyers_connector)
             providers = provider_manager.get_available_providers()
             
             return jsonify({
