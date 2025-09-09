@@ -1,3 +1,1 @@
-"""
-Analytics Module
-"""
+# Analytics module for performance tracking

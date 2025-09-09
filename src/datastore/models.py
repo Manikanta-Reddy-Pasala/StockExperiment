@@ -248,3 +248,144 @@ class SelectedStock(Base):
     
     # Relationship with user
     user = relationship("User", back_populates="selected_stocks")
+
+
+class ScreenedStock(Base):
+    """Stocks that passed screening criteria."""
+    __tablename__ = 'screened_stocks'
+    
+    id = Column(Integer, primary_key=True)
+    symbol = Column(String(50), nullable=False)
+    name = Column(String(100))
+    sector = Column(String(50))
+    exchange = Column(String(20))
+    market_cap = Column(Float)
+    current_price = Column(Float)
+    screening_date = Column(DateTime, default=datetime.utcnow)
+    screening_criteria = Column(Text)  # JSON string of criteria used
+    financial_data = Column(Text)  # JSON string of financial metrics
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    strategy_selections = relationship("StrategySelection", back_populates="screened_stock")
+
+
+class StrategySelection(Base):
+    """Stocks selected by specific strategies."""
+    __tablename__ = 'strategy_selections'
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    screened_stock_id = Column(Integer, ForeignKey('screened_stocks.id'), nullable=False)
+    strategy_name = Column(String(100), nullable=False)
+    selection_date = Column(DateTime, default=datetime.utcnow)
+    selection_score = Column(Float)  # Strategy-specific score
+    allocation_percentage = Column(Float)  # Portfolio allocation percentage
+    position_size = Column(Integer)  # Number of shares
+    status = Column(String(20), default='Selected')  # Selected, Executed, Exited
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User")
+    screened_stock = relationship("ScreenedStock", back_populates="strategy_selections")
+    dry_run_positions = relationship("DryRunPosition", back_populates="strategy_selection")
+
+
+class DryRunPortfolio(Base):
+    """Dry run portfolio for strategy testing."""
+    __tablename__ = 'dry_run_portfolios'
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    portfolio_id = Column(String(100), unique=True, nullable=False)
+    strategy_name = Column(String(100), nullable=False)
+    initial_capital = Column(Float, nullable=False)
+    current_capital = Column(Float, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    is_active = Column(Boolean, default=True)
+    
+    # Relationships
+    user = relationship("User")
+    positions = relationship("DryRunPosition", back_populates="portfolio")
+    performance_snapshots = relationship("DryRunPerformance", back_populates="portfolio")
+
+
+class DryRunPosition(Base):
+    """Positions in dry run portfolios."""
+    __tablename__ = 'dry_run_positions'
+    
+    id = Column(Integer, primary_key=True)
+    portfolio_id = Column(Integer, ForeignKey('dry_run_portfolios.id'), nullable=False)
+    strategy_selection_id = Column(Integer, ForeignKey('strategy_selections.id'), nullable=False)
+    symbol = Column(String(50), nullable=False)
+    quantity = Column(Integer, nullable=False)
+    entry_price = Column(Float, nullable=False)
+    current_price = Column(Float)
+    average_price = Column(Float)
+    unrealized_pnl = Column(Float)
+    realized_pnl = Column(Float)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    portfolio = relationship("DryRunPortfolio", back_populates="positions")
+    strategy_selection = relationship("StrategySelection", back_populates="dry_run_positions")
+
+
+class DryRunPerformance(Base):
+    """Performance snapshots for dry run portfolios."""
+    __tablename__ = 'dry_run_performance'
+    
+    id = Column(Integer, primary_key=True)
+    portfolio_id = Column(Integer, ForeignKey('dry_run_portfolios.id'), nullable=False)
+    snapshot_date = Column(DateTime, default=datetime.utcnow)
+    portfolio_value = Column(Float, nullable=False)
+    total_return = Column(Float, nullable=False)
+    return_percentage = Column(Float, nullable=False)
+    num_positions = Column(Integer, nullable=False)
+    performance_metrics = Column(Text)  # JSON string of detailed metrics
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    portfolio = relationship("DryRunPortfolio", back_populates="performance_snapshots")
+
+
+class ExecutionLog(Base):
+    """Log of trading workflow executions."""
+    __tablename__ = 'execution_logs'
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    execution_id = Column(String(100), unique=True, nullable=False)
+    execution_type = Column(String(50), nullable=False)  # 'complete_workflow', 'dry_run', 'screening_only'
+    status = Column(String(20), nullable=False)  # 'success', 'error', 'partial'
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime)
+    duration_seconds = Column(Float)
+    screened_stocks_count = Column(Integer, default=0)
+    strategies_executed = Column(Text)  # JSON string of strategy names
+    results_summary = Column(Text)  # JSON string of execution results
+    error_message = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User")
+
+
+class AIAnalysis(Base):
+    """AI analysis results from ChatGPT."""
+    __tablename__ = 'ai_analyses'
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    analysis_type = Column(String(50), nullable=False)  # 'stock', 'portfolio', 'strategy_comparison'
+    target_id = Column(String(100))  # Stock symbol, strategy name, etc.
+    analysis_data = Column(Text, nullable=False)  # JSON string of analysis results
+    confidence_score = Column(Float)
+    recommendation = Column(String(20))  # BUY, HOLD, SELL
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User")

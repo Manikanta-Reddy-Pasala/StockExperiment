@@ -736,6 +736,291 @@ def create_app():
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
+    # Trading System API Endpoints
+    @app.route('/api/trading/run-screening', methods=['POST'])
+    @login_required
+    def run_stock_screening():
+        """Run stock screening process."""
+        try:
+            from screening.stock_screener import StockScreener
+            
+            screener = StockScreener()
+            screened_stocks = screener.run_daily_screening()
+            
+            return jsonify({
+                'success': True,
+                'screened_stocks': screened_stocks,
+                'count': len(screened_stocks),
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to run screening: {str(e)}'}), 500
+
+    @app.route('/api/trading/run-strategies', methods=['POST'])
+    @login_required
+    def run_trading_strategies():
+        """Run trading strategies on screened stocks."""
+        try:
+            from strategies.strategy_engine import StrategyEngine
+            
+            data = request.get_json()
+            screened_stocks = data.get('screened_stocks', [])
+            
+            if not screened_stocks:
+                return jsonify({'error': 'No screened stocks provided'}), 400
+            
+            strategy_engine = StrategyEngine()
+            strategy_results = strategy_engine.run_strategies(screened_stocks)
+            
+            return jsonify({
+                'success': True,
+                'strategy_results': strategy_results,
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to run strategies: {str(e)}'}), 500
+
+    @app.route('/api/trading/run-dry-run', methods=['POST'])
+    @login_required
+    def run_dry_run():
+        """Run dry run mode for strategy testing."""
+        try:
+            from execution.trading_executor import TradingExecutor
+            
+            data = request.get_json()
+            strategy_name = data.get('strategy_name')  # Optional: specific strategy
+            
+            executor = TradingExecutor(user_id=current_user.id)
+            result = executor.run_dry_run_only(strategy_name)
+            
+            return jsonify({
+                'success': True,
+                'dry_run_result': result,
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to run dry run: {str(e)}'}), 500
+
+    @app.route('/api/trading/run-complete-workflow', methods=['POST'])
+    @login_required
+    def run_complete_workflow():
+        """Run complete trading workflow."""
+        try:
+            from execution.trading_executor import TradingExecutor
+            
+            executor = TradingExecutor(user_id=current_user.id)
+            result = executor.run_complete_workflow()
+            
+            return jsonify({
+                'success': True,
+                'execution_result': result,
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to run complete workflow: {str(e)}'}), 500
+
+    @app.route('/api/trading/start-scheduled-execution', methods=['POST'])
+    @login_required
+    def start_scheduled_execution():
+        """Start scheduled execution of trading workflow."""
+        try:
+            from execution.trading_executor import TradingExecutor
+            
+            data = request.get_json()
+            interval_hours = data.get('interval_hours', 1)
+            
+            executor = TradingExecutor(user_id=current_user.id)
+            executor.start_scheduled_execution(interval_hours)
+            
+            return jsonify({
+                'success': True,
+                'message': f'Scheduled execution started with {interval_hours} hour interval',
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to start scheduled execution: {str(e)}'}), 500
+
+    @app.route('/api/trading/stop-scheduled-execution', methods=['POST'])
+    @login_required
+    def stop_scheduled_execution():
+        """Stop scheduled execution."""
+        try:
+            from execution.trading_executor import TradingExecutor
+            
+            executor = TradingExecutor(user_id=current_user.id)
+            executor.stop_scheduled_execution()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Scheduled execution stopped',
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to stop scheduled execution: {str(e)}'}), 500
+
+    @app.route('/api/trading/execution-status', methods=['GET'])
+    @login_required
+    def get_execution_status():
+        """Get current execution status."""
+        try:
+            from execution.trading_executor import TradingExecutor
+            
+            executor = TradingExecutor(user_id=current_user.id)
+            status = executor.get_execution_status()
+            
+            return jsonify({
+                'success': True,
+                'status': status,
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to get execution status: {str(e)}'}), 500
+
+    @app.route('/api/trading/cleanup-dry-run', methods=['POST'])
+    @login_required
+    def cleanup_dry_run():
+        """Clean up dry run portfolios."""
+        try:
+            from execution.trading_executor import TradingExecutor
+            
+            executor = TradingExecutor(user_id=current_user.id)
+            executor.cleanup_dry_run_portfolios()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Dry run portfolios cleaned up',
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to cleanup dry run: {str(e)}'}), 500
+
+    @app.route('/api/analytics/performance-report', methods=['GET'])
+    @login_required
+    def get_performance_report():
+        """Get performance report for strategies."""
+        try:
+            from analytics.performance_tracker import PerformanceTracker
+            
+            strategy_names = request.args.getlist('strategies')
+            lookback_days = int(request.args.get('lookback_days', 90))
+            
+            tracker = PerformanceTracker()
+            report = tracker.generate_performance_report(strategy_names, lookback_days)
+            
+            return jsonify({
+                'success': True,
+                'performance_report': report,
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to get performance report: {str(e)}'}), 500
+
+    @app.route('/api/analytics/strategy-comparison', methods=['GET'])
+    @login_required
+    def get_strategy_comparison():
+        """Get strategy comparison analysis."""
+        try:
+            from analytics.performance_tracker import PerformanceTracker
+            
+            strategy_names = request.args.getlist('strategies')
+            
+            tracker = PerformanceTracker()
+            comparison = tracker.compare_strategies(strategy_names)
+            
+            return jsonify({
+                'success': True,
+                'strategy_comparison': comparison,
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to get strategy comparison: {str(e)}'}), 500
+
+    @app.route('/api/ai/analyze-stock', methods=['POST'])
+    @login_required
+    def analyze_stock_with_ai():
+        """Analyze a stock using ChatGPT."""
+        try:
+            from analysis.chatgpt_analyzer import ChatGPTAnalyzer
+            
+            data = request.get_json()
+            stock_data = data.get('stock_data')
+            
+            if not stock_data:
+                return jsonify({'error': 'Stock data required'}), 400
+            
+            analyzer = ChatGPTAnalyzer()
+            analysis = analyzer.analyze_stock(stock_data)
+            
+            return jsonify({
+                'success': True,
+                'ai_analysis': analysis,
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to analyze stock: {str(e)}'}), 500
+
+    @app.route('/api/ai/analyze-portfolio', methods=['POST'])
+    @login_required
+    def analyze_portfolio_with_ai():
+        """Analyze a portfolio using ChatGPT."""
+        try:
+            from analysis.chatgpt_analyzer import ChatGPTAnalyzer
+            
+            data = request.get_json()
+            selected_stocks = data.get('selected_stocks', [])
+            strategy_name = data.get('strategy_name', 'Unknown')
+            
+            if not selected_stocks:
+                return jsonify({'error': 'Selected stocks required'}), 400
+            
+            analyzer = ChatGPTAnalyzer()
+            analysis = analyzer.analyze_portfolio(selected_stocks, strategy_name)
+            
+            return jsonify({
+                'success': True,
+                'ai_analysis': analysis,
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to analyze portfolio: {str(e)}'}), 500
+
+    @app.route('/api/ai/compare-strategies', methods=['POST'])
+    @login_required
+    def compare_strategies_with_ai():
+        """Compare strategies using ChatGPT."""
+        try:
+            from analysis.chatgpt_analyzer import ChatGPTAnalyzer
+            
+            data = request.get_json()
+            strategy_results = data.get('strategy_results', {})
+            
+            if not strategy_results:
+                return jsonify({'error': 'Strategy results required'}), 400
+            
+            analyzer = ChatGPTAnalyzer()
+            comparison = analyzer.compare_strategies(strategy_results)
+            
+            return jsonify({
+                'success': True,
+                'ai_comparison': comparison,
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to compare strategies: {str(e)}'}), 500
+
     # Health check endpoint
     @app.route('/health')
     def health_check():
