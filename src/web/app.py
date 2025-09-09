@@ -78,60 +78,6 @@ def create_app():
         
         return render_template('login.html')
     
-    @app.route('/register', methods=['GET', 'POST'])
-    def register():
-        """Registration page."""
-        if request.method == 'POST':
-            username = request.form.get('username')
-            email = request.form.get('email')
-            password = request.form.get('password')
-            confirm_password = request.form.get('confirm_password')
-            first_name = request.form.get('first_name')
-            last_name = request.form.get('last_name')
-            
-            # Validation
-            if not all([username, email, password, confirm_password]):
-                flash('Please fill in all required fields.', 'error')
-                return render_template('register.html')
-            
-            if password != confirm_password:
-                flash('Passwords do not match.', 'error')
-                return render_template('register.html')
-            
-            if len(password) < 6:
-                flash('Password must be at least 6 characters long.', 'error')
-                return render_template('register.html')
-            
-            with db_manager.get_session() as db_session:
-                # Check if username or email already exists
-                existing_user = db_session.query(User).filter(
-                    (User.username == username) | (User.email == email)
-                ).first()
-                
-                if existing_user:
-                    if existing_user.username == username:
-                        flash('Username already exists.', 'error')
-                    else:
-                        flash('Email already registered.', 'error')
-                    return render_template('register.html')
-                
-                # Create new user
-                password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
-                new_user = User(
-                    username=username,
-                    email=email,
-                    password_hash=password_hash,
-                    first_name=first_name,
-                    last_name=last_name
-                )
-                
-                db_session.add(new_user)
-                db_session.commit()
-                
-                flash('Registration successful! Please log in.', 'success')
-                return redirect(url_for('login'))
-        
-        return render_template('register.html')
     
     @app.route('/logout')
     @login_required
