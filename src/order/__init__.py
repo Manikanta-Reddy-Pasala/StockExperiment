@@ -1,3 +1,0 @@
-"""
-Order Routing Module
-"""

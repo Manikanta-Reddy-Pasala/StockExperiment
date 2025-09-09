@@ -1,3 +1,0 @@
-"""
-Momentum Stock Selector Module
-"""

@@ -17,6 +17,7 @@ yfinance==0.2.37
 matplotlib==3.8.3
 seaborn==0.12.2
 openai==0.27.8
+requests==2.31.0
 fyers-apiv3==3.1.7
 
 # Testing

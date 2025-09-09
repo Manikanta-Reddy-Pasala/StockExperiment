@@ -7,7 +7,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 from datastore.database import get_database_manager
 from datastore.models import User, Configuration
-from selector.selector_engine import SelectorEngine
+# Removed old selector system - using new strategies system instead
 from risk.risk_manager import RiskManager
 from order.order_router import OrderRouter
 from simulator.simulator import Simulator

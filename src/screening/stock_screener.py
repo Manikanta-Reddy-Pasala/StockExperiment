@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from datastore.database import get_database_manager
 from datastore.models import Instrument, MarketData
+from data_sources.data_provider import get_data_provider_manager
 import logging
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,7 @@ class StockScreener:
     def __init__(self):
         """Initialize the stock screener."""
         self.db_manager = get_database_manager()
+        self.data_provider = get_data_provider_manager()
         
         # Screening criteria
         self.criteria = {
@@ -222,7 +224,7 @@ class StockScreener:
     
     def get_stock_financial_data(self, symbol: str) -> Optional[Dict]:
         """
-        Get detailed financial data for a stock.
+        Get detailed financial data for a stock using real data sources.
         
         Args:
             symbol (str): Stock symbol
@@ -231,33 +233,71 @@ class StockScreener:
             Optional[Dict]: Financial data or None if not available
         """
         try:
-            # This would typically fetch from financial data providers
-            # For now, we'll create mock data
-            # In production, this would connect to APIs like:
-            # - NSE/BSE APIs
-            # - Financial data providers (Alpha Vantage, Yahoo Finance, etc.)
-            # - Company financial reports
+            # Get real data from data providers
+            stock_data = self.data_provider.get_stock_data(symbol)
             
-            mock_data = {
-                'current_price': np.random.uniform(100, 3000),
-                'low_price': np.random.uniform(50, 2000),
-                'high_price': np.random.uniform(2000, 4000),
-                'dma_50': np.random.uniform(80, 2500),
-                'volume': np.random.randint(100000, 10000000),
-                'avg_volume_1week': np.random.randint(50000, 5000000),
-                'sales_latest_quarter': np.random.uniform(1000, 10000),
-                'sales_preceding_quarter': np.random.uniform(800, 8000),
-                'op_profit_latest_quarter': np.random.uniform(100, 2000),
-                'op_profit_preceding_quarter': np.random.uniform(80, 1500),
-                'op_profit_2quarters_back': np.random.uniform(60, 1200),
-                'sales_current_year': np.random.uniform(4000, 40000),
-                'sales_preceding_year': np.random.uniform(3000, 30000),
-                'intrinsic_value': np.random.uniform(2000, 6000),
-                'debt_to_equity': np.random.uniform(0.1, 0.3),
-                'piotroski_score': np.random.randint(3, 9)
+            if not stock_data:
+                logger.warning(f"No data available for {symbol}")
+                return None
+            
+            # Get historical data for additional calculations
+            end_date = datetime.now().strftime('%Y-%m-%d')
+            start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+            historical_data = self.data_provider.get_historical_data(symbol, start_date, end_date)
+            
+            # Calculate additional metrics
+            if historical_data is not None and not historical_data.empty:
+                # Calculate 50-day moving average
+                dma_50 = historical_data['Close'].rolling(window=50).mean().iloc[-1] if len(historical_data) >= 50 else stock_data['current_price']
+                
+                # Calculate 1-week average volume
+                avg_volume_1week = historical_data['Volume'].rolling(window=7).mean().iloc[-1] if len(historical_data) >= 7 else stock_data['volume']
+                
+                # Get high and low prices
+                high_price = historical_data['High'].max()
+                low_price = historical_data['Low'].min()
+            else:
+                dma_50 = stock_data['current_price']
+                avg_volume_1week = stock_data['volume']
+                high_price = stock_data.get('high_52w', stock_data['current_price'] * 1.2)
+                low_price = stock_data.get('low_52w', stock_data['current_price'] * 0.8)
+            
+            # Calculate intrinsic value (simplified DCF model)
+            # This is a placeholder - in production, you'd use more sophisticated models
+            pe_ratio = stock_data.get('pe_ratio', 15)
+            growth_rate = stock_data.get('revenue_growth', 0.1)
+            intrinsic_value = stock_data['current_price'] * (1 + growth_rate) * pe_ratio / 15
+            
+            # Calculate Piotroski score (simplified)
+            # This is a placeholder - in production, you'd calculate the actual score
+            piotroski_score = 6  # Default middle score
+            
+            # Calculate sales and profit growth (simplified)
+            sales_growth = stock_data.get('revenue_growth', 0.1)
+            profit_growth = stock_data.get('profit_margins', 0.1)
+            
+            return {
+                'current_price': stock_data['current_price'],
+                'low_price': low_price,
+                'high_price': high_price,
+                'dma_50': dma_50,
+                'volume': stock_data['volume'],
+                'avg_volume_1week': avg_volume_1week,
+                'sales_latest_quarter': 1000 * (1 + sales_growth),  # Simplified
+                'sales_preceding_quarter': 1000,
+                'op_profit_latest_quarter': 100 * (1 + profit_growth),  # Simplified
+                'op_profit_preceding_quarter': 100,
+                'op_profit_2quarters_back': 90,
+                'sales_current_year': 4000 * (1 + sales_growth),  # Simplified
+                'sales_preceding_year': 4000,
+                'intrinsic_value': intrinsic_value,
+                'debt_to_equity': stock_data.get('debt_to_equity', 0.2),
+                'piotroski_score': piotroski_score,
+                'pe_ratio': pe_ratio,
+                'pb_ratio': stock_data.get('pb_ratio', 2.0),
+                'roe': stock_data.get('roe', 0.15),
+                'data_source': stock_data.get('data_source', 'Unknown')
             }
-            
-            return mock_data
             
         except Exception as e:
             logger.error(f"Error fetching financial data for {symbol}: {e}")

@@ -484,76 +484,7 @@ def create_app():
         except Exception as e:
             return jsonify({'error': str(e)}), 500
     
-    # Multi-user trading engine API endpoints
-    @app.route('/api/trading_engine/status')
-    @login_required
-    def trading_engine_status():
-        """API endpoint for trading engine status."""
-        try:
-            # This would need to be passed from the main application
-            # For now, we'll return a placeholder response
-            return jsonify({
-                'status': 'running',
-                'message': 'Multi-user trading engine is running',
-                'active_users': 0,
-                'mode': 'development'
-            })
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-    
-    @app.route('/api/trading_engine/user_session')
-    @login_required
-    def user_trading_session():
-        """API endpoint for current user's trading session status."""
-        try:
-            # This would need to be passed from the main application
-            # For now, we'll return a placeholder response
-            return jsonify({
-                'user_id': current_user.id,
-                'username': current_user.username,
-                'is_active': True,
-                'last_activity': datetime.utcnow().isoformat(),
-                'trading_state': {
-                    'last_scan_time': None,
-                    'selected_stocks': [],
-                    'active_orders': [],
-                    'positions': {},
-                    'daily_pnl': 0.0,
-                    'risk_metrics': {}
-                }
-            })
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-    
-    @app.route('/api/trading_engine/start_session', methods=['POST'])
-    @login_required
-    def start_trading_session():
-        """API endpoint to start a trading session for the current user."""
-        try:
-            # This would need to be passed from the main application
-            # For now, we'll return a placeholder response
-            return jsonify({
-                'status': 'success',
-                'message': f'Trading session started for user {current_user.username}',
-                'user_id': current_user.id
-            })
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-    
-    @app.route('/api/trading_engine/stop_session', methods=['POST'])
-    @login_required
-    def stop_trading_session():
-        """API endpoint to stop a trading session for the current user."""
-        try:
-            # This would need to be passed from the main application
-            # For now, we'll return a placeholder response
-            return jsonify({
-                'status': 'success',
-                'message': f'Trading session stopped for user {current_user.username}',
-                'user_id': current_user.id
-            })
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
+    # Removed old trading engine API endpoints - using new trading executor system instead
     
     # Admin routes
     @app.route('/admin/users')
@@ -1020,6 +951,305 @@ def create_app():
             
         except Exception as e:
             return jsonify({'error': f'Failed to compare strategies: {str(e)}'}), 500
+
+    # Data Sources API Endpoints
+    @app.route('/api/data/stock-data', methods=['POST'])
+    @login_required
+    def get_stock_data():
+        """Get stock data from multiple sources."""
+        try:
+            from data_sources.data_provider import get_data_provider_manager
+            
+            data = request.get_json()
+            symbol = data.get('symbol')
+            
+            if not symbol:
+                return jsonify({'error': 'Symbol required'}), 400
+            
+            provider_manager = get_data_provider_manager()
+            stock_data = provider_manager.get_stock_data(symbol)
+            
+            if not stock_data:
+                return jsonify({'error': f'No data available for {symbol}'}), 404
+            
+            return jsonify({
+                'success': True,
+                'stock_data': stock_data,
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to get stock data: {str(e)}'}), 500
+
+    @app.route('/api/data/current-price', methods=['POST'])
+    @login_required
+    def get_current_price():
+        """Get current price for a stock."""
+        try:
+            from data_sources.data_provider import get_data_provider_manager
+            
+            data = request.get_json()
+            symbol = data.get('symbol')
+            
+            if not symbol:
+                return jsonify({'error': 'Symbol required'}), 400
+            
+            provider_manager = get_data_provider_manager()
+            price = provider_manager.get_current_price(symbol)
+            
+            if price is None:
+                return jsonify({'error': f'No price data available for {symbol}'}), 404
+            
+            return jsonify({
+                'success': True,
+                'symbol': symbol,
+                'current_price': price,
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to get current price: {str(e)}'}), 500
+
+    @app.route('/api/data/providers', methods=['GET'])
+    @login_required
+    def get_data_providers():
+        """Get list of available data providers."""
+        try:
+            from data_sources.data_provider import get_data_provider_manager
+            
+            provider_manager = get_data_provider_manager()
+            providers = provider_manager.get_available_providers()
+            
+            return jsonify({
+                'success': True,
+                'providers': providers,
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to get data providers: {str(e)}'}), 500
+
+    # Email Alerts API Endpoints
+    @app.route('/api/alerts/send-stock-pick', methods=['POST'])
+    @login_required
+    def send_stock_pick_alert():
+        """Send stock pick alert via email."""
+        try:
+            from alerts.email_alerts import get_email_alert_manager
+            
+            data = request.get_json()
+            stock_data = data.get('stock_data')
+            strategy_name = data.get('strategy_name', 'Unknown')
+            recommendation = data.get('recommendation', 'BUY')
+            
+            if not stock_data:
+                return jsonify({'error': 'Stock data required'}), 400
+            
+            alert_manager = get_email_alert_manager()
+            success = alert_manager.send_stock_pick_alert(
+                current_user.id, stock_data, strategy_name, recommendation
+            )
+            
+            return jsonify({
+                'success': success,
+                'message': 'Stock pick alert sent' if success else 'Failed to send alert',
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200 if success else 500
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to send stock pick alert: {str(e)}'}), 500
+
+    @app.route('/api/alerts/send-portfolio-alert', methods=['POST'])
+    @login_required
+    def send_portfolio_alert():
+        """Send portfolio alert via email."""
+        try:
+            from alerts.email_alerts import get_email_alert_manager
+            
+            data = request.get_json()
+            portfolio_data = data.get('portfolio_data', {})
+            alert_type = data.get('alert_type', 'general')
+            
+            alert_manager = get_email_alert_manager()
+            success = alert_manager.send_portfolio_alert(
+                current_user.id, portfolio_data, alert_type
+            )
+            
+            return jsonify({
+                'success': success,
+                'message': 'Portfolio alert sent' if success else 'Failed to send alert',
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200 if success else 500
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to send portfolio alert: {str(e)}'}), 500
+
+    # Order Management API Endpoints
+    @app.route('/api/orders/create-buy-order', methods=['POST'])
+    @login_required
+    def create_buy_order():
+        """Create a buy order."""
+        try:
+            from orders.order_manager import get_order_manager, OrderType
+            
+            data = request.get_json()
+            symbol = data.get('symbol')
+            quantity = data.get('quantity')
+            order_type = data.get('order_type', 'MARKET')
+            price = data.get('price')
+            stop_loss_price = data.get('stop_loss_price')
+            take_profit_price = data.get('take_profit_price')
+            
+            if not symbol or not quantity:
+                return jsonify({'error': 'Symbol and quantity required'}), 400
+            
+            order_manager = get_order_manager()
+            order_id = order_manager.create_buy_order(
+                current_user.id, symbol, quantity, 
+                OrderType(order_type), price, stop_loss_price, take_profit_price
+            )
+            
+            if not order_id:
+                return jsonify({'error': 'Failed to create buy order'}), 500
+            
+            return jsonify({
+                'success': True,
+                'order_id': order_id,
+                'message': 'Buy order created successfully',
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to create buy order: {str(e)}'}), 500
+
+    @app.route('/api/orders/create-sell-order', methods=['POST'])
+    @login_required
+    def create_sell_order():
+        """Create a sell order."""
+        try:
+            from orders.order_manager import get_order_manager, OrderType
+            
+            data = request.get_json()
+            symbol = data.get('symbol')
+            quantity = data.get('quantity')
+            order_type = data.get('order_type', 'MARKET')
+            price = data.get('price')
+            
+            if not symbol or not quantity:
+                return jsonify({'error': 'Symbol and quantity required'}), 400
+            
+            order_manager = get_order_manager()
+            order_id = order_manager.create_sell_order(
+                current_user.id, symbol, quantity, 
+                OrderType(order_type), price
+            )
+            
+            if not order_id:
+                return jsonify({'error': 'Failed to create sell order'}), 500
+            
+            return jsonify({
+                'success': True,
+                'order_id': order_id,
+                'message': 'Sell order created successfully',
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to create sell order: {str(e)}'}), 500
+
+    @app.route('/api/orders/cancel-order', methods=['POST'])
+    @login_required
+    def cancel_order():
+        """Cancel an order."""
+        try:
+            from orders.order_manager import get_order_manager
+            
+            data = request.get_json()
+            order_id = data.get('order_id')
+            
+            if not order_id:
+                return jsonify({'error': 'Order ID required'}), 400
+            
+            order_manager = get_order_manager()
+            success = order_manager.cancel_order(order_id)
+            
+            if not success:
+                return jsonify({'error': 'Failed to cancel order'}), 500
+            
+            return jsonify({
+                'success': True,
+                'message': 'Order cancelled successfully',
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to cancel order: {str(e)}'}), 500
+
+    @app.route('/api/orders/user-orders', methods=['GET'])
+    @login_required
+    def get_user_orders():
+        """Get user's orders."""
+        try:
+            from orders.order_manager import get_order_manager, OrderStatus
+            
+            status = request.args.get('status')
+            order_status = OrderStatus(status) if status else None
+            
+            order_manager = get_order_manager()
+            orders = order_manager.get_user_orders(current_user.id, order_status)
+            
+            return jsonify({
+                'success': True,
+                'orders': orders,
+                'count': len(orders),
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to get user orders: {str(e)}'}), 500
+
+    @app.route('/api/orders/user-positions', methods=['GET'])
+    @login_required
+    def get_user_positions():
+        """Get user's positions."""
+        try:
+            from orders.order_manager import get_order_manager
+            
+            order_manager = get_order_manager()
+            positions = order_manager.get_user_positions(current_user.id)
+            
+            return jsonify({
+                'success': True,
+                'positions': positions,
+                'count': len(positions),
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to get user positions: {str(e)}'}), 500
+
+    @app.route('/api/orders/user-trades', methods=['GET'])
+    @login_required
+    def get_user_trades():
+        """Get user's trades."""
+        try:
+            from orders.order_manager import get_order_manager
+            
+            days = int(request.args.get('days', 30))
+            
+            order_manager = get_order_manager()
+            trades = order_manager.get_user_trades(current_user.id, days)
+            
+            return jsonify({
+                'success': True,
+                'trades': trades,
+                'count': len(trades),
+                'days': days,
+                'timestamp': datetime.utcnow().isoformat()
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': f'Failed to get user trades: {str(e)}'}), 500
 
     # Health check endpoint
     @app.route('/health')
