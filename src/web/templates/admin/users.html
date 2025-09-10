@@ -5,7 +5,7 @@
 {% block page_title %}User Management{% endblock %}
 
 <style>
-    /* Dark theme styles for admin pages */
+    /* Simple, clean dark theme styles */
     .dark-theme .card {
         background-color: #1e1e1e;
         color: #e0e0e0;
@@ -39,19 +39,6 @@
     .dark-theme .table-striped > tbody > tr:nth-of-type(even) {
         background-color: #1e1e1e;
     }
-    .dark-theme .form-control, 
-    .dark-theme .form-select {
-        background-color: #2d2d2d;
-        color: #e0e0e0;
-        border: 1px solid #444;
-    }
-    .dark-theme .form-control:focus, 
-    .dark-theme .form-select:focus {
-        background-color: #2d2d2d;
-        color: #e0e0e0;
-        border-color: #0d6efd;
-        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
-    }
     .dark-theme .btn-outline-primary {
         color: #6ea8fe;
         border-color: #6ea8fe;
@@ -76,56 +63,6 @@
         background-color: #ea868f;
         color: #000;
     }
-    /* Dark theme for modals */
-    .dark-theme .modal-content {
-        background-color: #1e1e1e;
-        color: #e0e0e0;
-        border: 1px solid #444;
-    }
-    .dark-theme .modal-header,
-    .dark-theme .modal-footer {
-        background-color: #2d2d2d;
-        border-color: #444;
-    }
-    .dark-theme .modal-body .form-label,
-    .dark-theme .modal-body .form-check-label,
-    .dark-theme .modal-title {
-        color: #e0e0e0;
-    }
-    .dark-theme .modal-body .form-control,
-    .dark-theme .modal-body .form-select {
-        background-color: #2d2d2d;
-        color: #e0e0e0;
-        border-color: #444;
-    }
-    .dark-theme .modal-footer .btn-secondary:hover {
-        background-color: #5c636a;
-        border-color: #565e64;
-    }
-    .dark-theme .alert {
-        background-color: #2d2d2d;
-        border-color: #444;
-        color: #e0e0e0;
-    }
-    .dark-theme .alert-warning {
-        background-color: #664d03;
-        border-color: #ffca63;
-        color: #ffca63;
-    }
-    .dark-theme .alert-info {
-        background-color: #084298;
-        border-color: #81bde9;
-        color: #81bde9;
-    }
-    .dark-theme .form-label {
-        color: #e0e0e0;
-    }
-    .dark-theme .form-text {
-        color: #a0a0a0;
-    }
-    .dark-theme .btn-close {
-        filter: invert(1);
-    }
     .dark-theme .badge.bg-success {
         background-color: #75b798 !important;
     }
@@ -146,39 +83,157 @@
         background-color: #6c757d !important;
     }
     
-    /* Dark theme for form checkboxes */
+    /* Essential dark mode styles for form controls */
+    .dark-theme .form-control, 
+    .dark-theme .form-select {
+        background-color: #2d2d2d !important;
+        color: #e0e0e0 !important;
+        border: 1px solid #444 !important;
+    }
+    .dark-theme .form-control:focus, 
+    .dark-theme .form-select:focus {
+        background-color: #2d2d2d !important;
+        color: #e0e0e0 !important;
+        border-color: #0d6efd !important;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+    }
+    .dark-theme .form-label {
+        color: #e0e0e0 !important;
+    }
+    .dark-theme .form-check-label {
+        color: #e0e0e0 !important;
+    }
     .dark-theme .form-check-input {
-        background-color: #2d2d2d;
-        border: 1px solid #444;
+        background-color: #2d2d2d !important;
+        border: 1px solid #444 !important;
     }
     .dark-theme .form-check-input:checked {
-        background-color: #0d6efd;
-        border-color: #0d6efd;
+        background-color: #0d6efd !important;
+        border-color: #0d6efd !important;
     }
     .dark-theme .form-check-input:focus {
-        border-color: #0d6efd;
-        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        border-color: #0d6efd !important;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
     }
     
-    /* Dark theme for modal backdrop */
-    .dark-theme .modal-backdrop {
-        background-color: rgba(0, 0, 0, 0.8);
+    /* AGGRESSIVE Modal dark mode styles - Maximum specificity */
+    body.dark-theme .modal-content,
+    body.dark-theme .modal.show .modal-content,
+    body.dark-theme #addUserModal .modal-content,
+    body.dark-theme #editUserModal .modal-content,
+    body.dark-theme #resetPasswordModal .modal-content {
+        background-color: #1e1e1e !important;
+        color: #e0e0e0 !important;
+        border: 1px solid #444 !important;
     }
     
-    /* Ensure proper contrast for required field asterisks */
-    .dark-theme .form-label {
-        color: #e0e0e0;
+    body.dark-theme .modal-header,
+    body.dark-theme .modal.show .modal-header,
+    body.dark-theme #addUserModal .modal-header,
+    body.dark-theme #editUserModal .modal-header,
+    body.dark-theme #resetPasswordModal .modal-header {
+        background-color: #2d2d2d !important;
+        border-bottom: 1px solid #444 !important;
+        color: #e0e0e0 !important;
     }
     
-    /* Additional modal dark theme fixes */
-    .dark-theme .modal-dialog {
-        color: #e0e0e0;
+    body.dark-theme .modal-body,
+    body.dark-theme .modal.show .modal-body,
+    body.dark-theme #addUserModal .modal-body,
+    body.dark-theme #editUserModal .modal-body,
+    body.dark-theme #resetPasswordModal .modal-body {
+        background-color: #1e1e1e !important;
+        color: #e0e0e0 !important;
     }
-    .dark-theme .modal-content {
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.5);
+    
+    body.dark-theme .modal-footer,
+    body.dark-theme .modal.show .modal-footer,
+    body.dark-theme #addUserModal .modal-footer,
+    body.dark-theme #editUserModal .modal-footer,
+    body.dark-theme #resetPasswordModal .modal-footer {
+        background-color: #2d2d2d !important;
+        border-top: 1px solid #444 !important;
     }
-    .dark-theme .modal-header .btn-close {
-        filter: invert(1) grayscale(100%) brightness(200%);
+    
+    body.dark-theme .modal-title,
+    body.dark-theme .modal.show .modal-title,
+    body.dark-theme #addUserModal .modal-title,
+    body.dark-theme #editUserModal .modal-title,
+    body.dark-theme #resetPasswordModal .modal-title {
+        color: #e0e0e0 !important;
+    }
+    
+    body.dark-theme .btn-close,
+    body.dark-theme .modal.show .btn-close,
+    body.dark-theme #addUserModal .btn-close,
+    body.dark-theme #editUserModal .btn-close,
+    body.dark-theme #resetPasswordModal .btn-close {
+        filter: invert(1) grayscale(100%) brightness(200%) !important;
+    }
+    
+    /* AGGRESSIVE Form control styles - Maximum specificity */
+    body.dark-theme .modal .form-control,
+    body.dark-theme .modal.show .form-control,
+    body.dark-theme #addUserModal .form-control,
+    body.dark-theme #editUserModal .form-control,
+    body.dark-theme #resetPasswordModal .form-control {
+        background-color: #2d2d2d !important;
+        color: #e0e0e0 !important;
+        border: 1px solid #444 !important;
+    }
+    
+    body.dark-theme .modal .form-control:focus,
+    body.dark-theme .modal.show .form-control:focus,
+    body.dark-theme #addUserModal .form-control:focus,
+    body.dark-theme #editUserModal .form-control:focus,
+    body.dark-theme #resetPasswordModal .form-control:focus {
+        background-color: #2d2d2d !important;
+        color: #e0e0e0 !important;
+        border-color: #0d6efd !important;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+    }
+    
+    body.dark-theme .modal .form-label,
+    body.dark-theme .modal.show .form-label,
+    body.dark-theme #addUserModal .form-label,
+    body.dark-theme #editUserModal .form-label,
+    body.dark-theme #resetPasswordModal .form-label {
+        color: #e0e0e0 !important;
+    }
+    
+    body.dark-theme .modal .form-check-label,
+    body.dark-theme .modal.show .form-check-label,
+    body.dark-theme #addUserModal .form-check-label,
+    body.dark-theme #editUserModal .form-check-label,
+    body.dark-theme #resetPasswordModal .form-check-label {
+        color: #e0e0e0 !important;
+    }
+    
+    body.dark-theme .modal .form-check-input,
+    body.dark-theme .modal.show .form-check-input,
+    body.dark-theme #addUserModal .form-check-input,
+    body.dark-theme #editUserModal .form-check-input,
+    body.dark-theme #resetPasswordModal .form-check-input {
+        background-color: #2d2d2d !important;
+        border: 1px solid #444 !important;
+    }
+    
+    body.dark-theme .modal .form-check-input:checked,
+    body.dark-theme .modal.show .form-check-input:checked,
+    body.dark-theme #addUserModal .form-check-input:checked,
+    body.dark-theme #editUserModal .form-check-input:checked,
+    body.dark-theme #resetPasswordModal .form-check-input:checked {
+        background-color: #0d6efd !important;
+        border-color: #0d6efd !important;
+    }
+    
+    body.dark-theme .modal .form-check-input:focus,
+    body.dark-theme .modal.show .form-check-input:focus,
+    body.dark-theme #addUserModal .form-check-input:focus,
+    body.dark-theme #editUserModal .form-check-input:focus,
+    body.dark-theme #resetPasswordModal .form-check-input:focus {
+        border-color: #0d6efd !important;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
     }
 </style>
 
@@ -218,13 +273,13 @@
     </div>
 </div>
 
-<!-- Add User Modal -->
-<div class="modal fade" id="addUserModal" tabindex="-1">
-    <div class="modal-dialog">
+<!-- Add User Modal - Clean Version with Bootstrap CSS Variables -->
+<div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Add New User</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="addUserModalLabel">Add New User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="addUserForm">
                 <div class="modal-body">
@@ -550,7 +605,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <button class="btn btn-sm btn-outline-warning" onclick="resetPassword(${user.id})" title="Reset Password">
                             <i class="bi bi-key"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteUser(${user.id})" ${user.id === {{ current_user.id }} ? 'disabled' : ''} title="Delete User">
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteUser(${user.id})" ${user.id === 0 ? 'disabled' : ''} title="Delete User">
                             <i class="bi bi-trash"></i>
                         </button>
                     </td>
@@ -621,6 +676,172 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     };
+    
+    // FORCE dark mode styling when modals open - ONLY in dark mode
+    function forceDarkMode() {
+        if (document.body.classList.contains('dark-theme')) {
+            // Force apply dark mode to all modals
+            const modals = ['addUserModal', 'editUserModal', 'resetPasswordModal'];
+            modals.forEach(modalId => {
+                const modal = document.getElementById(modalId);
+                if (modal) {
+                    const modalContent = modal.querySelector('.modal-content');
+                    const modalHeader = modal.querySelector('.modal-header');
+                    const modalBody = modal.querySelector('.modal-body');
+                    const modalFooter = modal.querySelector('.modal-footer');
+                    const formControls = modal.querySelectorAll('.form-control');
+                    const formLabels = modal.querySelectorAll('.form-label');
+                    const formCheckLabels = modal.querySelectorAll('.form-check-label');
+                    const formCheckInputs = modal.querySelectorAll('.form-check-input');
+                    const modalTitle = modal.querySelector('.modal-title');
+                    const btnClose = modal.querySelector('.btn-close');
+                    
+                    if (modalContent) {
+                        modalContent.style.setProperty('background-color', '#1e1e1e', 'important');
+                        modalContent.style.setProperty('color', '#e0e0e0', 'important');
+                        modalContent.style.setProperty('border', '1px solid #444', 'important');
+                    }
+                    
+                    if (modalHeader) {
+                        modalHeader.style.setProperty('background-color', '#2d2d2d', 'important');
+                        modalHeader.style.setProperty('border-bottom', '1px solid #444', 'important');
+                        modalHeader.style.setProperty('color', '#e0e0e0', 'important');
+                    }
+                    
+                    if (modalBody) {
+                        modalBody.style.setProperty('background-color', '#1e1e1e', 'important');
+                        modalBody.style.setProperty('color', '#e0e0e0', 'important');
+                    }
+                    
+                    if (modalFooter) {
+                        modalFooter.style.setProperty('background-color', '#2d2d2d', 'important');
+                        modalFooter.style.setProperty('border-top', '1px solid #444', 'important');
+                    }
+                    
+                    formControls.forEach(control => {
+                        control.style.setProperty('background-color', '#2d2d2d', 'important');
+                        control.style.setProperty('color', '#e0e0e0', 'important');
+                        control.style.setProperty('border', '1px solid #444', 'important');
+                    });
+                    
+                    formLabels.forEach(label => {
+                        label.style.setProperty('color', '#e0e0e0', 'important');
+                    });
+                    
+                    formCheckLabels.forEach(label => {
+                        label.style.setProperty('color', '#e0e0e0', 'important');
+                    });
+                    
+                    formCheckInputs.forEach(input => {
+                        input.style.setProperty('background-color', '#2d2d2d', 'important');
+                        input.style.setProperty('border', '1px solid #444', 'important');
+                    });
+                    
+                    if (modalTitle) {
+                        modalTitle.style.setProperty('color', '#e0e0e0', 'important');
+                    }
+                    
+                    if (btnClose) {
+                        btnClose.style.setProperty('filter', 'invert(1) grayscale(100%) brightness(200%)', 'important');
+                    }
+                }
+            });
+        } else {
+            // Reset to light mode - remove all forced styles
+            const modals = ['addUserModal', 'editUserModal', 'resetPasswordModal'];
+            modals.forEach(modalId => {
+                const modal = document.getElementById(modalId);
+                if (modal) {
+                    const modalContent = modal.querySelector('.modal-content');
+                    const modalHeader = modal.querySelector('.modal-header');
+                    const modalBody = modal.querySelector('.modal-body');
+                    const modalFooter = modal.querySelector('.modal-footer');
+                    const formControls = modal.querySelectorAll('.form-control');
+                    const formLabels = modal.querySelectorAll('.form-label');
+                    const formCheckLabels = modal.querySelectorAll('.form-check-label');
+                    const formCheckInputs = modal.querySelectorAll('.form-check-input');
+                    const modalTitle = modal.querySelector('.modal-title');
+                    const btnClose = modal.querySelector('.btn-close');
+                    
+                    if (modalContent) {
+                        modalContent.style.removeProperty('background-color');
+                        modalContent.style.removeProperty('color');
+                        modalContent.style.removeProperty('border');
+                    }
+                    
+                    if (modalHeader) {
+                        modalHeader.style.removeProperty('background-color');
+                        modalHeader.style.removeProperty('border-bottom');
+                        modalHeader.style.removeProperty('color');
+                    }
+                    
+                    if (modalBody) {
+                        modalBody.style.removeProperty('background-color');
+                        modalBody.style.removeProperty('color');
+                    }
+                    
+                    if (modalFooter) {
+                        modalFooter.style.removeProperty('background-color');
+                        modalFooter.style.removeProperty('border-top');
+                    }
+                    
+                    formControls.forEach(control => {
+                        control.style.removeProperty('background-color');
+                        control.style.removeProperty('color');
+                        control.style.removeProperty('border');
+                    });
+                    
+                    formLabels.forEach(label => {
+                        label.style.removeProperty('color');
+                    });
+                    
+                    formCheckLabels.forEach(label => {
+                        label.style.removeProperty('color');
+                    });
+                    
+                    formCheckInputs.forEach(input => {
+                        input.style.removeProperty('background-color');
+                        input.style.removeProperty('border');
+                    });
+                    
+                    if (modalTitle) {
+                        modalTitle.style.removeProperty('color');
+                    }
+                    
+                    if (btnClose) {
+                        btnClose.style.removeProperty('filter');
+                    }
+                }
+            });
+        }
+    }
+    
+    // Apply when modals are shown
+    const modals = ['addUserModal', 'editUserModal', 'resetPasswordModal'];
+    modals.forEach(modalId => {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.addEventListener('shown.bs.modal', function() {
+                forceDarkMode();
+                // Apply again after a short delay
+                setTimeout(forceDarkMode, 100);
+            });
+        }
+    });
+    
+    // Also apply when theme changes
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                forceDarkMode();
+            }
+        });
+    });
+    
+    observer.observe(document.body, {
+        attributes: true,
+        attributeFilter: ['class']
+    });
 });
 </script>
 {% endblock %}
