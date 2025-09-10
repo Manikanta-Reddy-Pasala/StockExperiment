@@ -1,250 +1,114 @@
 """
-FastAPI Trading Strategies Module
+Trading Strategies API
 """
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
+from flask import Blueprint, request, jsonify
+from flask_login import login_required
+from api.common.decorators import api_response, validate_json
+from api.common.errors import ValidationError, InternalServerError
 from datetime import datetime
+import logging
 
-router = APIRouter()
+logger = logging.getLogger(__name__)
 
-class Strategy(BaseModel):
-    id: int
-    name: str
-    description: str
-    parameters: Dict[str, Any]
-    is_active: bool = True
+strategies_bp = Blueprint('strategies', __name__)
 
-class StrategyExecution(BaseModel):
-    screened_stocks: List[str]
-    strategy_name: Optional[str] = None
-    parameters: Optional[Dict[str, Any]] = None
-
-class APIResponse(BaseModel):
-    success: bool
-    data: Optional[dict] = None
-    message: Optional[str] = None
-    timestamp: datetime
-
-@router.get("/list", response_model=APIResponse, summary="Get Available Strategies")
-async def get_strategies():
-    """
-    Get list of available trading strategies.
-    
-    Returns all available trading strategies with their parameters and descriptions.
-    """
-    strategies = [
-        {
-            "id": 1,
-            "name": "Momentum Strategy",
-            "description": "Buys stocks with strong upward momentum",
-            "parameters": {
-                "lookback_period": 20,
-                "momentum_threshold": 0.05,
-                "volume_multiplier": 1.5
-            },
-            "is_active": True
-        },
-        {
-            "id": 2,
-            "name": "Mean Reversion Strategy",
-            "description": "Buys oversold stocks expecting price reversal",
-            "parameters": {
-                "rsi_oversold": 30,
-                "rsi_overbought": 70,
-                "lookback_period": 14
-            },
-            "is_active": True
-        },
-        {
-            "id": 3,
-            "name": "Breakout Strategy",
-            "description": "Buys stocks breaking above resistance levels",
-            "parameters": {
-                "resistance_lookback": 20,
-                "volume_confirmation": True,
-                "breakout_threshold": 0.02
-            },
-            "is_active": True
-        },
-        {
-            "id": 4,
-            "name": "Value Strategy",
-            "description": "Buys undervalued stocks based on fundamental metrics",
-            "parameters": {
-                "max_pe_ratio": 15,
-                "min_dividend_yield": 0.02,
-                "debt_to_equity_max": 0.5
-            },
-            "is_active": False
-        }
-    ]
-    
-    return APIResponse(
-        success=True,
-        data={"strategies": strategies, "count": len(strategies)},
-        timestamp=datetime.utcnow()
-    )
-
-@router.post("/run", response_model=APIResponse, summary="Run Trading Strategies")
-async def run_strategies(execution: StrategyExecution):
-    """
-    Run trading strategies on screened stocks.
-    
-    Executes specified trading strategies on the provided list of screened stocks.
-    
-    - **screened_stocks**: List of stock symbols to analyze
-    - **strategy_name**: Specific strategy to run (optional, runs all if not specified)
-    - **parameters**: Custom parameters for strategy execution
-    """
+@strategies_bp.route('/run', methods=['POST'])
+@login_required
+@validate_json('screened_stocks')
+@api_response
+def run_strategies():
+    """Run trading strategies on screened stocks."""
     try:
-        if not execution.screened_stocks:
-            raise HTTPException(
-                status_code=400,
-                detail="No screened stocks provided"
-            )
+        data = request.get_json()
+        screened_stocks = data.get('screened_stocks', [])
         
-        # Mock strategy execution results
-        strategy_results = {
-            "execution_id": f"exec_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
-            "stocks_analyzed": len(execution.screened_stocks),
-            "strategies_run": ["Momentum Strategy", "Mean Reversion Strategy", "Breakout Strategy"],
-            "recommendations": [
-                {
-                    "symbol": "AAPL",
-                    "strategy": "Momentum Strategy",
-                    "action": "BUY",
-                    "confidence": 0.85,
-                    "target_price": 180.00,
-                    "stop_loss": 170.00,
-                    "reason": "Strong upward momentum with volume confirmation"
-                },
-                {
-                    "symbol": "GOOGL",
-                    "strategy": "Breakout Strategy",
-                    "action": "BUY",
-                    "confidence": 0.78,
-                    "target_price": 150.00,
-                    "stop_loss": 140.00,
-                    "reason": "Breaking above resistance with high volume"
-                },
-                {
-                    "symbol": "MSFT",
-                    "strategy": "Mean Reversion Strategy",
-                    "action": "HOLD",
-                    "confidence": 0.65,
-                    "target_price": 335.00,
-                    "stop_loss": 320.00,
-                    "reason": "Neutral RSI, waiting for better entry point"
-                }
-            ],
-            "summary": {
-                "total_recommendations": 3,
-                "buy_signals": 2,
-                "hold_signals": 1,
-                "sell_signals": 0,
-                "avg_confidence": 0.76
-            }
+        if not screened_stocks:
+            raise ValidationError("No screened stocks provided")
+        
+        from strategies.strategy_engine import StrategyEngine
+        strategy_engine = StrategyEngine()
+        strategy_results = strategy_engine.run_strategies(screened_stocks)
+        
+        return {
+            'strategy_results': strategy_results,
+            'timestamp': datetime.utcnow().isoformat()
         }
-        
-        return APIResponse(
-            success=True,
-            data={"strategy_results": strategy_results},
-            timestamp=datetime.utcnow()
-        )
-        
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to run strategies: {str(e)}"
-        )
+        logger.error(f"Failed to run strategies: {str(e)}")
+        raise InternalServerError(f"Failed to run strategies: {str(e)}")
 
-@router.get("/performance", response_model=APIResponse, summary="Get Strategy Performance")
-async def get_strategy_performance():
-    """
-    Get strategy performance metrics.
-    
-    Returns performance metrics for all trading strategies.
-    """
-    performance = {
-        "overall_performance": {
-            "total_trades": 156,
-            "winning_trades": 98,
-            "losing_trades": 58,
-            "win_rate": 0.628,
-            "total_return": 0.234,
-            "sharpe_ratio": 1.45
-        },
-        "strategy_performance": [
-            {
-                "strategy": "Momentum Strategy",
-                "trades": 45,
-                "win_rate": 0.689,
-                "avg_return": 0.045,
-                "max_drawdown": -0.08
-            },
-            {
-                "strategy": "Mean Reversion Strategy",
-                "trades": 38,
-                "win_rate": 0.605,
-                "avg_return": 0.032,
-                "max_drawdown": -0.12
-            },
-            {
-                "strategy": "Breakout Strategy",
-                "trades": 42,
-                "win_rate": 0.667,
-                "avg_return": 0.051,
-                "max_drawdown": -0.09
-            },
-            {
-                "strategy": "Value Strategy",
-                "trades": 31,
-                "win_rate": 0.548,
-                "avg_return": 0.028,
-                "max_drawdown": -0.15
-            }
-        ]
-    }
-    
-    return APIResponse(
-        success=True,
-        data={"performance": performance},
-        timestamp=datetime.utcnow()
-    )
-
-@router.post("/backtest", response_model=APIResponse, summary="Backtest Strategy")
-async def backtest_strategy(execution: StrategyExecution):
-    """
-    Backtest a trading strategy.
-    
-    Runs a backtest of the specified strategy on historical data.
-    """
+@strategies_bp.route('/list', methods=['GET'])
+@login_required
+@api_response
+def get_strategies():
+    """Get available trading strategies."""
     try:
-        backtest_results = {
-            "backtest_id": f"bt_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
-            "strategy": execution.strategy_name or "All Strategies",
-            "period": "2023-01-01 to 2024-01-01",
-            "initial_capital": 100000,
-            "final_capital": 123400,
-            "total_return": 0.234,
-            "annualized_return": 0.234,
-            "volatility": 0.18,
-            "sharpe_ratio": 1.30,
-            "max_drawdown": -0.12,
-            "win_rate": 0.628,
-            "total_trades": 156,
-            "avg_trade_duration": "5.2 days"
-        }
+        from strategies.strategy_engine import StrategyEngine
+        strategy_engine = StrategyEngine()
+        strategies = strategy_engine.get_available_strategies()
         
-        return APIResponse(
-            success=True,
-            data={"backtest_results": backtest_results},
-            timestamp=datetime.utcnow()
-        )
-        
+        return strategies
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to run backtest: {str(e)}"
-        )
+        logger.error(f"Failed to get strategies: {str(e)}")
+        raise InternalServerError(f"Failed to get strategies: {str(e)}")
+
+@strategies_bp.route('/performance', methods=['GET'])
+@login_required
+@api_response
+def get_strategy_performance():
+    """Get strategy performance metrics."""
+    try:
+        from datastore.database import get_database_manager
+        from datastore.models import Strategy, Trade
+        
+        db_manager = get_database_manager()
+        
+        with db_manager.get_session() as session:
+            strategies = session.query(Strategy).all()
+            
+            performance_data = []
+            for strategy in strategies:
+                # Get trades for this strategy
+                trades = session.query(Trade).filter(Trade.strategy_id == strategy.id).all()
+                
+                if trades:
+                    total_trades = len(trades)
+                    winning_trades = len([t for t in trades if t.pnl > 0])
+                    total_pnl = sum(t.pnl for t in trades)
+                    win_rate = (winning_trades / total_trades) * 100
+                    
+                    performance_data.append({
+                        'strategy_id': strategy.id,
+                        'strategy_name': strategy.name,
+                        'total_trades': total_trades,
+                        'winning_trades': winning_trades,
+                        'win_rate': round(win_rate, 2),
+                        'total_pnl': round(total_pnl, 2),
+                        'avg_pnl': round(total_pnl / total_trades, 2)
+                    })
+            
+            return performance_data
+    except Exception as e:
+        logger.error(f"Failed to get strategy performance: {str(e)}")
+        raise InternalServerError(f"Failed to get strategy performance: {str(e)}")
+
+@strategies_bp.route('/backtest', methods=['POST'])
+@login_required
+@validate_json('strategy_id', 'start_date', 'end_date')
+@api_response
+def run_backtest():
+    """Run backtest for a strategy."""
+    try:
+        data = request.get_json()
+        strategy_id = data.get('strategy_id')
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        
+        from strategies.strategy_engine import StrategyEngine
+        strategy_engine = StrategyEngine()
+        backtest_results = strategy_engine.run_backtest(strategy_id, start_date, end_date)
+        
+        return backtest_results
+    except Exception as e:
+        logger.error(f"Failed to run backtest: {str(e)}")
+        raise InternalServerError(f"Failed to run backtest: {str(e)}")

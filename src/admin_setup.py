@@ -2,16 +2,9 @@
 Admin User Setup for the Trading System
 """
 import os
+from flask_bcrypt import Bcrypt
 from datastore.database import get_database_manager
 from datastore.models import User
-
-# Make Flask-Bcrypt optional for FastAPI compatibility
-try:
-    from flask_bcrypt import Bcrypt
-except ImportError:
-    # Use passlib for FastAPI
-    from passlib.context import CryptContext
-    Bcrypt = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def create_admin_user():
