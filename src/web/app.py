@@ -93,16 +93,6 @@ def create_app():
         """Dashboard page."""
         return render_template('dashboard.html')
     
-    @app.route('/api/portfolio_chart')
-    @login_required
-    def portfolio_chart_data():
-        """API endpoint for positions chart data."""
-        try:
-            chart_data = charts.get_positions_chart_data()
-            return jsonify(chart_data)
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-    
     @app.route('/api/dashboard/metrics')
     @login_required
     def dashboard_metrics():
