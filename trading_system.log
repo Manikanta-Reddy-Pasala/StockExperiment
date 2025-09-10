@@ -856,3 +856,10 @@
  * Running on http://127.0.0.1:5001
  * Running on http://192.168.70.124:5001
 2025-09-10 19:00:04,221 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-09-11 02:32:29,436 - src.main - INFO - Logging initialized with level INFO
+2025-09-11 02:32:29,437 - src.main - INFO - Starting Automated Trading System
+2025-09-11 02:32:29,437 - src.main - INFO - Multi-user mode: True
+2025-09-11 02:32:29,437 - src.main - INFO - Initializing new trading system components
+2025-09-11 02:32:29,437 - src.main - INFO - DATABASE_URL environment variable: NOT SET
+2025-09-11 02:32:29,437 - src.main - INFO - FLASK_ENV environment variable: NOT SET
+2025-09-11 02:32:29,437 - src.main - INFO - Using database URL: postgresql://trader:trader_password@database:5432/trading_system
