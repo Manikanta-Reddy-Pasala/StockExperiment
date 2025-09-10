@@ -168,14 +168,14 @@ class TestUserTradingSession:
                 # Test initial state
                 initial_state = user_session.get_trading_state()
                 assert 'last_scan_time' in initial_state
-                assert 'selected_stocks' in initial_state
+                assert 'suggested_stocks' in initial_state
                 
                 # Test state update
-                updates = {'selected_stocks': ['RELIANCE.NS', 'TCS.NS']}
+                updates = {'suggested_stocks': ['RELIANCE.NS', 'TCS.NS']}
                 user_session.update_trading_state(updates)
                 
                 updated_state = user_session.get_trading_state()
-                assert updated_state['selected_stocks'] == ['RELIANCE.NS', 'TCS.NS']
+                assert updated_state['suggested_stocks'] == ['RELIANCE.NS', 'TCS.NS']
 
 
 class TestMultiUserTradingEngine:
@@ -298,15 +298,15 @@ class TestMultiUserTradingEngine:
             session2 = trading_engine.create_user_session(user2)
             
             # Update trading state for user1
-            session1.update_trading_state({'selected_stocks': ['RELIANCE.NS']})
+            session1.update_trading_state({'suggested_stocks': ['RELIANCE.NS']})
             
             # Verify user2's state is not affected
             user2_state = session2.get_trading_state()
-            assert user2_state['selected_stocks'] == []
+            assert user2_state['suggested_stocks'] == []
             
             # Verify user1's state is correct
             user1_state = session1.get_trading_state()
-            assert user1_state['selected_stocks'] == ['RELIANCE.NS']
+            assert user1_state['suggested_stocks'] == ['RELIANCE.NS']
     
     def test_market_scan_execution(self, trading_engine, db_manager, test_users):
         """Test market scan execution for a user."""
@@ -332,8 +332,8 @@ class TestMultiUserTradingEngine:
                     
                     # Verify trading state was updated
                     state = user_session.get_trading_state()
-                    assert len(state['selected_stocks']) == 1
-                    assert state['selected_stocks'][0]['symbol'] == 'RELIANCE.NS'
+                    assert len(state['suggested_stocks']) == 1
+                    assert state['suggested_stocks'][0] == 'RELIANCE'
 
 
 class TestMultiUserTradingEngineIntegration:

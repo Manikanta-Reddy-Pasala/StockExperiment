@@ -33,7 +33,7 @@ class User(UserMixin, Base):
     strategies = relationship("Strategy", back_populates="user")
     configurations = relationship("Configuration", back_populates="user")
     logs = relationship("Log", back_populates="user")
-    selected_stocks = relationship("SelectedStock", back_populates="user")
+    suggested_stocks = relationship("SuggestedStock", back_populates="user")
     
     def __repr__(self):
         return f'<User {self.username}>'
@@ -230,9 +230,9 @@ class Log(Base):
     user = relationship("User", back_populates="logs")
 
 
-class SelectedStock(Base):
-    """Selected stocks with performance tracking."""
-    __tablename__ = 'selected_stocks'
+class SuggestedStock(Base):
+    """Suggested stocks with performance tracking."""
+    __tablename__ = 'suggested_stocks'
     
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
@@ -247,7 +247,7 @@ class SelectedStock(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationship with user
-    user = relationship("User", back_populates="selected_stocks")
+    user = relationship("User", back_populates="suggested_stocks")
 
 
 class ScreenedStock(Base):

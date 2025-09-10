@@ -67,12 +67,12 @@ class ChatGPTAnalyzer:
             logger.error(f"Error analyzing stock {stock_data.get('symbol', 'unknown')}: {e}")
             return self._get_fallback_analysis(stock_data)
     
-    def analyze_portfolio(self, selected_stocks: List[Dict], strategy_name: str) -> Dict:
+    def analyze_portfolio(self, suggested_stocks: List[Dict], strategy_name: str) -> Dict:
         """
-        Analyze a portfolio of selected stocks.
+        Analyze a portfolio of suggested stocks.
         
         Args:
-            selected_stocks (List[Dict]): List of selected stocks
+            suggested_stocks (List[Dict]): List of suggested stocks
             strategy_name (str): Name of the strategy used
             
         Returns:
@@ -80,7 +80,7 @@ class ChatGPTAnalyzer:
         """
         try:
             # Prepare portfolio information
-            portfolio_info = self._prepare_portfolio_info(selected_stocks, strategy_name)
+            portfolio_info = self._prepare_portfolio_info(suggested_stocks, strategy_name)
             
             # Create portfolio analysis prompt
             prompt = self._create_portfolio_analysis_prompt(portfolio_info)
@@ -89,13 +89,13 @@ class ChatGPTAnalyzer:
             analysis = self._get_chatgpt_response(prompt)
             
             # Parse and structure the response
-            structured_analysis = self._parse_portfolio_analysis_response(analysis, selected_stocks, strategy_name)
+            structured_analysis = self._parse_portfolio_analysis_response(analysis, suggested_stocks, strategy_name)
             
             return structured_analysis
             
         except Exception as e:
             logger.error(f"Error analyzing portfolio for strategy {strategy_name}: {e}")
-            return self._get_fallback_portfolio_analysis(selected_stocks, strategy_name)
+            return self._get_fallback_portfolio_analysis(suggested_stocks, strategy_name)
     
     def compare_strategies(self, strategy_results: Dict[str, List[Dict]]) -> Dict:
         """
@@ -298,7 +298,7 @@ Format your response as JSON with the following structure:
                 'raw_response': response
             }
     
-    def _parse_portfolio_analysis_response(self, response: str, selected_stocks: List[Dict], strategy_name: str) -> Dict:
+    def _parse_portfolio_analysis_response(self, response: str, suggested_stocks: List[Dict], strategy_name: str) -> Dict:
         """Parse ChatGPT response for portfolio analysis."""
         try:
             if "```json" in response:
@@ -311,7 +311,7 @@ Format your response as JSON with the following structure:
             analysis = json.loads(json_str)
             analysis['timestamp'] = datetime.utcnow().isoformat()
             analysis['strategy_name'] = strategy_name
-            analysis['num_stocks'] = len(selected_stocks)
+            analysis['num_stocks'] = len(suggested_stocks)
             
             return analysis
             
@@ -325,7 +325,7 @@ Format your response as JSON with the following structure:
                 'recommendations': ['Analysis pending'],
                 'timestamp': datetime.utcnow().isoformat(),
                 'strategy_name': strategy_name,
-                'num_stocks': len(selected_stocks),
+                'num_stocks': len(suggested_stocks),
                 'raw_response': response
             }
     
@@ -375,7 +375,7 @@ Format your response as JSON with the following structure:
             'fallback': True
         }
     
-    def _get_fallback_portfolio_analysis(self, selected_stocks: List[Dict], strategy_name: str) -> Dict:
+    def _get_fallback_portfolio_analysis(self, suggested_stocks: List[Dict], strategy_name: str) -> Dict:
         """Get fallback portfolio analysis."""
         return {
             'portfolio_rating': 6,
@@ -386,7 +386,7 @@ Format your response as JSON with the following structure:
             'recommendations': ['Monitor performance', 'Review regularly'],
             'timestamp': datetime.utcnow().isoformat(),
             'strategy_name': strategy_name,
-            'num_stocks': len(selected_stocks),
+            'num_stocks': len(suggested_stocks),
             'fallback': True
         }
     
@@ -409,12 +409,12 @@ Format your response as JSON with the following structure:
             'fallback': True
         }
     
-    def _prepare_portfolio_info(self, selected_stocks: List[Dict], strategy_name: str) -> Dict:
+    def _prepare_portfolio_info(self, suggested_stocks: List[Dict], strategy_name: str) -> Dict:
         """Prepare portfolio information for analysis."""
         stock_details = ""
         sector_distribution = {}
         
-        for stock in selected_stocks:
+        for stock in suggested_stocks:
             sector = stock.get('sector', 'Unknown')
             sector_distribution[sector] = sector_distribution.get(sector, 0) + 1
             
@@ -422,7 +422,7 @@ Format your response as JSON with the following structure:
         
         return {
             'strategy_name': strategy_name,
-            'num_stocks': len(selected_stocks),
+            'num_stocks': len(suggested_stocks),
             'stock_details': stock_details,
             'sector_distribution': sector_distribution
         }

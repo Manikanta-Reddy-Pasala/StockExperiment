@@ -5,7 +5,7 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, f
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_bcrypt import Bcrypt
 from datastore.database import get_database_manager
-from datastore.models import Log, Order, Trade, Position, User, Strategy, SelectedStock, Configuration
+from datastore.models import Log, Order, Trade, Position, User, Strategy, SuggestedStock, Configuration
 # Add import for charting
 from charting.db_charts import DatabaseCharts
 from trading_engine.multi_user_trading_engine import MultiUserTradingEngine
@@ -132,47 +132,6 @@ def create_app():
                 'positions': positions_data,
                 'recent_orders': orders_data
             })
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-    
-    @app.route('/api/selected_stocks')
-    @login_required
-    def api_selected_stocks():
-        """API endpoint for selected stocks."""
-        try:
-            period = request.args.get('period', 'week')
-            
-            with db_manager.get_session() as session:
-                selected_stocks = session.query(SelectedStock).filter(
-                    SelectedStock.user_id == current_user.id
-                ).order_by(SelectedStock.selection_date.desc()).all()
-                
-                stocks_data = [{
-                    'id': stock.id,
-                    'symbol': stock.symbol,
-                    'selection_date': stock.selection_date.isoformat(),
-                    'selection_price': stock.selection_price,
-                    'current_price': stock.current_price,
-                    'quantity': stock.quantity,
-                    'strategy_name': stock.strategy_name,
-                    'status': stock.status,
-                    'created_at': stock.created_at.isoformat()
-                } for stock in selected_stocks]
-            
-            return jsonify({
-                'stocks': stocks_data
-            })
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-    
-    @app.route('/api/pnl_chart')
-    @login_required
-    def pnl_chart_data():
-        """API endpoint for P&L chart data."""
-        try:
-            days = int(request.args.get('days', 30))
-            chart_data = charts.get_pnl_chart_data(days)
-            return jsonify(chart_data)
         except Exception as e:
             return jsonify({'error': str(e)}), 500
     
@@ -366,11 +325,11 @@ def create_app():
         except Exception as e:
             return jsonify({'error': str(e)}), 500
     
-    @app.route('/selected_stocks')
+    @app.route('/suggested_stocks')
     @login_required
-    def selected_stocks():
-        """Selected stocks page."""
-        return render_template('selected_stocks.html')
+    def suggested_stocks():
+        """Suggested stocks page."""
+        return render_template('suggested_stocks.html')
     
     @app.route('/reports')
     @login_required
@@ -896,14 +855,14 @@ def create_app():
             from analysis.chatgpt_analyzer import ChatGPTAnalyzer
             
             data = request.get_json()
-            selected_stocks = data.get('selected_stocks', [])
+            suggested_stocks = data.get('suggested_stocks', [])
             strategy_name = data.get('strategy_name', 'Unknown')
             
-            if not selected_stocks:
-                return jsonify({'error': 'Selected stocks required'}), 400
+            if not suggested_stocks:
+                return jsonify({'error': 'Suggested stocks required'}), 400
             
             analyzer = ChatGPTAnalyzer()
-            analysis = analyzer.analyze_portfolio(selected_stocks, strategy_name)
+            analysis = analyzer.analyze_portfolio(suggested_stocks, strategy_name)
             
             return jsonify({
                 'success': True,

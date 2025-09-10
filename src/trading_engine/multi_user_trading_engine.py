@@ -49,7 +49,7 @@ class UserTradingSession:
         # Initialize trading state
         self.trading_state = {
             'last_scan_time': None,
-            'selected_stocks': [],
+            'suggested_stocks': [],
             'active_orders': [],
             'positions': {},
             'daily_pnl': 0.0,
@@ -359,17 +359,17 @@ class MultiUserTradingEngine:
             symbols = ['RELIANCE', 'TCS', 'HDFC', 'INFY', 'HINDUNILVR', 'ITC', 'SBIN', 'BHARTIARTL', 'KOTAKBANK', 'LT']
             
             # Simulate stock selection (in real implementation, this would use strategy logic)
-            selected_stocks = symbols[:5]  # Select first 5 for demo
+            suggested_stocks = symbols[:5]  # Select first 5 for demo
             
             # Update user's trading state
             user_session.update_trading_state({
-                'selected_stocks': selected_stocks
+                'suggested_stocks': suggested_stocks
             })
             
             # Log the scan
             user_session.compliance_logger.log_system_event(
                 event_type="MARKET_SCAN_COMPLETED",
-                message=f"Market scan completed for user {user_session.username}. Selected {len(selected_stocks)} stocks.",
+                message=f"Market scan completed for user {user_session.username}. Suggested {len(suggested_stocks)} stocks.",
                 details={"user_id": user_session.user_id, "username": user_session.username}
             )
             

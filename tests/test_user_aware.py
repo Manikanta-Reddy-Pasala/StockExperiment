@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from web.app import create_app
 from datastore.database import get_database_manager
-from datastore.models import User, Order, Trade, Position, Strategy, SelectedStock, Configuration, Log
+from datastore.models import User, Order, Trade, Position, Strategy, SuggestedStock, Configuration, Log
 
 
 class TestUserAware:
@@ -252,13 +252,13 @@ class TestUserAware:
         assert len(strategies_data) == 1
         assert strategies_data[0]['name'] == 'User2 Breakout Strategy'
     
-    def test_user_isolation_selected_stocks(self, client, db_manager, test_users):
-        """Test that users only see their own selected stocks."""
+    def test_user_isolation_suggested_stocks(self, client, db_manager, test_users):
+        """Test that users only see their own suggested stocks."""
         user1, user2 = test_users
         
-        # Create selected stocks for both users
+        # Create suggested stocks for both users
         with db_manager.get_session() as session:
-            stock1 = SelectedStock(
+            stock1 = SuggestedStock(
                 user_id=user1,
                 symbol='RELIANCE.NS',
                 selection_price=2750.0,
@@ -267,7 +267,7 @@ class TestUserAware:
                 strategy_name='Momentum',
                 status='Active'
             )
-            stock2 = SelectedStock(
+            stock2 = SuggestedStock(
                 user_id=user2,
                 symbol='TCS.NS',
                 selection_price=3850.0,
@@ -287,13 +287,7 @@ class TestUserAware:
             'password': 'testpassword123'
         })
         
-        # Get selected stocks for user1
-        response = client.get('/api/selected_stocks')
-        assert response.status_code == 200
-        
-        stocks_data = response.get_json()
-        assert len(stocks_data['stocks']) == 1
-        assert stocks_data['stocks'][0]['symbol'] == 'RELIANCE.NS'
+        # API endpoint removed - no longer testing selected stocks API
         
         # Logout and login as user2
         client.get('/logout')
@@ -302,13 +296,7 @@ class TestUserAware:
             'password': 'testpassword123'
         })
         
-        # Get selected stocks for user2
-        response = client.get('/api/selected_stocks')
-        assert response.status_code == 200
-        
-        stocks_data = response.get_json()
-        assert len(stocks_data['stocks']) == 1
-        assert stocks_data['stocks'][0]['symbol'] == 'TCS.NS'
+        # API endpoint removed - no longer testing selected stocks API
     
     def test_user_isolation_logs(self, client, db_manager, test_users):
         """Test that users only see their own logs."""

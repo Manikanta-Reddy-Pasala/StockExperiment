@@ -139,8 +139,8 @@ class TradingExecutor:
             if strategy_name:
                 strategy = self.strategy_engine.strategies.get(strategy_name)
                 if strategy:
-                    selected_stocks = strategy.select_stocks(screened_stocks)
-                    strategy_results = {strategy_name: selected_stocks}
+                    suggested_stocks = strategy.select_stocks(screened_stocks)
+                    strategy_results = {strategy_name: suggested_stocks}
                 else:
                     return self._create_error_result(f"Strategy {strategy_name} not found")
             else:
@@ -219,9 +219,9 @@ class TradingExecutor:
         try:
             # Analyze each strategy's portfolio
             portfolio_analysis = {}
-            for strategy_name, selected_stocks in strategy_results.items():
-                if selected_stocks:
-                    analysis = self.chatgpt_analyzer.analyze_portfolio(selected_stocks, strategy_name)
+            for strategy_name, suggested_stocks in strategy_results.items():
+                if suggested_stocks:
+                    analysis = self.chatgpt_analyzer.analyze_portfolio(suggested_stocks, strategy_name)
                     portfolio_analysis[strategy_name] = analysis
             
             # Compare strategies
@@ -242,12 +242,12 @@ class TradingExecutor:
         try:
             dry_run_results = {}
             
-            for strategy_name, selected_stocks in strategy_results.items():
-                if selected_stocks:
+            for strategy_name, suggested_stocks in strategy_results.items():
+                if suggested_stocks:
                     # Create portfolio for this strategy
                     success = self.dry_run_manager.execute_strategy(
                         strategy_name, 
-                        selected_stocks, 
+                        suggested_stocks, 
                         allocation_strategy='equal_weight'
                     )
                     
@@ -256,9 +256,9 @@ class TradingExecutor:
                         performance = self.dry_run_manager.get_strategy_performance(strategy_name)
                         dry_run_results[strategy_name] = {
                             'portfolio_created': True,
-                            'num_stocks': len(selected_stocks),
+                            'num_stocks': len(suggested_stocks),
                             'performance': performance,
-                            'selected_stocks': selected_stocks
+                            'suggested_stocks': suggested_stocks
                         }
                     else:
                         dry_run_results[strategy_name] = {
@@ -284,11 +284,11 @@ class TradingExecutor:
             }
             
             # Evaluate each strategy
-            for strategy_name, selected_stocks in strategy_results.items():
-                if selected_stocks:
+            for strategy_name, suggested_stocks in strategy_results.items():
+                if suggested_stocks:
                     # Strategy metrics
                     strategy_metrics = self.strategy_engine.get_strategy_performance_metrics(
-                        strategy_name, selected_stocks
+                        strategy_name, suggested_stocks
                     )
                     evaluation['strategy_metrics'][strategy_name] = strategy_metrics
                     
@@ -298,7 +298,7 @@ class TradingExecutor:
                         evaluation['portfolio_metrics'][strategy_name] = portfolio_performance
                         
                         # Risk analysis
-                        risk_metrics = self._calculate_risk_metrics(selected_stocks, portfolio_performance)
+                        risk_metrics = self._calculate_risk_metrics(suggested_stocks, portfolio_performance)
                         evaluation['risk_analysis'][strategy_name] = risk_metrics
             
             # Create performance ranking
@@ -310,22 +310,22 @@ class TradingExecutor:
             logger.error(f"Error evaluating performance: {e}")
             return {'error': str(e), 'timestamp': datetime.utcnow().isoformat()}
     
-    def _calculate_risk_metrics(self, selected_stocks: List[Dict], portfolio_performance: Dict) -> Dict:
+    def _calculate_risk_metrics(self, suggested_stocks: List[Dict], portfolio_performance: Dict) -> Dict:
         """Calculate risk metrics for a portfolio."""
         try:
             # Calculate sector concentration
             sector_distribution = {}
-            for stock in selected_stocks:
+            for stock in suggested_stocks:
                 sector = stock.get('sector', 'Unknown')
                 sector_distribution[sector] = sector_distribution.get(sector, 0) + 1
             
             # Calculate concentration risk
-            max_sector_weight = max(sector_distribution.values()) / len(selected_stocks) if selected_stocks else 0
+            max_sector_weight = max(sector_distribution.values()) / len(suggested_stocks) if suggested_stocks else 0
             concentration_risk = 'High' if max_sector_weight > 0.4 else 'Medium' if max_sector_weight > 0.2 else 'Low'
             
             # Calculate market cap distribution
             market_cap_distribution = {'small_cap': 0, 'mid_cap': 0, 'large_cap': 0}
-            for stock in selected_stocks:
+            for stock in suggested_stocks:
                 market_cap = stock.get('market_cap', 0)
                 if market_cap < 10000:
                     market_cap_distribution['small_cap'] += 1
@@ -338,7 +338,7 @@ class TradingExecutor:
                 'sector_concentration': sector_distribution,
                 'concentration_risk': concentration_risk,
                 'market_cap_distribution': market_cap_distribution,
-                'num_positions': len(selected_stocks),
+                'num_positions': len(suggested_stocks),
                 'diversification_score': 1 - max_sector_weight
             }
             
@@ -394,13 +394,13 @@ class TradingExecutor:
                 return recommendations
             
             # Strategy-specific recommendations
-            for strategy_name, selected_stocks in strategy_results.items():
-                if selected_stocks:
-                    recommendations.append(f"{strategy_name.title()} strategy selected {len(selected_stocks)} stocks")
+            for strategy_name, suggested_stocks in strategy_results.items():
+                if suggested_stocks:
+                    recommendations.append(f"{strategy_name.title()} strategy suggested {len(suggested_stocks)} stocks")
                     
                     # Check for concentration
-                    sectors = [s.get('sector', 'Unknown') for s in selected_stocks]
-                    if len(set(sectors)) < len(selected_stocks) * 0.5:
+                    sectors = [s.get('sector', 'Unknown') for s in suggested_stocks]
+                    if len(set(sectors)) < len(suggested_stocks) * 0.5:
                         recommendations.append(f"Consider diversifying {strategy_name} strategy across more sectors")
             
             # AI-based recommendations

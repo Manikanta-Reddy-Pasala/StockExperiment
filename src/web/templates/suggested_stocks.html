@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block title %}Suggested Stocks{% endblock %}
+
+{% block content %}
+<div class="row g-4 mb-4">
+    <div class="col-md-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Suggested Stocks</h5>
+                <div class="d-flex align-items-center">
+                    <select class="form-select form-select-sm me-2" id="time-filter">
+                        <option value="today">Today</option>
+                        <option value="week" selected>This Week</option>
+                        <option value="month">This Month</option>
+                        <option value="all">All Time</option>
+                    </select>
+                    <div class="dropdown me-2">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="strategy-filter" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-funnel"></i> Strategy Filter
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="strategy-filter">
+                            <li>
+                                <div class="form-check ms-2">
+                                    <input class="form-check-input" type="checkbox" value="all" id="strategy-all" checked>
+                                    <label class="form-check-label" for="strategy-all">
+                                        All Strategies
+                                    </label>
+                                </div>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <div class="form-check ms-2">
+                                    <input class="form-check-input strategy-checkbox" type="checkbox" value="momentum" id="strategy-momentum" checked>
+                                    <label class="form-check-label" for="strategy-momentum">
+                                        Momentum Strategy
+                                    </label>
+                                </div>
+                            </li>
+                            <li>
+                                <div class="form-check ms-2">
+                                    <input class="form-check-input strategy-checkbox" type="checkbox" value="breakout" id="strategy-breakout" checked>
+                                    <label class="form-check-label" for="strategy-breakout">
+                                        Breakout Strategy
+                                    </label>
+                                </div>
+                            </li>
+                            <li>
+                                <div class="form-check ms-2">
+                                    <input class="form-check-input strategy-checkbox" type="checkbox" value="mean-reversion" id="strategy-mean-reversion" checked>
+                                    <label class="form-check-label" for="strategy-mean-reversion">
+                                        Mean Reversion Strategy
+                                    </label>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary" id="refresh-btn">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="suggested-stocks-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Selection Date</th>
+                                <th>Selection Price</th>
+                                <th>Current Price</th>
+                                <th>Quantity</th>
+                                <th>Investment</th>
+                                <th>Current Value</th>
+                                <th>Strategy</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Suggested stocks will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Sample data for demonstration
+    const sampleSuggestedStocks = [
+        {
+            symbol: 'RELIANCE.NS',
+            selection_date: '2024-01-15',
+            selection_price: 2750.50,
+            current_price: 2820.75,
+            quantity: 10,
+            strategy: 'Momentum Strategy',
+            status: 'Active'
+        },
+        {
+            symbol: 'TCS.NS',
+            selection_date: '2024-01-16',
+            selection_price: 3850.75,
+            current_price: 3920.25,
+            quantity: 5,
+            strategy: 'Breakout Strategy',
+            status: 'Active'
+        },
+        {
+            symbol: 'INFY.NS',
+            selection_date: '2024-01-17',
+            selection_price: 1620.00,
+            current_price: 1580.50,
+            quantity: 15,
+            strategy: 'Mean Reversion Strategy',
+            status: 'Active'
+        },
+        {
+            symbol: 'HDFC.NS',
+            selection_date: '2024-01-18',
+            selection_price: 1450.25,
+            current_price: 1475.80,
+            quantity: 8,
+            strategy: 'Momentum Strategy',
+            status: 'Sold'
+        },
+        {
+            symbol: 'WIPRO.NS',
+            selection_date: '2024-01-19',
+            selection_price: 420.50,
+            current_price: 435.25,
+            quantity: 25,
+            strategy: 'Breakout Strategy',
+            status: 'Active'
+        }
+    ];
+
+    // Get selected strategies
+    function getSelectedStrategies() {
+        const checkboxes = document.querySelectorAll('.strategy-checkbox:checked');
+        return Array.from(checkboxes).map(cb => cb.value);
+    }
+
+    // Filter stocks based on selected strategies
+    function filterStocksByStrategy(stocks) {
+        const selectedStrategies = getSelectedStrategies();
+        if (selectedStrategies.length === 0) return [];
+        
+        return stocks.filter(stock => {
+            const strategyName = stock.strategy.toLowerCase();
+            return selectedStrategies.some(strategy => 
+                strategyName.includes(strategy.toLowerCase())
+            );
+        });
+    }
+
+    // Populate table with filtered stocks
+    function populateTable() {
+        const timeFilter = document.getElementById('time-filter').value;
+        const table = document.getElementById('suggested-stocks-table').getElementsByTagName('tbody')[0];
+        table.innerHTML = '';
+        
+        // Filter stocks by time period (simplified for demo)
+        let filteredStocks = sampleSuggestedStocks;
+        
+        // Filter by strategy
+        filteredStocks = filterStocksByStrategy(filteredStocks);
+        
+        filteredStocks.forEach(stock => {
+            const row = table.insertRow();
+            
+            // Calculate values
+            const investment = stock.quantity * stock.selection_price;
+            const value = stock.quantity * stock.current_price;
+            
+            // Populate row
+            row.insertCell(0).textContent = stock.symbol;
+            row.insertCell(1).textContent = new Date(stock.selection_date).toLocaleDateString();
+            row.insertCell(2).textContent = '₹' + stock.selection_price.toFixed(2);
+            row.insertCell(3).textContent = '₹' + stock.current_price.toFixed(2);
+            row.insertCell(4).textContent = stock.quantity;
+            row.insertCell(5).textContent = '₹' + investment.toFixed(2);
+            row.insertCell(6).textContent = '₹' + value.toFixed(2);
+            
+            // Strategy column
+            const strategyCell = row.insertCell(7);
+            strategyCell.textContent = stock.strategy;
+            strategyCell.className = 'text-info';
+            
+            // Status column
+            const statusCell = row.insertCell(8);
+            statusCell.textContent = stock.status;
+            statusCell.className = stock.status === 'Active' ? 'text-success' : 
+                                stock.status === 'Sold' ? 'text-secondary' : 'text-warning';
+        });
+    }
+
+    // Handle strategy filter changes
+    function handleStrategyFilter() {
+        const allCheckbox = document.getElementById('strategy-all');
+        const strategyCheckboxes = document.querySelectorAll('.strategy-checkbox');
+        
+        if (allCheckbox.checked) {
+            // If "All" is checked, check all strategy checkboxes
+            strategyCheckboxes.forEach(cb => cb.checked = true);
+        } else {
+            // If "All" is unchecked, uncheck all strategy checkboxes
+            strategyCheckboxes.forEach(cb => cb.checked = false);
+        }
+        
+        populateTable();
+    }
+
+    // Handle individual strategy checkbox changes
+    function handleIndividualStrategyChange() {
+        const allCheckbox = document.getElementById('strategy-all');
+        const strategyCheckboxes = document.querySelectorAll('.strategy-checkbox');
+        const checkedCount = document.querySelectorAll('.strategy-checkbox:checked').length;
+        
+        // If all individual checkboxes are checked, check "All"
+        if (checkedCount === strategyCheckboxes.length) {
+            allCheckbox.checked = true;
+        } else {
+            allCheckbox.checked = false;
+        }
+        
+        populateTable();
+    }
+
+    // Event listeners
+    document.getElementById('time-filter').addEventListener('change', populateTable);
+    document.getElementById('refresh-btn').addEventListener('click', populateTable);
+    document.getElementById('strategy-all').addEventListener('change', handleStrategyFilter);
+    
+    // Add event listeners to individual strategy checkboxes
+    document.querySelectorAll('.strategy-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', handleIndividualStrategyChange);
+    });
+
+    // Initialize page when loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        populateTable();
+    });
+</script>
+{% endblock %}

@@ -11,7 +11,7 @@ from flask_bcrypt import Bcrypt
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from datastore.database import get_database_manager
-from datastore.models import User, Order, Trade, Position, Strategy, SelectedStock, Configuration, Log
+from datastore.models import User, Order, Trade, Position, Strategy, SuggestedStock, Configuration, Log
 
 
 class TestUserAwareDatabase:
@@ -189,13 +189,13 @@ class TestUserAwareDatabase:
             assert len(user2_strategies) == 1
             assert user2_strategies[0].name == 'User2 Breakout Strategy'
     
-    def test_user_isolation_selected_stocks(self, db_manager, test_users):
-        """Test that selected stocks are properly isolated by user."""
+    def test_user_isolation_suggested_stocks(self, db_manager, test_users):
+        """Test that suggested stocks are properly isolated by user."""
         user1_id, user2_id = test_users
         
-        # Create selected stocks for both users
+        # Create suggested stocks for both users
         with db_manager.get_session() as session:
-            stock1 = SelectedStock(
+            stock1 = SuggestedStock(
                 user_id=user1_id,
                 symbol='RELIANCE.NS',
                 selection_price=2750.0,
@@ -204,7 +204,7 @@ class TestUserAwareDatabase:
                 strategy_name='Momentum',
                 status='Active'
             )
-            stock2 = SelectedStock(
+            stock2 = SuggestedStock(
                 user_id=user2_id,
                 symbol='TCS.NS',
                 selection_price=3850.0,
@@ -218,15 +218,15 @@ class TestUserAwareDatabase:
             session.add(stock2)
             session.commit()
         
-        # Test user1 can only see their selected stocks
+        # Test user1 can only see their suggested stocks
         with db_manager.get_session() as session:
-            user1_stocks = session.query(SelectedStock).filter(SelectedStock.user_id == user1_id).all()
+            user1_stocks = session.query(SuggestedStock).filter(SuggestedStock.user_id == user1_id).all()
             assert len(user1_stocks) == 1
             assert user1_stocks[0].symbol == 'RELIANCE.NS'
         
-        # Test user2 can only see their selected stocks
+        # Test user2 can only see their suggested stocks
         with db_manager.get_session() as session:
-            user2_stocks = session.query(SelectedStock).filter(SelectedStock.user_id == user2_id).all()
+            user2_stocks = session.query(SuggestedStock).filter(SuggestedStock.user_id == user2_id).all()
             assert len(user2_stocks) == 1
             assert user2_stocks[0].symbol == 'TCS.NS'
     
