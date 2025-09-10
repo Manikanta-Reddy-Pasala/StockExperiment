@@ -801,26 +801,6 @@ def create_app():
         except Exception as e:
             return jsonify({'error': f'Failed to get performance report: {str(e)}'}), 500
 
-    @app.route('/api/analytics/strategy-comparison', methods=['GET'])
-    @login_required
-    def get_strategy_comparison():
-        """Get strategy comparison analysis."""
-        try:
-            from analytics.performance_tracker import PerformanceTracker
-            
-            strategy_names = request.args.getlist('strategies')
-            
-            tracker = PerformanceTracker()
-            comparison = tracker.compare_strategies(strategy_names)
-            
-            return jsonify({
-                'success': True,
-                'strategy_comparison': comparison,
-                'timestamp': datetime.utcnow().isoformat()
-            }), 200
-            
-        except Exception as e:
-            return jsonify({'error': f'Failed to get strategy comparison: {str(e)}'}), 500
 
     @app.route('/api/ai/analyze-stock', methods=['POST'])
     @login_required
@@ -873,30 +853,6 @@ def create_app():
         except Exception as e:
             return jsonify({'error': f'Failed to analyze portfolio: {str(e)}'}), 500
 
-    @app.route('/api/ai/compare-strategies', methods=['POST'])
-    @login_required
-    def compare_strategies_with_ai():
-        """Compare strategies using ChatGPT."""
-        try:
-            from analysis.chatgpt_analyzer import ChatGPTAnalyzer
-            
-            data = request.get_json()
-            strategy_results = data.get('strategy_results', {})
-            
-            if not strategy_results:
-                return jsonify({'error': 'Strategy results required'}), 400
-            
-            analyzer = ChatGPTAnalyzer()
-            comparison = analyzer.compare_strategies(strategy_results)
-            
-            return jsonify({
-                'success': True,
-                'ai_comparison': comparison,
-                'timestamp': datetime.utcnow().isoformat()
-            }), 200
-            
-        except Exception as e:
-            return jsonify({'error': f'Failed to compare strategies: {str(e)}'}), 500
 
     # Data Sources API Endpoints
     @app.route('/api/data/stock-data', methods=['POST'])
