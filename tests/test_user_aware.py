@@ -176,7 +176,7 @@ class TestUserAware:
         })
         
         # Get positions for user1
-        response = client.get('/api/positions')
+        response = client.get('/api/portfolio')
         assert response.status_code == 200
         
         positions_data = response.get_json()
@@ -192,7 +192,7 @@ class TestUserAware:
         })
         
         # Get positions for user2
-        response = client.get('/api/positions')
+        response = client.get('/api/portfolio')
         assert response.status_code == 200
         
         positions_data = response.get_json()

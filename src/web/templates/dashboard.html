@@ -28,7 +28,7 @@
             <div class="card-body text-center">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h6 class="card-title text-muted">Open Positions</h6>
+                        <h6 class="card-title text-muted">Portfolio Holdings</h6>
                         <h3 class="text-info fw-bold" id="open-positions">0</h3>
                     </div>
                     <div class="bg-info bg-opacity-10 rounded-circle p-3">
@@ -38,7 +38,7 @@
                 <div class="progress mt-2" style="height: 5px;">
                     <div class="progress-bar bg-info" role="progressbar" style="width: 60%"></div>
                 </div>
-                <small class="text-muted">Active positions</small>
+                <small class="text-muted">Active holdings</small>
             </div>
         </div>
     </div>
@@ -206,12 +206,12 @@
             // Update total P&L
             document.getElementById('total-pnl').textContent = '₹' + data.total_pnl.toFixed(2);
             
-            // Update positions table
-            const positionsTable = document.getElementById('positions-table').getElementsByTagName('tbody')[0];
-            positionsTable.innerHTML = '';
+            // Update portfolio table
+            const portfolioTable = document.getElementById('positions-table').getElementsByTagName('tbody')[0];
+            portfolioTable.innerHTML = '';
             
             data.positions.forEach(position => {
-                const row = positionsTable.insertRow();
+                const row = portfolioTable.insertRow();
                 row.insertCell(0).textContent = position.symbol;
                 row.insertCell(1).textContent = position.quantity;
                 row.insertCell(2).textContent = '₹' + position.avg_price.toFixed(2);

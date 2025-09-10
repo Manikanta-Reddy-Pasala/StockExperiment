@@ -96,10 +96,9 @@ def create_app():
     @app.route('/api/portfolio_chart')
     @login_required
     def portfolio_chart_data():
-        """API endpoint for portfolio value chart data."""
+        """API endpoint for positions chart data."""
         try:
-            days = int(request.args.get('days', 30))
-            chart_data = charts.get_portfolio_value_chart_data(days)
+            chart_data = charts.get_positions_chart_data()
             return jsonify(chart_data)
         except Exception as e:
             return jsonify({'error': str(e)}), 500
@@ -321,16 +320,16 @@ def create_app():
         except Exception as e:
             return jsonify({'error': str(e)}), 500
     
-    @app.route('/positions')
+    @app.route('/portfolio')
     @login_required
-    def positions():
-        """Positions page."""
-        return render_template('positions.html')
+    def portfolio():
+        """Portfolio page."""
+        return render_template('portfolio.html')
     
-    @app.route('/api/positions')
+    @app.route('/api/portfolio')
     @login_required
-    def api_positions():
-        """API endpoint for positions."""
+    def api_portfolio():
+        """API endpoint for portfolio."""
         try:
             with db_manager.get_session() as session:
                 positions = session.query(Position).filter(
