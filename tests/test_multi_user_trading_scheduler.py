@@ -67,8 +67,6 @@ def test_config():
     """Create test configuration."""
     return {
         'trading': {
-            'market_open': '09:15',
-            'market_close': '15:30',
             'pre_open_start': '09:00',
             'pre_open_end': '09:15'
         }
@@ -102,8 +100,6 @@ class TestMultiUserTradingScheduler:
         assert scheduler.trading_engine is not None
         assert scheduler.is_running is False
         assert len(scheduler.jobs) == 0
-        assert scheduler.market_open_time == dt_time(9, 15)
-        assert scheduler.market_close_time == dt_time(15, 30)
     
     def test_holiday_management(self, scheduler):
         """Test holiday management."""
@@ -237,7 +233,6 @@ class TestMultiUserTradingScheduler:
         
         assert 'is_running' in status
         assert 'scheduled_jobs_count' in status
-        assert 'market_open' in status
         assert 'pre_open' in status
         assert 'holidays' in status
         assert 'jobs' in status

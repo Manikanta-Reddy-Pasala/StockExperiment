@@ -22,8 +22,6 @@ class ConfigManager:
                 'log_level': os.getenv('LOG_LEVEL', 'INFO')
             },
             'trading': {
-                'market_open': os.getenv('MARKET_OPEN', '09:15'),
-                'market_close': os.getenv('MARKET_CLOSE', '15:30'),
                 'pre_open_start': os.getenv('PRE_OPEN_START', '09:00'),
                 'pre_open_end': os.getenv('PRE_OPEN_END', '09:15'),
                 'live_trading': os.getenv('LIVE_TRADING', 'false').lower() == 'true'

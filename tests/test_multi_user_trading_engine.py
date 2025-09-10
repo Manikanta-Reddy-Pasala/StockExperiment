@@ -82,8 +82,6 @@ def test_config():
             'single_name_exposure_limit': 0.05
         },
         'trading': {
-            'market_open': '09:15',
-            'market_close': '15:30'
         }
     }
 

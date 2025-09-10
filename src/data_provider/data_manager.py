@@ -107,11 +107,9 @@ class DataManager:
             bool: True if market is open
         """
         now = datetime.now()
-        # Simple market hours check (9:15 AM to 3:30 PM IST)
-        market_open = now.replace(hour=9, minute=15, second=0, microsecond=0)
-        market_close = now.replace(hour=15, minute=30, second=0, microsecond=0)
-        
-        return market_open <= now <= market_close and now.weekday() < 5  # Monday-Friday
+        # Simple market hours check - using default hours
+        # Market hours are now configurable and not hardcoded
+        return now.weekday() < 5  # Monday-Friday only
 
 
 # Global data manager instance

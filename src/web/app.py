@@ -459,8 +459,6 @@ def create_app():
                 if not settings_data:
                     settings_data = {
                         'trading_mode': 'development',
-                        'market_open': '09:15',
-                        'market_close': '15:30',
                         'max_capital_per_trade': 1.0,
                         'max_concurrent_trades': 10,
                         'daily_loss_limit': 2.0,
