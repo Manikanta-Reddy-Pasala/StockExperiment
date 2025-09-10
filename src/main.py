@@ -142,6 +142,11 @@ def main():
         default=True,
         help='Enable multi-user mode (default: True)'
     )
+    parser.add_argument(
+        '--dev',
+        action='store_true',
+        help='Enable development mode with auto-reloading'
+    )
     
     args = parser.parse_args()
     
@@ -164,13 +169,16 @@ def main():
     # Get configuration for web app
     host = config.get('web', {}).get('host', '0.0.0.0')
     port = config.get('web', {}).get('port', 5001)
-    debug = config.get('web', {}).get('debug', False)
+    
+    # Enable debug mode for development
+    debug = args.dev or config.get('web', {}).get('debug', False)
     
     logger.info(f"Starting web application on {host}:{port}")
+    logger.info(f"Debug mode: {debug}")
     logger.info("Trading system is ready!")
     
-    # Run the Flask app
-    app.run(host=host, port=port, debug=debug)
+    # Run the Flask app with auto-reloading in development mode
+    app.run(host=host, port=port, debug=debug, use_reloader=debug)
 
 
 if __name__ == '__main__':

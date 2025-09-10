@@ -145,6 +145,41 @@
     .dark-theme .badge.bg-secondary {
         background-color: #6c757d !important;
     }
+    
+    /* Dark theme for form checkboxes */
+    .dark-theme .form-check-input {
+        background-color: #2d2d2d;
+        border: 1px solid #444;
+    }
+    .dark-theme .form-check-input:checked {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+    .dark-theme .form-check-input:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+    
+    /* Dark theme for modal backdrop */
+    .dark-theme .modal-backdrop {
+        background-color: rgba(0, 0, 0, 0.8);
+    }
+    
+    /* Ensure proper contrast for required field asterisks */
+    .dark-theme .form-label {
+        color: #e0e0e0;
+    }
+    
+    /* Additional modal dark theme fixes */
+    .dark-theme .modal-dialog {
+        color: #e0e0e0;
+    }
+    .dark-theme .modal-content {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.5);
+    }
+    .dark-theme .modal-header .btn-close {
+        filter: invert(1) grayscale(100%) brightness(200%);
+    }
 </style>
 
 {% block content %}

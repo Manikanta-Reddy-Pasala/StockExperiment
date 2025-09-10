@@ -1,0 +1,37 @@
+services:
+  # Trading system application - Development mode
+  trading_system:
+    build: .
+    container_name: trading_system_app_dev
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://trader:trader_password@database:5432/trading_system
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - PYTHONPATH=/app
+      - FYERS_CLIENT_ID=${FYERS_CLIENT_ID:-your_client_id}
+      - FYERS_ACCESS_TOKEN=${FYERS_ACCESS_TOKEN:-your_access_token}
+    ports:
+      - "5001:5001"
+    volumes:
+      # Mount source code for live reloading
+      - ./src:/app/src:ro
+      - ./run.py:/app/run.py:ro
+      - ./requirements.txt:/app/requirements.txt:ro
+      - ./logs:/app/logs
+      # Mount templates for live reloading
+      - ./src/web/templates:/app/src/web/templates:ro
+      - ./src/web/static:/app/src/web/static:ro
+    restart: unless-stopped
+    networks:
+      - trading_network
+    command: python run.py --multi-user --dev
+    # Override the health check for development
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

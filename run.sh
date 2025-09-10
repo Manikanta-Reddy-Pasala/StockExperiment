@@ -70,23 +70,59 @@ start_app() {
     print_status "To stop: docker compose down"
 }
 
+# Function to start the application in development mode
+start_dev() {
+    print_status "Starting Trading System in Development Mode with Auto-reloading..."
+    
+    # Build and start services with development override
+    docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
+    
+    print_success "Trading System started in Development Mode!"
+    print_status "Services running:"
+    echo "  - Web Interface: http://localhost:5001"
+    echo "  - Database: localhost:5432"
+    echo "  - Redis: localhost:6379"
+    echo ""
+    print_status "Development features enabled:"
+    echo "  - Auto-reloading on Python file changes"
+    echo "  - Auto-reloading on HTML template changes"
+    echo "  - Debug mode enabled"
+    echo ""
+    print_status "To view logs: docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f"
+    print_status "To stop: docker compose -f docker-compose.yml -f docker-compose.dev.yml down"
+}
+
 # Function to stop the application
 stop_app() {
     print_status "Stopping Trading System..."
-    docker compose down
+    # Try to stop both production and development modes
+    docker compose down 2>/dev/null || true
+    docker compose -f docker-compose.yml -f docker-compose.dev.yml down 2>/dev/null || true
     print_success "Trading System stopped successfully!"
 }
 
 # Function to show logs
 show_logs() {
     print_status "Showing Trading System logs..."
-    docker compose logs -f
+    # Try to show logs from development mode first, then production
+    if docker compose -f docker-compose.yml -f docker-compose.dev.yml ps --services --filter "status=running" | grep -q trading_system; then
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f
+    else
+        docker compose logs -f
+    fi
 }
 
 # Function to show status
 show_status() {
     print_status "Trading System Status:"
-    docker compose ps
+    # Show status for both production and development modes
+    if docker compose -f docker-compose.yml -f docker-compose.dev.yml ps --services --filter "status=running" | grep -q trading_system; then
+        print_status "Development Mode:"
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml ps
+    else
+        print_status "Production Mode:"
+        docker compose ps
+    fi
 }
 
 # Function to restart the application
@@ -115,6 +151,9 @@ case "${1:-start}" in
     start)
         start_app
         ;;
+    dev)
+        start_dev
+        ;;
     stop)
         stop_app
         ;;
@@ -131,10 +170,11 @@ case "${1:-start}" in
         cleanup
         ;;
     *)
-        echo "Usage: $0 {start|stop|restart|logs|status|cleanup}"
+        echo "Usage: $0 {start|dev|stop|restart|logs|status|cleanup}"
         echo ""
         echo "Commands:"
-        echo "  start   - Start the Trading System (default)"
+        echo "  start   - Start the Trading System in production mode (default)"
+        echo "  dev     - Start the Trading System in development mode with auto-reloading"
         echo "  stop    - Stop the Trading System"
         echo "  restart - Restart the Trading System"
         echo "  logs    - Show application logs"
