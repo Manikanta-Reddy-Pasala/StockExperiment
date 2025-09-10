@@ -5,7 +5,14 @@ from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text, 
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from flask_login import UserMixin
+
+# Make Flask-Login optional for FastAPI compatibility
+try:
+    from flask_login import UserMixin
+except ImportError:
+    # Create a dummy UserMixin for FastAPI
+    class UserMixin:
+        pass
 
 Base = declarative_base()
 

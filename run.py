@@ -34,34 +34,28 @@ def main():
     
     args = parser.parse_args()
     
-    # Run the main trading system
+    # Run the FastAPI application
     try:
-        # Pass the arguments to the main function
-        import src.main
-        # Create a mock args object to pass to main
-        class MockArgs:
-            def __init__(self, multi_user=True, dev=False):
-                self.multi_user = multi_user
-                self.dev = dev
+        import uvicorn
         
-        # Create args object with parsed values
-        mock_args = MockArgs(
-            multi_user=args.multi_user and not args.single_user,
-            dev=args.dev
-        )
-        
-        # Temporarily replace sys.argv to pass args to main
-        original_argv = sys.argv
-        sys.argv = ['run.py']
-        if mock_args.multi_user:
-            sys.argv.append('--multi-user')
-        if mock_args.dev:
-            sys.argv.append('--dev')
-            
-        src.main.main()
-        
-        # Restore original argv
-        sys.argv = original_argv
+        if args.dev:
+            # Use import string for reload to work
+            uvicorn.run(
+                "src.web.app:app",
+                host="0.0.0.0",
+                port=5001,
+                reload=True,
+                log_level="info"
+            )
+        else:
+            # Import app directly for production
+            from src.web.app import app
+            uvicorn.run(
+                app,
+                host="0.0.0.0",
+                port=5001,
+                log_level="info"
+            )
     except KeyboardInterrupt:
         print("\nApplication stopped by user.")
     except Exception as e:

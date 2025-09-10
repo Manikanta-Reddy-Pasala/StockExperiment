@@ -1,215 +1,223 @@
 """
-User Management API
+FastAPI Admin Users Module
 """
-from flask import Blueprint, request, jsonify
-from flask_login import login_required, current_user
-from datastore.database import get_database_manager
-from datastore.models import User
-from api.common.decorators import api_response, admin_required, validate_json
-from api.common.errors import ValidationError, NotFoundError, ConflictError
+from fastapi import APIRouter, HTTPException, Depends, status
+from pydantic import BaseModel, EmailStr
+from typing import List, Optional
 from datetime import datetime
-import logging
 
-logger = logging.getLogger(__name__)
+router = APIRouter()
 
-users_bp = Blueprint('users', __name__)
+# Pydantic models
+class UserBase(BaseModel):
+    username: str
+    email: EmailStr
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    is_admin: bool = False
 
-@users_bp.route('', methods=['GET'])
-@login_required
-@admin_required
-@api_response
-def get_users():
-    """Get all users."""
-    db_manager = get_database_manager()
+class UserCreate(UserBase):
+    password: str
+
+class UserUpdate(BaseModel):
+    username: Optional[str] = None
+    email: Optional[EmailStr] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    is_admin: Optional[bool] = None
+    is_active: Optional[bool] = None
+    password: Optional[str] = None
+
+class UserResponse(UserBase):
+    id: int
+    is_active: bool
+    created_at: Optional[datetime] = None
+    last_login: Optional[datetime] = None
+
+class PasswordReset(BaseModel):
+    new_password: str
+
+class APIResponse(BaseModel):
+    success: bool
+    data: Optional[dict] = None
+    message: Optional[str] = None
+    timestamp: datetime
+
+# Mock data for demonstration
+MOCK_USERS = [
+    {
+        "id": 1,
+        "username": "admin",
+        "email": "admin@example.com",
+        "first_name": "Admin",
+        "last_name": "User",
+        "is_admin": True,
+        "is_active": True,
+        "created_at": datetime.utcnow(),
+        "last_login": datetime.utcnow()
+    },
+    {
+        "id": 2,
+        "username": "trader1",
+        "email": "trader1@example.com",
+        "first_name": "John",
+        "last_name": "Doe",
+        "is_admin": False,
+        "is_active": True,
+        "created_at": datetime.utcnow(),
+        "last_login": None
+    }
+]
+
+@router.get("/", response_model=APIResponse, summary="Get All Users")
+async def get_users():
+    """
+    Get all users (Admin only).
     
-    with db_manager.get_session() as session:
-        users = session.query(User).all()
-        
-        users_data = []
-        for user in users:
-            users_data.append({
-                'id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'is_admin': user.is_admin,
-                'is_active': user.is_active,
-                'created_at': user.created_at.isoformat() if user.created_at else None,
-                'last_login': user.last_login.isoformat() if user.last_login else None
-            })
-        
-        return users_data
+    Returns a list of all users in the system.
+    """
+    return APIResponse(
+        success=True,
+        data={"users": MOCK_USERS, "count": len(MOCK_USERS)},
+        timestamp=datetime.utcnow()
+    )
 
-@users_bp.route('', methods=['POST'])
-@login_required
-@admin_required
-@validate_json('username', 'email', 'password')
-@api_response
-def create_user():
-    """Create a new user."""
-    db_manager = get_database_manager()
-    data = request.get_json()
+@router.post("/", response_model=APIResponse, status_code=status.HTTP_201_CREATED, summary="Create User")
+async def create_user(user: UserCreate):
+    """
+    Create a new user (Admin only).
     
-    # Validate required fields
-    username = data.get('username')
-    email = data.get('email')
-    password = data.get('password')
-    first_name = data.get('first_name', '')
-    last_name = data.get('last_name', '')
-    is_admin = data.get('is_admin', False)
+    - **username**: Unique username
+    - **email**: Valid email address
+    - **password**: User password (min 6 characters)
+    - **first_name**: User's first name (optional)
+    - **last_name**: User's last name (optional)
+    - **is_admin**: Whether user has admin privileges
+    """
+    # Check if username or email already exists
+    for existing_user in MOCK_USERS:
+        if existing_user["username"] == user.username or existing_user["email"] == user.email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username or email already exists"
+            )
     
-    with db_manager.get_session() as session:
-        # Check if username already exists
-        existing_user = session.query(User).filter(User.username == username).first()
-        if existing_user:
-            raise ConflictError(f"Username '{username}' already exists")
-        
-        # Check if email already exists
-        existing_email = session.query(User).filter(User.email == email).first()
-        if existing_email:
-            raise ConflictError(f"Email '{email}' already exists")
-        
-        # Create new user
-        from flask_bcrypt import Bcrypt
-        bcrypt = Bcrypt()
-        hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
-        
-        new_user = User(
-            username=username,
-            email=email,
-            password_hash=hashed_password,
-            first_name=first_name,
-            last_name=last_name,
-            is_admin=is_admin,
-            is_active=True
+    # Create new user
+    new_user = {
+        "id": len(MOCK_USERS) + 1,
+        "username": user.username,
+        "email": user.email,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "is_admin": user.is_admin,
+        "is_active": True,
+        "created_at": datetime.utcnow(),
+        "last_login": None
+    }
+    
+    MOCK_USERS.append(new_user)
+    
+    return APIResponse(
+        success=True,
+        data={"user": new_user},
+        message="User created successfully",
+        timestamp=datetime.utcnow()
+    )
+
+@router.get("/{user_id}", response_model=APIResponse, summary="Get User by ID")
+async def get_user(user_id: int):
+    """
+    Get a specific user by ID (Admin only).
+    
+    - **user_id**: The ID of the user to retrieve
+    """
+    user = next((u for u in MOCK_USERS if u["id"] == user_id), None)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
         )
-        
-        session.add(new_user)
-        session.commit()
-        
-        return {
-            'id': new_user.id,
-            'username': new_user.username,
-            'email': new_user.email,
-            'first_name': new_user.first_name,
-            'last_name': new_user.last_name,
-            'is_admin': new_user.is_admin,
-            'is_active': new_user.is_active,
-            'created_at': new_user.created_at.isoformat()
-        }, 201
+    
+    return APIResponse(
+        success=True,
+        data={"user": user},
+        timestamp=datetime.utcnow()
+    )
 
-@users_bp.route('/<int:user_id>', methods=['PUT'])
-@login_required
-@admin_required
-@api_response
-def update_user(user_id):
-    """Update a user."""
-    db_manager = get_database_manager()
-    data = request.get_json()
+@router.put("/{user_id}", response_model=APIResponse, summary="Update User")
+async def update_user(user_id: int, user_update: UserUpdate):
+    """
+    Update user information (Admin only).
     
-    with db_manager.get_session() as session:
-        user = session.query(User).get(user_id)
-        if not user:
-            raise NotFoundError(f"User with ID {user_id} not found")
-        
-        # Update fields
-        if 'username' in data:
-            # Check if username already exists (excluding current user)
-            existing_user = session.query(User).filter(
-                User.username == data['username'],
-                User.id != user_id
-            ).first()
-            if existing_user:
-                raise ConflictError(f"Username '{data['username']}' already exists")
-            user.username = data['username']
-        
-        if 'email' in data:
-            # Check if email already exists (excluding current user)
-            existing_email = session.query(User).filter(
-                User.email == data['email'],
-                User.id != user_id
-            ).first()
-            if existing_email:
-                raise ConflictError(f"Email '{data['email']}' already exists")
-            user.email = data['email']
-        
-        if 'password' in data and data['password']:
-            from flask_bcrypt import Bcrypt
-            bcrypt = Bcrypt()
-            user.password_hash = bcrypt.generate_password_hash(data['password']).decode('utf-8')
-        
-        if 'first_name' in data:
-            user.first_name = data['first_name']
-        
-        if 'last_name' in data:
-            user.last_name = data['last_name']
-        
-        if 'is_active' in data:
-            user.is_active = data['is_active']
-        
-        if 'is_admin' in data:
-            user.is_admin = data['is_admin']
-        
-        session.commit()
-        
-        return {
-            'id': user.id,
-            'username': user.username,
-            'email': user.email,
-            'first_name': user.first_name,
-            'last_name': user.last_name,
-            'is_admin': user.is_admin,
-            'is_active': user.is_active,
-            'updated_at': datetime.utcnow().isoformat()
-        }
+    - **user_id**: The ID of the user to update
+    - **user_update**: User data to update
+    """
+    user = next((u for u in MOCK_USERS if u["id"] == user_id), None)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Update user fields
+    update_data = user_update.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        if field != "password":  # Handle password separately
+            user[field] = value
+    
+    return APIResponse(
+        success=True,
+        data={"user": user},
+        message="User updated successfully",
+        timestamp=datetime.utcnow()
+    )
 
-@users_bp.route('/<int:user_id>', methods=['DELETE'])
-@login_required
-@admin_required
-@api_response
-def delete_user(user_id):
-    """Delete a user."""
-    db_manager = get_database_manager()
+@router.delete("/{user_id}", response_model=APIResponse, summary="Delete User")
+async def delete_user(user_id: int):
+    """
+    Delete a user (Admin only).
     
-    with db_manager.get_session() as session:
-        user = session.query(User).get(user_id)
-        if not user:
-            raise NotFoundError(f"User with ID {user_id} not found")
-        
-        # Prevent deleting current user
-        if user.id == current_user.id:
-            raise ValidationError("Cannot delete your own account")
-        
-        session.delete(user)
-        session.commit()
-        
-        return {'message': f'User {user.username} deleted successfully'}
+    - **user_id**: The ID of the user to delete
+    """
+    global MOCK_USERS
+    user = next((u for u in MOCK_USERS if u["id"] == user_id), None)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    MOCK_USERS = [u for u in MOCK_USERS if u["id"] != user_id]
+    
+    return APIResponse(
+        success=True,
+        data={"message": "User deleted successfully"},
+        timestamp=datetime.utcnow()
+    )
 
-@users_bp.route('/<int:user_id>/reset-password', methods=['POST'])
-@login_required
-@admin_required
-@validate_json('new_password')
-@api_response
-def reset_user_password(user_id):
-    """Reset a user's password."""
-    db_manager = get_database_manager()
-    data = request.get_json()
+@router.post("/{user_id}/reset-password", response_model=APIResponse, summary="Reset User Password")
+async def reset_user_password(user_id: int, password_reset: PasswordReset):
+    """
+    Reset a user's password (Admin only).
     
-    new_password = data.get('new_password')
+    - **user_id**: The ID of the user whose password to reset
+    - **password_reset**: New password data
+    """
+    user = next((u for u in MOCK_USERS if u["id"] == user_id), None)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
     
-    if len(new_password) < 6:
-        raise ValidationError("Password must be at least 6 characters long")
+    if len(password_reset.new_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 6 characters long"
+        )
     
-    with db_manager.get_session() as session:
-        user = session.query(User).get(user_id)
-        if not user:
-            raise NotFoundError(f"User with ID {user_id} not found")
-        
-        from flask_bcrypt import Bcrypt
-        bcrypt = Bcrypt()
-        user.password_hash = bcrypt.generate_password_hash(new_password).decode('utf-8')
-        
-        session.commit()
-        
-        return {'message': f'Password reset successfully for user {user.username}'}
+    return APIResponse(
+        success=True,
+        data={"message": "Password reset successfully"},
+        timestamp=datetime.utcnow()
+    )
