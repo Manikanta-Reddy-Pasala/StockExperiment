@@ -279,3 +279,4 @@ if __name__ == "__main__":
             print(f"  Failed to get data")
     
     print(f"\nAvailable providers: {manager.get_available_providers()}")
+

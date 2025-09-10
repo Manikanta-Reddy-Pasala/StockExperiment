@@ -279,3 +279,13 @@ print(f"Confidence: {analysis['confidence']}/10")
 - **Market Conditions**: Strategies may perform differently in different market conditions
 
 This system provides a robust foundation for systematic stock selection and strategy testing, combining quantitative analysis with AI-powered insights for informed investment decisions.
+
+
+### Reset Everything
+
+To completely reset the system:
+
+```bash
+./run.sh cleanup
+./run.sh start
+```

@@ -105,6 +105,15 @@ class ConfigManager:
         
         config[keys[-1]] = value
 
+    def get_config(self) -> Dict[str, Any]:
+        """
+        Backward-compatible accessor for the full configuration dictionary.
+        
+        Returns:
+            Dict[str, Any]: The full configuration mapping
+        """
+        return self.config
+
 
 # Global configuration manager instance
 config_manager = None

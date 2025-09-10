@@ -77,8 +77,7 @@ class UserTradingSession:
             self.broker_connector = Simulator()
         
         # Initialize other components
-        self.selector_engine = SelectorEngine()
-        self.selector_engine.set_data_manager(self.data_manager)
+        # Note: SelectorEngine removed - using new strategies system instead
         
         # Initialize risk manager with user-specific config
         user_risk_config = self._get_user_risk_config()
@@ -355,16 +354,12 @@ class MultiUserTradingEngine:
             user_session (UserTradingSession): User's trading session
         """
         try:
-            # Get user's active strategy
-            active_strategy = user_session.selector_engine.get_active_strategy()
-            if not active_strategy:
-                return
+            # Simplified market scan - in real implementation, this would use the strategies system
+            # For now, we'll just simulate a basic scan
+            symbols = ['RELIANCE', 'TCS', 'HDFC', 'INFY', 'HINDUNILVR', 'ITC', 'SBIN', 'BHARTIARTL', 'KOTAKBANK', 'LT']
             
-            # Get list of symbols to scan (simplified - in real implementation, this would be more sophisticated)
-            symbols = list(user_session.selector_engine.MID_CAP_STOCKS)[:10]  # Limit to 10 for demo
-            
-            # Run stock selection
-            selected_stocks = user_session.selector_engine.select_stocks(symbols=symbols)
+            # Simulate stock selection (in real implementation, this would use strategy logic)
+            selected_stocks = symbols[:5]  # Select first 5 for demo
             
             # Update user's trading state
             user_session.update_trading_state({

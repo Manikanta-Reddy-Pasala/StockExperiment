@@ -828,3 +828,31 @@
 2025-09-09 01:18:01,192 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 01:18:01] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
 2025-09-09 01:18:14,685 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 01:18:14] "GET / HTTP/1.1" 200 -
 2025-09-09 01:18:14,696 - werkzeug - INFO - 127.0.0.1 - - [09/Sep/2025 01:18:14] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
+2025-09-10 18:59:30,901 - __main__ - INFO - Logging initialized with level INFO
+2025-09-10 18:59:30,901 - __main__ - INFO - Starting Automated Trading System
+2025-09-10 18:59:30,901 - __main__ - INFO - Multi-user mode: True
+2025-09-10 18:59:30,901 - __main__ - INFO - Initializing new trading system components
+2025-09-10 18:59:30,901 - __main__ - INFO - DATABASE_URL environment variable: NOT SET
+2025-09-10 18:59:30,901 - __main__ - INFO - FLASK_ENV environment variable: NOT SET
+2025-09-10 18:59:30,901 - __main__ - INFO - Using database URL: postgresql://trader:trader_password@database:5432/trading_system
+2025-09-10 18:59:40,924 - __main__ - INFO - Logging initialized with level INFO
+2025-09-10 18:59:40,924 - __main__ - INFO - Starting Automated Trading System
+2025-09-10 18:59:40,924 - __main__ - INFO - Multi-user mode: True
+2025-09-10 18:59:40,924 - __main__ - INFO - Initializing new trading system components
+2025-09-10 18:59:40,924 - __main__ - INFO - DATABASE_URL environment variable: sqlite:///./trading_system.db
+2025-09-10 18:59:40,924 - __main__ - INFO - FLASK_ENV environment variable: NOT SET
+2025-09-10 18:59:40,924 - __main__ - INFO - Using database URL: sqlite:///./trading_system.db
+2025-09-10 18:59:41,061 - __main__ - INFO - Database initialized with PostgreSQL
+2025-09-10 18:59:41,488 - __main__ - INFO - Admin user setup completed
+2025-09-10 18:59:41,488 - broker.fyers_connector - INFO - Initializing FYERS connection for client: your_client_id
+2025-09-10 18:59:41,488 - __main__ - INFO - FYERS connector initialized for data provider
+2025-09-10 19:00:04,136 - data_sources.fyers_provider - INFO - FYERS API provider initialized for Indian stocks
+2025-09-10 19:00:04,136 - __main__ - INFO - Enhanced data provider manager initialized
+2025-09-10 19:00:04,136 - __main__ - INFO - New trading system components initialized
+2025-09-10 19:00:04,192 - __main__ - INFO - Starting web application on 0.0.0.0:5001
+2025-09-10 19:00:04,192 - __main__ - INFO - Trading system is ready!
+2025-09-10 19:00:04,221 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5001
+ * Running on http://192.168.70.124:5001
+2025-09-10 19:00:04,221 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
