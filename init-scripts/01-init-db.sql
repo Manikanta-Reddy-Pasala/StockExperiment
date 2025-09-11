@@ -135,3 +135,24 @@ CREATE TABLE IF NOT EXISTS logs (
     module VARCHAR(50),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS broker_configurations (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    broker_name VARCHAR(50) NOT NULL,
+    client_id VARCHAR(100),
+    access_token TEXT,
+    refresh_token TEXT,
+    api_key VARCHAR(200),
+    api_secret TEXT,
+    redirect_url VARCHAR(500),
+    app_type VARCHAR(20),
+    is_active BOOLEAN DEFAULT TRUE,
+    is_connected BOOLEAN DEFAULT FALSE,
+    last_connection_test TIMESTAMP,
+    connection_status VARCHAR(20),
+    error_message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, broker_name)
+);

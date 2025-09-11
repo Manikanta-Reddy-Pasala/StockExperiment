@@ -34,6 +34,7 @@ class User(UserMixin, Base):
     configurations = relationship("Configuration", back_populates="user")
     logs = relationship("Log", back_populates="user")
     suggested_stocks = relationship("SuggestedStock", back_populates="user")
+    broker_configurations = relationship("BrokerConfiguration", back_populates="user")
     
     def __repr__(self):
         return f'<User {self.username}>'
@@ -389,3 +390,34 @@ class AIAnalysis(Base):
     
     # Relationships
     user = relationship("User")
+
+
+class BrokerConfiguration(Base):
+    """Broker configuration and credentials."""
+    __tablename__ = 'broker_configurations'
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True)  # NULL for global configs
+    broker_name = Column(String(50), nullable=False)  # 'fyers', 'zerodha', etc.
+    client_id = Column(String(100))
+    access_token = Column(Text)  # Encrypted token
+    refresh_token = Column(Text)  # Encrypted refresh token
+    api_key = Column(String(200))
+    api_secret = Column(Text)  # Encrypted secret
+    redirect_url = Column(String(500))
+    app_type = Column(String(20))  # '100' for web, '2' for mobile
+    is_active = Column(Boolean, default=True)
+    is_connected = Column(Boolean, default=False)
+    last_connection_test = Column(DateTime)
+    connection_status = Column(String(20))  # 'connected', 'disconnected', 'error'
+    error_message = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship with user (optional for global configs)
+    user = relationship("User")
+    
+    # Unique constraint: broker_name should be unique per user (or globally if user_id is NULL)
+    __table_args__ = (
+        UniqueConstraint('user_id', 'broker_name', name='_user_broker_uc'),
+    )

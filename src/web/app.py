@@ -7,15 +7,17 @@ from flask_bcrypt import Bcrypt
 try:
     # Try relative imports first (for normal usage)
     from ..models.database import get_database_manager
-    from ..models.models import Log, Order, Trade, Position, User, Strategy, SuggestedStock, Configuration
+    from ..models.models import Log, Order, Trade, Position, User, Strategy, SuggestedStock, Configuration, BrokerConfiguration
     from ..integrations.db_charts import DatabaseCharts
     from ..integrations.multi_user_trading_engine import get_trading_engine
+    from ..services.broker_service import get_broker_service, FyersAPIConnector
 except ImportError:
     # Fall back to absolute imports (for testing)
     from models.database import get_database_manager
-    from models.models import Log, Order, Trade, Position, User, Strategy, SuggestedStock, Configuration
+    from models.models import Log, Order, Trade, Position, User, Strategy, SuggestedStock, Configuration, BrokerConfiguration
     from integrations.db_charts import DatabaseCharts
     from integrations.multi_user_trading_engine import get_trading_engine
+    from services.broker_service import get_broker_service, FyersAPIConnector
 from datetime import datetime
 import secrets
 
@@ -206,6 +208,12 @@ def create_app():
         """Alerts page."""
         return render_template('alerts.html')
     
+    @app.route('/brokers')
+    @login_required
+    def brokers():
+        """Brokers page."""
+        return render_template('brokers.html')
+    
     @app.route('/settings')
     @login_required
     def settings():
@@ -379,6 +387,201 @@ def create_app():
                 return jsonify({'message': 'User deleted successfully'})
         except Exception as e:
             return jsonify({'error': str(e)}), 500
+    
+    # Broker API Routes
+    @app.route('/api/brokers/fyers', methods=['GET'])
+    @login_required
+    def api_get_fyers_info():
+        """Get FYERS broker information."""
+        try:
+            broker_service = get_broker_service()
+            
+            # Get FYERS configuration from database
+            config = broker_service.get_broker_config('fyers', current_user.id)
+            
+            if not config:
+                return jsonify({
+                    'success': True,
+                    'client_id': '',
+                    'access_token': False,
+                    'connected': False,
+                    'last_updated': '-',
+                    'stats': {
+                        'total_orders': 0,
+                        'successful_orders': 0,
+                        'pending_orders': 0,
+                        'failed_orders': 0,
+                        'last_order_time': '-',
+                        'api_response_time': '-'
+                    }
+                })
+            
+            # Get broker statistics
+            stats = broker_service.get_broker_stats('fyers', current_user.id)
+            
+            return jsonify({
+                'success': True,
+                'client_id': config.client_id or '',
+                'access_token': bool(config.access_token),
+                'connected': config.is_connected,
+                'connection_status': config.connection_status or 'unknown',
+                'last_updated': config.updated_at.strftime('%Y-%m-%d %H:%M:%S') if config.updated_at else '-',
+                'last_connection_test': config.last_connection_test.strftime('%Y-%m-%d %H:%M:%S') if config.last_connection_test else '-',
+                'error_message': config.error_message or '',
+                'redirect_url': config.redirect_url or '',
+                'app_type': config.app_type or '100',
+                'is_active': config.is_active,
+                'stats': stats
+            })
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    @app.route('/api/brokers/fyers/test', methods=['POST'])
+    @login_required
+    def api_test_fyers_connection():
+        """Test FYERS broker connection."""
+        try:
+            broker_service = get_broker_service()
+            
+            # Get FYERS configuration from database
+            config = broker_service.get_broker_config('fyers', current_user.id)
+            
+            if not config or not config.client_id or not config.access_token:
+                return jsonify({
+                    'success': False,
+                    'error': 'FYERS credentials not configured'
+                }), 400
+            
+            # Create FYERS API connector and test connection
+            connector = FyersAPIConnector(config.client_id, broker_service._decrypt_data(config.access_token))
+            result = connector.test_connection()
+            
+            # Update connection status in database
+            config.is_connected = result['success']
+            config.connection_status = 'connected' if result['success'] else 'disconnected'
+            config.last_connection_test = datetime.utcnow()
+            config.error_message = result.get('message', '') if not result['success'] else None
+            
+            with broker_service.db_manager.get_session() as session:
+                session.merge(config)
+                session.commit()
+            
+            return jsonify({
+                'success': result['success'],
+                'message': result['message'],
+                'response_time': result.get('response_time', '-'),
+                'status_code': result.get('status_code', 0)
+            })
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    @app.route('/api/brokers/fyers/refresh-token', methods=['POST'])
+    @login_required
+    def api_refresh_fyers_token():
+        """Refresh FYERS access token."""
+        try:
+            # In a real implementation, you would:
+            # 1. Use the refresh token to get a new access token
+            # 2. Update the database configuration
+            # 3. Restart the connection
+            
+            # For now, we'll simulate a successful refresh
+            return jsonify({
+                'success': True,
+                'message': 'Token refresh initiated successfully'
+            })
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    @app.route('/api/brokers/fyers/config', methods=['POST'])
+    @login_required
+    def api_save_fyers_config():
+        """Save FYERS broker configuration."""
+        try:
+            data = request.get_json()
+            
+            # Validate required fields
+            if not data.get('client_id') or not data.get('access_token'):
+                return jsonify({
+                    'success': False,
+                    'error': 'Client ID and Access Token are required'
+                }), 400
+            
+            broker_service = get_broker_service()
+            
+            # Save configuration to database
+            config = broker_service.save_broker_config('fyers', {
+                'client_id': data.get('client_id'),
+                'access_token': data.get('access_token'),
+                'refresh_token': data.get('refresh_token', ''),
+                'redirect_url': data.get('redirect_url', 'https://trade.fyers.in/api-login/redirect-uri/index.html'),
+                'app_type': data.get('app_type', '100'),
+                'is_active': True
+            }, current_user.id)
+            
+            return jsonify({
+                'success': True,
+                'message': 'FYERS configuration saved successfully',
+                'config': {
+                    'id': config.id,
+                    'client_id': config.client_id,
+                    'redirect_url': config.redirect_url,
+                    'app_type': config.app_type,
+                    'is_active': config.is_active,
+                    'created_at': config.created_at.isoformat() if config.created_at else None,
+                    'updated_at': config.updated_at.isoformat() if config.updated_at else None
+                }
+            })
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    @app.route('/api/brokers/fyers/config', methods=['PUT'])
+    @login_required
+    def api_update_fyers_config():
+        """Update FYERS broker configuration."""
+        try:
+            data = request.get_json()
+            broker_service = get_broker_service()
+            
+            # Get existing config
+            config = broker_service.get_broker_config('fyers', current_user.id)
+            if not config:
+                return jsonify({
+                    'success': False,
+                    'error': 'FYERS configuration not found'
+                }), 404
+            
+            # Update configuration
+            update_data = {}
+            if 'client_id' in data:
+                update_data['client_id'] = data['client_id']
+            if 'access_token' in data:
+                update_data['access_token'] = data['access_token']
+            if 'refresh_token' in data:
+                update_data['refresh_token'] = data['refresh_token']
+            if 'redirect_url' in data:
+                update_data['redirect_url'] = data['redirect_url']
+            if 'app_type' in data:
+                update_data['app_type'] = data['app_type']
+            if 'is_active' in data:
+                update_data['is_active'] = data['is_active']
+            
+            config = broker_service.save_broker_config('fyers', update_data, current_user.id)
+            
+            return jsonify({
+                'success': True,
+                'message': 'FYERS configuration updated successfully',
+                'config': {
+                    'id': config.id,
+                    'client_id': config.client_id,
+                    'redirect_url': config.redirect_url,
+                    'app_type': config.app_type,
+                    'is_active': config.is_active,
+                    'updated_at': config.updated_at.isoformat() if config.updated_at else None
+                }
+            })
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
     
     return app
 

@@ -29,3 +29,6 @@ pytest-mock==3.11.1
 # Development tools
 black==23.7.0
 flake8==6.0.0
+
+# Security
+cryptography==41.0.7
