@@ -12,6 +12,7 @@ try:
     from ..integrations.db_charts import DatabaseCharts
     from ..integrations.multi_user_trading_engine import get_trading_engine
     from ..services.broker_service import get_broker_service, FyersAPIConnector, FyersOAuth2Flow
+    from ..services.stock_screening_service import get_stock_screening_service, StrategyType
 except ImportError:
     # Fall back to absolute imports (for testing)
     from models.database import get_database_manager
@@ -19,6 +20,7 @@ except ImportError:
     from integrations.db_charts import DatabaseCharts
     from integrations.multi_user_trading_engine import get_trading_engine
     from services.broker_service import get_broker_service, FyersAPIConnector, FyersOAuth2Flow
+    from services.stock_screening_service import get_stock_screening_service, StrategyType
 from datetime import datetime
 import secrets
 import sys
@@ -1002,6 +1004,147 @@ def create_app():
             })
         except Exception as e:
             app.logger.error(f"Error getting FYERS historical data for user {current_user.id}: {str(e)}")
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
+    
+    # Suggested Stocks API Routes
+    @app.route('/api/suggested-stocks', methods=['GET'])
+    @login_required
+    def api_get_suggested_stocks():
+        """Get suggested stocks based on screening criteria."""
+        try:
+            app.logger.info(f"Fetching suggested stocks for user {current_user.id}")
+            
+            # Get strategy filters from query parameters
+            strategies = request.args.getlist('strategies')
+            time_filter = request.args.get('time_filter', 'week')
+            
+            # Convert strategy strings to StrategyType enums
+            strategy_types = []
+            for strategy in strategies:
+                try:
+                    strategy_types.append(StrategyType(strategy))
+                except ValueError:
+                    app.logger.warning(f"Invalid strategy type: {strategy}")
+            
+            # If no strategies specified, use all
+            if not strategy_types:
+                strategy_types = [StrategyType.MOMENTUM, StrategyType.VALUE, StrategyType.GROWTH, 
+                                StrategyType.MEAN_REVERSION, StrategyType.BREAKOUT]
+            
+            # Get stock screening service with broker service
+            broker_service = get_broker_service()
+            screening_service = get_stock_screening_service(broker_service)
+            
+            # Screen stocks
+            suggested_stocks = screening_service.screen_stocks(strategy_types, current_user.id)
+            
+            # Convert to API response format
+            stocks_data = []
+            for stock in suggested_stocks:
+                stocks_data.append({
+                    'symbol': stock.symbol,
+                    'name': stock.name,
+                    'selection_date': datetime.now().strftime('%Y-%m-%d'),
+                    'selection_price': round(stock.current_price, 2),
+                    'current_price': round(stock.current_price, 2),
+                    'quantity': 10,  # Default quantity
+                    'investment': round(stock.current_price * 10, 2),
+                    'current_value': round(stock.current_price * 10, 2),
+                    'strategy': stock.strategy,
+                    'status': 'Active',
+                    'recommendation': stock.recommendation,
+                    'target_price': round(stock.target_price, 2) if stock.target_price else None,
+                    'stop_loss': round(stock.stop_loss, 2) if stock.stop_loss else None,
+                    'reason': stock.reason,
+                    'market_cap': round(stock.market_cap, 2),
+                    'pe_ratio': round(stock.pe_ratio, 2) if stock.pe_ratio else None,
+                    'pb_ratio': round(stock.pb_ratio, 2) if stock.pb_ratio else None,
+                    'roe': round(stock.roe * 100, 2) if stock.roe else None,
+                    'sales_growth': round(stock.sales_growth, 2) if stock.sales_growth else None
+                })
+            
+            app.logger.info(f"Found {len(stocks_data)} suggested stocks for user {current_user.id}")
+            
+            return jsonify({
+                'success': True,
+                'data': stocks_data,
+                'total': len(stocks_data),
+                'strategies': [s.value for s in strategy_types],
+                'time_filter': time_filter
+            })
+            
+        except Exception as e:
+            app.logger.error(f"Error getting suggested stocks for user {current_user.id}: {str(e)}")
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
+    
+    @app.route('/api/suggested-stocks/refresh', methods=['POST'])
+    @login_required
+    def api_refresh_suggested_stocks():
+        """Refresh suggested stocks by running screening again."""
+        try:
+            app.logger.info(f"Refreshing suggested stocks for user {current_user.id}")
+            
+            # Get strategy filters from request body
+            data = request.get_json() or {}
+            strategies = data.get('strategies', [])
+            
+            # Convert strategy strings to StrategyType enums
+            strategy_types = []
+            for strategy in strategies:
+                try:
+                    strategy_types.append(StrategyType(strategy))
+                except ValueError:
+                    app.logger.warning(f"Invalid strategy type: {strategy}")
+            
+            # If no strategies specified, use all
+            if not strategy_types:
+                strategy_types = [StrategyType.MOMENTUM, StrategyType.VALUE, StrategyType.GROWTH, 
+                                StrategyType.MEAN_REVERSION, StrategyType.BREAKOUT]
+            
+            # Get stock screening service with broker service
+            broker_service = get_broker_service()
+            screening_service = get_stock_screening_service(broker_service)
+            
+            # Screen stocks
+            suggested_stocks = screening_service.screen_stocks(strategy_types, current_user.id)
+            
+            # Convert to API response format
+            stocks_data = []
+            for stock in suggested_stocks:
+                stocks_data.append({
+                    'symbol': stock.symbol,
+                    'name': stock.name,
+                    'selection_date': datetime.now().strftime('%Y-%m-%d'),
+                    'selection_price': round(stock.current_price, 2),
+                    'current_price': round(stock.current_price, 2),
+                    'quantity': 10,  # Default quantity
+                    'investment': round(stock.current_price * 10, 2),
+                    'current_value': round(stock.current_price * 10, 2),
+                    'strategy': stock.strategy,
+                    'status': 'Active',
+                    'recommendation': stock.recommendation,
+                    'target_price': round(stock.target_price, 2) if stock.target_price else None,
+                    'stop_loss': round(stock.stop_loss, 2) if stock.stop_loss else None,
+                    'reason': stock.reason,
+                    'market_cap': round(stock.market_cap, 2),
+                    'pe_ratio': round(stock.pe_ratio, 2) if stock.pe_ratio else None,
+                    'pb_ratio': round(stock.pb_ratio, 2) if stock.pb_ratio else None,
+                    'roe': round(stock.roe * 100, 2) if stock.roe else None,
+                    'sales_growth': round(stock.sales_growth, 2) if stock.sales_growth else None
+                })
+            
+            app.logger.info(f"Refreshed {len(stocks_data)} suggested stocks for user {current_user.id}")
+            
+            return jsonify({
+                'success': True,
+                'data': stocks_data,
+                'total': len(stocks_data),
+                'strategies': [s.value for s in strategy_types],
+                'refreshed_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            })
+            
+        except Exception as e:
+            app.logger.error(f"Error refreshing suggested stocks for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
     
     return app

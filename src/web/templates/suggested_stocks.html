@@ -92,54 +92,8 @@
 
 {% block scripts %}
 <script>
-    // Sample data for demonstration
-    const sampleSuggestedStocks = [
-        {
-            symbol: 'RELIANCE.NS',
-            selection_date: '2024-01-15',
-            selection_price: 2750.50,
-            current_price: 2820.75,
-            quantity: 10,
-            strategy: 'Momentum Strategy',
-            status: 'Active'
-        },
-        {
-            symbol: 'TCS.NS',
-            selection_date: '2024-01-16',
-            selection_price: 3850.75,
-            current_price: 3920.25,
-            quantity: 5,
-            strategy: 'Breakout Strategy',
-            status: 'Active'
-        },
-        {
-            symbol: 'INFY.NS',
-            selection_date: '2024-01-17',
-            selection_price: 1620.00,
-            current_price: 1580.50,
-            quantity: 15,
-            strategy: 'Mean Reversion Strategy',
-            status: 'Active'
-        },
-        {
-            symbol: 'HDFC.NS',
-            selection_date: '2024-01-18',
-            selection_price: 1450.25,
-            current_price: 1475.80,
-            quantity: 8,
-            strategy: 'Momentum Strategy',
-            status: 'Sold'
-        },
-        {
-            symbol: 'WIPRO.NS',
-            selection_date: '2024-01-19',
-            selection_price: 420.50,
-            current_price: 435.25,
-            quantity: 25,
-            strategy: 'Breakout Strategy',
-            status: 'Active'
-        }
-    ];
+    // Real data from API
+    let suggestedStocks = [];
 
     // Get selected strategies
     function getSelectedStrategies() {
@@ -147,32 +101,90 @@
         return Array.from(checkboxes).map(cb => cb.value);
     }
 
-    // Filter stocks based on selected strategies
-    function filterStocksByStrategy(stocks) {
-        const selectedStrategies = getSelectedStrategies();
-        if (selectedStrategies.length === 0) return [];
-        
-        return stocks.filter(stock => {
-            const strategyName = stock.strategy.toLowerCase();
-            return selectedStrategies.some(strategy => 
-                strategyName.includes(strategy.toLowerCase())
-            );
-        });
+    // Fetch suggested stocks from API
+    async function fetchSuggestedStocks() {
+        try {
+            const selectedStrategies = getSelectedStrategies();
+            const timeFilter = document.getElementById('time-filter').value;
+            
+            // Build query parameters
+            const params = new URLSearchParams();
+            selectedStrategies.forEach(strategy => params.append('strategies', strategy));
+            params.append('time_filter', timeFilter);
+            
+            const response = await fetch(`/api/suggested-stocks?${params}`, {
+                credentials: 'same-origin'
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                suggestedStocks = data.data;
+                populateTable();
+                showNotification(`Loaded ${data.total} suggested stocks`, 'success');
+            } else {
+                throw new Error(data.error || 'Failed to fetch suggested stocks');
+            }
+        } catch (error) {
+            console.error('Error fetching suggested stocks:', error);
+            showNotification(`Error loading stocks: ${error.message}`, 'error');
+        }
+    }
+
+    // Refresh suggested stocks
+    async function refreshSuggestedStocks() {
+        try {
+            const selectedStrategies = getSelectedStrategies();
+            
+            const response = await fetch('/api/suggested-stocks/refresh', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    strategies: selectedStrategies
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                suggestedStocks = data.data;
+                populateTable();
+                showNotification(`Refreshed ${data.total} suggested stocks at ${data.refreshed_at}`, 'success');
+            } else {
+                throw new Error(data.error || 'Failed to refresh suggested stocks');
+            }
+        } catch (error) {
+            console.error('Error refreshing suggested stocks:', error);
+            showNotification(`Error refreshing stocks: ${error.message}`, 'error');
+        }
     }
 
     // Populate table with filtered stocks
     function populateTable() {
-        const timeFilter = document.getElementById('time-filter').value;
         const table = document.getElementById('suggested-stocks-table').getElementsByTagName('tbody')[0];
         table.innerHTML = '';
         
-        // Filter stocks by time period (simplified for demo)
-        let filteredStocks = sampleSuggestedStocks;
+        if (suggestedStocks.length === 0) {
+            const row = table.insertRow();
+            const cell = row.insertCell();
+            cell.colSpan = 9;
+            cell.className = 'text-center text-muted py-4';
+            cell.innerHTML = '<i class="bi bi-info-circle me-2"></i>No stocks found. Try adjusting your filters or refresh the data.';
+            return;
+        }
         
-        // Filter by strategy
-        filteredStocks = filterStocksByStrategy(filteredStocks);
-        
-        filteredStocks.forEach(stock => {
+        suggestedStocks.forEach(stock => {
             const row = table.insertRow();
             
             // Calculate values
@@ -214,7 +226,7 @@
             strategyCheckboxes.forEach(cb => cb.checked = false);
         }
         
-        populateTable();
+        fetchSuggestedStocks();
     }
 
     // Handle individual strategy checkbox changes
@@ -230,12 +242,33 @@
             allCheckbox.checked = false;
         }
         
-        populateTable();
+        fetchSuggestedStocks();
+    }
+
+    // Show notification function
+    function showNotification(message, type = 'info') {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show position-fixed`;
+        notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        notification.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 5000);
     }
 
     // Event listeners
-    document.getElementById('time-filter').addEventListener('change', populateTable);
-    document.getElementById('refresh-btn').addEventListener('click', populateTable);
+    document.getElementById('time-filter').addEventListener('change', fetchSuggestedStocks);
+    document.getElementById('refresh-btn').addEventListener('click', refreshSuggestedStocks);
     document.getElementById('strategy-all').addEventListener('change', handleStrategyFilter);
     
     // Add event listeners to individual strategy checkboxes
@@ -245,7 +278,7 @@
 
     // Initialize page when loaded
     document.addEventListener('DOMContentLoaded', function() {
-        populateTable();
+        fetchSuggestedStocks();
     });
 </script>
 {% endblock %}
