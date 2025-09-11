@@ -419,18 +419,23 @@ def create_app():
             # Get broker statistics
             stats = broker_service.get_broker_stats('fyers', current_user.id)
             
+            # Format the config data
+            config_data = {
+                'client_id': config.get('client_id', ''),
+                'access_token': bool(config.get('access_token')),
+                'connected': config.get('is_connected', False),
+                'connection_status': config.get('connection_status', 'unknown'),
+                'last_updated': config.get('updated_at').strftime('%Y-%m-%d %H:%M:%S') if config.get('updated_at') else '-',
+                'last_connection_test': config.get('last_connection_test').strftime('%Y-%m-%d %H:%M:%S') if config.get('last_connection_test') else '-',
+                'error_message': config.get('error_message', ''),
+                'redirect_url': config.get('redirect_url', ''),
+                'app_type': config.get('app_type', '100'),
+                'is_active': config.get('is_active', True)
+            }
+            
             return jsonify({
                 'success': True,
-                'client_id': config.client_id or '',
-                'access_token': bool(config.access_token),
-                'connected': config.is_connected,
-                'connection_status': config.connection_status or 'unknown',
-                'last_updated': config.updated_at.strftime('%Y-%m-%d %H:%M:%S') if config.updated_at else '-',
-                'last_connection_test': config.last_connection_test.strftime('%Y-%m-%d %H:%M:%S') if config.last_connection_test else '-',
-                'error_message': config.error_message or '',
-                'redirect_url': config.redirect_url or '',
-                'app_type': config.app_type or '100',
-                'is_active': config.is_active,
+                **config_data,
                 'stats': stats
             })
         except Exception as e:
@@ -447,25 +452,32 @@ def create_app():
             # Get FYERS configuration from database
             config = broker_service.get_broker_config('fyers', current_user.id)
             
-            if not config or not config.client_id or not config.access_token:
+            if not config or not config.get('client_id') or not config.get('access_token'):
                 return jsonify({
                     'success': False,
                     'error': 'FYERS credentials not configured'
                 }), 400
             
             # Create FYERS API connector and test connection
-            connector = FyersAPIConnector(config.client_id, config.access_token)
+            connector = FyersAPIConnector(config.get('client_id'), config.get('access_token'))
             result = connector.test_connection()
             
             # Update connection status in database
-            config.is_connected = result['success']
-            config.connection_status = 'connected' if result['success'] else 'disconnected'
-            config.last_connection_test = datetime.utcnow()
-            config.error_message = result.get('message', '') if not result['success'] else None
-            
             with broker_service.db_manager.get_session() as session:
-                session.merge(config)
-                session.commit()
+                # Get the config within this session
+                query = session.query(BrokerConfiguration).filter_by(broker_name='fyers')
+                if current_user.id:
+                    query = query.filter_by(user_id=current_user.id)
+                else:
+                    query = query.filter_by(user_id=None)
+                
+                config = query.first()
+                if config:
+                    config.is_connected = result['success']
+                    config.connection_status = 'connected' if result['success'] else 'disconnected'
+                    config.last_connection_test = datetime.utcnow()
+                    config.error_message = result.get('message', '') if not result['success'] else None
+                    session.commit()
             
             return jsonify({
                 'success': result['success'],
@@ -520,18 +532,21 @@ def create_app():
                 'is_active': True
             }, current_user.id)
             
+            # Format the config data
+            config_data = {
+                'id': config.get('id'),
+                'client_id': config.get('client_id'),
+                'redirect_url': config.get('redirect_url'),
+                'app_type': config.get('app_type'),
+                'is_active': config.get('is_active'),
+                'created_at': config.get('created_at').isoformat() if config.get('created_at') else None,
+                'updated_at': config.get('updated_at').isoformat() if config.get('updated_at') else None
+            }
+            
             return jsonify({
                 'success': True,
                 'message': 'FYERS configuration saved successfully',
-                'config': {
-                    'id': config.id,
-                    'client_id': config.client_id,
-                    'redirect_url': config.redirect_url,
-                    'app_type': config.app_type,
-                    'is_active': config.is_active,
-                    'created_at': config.created_at.isoformat() if config.created_at else None,
-                    'updated_at': config.updated_at.isoformat() if config.updated_at else None
-                }
+                'config': config_data
             })
         except Exception as e:
             app.logger.error(f"Error saving FYERS configuration: {str(e)}")

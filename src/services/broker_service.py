@@ -22,7 +22,7 @@ class BrokerService:
     def __init__(self):
         self.db_manager = get_database_manager()
     
-    def get_broker_config(self, broker_name: str, user_id: Optional[int] = None) -> Optional[BrokerConfiguration]:
+    def get_broker_config(self, broker_name: str, user_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
         """Get broker configuration from database."""
         with self.db_manager.get_session() as session:
             query = session.query(BrokerConfiguration).filter_by(broker_name=broker_name)
@@ -30,13 +30,43 @@ class BrokerService:
                 query = query.filter_by(user_id=user_id)
             else:
                 query = query.filter_by(user_id=None)  # Global config
-            return query.first()
+            
+            config = query.first()
+            if not config:
+                return None
+            
+            # Return data dictionary instead of SQLAlchemy object
+            return {
+                'id': config.id,
+                'user_id': config.user_id,
+                'broker_name': config.broker_name,
+                'client_id': config.client_id,
+                'access_token': config.access_token,
+                'refresh_token': config.refresh_token,
+                'api_key': config.api_key,
+                'api_secret': config.api_secret,
+                'redirect_url': config.redirect_url,
+                'app_type': config.app_type,
+                'is_active': config.is_active,
+                'is_connected': config.is_connected,
+                'last_connection_test': config.last_connection_test,
+                'connection_status': config.connection_status,
+                'error_message': config.error_message,
+                'created_at': config.created_at,
+                'updated_at': config.updated_at
+            }
     
-    def save_broker_config(self, broker_name: str, config_data: Dict[str, Any], user_id: Optional[int] = None) -> BrokerConfiguration:
+    def save_broker_config(self, broker_name: str, config_data: Dict[str, Any], user_id: Optional[int] = None) -> Dict[str, Any]:
         """Save broker configuration to database."""
         with self.db_manager.get_session() as session:
-            # Check if config exists
-            existing_config = self.get_broker_config(broker_name, user_id)
+            # Check if config exists within this session
+            query = session.query(BrokerConfiguration).filter_by(broker_name=broker_name)
+            if user_id:
+                query = query.filter_by(user_id=user_id)
+            else:
+                query = query.filter_by(user_id=None)  # Global config
+            
+            existing_config = query.first()
             
             if existing_config:
                 # Update existing config
@@ -61,7 +91,28 @@ class BrokerService:
             config.updated_at = datetime.utcnow()
             
             session.commit()
-            return config
+            session.refresh(config)  # Refresh to get the updated object
+            
+            # Return data dictionary instead of SQLAlchemy object
+            return {
+                'id': config.id,
+                'user_id': config.user_id,
+                'broker_name': config.broker_name,
+                'client_id': config.client_id,
+                'access_token': config.access_token,
+                'refresh_token': config.refresh_token,
+                'api_key': config.api_key,
+                'api_secret': config.api_secret,
+                'redirect_url': config.redirect_url,
+                'app_type': config.app_type,
+                'is_active': config.is_active,
+                'is_connected': config.is_connected,
+                'last_connection_test': config.last_connection_test,
+                'connection_status': config.connection_status,
+                'error_message': config.error_message,
+                'created_at': config.created_at,
+                'updated_at': config.updated_at
+            }
     
     def get_broker_stats(self, broker_name: str, user_id: Optional[int] = None) -> Dict[str, Any]:
         """Get broker statistics from database."""
