@@ -5,10 +5,8 @@ import os
 import time
 import requests
 import json
-import base64
 from datetime import datetime
 from typing import Dict, Optional, Any
-from cryptography.fernet import Fernet
 
 try:
     from ..models.database import get_database_manager
@@ -23,60 +21,6 @@ class BrokerService:
     
     def __init__(self):
         self.db_manager = get_database_manager()
-        self.encryption_key = self._get_or_create_encryption_key()
-        self.cipher = Fernet(self.encryption_key)
-    
-    def _get_or_create_encryption_key(self) -> bytes:
-        """Get or create encryption key for storing sensitive data."""
-        with self.db_manager.get_session() as session:
-            # Try to get encryption key from database
-            from ..models.models import Configuration
-            config = session.query(Configuration).filter_by(
-                user_id=None,  # Global config
-                key='broker_encryption_key'
-            ).first()
-            
-            if config and config.value:
-                try:
-                    return base64.b64decode(config.value.encode())
-                except Exception:
-                    # If decoding fails, generate new key
-                    pass
-            
-            # Generate new encryption key
-            key = Fernet.generate_key()
-            key_b64 = base64.b64encode(key).decode()
-            
-            # Save to database
-            if config:
-                config.value = key_b64
-                config.updated_at = datetime.utcnow()
-            else:
-                config = Configuration(
-                    user_id=None,  # Global config
-                    key='broker_encryption_key',
-                    value=key_b64,
-                    description='Encryption key for broker configuration data'
-                )
-                session.add(config)
-            
-            session.commit()
-            return key
-    
-    def _encrypt_data(self, data: str) -> str:
-        """Encrypt sensitive data."""
-        if not data:
-            return ""
-        return self.cipher.encrypt(data.encode()).decode()
-    
-    def _decrypt_data(self, encrypted_data: str) -> str:
-        """Decrypt sensitive data."""
-        if not encrypted_data:
-            return ""
-        try:
-            return self.cipher.decrypt(encrypted_data.encode()).decode()
-        except Exception:
-            return ""
     
     def get_broker_config(self, broker_name: str, user_id: Optional[int] = None) -> Optional[BrokerConfiguration]:
         """Get broker configuration from database."""
@@ -105,12 +49,12 @@ class BrokerService:
                 )
                 session.add(config)
             
-            # Update fields
+            # Update fields (storing directly without encryption for simplicity)
             config.client_id = config_data.get('client_id', '')
-            config.access_token = self._encrypt_data(config_data.get('access_token', ''))
-            config.refresh_token = self._encrypt_data(config_data.get('refresh_token', ''))
+            config.access_token = config_data.get('access_token', '')
+            config.refresh_token = config_data.get('refresh_token', '')
             config.api_key = config_data.get('api_key', '')
-            config.api_secret = self._encrypt_data(config_data.get('api_secret', ''))
+            config.api_secret = config_data.get('api_secret', '')
             config.redirect_url = config_data.get('redirect_url', '')
             config.app_type = config_data.get('app_type', '100')
             config.is_active = config_data.get('is_active', True)

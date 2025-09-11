@@ -434,7 +434,8 @@ def create_app():
                 'stats': stats
             })
         except Exception as e:
-            return jsonify({'success': False, 'error': str(e)}), 500
+            app.logger.error(f"Error getting FYERS broker info: {str(e)}")
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
     
     @app.route('/api/brokers/fyers/test', methods=['POST'])
     @login_required
@@ -453,7 +454,7 @@ def create_app():
                 }), 400
             
             # Create FYERS API connector and test connection
-            connector = FyersAPIConnector(config.client_id, broker_service._decrypt_data(config.access_token))
+            connector = FyersAPIConnector(config.client_id, config.access_token)
             result = connector.test_connection()
             
             # Update connection status in database
@@ -533,7 +534,8 @@ def create_app():
                 }
             })
         except Exception as e:
-            return jsonify({'success': False, 'error': str(e)}), 500
+            app.logger.error(f"Error saving FYERS configuration: {str(e)}")
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
     
     @app.route('/api/brokers/fyers/config', methods=['PUT'])
     @login_required

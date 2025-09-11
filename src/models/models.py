@@ -400,10 +400,10 @@ class BrokerConfiguration(Base):
     user_id = Column(Integer, ForeignKey('users.id'), nullable=True)  # NULL for global configs
     broker_name = Column(String(50), nullable=False)  # 'fyers', 'zerodha', etc.
     client_id = Column(String(100))
-    access_token = Column(Text)  # Encrypted token
-    refresh_token = Column(Text)  # Encrypted refresh token
+    access_token = Column(Text)
+    refresh_token = Column(Text)
     api_key = Column(String(200))
-    api_secret = Column(Text)  # Encrypted secret
+    api_secret = Column(Text)
     redirect_url = Column(String(500))
     app_type = Column(String(20))  # '100' for web, '2' for mobile
     is_active = Column(Boolean, default=True)
