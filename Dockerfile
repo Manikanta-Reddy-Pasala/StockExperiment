@@ -28,8 +28,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create logs directory
-RUN mkdir -p logs
+# Create logs directory in the correct location and make it writable
+RUN mkdir -p /app/src/data/logs && \
+    chmod 777 /app/src/data/logs
 
 # Expose port
 EXPOSE 5001
