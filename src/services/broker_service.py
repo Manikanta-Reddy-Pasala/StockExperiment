@@ -188,25 +188,28 @@ class FyersOAuth2Flow:
         self.response_type = "code"
         self.state = "sample"
     
-    def generate_auth_url(self) -> str:
-        """Generate the authorization URL for user login."""
+    def generate_auth_url(self, user_id: int = 1) -> str:
+        """Generate the authorization URL for user login with automated callback."""
         if not FYERS_AVAILABLE:
             raise Exception("fyers-apiv3 library not available")
         
         try:
+            # Use our automated callback URL instead of the default redirect URI
+            automated_redirect_uri = f"http://localhost:5001/api/brokers/fyers/oauth/callback"
+            
             # Create session model for OAuth flow
             app_session = fyersModel.SessionModel(
                 client_id=self.client_id,
-                redirect_uri=self.redirect_uri,
+                redirect_uri=automated_redirect_uri,
                 response_type=self.response_type,
-                state=self.state,
+                state=str(user_id),  # Pass user_id in state for callback
                 secret_key=self.secret_key,
                 grant_type=self.grant_type
             )
             
             # Generate the authorization URL
             auth_url = app_session.generate_authcode()
-            logger.info(f"Generated FYERS authorization URL: {auth_url}")
+            logger.info(f"Generated FYERS authorization URL with automated callback: {auth_url}")
             return auth_url
             
         except Exception as e:

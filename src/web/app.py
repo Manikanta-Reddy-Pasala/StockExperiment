@@ -653,34 +653,36 @@ def create_app():
     @app.route('/api/brokers/fyers/auth-url', methods=['POST'])
     @login_required
     def api_generate_fyers_auth_url():
-        """Generate FYERS OAuth2 authorization URL."""
+        """Generate FYERS OAuth2 authorization URL using database configuration."""
         try:
             app.logger.info(f"Generating FYERS auth URL for user {current_user.id}")
-            data = request.get_json()
             
-            # Validate required fields
-            if not data.get('client_id') or not data.get('secret_key') or not data.get('redirect_uri'):
-                app.logger.warning(f"Missing required FYERS OAuth2 credentials for user {current_user.id}")
+            # Get broker configuration from database
+            broker_service = get_broker_service()
+            config = broker_service.get_broker_config(current_user.id)
+            
+            if not config or not config.get('client_id') or not config.get('api_secret'):
+                app.logger.warning(f"No FYERS configuration found for user {current_user.id}")
                 return jsonify({
                     'success': False,
-                    'error': 'Client ID, Secret Key, and Redirect URI are required'
+                    'error': 'FYERS configuration not found. Please save your Client ID and Secret Key first.'
                 }), 400
             
-            # Create OAuth2 flow handler
+            # Create OAuth2 flow handler using database configuration
             oauth_flow = FyersOAuth2Flow(
-                client_id=data.get('client_id'),
-                secret_key=data.get('secret_key'),
-                redirect_uri=data.get('redirect_uri')
+                client_id=config.get('client_id'),
+                secret_key=config.get('api_secret'),
+                redirect_uri=config.get('redirect_url', 'https://trade.fyers.in/api-login/redirect-uri/index.html')
             )
             
-            # Generate authorization URL
-            auth_url = oauth_flow.generate_auth_url()
+            # Generate authorization URL with user_id for automated callback
+            auth_url = oauth_flow.generate_auth_url(current_user.id)
             
             app.logger.info(f"FYERS auth URL generated successfully for user {current_user.id}")
             return jsonify({
                 'success': True,
                 'auth_url': auth_url,
-                'message': 'Authorization URL generated successfully. Please visit this URL to authorize the application.'
+                'message': 'Authorization URL generated successfully. Please visit this URL to authorize the application. The token will be automatically saved upon authorization.'
             })
             
         except Exception as e:
@@ -1146,6 +1148,83 @@ def create_app():
         except Exception as e:
             app.logger.error(f"Error refreshing suggested stocks for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
+    
+    # Automated OAuth2 Redirect Handler
+    @app.route('/api/brokers/fyers/oauth/callback', methods=['GET'])
+    def api_fyers_oauth_callback():
+        """Automated OAuth2 callback handler for FYERS authorization."""
+        try:
+            # Get authorization code from query parameters
+            auth_code = request.args.get('auth_code')
+            state = request.args.get('state')
+            
+            if not auth_code:
+                app.logger.error("No authorization code received in OAuth callback")
+                return render_template('oauth_callback.html', 
+                                     success=False, 
+                                     message="No authorization code received")
+            
+            app.logger.info(f"Received OAuth callback with auth_code: {auth_code[:10]}...")
+            
+            # Get the user ID from state parameter (if provided) or default to 1
+            user_id = 1  # Default user ID
+            if state:
+                try:
+                    # State could contain user_id or other info
+                    user_id = int(state)
+                except ValueError:
+                    user_id = 1
+            
+            # Get broker service and exchange the auth code for access token
+            broker_service = get_broker_service()
+            
+            # Get current broker config
+            config = broker_service.get_broker_config(user_id)
+            if not config or not config.get('client_id') or not config.get('api_secret'):
+                app.logger.error(f"No broker configuration found for user {user_id}")
+                return render_template('oauth_callback.html', 
+                                     success=False, 
+                                     message="No broker configuration found. Please configure your FYERS credentials first.")
+            
+            # Create OAuth2 flow instance
+            oauth_flow = FyersOAuth2Flow(
+                client_id=config.get('client_id'),
+                secret_key=config.get('api_secret'),
+                redirect_uri=config.get('redirect_url')
+            )
+            
+            # Exchange auth code for access token
+            result = oauth_flow.exchange_auth_code(auth_code)
+            
+            if result.get('success'):
+                access_token = result.get('access_token')
+                
+                # Save the access token to database
+                token_data = {
+                    'access_token': access_token,
+                    'is_connected': True,
+                    'connection_status': 'connected'
+                }
+                
+                broker_service.save_broker_config(user_id, token_data)
+                
+                app.logger.info(f"Successfully exchanged auth code for access token for user {user_id}")
+                
+                return render_template('oauth_callback.html', 
+                                     success=True, 
+                                     message="Successfully connected to FYERS! You can now close this window and return to the trading system.")
+            else:
+                error_msg = result.get('error', 'Unknown error occurred')
+                app.logger.error(f"Failed to exchange auth code: {error_msg}")
+                return render_template('oauth_callback.html', 
+                                     success=False, 
+                                     message=f"Failed to connect to FYERS: {error_msg}")
+                
+        except Exception as e:
+            app.logger.error(f"Error in OAuth callback: {str(e)}")
+            return render_template('oauth_callback.html', 
+                                 success=False, 
+                                 message=f"An error occurred: {str(e)}")
     
     return app
 

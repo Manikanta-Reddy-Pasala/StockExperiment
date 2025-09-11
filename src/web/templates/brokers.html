@@ -201,27 +201,11 @@
                                             </button>
                                         </div>
                                         
-                                        <!-- Auth Code Input (hidden initially) -->
-                                        <div id="auth-code-section" class="mt-4" style="display: none;">
-                                            <div class="alert alert-warning">
-                                                <i class="bi bi-exclamation-triangle me-2"></i>
-                                                <strong>Step 3:</strong> Visit the opened URL, login to FYERS, and copy the authorization code from the redirect URL.
-                                            </div>
-                                            
-                                            <div class="row">
-                                                <div class="col-md-8 mb-3">
-                                                    <label for="fyers-auth-code" class="form-label">
-                                                        <i class="bi bi-code-square me-1"></i>Authorization Code
-                                                    </label>
-                                                    <input type="text" class="form-control" id="fyers-auth-code" 
-                                                           placeholder="Paste the auth code from the authorization URL" required>
-                                                    <div class="form-text">Copy the code from the URL after FYERS authorization</div>
-                                                </div>
-                                                <div class="col-md-4 mb-3 d-flex align-items-end">
-                                                    <button type="button" class="btn btn-primary w-100" id="exchange-auth-code">
-                                                        <i class="bi bi-arrow-repeat me-2"></i> Complete Setup
-                                                    </button>
-                                                </div>
+                                        <!-- Automated OAuth2 Flow Info -->
+                                        <div class="mt-4">
+                                            <div class="alert alert-info">
+                                                <i class="bi bi-info-circle me-2"></i>
+                                                <strong>Automated Flow:</strong> When you click "Generate Auth URL", a new window will open for FYERS authorization. After you complete the authorization, the access token will be automatically saved to your account.
                                             </div>
                                         </div>
                                     </form>
@@ -337,8 +321,9 @@
                 
                 // Update OAuth form fields from database
                 document.getElementById('fyers-oauth-client-id').value = data.client_id || '';
-                // Mask the secret key for security
+                // Show placeholder for secret key if it exists, empty if not
                 document.getElementById('fyers-oauth-secret-key').value = data.api_secret ? '••••••••••••••••' : '';
+                document.getElementById('fyers-oauth-secret-key').placeholder = data.api_secret ? 'Secret key is saved' : 'Enter your App Secret';
                 document.getElementById('fyers-oauth-redirect-uri').value = data.redirect_url || 'https://trade.fyers.in/api-login/redirect-uri/index.html';
                 
                 // Show auth URL section if basic configuration exists
@@ -463,40 +448,38 @@
     }
     
     async function generateAuthUrl() {
-        const clientId = document.getElementById('fyers-oauth-client-id').value;
-        const secretKey = document.getElementById('fyers-oauth-secret-key').value;
-        const redirectUri = document.getElementById('fyers-oauth-redirect-uri').value;
-        
-        if (!clientId || !secretKey || !redirectUri) {
-            showNotification('Please fill in all OAuth2 fields', 'error');
-            return;
-        }
-        
         try {
             const response = await fetch('/api/brokers/fyers/auth-url', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    client_id: clientId,
-                    secret_key: secretKey,
-                    redirect_uri: redirectUri
-                })
+                credentials: 'same-origin',
+                body: JSON.stringify({}) // No data needed, uses database configuration
             });
             
             const data = await response.json();
             
             if (data.success) {
-                showNotification('Authorization URL generated successfully!', 'success');
+                showNotification('Authorization URL generated successfully! Opening in new window...', 'success');
                 
-                // Show the auth code input section
-                document.getElementById('auth-code-section').style.display = 'block';
+                // Open the authorization URL in a new window
+                const authWindow = window.open(data.auth_url, '_blank', 'width=800,height=600');
                 
-                // Open the auth URL in a new tab
-                window.open(data.auth_url, '_blank');
+                // Show success message about automated flow
+                showNotification('Please complete the authorization in the new window. The access token will be automatically saved!', 'info');
                 
-                showNotification('Please visit the opened URL, login to FYERS, and copy the auth code from the URL', 'info');
+                // Check for window close and refresh data
+                const checkClosed = setInterval(() => {
+                    if (authWindow.closed) {
+                        clearInterval(checkClosed);
+                        showNotification('Authorization window closed. Refreshing data...', 'info');
+                        setTimeout(() => {
+                            fetchBrokerInfo();
+                        }, 2000);
+                    }
+                }, 1000);
+                
             } else {
                 showNotification(`Error: ${data.error}`, 'error');
             }
@@ -505,51 +488,6 @@
         }
     }
     
-    async function exchangeAuthCode() {
-        const clientId = document.getElementById('fyers-oauth-client-id').value;
-        const secretKey = document.getElementById('fyers-oauth-secret-key').value;
-        const redirectUri = document.getElementById('fyers-oauth-redirect-uri').value;
-        const authCode = document.getElementById('fyers-auth-code').value;
-        
-        if (!clientId || !secretKey || !redirectUri || !authCode) {
-            showNotification('Please fill in all fields including the auth code', 'error');
-            return;
-        }
-        
-        try {
-            const response = await fetch('/api/brokers/fyers/exchange-token', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    client_id: clientId,
-                    secret_key: secretKey,
-                    redirect_uri: redirectUri,
-                    auth_code: authCode
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                showNotification('Access token obtained and saved successfully!', 'success');
-                
-                // Hide the auth code section
-                document.getElementById('auth-code-section').style.display = 'none';
-                
-                // Clear only the auth code field
-                document.getElementById('fyers-auth-code').value = '';
-                
-                // Refresh broker info to show updated status and populate form fields
-                fetchBrokerInfo();
-            } else {
-                showNotification(`Error: ${data.error}`, 'error');
-            }
-        } catch (error) {
-            showNotification(`Error exchanging auth code: ${error.message}`, 'error');
-        }
-    }
 
     document.addEventListener('DOMContentLoaded', function() {
         fetchBrokerInfo();
@@ -557,7 +495,6 @@
         // OAuth2 event listeners
         document.getElementById('save-oauth-config').addEventListener('click', saveOAuthConfig);
         document.getElementById('generate-auth-url').addEventListener('click', generateAuthUrl);
-        document.getElementById('exchange-auth-code').addEventListener('click', exchangeAuthCode);
         
         // Token refresh event listeners
         document.getElementById('refresh-expired-token').addEventListener('click', function() {
@@ -571,3 +508,4 @@
     });
 </script>
 {% endblock %}
+
