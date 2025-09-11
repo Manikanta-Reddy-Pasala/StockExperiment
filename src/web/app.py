@@ -419,6 +419,8 @@ def create_app():
             # Get FYERS configuration from database
             config = broker_service.get_broker_config('fyers', current_user.id)
             
+            app.logger.info(f"FYERS config for user {current_user.id}: {config}")
+            
             if not config:
                 app.logger.info("No FYERS configuration found for user")
                 return jsonify({
@@ -452,7 +454,8 @@ def create_app():
                 'error_message': config.get('error_message', ''),
                 'redirect_url': config.get('redirect_url', ''),
                 'app_type': config.get('app_type', '100'),
-                'is_active': config.get('is_active', True)
+                'is_active': config.get('is_active', True),
+                'is_token_expired': config.get('is_token_expired', False)
             }
             
             app.logger.info(f"FYERS broker info retrieved successfully for user {current_user.id}")
@@ -462,7 +465,7 @@ def create_app():
                 'stats': stats
             })
         except Exception as e:
-            app.logger.error(f"Error getting FYERS broker info for user {current_user.id}: {str(e)}")
+            app.logger.error(f"Error getting FYERS broker info for user {current_user.id}: {str(e)}", exc_info=True)
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
     
     @app.route('/api/brokers/fyers/test', methods=['POST'])
@@ -657,17 +660,67 @@ def create_app():
         """Refresh FYERS access token."""
         try:
             app.logger.info(f"Refreshing FYERS token for user {current_user.id}")
-            # In a real implementation, you would:
-            # 1. Use the refresh token to get a new access token
-            # 2. Update the database configuration
-            # 3. Restart the connection
             
-            # For now, we'll simulate a successful refresh
-            app.logger.info(f"FYERS token refresh initiated successfully for user {current_user.id}")
-            return jsonify({
-                'success': True,
-                'message': 'Token refresh initiated successfully'
-            })
+            # Get broker service
+            broker_service = get_broker_service()
+            
+            # Get current FYERS configuration from database
+            config = broker_service.get_broker_config('fyers', current_user.id)
+            
+            if not config:
+                app.logger.warning(f"No FYERS configuration found for user {current_user.id}")
+                return jsonify({
+                    'success': False,
+                    'error': 'FYERS configuration not found. Please configure your FYERS credentials first.'
+                }), 400
+            
+            # Check if we have a refresh token
+            refresh_token = config.get('refresh_token')
+            if not refresh_token:
+                app.logger.warning(f"No refresh token found for user {current_user.id}")
+                return jsonify({
+                    'success': False,
+                    'error': 'No refresh token available. Please re-authenticate with FYERS.'
+                }), 400
+            
+            # For FYERS, we need to use the OAuth2 flow to get a new token
+            # Since FYERS doesn't have a standard refresh token flow, we'll need to re-authenticate
+            # Check if we have the required OAuth2 credentials
+            client_id = config.get('client_id')
+            api_secret = config.get('api_secret')
+            redirect_url = config.get('redirect_url')
+            
+            if not client_id or not api_secret:
+                app.logger.warning(f"Missing OAuth2 credentials for user {current_user.id}")
+                return jsonify({
+                    'success': False,
+                    'error': 'Missing OAuth2 credentials. Please re-configure your FYERS credentials.'
+                }), 400
+            
+            # Generate a new authorization URL
+            try:
+                oauth_flow = FyersOAuth2Flow(
+                    client_id=client_id,
+                    secret_key=api_secret,
+                    redirect_uri=redirect_url
+                )
+                
+                # Generate authorization URL with user_id for automated callback
+                auth_url = oauth_flow.generate_auth_url(current_user.id)
+                
+                app.logger.info(f"FYERS re-authentication URL generated successfully for user {current_user.id}")
+                return jsonify({
+                    'success': True,
+                    'message': 'Re-authentication required. Please complete the authorization process.',
+                    'auth_url': auth_url
+                })
+            except Exception as e:
+                app.logger.error(f"Error generating FYERS auth URL for user {current_user.id}: {str(e)}")
+                return jsonify({
+                    'success': False,
+                    'error': f'Failed to generate re-authentication URL: {str(e)}'
+                }), 500
+            
         except Exception as e:
             app.logger.error(f"Error refreshing FYERS token for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': str(e)}), 500
@@ -1030,6 +1083,475 @@ def create_app():
             app.logger.error(f"Error getting FYERS historical data for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
     
+    # Dashboard API Routes
+    @app.route('/api/dashboard/metrics', methods=['GET'])
+    @login_required
+    def api_get_dashboard_metrics():
+        """Get dashboard metrics using FYERS API."""
+        try:
+            app.logger.info(f"Fetching dashboard metrics for user {current_user.id}")
+            
+            # Get broker service
+            broker_service = get_broker_service()
+            
+            # Get FYERS configuration
+            config = broker_service.get_broker_config('fyers', current_user.id)
+            if not config or not config.get('is_connected'):
+                app.logger.warning(f"FYERS not connected for user {current_user.id}")
+                return jsonify({
+                    'success': False,
+                    'error': 'FYERS not connected. Please configure your broker connection.'
+                }), 400
+            
+            # Initialize FYERS API connector
+            from .services.broker_service import FyersAPIConnector
+            fyers_connector = FyersAPIConnector(
+                client_id=config.get('client_id'),
+                access_token=config.get('access_token')
+            )
+            
+            # Get user profile, funds, and holdings
+            profile_data = fyers_connector.get_profile()
+            funds_data = fyers_connector.get_funds()
+            holdings_data = fyers_connector.get_holdings()
+            positions_data = fyers_connector.get_positions()
+            
+            # Calculate total P&L from positions
+            total_pnl = 0
+            if positions_data.get('success') and positions_data.get('data'):
+                for position in positions_data['data']:
+                    pnl = position.get('pl', 0)
+                    total_pnl += float(pnl) if pnl else 0
+            
+            # Get available funds
+            available_funds = 0
+            if funds_data.get('success') and funds_data.get('data'):
+                fund_limits = funds_data['data'].get('fund_limit', [])
+                for fund in fund_limits:
+                    if fund.get('equity_amount'):
+                        available_funds += float(fund['equity_amount'])
+            
+            # Get total portfolio value from holdings
+            total_portfolio_value = 0
+            if holdings_data.get('success') and holdings_data.get('data'):
+                holdings = holdings_data['data'].get('holdings', [])
+                for holding in holdings:
+                    if holding.get('market_value'):
+                        total_portfolio_value += float(holding['market_value'])
+            
+            # Get market quotes for major indices
+            market_quotes = fyers_connector.get_quotes("NSE:NIFTY50-INDEX,NSE:SENSEX-INDEX,NSE:NIFTYBANK-INDEX,NSE:NIFTYIT-INDEX")
+            
+            # Process market data
+            market_data = {}
+            if market_quotes.get('success') and market_quotes.get('data'):
+                for symbol, quote in market_quotes['data'].items():
+                    if quote.get('v'):
+                        market_data[symbol] = {
+                            'price': quote['v'].get('lp', 0),
+                            'change': quote['v'].get('ch', 0),
+                            'change_percent': quote['v'].get('chp', 0)
+                        }
+            
+            return jsonify({
+                'success': True,
+                'data': {
+                    'total_pnl': total_pnl,
+                    'available_funds': available_funds,
+                    'total_portfolio_value': total_portfolio_value,
+                    'market_data': market_data,
+                    'profile': profile_data.get('data', {}),
+                    'last_updated': datetime.now().isoformat()
+                }
+            })
+            
+        except Exception as e:
+            app.logger.error(f"Error fetching dashboard metrics for user {current_user.id}: {str(e)}")
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
+    
+    # Portfolio API Routes
+    @app.route('/api/portfolio/holdings', methods=['GET'])
+    @login_required
+    def api_get_portfolio_holdings():
+        """Get portfolio holdings using FYERS API."""
+        try:
+            app.logger.info(f"Fetching portfolio holdings for user {current_user.id}")
+            
+            # Get broker service
+            broker_service = get_broker_service()
+            
+            # Get FYERS configuration
+            config = broker_service.get_broker_config('fyers', current_user.id)
+            if not config or not config.get('is_connected'):
+                app.logger.warning(f"FYERS not connected for user {current_user.id}")
+                return jsonify({
+                    'success': False,
+                    'error': 'FYERS not connected. Please configure your broker connection.'
+                }), 400
+            
+            # Initialize FYERS API connector
+            from .services.broker_service import FyersAPIConnector
+            fyers_connector = FyersAPIConnector(
+                client_id=config.get('client_id'),
+                access_token=config.get('access_token')
+            )
+            
+            # Get holdings data
+            holdings_data = fyers_connector.get_holdings()
+            
+            if holdings_data.get('success') and holdings_data.get('data'):
+                holdings = holdings_data['data'].get('holdings', [])
+                
+                # Process holdings data
+                processed_holdings = []
+                for holding in holdings:
+                    processed_holdings.append({
+                        'symbol': holding.get('symbol', ''),
+                        'quantity': holding.get('quantity', 0),
+                        'average_price': holding.get('average_price', 0),
+                        'market_value': holding.get('market_value', 0),
+                        'pnl': holding.get('pnl', 0),
+                        'pnl_percent': holding.get('pnl_percent', 0),
+                        'ltp': holding.get('ltp', 0)
+                    })
+                
+                return jsonify({
+                    'success': True,
+                    'data': processed_holdings,
+                    'last_updated': datetime.now().isoformat()
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to fetch holdings data from FYERS'
+                }), 400
+                
+        except Exception as e:
+            app.logger.error(f"Error fetching portfolio holdings for user {current_user.id}: {str(e)}")
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
+    
+    @app.route('/api/portfolio/positions', methods=['GET'])
+    @login_required
+    def api_get_portfolio_positions():
+        """Get portfolio positions using FYERS API."""
+        try:
+            app.logger.info(f"Fetching portfolio positions for user {current_user.id}")
+            
+            # Get broker service
+            broker_service = get_broker_service()
+            
+            # Get FYERS configuration
+            config = broker_service.get_broker_config('fyers', current_user.id)
+            if not config or not config.get('is_connected'):
+                app.logger.warning(f"FYERS not connected for user {current_user.id}")
+                return jsonify({
+                    'success': False,
+                    'error': 'FYERS not connected. Please configure your broker connection.'
+                }), 400
+            
+            # Initialize FYERS API connector
+            from .services.broker_service import FyersAPIConnector
+            fyers_connector = FyersAPIConnector(
+                client_id=config.get('client_id'),
+                access_token=config.get('access_token')
+            )
+            
+            # Get positions data
+            positions_data = fyers_connector.get_positions()
+            
+            if positions_data.get('success') and positions_data.get('data'):
+                positions = positions_data['data']
+                
+                # Process positions data
+                processed_positions = []
+                for position in positions:
+                    processed_positions.append({
+                        'symbol': position.get('symbol', ''),
+                        'quantity': position.get('netQty', 0),
+                        'average_price': position.get('avgPrice', 0),
+                        'ltp': position.get('ltp', 0),
+                        'pnl': position.get('pl', 0),
+                        'pnl_percent': position.get('plPercent', 0),
+                        'side': position.get('side', ''),
+                        'product': position.get('product', '')
+                    })
+                
+                return jsonify({
+                    'success': True,
+                    'data': processed_positions,
+                    'last_updated': datetime.now().isoformat()
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to fetch positions data from FYERS'
+                }), 400
+                
+        except Exception as e:
+            app.logger.error(f"Error fetching portfolio positions for user {current_user.id}: {str(e)}")
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+    # Orders API Routes
+    @app.route('/api/orders/history', methods=['GET'])
+    @login_required
+    def api_get_orders_history():
+        """Get orders history using FYERS API."""
+        try:
+            app.logger.info(f"Fetching orders history for user {current_user.id}")
+            
+            # Get broker service
+            broker_service = get_broker_service()
+            
+            # Get FYERS configuration
+            config = broker_service.get_broker_config('fyers', current_user.id)
+            if not config or not config.get('is_connected'):
+                app.logger.warning(f"FYERS not connected for user {current_user.id}")
+                return jsonify({
+                    'success': False,
+                    'error': 'FYERS not connected. Please configure your broker connection.'
+                }), 400
+            
+            # Initialize FYERS API connector
+            from .services.broker_service import FyersAPIConnector
+            fyers_connector = FyersAPIConnector(
+                client_id=config.get('client_id'),
+                access_token=config.get('access_token')
+            )
+            
+            # Get orderbook data
+            orderbook_data = fyers_connector.get_orderbook()
+            
+            if orderbook_data.get('success') and orderbook_data.get('data'):
+                orders = orderbook_data['data'].get('orderBook', [])
+                
+                # Process orders data
+                processed_orders = []
+                for order in orders:
+                    processed_orders.append({
+                        'id': order.get('id', ''),
+                        'symbol': order.get('symbol', ''),
+                        'side': order.get('side', ''),
+                        'type': order.get('type', ''),
+                        'quantity': order.get('qty', 0),
+                        'price': order.get('limitPrice', 0),
+                        'status': order.get('status', ''),
+                        'order_time': order.get('orderDateTime', ''),
+                        'filled_quantity': order.get('filledQty', 0),
+                        'remaining_quantity': order.get('remainingQty', 0),
+                        'product': order.get('product', '')
+                    })
+                
+                return jsonify({
+                    'success': True,
+                    'data': processed_orders,
+                    'last_updated': datetime.now().isoformat()
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to fetch orders data from FYERS'
+                }), 400
+                
+        except Exception as e:
+            app.logger.error(f"Error fetching orders history for user {current_user.id}: {str(e)}")
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
+    
+    @app.route('/api/orders/trades', methods=['GET'])
+    @login_required
+    def api_get_trades_history():
+        """Get trades history using FYERS API."""
+        try:
+            app.logger.info(f"Fetching trades history for user {current_user.id}")
+            
+            # Get broker service
+            broker_service = get_broker_service()
+            
+            # Get FYERS configuration
+            config = broker_service.get_broker_config('fyers', current_user.id)
+            if not config or not config.get('is_connected'):
+                app.logger.warning(f"FYERS not connected for user {current_user.id}")
+                return jsonify({
+                    'success': False,
+                    'error': 'FYERS not connected. Please configure your broker connection.'
+                }), 400
+            
+            # Initialize FYERS API connector
+            from .services.broker_service import FyersAPIConnector
+            fyers_connector = FyersAPIConnector(
+                client_id=config.get('client_id'),
+                access_token=config.get('access_token')
+            )
+            
+            # Get tradebook data
+            tradebook_data = fyers_connector.get_tradebook()
+            
+            if tradebook_data.get('success') and tradebook_data.get('data'):
+                trades = tradebook_data['data'].get('tradeBook', [])
+                
+                # Process trades data
+                processed_trades = []
+                for trade in trades:
+                    processed_trades.append({
+                        'id': trade.get('id', ''),
+                        'symbol': trade.get('symbol', ''),
+                        'side': trade.get('side', ''),
+                        'quantity': trade.get('qty', 0),
+                        'price': trade.get('tradedPrice', 0),
+                        'trade_time': trade.get('tradeDateTime', ''),
+                        'order_id': trade.get('orderNumber', ''),
+                        'product': trade.get('product', ''),
+                        'pnl': trade.get('pnl', 0)
+                    })
+                
+                return jsonify({
+                    'success': True,
+                    'data': processed_trades,
+                    'last_updated': datetime.now().isoformat()
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to fetch trades data from FYERS'
+                }), 400
+                
+        except Exception as e:
+            app.logger.error(f"Error fetching trades history for user {current_user.id}: {str(e)}")
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+    # Market Data API Routes
+    @app.route('/api/market/quotes', methods=['GET'])
+    @login_required
+    def api_get_market_quotes():
+        """Get market quotes using FYERS API."""
+        try:
+            app.logger.info(f"Fetching market quotes for user {current_user.id}")
+            
+            # Get symbols from query parameters
+            symbols = request.args.get('symbols', 'NSE:NIFTY50-INDEX,NSE:SENSEX-INDEX,NSE:NIFTYBANK-INDEX,NSE:NIFTYIT-INDEX')
+            
+            # Get broker service
+            broker_service = get_broker_service()
+            
+            # Get FYERS configuration
+            config = broker_service.get_broker_config('fyers', current_user.id)
+            if not config or not config.get('is_connected'):
+                app.logger.warning(f"FYERS not connected for user {current_user.id}")
+                return jsonify({
+                    'success': False,
+                    'error': 'FYERS not connected. Please configure your broker connection.'
+                }), 400
+            
+            # Initialize FYERS API connector
+            from .services.broker_service import FyersAPIConnector
+            fyers_connector = FyersAPIConnector(
+                client_id=config.get('client_id'),
+                access_token=config.get('access_token')
+            )
+            
+            # Get quotes data
+            quotes_data = fyers_connector.get_quotes(symbols)
+            
+            if quotes_data.get('success') and quotes_data.get('data'):
+                quotes = quotes_data['data']
+                
+                # Process quotes data
+                processed_quotes = []
+                for symbol, quote in quotes.items():
+                    if quote.get('v'):
+                        processed_quotes.append({
+                            'symbol': symbol,
+                            'price': quote['v'].get('lp', 0),
+                            'change': quote['v'].get('ch', 0),
+                            'change_percent': quote['v'].get('chp', 0),
+                            'volume': quote['v'].get('volume', 0),
+                            'high': quote['v'].get('h', 0),
+                            'low': quote['v'].get('l', 0),
+                            'open': quote['v'].get('open_price', 0),
+                            'close': quote['v'].get('prev_close_price', 0)
+                        })
+                
+                return jsonify({
+                    'success': True,
+                    'data': processed_quotes,
+                    'last_updated': datetime.now().isoformat()
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to fetch quotes data from FYERS'
+                }), 400
+                
+        except Exception as e:
+            app.logger.error(f"Error fetching market quotes for user {current_user.id}: {str(e)}")
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
+    
+    @app.route('/api/market/historical', methods=['GET'])
+    @login_required
+    def api_get_historical_data():
+        """Get historical data using FYERS API."""
+        try:
+            app.logger.info(f"Fetching historical data for user {current_user.id}")
+            
+            # Get parameters from query
+            symbol = request.args.get('symbol', 'NSE:NIFTY50-INDEX')
+            resolution = request.args.get('resolution', 'D')  # D, 1, 5, 15, 30, 60
+            range_from = request.args.get('from')
+            range_to = request.args.get('to')
+            
+            # Get broker service
+            broker_service = get_broker_service()
+            
+            # Get FYERS configuration
+            config = broker_service.get_broker_config('fyers', current_user.id)
+            if not config or not config.get('is_connected'):
+                app.logger.warning(f"FYERS not connected for user {current_user.id}")
+                return jsonify({
+                    'success': False,
+                    'error': 'FYERS not connected. Please configure your broker connection.'
+                }), 400
+            
+            # Initialize FYERS API connector
+            from .services.broker_service import FyersAPIConnector
+            fyers_connector = FyersAPIConnector(
+                client_id=config.get('client_id'),
+                access_token=config.get('access_token')
+            )
+            
+            # Get historical data
+            historical_data = fyers_connector.get_history(symbol, resolution, range_from, range_to)
+            
+            if historical_data.get('success') and historical_data.get('data'):
+                candles = historical_data['data'].get('candles', [])
+                
+                # Process historical data
+                processed_data = []
+                for candle in candles:
+                    processed_data.append({
+                        'timestamp': candle[0],
+                        'open': candle[1],
+                        'high': candle[2],
+                        'low': candle[3],
+                        'close': candle[4],
+                        'volume': candle[5] if len(candle) > 5 else 0
+                    })
+                
+                return jsonify({
+                    'success': True,
+                    'data': processed_data,
+                    'symbol': symbol,
+                    'resolution': resolution,
+                    'last_updated': datetime.now().isoformat()
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to fetch historical data from FYERS'
+                }), 400
+                
+        except Exception as e:
+            app.logger.error(f"Error fetching historical data for user {current_user.id}: {str(e)}")
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
     # Suggested Stocks API Routes
     @app.route('/api/suggested-stocks', methods=['GET'])
     @login_required

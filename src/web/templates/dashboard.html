@@ -238,56 +238,180 @@
     async function fetchDashboardMetrics() {
         try {
             const response = await fetch('/api/dashboard/metrics');
-            const data = await response.json();
+            const result = await response.json();
+            
+            if (!result.success) {
+                console.error('Failed to fetch dashboard metrics:', result.error);
+                showNotification('Failed to fetch dashboard data: ' + result.error, 'error');
+                return;
+            }
+            
+            const data = result.data;
             
             // Update total P&L
             const totalPnlElement = document.getElementById('total-pnl');
-            totalPnlElement.textContent = '₹' + data.total_pnl.toFixed(2);
-            totalPnlElement.className = data.total_pnl >= 0 ? 'price-up' : 'price-down';
+            if (totalPnlElement) {
+                totalPnlElement.textContent = '₹' + data.total_pnl.toFixed(2);
+                totalPnlElement.className = data.total_pnl >= 0 ? 'price-up' : 'price-down';
+            }
 
-            // Update portfolio table
-            const portfolioTable = document.getElementById('positions-table').getElementsByTagName('tbody')[0];
-            portfolioTable.innerHTML = '';
+            // Update available funds
+            const availableFundsElement = document.getElementById('available-funds');
+            if (availableFundsElement) {
+                availableFundsElement.textContent = '₹' + data.available_funds.toFixed(2);
+            }
+
+            // Update portfolio value
+            const portfolioValueElement = document.getElementById('portfolio-value');
+            if (portfolioValueElement) {
+                portfolioValueElement.textContent = '₹' + data.total_portfolio_value.toFixed(2);
+            }
+
+            // Update market data
+            if (data.market_data) {
+                updateMarketData(data.market_data);
+            }
+
+            // Fetch and update portfolio positions
+            await fetchPortfolioPositions();
             
-            data.positions.forEach(position => {
-                const row = portfolioTable.insertRow();
-                row.insertCell(0).textContent = position.symbol;
-                row.insertCell(1).textContent = position.quantity;
-                row.insertCell(2).textContent = '₹' + position.avg_price.toFixed(2);
-                row.insertCell(3).textContent = '₹' + position.last_price.toFixed(2);
-                const pnlCell = row.insertCell(4);
-                pnlCell.textContent = '₹' + position.pnl.toFixed(2);
-                pnlCell.className = position.pnl >= 0 ? 'price-up' : 'price-down';
-                
-                const actionCell = row.insertCell(5);
-                const actionBtn = document.createElement('button');
-                actionBtn.className = 'btn btn-sm btn-outline-primary';
-                actionBtn.textContent = 'Trade';
-                actionCell.appendChild(actionBtn);
-            });
+            // Fetch and update recent orders
+            await fetchRecentOrders();
             
-            // Update orders table
-            const ordersTable = document.getElementById('orders-table').getElementsByTagName('tbody')[0];
-            ordersTable.innerHTML = '';
-            
-            data.recent_orders.forEach(order => {
-                const row = ordersTable.insertRow();
-                row.insertCell(0).textContent = order.order_id.substring(0, 8) + '...';
-                row.insertCell(1).textContent = order.symbol;
-                row.insertCell(2).textContent = order.type;
-                const statusCell = row.insertCell(3);
-                statusCell.textContent = order.status;
-                statusCell.className = order.status === 'COMPLETE' ? 'text-success' : 
-                                     order.status === 'REJECTED' ? 'text-danger' : 'text-warning';
-            });
-            
-            // Update counts
-            document.getElementById('open-positions').textContent = data.positions.length;
-            document.getElementById('pending-orders').textContent = data.recent_orders.filter(o => o.status === 'PLACED').length;
         } catch (error) {
             console.error('Error fetching dashboard metrics:', error);
+            showNotification('Error fetching dashboard data: ' + error.message, 'error');
         }
     }
+
+    // Update market data display
+    function updateMarketData(marketData) {
+        const marketIndices = {
+            'NSE:NIFTY50-INDEX': 'NIFTY 50',
+            'NSE:SENSEX-INDEX': 'SENSEX',
+            'NSE:NIFTYBANK-INDEX': 'BANK NIFTY',
+            'NSE:NIFTYIT-INDEX': 'NIFTY IT'
+        };
+
+        Object.entries(marketData).forEach(([symbol, data]) => {
+            const indexName = marketIndices[symbol];
+            if (indexName) {
+                // Find the corresponding element and update it
+                const elements = document.querySelectorAll('.text-center');
+                elements.forEach(element => {
+                    const title = element.querySelector('h3');
+                    if (title && title.textContent.includes(indexName)) {
+                        const priceElement = element.querySelector('p');
+                        const badgeElement = element.querySelector('.badge');
+                        
+                        if (priceElement) {
+                            priceElement.textContent = data.price.toFixed(2);
+                        }
+                        
+                        if (badgeElement) {
+                            const changePercent = data.change_percent;
+                            badgeElement.textContent = `${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%`;
+                            badgeElement.className = changePercent >= 0 ? 'badge bg-success' : 'badge bg-danger';
+                            badgeElement.innerHTML = `<i class="bi bi-arrow-${changePercent >= 0 ? 'up' : 'down'}"></i> ${badgeElement.textContent}`;
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    // Fetch portfolio positions
+    async function fetchPortfolioPositions() {
+        try {
+            const response = await fetch('/api/portfolio/positions');
+            const result = await response.json();
+            
+            if (result.success && result.data) {
+                const portfolioTable = document.getElementById('positions-table');
+                if (portfolioTable) {
+                    const tbody = portfolioTable.getElementsByTagName('tbody')[0];
+                    tbody.innerHTML = '';
+                    
+                    result.data.forEach(position => {
+                        const row = tbody.insertRow();
+                        row.insertCell(0).textContent = position.symbol;
+                        row.insertCell(1).textContent = position.quantity;
+                        row.insertCell(2).textContent = '₹' + position.average_price.toFixed(2);
+                        row.insertCell(3).textContent = '₹' + position.ltp.toFixed(2);
+                        const pnlCell = row.insertCell(4);
+                        pnlCell.textContent = '₹' + position.pnl.toFixed(2);
+                        pnlCell.className = position.pnl >= 0 ? 'price-up' : 'price-down';
+                        
+                        const actionCell = row.insertCell(5);
+                        const actionBtn = document.createElement('button');
+                        actionBtn.className = 'btn btn-sm btn-outline-primary';
+                        actionBtn.textContent = 'Trade';
+                        actionCell.appendChild(actionBtn);
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching portfolio positions:', error);
+        }
+    }
+
+    // Fetch recent orders
+    async function fetchRecentOrders() {
+        try {
+            const response = await fetch('/api/orders/history');
+            const result = await response.json();
+            
+            if (result.success && result.data) {
+                const ordersTable = document.getElementById('orders-table');
+                if (ordersTable) {
+                    const tbody = ordersTable.getElementsByTagName('tbody')[0];
+                    tbody.innerHTML = '';
+                    
+                    // Show only recent orders (last 10)
+                    const recentOrders = result.data.slice(0, 10);
+                    
+                    recentOrders.forEach(order => {
+                        const row = tbody.insertRow();
+                        row.insertCell(0).textContent = order.id.substring(0, 8) + '...';
+                        row.insertCell(1).textContent = order.symbol;
+                        row.insertCell(2).textContent = order.type;
+                        const statusCell = row.insertCell(3);
+                        statusCell.textContent = order.status;
+                        statusCell.className = order.status === 'COMPLETE' ? 'text-success' : 
+                                             order.status === 'REJECTED' ? 'text-danger' : 'text-warning';
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching recent orders:', error);
+        }
+    }
+
+    // Notification function
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show position-fixed`;
+        notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        notification.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 5000);
+    }
+    // Initialize dashboard when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        fetchDashboardMetrics();
+        
+        // Refresh data every 30 seconds
+        setInterval(fetchDashboardMetrics, 30000);
+    });
     
     // Initialize portfolio chart
     function initPortfolioChart() {

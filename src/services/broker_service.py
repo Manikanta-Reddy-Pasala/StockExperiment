@@ -51,7 +51,7 @@ class BrokerService:
             
             return current_time >= exp_datetime
         except Exception as e:
-            self.logger.warning(f"Error checking token expiration: {e}")
+            logger.warning(f"Error checking token expiration: {e}")
             return True  # Assume expired if we can't check
     
     def get_broker_config(self, broker_name: str, user_id: Optional[int] = None) -> Optional[Dict[str, Any]]:

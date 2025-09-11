@@ -141,13 +141,8 @@
                                 
                                 <!-- FYERS OAuth2 Configuration -->
                                 <div class="mb-4">
-                                    <h6 class="text-primary mb-3">
-                                        <i class="bi bi-shield-check me-2"></i>FYERS API Configuration
-                                    </h6>
-                                    <p class="text-muted mb-4">
-                                        Configure your FYERS broker connection using OAuth2 authentication. 
-                                        You'll need your App ID, App Secret, and Redirect URI from your FYERS API dashboard.
-                                    </p>
+                        
+        
                                     
                                     <form id="fyers-oauth-form">
                                         <div class="row">
@@ -176,29 +171,15 @@
                                                 <div class="form-text">Your App's Redirect URI from API dashboard</div>
                                             </div>
                                         </div>
-                                        
-                                        <div class="alert alert-info">
-                                            <i class="bi bi-info-circle me-2"></i>
-                                            <strong>How it works:</strong> Click "Save & Start OAuth2" to save your configuration and automatically open the FYERS authorization page. 
-                                            Complete the authorization and the access token will be automatically saved to your account.
-                                        </div>
+                   
                                         
                                         <div class="d-flex justify-content-between align-items-center mb-3">
-                                            <div class="text-muted">
-                                                <small>Save configuration and automatically start OAuth2 flow</small>
-                                            </div>
+                                   
                                             <button type="button" class="btn btn-primary" id="save-oauth-config">
-                                                <i class="bi bi-save me-2"></i> Save & Start OAuth2
+                                                <i class="bi bi-save me-2"></i> Save Configuration
                                             </button>
                                         </div>
                                         
-                                        <!-- Automated OAuth2 Flow Info -->
-                                        <div class="mt-4">
-                                            <div class="alert alert-info">
-                                                <i class="bi bi-info-circle me-2"></i>
-                                                <strong>Automated Flow:</strong> When you click "Generate Auth URL", a new window will open for FYERS authorization. After you complete the authorization, the access token will be automatically saved to your account.
-                                            </div>
-                                        </div>
                                     </form>
                                 </div>
                             </div>
@@ -252,6 +233,13 @@
             // Check if response is not ok
             if (!response.ok) {
                 console.log('Response not ok:', response.status);
+                // Try to parse error response
+                try {
+                    const errorData = await response.json();
+                    console.error('API Error:', errorData);
+                } catch (e) {
+                    console.error('Network Error:', response.statusText);
+                }
                 return;
             }
             
@@ -323,6 +311,8 @@
                 if (data.error_message) {
                     console.warn('FYERS connection error:', data.error_message);
                 }
+            } else {
+                console.error('API returned success=false:', data);
             }
         } catch (error) {
             console.error('Error fetching broker info:', error);
@@ -373,7 +363,7 @@
     
     // Refresh FYERS token
     document.getElementById('refresh-fyers-token').addEventListener('click', async function() {
-        if (confirm('Are you sure you want to refresh the FYERS access token? This may require re-authentication.')) {
+        if (confirm('Are you sure you want to refresh the FYERS access token? This will require re-authentication.')) {
             try {
                 const response = await fetch('/api/brokers/fyers/refresh-token', {
                     method: 'POST'
@@ -381,8 +371,23 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert('Token refresh initiated successfully!');
-                    fetchBrokerInfo(); // Refresh the page data
+                    // If we have an auth URL, open it for re-authentication
+                    if (data.auth_url) {
+                        alert('Re-authentication required. Please complete the authorization in the new window.');
+                        const authWindow = window.open(data.auth_url, '_blank', 'width=800,height=600');
+                        
+                        // Check for window close and refresh data
+                        const checkClosed = setInterval(() => {
+                            if (authWindow.closed) {
+                                clearInterval(checkClosed);
+                                alert('Authorization completed. Refreshing data...');
+                                fetchBrokerInfo();
+                            }
+                        }, 1000);
+                    } else {
+                        alert('Token refresh initiated successfully!');
+                        fetchBrokerInfo(); // Refresh the page data
+                    }
                 } else {
                     alert('Token refresh failed: ' + (data.error || 'Unknown error'));
                 }
@@ -466,11 +471,17 @@
         
         // Token refresh event listeners
         document.getElementById('refresh-expired-token').addEventListener('click', function() {
-            showNotification('Please save your configuration again to refresh your token via OAuth2 flow.', 'info');
+            // Instead of just showing a notification, let's trigger the refresh token process
+            document.getElementById('refresh-fyers-token').click();
         });
         
         // Refresh data every 30 seconds
-        setInterval(fetchBrokerInfo, 30000);
+        setInterval(function() {
+            // Only refresh if the page is visible to avoid unnecessary API calls
+            if (!document.hidden) {
+                fetchBrokerInfo();
+            }
+        }, 30000);
     });
 </script>
 {% endblock %}
