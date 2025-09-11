@@ -10,11 +10,11 @@ from flask_login import current_user
 from flask_bcrypt import Bcrypt
 
 # Add src to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from web.app import create_app
-from datastore.database import get_database_manager
-from datastore.models import User, Order, Trade, Position, Strategy, SuggestedStock, Configuration, Log
+from models.database import get_database_manager
+from models.models import User, Order, Trade, Position, Strategy, SuggestedStock, Configuration, Log
 
 
 class TestUserAware:

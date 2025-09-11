@@ -343,11 +343,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function loadUsers() {
         fetch('/api/admin/users')
         .then(response => response.json())
-        .then(users => {
+        .then(data => {
             const tbody = usersTable.querySelector('tbody');
             tbody.innerHTML = '';
             
-            users.forEach(user => {
+            data.users.forEach(user => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${user.id}</td>
@@ -391,8 +391,8 @@ document.addEventListener('DOMContentLoaded', function() {
     window.editUser = function(userId) {
         fetch(`/api/admin/users`)
         .then(response => response.json())
-        .then(users => {
-            const user = users.find(u => u.id === userId);
+        .then(data => {
+            const user = data.users.find(u => u.id === userId);
             if (user) {
                 document.getElementById('edit_user_id').value = user.id;
                 document.getElementById('edit_username').value = user.username;
@@ -411,8 +411,8 @@ document.addEventListener('DOMContentLoaded', function() {
     window.resetPassword = function(userId) {
         fetch(`/api/admin/users`)
         .then(response => response.json())
-        .then(users => {
-            const user = users.find(u => u.id === userId);
+        .then(data => {
+            const user = data.users.find(u => u.id === userId);
             if (user) {
                 document.getElementById('reset_user_id').value = user.id;
                 document.getElementById('reset_username').textContent = user.username;

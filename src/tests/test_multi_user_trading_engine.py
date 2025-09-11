@@ -9,11 +9,11 @@ from datetime import datetime
 from unittest.mock import Mock, patch
 
 # Add the src directory to the path so we can import our modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from datastore.database import get_database_manager, DatabaseManager
-from datastore.models import User, Configuration
-from trading_engine.multi_user_trading_engine import MultiUserTradingEngine, UserTradingSession
+from models.database import get_database_manager, DatabaseManager
+from models.models import User, Configuration
+from integrations.multi_user_trading_engine import MultiUserTradingEngine
 
 
 @pytest.fixture
