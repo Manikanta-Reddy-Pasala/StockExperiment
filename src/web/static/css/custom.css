@@ -19,6 +19,8 @@ Custom CSS for the Automated Trading System
     --light-sidebar-bg: #ffffff;
     --light-card-bg: #ffffff;
     --light-border-color: #dee2e6;
+    --light-table-header-bg: #f1f3f5;
+    --light-table-hover-bg: #e9ecef;
 
     --dark-bg: #121212;
     --dark-color: #e0e0e0;
@@ -26,6 +28,8 @@ Custom CSS for the Automated Trading System
     --dark-card-bg: #2c2c2c;
     --dark-border-color: #444444;
     --dark-muted-color: #a0a0a0;
+    --dark-table-header-bg: #343a40;
+    --dark-table-hover-bg: #3f464d;
 
     --font-family-sans-serif: 'Inter', sans-serif;
     --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -98,7 +102,7 @@ body {
 }
 
 .table thead {
-    background-color: #f1f3f5;
+    background-color: var(--light-table-header-bg);
 }
 
 .table th {
@@ -107,6 +111,7 @@ body {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    color: var(--light-color);
 }
 
 .table td {
@@ -116,7 +121,7 @@ body {
 }
 
 .table tbody tr:hover {
-    background-color: rgba(0, 123, 255, 0.05);
+    background-color: var(--light-table-hover-bg);
 }
 
 /*
@@ -167,7 +172,7 @@ body.dark-theme {
 }
 
 .dark-theme .table thead {
-    background-color: #343a40;
+    background-color: var(--dark-table-header-bg);
 }
 
 .dark-theme .table th {
@@ -180,7 +185,7 @@ body.dark-theme {
 }
 
 .dark-theme .table tbody tr:hover {
-    background-color: rgba(0, 123, 255, 0.1);
+    background-color: var(--dark-table-hover-bg);
 }
 
 .dark-theme .text-muted {
