@@ -1,0 +1,203 @@
+/*
+Custom CSS for the Automated Trading System
+*/
+
+/* Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* CSS Variables for theming */
+:root {
+    --primary-color: #007bff;
+    --secondary-color: #6c757d;
+    --success-color: #28a745;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --info-color: #17a2b8;
+
+    --light-bg: #f8f9fa;
+    --light-color: #212529;
+    --light-sidebar-bg: #ffffff;
+    --light-card-bg: #ffffff;
+    --light-border-color: #dee2e6;
+
+    --dark-bg: #1a1a1a;
+    --dark-color: #e0e0e0;
+    --dark-sidebar-bg: #252525;
+    --dark-card-bg: #2c2c2c;
+    --dark-border-color: #444444;
+
+    --font-family-sans-serif: 'Inter', sans-serif;
+    --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --border-radius: 0.5rem;
+}
+
+body {
+    font-family: var(--font-family-sans-serif);
+    background-color: var(--light-bg);
+    color: var(--light-color);
+    transition: background-color 0.3s, color 0.3s;
+}
+
+/* Sidebar styles */
+.sidebar {
+    background-color: var(--light-sidebar-bg);
+    box-shadow: var(--box-shadow);
+    min-height: 100vh;
+}
+
+.sidebar .nav-link {
+    color: #555;
+    font-weight: 500;
+    padding: 0.75rem 1.5rem;
+    border-left: 3px solid transparent;
+}
+
+.sidebar .nav-link.active,
+.sidebar .nav-link:hover {
+    color: var(--primary-color);
+    background-color: rgba(0, 123, 255, 0.1);
+    border-left-color: var(--primary-color);
+}
+
+.sidebar .nav-link .bi {
+    margin-right: 0.75rem;
+}
+
+/* Main content styles */
+.main-content {
+    background-color: var(--light-bg);
+    min-height: 100vh;
+}
+
+/* Card styles */
+.card {
+    background-color: var(--light-card-bg);
+    border: 1px solid var(--light-border-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    transition: all 0.3s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 12px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+    background-color: var(--light-card-bg);
+    border-bottom: 1px solid var(--light-border-color);
+    font-weight: 600;
+}
+
+/* Table styles */
+.table {
+    background-color: var(--light-card-bg);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+.table thead {
+    background-color: #f1f3f5;
+}
+
+.table th {
+    border: none;
+    padding: 1rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.table td {
+    padding: 1rem;
+    vertical-align: middle;
+    border-top: 1px solid var(--light-border-color);
+}
+
+.table tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+/* Dark Theme */
+body.dark-theme {
+    background-color: var(--dark-bg);
+    color: var(--dark-color);
+}
+
+.dark-theme .sidebar {
+    background-color: var(--dark-sidebar-bg);
+}
+
+.dark-theme .sidebar .nav-link {
+    color: #a0a0a0;
+}
+
+.dark-theme .sidebar .nav-link.active,
+.dark-theme .sidebar .nav-link:hover {
+    color: #ffffff;
+    background-color: rgba(0, 123, 255, 0.2);
+}
+
+.dark-theme .main-content {
+    background-color: var(--dark-bg);
+}
+
+.dark-theme .card {
+    background-color: var(--dark-card-bg);
+    border-color: var(--dark-border-color);
+}
+
+.dark-theme .card-header {
+    background-color: var(--dark-card-bg);
+    border-color: var(--dark-border-color);
+    color: #ffffff;
+}
+
+.dark-theme .table {
+    background-color: var(--dark-card-bg);
+}
+
+.dark-theme .table thead {
+    background-color: #343a40;
+}
+
+.dark-theme .table th {
+    color: #ffffff;
+}
+
+.dark-theme .table td {
+    border-top-color: var(--dark-border-color);
+    color: var(--dark-color);
+}
+
+.dark-theme .table tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.1);
+}
+
+/* Utility classes */
+.text-success {
+    color: var(--success-color) !important;
+}
+.text-danger {
+    color: var(--danger-color) !important;
+}
+.fw-bold {
+    font-weight: 700 !important;
+}
+.text-muted {
+    color: #6c757d !important;
+}
+
+.dark-theme .text-muted {
+    color: #a0a0a0 !important;
+}
+
+/* Highlight prices */
+.price-up {
+    color: var(--success-color);
+    font-weight: 600;
+}
+.price-down {
+    color: var(--danger-color);
+    font-weight: 600;
+}
