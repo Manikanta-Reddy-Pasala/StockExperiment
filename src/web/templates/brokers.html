@@ -253,7 +253,16 @@
     // Fetch broker information
     async function fetchBrokerInfo() {
         try {
-            const response = await fetch('/api/brokers/fyers');
+            const response = await fetch('/api/brokers/fyers', {
+                credentials: 'same-origin'
+            });
+            
+            // Check if response is a redirect (authentication required)
+            if (response.redirected || response.status === 302) {
+                console.log('Authentication required - redirecting to login');
+                return; // Don't update status, just return
+            }
+            
             const data = await response.json();
             
             if (data.success) {
