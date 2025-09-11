@@ -523,25 +523,33 @@ def create_app():
             app.logger.info(f"Saving FYERS configuration for user {current_user.id}")
             data = request.get_json()
             
-            # Validate required fields
-            if not data.get('client_id') or not data.get('access_token'):
-                app.logger.warning(f"Missing required FYERS credentials for user {current_user.id}")
+            # Validate required fields - for OAuth2, we need client_id and secret_key
+            if not data.get('client_id'):
+                app.logger.warning(f"Missing required FYERS client_id for user {current_user.id}")
                 return jsonify({
                     'success': False,
-                    'error': 'Client ID and Access Token are required'
+                    'error': 'Client ID is required'
                 }), 400
             
             broker_service = get_broker_service()
             
-            # Save configuration to database
-            config = broker_service.save_broker_config('fyers', {
+            # Save configuration to database - handle both OAuth2 (secret_key) and manual (access_token) configs
+            config_data = {
                 'client_id': data.get('client_id'),
-                'access_token': data.get('access_token'),
-                'refresh_token': data.get('refresh_token', ''),
-                'redirect_url': data.get('redirect_url', 'https://trade.fyers.in/api-login/redirect-uri/index.html'),
+                'redirect_url': data.get('redirect_uri') or data.get('redirect_url', 'https://trade.fyers.in/api-login/redirect-uri/index.html'),
                 'app_type': data.get('app_type', '100'),
                 'is_active': True
-            }, current_user.id)
+            }
+            
+            # For OAuth2 flow, save secret_key as api_secret
+            if data.get('secret_key'):
+                config_data['api_secret'] = data.get('secret_key')
+            # For manual config, save access_token
+            elif data.get('access_token'):
+                config_data['access_token'] = data.get('access_token')
+                config_data['refresh_token'] = data.get('refresh_token', '')
+            
+            config = broker_service.save_broker_config('fyers', config_data, current_user.id)
             
             app.logger.info(f"FYERS configuration saved successfully for user {current_user.id}")
             

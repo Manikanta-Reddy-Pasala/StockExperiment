@@ -169,13 +169,22 @@
                                         
                                         <div class="alert alert-info">
                                             <i class="bi bi-info-circle me-2"></i>
-                                            <strong>How it works:</strong> Click "Generate Auth URL" to get an authorization link. 
-                                            Visit the link, login to FYERS, and copy the auth code back here to complete the setup.
+                                            <strong>How it works:</strong> First save your configuration, then generate the authorization URL. 
+                                            Visit the URL, login to FYERS, and copy the auth code back here to complete the setup.
                                         </div>
                                         
                                         <div class="d-flex justify-content-between align-items-center mb-3">
                                             <div class="text-muted">
-                                                <small>Step 1: Generate authorization URL</small>
+                                                <small>Step 1: Save configuration</small>
+                                            </div>
+                                            <button type="button" class="btn btn-primary" id="save-oauth-config">
+                                                <i class="bi bi-save me-2"></i> Save Configuration
+                                            </button>
+                                        </div>
+                                        
+                                        <div class="d-flex justify-content-between align-items-center mb-3" id="auth-url-section" style="display: none;">
+                                            <div class="text-muted">
+                                                <small>Step 2: Generate authorization URL</small>
                                             </div>
                                             <button type="button" class="btn btn-success" id="generate-auth-url">
                                                 <i class="bi bi-link-45deg me-2"></i> Generate Auth URL
@@ -186,7 +195,7 @@
                                         <div id="auth-code-section" class="mt-4" style="display: none;">
                                             <div class="alert alert-warning">
                                                 <i class="bi bi-exclamation-triangle me-2"></i>
-                                                <strong>Step 2:</strong> Visit the opened URL, login to FYERS, and copy the authorization code from the redirect URL.
+                                                <strong>Step 3:</strong> Visit the opened URL, login to FYERS, and copy the authorization code from the redirect URL.
                                             </div>
                                             
                                             <div class="row">
@@ -285,6 +294,16 @@
                 document.getElementById('fyers-redirect-url').value = data.redirect_url || 'https://trade.fyers.in/api-login/redirect-uri/index.html';
                 document.getElementById('fyers-app-type').value = data.app_type || '100';
                 
+                // Update OAuth form fields from database
+                document.getElementById('fyers-oauth-client-id').value = data.client_id || '';
+                document.getElementById('fyers-oauth-secret-key').value = data.api_secret ? '••••••••••••••••' : '';
+                document.getElementById('fyers-oauth-redirect-uri').value = data.redirect_url || 'https://trade.fyers.in/api-login/redirect-uri/index.html';
+                
+                // Show auth URL section if configuration exists
+                if (data.client_id && data.api_secret) {
+                    document.getElementById('auth-url-section').style.display = 'flex';
+                }
+                
                 // Show error message if there's one
                 if (data.error_message) {
                     console.warn('FYERS connection error:', data.error_message);
@@ -361,6 +380,46 @@
     
     // Fetch data when page loads
     // OAuth2 Flow Functions
+    async function saveOAuthConfig() {
+        const clientId = document.getElementById('fyers-oauth-client-id').value;
+        const secretKey = document.getElementById('fyers-oauth-secret-key').value;
+        const redirectUri = document.getElementById('fyers-oauth-redirect-uri').value;
+        
+        if (!clientId || !secretKey || !redirectUri) {
+            showNotification('Please fill in all OAuth2 fields', 'error');
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/brokers/fyers/config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    client_id: clientId,
+                    secret_key: secretKey,
+                    redirect_uri: redirectUri
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showNotification('Configuration saved successfully!', 'success');
+                // Show the auth URL generation section
+                document.getElementById('auth-url-section').style.display = 'flex';
+                // Refresh broker info to show updated status
+                fetchBrokerInfo();
+            } else {
+                showNotification('Failed to save configuration: ' + (result.error || 'Unknown error'), 'error');
+            }
+        } catch (error) {
+            console.error('Error saving OAuth config:', error);
+            showNotification('Error saving configuration: ' + error.message, 'error');
+        }
+    }
+    
     async function generateAuthUrl() {
         const clientId = document.getElementById('fyers-oauth-client-id').value;
         const secretKey = document.getElementById('fyers-oauth-secret-key').value;
@@ -455,6 +514,7 @@
         fetchBrokerInfo();
         
         // OAuth2 event listeners
+        document.getElementById('save-oauth-config').addEventListener('click', saveOAuthConfig);
         document.getElementById('generate-auth-url').addEventListener('click', generateAuthUrl);
         document.getElementById('exchange-auth-code').addEventListener('click', exchangeAuthCode);
         
