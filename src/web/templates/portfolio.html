@@ -3,58 +3,57 @@
 {% block title %}Portfolio{% endblock %}
 
 {% block content %}
-<style>
-    .allocation-card {
-        transition: transform 0.2s ease-in-out;
-        height: 100%;
-    }
-    .allocation-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-    }
-</style>
-
-<div class="row g-4 mb-4">
-    <div class="col-md-4">
-        <div class="card border-success border-2 shadow-sm">
-            <div class="card-body text-center">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title text-muted">Total Holdings</h6>
-                        <h3 class="text-success fw-bold" id="total-positions">0</h3>
+<!-- Modern Stats Cards -->
+<div class="row g-4 mb-5">
+    <div class="col-lg-3 col-md-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.1s;">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-2 fw-semibold">Total Holdings</h6>
+                        <h2 class="fw-bold mb-0" id="total-positions">0</h2>
+                        <small class="text-success">
+                            <i class="bi bi-briefcase-fill"></i> Active positions
+                        </small>
                     </div>
-                    <div class="bg-success bg-opacity-10 rounded-circle p-3">
-                        <i class="bi bi-graph-up text-success fs-4"></i>
+                    <div class="bg-gradient-success rounded-3 p-3">
+                        <i class="bi bi-briefcase-fill text-white fs-3"></i>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card border-primary border-2 shadow-sm">
-            <div class="card-body text-center">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title text-muted">Portfolio Value</h6>
-                        <h3 class="text-primary fw-bold" id="portfolio-value">₹0.00</h3>
+    <div class="col-lg-3 col-md-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.2s;">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-2 fw-semibold">Portfolio Value</h6>
+                        <h2 class="fw-bold mb-0" id="portfolio-value">₹0.00</h2>
+                        <small class="text-primary">
+                            <i class="bi bi-currency-rupee-fill"></i> Total value
+                        </small>
                     </div>
-                    <div class="bg-primary bg-opacity-10 rounded-circle p-3">
-                        <i class="bi bi-currency-rupee text-primary fs-4"></i>
+                    <div class="bg-gradient-primary rounded-3 p-3">
+                        <i class="bi bi-wallet2 text-white fs-3"></i>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card border-warning border-2 shadow-sm">
-            <div class="card-body text-center">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title text-muted">Total P&L</h6>
-                        <h3 class="text-warning fw-bold" id="total-pnl">₹0.00</h3>
+    <div class="col-lg-3 col-md-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.3s;">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-2 fw-semibold">Total P&L</h6>
+                        <h2 class="fw-bold mb-0" id="total-pnl">₹0.00</h2>
+                        <small class="text-warning">
+                            <i class="bi bi-graph-up-arrow"></i> Profit/Loss
+                        </small>
                     </div>
-                    <div class="bg-warning bg-opacity-10 rounded-circle p-3">
-                        <i class="bi bi-currency-rupee text-warning fs-4"></i>
+                    <div class="bg-gradient-warning rounded-3 p-3">
+                        <i class="bi bi-graph-up-arrow text-white fs-3"></i>
                     </div>
                 </div>
             </div>
@@ -62,18 +61,23 @@
     </div>
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <h5 class="card-title mb-0">Current Portfolio</h5>
-        <div class="d-flex">
-            <select class="form-select form-select-sm me-2" id="pnl-filter">
-                <option value="all">All Holdings</option>
-                <option value="profit">Profitable</option>
-                <option value="loss">Loss-making</option>
-            </select>
-            <button class="btn btn-sm btn-outline-primary" id="refresh-positions">
-                <i class="bi bi-arrow-clockwise"></i> Refresh
-            </button>
+<!-- Modern Portfolio Table -->
+<div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.4s;">
+    <div class="card-header bg-gradient-primary text-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0 text-white">
+                <i class="bi bi-briefcase-fill me-2"></i>Current Portfolio
+            </h5>
+            <div class="d-flex gap-2 align-items-center">
+                <select class="form-select form-select-sm" id="pnl-filter" style="min-width: 140px;">
+                    <option value="all">All Holdings</option>
+                    <option value="profit">Profitable</option>
+                    <option value="loss">Loss-making</option>
+                </select>
+                <button class="btn btn-light btn-sm" id="refresh-positions">
+                    <i class="bi bi-arrow-repeat"></i>
+                </button>
+            </div>
         </div>
     </div>
     <div class="card-body">

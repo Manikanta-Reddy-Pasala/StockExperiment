@@ -5,9 +5,11 @@
 {% block content %}
 <div class="row g-4">
     <div class="col-md-8">
-        <div class="card shadow-sm">
-            <div class="card-header bg-white">
-                <h5 class="card-title mb-0">System Configuration</h5>
+        <div class="card hover-lift animate-fade-in-up">
+            <div class="card-header bg-gradient-primary text-white">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="bi bi-gear-fill me-2"></i>System Configuration
+                </h5>
             </div>
             <div class="card-body">
                 <form id="system-config-form">
@@ -112,10 +114,10 @@
                     
                     <div class="d-flex justify-content-end mt-4">
                         <button type="button" class="btn btn-outline-secondary me-2" id="reset-config">
-                            <i class="bi bi-arrow-counterclockwise"></i> Reset
+                            <i class="bi bi-arrow-clockwise"></i> Reset
                         </button>
                         <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-save"></i> Save Configuration
+                            <i class="bi bi-save-fill"></i> Save Configuration
                         </button>
                     </div>
                 </form>
@@ -177,19 +179,19 @@
             </div>
             <div class="card-body">
                 <button class="btn btn-outline-primary w-100 mb-2" id="test-email">
-                    <i class="bi bi-envelope"></i> Test Email Configuration
+                    <i class="bi bi-envelope-fill"></i> Test Email Configuration
                 </button>
                 <button class="btn btn-outline-secondary w-100 mb-2" id="backup-config">
                     <i class="bi bi-download"></i> Backup Configuration
                 </button>
                 <button class="btn btn-outline-info w-100 mb-2" id="export-data">
-                    <i class="bi bi-box-arrow-up"></i> Export Trading Data
+                    <i class="bi bi-upload"></i> Export Trading Data
                 </button>
                 <button class="btn btn-outline-warning w-100 mb-2" id="clear-cache">
-                    <i class="bi bi-trash"></i> Clear Data Cache
+                    <i class="bi bi-trash-fill"></i> Clear Data Cache
                 </button>
                 <button class="btn btn-outline-danger w-100" id="reset-system">
-                    <i class="bi bi-arrow-counterclockwise"></i> Factory Reset
+                    <i class="bi bi-arrow-clockwise"></i> Factory Reset
                 </button>
             </div>
         </div>

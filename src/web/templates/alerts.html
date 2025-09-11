@@ -3,86 +3,75 @@
 {% block title %}Alerts{% endblock %}
 
 {% block content %}
-<style>
-    .chart-container {
-        position: relative;
-        height: 200px;
-        width: 100%;
-        margin: 0 auto;
-    }
-    .alert-card {
-        transition: transform 0.2s ease-in-out;
-        height: 100%;
-    }
-    .alert-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-    }
-    .chart-wrapper {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100%;
-        padding: 10px;
-    }
-</style>
-
-<div class="row g-4 mb-4">
-    <div class="col-md-3">
-        <div class="card border-danger border-2 shadow-sm">
-            <div class="card-body text-center">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title text-muted">Unread Alerts</h6>
-                        <h3 class="text-danger fw-bold" id="unread-alerts">12</h3>
+<!-- Modern Stats Cards -->
+<div class="row g-4 mb-5">
+    <div class="col-lg-3 col-md-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.1s;">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-2 fw-semibold">Unread Alerts</h6>
+                        <h2 class="fw-bold mb-0" id="unread-alerts">12</h2>
+                        <small class="text-danger">
+                            <i class="bi bi-exclamation-triangle-fill"></i> Need attention
+                        </small>
                     </div>
-                    <div class="bg-danger bg-opacity-10 rounded-circle p-3">
-                        <i class="bi bi-bell text-danger fs-4"></i>
+                    <div class="bg-gradient-danger rounded-3 p-3">
+                        <i class="bi bi-exclamation-triangle-fill text-white fs-3"></i>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card border-primary border-2 shadow-sm">
-            <div class="card-body text-center">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title text-muted">Critical</h6>
-                        <h3 class="text-primary fw-bold" id="critical-alerts">3</h3>
+    <div class="col-lg-3 col-md-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.2s;">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-2 fw-semibold">Critical</h6>
+                        <h2 class="fw-bold mb-0" id="critical-alerts">3</h2>
+                        <small class="text-primary">
+                            <i class="bi bi-shield-exclamation-fill"></i> Urgent action
+                        </small>
                     </div>
-                    <div class="bg-primary bg-opacity-10 rounded-circle p-3">
-                        <i class="bi bi-exclamation-triangle text-primary fs-4"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card border-warning border-2 shadow-sm">
-            <div class="card-body text-center">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title text-muted">Warnings</h6>
-                        <h3 class="text-warning fw-bold" id="warning-alerts">7</h3>
-                    </div>
-                    <div class="bg-warning bg-opacity-10 rounded-circle p-3">
-                        <i class="bi bi-exclamation-circle text-warning fs-4"></i>
+                    <div class="bg-gradient-primary rounded-3 p-3">
+                        <i class="bi bi-exclamation-triangle-fill text-white fs-3"></i>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card border-info border-2 shadow-sm">
-            <div class="card-body text-center">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title text-muted">Info</h6>
-                        <h3 class="text-info fw-bold" id="info-alerts">15</h3>
+    <div class="col-lg-3 col-md-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.3s;">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-2 fw-semibold">Warnings</h6>
+                        <h2 class="fw-bold mb-0" id="warning-alerts">7</h2>
+                        <small class="text-warning">
+                            <i class="bi bi-exclamation-circle-fill"></i> Monitor closely
+                        </small>
                     </div>
-                    <div class="bg-info bg-opacity-10 rounded-circle p-3">
-                        <i class="bi bi-info-circle text-info fs-4"></i>
+                    <div class="bg-gradient-warning rounded-3 p-3">
+                        <i class="bi bi-exclamation-circle-fill text-white fs-3"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.4s;">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-2 fw-semibold">Info</h6>
+                        <h2 class="fw-bold mb-0" id="info-alerts">15</h2>
+                        <small class="text-info">
+                            <i class="bi bi-info-circle-fill"></i> Information
+                        </small>
+                    </div>
+                    <div class="bg-gradient-info rounded-3 p-3">
+                        <i class="bi bi-info-circle-fill text-white fs-3"></i>
                     </div>
                 </div>
             </div>
@@ -106,10 +95,10 @@
                 <option value="read">Read</option>
             </select>
             <button class="btn btn-sm btn-outline-primary me-2" id="refresh-alerts">
-                <i class="bi bi-arrow-clockwise"></i> Refresh
+                <i class="bi bi-arrow-repeat"></i>
             </button>
             <button class="btn btn-sm btn-outline-danger" id="clear-alerts">
-                <i class="bi bi-trash"></i> Clear All
+                <i class="bi bi-trash"></i>
             </button>
         </div>
     </div>
@@ -202,12 +191,12 @@
                 const actionCell = row.insertCell(5);
                 const markReadBtn = document.createElement('button');
                 markReadBtn.className = 'btn btn-sm btn-outline-primary me-1';
-                markReadBtn.innerHTML = '<i class="bi bi-check"></i>';
+                markReadBtn.innerHTML = '<i class="bi bi-check-circle-fill"></i>';
                 markReadBtn.title = 'Mark as Read';
                 
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'btn btn-sm btn-outline-danger';
-                deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+                deleteBtn.innerHTML = '<i class="bi bi-trash-fill"></i>';
                 deleteBtn.title = 'Delete';
                 
                 actionCell.appendChild(markReadBtn);
@@ -237,7 +226,7 @@
         const ctx = document.getElementById('alerts-trend-chart').getContext('2d');
         
         // Check if dark mode is enabled
-        const isDarkMode = document.body.classList.contains('dark-theme');
+        const isDarkMode = false;
         
         // Define colors based on theme
         const criticalBorderColor = isDarkMode ? 'rgb(255, 107, 107)' : 'rgb(220, 53, 69)';
@@ -328,7 +317,7 @@
         const ctx = document.getElementById('alerts-distribution-chart').getContext('2d');
         
         // Check if dark mode is enabled
-        const isDarkMode = document.body.classList.contains('dark-theme');
+        const isDarkMode = false;
         
         // Define colors based on theme
         const backgroundColors = isDarkMode ? [

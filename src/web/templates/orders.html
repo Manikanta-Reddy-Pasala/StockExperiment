@@ -3,62 +3,76 @@
 {% block title %}Orders{% endblock %}
 
 {% block content %}
-<div class="row g-4 mb-4">
-    <div class="col-md-3">
-        <div class="card border-primary border-2 shadow-sm">
-            <div class="card-body text-center">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title text-muted">Total Orders</h6>
-                        <h3 class="text-primary fw-bold" id="total-orders">0</h3>
+
+<!-- Modern Stats Cards -->
+<div class="row g-4 mb-5">
+    <div class="col-lg-3 col-md-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.1s;">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-2 fw-semibold">Total Orders</h6>
+                        <h2 class="fw-bold mb-0" id="total-orders">0</h2>
+                        <small class="text-primary">
+                            <i class="bi bi-arrow-up"></i> All time orders
+                        </small>
                     </div>
-                    <div class="bg-primary bg-opacity-10 rounded-circle p-3">
-                        <i class="bi bi-list-task text-primary fs-4"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card border-success border-2 shadow-sm">
-            <div class="card-body text-center">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title text-muted">Completed</h6>
-                        <h3 class="text-success fw-bold" id="completed-orders">0</h3>
-                    </div>
-                    <div class="bg-success bg-opacity-10 rounded-circle p-3">
-                        <i class="bi bi-check-circle text-success fs-4"></i>
+                    <div class="bg-gradient-primary rounded-3 p-3">
+                        <i class="bi bi-list-check text-white fs-3"></i>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card border-warning border-2 shadow-sm">
-            <div class="card-body text-center">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title text-muted">Pending</h6>
-                        <h3 class="text-warning fw-bold" id="pending-orders">0</h3>
+    <div class="col-lg-3 col-md-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.2s;">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-2 fw-semibold">Completed</h6>
+                        <h2 class="fw-bold mb-0" id="completed-orders">0</h2>
+                        <small class="text-success">
+                            <i class="bi bi-check-circle-fill"></i> Successfully executed
+                        </small>
                     </div>
-                    <div class="bg-warning bg-opacity-10 rounded-circle p-3">
-                        <i class="bi bi-clock-history text-warning fs-4"></i>
+                    <div class="bg-gradient-success rounded-3 p-3">
+                        <i class="bi bi-check2-circle text-white fs-3"></i>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card border-danger border-2 shadow-sm">
-            <div class="card-body text-center">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title text-muted">Failed</h6>
-                        <h3 class="text-danger fw-bold" id="failed-orders">0</h3>
+    <div class="col-lg-3 col-md-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.3s;">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-2 fw-semibold">Pending</h6>
+                        <h2 class="fw-bold mb-0" id="pending-orders">0</h2>
+                        <small class="text-warning">
+                            <i class="bi bi-clock-fill"></i> Awaiting execution
+                        </small>
                     </div>
-                    <div class="bg-danger bg-opacity-10 rounded-circle p-3">
-                        <i class="bi bi-x-circle text-danger fs-4"></i>
+                    <div class="bg-gradient-warning rounded-3 p-3">
+                        <i class="bi bi-clock text-white fs-3"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.4s;">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-2 fw-semibold">Failed</h6>
+                        <h2 class="fw-bold mb-0" id="failed-orders">0</h2>
+                        <small class="text-danger">
+                            <i class="bi bi-x-circle-fill"></i> Rejected/Cancelled
+                        </small>
+                    </div>
+                    <div class="bg-gradient-danger rounded-3 p-3">
+                        <i class="bi bi-x-circle text-white fs-3"></i>
                     </div>
                 </div>
             </div>
@@ -66,37 +80,42 @@
     </div>
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <h5 class="card-title mb-0">Order History</h5>
-        <div class="d-flex">
-            <select class="form-select form-select-sm me-2" id="status-filter">
-                <option value="all">All Orders</option>
-                <option value="complete">Completed</option>
-                <option value="placed">Placed</option>
-                <option value="rejected">Rejected</option>
-                <option value="cancelled">Cancelled</option>
-            </select>
-            <button class="btn btn-sm btn-outline-primary" id="refresh-orders">
-                <i class="bi bi-arrow-clockwise"></i> Refresh
-            </button>
+<!-- Modern Orders Table -->
+<div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.5s;">
+    <div class="card-header bg-gradient-primary text-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0 text-white">
+                <i class="bi bi-clock-history me-2"></i>Order History
+            </h5>
+            <div class="d-flex gap-2 align-items-center">
+                <select class="form-select form-select-sm" id="status-filter" style="min-width: 140px;">
+                    <option value="all">All Orders</option>
+                    <option value="complete">Completed</option>
+                    <option value="placed">Placed</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+                <button class="btn btn-light btn-sm" id="refresh-orders">
+                    <i class="bi bi-arrow-repeat"></i>
+                </button>
+            </div>
         </div>
     </div>
-    <div class="card-body">
+    <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover" id="orders-table">
+            <table class="table table-hover mb-0" id="orders-table">
                 <thead class="table-light">
                     <tr>
-                        <th>Order ID</th>
-                        <th>Symbol</th>
-                        <th>Type</th>
-                        <th>Transaction</th>
-                        <th>Quantity</th>
-                        <th>Filled</th>
-                        <th>Status</th>
-                        <th>Price</th>
-                        <th>Created At</th>
-                        <th>Actions</th>
+                        <th class="border-0"><i class="bi bi-hash me-2"></i>Order ID</th>
+                        <th class="border-0"><i class="bi bi-tag me-2"></i>Symbol</th>
+                        <th class="border-0"><i class="bi bi-arrow-left-right me-2"></i>Type</th>
+                        <th class="border-0"><i class="bi bi-arrow-up-down me-2"></i>Transaction</th>
+                        <th class="border-0"><i class="bi bi-hash me-2"></i>Quantity</th>
+                        <th class="border-0"><i class="bi bi-check-circle me-2"></i>Filled</th>
+                        <th class="border-0"><i class="bi bi-info-circle me-2"></i>Status</th>
+                        <th class="border-0"><i class="bi bi-currency-rupee me-2"></i>Price</th>
+                        <th class="border-0"><i class="bi bi-calendar me-2"></i>Created At</th>
+                        <th class="border-0"><i class="bi bi-gear me-2"></i>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -152,7 +171,7 @@
                 const actionCell = row.insertCell(9);
                 const viewBtn = document.createElement('button');
                 viewBtn.className = 'btn btn-sm btn-outline-primary';
-                viewBtn.innerHTML = '<i class="bi bi-eye"></i>';
+                viewBtn.innerHTML = '<i class="bi bi-eye-fill"></i>';
                 viewBtn.title = 'View Details';
                 actionCell.appendChild(viewBtn);
             });
