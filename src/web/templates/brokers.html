@@ -129,117 +129,84 @@
                                 </h6>
                             </div>
                             <div class="card-body">
-                                <!-- OAuth2 Flow Section -->
+                                <!-- FYERS OAuth2 Configuration -->
                                 <div class="mb-4">
                                     <h6 class="text-primary mb-3">
-                                        <i class="bi bi-shield-check me-2"></i>OAuth2 Authentication (Recommended)
+                                        <i class="bi bi-shield-check me-2"></i>FYERS API Configuration
                                     </h6>
+                                    <p class="text-muted mb-4">
+                                        Configure your FYERS broker connection using OAuth2 authentication. 
+                                        You'll need your App ID, App Secret, and Redirect URI from your FYERS API dashboard.
+                                    </p>
+                                    
                                     <form id="fyers-oauth-form">
                                         <div class="row">
                                             <div class="col-md-4 mb-3">
-                                                <label for="fyers-oauth-client-id" class="form-label">Client ID</label>
+                                                <label for="fyers-oauth-client-id" class="form-label">
+                                                    <i class="bi bi-person-badge me-1"></i>App ID (Client ID)
+                                                </label>
                                                 <input type="text" class="form-control" id="fyers-oauth-client-id" 
-                                                       placeholder="XCXXXXXxxM-100">
-                                                <div class="form-text">Your FYERS App ID</div>
+                                                       placeholder="XCXXXXXxxM-100" required>
+                                                <div class="form-text">Your FYERS App ID from API dashboard</div>
                                             </div>
                                             <div class="col-md-4 mb-3">
-                                                <label for="fyers-oauth-secret-key" class="form-label">Secret Key</label>
+                                                <label for="fyers-oauth-secret-key" class="form-label">
+                                                    <i class="bi bi-key me-1"></i>App Secret
+                                                </label>
                                                 <input type="password" class="form-control" id="fyers-oauth-secret-key" 
-                                                       placeholder="MH*****TJ5">
-                                                <div class="form-text">Your FYERS App Secret</div>
+                                                       placeholder="MH*****TJ5" required>
+                                                <div class="form-text">Your FYERS App Secret from API dashboard</div>
                                             </div>
                                             <div class="col-md-4 mb-3">
-                                                <label for="fyers-oauth-redirect-uri" class="form-label">Redirect URI</label>
+                                                <label for="fyers-oauth-redirect-uri" class="form-label">
+                                                    <i class="bi bi-link-45deg me-1"></i>Redirect URI
+                                                </label>
                                                 <input type="url" class="form-control" id="fyers-oauth-redirect-uri" 
-                                                       value="https://trade.fyers.in/api-login/redirect-uri/index.html">
-                                                <div class="form-text">Your App's Redirect URI</div>
+                                                       value="https://trade.fyers.in/api-login/redirect-uri/index.html" required>
+                                                <div class="form-text">Your App's Redirect URI from API dashboard</div>
                                             </div>
                                         </div>
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <div class="alert alert-warning mb-0 me-3" style="flex: 1;">
-                                                <i class="bi bi-exclamation-triangle me-2"></i>
-                                                <strong>OAuth2 Flow:</strong> This will generate an authorization URL. 
-                                                Visit the URL, login to FYERS, and copy the auth code back here.
+                                        
+                                        <div class="alert alert-info">
+                                            <i class="bi bi-info-circle me-2"></i>
+                                            <strong>How it works:</strong> Click "Generate Auth URL" to get an authorization link. 
+                                            Visit the link, login to FYERS, and copy the auth code back here to complete the setup.
+                                        </div>
+                                        
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <div class="text-muted">
+                                                <small>Step 1: Generate authorization URL</small>
                                             </div>
                                             <button type="button" class="btn btn-success" id="generate-auth-url">
-                                                <i class="bi bi-link-45deg"></i> Generate Auth URL
+                                                <i class="bi bi-link-45deg me-2"></i> Generate Auth URL
                                             </button>
                                         </div>
                                         
                                         <!-- Auth Code Input (hidden initially) -->
-                                        <div id="auth-code-section" class="mt-3" style="display: none;">
+                                        <div id="auth-code-section" class="mt-4" style="display: none;">
+                                            <div class="alert alert-warning">
+                                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                                <strong>Step 2:</strong> Visit the opened URL, login to FYERS, and copy the authorization code from the redirect URL.
+                                            </div>
+                                            
                                             <div class="row">
                                                 <div class="col-md-8 mb-3">
-                                                    <label for="fyers-auth-code" class="form-label">Authorization Code</label>
+                                                    <label for="fyers-auth-code" class="form-label">
+                                                        <i class="bi bi-code-square me-1"></i>Authorization Code
+                                                    </label>
                                                     <input type="text" class="form-control" id="fyers-auth-code" 
-                                                           placeholder="Paste the auth code from the authorization URL">
-                                                    <div class="form-text">Copy the auth code from the URL after authorization</div>
+                                                           placeholder="Paste the auth code from the authorization URL" required>
+                                                    <div class="form-text">Copy the code from the URL after FYERS authorization</div>
                                                 </div>
                                                 <div class="col-md-4 mb-3 d-flex align-items-end">
                                                     <button type="button" class="btn btn-primary w-100" id="exchange-auth-code">
-                                                        <i class="bi bi-arrow-repeat"></i> Get Access Token
+                                                        <i class="bi bi-arrow-repeat me-2"></i> Complete Setup
                                                     </button>
                                                 </div>
                                             </div>
                                         </div>
                                     </form>
                                 </div>
-                                
-                                <hr class="my-4">
-                                
-                                <!-- Manual Configuration Section -->
-                                <div class="mb-3">
-                                    <h6 class="text-secondary mb-3">
-                                        <i class="bi bi-gear me-2"></i>Manual Configuration (Alternative)
-                                    </h6>
-                                </div>
-                                
-                                <form id="fyers-config-form">
-                                    <div class="row">
-                                        <div class="col-md-6 mb-3">
-                                            <label for="fyers-client-id-input" class="form-label">Client ID</label>
-                                            <input type="text" class="form-control" id="fyers-client-id-input" 
-                                                   placeholder="Enter FYERS Client ID">
-                                            <div class="form-text">Your FYERS API Client ID</div>
-                                        </div>
-                                        <div class="col-md-6 mb-3">
-                                            <label for="fyers-access-token-input" class="form-label">Access Token</label>
-                                            <input type="password" class="form-control" id="fyers-access-token-input" 
-                                                   placeholder="Enter FYERS Access Token">
-                                            <div class="form-text">Your FYERS API Access Token</div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="row">
-                                        <div class="col-md-6 mb-3">
-                                            <label for="fyers-redirect-url" class="form-label">Redirect URL</label>
-                                            <input type="url" class="form-control" id="fyers-redirect-url" 
-                                                   value="https://trade.fyers.in/api-login/redirect-uri/index.html">
-                                        </div>
-                                        <div class="col-md-6 mb-3">
-                                            <label for="fyers-app-type" class="form-label">App Type</label>
-                                            <select class="form-select" id="fyers-app-type">
-                                                <option value="100">FYERS Web</option>
-                                                <option value="2">FYERS Mobile</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="alert alert-info">
-                                        <i class="bi bi-info-circle me-2"></i>
-                                        <strong>Note:</strong> FYERS broker configuration is stored securely in the database. 
-                                        Enter your credentials below and save to configure your broker connection.
-                                    </div>
-                                    
-                                    <div class="d-flex justify-content-end mt-3">
-                                        <button type="button" class="btn btn-outline-secondary me-2" id="reset-fyers-config">
-                                            <i class="bi bi-arrow-clockwise"></i> Reset
-                                        </button>
-                                        <button type="button" class="btn btn-primary" id="save-fyers-config">
-                                            <i class="bi bi-save-fill"></i> Save Configuration
-                                        </button>
-                                    </div>
-                                </form>
                             </div>
                         </div>
                     </div>
@@ -391,64 +358,6 @@
         }
     });
     
-    // Save FYERS configuration
-    document.getElementById('save-fyers-config').addEventListener('click', async function() {
-        const clientId = document.getElementById('fyers-client-id-input').value.trim();
-        const accessToken = document.getElementById('fyers-access-token-input').value.trim();
-        const redirectUrl = document.getElementById('fyers-redirect-url').value.trim();
-        const appType = document.getElementById('fyers-app-type').value;
-        
-        if (!clientId || !accessToken) {
-            alert('Please enter both Client ID and Access Token');
-            return;
-        }
-        
-        const button = this;
-        const originalText = button.innerHTML;
-        button.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
-        button.disabled = true;
-        
-        try {
-            const response = await fetch('/api/brokers/fyers/config', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    client_id: clientId,
-                    access_token: accessToken,
-                    redirect_url: redirectUrl,
-                    app_type: appType
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                // Show success message
-                showNotification('FYERS configuration saved successfully!', 'success');
-                // Refresh the page data to show updated information
-                fetchBrokerInfo();
-            } else {
-                showNotification('Failed to save configuration: ' + (data.error || 'Unknown error'), 'error');
-            }
-        } catch (error) {
-            showNotification('Error saving configuration: ' + error.message, 'error');
-        } finally {
-            button.innerHTML = originalText;
-            button.disabled = false;
-        }
-    });
-    
-    // Reset FYERS configuration
-    document.getElementById('reset-fyers-config').addEventListener('click', function() {
-        if (confirm('Are you sure you want to reset the FYERS configuration to default values?')) {
-            document.getElementById('fyers-client-id-input').value = '';
-            document.getElementById('fyers-access-token-input').value = '';
-            document.getElementById('fyers-redirect-url').value = 'https://trade.fyers.in/api-login/redirect-uri/index.html';
-            document.getElementById('fyers-app-type').value = '100';
-        }
-    });
     
     // Fetch data when page loads
     // OAuth2 Flow Functions
