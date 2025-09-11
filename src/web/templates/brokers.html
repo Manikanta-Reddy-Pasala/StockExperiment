@@ -146,7 +146,7 @@
                                                     <i class="bi bi-person-badge me-1"></i>App ID (Client ID)
                                                 </label>
                                                 <input type="text" class="form-control" id="fyers-oauth-client-id" 
-                                                       placeholder="XCXXXXXxxM-100" required>
+                                                       placeholder="Enter your FYERS App ID" required>
                                                 <div class="form-text">Your FYERS App ID from API dashboard</div>
                                             </div>
                                             <div class="col-md-4 mb-3">
@@ -154,7 +154,7 @@
                                                     <i class="bi bi-key me-1"></i>App Secret
                                                 </label>
                                                 <input type="password" class="form-control" id="fyers-oauth-secret-key" 
-                                                       placeholder="MH*****TJ5" required>
+                                                       placeholder="Enter your FYERS App Secret" required>
                                                 <div class="form-text">Your FYERS App Secret from API dashboard</div>
                                             </div>
                                             <div class="col-md-4 mb-3">
@@ -305,7 +305,7 @@
                 
                 // Update OAuth form fields from database
                 document.getElementById('fyers-oauth-client-id').value = data.client_id || '';
-                document.getElementById('fyers-oauth-secret-key').value = data.api_secret ? '••••••••••••••••' : '';
+                document.getElementById('fyers-oauth-secret-key').value = data.api_secret || '';
                 document.getElementById('fyers-oauth-redirect-uri').value = data.redirect_url || 'https://trade.fyers.in/api-login/redirect-uri/index.html';
                 
                 // Show auth URL section if configuration exists
