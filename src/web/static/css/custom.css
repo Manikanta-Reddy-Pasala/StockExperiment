@@ -20,11 +20,12 @@ Custom CSS for the Automated Trading System
     --light-card-bg: #ffffff;
     --light-border-color: #dee2e6;
 
-    --dark-bg: #1a1a1a;
+    --dark-bg: #121212;
     --dark-color: #e0e0e0;
-    --dark-sidebar-bg: #252525;
+    --dark-sidebar-bg: #1e1e1e;
     --dark-card-bg: #2c2c2c;
     --dark-border-color: #444444;
+    --dark-muted-color: #a0a0a0;
 
     --font-family-sans-serif: 'Inter', sans-serif;
     --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -118,7 +119,11 @@ body {
     background-color: rgba(0, 123, 255, 0.05);
 }
 
-/* Dark Theme */
+/*
+ * Dark Theme
+ * ----------
+ * Styles for the dark mode.
+ */
 body.dark-theme {
     background-color: var(--dark-bg);
     color: var(--dark-color);
@@ -126,16 +131,18 @@ body.dark-theme {
 
 .dark-theme .sidebar {
     background-color: var(--dark-sidebar-bg);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
 }
 
 .dark-theme .sidebar .nav-link {
-    color: #a0a0a0;
+    color: var(--dark-muted-color);
 }
 
 .dark-theme .sidebar .nav-link.active,
 .dark-theme .sidebar .nav-link:hover {
     color: #ffffff;
     background-color: rgba(0, 123, 255, 0.2);
+    border-left-color: var(--primary-color);
 }
 
 .dark-theme .main-content {
@@ -145,6 +152,7 @@ body.dark-theme {
 .dark-theme .card {
     background-color: var(--dark-card-bg);
     border-color: var(--dark-border-color);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
 }
 
 .dark-theme .card-header {
@@ -155,6 +163,7 @@ body.dark-theme {
 
 .dark-theme .table {
     background-color: var(--dark-card-bg);
+    color: var(--dark-color);
 }
 
 .dark-theme .table thead {
@@ -174,30 +183,25 @@ body.dark-theme {
     background-color: rgba(0, 123, 255, 0.1);
 }
 
-/* Utility classes */
-.text-success {
+.dark-theme .text-muted {
+    color: var(--dark-muted-color) !important;
+}
+
+.dark-theme .price-up {
     color: var(--success-color) !important;
 }
-.text-danger {
+
+.dark-theme .price-down {
     color: var(--danger-color) !important;
 }
-.fw-bold {
+
+/* Utility classes - ensure they are overridden in dark mode */
+.dark-theme .text-success {
+    color: var(--success-color) !important;
+}
+.dark-theme .text-danger {
+    color: var(--danger-color) !important;
+}
+.dark-theme .fw-bold {
     font-weight: 700 !important;
-}
-.text-muted {
-    color: #6c757d !important;
-}
-
-.dark-theme .text-muted {
-    color: #a0a0a0 !important;
-}
-
-/* Highlight prices */
-.price-up {
-    color: var(--success-color);
-    font-weight: 600;
-}
-.price-down {
-    color: var(--danger-color);
-    font-weight: 600;
 }
