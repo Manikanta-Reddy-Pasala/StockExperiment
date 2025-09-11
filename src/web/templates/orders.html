@@ -13,7 +13,7 @@
                         <h3 class="text-primary fw-bold" id="total-orders">0</h3>
                     </div>
                     <div class="bg-primary bg-opacity-10 rounded-circle p-3">
-                        <i class="bi bi-list-task text-primary fs-4"></i>
+                        <i class="bi bi-list-ul text-primary fs-4"></i>
                     </div>
                 </div>
             </div>
@@ -28,7 +28,7 @@
                         <h3 class="text-success fw-bold" id="completed-orders">0</h3>
                     </div>
                     <div class="bg-success bg-opacity-10 rounded-circle p-3">
-                        <i class="bi bi-check-circle text-success fs-4"></i>
+                        <i class="bi bi-check-circle-fill text-success fs-4"></i>
                     </div>
                 </div>
             </div>
@@ -43,7 +43,7 @@
                         <h3 class="text-warning fw-bold" id="pending-orders">0</h3>
                     </div>
                     <div class="bg-warning bg-opacity-10 rounded-circle p-3">
-                        <i class="bi bi-clock-history text-warning fs-4"></i>
+                        <i class="bi bi-hourglass-split text-warning fs-4"></i>
                     </div>
                 </div>
             </div>
@@ -58,7 +58,7 @@
                         <h3 class="text-danger fw-bold" id="failed-orders">0</h3>
                     </div>
                     <div class="bg-danger bg-opacity-10 rounded-circle p-3">
-                        <i class="bi bi-x-circle text-danger fs-4"></i>
+                        <i class="bi bi-x-circle-fill text-danger fs-4"></i>
                     </div>
                 </div>
             </div>
@@ -78,7 +78,7 @@
                 <option value="cancelled">Cancelled</option>
             </select>
             <button class="btn btn-sm btn-outline-primary" id="refresh-orders">
-                <i class="bi bi-arrow-clockwise"></i> Refresh
+                <i class="bi bi-arrow-repeat"></i> Refresh
             </button>
         </div>
     </div>
@@ -152,7 +152,7 @@
                 const actionCell = row.insertCell(9);
                 const viewBtn = document.createElement('button');
                 viewBtn.className = 'btn btn-sm btn-outline-primary';
-                viewBtn.innerHTML = '<i class="bi bi-eye"></i>';
+                viewBtn.innerHTML = '<i class="bi bi-eye-fill"></i>';
                 viewBtn.title = 'View Details';
                 actionCell.appendChild(viewBtn);
             });
