@@ -585,6 +585,63 @@ body {
     font-size: 1.25rem !important;
 }
 
+/* Icon Visibility Fixes */
+.bg-primary .bi,
+.bg-gradient-primary .bi {
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.bg-success .bi,
+.bg-gradient-success .bi {
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.bg-danger .bi,
+.bg-gradient-danger .bi {
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.bg-warning .bi,
+.bg-gradient-warning .bi {
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.bg-info .bi,
+.bg-gradient-info .bi {
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Background opacity icons */
+.bg-primary.bg-opacity-10 .bi {
+    color: var(--primary-color) !important;
+    text-shadow: none;
+}
+
+.bg-success.bg-opacity-10 .bi {
+    color: var(--success-color) !important;
+    text-shadow: none;
+}
+
+.bg-danger.bg-opacity-10 .bi {
+    color: var(--danger-color) !important;
+    text-shadow: none;
+}
+
+.bg-warning.bg-opacity-10 .bi {
+    color: var(--warning-color) !important;
+    text-shadow: none;
+}
+
+.bg-info.bg-opacity-10 .bi {
+    color: var(--info-color) !important;
+    text-shadow: none;
+}
+
 /* Gradient Background Classes */
 .bg-gradient-primary {
     background: var(--gradient-primary) !important;

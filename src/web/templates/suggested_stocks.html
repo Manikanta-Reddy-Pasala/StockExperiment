@@ -3,22 +3,24 @@
 {% block title %}Suggested Stocks{% endblock %}
 
 {% block content %}
-<div class="row g-4 mb-4">
-    <div class="col-md-12">
-        <div class="card shadow-sm">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">Suggested Stocks</h5>
-                <div class="d-flex align-items-center">
-                    <select class="form-select form-select-sm me-2" id="time-filter">
-                        <option value="today">Today</option>
-                        <option value="week" selected>This Week</option>
-                        <option value="month">This Month</option>
-                        <option value="all">All Time</option>
-                    </select>
-                    <div class="dropdown me-2">
-                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="strategy-filter" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-funnel-fill"></i> Strategy Filter
-                        </button>
+<!-- Modern Suggested Stocks Table -->
+<div class="card hover-lift animate-fade-in-up">
+    <div class="card-header bg-gradient-primary text-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0 text-white">
+                <i class="bi bi-lightbulb me-2"></i>Suggested Stocks
+            </h5>
+            <div class="d-flex gap-2 align-items-center">
+                <select class="form-select form-select-sm" id="time-filter" style="min-width: 120px;">
+                    <option value="today">Today</option>
+                    <option value="week" selected>This Week</option>
+                    <option value="month">This Month</option>
+                    <option value="all">All Time</option>
+                </select>
+                <div class="dropdown">
+                    <button class="btn btn-light btn-sm dropdown-toggle" type="button" id="strategy-filter" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-funnel"></i>
+                    </button>
                         <ul class="dropdown-menu" aria-labelledby="strategy-filter">
                             <li>
                                 <div class="form-check ms-2">

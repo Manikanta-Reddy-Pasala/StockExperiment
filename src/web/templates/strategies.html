@@ -3,71 +3,57 @@
 {% block title %}Strategies{% endblock %}
 
 {% block content %}
-<style>
-    .chart-container {
-        position: relative;
-        height: 200px;
-        width: 100%;
-        margin: 0 auto;
-    }
-    .strategy-card {
-        transition: transform 0.2s ease-in-out;
-        height: 100%;
-    }
-    .strategy-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-    }
-    .chart-wrapper {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100%;
-        padding: 10px;
-    }
-</style>
-
-<div class="row g-4 mb-4">
-    <div class="col-md-4">
-        <div class="card border-primary border-2 shadow-sm strategy-card">
-            <div class="card-body text-center">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title text-muted">Active Strategies</h6>
-                        <h3 class="text-primary fw-bold" id="active-strategies-count">2</h3>
+<!-- Modern Stats Cards -->
+<div class="row g-4 mb-5">
+    <div class="col-lg-3 col-md-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.1s;">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-2 fw-semibold">Active Strategies</h6>
+                        <h2 class="fw-bold mb-0" id="active-strategies-count">2</h2>
+                        <small class="text-primary">
+                            <i class="bi bi-gear-fill"></i> Running strategies
+                        </small>
                     </div>
-                    <div class="bg-primary bg-opacity-10 rounded-circle p-3">
-                        <i class="bi bi-cpu text-primary fs-4"></i>
+                    <div class="bg-gradient-primary rounded-3 p-3">
+                        <i class="bi bi-gear-fill text-white fs-3"></i>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card border-success border-2 shadow-sm strategy-card">
-            <div class="card-body text-center">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title text-muted">Avg Return</h6>
-                        <h3 class="text-success fw-bold" id="avg-return">12.5%</h3>
+    <div class="col-lg-3 col-md-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.2s;">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-2 fw-semibold">Avg Return</h6>
+                        <h2 class="fw-bold mb-0" id="avg-return">12.5%</h2>
+                        <small class="text-success">
+                            <i class="bi bi-graph-up-arrow"></i> Performance
+                        </small>
                     </div>
-                    <div class="bg-success bg-opacity-10 rounded-circle p-3">
-                        <i class="bi bi-trending-up text-success fs-4"></i>
+                    <div class="bg-gradient-success rounded-3 p-3">
+                        <i class="bi bi-graph-up-arrow text-white fs-3"></i>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card border-info border-2 shadow-sm strategy-card">
-            <div class="card-body text-center">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title text-muted">Total Signals</h6>
-                        <h3 class="text-info fw-bold" id="total-signals">124</h3>
+    <div class="col-lg-3 col-md-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.3s;">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-2 fw-semibold">Total Signals</h6>
+                        <h2 class="fw-bold mb-0" id="total-signals">124</h2>
+                        <small class="text-info">
+                            <i class="bi bi-bell-fill"></i> Generated signals
+                        </small>
                     </div>
-                    <div class="bg-info bg-opacity-10 rounded-circle p-3">
-                        <i class="bi bi-broadcast text-info fs-4"></i>
+                    <div class="bg-gradient-info rounded-3 p-3">
+                        <i class="bi bi-bell-fill text-white fs-3"></i>
                     </div>
                 </div>
             </div>

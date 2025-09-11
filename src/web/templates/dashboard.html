@@ -3,20 +3,53 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<!-- Modern Hero Section -->
+<!-- Market Overview Section - Moved to Top -->
 <div class="row mb-5">
     <div class="col-12">
-        <div class="card glass-effect animate-fade-in-up">
-            <div class="card-body text-center py-5">
-                <h1 class="display-4 text-gradient mb-3">Trading Dashboard</h1>
-                <p class="lead text-muted">Monitor your portfolio performance and trading activities in real-time</p>
-                <div class="d-flex justify-content-center gap-3 mt-4">
-                    <span class="badge bg-success fs-6 px-3 py-2">
-                        <i class="bi bi-check-circle-fill me-2"></i>System Online
-                    </span>
-                    <span class="badge bg-info fs-6 px-3 py-2">
-                        <i class="bi bi-clock-fill me-2"></i>Market Open
-                    </span>
+        <div class="card hover-lift animate-fade-in-up">
+            <div class="card-header bg-gradient-success text-white">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="bi bi-graph-up me-2"></i>Market Overview
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-lg-3 col-md-6">
+                        <div class="text-center">
+                            <h3 class="text-success fw-bold mb-1">NIFTY 50</h3>
+                            <p class="text-muted mb-2">19,832.45</p>
+                            <span class="badge bg-success">
+                                <i class="bi bi-arrow-up"></i> +0.85%
+                            </span>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="text-center">
+                            <h3 class="text-success fw-bold mb-1">SENSEX</h3>
+                            <p class="text-muted mb-2">66,247.90</p>
+                            <span class="badge bg-success">
+                                <i class="bi bi-arrow-up"></i> +0.72%
+                            </span>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="text-center">
+                            <h3 class="text-danger fw-bold mb-1">BANK NIFTY</h3>
+                            <p class="text-muted mb-2">44,521.30</p>
+                            <span class="badge bg-danger">
+                                <i class="bi bi-arrow-down"></i> -0.45%
+                            </span>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="text-center">
+                            <h3 class="text-success fw-bold mb-1">NIFTY IT</h3>
+                            <p class="text-muted mb-2">28,456.75</p>
+                            <span class="badge bg-success">
+                                <i class="bi bi-arrow-up"></i> +1.25%
+                            </span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -165,37 +198,6 @@
                             <!-- Orders will be populated by JavaScript -->
                         </tbody>
                     </table>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Market Overview Card -->
-        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.7s;">
-            <div class="card-header bg-gradient-success text-white">
-                <h5 class="card-title mb-0 text-white">
-                    <i class="bi bi-graph-up me-2"></i>Market Overview
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-6">
-                        <div class="text-center p-3 bg-light rounded-3">
-                            <small class="text-muted d-block">NIFTY 50</small>
-                            <h4 class="fw-bold mb-1">21,845.45</h4>
-                            <span class="badge bg-success">
-                                <i class="bi bi-arrow-up"></i> +0.85%
-                            </span>
-                        </div>
-                    </div>
-                    <div class="col-6">
-                        <div class="text-center p-3 bg-light rounded-3">
-                            <small class="text-muted d-block">SENSEX</small>
-                            <h4 class="fw-bold mb-1">72,345.67</h4>
-                            <span class="badge bg-danger">
-                                <i class="bi bi-arrow-down"></i> -0.25%
-                            </span>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
