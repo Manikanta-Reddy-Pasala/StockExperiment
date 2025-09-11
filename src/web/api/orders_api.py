@@ -44,7 +44,7 @@ class CreateBuyOrder(Resource):
     def post(self):
         """Create a buy order."""
         try:
-            from order.order_router import OrderRouter
+            from execution.order_router import OrderRouter
             
             data = request.get_json()
             symbol = data.get('symbol')

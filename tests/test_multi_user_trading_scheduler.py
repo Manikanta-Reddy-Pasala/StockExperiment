@@ -9,7 +9,7 @@ from datetime import datetime, time as dt_time
 from unittest.mock import Mock, patch
 
 # Add the src directory to the path so we can import our modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from datastore.database import get_database_manager
 from datastore.models import User

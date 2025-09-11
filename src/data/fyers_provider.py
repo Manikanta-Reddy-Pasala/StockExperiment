@@ -7,7 +7,7 @@ import numpy as np
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 import logging
-from data_sources.data_provider import DataProvider
+from .data_provider import DataProvider, DataProvider
 
 logger = logging.getLogger(__name__)
 
@@ -113,23 +113,25 @@ class FyersDataProvider(DataProvider):
         try:
             if not self.fyers_connector:
                 return None
-            
-            # Convert symbol format
+
             fyers_symbol = self._convert_symbol_format(symbol)
             
             # Use FYERS connector to get historical data
-            # This would use the existing FYERS connector methods
-            # For now, we'll create a placeholder that would integrate with the actual FYERS API
+            data = self.fyers_connector.get_historical_data(fyers_symbol, start_date, end_date)
+
+            if data is None:
+                return None
+
+            # Convert to DataFrame
+            df = pd.DataFrame(data)
+            df['date'] = pd.to_datetime(df['t'], unit='s')
+            df.set_index('date', inplace=True)
+            df.rename(columns={'o': 'Open', 'h': 'High', 'l': 'Low', 'c': 'Close', 'v': 'Volume'}, inplace=True)
             
-            # In a real implementation, this would call:
-            # hist_data = self.fyers_connector.get_historical_data(fyers_symbol, start_date, end_date)
-            
-            # For now, return None to fall back to Yahoo Finance
-            logger.info(f"FYERS historical data request for {symbol} - would integrate with FYERS connector")
-            return None
-            
+            return df[['Open', 'High', 'Low', 'Close', 'Volume']]
+
         except Exception as e:
-            logger.error(f"Error getting historical data for {symbol}: {e}")
+            logger.error(f"Error getting historical data for {symbol} from FYERS API: {e}")
             return None
     
     def _convert_symbol_format(self, symbol: str) -> str:
@@ -165,118 +167,3 @@ class FyersDataProvider(DataProvider):
         except Exception as e:
             logger.error(f"Error getting company info for {fyers_symbol}: {e}")
             return {}
-
-
-# Enhanced Data Provider Manager that can use FYERS connector
-class EnhancedDataProviderManager:
-    """Enhanced data provider manager that can integrate with existing FYERS connector."""
-    
-    def __init__(self, fyers_connector=None):
-        """Initialize enhanced data provider manager."""
-        self.providers = []
-        self.fyers_connector = fyers_connector
-        self._initialize_providers()
-    
-    def _initialize_providers(self):
-        """Initialize available data providers."""
-        # Add Yahoo Finance (always available)
-        from data_sources.data_provider import YahooFinanceProvider
-        self.providers.append(YahooFinanceProvider())
-        
-        # Add FYERS API if connector is available
-        if self.fyers_connector:
-            self.providers.append(FyersDataProvider(self.fyers_connector))
-            logger.info("FYERS API provider initialized for Indian stocks")
-        else:
-            logger.info("FYERS connector not available, using Yahoo Finance only")
-    
-    def get_stock_data(self, symbol: str, period: str = "1y") -> Optional[Dict]:
-        """Get stock data from available providers with fallback."""
-        for provider in self.providers:
-            try:
-                data = provider.get_stock_data(symbol, period)
-                if data:
-                    logger.info(f"Got data for {symbol} from {provider.name}")
-                    return data
-            except Exception as e:
-                logger.warning(f"Provider {provider.name} failed for {symbol}: {e}")
-                continue
-        
-        logger.error(f"All providers failed for {symbol}")
-        return None
-    
-    def get_current_price(self, symbol: str) -> Optional[float]:
-        """Get current price from available providers with fallback."""
-        for provider in self.providers:
-            try:
-                price = provider.get_current_price(symbol)
-                if price:
-                    return price
-            except Exception as e:
-                logger.warning(f"Provider {provider.name} failed for {symbol}: {e}")
-                continue
-        
-        return None
-    
-    def get_historical_data(self, symbol: str, start_date: str, end_date: str) -> Optional[pd.DataFrame]:
-        """Get historical data from available providers with fallback."""
-        for provider in self.providers:
-            try:
-                data = provider.get_historical_data(symbol, start_date, end_date)
-                if data is not None and not data.empty:
-                    return data
-            except Exception as e:
-                logger.warning(f"Provider {provider.name} failed for {symbol}: {e}")
-                continue
-        
-        return None
-    
-    def get_multiple_stocks_data(self, symbols: List[str], period: str = "1y") -> Dict[str, Dict]:
-        """Get data for multiple stocks."""
-        results = {}
-        
-        for symbol in symbols:
-            data = self.get_stock_data(symbol, period)
-            if data:
-                results[symbol] = data
-        
-        logger.info(f"Retrieved data for {len(results)}/{len(symbols)} stocks")
-        return results
-    
-    def get_available_providers(self) -> List[str]:
-        """Get list of available providers."""
-        return [provider.name for provider in self.providers]
-
-
-# Global instance
-_enhanced_data_provider_manager = None
-
-def get_enhanced_data_provider_manager(fyers_connector=None) -> EnhancedDataProviderManager:
-    """Get global enhanced data provider manager instance."""
-    global _enhanced_data_provider_manager
-    if _enhanced_data_provider_manager is None or fyers_connector:
-        _enhanced_data_provider_manager = EnhancedDataProviderManager(fyers_connector)
-    return _enhanced_data_provider_manager
-
-
-if __name__ == "__main__":
-    # Test the enhanced data provider manager
-    manager = get_enhanced_data_provider_manager()
-    
-    # Test with a few Indian stocks
-    test_symbols = ["RELIANCE.NS", "TCS.NS", "INFY.NS"]
-    
-    for symbol in test_symbols:
-        print(f"\nTesting {symbol}:")
-        data = manager.get_stock_data(symbol)
-        if data:
-            print(f"  Name: {data['name']}")
-            print(f"  Price: ₹{data['current_price']:.2f}")
-            print(f"  Market Cap: ₹{data['market_cap']:,.0f}")
-            print(f"  Sector: {data['sector']}")
-            print(f"  Source: {data['data_source']}")
-        else:
-            print(f"  Failed to get data")
-    
-    print(f"\nAvailable providers: {manager.get_available_providers()}")
-

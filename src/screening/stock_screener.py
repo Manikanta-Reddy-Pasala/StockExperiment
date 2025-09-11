@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from datastore.database import get_database_manager
 from datastore.models import Instrument, MarketData
-from data_sources.fyers_provider import get_enhanced_data_provider_manager
+from data.manager import get_data_provider_manager
 import logging
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ class StockScreener:
     def __init__(self, fyers_connector=None):
         """Initialize the stock screener."""
         self.db_manager = get_database_manager()
-        self.data_provider = get_enhanced_data_provider_manager(fyers_connector)
+        self.data_provider = get_data_provider_manager(fyers_connector)
         
         # Screening criteria
         self.criteria = {

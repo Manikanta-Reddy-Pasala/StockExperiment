@@ -19,6 +19,8 @@ try:
 except ImportError:
     FyersConnector = None
 
+from alerts.email_alerts import get_email_service
+
 
 def setup_logging(config: Dict[str, Any]) -> logging.Logger:
     """
@@ -115,20 +117,25 @@ def initialize_components(config: Dict[str, Any]) -> Dict[str, Any]:
     
     # Initialize enhanced data provider manager with FYERS connector
     try:
-        from data_sources.fyers_provider import get_enhanced_data_provider_manager
-        data_provider_manager = get_enhanced_data_provider_manager(fyers_connector)
+        from data.manager import get_data_provider_manager
+        data_provider_manager = get_data_provider_manager(fyers_connector)
         logger.info("Enhanced data provider manager initialized")
     except Exception as e:
         logger.error(f"Failed to initialize data provider manager: {e}")
         data_provider_manager = None
     
+    # Initialize email service
+    email_service = get_email_service(config)
+    logger.info("Email service initialized")
+
     logger.info("New trading system components initialized")
     
     return {
         'config': config,
         'db_manager': db_manager,
         'fyers_connector': fyers_connector,
-        'data_provider_manager': data_provider_manager
+        'data_provider_manager': data_provider_manager,
+        'email_service': email_service
     }
 
 

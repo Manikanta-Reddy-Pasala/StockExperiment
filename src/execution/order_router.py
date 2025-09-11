@@ -63,7 +63,7 @@ class OrderRouter:
                 'quantity': quantity,
                 'order_type': order_type,
                 'price': price,
-                'user_id': user_id,
+                'user_id': user_.id,
                 'routed_at': datetime.now().isoformat()
             }
             

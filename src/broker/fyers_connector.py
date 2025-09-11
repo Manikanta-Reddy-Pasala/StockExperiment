@@ -143,6 +143,31 @@ class FyersConnector:
         except Exception as e:
             self.logger.error(f"Error getting holdings: {e}")
             return []
+
+    def get_historical_data(self, symbol: str, start_date: str, end_date: str, resolution: str = 'D') -> Optional[List[Dict[str, Any]]]:
+        """
+        Get historical data from FYERS.
+
+        Args:
+            symbol (str): Stock symbol
+            start_date (str): Start date in YYYY-MM-DD format
+            end_date (str): End date in YYYY-MM-DD format
+            resolution (str): Data resolution (e.g., 'D' for daily)
+
+        Returns:
+            Optional[List[Dict[str, Any]]]: List of historical data points or None
+        """
+        if not self.is_connected:
+            return None
+
+        try:
+            # In a real implementation, this would call the FYERS API
+            self.logger.info(f"Fetching historical data for {symbol} from {start_date} to {end_date}")
+            # For now, returning None to indicate that the data is not available from this placeholder
+            return None
+        except Exception as e:
+            self.logger.error(f"Error getting historical data: {e}")
+            return None
     
     def disconnect(self):
         """Disconnect from FYERS API."""

@@ -5,6 +5,7 @@ from flask_restx import Namespace, Resource
 from flask import request
 from flask_login import login_required, current_user
 from datetime import datetime
+from data.manager import get_data_provider_manager
 
 # Create namespace for data API
 ns_data = Namespace('data', description='Data operations')
@@ -15,8 +16,6 @@ class StockData(Resource):
     def post(self):
         """Get stock data from multiple sources including FYERS API."""
         try:
-            from data_sources.fyers_provider import get_enhanced_data_provider_manager
-            
             data = request.get_json()
             symbol = data.get('symbol')
             
@@ -26,7 +25,7 @@ class StockData(Resource):
             # Get FYERS connector from app context if available
             from flask import current_app
             fyers_connector = getattr(current_app, 'fyers_connector', None)
-            provider_manager = get_enhanced_data_provider_manager(fyers_connector)
+            provider_manager = get_data_provider_manager(fyers_connector)
             stock_data = provider_manager.get_stock_data(symbol)
             
             if not stock_data:
@@ -47,8 +46,6 @@ class CurrentPrice(Resource):
     def post(self):
         """Get current price for a stock."""
         try:
-            from data_sources.fyers_provider import get_enhanced_data_provider_manager
-            
             data = request.get_json()
             symbol = data.get('symbol')
             
@@ -58,7 +55,7 @@ class CurrentPrice(Resource):
             # Get FYERS connector from app context if available
             from flask import current_app
             fyers_connector = getattr(current_app, 'fyers_connector', None)
-            provider_manager = get_enhanced_data_provider_manager(fyers_connector)
+            provider_manager = get_data_provider_manager(fyers_connector)
             price = provider_manager.get_current_price(symbol)
             
             if price is None:
@@ -80,12 +77,10 @@ class DataProviders(Resource):
     def get(self):
         """Get list of available data providers."""
         try:
-            from data_sources.fyers_provider import get_enhanced_data_provider_manager
-            
             # Get FYERS connector from app context if available
             from flask import current_app
             fyers_connector = getattr(current_app, 'fyers_connector', None)
-            provider_manager = get_enhanced_data_provider_manager(fyers_connector)
+            provider_manager = get_data_provider_manager(fyers_connector)
             providers = provider_manager.get_available_providers()
             
             return {

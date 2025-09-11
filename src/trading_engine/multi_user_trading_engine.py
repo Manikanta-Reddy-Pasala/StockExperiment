@@ -9,15 +9,15 @@ from datastore.database import get_database_manager
 from datastore.models import User, Configuration
 # Removed old selector system - using new strategies system instead
 from risk.risk_manager import RiskManager
-from order.order_router import OrderRouter
+from execution.order_router import OrderRouter
 from simulator.simulator import Simulator
 try:
     from broker.fyers_connector import FyersConnector
 except ImportError:
     FyersConnector = None
-from data_provider.data_manager import get_data_manager
+from data.manager import get_data_provider_manager
 from compliance.compliance_logger import ComplianceLogger
-from email_alerts.email_alerts import EmailAlertingSystem
+from alerts.email_alerts import get_email_service
 
 
 class UserTradingSession:
@@ -58,9 +58,6 @@ class UserTradingSession:
     
     def _initialize_components(self):
         """Initialize trading components for this user."""
-        # Initialize data manager
-        self.data_manager = get_data_manager()
-        
         # Initialize broker connector based on mode
         if self.mode == 'production':
             # In production, use real Fyers connector if available
@@ -76,6 +73,9 @@ class UserTradingSession:
             # In development, use simulator
             self.broker_connector = Simulator()
         
+        # Initialize data manager
+        self.data_manager = get_data_provider_manager(self.broker_connector)
+
         # Initialize other components
         # Note: SelectorEngine removed - using new strategies system instead
         
@@ -91,7 +91,7 @@ class UserTradingSession:
         self.compliance_logger = ComplianceLogger(db_manager)
         
         # Initialize email alerting
-        self.email_alerting = EmailAlertingSystem(self.config)
+        self.email_alerting = get_email_service(self.config)
     
     def _get_user_risk_config(self) -> Dict[str, Any]:
         """Get user-specific risk configuration."""

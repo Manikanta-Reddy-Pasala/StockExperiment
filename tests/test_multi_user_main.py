@@ -103,7 +103,7 @@ class TestMainApplication:
                                             with patch('main.ComplianceLogger') as mock_compliance:
                                                 mock_compliance.return_value = Mock()
                                                 
-                                                with patch('main.EmailAlertingSystem') as mock_email:
+                                                with patch('main.get_email_service') as mock_email:
                                                     mock_email.return_value = Mock()
                                                     
                                                     # Initialize components in single-user mode
@@ -122,7 +122,7 @@ class TestMainApplication:
                                                     assert 'dashboard_reporter' in components
                                                     assert 'alert_manager' in components
                                                     assert 'compliance_logger' in components
-                                                    assert 'email_alerting' in components
+                                                    assert 'email_service' in components
                                                     
                                                     # Verify trading_engine is None for single-user mode
                                                     assert components['trading_engine'] is None
@@ -165,7 +165,7 @@ class TestMainApplication:
                                                 with patch('main.ComplianceLogger') as mock_compliance:
                                                     mock_compliance.return_value = Mock()
                                                     
-                                                    with patch('main.EmailAlertingSystem') as mock_email:
+                                                    with patch('main.get_email_service') as mock_email:
                                                         mock_email.return_value = Mock()
                                                         
                                                         # Initialize components in multi-user mode
@@ -184,7 +184,7 @@ class TestMainApplication:
                                                         assert 'dashboard_reporter' in components
                                                         assert 'alert_manager' in components
                                                         assert 'compliance_logger' in components
-                                                        assert 'email_alerting' in components
+                                                        assert 'email_service' in components
                                                         
                                                         # Verify trading_engine is initialized for multi-user mode
                                                         assert components['trading_engine'] is not None
@@ -227,7 +227,7 @@ class TestMainApplication:
                                                 with patch('main.ComplianceLogger') as mock_compliance:
                                                     mock_compliance.return_value = Mock()
                                                     
-                                                    with patch('main.EmailAlertingSystem') as mock_email:
+                                                    with patch('main.get_email_service') as mock_email:
                                                         mock_email.return_value = Mock()
                                                         
                                                         with patch.dict(os.environ, {
@@ -287,7 +287,7 @@ class TestMainApplicationIntegration:
                                                 with patch('main.ComplianceLogger') as mock_compliance:
                                                     mock_compliance.return_value = Mock()
                                                     
-                                                    with patch('main.EmailAlertingSystem') as mock_email:
+                                                    with patch('main.get_email_service') as mock_email:
                                                         mock_email.return_value = Mock()
                                                         
                                                         # Initialize components
@@ -336,7 +336,7 @@ class TestMainApplicationIntegration:
                                             with patch('main.ComplianceLogger') as mock_compliance:
                                                 mock_compliance.return_value = Mock()
                                                 
-                                                with patch('main.EmailAlertingSystem') as mock_email:
+                                                with patch('main.get_email_service') as mock_email:
                                                     mock_email.return_value = Mock()
                                                     
                                                     # Initialize components

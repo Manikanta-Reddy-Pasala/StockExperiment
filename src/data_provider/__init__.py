@@ -1,3 +1,0 @@
-"""
-Data Provider Module
-"""

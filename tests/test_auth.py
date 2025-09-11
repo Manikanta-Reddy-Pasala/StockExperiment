@@ -11,7 +11,7 @@ from flask_login import current_user
 from flask_bcrypt import Bcrypt
 
 # Add src to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
 from web.app import create_app
 from datastore.database import get_database_manager
