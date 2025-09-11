@@ -556,6 +556,21 @@ def create_app():
             
             app.logger.info(f"FYERS configuration saved successfully for user {current_user.id}")
             
+            # If OAuth2 credentials were saved, automatically generate auth URL
+            auth_url = None
+            if data.get('secret_key'):
+                try:
+                    # Generate OAuth2 auth URL automatically
+                    oauth_flow = FyersOAuth2Flow(
+                        client_id=data.get('client_id'),
+                        secret_key=data.get('secret_key'),
+                        redirect_uri=config_data.get('redirect_url')
+                    )
+                    auth_url = oauth_flow.generate_auth_url(current_user.id)
+                    app.logger.info(f"Auto-generated OAuth2 auth URL for user {current_user.id}")
+                except Exception as e:
+                    app.logger.error(f"Error auto-generating OAuth2 auth URL for user {current_user.id}: {str(e)}")
+            
             # Format the config data
             config_data = {
                 'id': config.get('id'),
@@ -567,11 +582,18 @@ def create_app():
                 'updated_at': config.get('updated_at').isoformat() if config.get('updated_at') else None
             }
             
-            return jsonify({
+            response_data = {
                 'success': True,
                 'message': 'FYERS configuration saved successfully',
                 'config': config_data
-            })
+            }
+            
+            # Include auth URL if generated
+            if auth_url:
+                response_data['auth_url'] = auth_url
+                response_data['message'] = 'FYERS configuration saved successfully. OAuth2 authorization URL generated automatically.'
+            
+            return jsonify(response_data)
         except Exception as e:
             app.logger.error(f"Error saving FYERS configuration for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
@@ -659,7 +681,7 @@ def create_app():
             
             # Get broker configuration from database
             broker_service = get_broker_service()
-            config = broker_service.get_broker_config(current_user.id)
+            config = broker_service.get_broker_config('fyers', current_user.id)
             
             if not config or not config.get('client_id') or not config.get('api_secret'):
                 app.logger.warning(f"No FYERS configuration found for user {current_user.id}")
@@ -672,7 +694,7 @@ def create_app():
             oauth_flow = FyersOAuth2Flow(
                 client_id=config.get('client_id'),
                 secret_key=config.get('api_secret'),
-                redirect_uri=config.get('redirect_url', 'https://trade.fyers.in/api-login/redirect-uri/index.html')
+                redirect_uri=config.get('redirect_url')
             )
             
             # Generate authorization URL with user_id for automated callback
@@ -1149,10 +1171,10 @@ def create_app():
             app.logger.error(f"Error refreshing suggested stocks for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
     
-    # Automated OAuth2 Redirect Handler
+    # Automated OAuth2 Callback API
     @app.route('/api/brokers/fyers/oauth/callback', methods=['GET'])
     def api_fyers_oauth_callback():
-        """Automated OAuth2 callback handler for FYERS authorization."""
+        """Automated OAuth2 callback API that accepts auth code and returns 200 status."""
         try:
             # Get authorization code from query parameters
             auth_code = request.args.get('auth_code')
@@ -1160,9 +1182,7 @@ def create_app():
             
             if not auth_code:
                 app.logger.error("No authorization code received in OAuth callback")
-                return render_template('oauth_callback.html', 
-                                     success=False, 
-                                     message="No authorization code received")
+                return jsonify({'success': False, 'error': 'No authorization code received'}), 400
             
             app.logger.info(f"Received OAuth callback with auth_code: {auth_code[:10]}...")
             
@@ -1175,16 +1195,14 @@ def create_app():
                 except ValueError:
                     user_id = 1
             
-            # Get broker service and exchange the auth code for access token
+            # Get broker service
             broker_service = get_broker_service()
             
             # Get current broker config
-            config = broker_service.get_broker_config(user_id)
+            config = broker_service.get_broker_config('fyers', user_id)
             if not config or not config.get('client_id') or not config.get('api_secret'):
                 app.logger.error(f"No broker configuration found for user {user_id}")
-                return render_template('oauth_callback.html', 
-                                     success=False, 
-                                     message="No broker configuration found. Please configure your FYERS credentials first.")
+                return jsonify({'success': False, 'error': 'No broker configuration found'}), 400
             
             # Create OAuth2 flow instance
             oauth_flow = FyersOAuth2Flow(
@@ -1194,10 +1212,11 @@ def create_app():
             )
             
             # Exchange auth code for access token
-            result = oauth_flow.exchange_auth_code(auth_code)
+            result = oauth_flow.exchange_auth_code_for_token(auth_code)
             
-            if result.get('success'):
-                access_token = result.get('access_token')
+            # Check if the response contains an access token
+            if result and 'access_token' in result:
+                access_token = result['access_token']
                 
                 # Save the access token to database
                 token_data = {
@@ -1206,25 +1225,24 @@ def create_app():
                     'connection_status': 'connected'
                 }
                 
-                broker_service.save_broker_config(user_id, token_data)
+                broker_service.save_broker_config('fyers', token_data, user_id)
                 
                 app.logger.info(f"Successfully exchanged auth code for access token for user {user_id}")
                 
-                return render_template('oauth_callback.html', 
-                                     success=True, 
-                                     message="Successfully connected to FYERS! You can now close this window and return to the trading system.")
+                # Return 200 status with success response
+                return jsonify({
+                    'success': True, 
+                    'message': 'Successfully connected to FYERS!',
+                    'user_id': user_id
+                }), 200
             else:
-                error_msg = result.get('error', 'Unknown error occurred')
+                error_msg = result.get('message', 'Unknown error occurred') if result else 'No response from FYERS'
                 app.logger.error(f"Failed to exchange auth code: {error_msg}")
-                return render_template('oauth_callback.html', 
-                                     success=False, 
-                                     message=f"Failed to connect to FYERS: {error_msg}")
+                return jsonify({'success': False, 'error': f'Failed to connect to FYERS: {error_msg}'}), 400
                 
         except Exception as e:
             app.logger.error(f"Error in OAuth callback: {str(e)}")
-            return render_template('oauth_callback.html', 
-                                 success=False, 
-                                 message=f"An error occurred: {str(e)}")
+            return jsonify({'success': False, 'error': f'An error occurred: {str(e)}'}), 500
     
     return app
 

@@ -100,7 +100,7 @@ class StockScreeningService:
         """Initialize FYERS connector for API calls."""
         try:
             if self.broker_service:
-                config = self.broker_service.get_broker_config(user_id)
+                config = self.broker_service.get_broker_config('fyers', user_id)
                 if config and config.get('is_connected') and config.get('access_token'):
                     from .broker_service import FyersAPIConnector
                     self.fyers_connector = FyersAPIConnector(
@@ -160,7 +160,8 @@ class StockScreeningService:
                 return None
             
             # Get quotes data from FYERS
-            quotes_data = self.fyers_connector.get_quotes([symbol])
+            # Fix: Pass symbol as string instead of list
+            quotes_data = self.fyers_connector.get_quotes(symbol)
             if not quotes_data or 'd' not in quotes_data or not quotes_data['d']:
                 return None
             
@@ -228,14 +229,13 @@ class StockScreeningService:
             end_date = datetime.now()
             start_date = end_date - timedelta(days=30)
             
-            hist_data = self.fyers_connector.get_history({
-                'symbol': symbol,
-                'resolution': 'D',
-                'date_format': '1',
-                'range_from': int(start_date.timestamp()),
-                'range_to': int(end_date.timestamp()),
-                'cont_flag': '1'
-            })
+            # Fix: Pass parameters individually instead of as a dictionary
+            hist_data = self.fyers_connector.get_history(
+                symbol=symbol,
+                resolution='D',
+                range_from=str(int(start_date.timestamp())),
+                range_to=str(int(end_date.timestamp()))
+            )
             
             if hist_data and 'candles' in hist_data:
                 volumes = [candle[5] for candle in hist_data['candles']]  # Volume is at index 5
@@ -493,14 +493,13 @@ class StockScreeningService:
             end_date = datetime.now()
             start_date = end_date - timedelta(days=30)
             
-            hist_data = self.fyers_connector.get_history({
-                'symbol': symbol,
-                'resolution': 'D',
-                'date_format': '1',
-                'range_from': int(start_date.timestamp()),
-                'range_to': int(end_date.timestamp()),
-                'cont_flag': '1'
-            })
+            # Fix: Pass parameters individually instead of as a dictionary
+            hist_data = self.fyers_connector.get_history(
+                symbol=symbol,
+                resolution='D',
+                range_from=str(int(start_date.timestamp())),
+                range_to=str(int(end_date.timestamp()))
+            )
             
             if hist_data and 'candles' in hist_data and len(hist_data['candles']) >= 20:
                 candles = hist_data['candles']
@@ -523,14 +522,13 @@ class StockScreeningService:
             end_date = datetime.now()
             start_date = end_date - timedelta(days=90)
             
-            hist_data = self.fyers_connector.get_history({
-                'symbol': symbol,
-                'resolution': 'D',
-                'date_format': '1',
-                'range_from': int(start_date.timestamp()),
-                'range_to': int(end_date.timestamp()),
-                'cont_flag': '1'
-            })
+            # Fix: Pass parameters individually instead of as a dictionary
+            hist_data = self.fyers_connector.get_history(
+                symbol=symbol,
+                resolution='D',
+                range_from=str(int(start_date.timestamp())),
+                range_to=str(int(end_date.timestamp()))
+            )
             
             if hist_data and 'candles' in hist_data and len(hist_data['candles']) >= 50:
                 candles = hist_data['candles']
@@ -560,14 +558,13 @@ class StockScreeningService:
             end_date = datetime.now()
             start_date = end_date - timedelta(days=90)
             
-            hist_data = self.fyers_connector.get_history({
-                'symbol': symbol,
-                'resolution': 'D',
-                'date_format': '1',
-                'range_from': int(start_date.timestamp()),
-                'range_to': int(end_date.timestamp()),
-                'cont_flag': '1'
-            })
+            # Fix: Pass parameters individually instead of as a dictionary
+            hist_data = self.fyers_connector.get_history(
+                symbol=symbol,
+                resolution='D',
+                range_from=str(int(start_date.timestamp())),
+                range_to=str(int(end_date.timestamp()))
+            )
             
             if hist_data and 'candles' in hist_data and len(hist_data['candles']) >= 20:
                 candles = hist_data['candles']

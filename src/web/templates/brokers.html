@@ -179,25 +179,16 @@
                                         
                                         <div class="alert alert-info">
                                             <i class="bi bi-info-circle me-2"></i>
-                                            <strong>How it works:</strong> First save your configuration, then generate the authorization URL. 
-                                            Visit the URL, login to FYERS, and copy the auth code back here to complete the setup.
+                                            <strong>How it works:</strong> Click "Save & Start OAuth2" to save your configuration and automatically open the FYERS authorization page. 
+                                            Complete the authorization and the access token will be automatically saved to your account.
                                         </div>
                                         
                                         <div class="d-flex justify-content-between align-items-center mb-3">
                                             <div class="text-muted">
-                                                <small>Step 1: Save configuration</small>
+                                                <small>Save configuration and automatically start OAuth2 flow</small>
                                             </div>
                                             <button type="button" class="btn btn-primary" id="save-oauth-config">
-                                                <i class="bi bi-save me-2"></i> Save Configuration
-                                            </button>
-                                        </div>
-                                        
-                                        <div class="d-flex justify-content-between align-items-center mb-3" id="auth-url-section" style="display: none;">
-                                            <div class="text-muted">
-                                                <small>Step 2: Generate authorization URL</small>
-                                            </div>
-                                            <button type="button" class="btn btn-success" id="generate-auth-url">
-                                                <i class="bi bi-link-45deg me-2"></i> Generate Auth URL
+                                                <i class="bi bi-save me-2"></i> Save & Start OAuth2
                                             </button>
                                         </div>
                                         
@@ -326,10 +317,7 @@
                 document.getElementById('fyers-oauth-secret-key').placeholder = data.api_secret ? 'Secret key is saved' : 'Enter your App Secret';
                 document.getElementById('fyers-oauth-redirect-uri').value = data.redirect_url || 'https://trade.fyers.in/api-login/redirect-uri/index.html';
                 
-                // Show auth URL section if basic configuration exists
-                if (data.client_id) {
-                    document.getElementById('auth-url-section').style.display = 'flex';
-                }
+                // Configuration is loaded, no additional UI changes needed
                 
                 // Show error message if there's one
                 if (data.error_message) {
@@ -434,8 +422,29 @@
             
             if (result.success) {
                 showNotification('Configuration saved successfully!', 'success');
-                // Show the auth URL generation section
-                document.getElementById('auth-url-section').style.display = 'flex';
+                
+                // If auth URL was automatically generated, open it
+                if (result.auth_url) {
+                    showNotification('Opening FYERS authorization page...', 'info');
+                    
+                    // Open the authorization URL in a new window
+                    const authWindow = window.open(result.auth_url, '_blank', 'width=800,height=600');
+                    
+                    // Show success message about automated flow
+                    showNotification('Please complete the authorization in the new window. The access token will be automatically saved!', 'info');
+                    
+                    // Check for window close and refresh data
+                    const checkClosed = setInterval(() => {
+                        if (authWindow.closed) {
+                            clearInterval(checkClosed);
+                            showNotification('Authorization window closed. Refreshing data...', 'info');
+                            setTimeout(() => {
+                                fetchBrokerInfo();
+                            }, 2000);
+                        }
+                    }, 1000);
+                }
+                
                 // Refresh broker info to show updated status
                 fetchBrokerInfo();
             } else {
@@ -447,46 +456,6 @@
         }
     }
     
-    async function generateAuthUrl() {
-        try {
-            const response = await fetch('/api/brokers/fyers/auth-url', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'same-origin',
-                body: JSON.stringify({}) // No data needed, uses database configuration
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                showNotification('Authorization URL generated successfully! Opening in new window...', 'success');
-                
-                // Open the authorization URL in a new window
-                const authWindow = window.open(data.auth_url, '_blank', 'width=800,height=600');
-                
-                // Show success message about automated flow
-                showNotification('Please complete the authorization in the new window. The access token will be automatically saved!', 'info');
-                
-                // Check for window close and refresh data
-                const checkClosed = setInterval(() => {
-                    if (authWindow.closed) {
-                        clearInterval(checkClosed);
-                        showNotification('Authorization window closed. Refreshing data...', 'info');
-                        setTimeout(() => {
-                            fetchBrokerInfo();
-                        }, 2000);
-                    }
-                }, 1000);
-                
-            } else {
-                showNotification(`Error: ${data.error}`, 'error');
-            }
-        } catch (error) {
-            showNotification(`Error generating auth URL: ${error.message}`, 'error');
-        }
-    }
     
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -494,13 +463,10 @@
         
         // OAuth2 event listeners
         document.getElementById('save-oauth-config').addEventListener('click', saveOAuthConfig);
-        document.getElementById('generate-auth-url').addEventListener('click', generateAuthUrl);
         
         // Token refresh event listeners
         document.getElementById('refresh-expired-token').addEventListener('click', function() {
-            // Show the auth URL section to allow token refresh
-            document.getElementById('auth-url-section').style.display = 'flex';
-            showNotification('Please generate a new auth URL and complete the OAuth2 flow to refresh your token.', 'info');
+            showNotification('Please save your configuration again to refresh your token via OAuth2 flow.', 'info');
         });
         
         // Refresh data every 30 seconds
