@@ -4,11 +4,11 @@ Flask Web Application for the Automated Trading System with Swagger Documentatio
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_bcrypt import Bcrypt
-from datastore.database import get_database_manager
-from datastore.models import Log, Order, Trade, Position, User, Strategy, SuggestedStock, Configuration
+from ..models.database import get_database_manager
+from ..models.models import Log, Order, Trade, Position, User, Strategy, SuggestedStock, Configuration
 # Add import for charting
-from charting.db_charts import DatabaseCharts
-from trading_engine.multi_user_trading_engine import MultiUserTradingEngine
+from ..integrations.db_charts import DatabaseCharts
+from ..integrations.multi_user_trading_engine import get_trading_engine
 from datetime import datetime
 import secrets
 
@@ -37,8 +37,8 @@ def create_app():
     charts = DatabaseCharts(db_manager)
     
     # Initialize API with all namespaces
-    from .api import create_api
-    api = create_api(app)
+    # from .api import create_api
+    # api = create_api(app)
     
     @login_manager.user_loader
     def load_user(user_id):

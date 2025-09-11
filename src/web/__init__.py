@@ -1,3 +1,1 @@
-"""
-Web Interface Module
-"""
+# Package initialization
