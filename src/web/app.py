@@ -441,6 +441,7 @@ def create_app():
             # Format the config data
             config_data = {
                 'client_id': config.get('client_id', ''),
+                'api_secret': config.get('api_secret', ''),
                 'access_token': bool(config.get('access_token')),
                 'connected': config.get('is_connected', False),
                 'connection_status': config.get('connection_status', 'unknown'),

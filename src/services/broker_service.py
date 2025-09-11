@@ -32,6 +32,28 @@ class BrokerService:
     def __init__(self):
         self.db_manager = get_database_manager()
     
+    def is_token_expired(self, access_token: str) -> bool:
+        """Check if FYERS access token is expired."""
+        if not access_token:
+            return True
+        
+        try:
+            import jwt
+            import datetime
+            
+            # Decode JWT token without verification to get expiration
+            decoded = jwt.decode(access_token, options={"verify_signature": False})
+            exp_timestamp = decoded.get('exp', 0)
+            
+            # Convert to datetime and check if expired
+            exp_datetime = datetime.datetime.fromtimestamp(exp_timestamp)
+            current_time = datetime.datetime.now()
+            
+            return current_time >= exp_datetime
+        except Exception as e:
+            self.logger.warning(f"Error checking token expiration: {e}")
+            return True  # Assume expired if we can't check
+    
     def get_broker_config(self, broker_name: str, user_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
         """Get broker configuration from database."""
         with self.db_manager.get_session() as session:
@@ -44,6 +66,9 @@ class BrokerService:
             config = query.first()
             if not config:
                 return None
+            
+            # Check if token is expired
+            is_expired = self.is_token_expired(config.access_token)
             
             # Return data dictionary instead of SQLAlchemy object
             return {
@@ -58,9 +83,10 @@ class BrokerService:
                 'redirect_url': config.redirect_url,
                 'app_type': config.app_type,
                 'is_active': config.is_active,
-                'is_connected': config.is_connected,
+                'is_connected': config.is_connected and not is_expired,  # Mark as disconnected if token expired
+                'is_token_expired': is_expired,
                 'last_connection_test': config.last_connection_test,
-                'connection_status': config.connection_status,
+                'connection_status': 'expired' if is_expired else config.connection_status,
                 'error_message': config.error_message,
                 'created_at': config.created_at,
                 'updated_at': config.updated_at

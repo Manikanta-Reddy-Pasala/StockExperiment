@@ -129,6 +129,16 @@
                                 </h6>
                             </div>
                             <div class="card-body">
+                                <!-- Token Expiration Warning -->
+                                <div id="token-expiration-warning" class="alert alert-warning d-none" role="alert">
+                                    <i class="bi bi-exclamation-triangle me-2"></i>
+                                    <strong>Token Expired:</strong> Your FYERS access token has expired (tokens expire every 2 hours). 
+                                    Please refresh your token to continue using the API.
+                                    <button type="button" class="btn btn-warning btn-sm ms-2" id="refresh-expired-token">
+                                        <i class="bi bi-arrow-clockwise me-1"></i> Refresh Token
+                                    </button>
+                                </div>
+                                
                                 <!-- FYERS OAuth2 Configuration -->
                                 <div class="mb-4">
                                     <h6 class="text-primary mb-3">
@@ -259,8 +269,15 @@
             
             // Check if response is a redirect (authentication required)
             if (response.redirected || response.status === 302) {
-                console.log('Authentication required - redirecting to login');
-                return; // Don't update status, just return
+                console.log('Authentication required - user needs to login');
+                // Don't update status, just return silently
+                return;
+            }
+            
+            // Check if response is not ok
+            if (!response.ok) {
+                console.log('Response not ok:', response.status);
+                return;
             }
             
             const data = await response.json();
@@ -276,13 +293,28 @@
                 // Update connection status from database
                 const connectionStatus = data.connection_status || 'unknown';
                 const isConnected = data.connected || false;
+                const isTokenExpired = data.is_token_expired || false;
                 
-                document.getElementById('fyers-connection-status').textContent = connectionStatus.charAt(0).toUpperCase() + connectionStatus.slice(1);
-                document.getElementById('fyers-connection-status').className = 
-                    isConnected ? 'badge bg-success' : 'badge bg-danger';
-                document.getElementById('fyers-status').textContent = connectionStatus.charAt(0).toUpperCase() + connectionStatus.slice(1);
-                document.getElementById('fyers-status').className = 
-                    isConnected ? 'badge bg-success' : 'badge bg-danger';
+                // Handle token expiration
+                if (isTokenExpired) {
+                    document.getElementById('fyers-connection-status').textContent = 'Token Expired';
+                    document.getElementById('fyers-connection-status').className = 'badge bg-warning';
+                    document.getElementById('fyers-status').textContent = 'Token Expired';
+                    document.getElementById('fyers-status').className = 'badge bg-warning';
+                    
+                    // Show token expiration warning
+                    document.getElementById('token-expiration-warning').classList.remove('d-none');
+                } else {
+                    document.getElementById('fyers-connection-status').textContent = connectionStatus.charAt(0).toUpperCase() + connectionStatus.slice(1);
+                    document.getElementById('fyers-connection-status').className = 
+                        isConnected ? 'badge bg-success' : 'badge bg-danger';
+                    document.getElementById('fyers-status').textContent = connectionStatus.charAt(0).toUpperCase() + connectionStatus.slice(1);
+                    document.getElementById('fyers-status').className = 
+                        isConnected ? 'badge bg-success' : 'badge bg-danger';
+                    
+                    // Hide token expiration warning
+                    document.getElementById('token-expiration-warning').classList.add('d-none');
+                }
                 
                 // Update last connection test time
                 if (data.last_connection_test && data.last_connection_test !== '-') {
@@ -305,11 +337,12 @@
                 
                 // Update OAuth form fields from database
                 document.getElementById('fyers-oauth-client-id').value = data.client_id || '';
-                document.getElementById('fyers-oauth-secret-key').value = data.api_secret || '';
+                // Mask the secret key for security
+                document.getElementById('fyers-oauth-secret-key').value = data.api_secret ? '••••••••••••••••' : '';
                 document.getElementById('fyers-oauth-redirect-uri').value = data.redirect_url || 'https://trade.fyers.in/api-login/redirect-uri/index.html';
                 
-                // Show auth URL section if configuration exists
-                if (data.client_id && data.api_secret) {
+                // Show auth URL section if basic configuration exists
+                if (data.client_id) {
                     document.getElementById('auth-url-section').style.display = 'flex';
                 }
                 
@@ -505,11 +538,10 @@
                 // Hide the auth code section
                 document.getElementById('auth-code-section').style.display = 'none';
                 
-                // Clear the form
-                document.getElementById('fyers-oauth-form').reset();
+                // Clear only the auth code field
                 document.getElementById('fyers-auth-code').value = '';
                 
-                // Refresh broker info to show updated status
+                // Refresh broker info to show updated status and populate form fields
                 fetchBrokerInfo();
             } else {
                 showNotification(`Error: ${data.error}`, 'error');
@@ -526,6 +558,13 @@
         document.getElementById('save-oauth-config').addEventListener('click', saveOAuthConfig);
         document.getElementById('generate-auth-url').addEventListener('click', generateAuthUrl);
         document.getElementById('exchange-auth-code').addEventListener('click', exchangeAuthCode);
+        
+        // Token refresh event listeners
+        document.getElementById('refresh-expired-token').addEventListener('click', function() {
+            // Show the auth URL section to allow token refresh
+            document.getElementById('auth-url-section').style.display = 'flex';
+            showNotification('Please generate a new auth URL and complete the OAuth2 flow to refresh your token.', 'info');
+        });
         
         // Refresh data every 30 seconds
         setInterval(fetchBrokerInfo, 30000);
