@@ -262,14 +262,14 @@
             
             // Update total P&L
             const totalPnlElement = document.getElementById('total-pnl');
-            if (totalPnlElement) {
+            if (totalPnlElement && data.total_pnl !== undefined) {
                 totalPnlElement.textContent = '₹' + data.total_pnl.toFixed(2);
                 totalPnlElement.className = data.total_pnl >= 0 ? 'price-up' : 'price-down';
             }
 
             // Update available funds
             const availableFundsElement = document.getElementById('available-funds');
-            if (availableFundsElement) {
+            if (availableFundsElement && data.available_funds !== undefined) {
                 availableFundsElement.textContent = '₹' + data.available_funds.toFixed(2);
             }
 
@@ -574,14 +574,225 @@
         });
     }
     
+    // Fetch portfolio holdings
+    async function fetchPortfolioHoldings() {
+        try {
+            const response = await fetch('/api/dashboard/portfolio-holdings');
+            const result = await response.json();
+            
+            if (result.success && result.data) {
+                updatePortfolioHoldingsTable(result.data);
+            } else {
+                console.error('Failed to fetch portfolio holdings:', result.error);
+                showPortfolioHoldingsError(result.error || 'Failed to load portfolio data');
+            }
+        } catch (error) {
+            console.error('Error fetching portfolio holdings:', error);
+            showPortfolioHoldingsError('Network error loading portfolio data');
+        }
+    }
+    
+    // Update portfolio holdings table
+    function updatePortfolioHoldingsTable(holdings) {
+        const tbody = document.querySelector('#positions-table tbody');
+        if (!tbody) return;
+        
+        tbody.innerHTML = '';
+        
+        if (holdings.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No active positions</td></tr>';
+            return;
+        }
+        
+        holdings.forEach(holding => {
+            const row = document.createElement('tr');
+            const pnlColor = holding.pnl >= 0 ? 'text-success' : 'text-danger';
+            const pnlIcon = holding.pnl >= 0 ? 'bi-arrow-up' : 'bi-arrow-down';
+            
+            row.innerHTML = `
+                <td><strong>${holding.symbol}</strong></td>
+                <td>${holding.quantity}</td>
+                <td>₹${holding.avg_price.toFixed(2)}</td>
+                <td>₹${holding.current_price.toFixed(2)}</td>
+                <td class="${pnlColor}">
+                    <i class="bi ${pnlIcon}"></i> ₹${holding.pnl.toFixed(2)}
+                    <br><small>(${holding.pnl_percent.toFixed(2)}%)</small>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary">View</button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+    
+    // Show error state for portfolio holdings
+    function showPortfolioHoldingsError(message) {
+        const tbody = document.querySelector('#positions-table tbody');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-warning"><i class="bi bi-exclamation-triangle me-2"></i>Error loading portfolio data</td></tr>';
+        }
+    }
+    
+    // Fetch recent orders
+    async function fetchRecentOrders() {
+        try {
+            const response = await fetch('/api/dashboard/recent-orders?limit=5');
+            const result = await response.json();
+            
+            if (result.success && result.data) {
+                updateRecentOrdersTable(result.data);
+            } else {
+                console.error('Failed to fetch recent orders:', result.error);
+                showRecentOrdersError(result.error || 'Failed to load orders data');
+            }
+        } catch (error) {
+            console.error('Error fetching recent orders:', error);
+            showRecentOrdersError('Network error loading orders data');
+        }
+    }
+    
+    // Update recent orders table
+    function updateRecentOrdersTable(orders) {
+        const tbody = document.querySelector('#orders-table tbody');
+        if (!tbody) return;
+        
+        tbody.innerHTML = '';
+        
+        if (orders.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No recent orders</td></tr>';
+            return;
+        }
+        
+        orders.forEach(order => {
+            const row = document.createElement('tr');
+            const statusColor = getOrderStatusColor(order.status);
+            const typeColor = order.side === 'buy' ? 'text-success' : 'text-danger';
+            
+            row.innerHTML = `
+                <td class="small">${order.order_id}</td>
+                <td class="small">${order.symbol}</td>
+                <td class="small ${typeColor}">${order.type}</td>
+                <td class="small"><span class="badge bg-${statusColor}">${order.status}</span></td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+    
+    // Show error state for recent orders
+    function showRecentOrdersError(message) {
+        const tbody = document.querySelector('#orders-table tbody');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-warning"><i class="bi bi-exclamation-triangle me-2"></i>Error loading orders data</td></tr>';
+        }
+    }
+    
+    // Get order status color
+    function getOrderStatusColor(status) {
+        const statusColors = {
+            'open': 'warning',
+            'complete': 'success',
+            'cancelled': 'danger',
+            'rejected': 'danger',
+            'pending': 'info',
+            'partially_filled': 'primary'
+        };
+        return statusColors[status.toLowerCase()] || 'secondary';
+    }
+    
+    // Fetch portfolio performance data
+    async function fetchPortfolioPerformance(period = '1W') {
+        try {
+            const response = await fetch(`/api/dashboard/portfolio-performance?period=${period}`);
+            const result = await response.json();
+            
+            if (result.success && result.data) {
+                updatePortfolioChart(result.data);
+            } else {
+                console.error('Failed to fetch portfolio performance:', result.error);
+                showPortfolioPerformanceError(result.error || 'Failed to load performance data');
+            }
+        } catch (error) {
+            console.error('Error fetching portfolio performance:', error);
+            showPortfolioPerformanceError('Network error loading performance data');
+        }
+    }
+    
+    // Show error state for portfolio performance
+    function showPortfolioPerformanceError(message) {
+        const ctx = document.getElementById('portfolioChart');
+        if (ctx) {
+            // Clear the canvas
+            ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
+            
+            // Show error message
+            const parent = ctx.parentElement;
+            parent.innerHTML = `
+                <div class="d-flex justify-content-center align-items-center h-100">
+                    <div class="text-center text-warning">
+                        <i class="bi bi-exclamation-triangle fs-1 mb-3"></i>
+                        <h5>Error Loading Chart</h5>
+                        <p class="text-muted">${message}</p>
+                    </div>
+                </div>
+            `;
+        }
+    }
+    
+    // Update portfolio chart
+    function updatePortfolioChart(data) {
+        const ctx = document.getElementById('portfolioChart');
+        if (!ctx) return;
+        
+        // Destroy existing chart if it exists
+        if (window.portfolioChart) {
+            window.portfolioChart.destroy();
+        }
+        
+        window.portfolioChart = new Chart(ctx, {
+            type: 'line',
+            data: data,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        grid: {
+                            color: 'rgba(0,0,0,0.1)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
     // Fetch data when page loads
     document.addEventListener('DOMContentLoaded', function() {
         fetchDashboardMetrics();
         fetchMarketOverview();
+        fetchPortfolioHoldings();
+        fetchRecentOrders();
+        fetchPortfolioPerformance();
         initPortfolioChart();
+        
         // Refresh every 30 seconds
         setInterval(fetchDashboardMetrics, 30000);
         setInterval(fetchMarketOverview, 30000);
+        setInterval(fetchPortfolioHoldings, 30000);
+        setInterval(fetchRecentOrders, 30000);
+        setInterval(fetchPortfolioPerformance, 30000);
     });
 </script>
 {% endblock %}

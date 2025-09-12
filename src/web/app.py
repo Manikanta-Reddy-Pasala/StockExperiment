@@ -573,11 +573,11 @@ def create_app():
             app.logger.error(f"Error fetching dashboard metrics for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
-    # Portfolio API Routes
+    # Portfolio API Routes (Legacy - keeping for backward compatibility)
     @app.route('/api/portfolio/holdings', methods=['GET'])
     @login_required
-    def api_get_portfolio_holdings():
-        """Get portfolio holdings using FYERS API."""
+    def api_get_portfolio_holdings_legacy():
+        """Get portfolio holdings using FYERS API (Legacy endpoint)."""
         try:
             app.logger.info(f"Fetching portfolio holdings for user {current_user.id}")
             result = portfolio_service.get_portfolio_holdings(current_user.id)
@@ -726,7 +726,7 @@ def create_app():
     @app.route('/api/market/overview', methods=['GET'])
     @login_required
     def api_get_market_overview():
-        """Get market overview data for major indices using FYERS API."""
+        """Get market overview data for major indices using broker APIs."""
         try:
             app.logger.info(f"Fetching market overview for user {current_user.id}")
             
@@ -740,6 +740,84 @@ def create_app():
                 
         except Exception as e:
             app.logger.error(f"Error fetching market overview: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+    @app.route('/api/dashboard/portfolio-holdings', methods=['GET'])
+    @login_required
+    def api_get_portfolio_holdings():
+        """Get portfolio holdings using broker-specific APIs."""
+        try:
+            app.logger.info(f"Fetching portfolio holdings for user {current_user.id}")
+            
+            dashboard_service = get_dashboard_service()
+            result = dashboard_service.get_portfolio_holdings(current_user.id)
+            
+            return jsonify(result)
+                
+        except Exception as e:
+            app.logger.error(f"Error fetching portfolio holdings: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+    @app.route('/api/dashboard/pending-orders', methods=['GET'])
+    @login_required
+    def api_get_pending_orders():
+        """Get pending orders using broker-specific APIs."""
+        try:
+            app.logger.info(f"Fetching pending orders for user {current_user.id}")
+            
+            dashboard_service = get_dashboard_service()
+            result = dashboard_service.get_pending_orders(current_user.id)
+            
+            return jsonify(result)
+                
+        except Exception as e:
+            app.logger.error(f"Error fetching pending orders: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+    @app.route('/api/dashboard/recent-orders', methods=['GET'])
+    @login_required
+    def api_get_recent_orders():
+        """Get recent orders using broker-specific APIs."""
+        try:
+            app.logger.info(f"Fetching recent orders for user {current_user.id}")
+            
+            limit = request.args.get('limit', 10, type=int)
+            dashboard_service = get_dashboard_service()
+            result = dashboard_service.get_recent_orders(current_user.id, limit)
+            
+            return jsonify(result)
+                
+        except Exception as e:
+            app.logger.error(f"Error fetching recent orders: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+    @app.route('/api/dashboard/portfolio-performance', methods=['GET'])
+    @login_required
+    def api_get_portfolio_performance():
+        """Get portfolio performance data using broker-specific APIs."""
+        try:
+            app.logger.info(f"Fetching portfolio performance for user {current_user.id}")
+            
+            period = request.args.get('period', '1W')
+            dashboard_service = get_dashboard_service()
+            result = dashboard_service.get_portfolio_performance(current_user.id, period)
+            
+            return jsonify(result)
+                
+        except Exception as e:
+            app.logger.error(f"Error fetching portfolio performance: {e}")
             return jsonify({
                 'success': False,
                 'error': str(e)

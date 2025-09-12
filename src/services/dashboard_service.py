@@ -1,70 +1,35 @@
 """
 Service for dashboard-related logic.
+Now uses the new DashboardIntegrationService for broker-agnostic integration.
 """
 from datetime import datetime
 from .broker_service import get_broker_service
+from .dashboard_integration_service import get_dashboard_integration_service
 
 class DashboardService:
     def __init__(self, broker_service):
         self.broker_service = broker_service
+        self.integration_service = get_dashboard_integration_service(broker_service)
 
     def get_dashboard_metrics(self, user_id: int):
-        """Get dashboard metrics using FYERS API."""
-        config = self.broker_service.get_broker_config('fyers', user_id)
-        if not config or not config.get('is_connected'):
-            raise ValueError('FYERS not connected. Please configure your broker connection.')
-
-        # Get user profile, funds, and holdings
-        profile_data = self.broker_service.get_fyers_profile(user_id)
-        funds_data = self.broker_service.get_fyers_funds(user_id)
-        holdings_data = self.broker_service.get_fyers_holdings(user_id)
-        positions_data = self.broker_service.get_fyers_positions(user_id)
-
-        # Calculate total P&L from positions
-        total_pnl = 0
-        if positions_data.get('success') and positions_data.get('data'):
-            for position in positions_data['data']:
-                pnl = position.get('pl', 0)
-                total_pnl += float(pnl) if pnl else 0
-
-        # Get available funds
-        available_funds = 0
-        if funds_data.get('success') and funds_data.get('data'):
-            fund_limits = funds_data['data'].get('fund_limit', [])
-            for fund in fund_limits:
-                if fund.get('equity_amount'):
-                    available_funds += float(fund['equity_amount'])
-
-        # Get total portfolio value from holdings
-        total_portfolio_value = 0
-        if holdings_data.get('success') and holdings_data.get('data'):
-            holdings = holdings_data['data'].get('holdings', [])
-            for holding in holdings:
-                if holding.get('market_value'):
-                    total_portfolio_value += float(holding['market_value'])
-
-        # Get market quotes for major indices
-        market_quotes = self.broker_service.get_fyers_quotes(user_id, "NSE:NIFTY50-INDEX,NSE:SENSEX-INDEX,NSE:NIFTYBANK-INDEX,NSE:NIFTYIT-INDEX")
-
-        # Process market data
-        market_data = {}
-        if market_quotes.get('success') and market_quotes.get('data'):
-            for symbol, quote in market_quotes['data'].items():
-                if quote.get('v'):
-                    market_data[symbol] = {
-                        'price': quote['v'].get('lp', 0),
-                        'change': quote['v'].get('ch', 0),
-                        'change_percent': quote['v'].get('chp', 0)
-                    }
-
-        return {
-            'total_pnl': total_pnl,
-            'available_funds': available_funds,
-            'total_portfolio_value': total_portfolio_value,
-            'market_data': market_data,
-            'profile': profile_data.get('data', {}),
-            'last_updated': datetime.now().isoformat()
-        }
+        """Get dashboard metrics using broker-specific APIs."""
+        return self.integration_service.get_dashboard_metrics(user_id)
+    
+    def get_portfolio_holdings(self, user_id: int):
+        """Get portfolio holdings using broker-specific APIs."""
+        return self.integration_service.get_portfolio_holdings(user_id)
+    
+    def get_pending_orders(self, user_id: int):
+        """Get pending orders using broker-specific APIs."""
+        return self.integration_service.get_pending_orders(user_id)
+    
+    def get_recent_orders(self, user_id: int, limit: int = 10):
+        """Get recent orders using broker-specific APIs."""
+        return self.integration_service.get_recent_orders(user_id, limit)
+    
+    def get_portfolio_performance(self, user_id: int, period: str = '1W'):
+        """Get portfolio performance data using broker-specific APIs."""
+        return self.integration_service.get_portfolio_performance(user_id, period)
 
 _dashboard_service = None
 
