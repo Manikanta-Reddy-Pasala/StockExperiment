@@ -190,6 +190,12 @@ def create_app():
         """Strategies page."""
         return render_template('strategies.html')
     
+    @app.route('/ml-prediction')
+    @login_required
+    def ml_prediction():
+        """ML Prediction page."""
+        return render_template('ml_prediction.html')
+    
     @app.route('/suggested_stocks')
     @login_required
     def suggested_stocks():
@@ -862,6 +868,15 @@ def create_app():
     app.register_blueprint(fyers_bp)
     app.register_blueprint(zerodha_bp)
     app.register_blueprint(simulator_bp)
+
+    # Register ML prediction blueprints
+    try:
+        from .routes.ml import ml_bp
+        app.register_blueprint(ml_bp)
+        app.logger.info("ML prediction routes registered successfully")
+    except ImportError as e:
+        app.logger.warning(f"ML prediction routes not available: {e}")
+        app.logger.warning("ML functionality will be disabled")
 
     # Individual broker page routes
     @app.route('/brokers/fyers')

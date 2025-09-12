@@ -9,8 +9,18 @@ import os
 # Add parent directory to path to import config
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from .web.app import create_app
-from config import DEBUG, HOST, PORT
+try:
+    # Try relative imports first (for normal usage when run as module)
+    from .web.app import create_app
+    from config import DEBUG, HOST, PORT
+except ImportError:
+    # Fall back to absolute imports (for direct execution)
+    import sys
+    import os
+    # Add parent directory to path
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from src.web.app import create_app
+    from config import DEBUG, HOST, PORT
 
 def main():
     """Main entry point for the trading system."""
