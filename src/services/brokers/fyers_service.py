@@ -43,8 +43,19 @@ class FyersService:
     def test_connection(self, user_id: int):
         """Test FYERS broker connection."""
         config = self.get_broker_config(user_id)
-        if not config or not config.get('client_id') or not config.get('access_token'):
-            raise ValueError('FYERS credentials not configured.')
+        
+        if not config:
+            raise ValueError('FYERS credentials not configured. Please configure your FYERS credentials first.')
+        
+        if not config.get('client_id'):
+            raise ValueError('FYERS client ID not configured.')
+        
+        if not config.get('access_token'):
+            raise ValueError('FYERS access token not configured. Please complete the OAuth flow.')
+        
+        # Check if token is expired and provide helpful message
+        if config.get('is_token_expired', False):
+            raise ValueError('FYERS access token has expired. Please refresh your token or complete the OAuth flow again.')
 
         connector = FyersAPIConnector(config.get('client_id'), config.get('access_token'))
         result = connector.test_connection()
@@ -153,14 +164,21 @@ class FyersService:
             decoded = jwt.decode(access_token, options={"verify_signature": False})
             exp_timestamp = decoded.get('exp', 0)
             
+            if not exp_timestamp:
+                logger.warning("No expiration timestamp found in token")
+                return False  # Don't assume expired if we can't determine expiration
+            
             # Convert to datetime and check if expired
             exp_datetime = datetime.datetime.fromtimestamp(exp_timestamp)
             current_time = datetime.datetime.now()
             
-            return current_time >= exp_datetime
+            # Add a 5-minute buffer to avoid edge cases
+            buffer_time = datetime.timedelta(minutes=5)
+            return current_time >= (exp_datetime - buffer_time)
+            
         except Exception as e:
             logger.warning(f"Error checking token expiration: {e}")
-            return True  # Assume expired if we can't check
+            return False  # Don't assume expired if we can't check - let the API call determine if it's valid
     
     def get_broker_config(self, user_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
         """Get FYERS broker configuration from database."""
