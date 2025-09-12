@@ -104,6 +104,9 @@
     // Fetch suggested stocks from API
     async function fetchSuggestedStocks() {
         try {
+            // Show loading spinner
+            showLoadingSpinner();
+            
             const selectedStrategies = getSelectedStrategies();
             const timeFilter = document.getElementById('time-filter').value;
             
@@ -132,12 +135,18 @@
         } catch (error) {
             console.error('Error fetching suggested stocks:', error);
             showNotification(`Error loading stocks: ${error.message}`, 'error');
+        } finally {
+            // Hide loading spinner
+            hideLoadingSpinner();
         }
     }
 
     // Refresh suggested stocks
     async function refreshSuggestedStocks() {
         try {
+            // Show loading spinner
+            showLoadingSpinner();
+            
             const selectedStrategies = getSelectedStrategies();
             
             const response = await fetch('/api/suggested-stocks/refresh', {
@@ -167,6 +176,9 @@
         } catch (error) {
             console.error('Error refreshing suggested stocks:', error);
             showNotification(`Error refreshing stocks: ${error.message}`, 'error');
+        } finally {
+            // Hide loading spinner
+            hideLoadingSpinner();
         }
     }
 
@@ -264,6 +276,29 @@
                 notification.remove();
             }
         }, 5000);
+    }
+
+    // Loading spinner functions
+    function showLoadingSpinner() {
+        const table = document.getElementById('suggested-stocks-table').getElementsByTagName('tbody')[0];
+        table.innerHTML = '';
+        
+        const row = table.insertRow();
+        const cell = row.insertCell();
+        cell.colSpan = 9;
+        cell.className = 'text-center py-4';
+        cell.innerHTML = `
+            <div class="d-flex justify-content-center align-items-center">
+                <div class="spinner-border text-primary me-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <span class="text-muted">Loading suggested stocks...</span>
+            </div>
+        `;
+    }
+
+    function hideLoadingSpinner() {
+        // The spinner will be replaced when populateTable() is called
     }
 
     // Event listeners
