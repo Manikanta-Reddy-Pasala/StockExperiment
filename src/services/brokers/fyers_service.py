@@ -77,6 +77,11 @@ class FyersService:
         if not config or not config.get('client_id') or not config.get('api_secret'):
             raise ValueError('FYERS configuration not found. Please save your Client ID and Secret Key first.')
 
+        # Debug logging
+        logger.info(f"Generating auth URL for user {user_id}")
+        logger.info(f"Using client_id: {config.get('client_id')}")
+        logger.info(f"Using redirect_uri: {config.get('redirect_url')}")
+
         oauth_flow = FyersOAuth2Flow(
             client_id=config.get('client_id'),
             secret_key=config.get('api_secret'),
@@ -90,12 +95,23 @@ class FyersService:
         if not config or not config.get('client_id') or not config.get('api_secret'):
             raise ValueError('FYERS configuration not found.')
 
+        # Debug logging
+        logger.info(f"Exchanging auth code for user {user_id}")
+        logger.info(f"Using client_id: {config.get('client_id')}")
+        logger.info(f"Using redirect_uri: {config.get('redirect_url')}")
+        logger.info(f"Auth code length: {len(auth_code) if auth_code else 0}")
+
         oauth_flow = FyersOAuth2Flow(
             client_id=config.get('client_id'),
             secret_key=config.get('api_secret'),
             redirect_uri=config.get('redirect_url')
         )
         token_response = oauth_flow.exchange_auth_code_for_token(auth_code)
+        
+        # Debug: Log the full response
+        logger.info(f"Token response received: {token_response}")
+        logger.info(f"Response type: {type(token_response)}")
+        logger.info(f"Response keys: {list(token_response.keys()) if isinstance(token_response, dict) else 'Not a dict'}")
 
         if 'access_token' in token_response:
             access_token = token_response['access_token']
@@ -376,6 +392,7 @@ class FyersOAuth2Flow:
             response = app_session.generate_token()
             
             logger.info("Successfully exchanged auth code for access token")
+            logger.info(f"Token response: {response}")
             return response
             
         except Exception as e:

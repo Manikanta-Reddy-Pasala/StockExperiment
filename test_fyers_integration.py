@@ -50,7 +50,8 @@ def test_fyers_integration():
         # You would need to provide actual credentials here
         test_client_id = "YOUR_CLIENT_ID"
         test_secret = "YOUR_SECRET_KEY"
-        test_redirect_uri = "http://localhost:5001/brokers/fyers/oauth/callback"
+        # Note: redirect_uri should be configured in the database, not hardcoded here
+        test_redirect_uri = "https://your-ngrok-url.ngrok-free.app/brokers/fyers/oauth/callback"
         
         if test_client_id == "YOUR_CLIENT_ID":
             print("ℹ️ Skipping OAuth2 flow test (credentials not provided)")

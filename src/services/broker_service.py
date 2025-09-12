@@ -293,16 +293,18 @@ class FyersOAuth2Flow:
             raise Exception("fyers-apiv3 library not available")
         
         try:
-            # Use our automated callback URL instead of the default redirect URI
-            automated_redirect_uri = f"http://localhost:5001/api/brokers/fyers/oauth/callback"
+            # Get the configuration from the database
+            config = self.get_broker_config('fyers', user_id)
+            if not config or not config.get('redirect_url') or not config.get('client_id') or not config.get('api_secret'):
+                raise ValueError('FYERS configuration not found in database.')
             
-            # Create session model for OAuth flow
+            # Create session model for OAuth flow using database configuration
             app_session = fyersModel.SessionModel(
-                client_id=self.client_id,
-                redirect_uri=automated_redirect_uri,
+                client_id=config.get('client_id'),
+                redirect_uri=config.get('redirect_url'),
                 response_type=self.response_type,
                 state=str(user_id),  # Pass user_id in state for callback
-                secret_key=self.secret_key,
+                secret_key=config.get('api_secret'),
                 grant_type=self.grant_type
             )
             
