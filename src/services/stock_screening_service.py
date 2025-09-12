@@ -162,18 +162,33 @@ class StockScreeningService:
             # Get quotes data from FYERS
             # Fix: Pass symbol as string instead of list
             quotes_data = self.fyers_connector.get_quotes(symbol)
+            
             if not quotes_data or 'd' not in quotes_data or not quotes_data['d']:
+                logger.warning(f"No quotes data or 'd' field missing for {symbol}")
                 return None
             
-            quote = quotes_data['d'].get(symbol, {})
+            # Handle both list and dict response formats
+            if isinstance(quotes_data['d'], list):
+                # If it's a list, find the quote for our symbol
+                quote = {}
+                for item in quotes_data['d']:
+                    if isinstance(item, dict):
+                        # Check both 'symbol' and 'n' fields for symbol matching
+                        item_symbol = item.get('symbol') or item.get('n')
+                        if item_symbol == symbol:
+                            quote = item
+                            break
+            else:
+                # If it's a dict, use the original logic
+                quote = quotes_data['d'].get(symbol, {})
             if not quote:
                 return None
             
-            # Extract basic data from quotes
-            current_price = quote.get('v', {}).get('lp', 0)  # Last price
-            volume = quote.get('v', {}).get('tt', 0)  # Total traded quantity
-            high_price = quote.get('v', {}).get('h', 0)  # High price
-            low_price = quote.get('v', {}).get('l', 0)  # Low price
+            # Extract basic data from quotes and convert to float
+            current_price = float(quote.get('v', {}).get('lp', 0))  # Last price
+            volume = float(quote.get('v', {}).get('tt', 0))  # Total traded quantity (tt field)
+            high_price = float(quote.get('v', {}).get('high_price', 0))  # High price
+            low_price = float(quote.get('v', {}).get('low_price', 0))  # Low price
             
             # Get historical data for volume analysis
             hist_data = self._get_historical_data(symbol)
@@ -238,7 +253,7 @@ class StockScreeningService:
             )
             
             if hist_data and 'candles' in hist_data:
-                volumes = [candle[5] for candle in hist_data['candles']]  # Volume is at index 5
+                volumes = [float(candle[5]) for candle in hist_data['candles']]  # Volume is at index 5, convert to float
                 return {'avg_volume': sum(volumes) / len(volumes) if volumes else 0}
             
             return None
@@ -503,8 +518,8 @@ class StockScreeningService:
             
             if hist_data and 'candles' in hist_data and len(hist_data['candles']) >= 20:
                 candles = hist_data['candles']
-                current_price = candles[-1][4]  # Close price is at index 4
-                price_20_days_ago = candles[-20][4]
+                current_price = float(candles[-1][4])  # Close price is at index 4, convert to float
+                price_20_days_ago = float(candles[-20][4])  # Convert to float
                 
                 return ((current_price - price_20_days_ago) / price_20_days_ago) * 100
             
@@ -532,14 +547,14 @@ class StockScreeningService:
             
             if hist_data and 'candles' in hist_data and len(hist_data['candles']) >= 50:
                 candles = hist_data['candles']
-                current_price = candles[-1][4]  # Close price
+                current_price = float(candles[-1][4])  # Close price, convert to float
                 
                 # Calculate 20-day and 50-day moving averages
                 recent_20 = candles[-20:]
                 recent_50 = candles[-50:]
                 
-                ma_20 = sum(candle[4] for candle in recent_20) / 20
-                ma_50 = sum(candle[4] for candle in recent_50) / 50
+                ma_20 = sum(float(candle[4]) for candle in recent_20) / 20
+                ma_50 = sum(float(candle[4]) for candle in recent_50) / 50
                 
                 # Below 20-day MA but above 50-day MA
                 return current_price < ma_20 and current_price > ma_50
@@ -568,15 +583,15 @@ class StockScreeningService:
             
             if hist_data and 'candles' in hist_data and len(hist_data['candles']) >= 20:
                 candles = hist_data['candles']
-                current_price = candles[-1][4]  # Close price
-                current_volume = candles[-1][5]  # Volume
+                current_price = float(candles[-1][4])  # Close price, convert to float
+                current_volume = float(candles[-1][5])  # Volume, convert to float
                 
                 # Get 20-day high (excluding today)
                 recent_20 = candles[-21:-1]  # Last 20 days excluding today
-                high_20 = max(candle[2] for candle in recent_20)  # High price is at index 2
+                high_20 = max(float(candle[2]) for candle in recent_20)  # High price is at index 2, convert to float
                 
                 # Calculate 20-day average volume
-                avg_volume_20 = sum(candle[5] for candle in recent_20) / 20
+                avg_volume_20 = sum(float(candle[5]) for candle in recent_20) / 20
                 volume_ratio = current_volume / avg_volume_20 if avg_volume_20 > 0 else 0
                 
                 # Breaking above 20-day high with high volume

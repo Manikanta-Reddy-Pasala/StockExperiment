@@ -212,6 +212,11 @@ class FyersService:
             # Check if token is expired
             is_expired = self.is_token_expired(config.access_token)
             
+            # Determine connection status based on available credentials and token expiration
+            has_credentials = bool(config.client_id and config.api_secret)
+            has_token = bool(config.access_token)
+            is_connected = has_credentials and has_token and not is_expired
+            
             # Return data dictionary instead of SQLAlchemy object
             return {
                 'id': config.id,
@@ -225,10 +230,10 @@ class FyersService:
                 'redirect_url': config.redirect_url,
                 'app_type': config.app_type,
                 'is_active': config.is_active,
-                'is_connected': config.is_connected and not is_expired,  # Mark as disconnected if token expired
+                'is_connected': is_connected,  # Based on credentials and token validity
                 'is_token_expired': is_expired,
                 'last_connection_test': config.last_connection_test,
-                'connection_status': 'expired' if is_expired else config.connection_status,
+                'connection_status': 'expired' if is_expired else ('connected' if is_connected else 'disconnected'),
                 'error_message': config.error_message,
                 'created_at': config.created_at,
                 'updated_at': config.updated_at
