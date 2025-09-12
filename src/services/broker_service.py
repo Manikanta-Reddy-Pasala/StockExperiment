@@ -31,6 +31,105 @@ class BrokerService:
     
     def __init__(self):
         self.db_manager = get_database_manager()
+
+    def _get_fyers_connector(self, user_id: int) -> 'FyersAPIConnector':
+        """Helper to get an initialized FyersAPIConnector for a user."""
+        config = self.get_broker_config('fyers', user_id)
+        if not config or not config.get('client_id') or not config.get('access_token'):
+            raise ValueError('FYERS credentials not configured or access token missing.')
+        return FyersAPIConnector(config['client_id'], config['access_token'])
+
+    def test_fyers_connection(self, user_id: int):
+        """Test FYERS broker connection."""
+        config = self.get_broker_config('fyers', user_id)
+        if not config or not config.get('client_id') or not config.get('access_token'):
+            raise ValueError('FYERS credentials not configured.')
+
+        connector = FyersAPIConnector(config.get('client_id'), config.get('access_token'))
+        result = connector.test_connection()
+
+        with self.db_manager.get_session() as session:
+            db_config = session.query(BrokerConfiguration).filter_by(broker_name='fyers', user_id=user_id).first()
+            if db_config:
+                db_config.is_connected = result['success']
+                db_config.connection_status = 'connected' if result['success'] else 'disconnected'
+                db_config.last_connection_test = datetime.utcnow()
+                db_config.error_message = result.get('message', '') if not result['success'] else None
+                session.commit()
+
+        return result
+
+    def generate_fyers_auth_url(self, user_id: int) -> str:
+        """Generate FYERS OAuth2 authorization URL."""
+        config = self.get_broker_config('fyers', user_id)
+        if not config or not config.get('client_id') or not config.get('api_secret'):
+            raise ValueError('FYERS configuration not found. Please save your Client ID and Secret Key first.')
+
+        oauth_flow = FyersOAuth2Flow(
+            client_id=config.get('client_id'),
+            secret_key=config.get('api_secret'),
+            redirect_uri=config.get('redirect_url')
+        )
+        return oauth_flow.generate_auth_url(user_id)
+
+    def exchange_fyers_auth_code(self, user_id: int, auth_code: str) -> dict:
+        """Exchange FYERS auth code for an access token and save it."""
+        config = self.get_broker_config('fyers', user_id)
+        if not config or not config.get('client_id') or not config.get('api_secret'):
+            raise ValueError('FYERS configuration not found.')
+
+        oauth_flow = FyersOAuth2Flow(
+            client_id=config.get('client_id'),
+            secret_key=config.get('api_secret'),
+            redirect_uri=config.get('redirect_url')
+        )
+        token_response = oauth_flow.exchange_auth_code_for_token(auth_code)
+
+        if 'access_token' in token_response:
+            access_token = token_response['access_token']
+
+            # Save the new tokens
+            self.save_broker_config('fyers', {
+                'access_token': access_token,
+                'is_connected': True,
+                'connection_status': 'connected'
+            }, user_id)
+
+            return {'success': True, 'access_token': access_token}
+        else:
+            raise ValueError(token_response.get('message', 'Failed to obtain access token'))
+
+    def get_fyers_funds(self, user_id: int):
+        connector = self._get_fyers_connector(user_id)
+        return connector.get_funds()
+
+    def get_fyers_holdings(self, user_id: int):
+        connector = self._get_fyers_connector(user_id)
+        return connector.get_holdings()
+
+    def get_fyers_positions(self, user_id: int):
+        connector = self._get_fyers_connector(user_id)
+        return connector.get_positions()
+
+    def get_fyers_orderbook(self, user_id: int):
+        connector = self._get_fyers_connector(user_id)
+        return connector.get_orderbook()
+
+    def get_fyers_tradebook(self, user_id: int):
+        connector = self._get_fyers_connector(user_id)
+        return connector.get_tradebook()
+
+    def get_fyers_quotes(self, user_id: int, symbols: str):
+        connector = self._get_fyers_connector(user_id)
+        return connector.get_quotes(symbols)
+
+    def get_fyers_history(self, user_id: int, symbol: str, resolution: str, range_from: str, range_to: str):
+        connector = self._get_fyers_connector(user_id)
+        return connector.get_history(symbol, resolution, range_from, range_to)
+
+    def get_fyers_profile(self, user_id: int):
+        connector = self._get_fyers_connector(user_id)
+        return connector.get_profile()
     
     def is_token_expired(self, access_token: str) -> bool:
         """Check if FYERS access token is expired."""
