@@ -1,5 +1,5 @@
 """
-Broker Service for managing broker connections and API interactions
+FYERS Broker Service - Dedicated service for FYERS broker operations
 """
 import os
 import time
@@ -13,8 +13,8 @@ from typing import Dict, Optional, Any
 logger = logging.getLogger(__name__)
 
 try:
-    from ..models.database import get_database_manager
-    from ..models.models import BrokerConfiguration, Order, Trade
+    from ...models.database import get_database_manager
+    from ...models.models import BrokerConfiguration, Order, Trade
 except ImportError:
     from models.database import get_database_manager
     from models.models import BrokerConfiguration, Order, Trade
@@ -26,22 +26,23 @@ except ImportError:
     FYERS_AVAILABLE = False
 
 
-class BrokerService:
-    """Service for managing broker configurations and connections."""
+class FyersService:
+    """Dedicated service for FYERS broker operations."""
     
     def __init__(self):
         self.db_manager = get_database_manager()
+        self.broker_name = 'fyers'
 
     def _get_fyers_connector(self, user_id: int) -> 'FyersAPIConnector':
         """Helper to get an initialized FyersAPIConnector for a user."""
-        config = self.get_broker_config('fyers', user_id)
+        config = self.get_broker_config(user_id)
         if not config or not config.get('client_id') or not config.get('access_token'):
             raise ValueError('FYERS credentials not configured or access token missing.')
         return FyersAPIConnector(config['client_id'], config['access_token'])
 
-    def test_fyers_connection(self, user_id: int):
+    def test_connection(self, user_id: int):
         """Test FYERS broker connection."""
-        config = self.get_broker_config('fyers', user_id)
+        config = self.get_broker_config(user_id)
         if not config or not config.get('client_id') or not config.get('access_token'):
             raise ValueError('FYERS credentials not configured.')
 
@@ -49,7 +50,7 @@ class BrokerService:
         result = connector.test_connection()
 
         with self.db_manager.get_session() as session:
-            db_config = session.query(BrokerConfiguration).filter_by(broker_name='fyers', user_id=user_id).first()
+            db_config = session.query(BrokerConfiguration).filter_by(broker_name=self.broker_name, user_id=user_id).first()
             if db_config:
                 db_config.is_connected = result['success']
                 db_config.connection_status = 'connected' if result['success'] else 'disconnected'
@@ -59,9 +60,9 @@ class BrokerService:
 
         return result
 
-    def generate_fyers_auth_url(self, user_id: int) -> str:
+    def generate_auth_url(self, user_id: int) -> str:
         """Generate FYERS OAuth2 authorization URL."""
-        config = self.get_broker_config('fyers', user_id)
+        config = self.get_broker_config(user_id)
         if not config or not config.get('client_id') or not config.get('api_secret'):
             raise ValueError('FYERS configuration not found. Please save your Client ID and Secret Key first.')
 
@@ -72,9 +73,9 @@ class BrokerService:
         )
         return oauth_flow.generate_auth_url(user_id)
 
-    def exchange_fyers_auth_code(self, user_id: int, auth_code: str) -> dict:
+    def exchange_auth_code(self, user_id: int, auth_code: str) -> dict:
         """Exchange FYERS auth code for an access token and save it."""
-        config = self.get_broker_config('fyers', user_id)
+        config = self.get_broker_config(user_id)
         if not config or not config.get('client_id') or not config.get('api_secret'):
             raise ValueError('FYERS configuration not found.')
 
@@ -89,7 +90,7 @@ class BrokerService:
             access_token = token_response['access_token']
 
             # Save the new tokens
-            self.save_broker_config('fyers', {
+            self.save_broker_config({
                 'access_token': access_token,
                 'is_connected': True,
                 'connection_status': 'connected'
@@ -99,35 +100,43 @@ class BrokerService:
         else:
             raise ValueError(token_response.get('message', 'Failed to obtain access token'))
 
-    def get_fyers_funds(self, user_id: int):
+    def get_funds(self, user_id: int):
+        """Get user funds."""
         connector = self._get_fyers_connector(user_id)
         return connector.get_funds()
 
-    def get_fyers_holdings(self, user_id: int):
+    def get_holdings(self, user_id: int):
+        """Get user holdings."""
         connector = self._get_fyers_connector(user_id)
         return connector.get_holdings()
 
-    def get_fyers_positions(self, user_id: int):
+    def get_positions(self, user_id: int):
+        """Get user positions."""
         connector = self._get_fyers_connector(user_id)
         return connector.get_positions()
 
-    def get_fyers_orderbook(self, user_id: int):
+    def get_orderbook(self, user_id: int):
+        """Get user orderbook."""
         connector = self._get_fyers_connector(user_id)
         return connector.get_orderbook()
 
-    def get_fyers_tradebook(self, user_id: int):
+    def get_tradebook(self, user_id: int):
+        """Get user tradebook."""
         connector = self._get_fyers_connector(user_id)
         return connector.get_tradebook()
 
-    def get_fyers_quotes(self, user_id: int, symbols: str):
+    def get_quotes(self, user_id: int, symbols: str):
+        """Get market quotes for symbols."""
         connector = self._get_fyers_connector(user_id)
         return connector.get_quotes(symbols)
 
-    def get_fyers_history(self, user_id: int, symbol: str, resolution: str, range_from: str, range_to: str):
+    def get_history(self, user_id: int, symbol: str, resolution: str, range_from: str, range_to: str):
+        """Get historical data for a symbol."""
         connector = self._get_fyers_connector(user_id)
         return connector.get_history(symbol, resolution, range_from, range_to)
 
-    def get_fyers_profile(self, user_id: int):
+    def get_profile(self, user_id: int):
+        """Get user profile."""
         connector = self._get_fyers_connector(user_id)
         return connector.get_profile()
     
@@ -153,10 +162,10 @@ class BrokerService:
             logger.warning(f"Error checking token expiration: {e}")
             return True  # Assume expired if we can't check
     
-    def get_broker_config(self, broker_name: str, user_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
-        """Get broker configuration from database."""
+    def get_broker_config(self, user_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
+        """Get FYERS broker configuration from database."""
         with self.db_manager.get_session() as session:
-            query = session.query(BrokerConfiguration).filter_by(broker_name=broker_name)
+            query = session.query(BrokerConfiguration).filter_by(broker_name=self.broker_name)
             if user_id:
                 query = query.filter_by(user_id=user_id)
             else:
@@ -191,11 +200,11 @@ class BrokerService:
                 'updated_at': config.updated_at
             }
     
-    def save_broker_config(self, broker_name: str, config_data: Dict[str, Any], user_id: Optional[int] = None) -> Dict[str, Any]:
-        """Save broker configuration to database."""
+    def save_broker_config(self, config_data: Dict[str, Any], user_id: Optional[int] = None) -> Dict[str, Any]:
+        """Save FYERS broker configuration to database."""
         with self.db_manager.get_session() as session:
             # Check if config exists within this session
-            query = session.query(BrokerConfiguration).filter_by(broker_name=broker_name)
+            query = session.query(BrokerConfiguration).filter_by(broker_name=self.broker_name)
             if user_id:
                 query = query.filter_by(user_id=user_id)
             else:
@@ -209,7 +218,7 @@ class BrokerService:
             else:
                 # Create new config
                 config = BrokerConfiguration(
-                    broker_name=broker_name,
+                    broker_name=self.broker_name,
                     user_id=user_id
                 )
                 session.add(config)
@@ -249,8 +258,8 @@ class BrokerService:
                 'updated_at': config.updated_at
             }
     
-    def get_broker_stats(self, broker_name: str, user_id: Optional[int] = None) -> Dict[str, Any]:
-        """Get broker statistics from database."""
+    def get_broker_stats(self, user_id: Optional[int] = None) -> Dict[str, Any]:
+        """Get FYERS broker statistics from database."""
         with self.db_manager.get_session() as session:
             # Get order statistics
             query = session.query(Order)
@@ -658,66 +667,6 @@ class FyersAPIConnector:
             logger.error(f"Exception while fetching FYERS orderbook: {error_msg}")
             return {'error': error_msg}
     
-    def place_order(self, order_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Place a single order."""
-        try:
-            logger.info("Placing FYERS order")
-            
-            # Use FYERS API client if available
-            if self.fyers_client:
-                try:
-                    response = self.fyers_client.place_order(order_data)
-                    logger.info("FYERS order placed successfully using fyers-apiv3")
-                    return response
-                except Exception as e:
-                    logger.warning(f"fyers-apiv3 order placement failed, falling back to requests: {str(e)}")
-            
-            # Fallback to direct API call
-            url = f"{self.base_url}/orders"
-            response = self.session.post(url, json=order_data, params={'access_token': self.access_token})
-            if response.status_code == 200:
-                data = response.json()
-                logger.info("FYERS order placed successfully using requests")
-                return data
-            else:
-                error_msg = f'HTTP {response.status_code}: {response.text}'
-                logger.error(f"Error placing FYERS order: {error_msg}")
-                return {'error': error_msg}
-        except Exception as e:
-            error_msg = str(e)
-            logger.error(f"Exception while placing FYERS order: {error_msg}")
-            return {'error': error_msg}
-    
-    def place_basket_orders(self, orders_data: list) -> Dict[str, Any]:
-        """Place multiple orders (basket)."""
-        try:
-            logger.info("Placing FYERS basket orders")
-            
-            # Use FYERS API client if available
-            if self.fyers_client:
-                try:
-                    response = self.fyers_client.place_basket_orders(orders_data)
-                    logger.info("FYERS basket orders placed successfully using fyers-apiv3")
-                    return response
-                except Exception as e:
-                    logger.warning(f"fyers-apiv3 basket orders placement failed, falling back to requests: {str(e)}")
-            
-            # Fallback to direct API call
-            url = f"{self.base_url}/orders-basket"
-            response = self.session.post(url, json=orders_data, params={'access_token': self.access_token})
-            if response.status_code == 200:
-                data = response.json()
-                logger.info("FYERS basket orders placed successfully using requests")
-                return data
-            else:
-                error_msg = f'HTTP {response.status_code}: {response.text}'
-                logger.error(f"Error placing FYERS basket orders: {error_msg}")
-                return {'error': error_msg}
-        except Exception as e:
-            error_msg = str(e)
-            logger.error(f"Exception while placing FYERS basket orders: {error_msg}")
-            return {'error': error_msg}
-    
     def get_quotes(self, symbols: str) -> Dict[str, Any]:
         """Get market quotes for symbols."""
         try:
@@ -798,6 +747,6 @@ class FyersAPIConnector:
             return {'error': error_msg}
 
 
-def get_broker_service() -> BrokerService:
-    """Get broker service instance."""
-    return BrokerService()
+def get_fyers_service() -> FyersService:
+    """Get FYERS service instance."""
+    return FyersService()

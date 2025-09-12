@@ -8,170 +8,127 @@
         <div class="card hover-lift animate-fade-in-up">
             <div class="card-header bg-gradient-primary text-white">
                 <h5 class="card-title mb-0 text-white">
-                    <i class="bi bi-building me-2"></i>Broker Configuration
+                    <i class="bi bi-building me-2"></i>Broker Management
                 </h5>
             </div>
             <div class="card-body">
-                <div class="row">
-                    <!-- FYERS Broker Card -->
-                    <div class="col-lg-6 mb-4">
-                        <div class="card h-100 broker-card">
-                            <div class="card-header bg-light">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <h6 class="card-title mb-0">
-                                        <i class="bi bi-building text-primary me-2"></i>FYERS
-                                    </h6>
-                                    <span class="badge bg-success" id="fyers-status">Connected</span>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="row mb-3">
-                                    <div class="col-6">
-                                        <small class="text-muted">Client ID</small>
-                                        <div class="fw-bold" id="fyers-client-id">Loading...</div>
-                                    </div>
-                                    <div class="col-6">
-                                        <small class="text-muted">API Version</small>
-                                        <div class="fw-bold">v3.1.7</div>
-                                    </div>
-                                </div>
-                                
-                                <div class="row mb-3">
-                                    <div class="col-6">
-                                        <small class="text-muted">Access Token</small>
-                                        <div class="fw-bold text-truncate" id="fyers-token-status">
-                                            <i class="bi bi-check-circle text-success"></i> Active
-                                        </div>
-                                    </div>
-                                    <div class="col-6">
-                                        <small class="text-muted">Last Updated</small>
-                                        <div class="fw-bold" id="fyers-last-updated">-</div>
-                                    </div>
-                                </div>
-
-                                <div class="mb-3">
-                                    <small class="text-muted">Connection Status</small>
-                                    <div class="d-flex align-items-center">
-                                        <div class="spinner-border spinner-border-sm text-success me-2" role="status" id="fyers-spinner" style="display: none;">
-                                            <span class="visually-hidden">Loading...</span>
-                                        </div>
-                                        <span class="badge bg-success" id="fyers-connection-status">Connected</span>
-                                    </div>
-                                </div>
-
-                                <div class="d-flex gap-2">
-                                    <button class="btn btn-outline-primary btn-sm" id="test-fyers-connection">
-                                        <i class="bi bi-wifi"></i> Test Connection
-                                    </button>
-                                    <button class="btn btn-outline-secondary btn-sm" id="refresh-fyers-token">
-                                        <i class="bi bi-arrow-clockwise"></i> Refresh Token
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Broker Statistics -->
-                    <div class="col-lg-6 mb-4">
-                        <div class="card h-100 broker-stats-card">
+                <!-- Broker Selection -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
                             <div class="card-header bg-light">
                                 <h6 class="card-title mb-0">
-                                    <i class="bi bi-graph-up me-2"></i>Broker Statistics
+                                    <i class="bi bi-gear me-2"></i>Select Broker
                                 </h6>
                             </div>
                             <div class="card-body">
-                                <div class="row text-center">
-                                    <div class="col-6 mb-3">
-                                        <div class="border-end">
-                                            <h4 class="text-primary mb-1 broker-stats-number" id="total-orders">0</h4>
-                                            <small class="text-muted">Total Orders</small>
+                                <div class="row align-items-center">
+                                    <div class="col-md-6">
+                                        <label for="broker-selector" class="form-label">Choose Broker</label>
+                                        <select class="form-select" id="broker-selector">
+                                            <option value="fyers">FYERS</option>
+                                            <option value="zerodha">Zerodha</option>
+                                            <option value="simulator">Simulator</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Quick Actions</label>
+                                        <div class="d-flex gap-2">
+                                            <button class="btn btn-primary" id="go-to-broker">
+                                                <i class="bi bi-arrow-right me-1"></i> Go to Broker
+                                            </button>
+                                            <button class="btn btn-outline-primary" id="test-current-broker">
+                                                <i class="bi bi-wifi me-1"></i> Test Connection
+                                            </button>
                                         </div>
                                     </div>
-                                    <div class="col-6 mb-3">
-                                        <h4 class="text-success mb-1 broker-stats-number" id="successful-orders">0</h4>
-                                        <small class="text-muted">Successful</small>
-                                    </div>
-                                    <div class="col-6">
-                                        <div class="border-end">
-                                            <h4 class="text-warning mb-1 broker-stats-number" id="pending-orders">0</h4>
-                                            <small class="text-muted">Pending</small>
-                                        </div>
-                                    </div>
-                                    <div class="col-6">
-                                        <h4 class="text-danger mb-1 broker-stats-number" id="failed-orders">0</h4>
-                                        <small class="text-muted">Failed</small>
-                                    </div>
-                                </div>
-                                
-                                <hr>
-                                
-                                <div class="mb-2">
-                                    <small class="text-muted">Last Order</small>
-                                    <div class="fw-bold" id="last-order-time">-</div>
-                                </div>
-                                
-                                <div class="mb-2">
-                                    <small class="text-muted">API Response Time</small>
-                                    <div class="fw-bold" id="api-response-time">-</div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Broker Configuration Section -->
-                <div class="row mt-4">
-                    <div class="col-12">
-                        <div class="card broker-config-section">
+                <!-- Available Brokers -->
+                <div class="row">
+                    <!-- FYERS Broker Card -->
+                    <div class="col-lg-4 mb-4">
+                        <div class="card h-100 broker-card">
                             <div class="card-header bg-light">
-                                <h6 class="card-title mb-0">
-                                    <i class="bi bi-gear me-2"></i>FYERS Configuration
-                                </h6>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6 class="card-title mb-0">
+                                        <i class="bi bi-building text-primary me-2"></i>FYERS
+                                    </h6>
+                                    <span class="badge bg-success">Available</span>
+                                </div>
                             </div>
                             <div class="card-body">
-                                
-                                <!-- FYERS OAuth2 Configuration -->
-                                <div class="mb-4">
-                        
-        
-                                    
-                                    <form id="fyers-oauth-form">
-                                        <div class="row">
-                                            <div class="col-md-4 mb-3">
-                                                <label for="fyers-oauth-client-id" class="form-label">
-                                                    <i class="bi bi-person-badge me-1"></i>App ID (Client ID)
-                                                </label>
-                                                <input type="text" class="form-control" id="fyers-oauth-client-id" 
-                                                       placeholder="Enter your FYERS App ID" required>
-                                                <div class="form-text">Your FYERS App ID from API dashboard</div>
-                                            </div>
-                                            <div class="col-md-4 mb-3">
-                                                <label for="fyers-oauth-secret-key" class="form-label">
-                                                    <i class="bi bi-key me-1"></i>App Secret
-                                                </label>
-                                                <input type="password" class="form-control" id="fyers-oauth-secret-key" 
-                                                       placeholder="Enter your FYERS App Secret" required>
-                                                <div class="form-text">Your FYERS App Secret from API dashboard</div>
-                                            </div>
-                                            <div class="col-md-4 mb-3">
-                                                <label for="fyers-oauth-redirect-uri" class="form-label">
-                                                    <i class="bi bi-link-45deg me-1"></i>Redirect URI
-                                                </label>
-                                                <input type="url" class="form-control" id="fyers-oauth-redirect-uri" 
-                                                       value="https://trade.fyers.in/api-login/redirect-uri/index.html" required>
-                                                <div class="form-text">Your App's Redirect URI from API dashboard</div>
-                                            </div>
-                                        </div>
-                   
-                                        
-                                        <div class="d-flex justify-content-between align-items-center mb-3">
-                                   
-                                            <button type="button" class="btn btn-primary" id="save-oauth-config">
-                                                <i class="bi bi-save me-2"></i> Save Configuration
-                                            </button>
-                                        </div>
-                                        
-                                    </form>
+                                <p class="card-text">Professional trading platform with advanced features and real-time market data.</p>
+                                <ul class="list-unstyled">
+                                    <li><i class="bi bi-check-circle text-success me-2"></i>Real-time Market Data</li>
+                                    <li><i class="bi bi-check-circle text-success me-2"></i>Advanced Order Types</li>
+                                    <li><i class="bi bi-check-circle text-success me-2"></i>Portfolio Management</li>
+                                    <li><i class="bi bi-check-circle text-success me-2"></i>OAuth2 Authentication</li>
+                                </ul>
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-primary" onclick="selectBroker('fyers')">
+                                        <i class="bi bi-arrow-right me-1"></i> Configure FYERS
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Zerodha Broker Card -->
+                    <div class="col-lg-4 mb-4">
+                        <div class="card h-100 broker-card">
+                            <div class="card-header bg-light">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6 class="card-title mb-0">
+                                        <i class="bi bi-building text-primary me-2"></i>Zerodha
+                                    </h6>
+                                    <span class="badge bg-warning">Coming Soon</span>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="card-text">India's largest stock broker with Kite Connect API integration.</p>
+                                <ul class="list-unstyled">
+                                    <li><i class="bi bi-clock text-warning me-2"></i>Kite Connect API</li>
+                                    <li><i class="bi bi-clock text-warning me-2"></i>NSE & BSE Support</li>
+                                    <li><i class="bi bi-clock text-warning me-2"></i>F&O Trading</li>
+                                    <li><i class="bi bi-clock text-warning me-2"></i>Real-time Data</li>
+                                </ul>
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-outline-secondary" disabled>
+                                        <i class="bi bi-hourglass-split me-1"></i> Coming Soon
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Simulator Broker Card -->
+                    <div class="col-lg-4 mb-4">
+                        <div class="card h-100 broker-card">
+                            <div class="card-header bg-light">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6 class="card-title mb-0">
+                                        <i class="bi bi-cpu text-primary me-2"></i>Simulator
+                                    </h6>
+                                    <span class="badge bg-info">Ready</span>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="card-text">Virtual trading environment for testing strategies without real money.</p>
+                                <ul class="list-unstyled">
+                                    <li><i class="bi bi-check-circle text-success me-2"></i>Virtual Trading</li>
+                                    <li><i class="bi bi-check-circle text-success me-2"></i>Risk-free Testing</li>
+                                    <li><i class="bi bi-check-circle text-success me-2"></i>Real-time Simulation</li>
+                                    <li><i class="bi bi-check-circle text-success me-2"></i>No Configuration</li>
+                                </ul>
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-info" onclick="selectBroker('simulator')">
+                                        <i class="bi bi-arrow-right me-1"></i> Use Simulator
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -207,273 +164,80 @@
         }, 5000);
     }
     
-    // Fetch broker information
-    async function fetchBrokerInfo() {
+    // Select broker and navigate to its page
+    function selectBroker(broker) {
+        if (broker === 'zerodha') {
+            showNotification('Zerodha integration is coming soon! Please use FYERS or Simulator for now.', 'info');
+            return;
+        }
+        
+        // Navigate to the specific broker page
+        window.location.href = `/brokers/${broker}`;
+    }
+    
+    // Get current broker from settings and redirect
+    async function getCurrentBrokerAndRedirect() {
         try {
-            const response = await fetch('/api/brokers/fyers', {
+            const response = await fetch('/api/settings', {
                 credentials: 'same-origin'
             });
             
-            // Check if response is a redirect (authentication required)
-            if (response.redirected || response.status === 302) {
-                console.log('Authentication required - user needs to login');
-                // Don't update status, just return silently
-                return;
-            }
-            
-            // Check if response is not ok
-            if (!response.ok) {
-                console.log('Response not ok:', response.status);
-                // Try to parse error response
-                try {
-                    const errorData = await response.json();
-                    console.error('API Error:', errorData);
-                } catch (e) {
-                    console.error('Network Error:', response.statusText);
-                }
-                return;
-            }
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                // Update FYERS information from database
-                document.getElementById('fyers-client-id').textContent = data.client_id || 'Not configured';
-                document.getElementById('fyers-token-status').innerHTML = 
-                    data.access_token ? '<i class="bi bi-check-circle text-success"></i> Active' : 
-                    '<i class="bi bi-x-circle text-danger"></i> Not configured';
-                document.getElementById('fyers-last-updated').textContent = data.last_updated || '-';
-                
-                // Update connection status from database
-                const connectionStatus = data.connection_status || 'unknown';
-                const isConnected = data.connected || false;
-                const isTokenExpired = data.is_token_expired || false;
-                
-                // Handle token expiration
-                if (isTokenExpired) {
-                    document.getElementById('fyers-connection-status').textContent = 'Token Expired';
-                    document.getElementById('fyers-connection-status').className = 'badge bg-warning';
-                    document.getElementById('fyers-status').textContent = 'Token Expired';
-                    document.getElementById('fyers-status').className = 'badge bg-warning';
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.settings && data.settings.broker_provider) {
+                    const currentBroker = data.settings.broker_provider;
+                    document.getElementById('broker-selector').value = currentBroker;
                     
-                    // Show token expiration warning
-                    document.getElementById('token-expiration-warning').classList.remove('d-none');
-                } else {
-                    document.getElementById('fyers-connection-status').textContent = connectionStatus.charAt(0).toUpperCase() + connectionStatus.slice(1);
-                    document.getElementById('fyers-connection-status').className = 
-                        isConnected ? 'badge bg-success' : 'badge bg-danger';
-                    document.getElementById('fyers-status').textContent = connectionStatus.charAt(0).toUpperCase() + connectionStatus.slice(1);
-                    document.getElementById('fyers-status').className = 
-                        isConnected ? 'badge bg-success' : 'badge bg-danger';
-                    
-                    // Hide token expiration warning
-                    document.getElementById('token-expiration-warning').classList.add('d-none');
+                    // Auto-redirect to the current broker page
+                    if (currentBroker !== 'zerodha') {
+                        window.location.href = `/brokers/${currentBroker}`;
+                    }
                 }
-                
-                // Update last connection test time
-                if (data.last_connection_test && data.last_connection_test !== '-') {
-                    document.getElementById('fyers-last-updated').textContent = data.last_connection_test;
-                }
-                
-                // Update statistics
-                document.getElementById('total-orders').textContent = data.stats?.total_orders || 0;
-                document.getElementById('successful-orders').textContent = data.stats?.successful_orders || 0;
-                document.getElementById('pending-orders').textContent = data.stats?.pending_orders || 0;
-                document.getElementById('failed-orders').textContent = data.stats?.failed_orders || 0;
-                document.getElementById('last-order-time').textContent = data.stats?.last_order_time || '-';
-                document.getElementById('api-response-time').textContent = data.stats?.api_response_time || '-';
-                
-                // Update form fields from database
-                document.getElementById('fyers-client-id-input').value = data.client_id || '';
-                document.getElementById('fyers-access-token-input').value = data.access_token ? '••••••••••••••••' : '';
-                document.getElementById('fyers-redirect-url').value = data.redirect_url || 'https://trade.fyers.in/api-login/redirect-uri/index.html';
-                document.getElementById('fyers-app-type').value = data.app_type || '100';
-                
-                // Update OAuth form fields from database
-                document.getElementById('fyers-oauth-client-id').value = data.client_id || '';
-                // Show placeholder for secret key if it exists, empty if not
-                document.getElementById('fyers-oauth-secret-key').value = data.api_secret ? '••••••••••••••••' : '';
-                document.getElementById('fyers-oauth-secret-key').placeholder = data.api_secret ? 'Secret key is saved' : 'Enter your App Secret';
-                document.getElementById('fyers-oauth-redirect-uri').value = data.redirect_url || 'https://trade.fyers.in/api-login/redirect-uri/index.html';
-                
-                // Configuration is loaded, no additional UI changes needed
-                
-                // Show error message if there's one
-                if (data.error_message) {
-                    console.warn('FYERS connection error:', data.error_message);
-                }
-            } else {
-                console.error('API returned success=false:', data);
             }
         } catch (error) {
-            console.error('Error fetching broker info:', error);
-            // Show error state
-            document.getElementById('fyers-status').textContent = 'Error';
-            document.getElementById('fyers-status').className = 'badge bg-danger';
+            console.error('Error getting current broker:', error);
         }
     }
     
-    // Test FYERS connection
-    document.getElementById('test-fyers-connection').addEventListener('click', async function() {
-        const spinner = document.getElementById('fyers-spinner');
-        const status = document.getElementById('fyers-connection-status');
+    // Go to selected broker
+    function goToSelectedBroker() {
+        const selectedBroker = document.getElementById('broker-selector').value;
+        selectBroker(selectedBroker);
+    }
+    
+    // Test connection for selected broker
+    async function testSelectedBroker() {
+        const selectedBroker = document.getElementById('broker-selector').value;
         
-        spinner.style.display = 'inline-block';
-        status.textContent = 'Testing...';
-        status.className = 'badge bg-warning';
+        if (selectedBroker === 'zerodha') {
+            showNotification('Zerodha integration is coming soon! Please use FYERS or Simulator for now.', 'info');
+            return;
+        }
         
         try {
-            const response = await fetch('/api/brokers/fyers/test', {
+            const response = await fetch(`/api/brokers/${selectedBroker}/test`, {
                 method: 'POST'
             });
             const data = await response.json();
             
             if (data.success) {
-                status.textContent = 'Connected';
-                status.className = 'badge bg-success';
-                // Update the main status badge as well
-                document.getElementById('fyers-status').textContent = 'Connected';
-                document.getElementById('fyers-status').className = 'badge bg-success';
+                showNotification(`${selectedBroker.toUpperCase()} connection test successful!`, 'success');
             } else {
-                status.textContent = 'Connection Failed';
-                status.className = 'badge bg-danger';
-                // Update the main status badge as well
-                document.getElementById('fyers-status').textContent = 'Disconnected';
-                document.getElementById('fyers-status').className = 'badge bg-danger';
-            }
-            
-            // Refresh the broker info to get updated database status
-            fetchBrokerInfo();
-        } catch (error) {
-            status.textContent = 'Connection Failed';
-            status.className = 'badge bg-danger';
-        } finally {
-            spinner.style.display = 'none';
-        }
-    });
-    
-    // Refresh FYERS token
-    document.getElementById('refresh-fyers-token').addEventListener('click', async function() {
-        if (confirm('Are you sure you want to refresh the FYERS access token? This will require re-authentication.')) {
-            try {
-                const response = await fetch('/api/brokers/fyers/refresh-token', {
-                    method: 'POST'
-                });
-                const data = await response.json();
-                
-                if (data.success) {
-                    // If we have an auth URL, open it for re-authentication
-                    if (data.auth_url) {
-                        alert('Re-authentication required. Please complete the authorization in the new window.');
-                        const authWindow = window.open(data.auth_url, '_blank', 'width=800,height=600');
-                        
-                        // Check for window close and refresh data
-                        const checkClosed = setInterval(() => {
-                            if (authWindow.closed) {
-                                clearInterval(checkClosed);
-                                alert('Authorization completed. Refreshing data...');
-                                fetchBrokerInfo();
-                            }
-                        }, 1000);
-                    } else {
-                        alert('Token refresh initiated successfully!');
-                        fetchBrokerInfo(); // Refresh the page data
-                    }
-                } else {
-                    alert('Token refresh failed: ' + (data.error || 'Unknown error'));
-                }
-            } catch (error) {
-                alert('Token refresh failed: ' + error.message);
-            }
-        }
-    });
-    
-    
-    // Fetch data when page loads
-    // OAuth2 Flow Functions
-    async function saveOAuthConfig() {
-        const clientId = document.getElementById('fyers-oauth-client-id').value;
-        const secretKey = document.getElementById('fyers-oauth-secret-key').value;
-        const redirectUri = document.getElementById('fyers-oauth-redirect-uri').value;
-        
-        if (!clientId || !secretKey || !redirectUri) {
-            showNotification('Please fill in all OAuth2 fields', 'error');
-            return;
-        }
-        
-        try {
-            const response = await fetch('/api/brokers/fyers/config', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    client_id: clientId,
-                    secret_key: secretKey,
-                    redirect_uri: redirectUri
-                })
-            });
-            
-            const result = await response.json();
-            
-            if (result.success) {
-                showNotification('Configuration saved successfully!', 'success');
-                
-                // If auth URL was automatically generated, open it
-                if (result.auth_url) {
-                    showNotification('Opening FYERS authorization page...', 'info');
-                    
-                    // Open the authorization URL in a new window
-                    const authWindow = window.open(result.auth_url, '_blank', 'width=800,height=600');
-                    
-                    // Show success message about automated flow
-                    showNotification('Please complete the authorization in the new window. The access token will be automatically saved!', 'info');
-                    
-                    // Check for window close and refresh data
-                    const checkClosed = setInterval(() => {
-                        if (authWindow.closed) {
-                            clearInterval(checkClosed);
-                            showNotification('Authorization window closed. Refreshing data...', 'info');
-                            setTimeout(() => {
-                                fetchBrokerInfo();
-                            }, 2000);
-                        }
-                    }, 1000);
-                }
-                
-                // Refresh broker info to show updated status
-                fetchBrokerInfo();
-            } else {
-                showNotification('Failed to save configuration: ' + (result.error || 'Unknown error'), 'error');
+                showNotification(`${selectedBroker.toUpperCase()} connection test failed: ${data.message || 'Unknown error'}`, 'error');
             }
         } catch (error) {
-            console.error('Error saving OAuth config:', error);
-            showNotification('Error saving configuration: ' + error.message, 'error');
+            showNotification(`Error testing ${selectedBroker.toUpperCase()} connection: ${error.message}`, 'error');
         }
     }
-    
-    
 
+    // Initialize page
     document.addEventListener('DOMContentLoaded', function() {
-        fetchBrokerInfo();
+        // Event listeners
+        document.getElementById('go-to-broker').addEventListener('click', goToSelectedBroker);
+        document.getElementById('test-current-broker').addEventListener('click', testSelectedBroker);
         
-        // OAuth2 event listeners
-        document.getElementById('save-oauth-config').addEventListener('click', saveOAuthConfig);
-        
-        // Token refresh event listeners
-        document.getElementById('refresh-expired-token').addEventListener('click', function() {
-            // Instead of just showing a notification, let's trigger the refresh token process
-            document.getElementById('refresh-fyers-token').click();
-        });
-        
-        // Refresh data every 30 seconds
-        setInterval(function() {
-            // Only refresh if the page is visible to avoid unnecessary API calls
-            if (!document.hidden) {
-                fetchBrokerInfo();
-            }
-        }, 30000);
+        // Get current broker from settings and redirect
+        getCurrentBrokerAndRedirect();
     });
 </script>
 {% endblock %}
-
