@@ -224,14 +224,27 @@ class FyersService:
                 session.add(config)
             
             # Update fields (storing directly without encryption for simplicity)
-            config.client_id = config_data.get('client_id', '')
-            config.access_token = config_data.get('access_token', '')
-            config.refresh_token = config_data.get('refresh_token', '')
-            config.api_key = config_data.get('api_key', '')
-            config.api_secret = config_data.get('api_secret', '')
-            config.redirect_url = config_data.get('redirect_url', '')
-            config.app_type = config_data.get('app_type', '100')
-            config.is_active = config_data.get('is_active', True)
+            # Only update fields that are provided in config_data
+            if config_data.get('client_id') is not None:
+                config.client_id = config_data.get('client_id', '')
+            if config_data.get('access_token') is not None:
+                config.access_token = config_data.get('access_token', '')
+            if config_data.get('refresh_token') is not None:
+                config.refresh_token = config_data.get('refresh_token', '')
+            if config_data.get('api_key') is not None:
+                config.api_key = config_data.get('api_key', '')
+            if config_data.get('api_secret') is not None:
+                config.api_secret = config_data.get('api_secret', '')
+            if config_data.get('redirect_url') is not None:
+                config.redirect_url = config_data.get('redirect_url', '')
+            if config_data.get('app_type') is not None:
+                config.app_type = config_data.get('app_type', '100')
+            if 'is_active' in config_data:
+                config.is_active = config_data.get('is_active', True)
+            if 'is_connected' in config_data:
+                config.is_connected = config_data.get('is_connected', False)
+            if 'connection_status' in config_data:
+                config.connection_status = config_data.get('connection_status', 'disconnected')
             config.updated_at = datetime.utcnow()
             
             session.commit()
@@ -297,18 +310,18 @@ class FyersOAuth2Flow:
         self.state = "sample"
     
     def generate_auth_url(self, user_id: int = 1) -> str:
-        """Generate the authorization URL for user login with automated callback."""
+        """Generate the authorization URL for user login."""
         if not FYERS_AVAILABLE:
             raise Exception("fyers-apiv3 library not available")
         
         try:
-            # Use our automated callback URL instead of the default redirect URI
-            automated_redirect_uri = f"http://localhost:5001/api/brokers/fyers/oauth/callback"
+            # Use the configured redirect URI from initialization
+            # The redirect_uri should be the one configured in the FYERS app
             
             # Create session model for OAuth flow
             app_session = fyersModel.SessionModel(
                 client_id=self.client_id,
-                redirect_uri=automated_redirect_uri,
+                redirect_uri=self.redirect_uri,  # Use the actual redirect URI from config
                 response_type=self.response_type,
                 state=str(user_id),  # Pass user_id in state for callback
                 secret_key=self.secret_key,
@@ -317,7 +330,7 @@ class FyersOAuth2Flow:
             
             # Generate the authorization URL
             auth_url = app_session.generate_authcode()
-            logger.info(f"Generated FYERS authorization URL with automated callback: {auth_url}")
+            logger.info(f"Generated FYERS authorization URL: {auth_url}")
             return auth_url
             
         except Exception as e:

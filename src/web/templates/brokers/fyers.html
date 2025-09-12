@@ -212,7 +212,7 @@
     // Fetch FYERS broker information
     async function fetchFyersInfo() {
         try {
-            const response = await fetch('/api/brokers/fyers', {
+            const response = await fetch('/brokers/fyers/api/info', {
                 credentials: 'same-origin'
             });
             
@@ -315,7 +315,7 @@
         status.className = 'badge bg-warning';
         
         try {
-            const response = await fetch('/api/brokers/fyers/test', {
+            const response = await fetch('/brokers/fyers/api/test', {
                 method: 'POST'
             });
             const data = await response.json();
@@ -348,7 +348,7 @@
     document.getElementById('refresh-fyers-token').addEventListener('click', async function() {
         if (confirm('Are you sure you want to refresh the FYERS access token? This will require re-authentication.')) {
             try {
-                const response = await fetch('/api/brokers/fyers/refresh-token', {
+                const response = await fetch('/brokers/fyers/api/refresh-token', {
                     method: 'POST'
                 });
                 const data = await response.json();
@@ -392,7 +392,7 @@
         }
         
         try {
-            const response = await fetch('/api/brokers/fyers/config', {
+            const response = await fetch('/brokers/fyers/api/config', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

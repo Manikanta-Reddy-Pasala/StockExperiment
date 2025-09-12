@@ -1,9 +1,10 @@
 """
 FYERS Broker API Routes - Dedicated routes for FYERS broker operations
 """
-from flask import Blueprint, request, jsonify, render_template, redirect, url_for
+from flask import Blueprint, request, jsonify, render_template, redirect, url_for, send_from_directory
 from flask_login import login_required, current_user
 import logging
+import os
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -117,29 +118,58 @@ def api_refresh_fyers_token():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @fyers_bp.route('/oauth/callback', methods=['GET'])
-def api_fyers_oauth_callback():
-    """FYERS OAuth2 callback handler."""
+def fyers_oauth_callback():
+    """FYERS OAuth2 callback handler - serves the callback HTML page."""
     try:
-        auth_code = request.args.get('auth_code')
-        state = request.args.get('state')
+        # Get the directory of the current file
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        static_dir = os.path.join(current_dir, '../../static')
+        return send_from_directory(static_dir, 'fyers_callback.html')
+    except Exception as e:
+        logger.error(f"Error serving FYERS OAuth callback page: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Callback page not found'}), 404
+
+@fyers_bp.route('/api/oauth/complete', methods=['POST'])
+def api_fyers_oauth_complete():
+    """Complete FYERS OAuth2 flow by exchanging auth code for access token."""
+    try:
+        data = request.get_json()
+        auth_code = data.get('auth_code')
+        state = data.get('state')
         
         if not auth_code:
             return jsonify({'success': False, 'error': 'Authorization code not provided'}), 400
         
-        # Extract user_id from state
-        user_id = int(state) if state and state.isdigit() else 1
+        # Extract user_id from state (default to current user if available)
+        if state and state.isdigit():
+            user_id = int(state)
+        elif current_user and hasattr(current_user, 'id'):
+            user_id = current_user.id
+        else:
+            user_id = 1  # Default user
+        
+        logger.info(f"Completing OAuth flow for user {user_id} with auth_code: {auth_code[:10]}...")
         
         fyers_service = get_fyers_service()
         result = fyers_service.exchange_auth_code(user_id, auth_code)
         
         if result.get('success'):
+            logger.info(f"OAuth flow completed successfully for user {user_id}")
+            # Test the connection to update status
+            try:
+                fyers_service.test_connection(user_id)
+            except Exception as test_error:
+                logger.warning(f"Could not test connection after OAuth: {str(test_error)}")
+            
             return jsonify({'success': True, 'message': 'Authorization successful'})
         else:
-            return jsonify({'success': False, 'error': 'Authorization failed'}), 400
+            error_msg = result.get('error', 'Authorization failed')
+            logger.error(f"OAuth flow failed for user {user_id}: {error_msg}")
+            return jsonify({'success': False, 'error': error_msg}), 400
             
     except Exception as e:
-        logger.error(f"Error in FYERS OAuth callback: {str(e)}", exc_info=True)
-        return jsonify({'success': False, 'error': 'Authorization failed'}), 500
+        logger.error(f"Error in FYERS OAuth complete: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @fyers_bp.route('/api/funds', methods=['GET'])
 @login_required
