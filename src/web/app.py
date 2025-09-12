@@ -723,6 +723,28 @@ def create_app():
             app.logger.error(f"Error fetching historical data for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
+    @app.route('/api/market/overview', methods=['GET'])
+    @login_required
+    def api_get_market_overview():
+        """Get market overview data for major indices using FYERS API."""
+        try:
+            app.logger.info(f"Fetching market overview for user {current_user.id}")
+            
+            from ..services.market_data_service import get_market_data_service
+            broker_service = get_broker_service()
+            market_service = get_market_data_service(broker_service)
+            
+            result = market_service.get_market_overview(user_id=current_user.id)
+            
+            return jsonify(result)
+                
+        except Exception as e:
+            app.logger.error(f"Error fetching market overview: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
     # Suggested Stocks API Routes
     @app.route('/api/suggested-stocks', methods=['GET'])
     @login_required

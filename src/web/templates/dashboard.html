@@ -14,38 +14,38 @@
             </div>
             <div class="card-body">
                 <div class="row g-4">
-                    <div class="col-lg-3 col-md-6">
+                    <div class="col-lg-3 col-md-6" data-index="NIFTY 50">
                         <div class="text-center">
-                            <h3 class="text-success fw-bold mb-1">NIFTY 50</h3>
-                            <p class="text-muted mb-2">19,832.45</p>
-                            <span class="badge bg-success">
+                            <h3 class="market-name text-success fw-bold mb-1">NIFTY 50</h3>
+                            <p class="market-price text-muted mb-2">19,832.45</p>
+                            <span class="badge market-badge bg-success">
                                 <i class="bi bi-arrow-up"></i> +0.85%
                             </span>
                         </div>
                     </div>
-                    <div class="col-lg-3 col-md-6">
+                    <div class="col-lg-3 col-md-6" data-index="SENSEX">
                         <div class="text-center">
-                            <h3 class="text-success fw-bold mb-1">SENSEX</h3>
-                            <p class="text-muted mb-2">66,247.90</p>
-                            <span class="badge bg-success">
+                            <h3 class="market-name text-success fw-bold mb-1">SENSEX</h3>
+                            <p class="market-price text-muted mb-2">66,247.90</p>
+                            <span class="badge market-badge bg-success">
                                 <i class="bi bi-arrow-up"></i> +0.72%
                             </span>
                         </div>
                     </div>
-                    <div class="col-lg-3 col-md-6">
+                    <div class="col-lg-3 col-md-6" data-index="BANK NIFTY">
                         <div class="text-center">
-                            <h3 class="text-danger fw-bold mb-1">BANK NIFTY</h3>
-                            <p class="text-muted mb-2">44,521.30</p>
-                            <span class="badge bg-danger">
+                            <h3 class="market-name text-danger fw-bold mb-1">BANK NIFTY</h3>
+                            <p class="market-price text-muted mb-2">44,521.30</p>
+                            <span class="badge market-badge bg-danger">
                                 <i class="bi bi-arrow-down"></i> -0.45%
                             </span>
                         </div>
                     </div>
-                    <div class="col-lg-3 col-md-6">
+                    <div class="col-lg-3 col-md-6" data-index="NIFTY IT">
                         <div class="text-center">
-                            <h3 class="text-success fw-bold mb-1">NIFTY IT</h3>
-                            <p class="text-muted mb-2">28,456.75</p>
-                            <span class="badge bg-success">
+                            <h3 class="market-name text-success fw-bold mb-1">NIFTY IT</h3>
+                            <p class="market-price text-muted mb-2">28,456.75</p>
+                            <span class="badge market-badge bg-success">
                                 <i class="bi bi-arrow-up"></i> +1.25%
                             </span>
                         </div>
@@ -463,12 +463,67 @@
         });
     }
     
+    // Fetch market overview data
+    async function fetchMarketOverview() {
+        try {
+            const response = await fetch('/api/market/overview');
+            const result = await response.json();
+            
+            if (result.success && result.data) {
+                updateMarketOverviewUI(result.data);
+            } else {
+                console.error('Failed to fetch market overview:', result.error);
+            }
+        } catch (error) {
+            console.error('Error fetching market overview:', error);
+        }
+    }
+    
+    // Update market overview UI with real-time data
+    function updateMarketOverviewUI(marketData) {
+        const indices = ['NIFTY 50', 'SENSEX', 'BANK NIFTY', 'NIFTY IT'];
+        
+        indices.forEach(indexName => {
+            const data = marketData[indexName];
+            if (data) {
+                // Find the corresponding column in the market overview section
+                const indexElement = document.querySelector(`[data-index="${indexName}"]`);
+                if (indexElement) {
+                    // Update price
+                    const priceElement = indexElement.querySelector('.market-price');
+                    if (priceElement) {
+                        priceElement.textContent = data.current_price.toLocaleString('en-IN');
+                    }
+                    
+                    // Update change percentage and badge
+                    const badgeElement = indexElement.querySelector('.market-badge');
+                    if (badgeElement) {
+                        const changeText = data.is_positive ? 
+                            `<i class="bi bi-arrow-up"></i> +${data.change_percent}%` :
+                            `<i class="bi bi-arrow-down"></i> ${data.change_percent}%`;
+                        
+                        badgeElement.innerHTML = changeText;
+                        badgeElement.className = `badge market-badge ${data.is_positive ? 'bg-success' : 'bg-danger'}`;
+                    }
+                    
+                    // Update index name color based on performance
+                    const nameElement = indexElement.querySelector('.market-name');
+                    if (nameElement) {
+                        nameElement.className = `market-name fw-bold mb-1 ${data.is_positive ? 'text-success' : 'text-danger'}`;
+                    }
+                }
+            }
+        });
+    }
+    
     // Fetch data when page loads
     document.addEventListener('DOMContentLoaded', function() {
         fetchDashboardMetrics();
+        fetchMarketOverview();
         initPortfolioChart();
         // Refresh every 30 seconds
         setInterval(fetchDashboardMetrics, 30000);
+        setInterval(fetchMarketOverview, 30000);
     });
 </script>
 {% endblock %}
