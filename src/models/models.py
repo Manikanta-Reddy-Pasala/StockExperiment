@@ -202,7 +202,6 @@ class Configuration(Base):
     user_id = Column(Integer, ForeignKey('users.id'), nullable=True)  # NULL for global configs
     key = Column(String(100), nullable=False)
     value = Column(Text)
-    description = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
