@@ -13,40 +13,52 @@
                 </h5>
             </div>
             <div class="card-body">
-                <div class="row g-4">
+                <div class="row g-4" id="market-overview-container">
                     <div class="col-lg-3 col-md-6" data-index="NIFTY 50">
                         <div class="text-center">
-                            <h3 class="market-name text-success fw-bold mb-1">NIFTY 50</h3>
-                            <p class="market-price text-muted mb-2">19,832.45</p>
-                            <span class="badge market-badge bg-success">
-                                <i class="bi bi-arrow-up"></i> +0.85%
+                            <h3 class="market-name text-muted fw-bold mb-1">NIFTY 50</h3>
+                            <p class="market-price text-muted mb-2">
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                Loading...
+                            </p>
+                            <span class="badge market-badge bg-secondary">
+                                <i class="bi bi-hourglass-split"></i> Loading...
                             </span>
                         </div>
                     </div>
                     <div class="col-lg-3 col-md-6" data-index="SENSEX">
                         <div class="text-center">
-                            <h3 class="market-name text-success fw-bold mb-1">SENSEX</h3>
-                            <p class="market-price text-muted mb-2">66,247.90</p>
-                            <span class="badge market-badge bg-success">
-                                <i class="bi bi-arrow-up"></i> +0.72%
+                            <h3 class="market-name text-muted fw-bold mb-1">SENSEX</h3>
+                            <p class="market-price text-muted mb-2">
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                Loading...
+                            </p>
+                            <span class="badge market-badge bg-secondary">
+                                <i class="bi bi-hourglass-split"></i> Loading...
                             </span>
                         </div>
                     </div>
                     <div class="col-lg-3 col-md-6" data-index="BANK NIFTY">
                         <div class="text-center">
-                            <h3 class="market-name text-danger fw-bold mb-1">BANK NIFTY</h3>
-                            <p class="market-price text-muted mb-2">44,521.30</p>
-                            <span class="badge market-badge bg-danger">
-                                <i class="bi bi-arrow-down"></i> -0.45%
+                            <h3 class="market-name text-muted fw-bold mb-1">BANK NIFTY</h3>
+                            <p class="market-price text-muted mb-2">
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                Loading...
+                            </p>
+                            <span class="badge market-badge bg-secondary">
+                                <i class="bi bi-hourglass-split"></i> Loading...
                             </span>
                         </div>
                     </div>
                     <div class="col-lg-3 col-md-6" data-index="NIFTY IT">
                         <div class="text-center">
-                            <h3 class="market-name text-success fw-bold mb-1">NIFTY IT</h3>
-                            <p class="market-price text-muted mb-2">28,456.75</p>
-                            <span class="badge market-badge bg-success">
-                                <i class="bi bi-arrow-up"></i> +1.25%
+                            <h3 class="market-name text-muted fw-bold mb-1">NIFTY IT</h3>
+                            <p class="market-price text-muted mb-2">
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                Loading...
+                            </p>
+                            <span class="badge market-badge bg-secondary">
+                                <i class="bi bi-hourglass-split"></i> Loading...
                             </span>
                         </div>
                     </div>
@@ -473,10 +485,41 @@
                 updateMarketOverviewUI(result.data);
             } else {
                 console.error('Failed to fetch market overview:', result.error);
+                showMarketOverviewError('Failed to load market data');
             }
         } catch (error) {
             console.error('Error fetching market overview:', error);
+            showMarketOverviewError('Network error loading market data');
         }
+    }
+    
+    // Show error state for market overview
+    function showMarketOverviewError(message) {
+        const indices = ['NIFTY 50', 'SENSEX', 'BANK NIFTY', 'NIFTY IT'];
+        
+        indices.forEach(indexName => {
+            const indexElement = document.querySelector(`[data-index="${indexName}"]`);
+            if (indexElement) {
+                // Update price
+                const priceElement = indexElement.querySelector('.market-price');
+                if (priceElement) {
+                    priceElement.innerHTML = `<i class="bi bi-exclamation-triangle text-warning me-2"></i>Error`;
+                }
+                
+                // Update badge
+                const badgeElement = indexElement.querySelector('.market-badge');
+                if (badgeElement) {
+                    badgeElement.innerHTML = `<i class="bi bi-exclamation-triangle"></i> Error`;
+                    badgeElement.className = 'badge market-badge bg-warning';
+                }
+                
+                // Update index name color
+                const nameElement = indexElement.querySelector('.market-name');
+                if (nameElement) {
+                    nameElement.className = 'market-name fw-bold mb-1 text-warning';
+                }
+            }
+        });
     }
     
     // Update market overview UI with real-time data
@@ -492,7 +535,7 @@
                     // Update price
                     const priceElement = indexElement.querySelector('.market-price');
                     if (priceElement) {
-                        priceElement.textContent = data.current_price.toLocaleString('en-IN');
+                        priceElement.innerHTML = data.current_price.toLocaleString('en-IN');
                     }
                     
                     // Update change percentage and badge
@@ -510,6 +553,21 @@
                     const nameElement = indexElement.querySelector('.market-name');
                     if (nameElement) {
                         nameElement.className = `market-name fw-bold mb-1 ${data.is_positive ? 'text-success' : 'text-danger'}`;
+                    }
+                }
+            } else {
+                // Handle missing data
+                const indexElement = document.querySelector(`[data-index="${indexName}"]`);
+                if (indexElement) {
+                    const priceElement = indexElement.querySelector('.market-price');
+                    if (priceElement) {
+                        priceElement.innerHTML = `<i class="bi bi-question-circle text-muted me-2"></i>N/A`;
+                    }
+                    
+                    const badgeElement = indexElement.querySelector('.market-badge');
+                    if (badgeElement) {
+                        badgeElement.innerHTML = `<i class="bi bi-question-circle"></i> N/A`;
+                        badgeElement.className = 'badge market-badge bg-secondary';
                     }
                 }
             }
