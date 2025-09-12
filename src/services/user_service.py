@@ -33,6 +33,10 @@ class UserService:
             )
             db_session.add(new_user)
             db_session.commit()
+            # Refresh the user object to ensure all attributes are loaded
+            db_session.refresh(new_user)
+            # Detach the user from the session to avoid DetachedInstanceError
+            db_session.expunge(new_user)
             return new_user
 
     def login_user(self, username, password):
@@ -43,6 +47,10 @@ class UserService:
                 if user.is_active:
                     user.last_login = datetime.utcnow()
                     db_session.commit()
+                    # Refresh the user object to ensure all attributes are loaded
+                    db_session.refresh(user)
+                    # Detach the user from the session to avoid DetachedInstanceError
+                    db_session.expunge(user)
                     return user
                 else:
                     raise ValueError('Your account has been deactivated.')

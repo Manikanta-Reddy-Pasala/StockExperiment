@@ -789,6 +789,156 @@ def create_app():
             app.logger.error(f"Error refreshing suggested stocks for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
     
+    # Settings API Routes
+    @app.route('/api/settings', methods=['GET'])
+    @login_required
+    def api_get_settings():
+        """Get user settings."""
+        try:
+            # For now, return default settings
+            # In a real implementation, you would store these in the database
+            settings = {
+                'trading_mode': 'development',
+                'max_capital_per_trade': 1.00,
+                'stop_loss_percentage': 2.0,
+                'take_profit_percentage': 5.0,
+                'primary_data_source': 'fyers',
+                'backup_data_source': 'yfinance',
+                'broker_provider': 'fyers',  # Default broker
+                'email_notifications': True,
+                'sms_notifications': False,
+                'notification_email': 'trader@example.com'
+            }
+            return jsonify({'success': True, 'settings': settings})
+        except Exception as e:
+            app.logger.error(f"Error getting settings for user {current_user.id}: {str(e)}")
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+    @app.route('/api/settings', methods=['POST'])
+    @login_required
+    def api_save_settings():
+        """Save user settings."""
+        try:
+            data = request.get_json()
+            # In a real implementation, you would save these to the database
+            app.logger.info(f"Saving settings for user {current_user.id}: {data}")
+            
+            # For now, just log the settings. In a real implementation, you would:
+            # 1. Create a UserSettings model
+            # 2. Save the settings to the database
+            # 3. Update the current broker based on broker_provider setting
+            
+            return jsonify({'success': True, 'message': 'Settings saved successfully'})
+        except Exception as e:
+            app.logger.error(f"Error saving settings for user {current_user.id}: {str(e)}")
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+    # Broker Selection API
+    @app.route('/api/brokers/current', methods=['GET'])
+    @login_required
+    def api_get_current_broker():
+        """Get the currently selected broker."""
+        try:
+            # Get broker from settings
+            settings = {
+                'broker_provider': 'fyers'  # Default
+            }
+            # In a real implementation, you would get this from user settings in database
+            return jsonify({'success': True, 'broker': settings['broker_provider']})
+        except Exception as e:
+            app.logger.error(f"Error getting current broker for user {current_user.id}: {str(e)}")
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+    @app.route('/api/brokers/current', methods=['POST'])
+    @login_required
+    def api_set_current_broker():
+        """Set the currently selected broker."""
+        try:
+            data = request.get_json()
+            broker = data.get('broker', 'fyers')
+            # In a real implementation, you would save this to user settings in database
+            app.logger.info(f"Setting current broker to {broker} for user {current_user.id}")
+            return jsonify({'success': True, 'message': f'Broker set to {broker}'})
+        except Exception as e:
+            app.logger.error(f"Error setting current broker for user {current_user.id}: {str(e)}")
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+    # Register broker-specific blueprints
+    from .routes.brokers import fyers_bp, zerodha_bp, simulator_bp
+    app.register_blueprint(fyers_bp)
+    app.register_blueprint(zerodha_bp)
+    app.register_blueprint(simulator_bp)
+    
+    # Individual broker page routes
+    @app.route('/brokers/fyers')
+    @login_required
+    def brokers_fyers():
+        """FYERS broker page."""
+        return render_template('brokers/fyers.html')
+    
+    @app.route('/brokers/zerodha')
+    @login_required
+    def brokers_zerodha():
+        """Zerodha broker page."""
+        return render_template('brokers/zerodha.html')
+    
+    @app.route('/brokers/simulator')
+    @login_required
+    def brokers_simulator():
+        """Simulator broker page."""
+        return render_template('brokers/simulator.html')
+    
+    # Generic Broker API Routes (for backward compatibility)
+    @app.route('/api/brokers/<broker_name>', methods=['GET'])
+    @login_required
+    def api_get_broker_info(broker_name):
+        """Get broker information for any supported broker."""
+        try:
+            app.logger.info(f"Fetching {broker_name} broker info for user {current_user.id}")
+            
+            if broker_name == 'fyers':
+                # Use existing FYERS logic
+                config = broker_service.get_broker_config('fyers', current_user.id)
+                
+                if not config:
+                    app.logger.info(f"No {broker_name} configuration found for user")
+                    return jsonify({
+                        'success': True, 'broker': broker_name, 'client_id': '', 'access_token': False, 
+                        'connected': False, 'last_updated': '-',
+                        'stats': {'total_orders': 0, 'successful_orders': 0, 'pending_orders': 0, 
+                                'failed_orders': 0, 'last_order_time': '-', 'api_response_time': '-'}
+                    })
+
+                stats = broker_service.get_broker_stats('fyers', current_user.id)
+                config['access_token'] = bool(config.get('access_token'))
+                
+                return jsonify({'success': True, 'broker': broker_name, **config, 'stats': stats})
+            
+            elif broker_name == 'zerodha':
+                # Placeholder for Zerodha
+                return jsonify({
+                    'success': True, 'broker': broker_name, 'client_id': '', 'access_token': False, 
+                    'connected': False, 'last_updated': '-',
+                    'stats': {'total_orders': 0, 'successful_orders': 0, 'pending_orders': 0, 
+                            'failed_orders': 0, 'last_order_time': '-', 'api_response_time': '-'}
+                })
+            
+            elif broker_name == 'simulator':
+                # Placeholder for Simulator
+                return jsonify({
+                    'success': True, 'broker': broker_name, 'client_id': 'simulator', 'access_token': True, 
+                    'connected': True, 'last_updated': '-',
+                    'stats': {'total_orders': 0, 'successful_orders': 0, 'pending_orders': 0, 
+                            'failed_orders': 0, 'last_order_time': '-', 'api_response_time': '-'}
+                })
+            
+            else:
+                return jsonify({'success': False, 'error': f'Unsupported broker: {broker_name}'}), 400
+                
+        except Exception as e:
+            app.logger.error(f"Error getting {broker_name} broker info for user {current_user.id}: {str(e)}", exc_info=True)
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
     # Automated OAuth2 Callback API
     @app.route('/api/brokers/fyers/oauth/callback', methods=['GET'])
     def api_fyers_oauth_callback():
