@@ -16,13 +16,43 @@ RUN apt-get update \
         build-essential \
         libpq-dev \
         gcc \
+        g++ \
         curl \
-    && rm -rf /var/lib/apt/lists/*
+        pkg-config \
+        libhdf5-dev \
+        libblas-dev \
+        liblapack-dev \
+        gfortran \
+        libfreetype6-dev \
+        libpng-dev \
+        libjpeg-dev \
+        libffi-dev \
+        libssl-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
-# Copy requirements file
+# Copy requirements file first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies
+# Upgrade pip and install wheel
+RUN pip install --upgrade pip setuptools wheel
+
+# Install core dependencies first (these rarely change)
+RUN pip install --no-cache-dir \
+    numpy==1.23.5 \
+    pandas==2.2.0
+
+# Install ML dependencies (these change less frequently)
+RUN pip install --no-cache-dir \
+    scikit-learn==1.4.2 \
+    xgboost==2.0.3 \
+    optuna==3.6.1
+
+# Install TensorFlow separately to avoid protobuf conflicts
+# Using TensorFlow 2.11.0 which is compatible with protobuf 5.x
+RUN pip install --no-cache-dir tensorflow==2.11.0
+
+# Install remaining dependencies (these change most frequently)
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code

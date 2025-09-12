@@ -127,7 +127,7 @@ python3 src/main.py
 
 ## 📊 ML Dependencies Added
 
-- `yfinance==0.2.28` - Stock data fetching
+- `fyers-apiv3==3.1.7` - Stock data fetching via Fyers API
 - `scikit-learn==1.4.2` - Random Forest and preprocessing
 - `xgboost==2.0.3` - Gradient boosting models  
 - `tensorflow==2.15.0` - LSTM neural networks

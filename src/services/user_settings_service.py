@@ -39,7 +39,7 @@ class UserSettingsService:
                 'stop_loss_percentage': 2.0,
                 'take_profit_percentage': 5.0,
                 'primary_data_source': 'fyers',
-                'backup_data_source': 'yfinance',
+                'backup_data_source': 'fyers',
                 'broker_provider': 'fyers',
                 'email_notifications': True,
                 'sms_notifications': False,

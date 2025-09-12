@@ -70,7 +70,8 @@ def train_model():
         result = train_and_tune_models(
             symbol=symbol,
             start_date=start_date,
-            end_date=end_date
+            end_date=end_date,
+            user_id=current_user.id
         )
         
         logger.info(f"ML training completed for symbol {symbol}")
@@ -99,7 +100,7 @@ def predict_stock(symbol):
         logger.info(f"Getting ML prediction for symbol {symbol} by user {current_user.id}")
         
         # Get prediction
-        prediction = get_prediction(symbol)
+        prediction = get_prediction(symbol, user_id=current_user.id)
         
         return jsonify({
             'success': True,
@@ -136,7 +137,7 @@ def backtest_stocks():
         results = []
         for symbol in symbols:
             try:
-                result = run_backtest(symbol)
+                result = run_backtest(symbol, user_id=current_user.id)
                 results.append(result)
             except FileNotFoundError:
                 logger.warning(f"Models not found for symbol {symbol}, skipping backtest")
@@ -164,7 +165,7 @@ def backtest_all_stocks():
     try:
         logger.info(f"Starting backtest for all trained models by user {current_user.id}")
         
-        results = run_backtest_for_all_stocks()
+        results = run_backtest_for_all_stocks(user_id=current_user.id)
         
         return jsonify({
             'success': True,
@@ -225,7 +226,8 @@ def ml_health():
             result = train_and_tune_models(
                 symbol=symbol,
                 start_date=start_date,
-                end_date=end_date
+                end_date=end_date,
+                user_id=current_user.id
             )
             
             logger.info(f"ML training completed for symbol {symbol}")
@@ -257,7 +259,7 @@ def ml_health():
             logger.info(f"Getting ML prediction for symbol {symbol} by user {current_user.id}")
             
             # Get prediction
-            prediction = get_prediction(symbol)
+            prediction = get_prediction(symbol, user_id=current_user.id)
             
             return jsonify({
                 'success': True,
@@ -297,7 +299,7 @@ def ml_health():
             results = []
             for symbol in symbols:
                 try:
-                    result = run_backtest(symbol)
+                    result = run_backtest(symbol, user_id=current_user.id)
                     results.append(result)
                 except FileNotFoundError:
                     logger.warning(f"Models not found for symbol {symbol}, skipping backtest")
@@ -328,7 +330,7 @@ def ml_health():
         try:
             logger.info(f"Starting backtest for all trained models by user {current_user.id}")
             
-            results = run_backtest_for_all_stocks()
+            results = run_backtest_for_all_stocks(user_id=current_user.id)
             
             return jsonify({
                 'success': True,

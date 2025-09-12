@@ -12,7 +12,7 @@ except ImportError:
     sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'utils'))
     from ml_helpers import load_model, load_lstm_model, load_scaler, get_model_dir
 
-def run_backtest(symbol: str, initial_cash=100000):
+def run_backtest(symbol: str, initial_cash=100000, user_id: int = 1):
     """Runs a backtest for a given stock symbol using regression models."""
     # Load models and scalers
     rf_model = load_model(f"{symbol}_rf")
@@ -24,7 +24,7 @@ def run_backtest(symbol: str, initial_cash=100000):
     if not all([rf_model, xgb_model, lstm_model, feature_scaler, target_scaler]):
         raise FileNotFoundError(f"Models or scalers for {symbol} not found. Please train them first.")
 
-    df = get_stock_data(symbol, period="3y")
+    df = get_stock_data(symbol, period="3y", user_id=user_id)
     if df is None:
         raise ValueError("Could not download data for backtest.")
 
@@ -93,7 +93,7 @@ def run_backtest(symbol: str, initial_cash=100000):
         "equity_curve": equity_curve
     }
 
-def run_backtest_for_all_stocks():
+def run_backtest_for_all_stocks(user_id: int = 1):
     """Runs backtest for all stocks with available models."""
     results = []
     stock_symbols = set()
@@ -107,7 +107,7 @@ def run_backtest_for_all_stocks():
 
     for symbol in stock_symbols:
         try:
-            result = run_backtest(symbol)
+            result = run_backtest(symbol, user_id=user_id)
             results.append(result)
         except FileNotFoundError as e:
             print(f"Skipping backtest for {symbol}: {e}")

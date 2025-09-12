@@ -52,7 +52,7 @@ def test_ml_components():
         import xgboost
         import tensorflow
         import optuna
-        import yfinance
+        import fyers_apiv3
         
         print("✅ Dependencies: All ML libraries available")
         success_count += 1

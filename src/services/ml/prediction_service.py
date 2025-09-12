@@ -11,7 +11,7 @@ except ImportError:
     sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'utils'))
     from ml_helpers import load_model, load_lstm_model, load_scaler
 
-def get_prediction(symbol: str):
+def get_prediction(symbol: str, user_id: int = 1):
     """Generates a regression-based price prediction for a given stock symbol."""
     # Load models
     rf_model = load_model(f"{symbol}_rf")
@@ -26,7 +26,7 @@ def get_prediction(symbol: str):
         raise FileNotFoundError(f"Models or scalers for symbol {symbol} not found. Please train them first.")
 
     # Get latest data
-    df = get_stock_data(symbol, period="1y")
+    df = get_stock_data(symbol, period="1y", user_id=user_id)
     if df is None or len(df) < 20:
         raise ValueError("Not enough data to make a prediction.")
 

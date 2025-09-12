@@ -96,9 +96,9 @@ def _objective_lstm(trial, X, y):
     return mean_squared_error(y_test, preds)
 
 # --- Training Orchestrator ---
-def train_and_tune_models(symbol: str, start_date: Optional[date] = None, end_date: Optional[date] = None):
+def train_and_tune_models(symbol: str, start_date: Optional[date] = None, end_date: Optional[date] = None, user_id: int = 1):
     """Orchestrates the model training and tuning process for regression."""
-    df = get_stock_data(symbol=symbol, start_date=start_date, end_date=end_date)
+    df = get_stock_data(symbol=symbol, start_date=start_date, end_date=end_date, user_id=user_id)
     if df is None or len(df) < 150:
         raise ValueError(f"Not enough data for {symbol} in the given date range to train models.")
 

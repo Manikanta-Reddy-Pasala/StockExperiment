@@ -99,14 +99,14 @@
                             <select class="form-select" id="primary-data-source">
                                 <option value="fyers">FYERS API</option>
                                 <option value="zerodha">Zerodha Kite Connect</option>
-                                <option value="yfinance">yFinance</option>
+                                <option value="fyers">Fyers</option>
                             </select>
                         </div>
                         
                         <div class="col-md-6 mb-3">
                             <label for="backup-data-source" class="form-label">Backup Data Source</label>
                             <select class="form-select" id="backup-data-source">
-                                <option value="yfinance">yFinance</option>
+                                <option value="fyers">Fyers</option>
                                 <option value="simulator">Simulator</option>
                                 <option value="none">None</option>
                             </select>
@@ -269,7 +269,7 @@
                 document.getElementById('stop-loss-percent').value = settings.stop_loss_percentage || 2.0;
                 document.getElementById('take-profit-percent').value = settings.take_profit_percentage || 5.0;
                 document.getElementById('primary-data-source').value = settings.primary_data_source || 'fyers';
-                document.getElementById('backup-data-source').value = settings.backup_data_source || 'yfinance';
+                document.getElementById('backup-data-source').value = settings.backup_data_source || 'fyers';
                 document.getElementById('broker-provider').value = settings.broker_provider || 'fyers';
                 document.getElementById('email-notifications').value = settings.email_notifications ? 'all' : 'none';
                 document.getElementById('sms-notifications').value = settings.sms_notifications ? 'critical' : 'none';
