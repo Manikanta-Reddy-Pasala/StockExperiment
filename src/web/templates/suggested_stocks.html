@@ -19,44 +19,29 @@
                 </select>
                 <div class="dropdown">
                     <button class="btn btn-light btn-sm dropdown-toggle" type="button" id="strategy-filter" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="bi bi-funnel"></i>
+                        <i class="bi bi-funnel"></i> Risk Level
                     </button>
-                        <ul class="dropdown-menu" aria-labelledby="strategy-filter">
-                            <li>
-                                <div class="form-check ms-2">
-                                    <input class="form-check-input" type="checkbox" value="all" id="strategy-all" checked>
-                                    <label class="form-check-label" for="strategy-all">
-                                        All Strategies
-                                    </label>
-                                </div>
-                            </li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <div class="form-check ms-2">
-                                    <input class="form-check-input strategy-checkbox" type="checkbox" value="momentum" id="strategy-momentum" checked>
-                                    <label class="form-check-label" for="strategy-momentum">
-                                        Momentum Strategy
-                                    </label>
-                                </div>
-                            </li>
-                            <li>
-                                <div class="form-check ms-2">
-                                    <input class="form-check-input strategy-checkbox" type="checkbox" value="breakout" id="strategy-breakout" checked>
-                                    <label class="form-check-label" for="strategy-breakout">
-                                        Breakout Strategy
-                                    </label>
-                                </div>
-                            </li>
-                            <li>
-                                <div class="form-check ms-2">
-                                    <input class="form-check-input strategy-checkbox" type="checkbox" value="mean_reversion" id="strategy-mean-reversion" checked>
-                                    <label class="form-check-label" for="strategy-mean-reversion">
-                                        Mean Reversion Strategy
-                                    </label>
-                                </div>
-                            </li>
-                        </ul>
-                    </div>
+                    <ul class="dropdown-menu" aria-labelledby="strategy-filter">
+                        <li>
+                            <div class="form-check ms-2">
+                                <input class="form-check-input strategy-radio" type="radio" name="strategy" value="default_risk" id="strategy-default" checked>
+                                <label class="form-check-label" for="strategy-default">
+                                    <i class="bi bi-shield-check text-success me-2"></i>Default Risk
+                                    <small class="text-muted d-block">Balanced portfolio with large & mid cap stocks</small>
+                                </label>
+                            </div>
+                        </li>
+                        <li>
+                            <div class="form-check ms-2">
+                                <input class="form-check-input strategy-radio" type="radio" name="strategy" value="high_risk" id="strategy-high">
+                                <label class="form-check-label" for="strategy-high">
+                                    <i class="bi bi-lightning-charge text-warning me-2"></i>High Risk
+                                    <small class="text-muted d-block">Aggressive portfolio with small cap stocks</small>
+                                </label>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
                     <button class="btn btn-sm btn-outline-primary" id="refresh-btn">
                         <i class="bi bi-arrow-repeat"></i>
                     </button>
@@ -68,14 +53,15 @@
                         <thead class="table-light">
                             <tr>
                                 <th>Symbol</th>
-                                <th>Selection Date</th>
-                                <th>Selection Price</th>
+                                <th>Company</th>
+                                <th>Market Cap</th>
                                 <th>Current Price</th>
-                                <th>Quantity</th>
+                                <th>Target Price</th>
+                                <th>Expected Return</th>
+                                <th>ML Confidence</th>
+                                <th>Recommended Qty</th>
                                 <th>Investment</th>
-                                <th>Current Value</th>
-                                <th>Strategy</th>
-                                <th>Status</th>
+                                <th>Risk Level</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -95,28 +81,33 @@
     // Real data from API
     let suggestedStocks = [];
 
-    // Get selected strategies
-    function getSelectedStrategies() {
-        const checkboxes = document.querySelectorAll('.strategy-checkbox:checked');
-        return Array.from(checkboxes).map(cb => cb.value);
+    // Get selected risk strategy
+    function getSelectedRiskStrategy() {
+        const selectedRadio = document.querySelector('input[name="strategy"]:checked');
+        return selectedRadio ? selectedRadio.value : 'default_risk';
     }
 
-    // Fetch suggested stocks from API
+    // Fetch suggested stocks from API using new risk-based approach
     async function fetchSuggestedStocks() {
         try {
             // Show loading spinner
             showLoadingSpinner();
             
-            const selectedStrategies = getSelectedStrategies();
+            const riskStrategy = getSelectedRiskStrategy();
             const timeFilter = document.getElementById('time-filter').value;
             
-            // Build query parameters
-            const params = new URLSearchParams();
-            selectedStrategies.forEach(strategy => params.append('strategies', strategy));
-            params.append('time_filter', timeFilter);
-            
-            const response = await fetch(`/api/suggested-stocks?${params}`, {
-                credentials: 'same-origin'
+            // Use the new enhanced strategy API
+            const response = await fetch('/api/strategy/generate-recommendations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    strategy_type: riskStrategy,
+                    capital: 100000, // Default 1 lakh
+                    time_filter: timeFilter
+                })
             });
             
             if (!response.ok) {
@@ -126,11 +117,11 @@
             const data = await response.json();
             
             if (data.success) {
-                suggestedStocks = data.data;
+                suggestedStocks = data.recommendations || [];
                 populateTable();
-                showNotification(`Loaded ${data.total} suggested stocks`, 'success');
+                showNotification(`Loaded ${suggestedStocks.length} ${riskStrategy.replace('_', ' ')} recommendations`, 'success');
             } else {
-                throw new Error(data.error || 'Failed to fetch suggested stocks');
+                throw new Error(data.error || 'Failed to fetch stock recommendations');
             }
         } catch (error) {
             console.error('Error fetching suggested stocks:', error);
@@ -190,72 +181,70 @@
         if (suggestedStocks.length === 0) {
             const row = table.insertRow();
             const cell = row.insertCell();
-            cell.colSpan = 9;
+            cell.colSpan = 10;
             cell.className = 'text-center text-muted py-4';
-            cell.innerHTML = '<i class="bi bi-info-circle me-2"></i>No stocks found. Try adjusting your filters or refresh the data.';
+            cell.innerHTML = '<i class="bi bi-info-circle me-2"></i>No recommendations found. Try adjusting your risk level or refresh the data.';
             return;
         }
         
-        suggestedStocks.forEach(stock => {
+        suggestedStocks.forEach(recommendation => {
             const row = table.insertRow();
             
-            // Calculate values
-            const investment = stock.quantity * stock.selection_price;
-            const value = stock.quantity * stock.current_price;
+            // Extract data from recommendation (it's already a flat dictionary)
+            const stock = recommendation;
+            const mlPrediction = recommendation.ml_prediction || {};
             
-            // Populate row
-            row.insertCell(0).textContent = stock.symbol;
-            row.insertCell(1).textContent = new Date(stock.selection_date).toLocaleDateString();
-            row.insertCell(2).textContent = '₹' + stock.selection_price.toFixed(2);
-            row.insertCell(3).textContent = '₹' + stock.current_price.toFixed(2);
-            row.insertCell(4).textContent = stock.quantity;
-            row.insertCell(5).textContent = '₹' + investment.toFixed(2);
-            row.insertCell(6).textContent = '₹' + value.toFixed(2);
+            // Populate row with new structure
+            row.insertCell(0).textContent = stock.symbol || 'N/A';
+            row.insertCell(1).textContent = stock.name || 'N/A';
             
-            // Strategy column
-            const strategyCell = row.insertCell(7);
-            strategyCell.textContent = stock.strategy;
-            strategyCell.className = 'text-info';
+            // Market Cap
+            const marketCapCell = row.insertCell(2);
+            const marketCap = stock.market_cap || 0;
+            if (marketCap > 20000) {
+                marketCapCell.innerHTML = '<span class="badge bg-success">Large Cap</span>';
+            } else if (marketCap > 5000) {
+                marketCapCell.innerHTML = '<span class="badge bg-warning">Mid Cap</span>';
+            } else {
+                marketCapCell.innerHTML = '<span class="badge bg-danger">Small Cap</span>';
+            }
             
-            // Status column
-            const statusCell = row.insertCell(8);
-            statusCell.textContent = stock.status;
-            statusCell.className = stock.status === 'Active' ? 'text-success' : 
-                                stock.status === 'Sold' ? 'text-secondary' : 'text-warning';
+            row.insertCell(3).textContent = '₹' + (stock.current_price || 0).toFixed(2);
+            row.insertCell(4).textContent = '₹' + (stock.target_price || 0).toFixed(2);
+            
+            // Expected Return
+            const returnCell = row.insertCell(5);
+            const expectedReturn = stock.expected_return || 0;
+            returnCell.textContent = expectedReturn.toFixed(1) + '%';
+            returnCell.className = expectedReturn > 0 ? 'text-success' : 'text-danger';
+            
+            // ML Confidence
+            const confidenceCell = row.insertCell(6);
+            const confidence = mlPrediction.confidence || 0;
+            confidenceCell.textContent = (confidence * 100).toFixed(1) + '%';
+            confidenceCell.className = confidence > 0.7 ? 'text-success' : confidence > 0.5 ? 'text-warning' : 'text-danger';
+            
+            row.insertCell(7).textContent = stock.recommended_quantity || 0;
+            row.insertCell(8).textContent = '₹' + (stock.investment_amount || 0).toFixed(2);
+            
+            // Risk Level
+            const riskCell = row.insertCell(9);
+            const riskScore = stock.risk_score || 0;
+            if (riskScore < 0.3) {
+                riskCell.innerHTML = '<span class="badge bg-success">Low</span>';
+            } else if (riskScore < 0.7) {
+                riskCell.innerHTML = '<span class="badge bg-warning">Medium</span>';
+            } else {
+                riskCell.innerHTML = '<span class="badge bg-danger">High</span>';
+            }
         });
     }
 
     // Handle strategy filter changes
     function handleStrategyFilter() {
-        const allCheckbox = document.getElementById('strategy-all');
-        const strategyCheckboxes = document.querySelectorAll('.strategy-checkbox');
-        
-        if (allCheckbox.checked) {
-            // If "All" is checked, check all strategy checkboxes
-            strategyCheckboxes.forEach(cb => cb.checked = true);
-        } else {
-            // If "All" is unchecked, uncheck all strategy checkboxes
-            strategyCheckboxes.forEach(cb => cb.checked = false);
-        }
-        
         fetchSuggestedStocks();
     }
 
-    // Handle individual strategy checkbox changes
-    function handleIndividualStrategyChange() {
-        const allCheckbox = document.getElementById('strategy-all');
-        const strategyCheckboxes = document.querySelectorAll('.strategy-checkbox');
-        const checkedCount = document.querySelectorAll('.strategy-checkbox:checked').length;
-        
-        // If all individual checkboxes are checked, check "All"
-        if (checkedCount === strategyCheckboxes.length) {
-            allCheckbox.checked = true;
-        } else {
-            allCheckbox.checked = false;
-        }
-        
-        fetchSuggestedStocks();
-    }
 
     // Show notification function
     function showNotification(message, type = 'info') {
@@ -304,15 +293,26 @@
     // Event listeners
     document.getElementById('time-filter').addEventListener('change', fetchSuggestedStocks);
     document.getElementById('refresh-btn').addEventListener('click', refreshSuggestedStocks);
-    document.getElementById('strategy-all').addEventListener('change', handleStrategyFilter);
     
-    // Add event listeners to individual strategy checkboxes
-    document.querySelectorAll('.strategy-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', handleIndividualStrategyChange);
+    // Add event listeners to strategy radio buttons
+    document.querySelectorAll('input[name="strategy"]').forEach(radio => {
+        radio.addEventListener('change', handleStrategyFilter);
     });
 
     // Initialize page when loaded
     document.addEventListener('DOMContentLoaded', function() {
+        // Check if strategy is specified in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const strategyParam = urlParams.get('strategy');
+        
+        if (strategyParam && (strategyParam === 'default_risk' || strategyParam === 'high_risk')) {
+            // Set the radio button based on URL parameter
+            const radioButton = document.getElementById(`strategy-${strategyParam.replace('_', '-')}`);
+            if (radioButton) {
+                radioButton.checked = true;
+            }
+        }
+        
         fetchSuggestedStocks();
     });
 </script>

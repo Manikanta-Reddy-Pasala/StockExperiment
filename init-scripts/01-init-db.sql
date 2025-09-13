@@ -194,3 +194,163 @@ CREATE TABLE IF NOT EXISTS broker_configurations (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, broker_name)
 );
+
+-- Enhanced Stock Strategy Tables
+CREATE TABLE IF NOT EXISTS stocks (
+    id SERIAL PRIMARY KEY,
+    symbol VARCHAR(50) UNIQUE NOT NULL,
+    name VARCHAR(200) NOT NULL,
+    exchange VARCHAR(20) NOT NULL,
+    sector VARCHAR(100),
+    market_cap DECIMAL(15,2),
+    market_cap_category VARCHAR(20),
+    current_price DECIMAL(10,2),
+    volume BIGINT,
+    pe_ratio DECIMAL(8,2),
+    pb_ratio DECIMAL(8,2),
+    roe DECIMAL(8,4),
+    debt_to_equity DECIMAL(8,4),
+    dividend_yield DECIMAL(8,4),
+    beta DECIMAL(8,4),
+    is_active BOOLEAN DEFAULT TRUE,
+    is_tradeable BOOLEAN DEFAULT TRUE,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS stock_prices (
+    id SERIAL PRIMARY KEY,
+    stock_id INTEGER REFERENCES stocks(id),
+    date DATE NOT NULL,
+    open_price DECIMAL(10,2),
+    high_price DECIMAL(10,2),
+    low_price DECIMAL(10,2),
+    close_price DECIMAL(10,2),
+    volume BIGINT,
+    adjusted_close DECIMAL(10,2),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(stock_id, date)
+);
+
+CREATE TABLE IF NOT EXISTS strategy_types (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) UNIQUE NOT NULL,
+    display_name VARCHAR(100) NOT NULL,
+    description TEXT,
+    config_json TEXT,
+    large_cap_allocation DECIMAL(5,4) DEFAULT 0.0,
+    mid_cap_allocation DECIMAL(5,4) DEFAULT 0.0,
+    small_cap_allocation DECIMAL(5,4) DEFAULT 0.0,
+    risk_level VARCHAR(20),
+    max_position_size DECIMAL(5,4),
+    max_sector_allocation DECIMAL(5,4),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS strategy_stock_selections (
+    id SERIAL PRIMARY KEY,
+    strategy_type_id INTEGER REFERENCES strategy_types(id),
+    stock_id INTEGER REFERENCES stocks(id),
+    selection_date DATE NOT NULL,
+    selection_price DECIMAL(10,2),
+    selection_reason TEXT,
+    ml_confidence DECIMAL(5,4),
+    expected_return DECIMAL(8,4),
+    risk_score DECIMAL(5,4),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(strategy_type_id, stock_id, selection_date)
+);
+
+CREATE TABLE IF NOT EXISTS ml_predictions (
+    id SERIAL PRIMARY KEY,
+    stock_id INTEGER REFERENCES stocks(id),
+    prediction_date DATE NOT NULL,
+    rf_predicted_price DECIMAL(10,2),
+    xgb_predicted_price DECIMAL(10,2),
+    lstm_predicted_price DECIMAL(10,2),
+    final_predicted_price DECIMAL(10,2),
+    predicted_change_percent DECIMAL(8,4),
+    confidence DECIMAL(5,4),
+    signal VARCHAR(10),
+    prediction_horizon_days INTEGER,
+    model_version VARCHAR(20),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(stock_id, prediction_date, prediction_horizon_days)
+);
+
+CREATE TABLE IF NOT EXISTS portfolio_strategies (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    strategy_name VARCHAR(100) NOT NULL,
+    strategy_type VARCHAR(20) NOT NULL,
+    total_capital DECIMAL(15,2) NOT NULL,
+    allocated_capital DECIMAL(15,2) DEFAULT 0.0,
+    available_capital DECIMAL(15,2),
+    large_cap_allocation DECIMAL(5,4) DEFAULT 0.6,
+    mid_cap_allocation DECIMAL(5,4) DEFAULT 0.3,
+    small_cap_allocation DECIMAL(5,4) DEFAULT 0.1,
+    max_position_size DECIMAL(5,4) DEFAULT 0.05,
+    max_sector_allocation DECIMAL(5,4) DEFAULT 0.20,
+    stop_loss_percentage DECIMAL(5,4) DEFAULT 0.10,
+    rebalance_frequency_days INTEGER DEFAULT 30,
+    last_rebalance_date TIMESTAMP,
+    next_rebalance_date TIMESTAMP,
+    initial_value DECIMAL(15,2),
+    current_value DECIMAL(15,2),
+    total_return DECIMAL(15,2),
+    return_percentage DECIMAL(8,4),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS portfolio_positions (
+    id SERIAL PRIMARY KEY,
+    portfolio_strategy_id INTEGER REFERENCES portfolio_strategies(id),
+    stock_id INTEGER REFERENCES stocks(id),
+    quantity INTEGER NOT NULL,
+    average_price DECIMAL(10,2) NOT NULL,
+    current_price DECIMAL(10,2),
+    market_value DECIMAL(15,2),
+    unrealized_pnl DECIMAL(15,2),
+    realized_pnl DECIMAL(15,2),
+    entry_date DATE NOT NULL,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Insert default strategy types
+INSERT INTO strategy_types (
+    name, display_name, description, config_json,
+    large_cap_allocation, mid_cap_allocation, small_cap_allocation,
+    risk_level, max_position_size, max_sector_allocation, is_active
+) VALUES 
+(
+    'default_risk',
+    'Default Risk (Balanced)',
+    'Balanced portfolio with 60% large cap, 30% mid cap, and 10% small cap allocation. Suitable for moderate risk investors.',
+    '{"approach": "balanced", "rebalance_frequency": 30, "ml_confidence_threshold": 0.65}',
+    0.60, 0.30, 0.10,
+    'medium', 0.05, 0.20, TRUE
+),
+(
+    'high_risk',
+    'High Risk (Small Cap Focus)',
+    'Aggressive portfolio with 80% small cap and 20% mid cap allocation. Suitable for high risk investors seeking higher returns.',
+    '{"approach": "aggressive", "rebalance_frequency": 15, "ml_confidence_threshold": 0.60}',
+    0.00, 0.20, 0.80,
+    'high', 0.08, 0.30, TRUE
+) ON CONFLICT (name) DO NOTHING;
+
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_stocks_symbol ON stocks(symbol);
+CREATE INDEX IF NOT EXISTS idx_stocks_market_cap_category ON stocks(market_cap_category);
+CREATE INDEX IF NOT EXISTS idx_stock_prices_stock_date ON stock_prices(stock_id, date);
+CREATE INDEX IF NOT EXISTS idx_strategy_stock_selections_strategy ON strategy_stock_selections(strategy_type_id);
+CREATE INDEX IF NOT EXISTS idx_ml_predictions_stock_date ON ml_predictions(stock_id, prediction_date);
+CREATE INDEX IF NOT EXISTS idx_portfolio_strategies_user ON portfolio_strategies(user_id);
+CREATE INDEX IF NOT EXISTS idx_portfolio_positions_portfolio ON portfolio_positions(portfolio_strategy_id);

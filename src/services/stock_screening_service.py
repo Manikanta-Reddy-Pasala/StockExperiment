@@ -15,12 +15,9 @@ logger = logging.getLogger(__name__)
 
 
 class StrategyType(Enum):
-    """Trading strategy types."""
-    MOMENTUM = "momentum"
-    VALUE = "value"
-    GROWTH = "growth"
-    MEAN_REVERSION = "mean-reversion"
-    BREAKOUT = "breakout"
+    """Risk-based strategy types."""
+    DEFAULT_RISK = "default_risk"
+    HIGH_RISK = "high_risk"
 
 
 @dataclass
@@ -115,7 +112,7 @@ class StockScreeningService:
     def screen_stocks(self, strategy_types: List[StrategyType] = None, user_id: int = 1) -> List[StockData]:
         """Screen stocks based on criteria and strategies."""
         if strategy_types is None:
-            strategy_types = [StrategyType.MOMENTUM, StrategyType.VALUE, StrategyType.GROWTH]
+            strategy_types = [StrategyType.DEFAULT_RISK, StrategyType.HIGH_RISK]
         
         # Initialize FYERS connector
         if not self._initialize_fyers_connector(user_id):
@@ -469,83 +466,47 @@ class StockScreeningService:
         return True
     
     def _passes_strategy_screening(self, stock: StockData, strategy: StrategyType) -> bool:
-        """Check if stock passes strategy-specific screening."""
-        if strategy == StrategyType.MOMENTUM:
-            return self._passes_momentum_screening(stock)
-        elif strategy == StrategyType.VALUE:
-            return self._passes_value_screening(stock)
-        elif strategy == StrategyType.GROWTH:
-            return self._passes_growth_screening(stock)
-        elif strategy == StrategyType.MEAN_REVERSION:
-            return self._passes_mean_reversion_screening(stock)
-        elif strategy == StrategyType.BREAKOUT:
-            return self._passes_breakout_screening(stock)
+        """Check if stock passes risk-based strategy screening."""
+        if strategy == StrategyType.DEFAULT_RISK:
+            return self._passes_default_risk_screening(stock)
+        elif strategy == StrategyType.HIGH_RISK:
+            return self._passes_high_risk_screening(stock)
         
         return False
     
-    def _passes_momentum_screening(self, stock: StockData) -> bool:
-        """Momentum strategy screening criteria."""
-        # Price momentum > 5%, Volume > 1.5x average
-        price_momentum = self._calculate_price_momentum(stock.symbol)
-        volume_ratio = stock.volume / stock.avg_volume if stock.avg_volume > 0 else 0
+    def _passes_default_risk_screening(self, stock: StockData) -> bool:
+        """Default risk strategy screening criteria - balanced approach."""
+        # Focus on large and mid cap stocks with good fundamentals
+        market_cap_ok = stock.market_cap is None or stock.market_cap >= 5000  # 5000 Cr+ (mid cap and above)
+        pe_ok = stock.pe_ratio is None or (stock.pe_ratio > 5 and stock.pe_ratio < 30)  # Reasonable PE
+        debt_ok = stock.debt_to_equity is None or stock.debt_to_equity < 0.5  # Low debt
+        roe_ok = stock.roe is None or stock.roe > 0.10  # Decent ROE
         
-        return price_momentum > 5.0 and volume_ratio > 1.5
+        return market_cap_ok and pe_ok and debt_ok and roe_ok
     
-    def _passes_value_screening(self, stock: StockData) -> bool:
-        """Value strategy screening criteria."""
-        # PE < 15, PB < 2, Debt/Equity < 0.3, ROE > 15%
-        pe_ok = stock.pe_ratio is None or stock.pe_ratio < 15
-        pb_ok = stock.pb_ratio is None or stock.pb_ratio < 2
-        debt_ok = stock.debt_to_equity is None or stock.debt_to_equity < 0.3
-        roe_ok = stock.roe is None or stock.roe > 0.15
+    def _passes_high_risk_screening(self, stock: StockData) -> bool:
+        """High risk strategy screening criteria - aggressive approach."""
+        # Focus on small and mid cap stocks with growth potential
+        market_cap_ok = stock.market_cap is None or stock.market_cap < 20000  # Below large cap
+        growth_ok = stock.sales_growth is None or stock.sales_growth > 10  # Some growth
+        volume_ok = stock.volume is None or stock.volume > 100000  # Decent liquidity
         
-        return pe_ok and pb_ok and debt_ok and roe_ok
-    
-    def _passes_growth_screening(self, stock: StockData) -> bool:
-        """Growth strategy screening criteria."""
-        # Revenue growth > 20%, Profit growth > 15%, ROE > 20%
-        revenue_growth_ok = stock.sales_growth is None or stock.sales_growth > 20
-        profit_growth_ok = stock.operating_profit_growth is None or stock.operating_profit_growth > 15
-        roe_ok = stock.roe is None or stock.roe > 0.20
-        
-        return revenue_growth_ok and profit_growth_ok and roe_ok
-    
-    def _passes_mean_reversion_screening(self, stock: StockData) -> bool:
-        """Mean reversion strategy screening criteria."""
-        # Stock trading below 20-day moving average but above 50-day
-        return self._is_mean_reversion_candidate(stock.symbol)
-    
-    def _passes_breakout_screening(self, stock: StockData) -> bool:
-        """Breakout strategy screening criteria."""
-        # Stock breaking above resistance with high volume
-        return self._is_breakout_candidate(stock.symbol)
+        return market_cap_ok and growth_ok and volume_ok
     
     def _create_recommendation(self, stock: StockData, strategy: StrategyType) -> StockData:
-        """Create stock recommendation based on strategy."""
+        """Create stock recommendation based on risk-based strategy."""
         stock.recommendation = "BUY"
-        stock.strategy = strategy.value.title() + " Strategy"
+        stock.strategy = strategy.value.replace('_', ' ').title() + " Strategy"
         
-        # Set target price and stop loss based on strategy
-        if strategy == StrategyType.MOMENTUM:
-            stock.target_price = stock.current_price * 1.15  # 15% target
-            stock.stop_loss = stock.current_price * 0.95     # 5% stop loss
-            stock.reason = "Strong momentum with high volume"
-        elif strategy == StrategyType.VALUE:
-            stock.target_price = stock.current_price * 1.20  # 20% target
-            stock.stop_loss = stock.current_price * 0.90     # 10% stop loss
-            stock.reason = "Undervalued with strong fundamentals"
-        elif strategy == StrategyType.GROWTH:
-            stock.target_price = stock.current_price * 1.25  # 25% target
-            stock.stop_loss = stock.current_price * 0.88     # 12% stop loss
-            stock.reason = "High growth potential with strong ROE"
-        elif strategy == StrategyType.MEAN_REVERSION:
-            stock.target_price = stock.current_price * 1.10  # 10% target
+        # Set target price and stop loss based on risk strategy
+        if strategy == StrategyType.DEFAULT_RISK:
+            stock.target_price = stock.current_price * 1.12  # 12% target (conservative)
             stock.stop_loss = stock.current_price * 0.92     # 8% stop loss
-            stock.reason = "Mean reversion opportunity"
-        elif strategy == StrategyType.BREAKOUT:
-            stock.target_price = stock.current_price * 1.18  # 18% target
-            stock.stop_loss = stock.current_price * 0.93     # 7% stop loss
-            stock.reason = "Breakout with high volume"
+            stock.reason = "Balanced risk profile with stable fundamentals"
+        elif strategy == StrategyType.HIGH_RISK:
+            stock.target_price = stock.current_price * 1.25  # 25% target (aggressive)
+            stock.stop_loss = stock.current_price * 0.85     # 15% stop loss
+            stock.reason = "High growth potential with higher risk-reward"
         
         return stock
     
@@ -553,17 +514,11 @@ class StockScreeningService:
         """Calculate recommendation score for sorting."""
         score = 0.0
         
-        # Base score from strategy strength
-        if stock.strategy == "Momentum Strategy":
-            score += 8.0
-        elif stock.strategy == "Value Strategy":
-            score += 7.0
-        elif stock.strategy == "Growth Strategy":
-            score += 9.0
-        elif stock.strategy == "Mean Reversion Strategy":
-            score += 6.0
-        elif stock.strategy == "Breakout Strategy":
-            score += 7.5
+        # Base score from risk strategy strength
+        if stock.strategy == "Default Risk Strategy":
+            score += 7.5  # Balanced approach
+        elif stock.strategy == "High Risk Strategy":
+            score += 8.5  # Higher potential returns
         
         # Bonus for strong fundamentals
         if stock.roe and stock.roe > 0.20:

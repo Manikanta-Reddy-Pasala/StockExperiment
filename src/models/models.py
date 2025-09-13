@@ -9,6 +9,12 @@ from flask_login import UserMixin
 
 Base = declarative_base()
 
+# Import enhanced stock models
+from .stock_models import (
+    Stock, StockPrice, StrategyType, StrategyStockSelection, MLPrediction,
+    PortfolioStrategy, PortfolioPosition, MarketDataSnapshot, MarketCapCategory
+)
+
 
 class User(UserMixin, Base):
     """User authentication and profile information."""
@@ -178,7 +184,7 @@ class Position(Base):
 
 
 class Strategy(Base):
-    """Momentum selection parameters."""
+    """Strategy selection parameters."""
     __tablename__ = 'strategies'
     
     id = Column(Integer, primary_key=True)

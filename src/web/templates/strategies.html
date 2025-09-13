@@ -80,12 +80,17 @@
                         </thead>
                         <tbody>
                             <tr>
-                                <td>Momentum Strategy</td>
-                                <td>Identifies stocks with strong price momentum</td>
-                                <td class="text-success">Active</td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline-primary me-1" title="Pause Strategy">
-                                        <i class="bi bi-pause-fill"></i>
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-shield-check text-success me-2"></i>
+                                        <strong>Default Risk Strategy</strong>
+                                    </div>
+                                </td>
+                                <td>Balanced portfolio with 60% large cap, 30% mid cap, and 10% small cap allocation</td>
+                                <td><span class="badge bg-success">Active</span></td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary me-1" title="View Recommendations" onclick="viewRecommendations('default_risk')">
+                                        <i class="bi bi-eye-fill"></i>
                                     </button>
                                     <button class="btn btn-sm btn-outline-secondary" title="Configure">
                                         <i class="bi bi-gear-fill"></i>
@@ -93,12 +98,17 @@
                                 </td>
                             </tr>
                             <tr>
-                                <td>Breakout Strategy</td>
-                                <td>Detects stocks breaking through key resistance levels</td>
-                                <td class="text-success">Active</td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline-primary me-1" title="Pause Strategy">
-                                        <i class="bi bi-pause-fill"></i>
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-lightning-charge text-warning me-2"></i>
+                                        <strong>High Risk Strategy</strong>
+                                    </div>
+                                </td>
+                                <td>Aggressive portfolio with 80% small cap and 20% mid cap allocation for higher returns</td>
+                                <td><span class="badge bg-success">Active</span></td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary me-1" title="View Recommendations" onclick="viewRecommendations('high_risk')">
+                                        <i class="bi bi-eye-fill"></i>
                                     </button>
                                     <button class="btn btn-sm btn-outline-secondary" title="Configure">
                                         <i class="bi bi-gear-fill"></i>
@@ -147,28 +157,28 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td>2025-09-09 10:30</td>
-                        <td>Momentum</td>
-                        <td>RELIANCE.NS</td>
+                        <td>2025-09-14 10:30</td>
+                        <td><span class="badge bg-success">Default Risk</span></td>
+                        <td>NSE:RELIANCE-EQ</td>
                         <td class="text-success">BUY</td>
                         <td>₹2,750.50</td>
-                        <td><span class="badge bg-success">Executed</span></td>
+                        <td><span class="badge bg-success">ML Signal</span></td>
                     </tr>
                     <tr>
-                        <td>2025-09-09 09:45</td>
-                        <td>Breakout</td>
-                        <td>TCS.NS</td>
+                        <td>2025-09-14 09:45</td>
+                        <td><span class="badge bg-warning">High Risk</span></td>
+                        <td>NSE:SMALLCAP-EQ</td>
                         <td class="text-success">BUY</td>
-                        <td>₹3,850.75</td>
-                        <td><span class="badge bg-warning">Pending</span></td>
+                        <td>₹850.75</td>
+                        <td><span class="badge bg-info">AI Recommended</span></td>
                     </tr>
                     <tr>
-                        <td>2025-09-08 11:15</td>
-                        <td>Momentum</td>
-                        <td>INFY.NS</td>
-                        <td class="text-danger">SELL</td>
-                        <td>₹1,620.00</td>
-                        <td><span class="badge bg-success">Executed</span></td>
+                        <td>2025-09-14 09:15</td>
+                        <td><span class="badge bg-success">Default Risk</span></td>
+                        <td>NSE:TCS-EQ</td>
+                        <td class="text-success">BUY</td>
+                        <td>₹3,850.00</td>
+                        <td><span class="badge bg-success">ML Signal</span></td>
                     </tr>
                 </tbody>
             </table>
@@ -188,13 +198,13 @@
         const isDarkMode = false;
         
         // Define colors based on theme
-        const momentumBorderColor = isDarkMode ? 'rgb(37, 139, 255)' : 'rgb(13, 110, 253)';
-        const momentumBgColor = isDarkMode ? 'rgba(37, 139, 255, 0.2)' : 'rgba(13, 110, 253, 0.1)';
-        const momentumPointColor = isDarkMode ? 'rgb(37, 139, 255)' : 'rgb(13, 110, 253)';
+        const defaultRiskBorderColor = isDarkMode ? 'rgb(37, 139, 255)' : 'rgb(13, 110, 253)';
+        const defaultRiskBgColor = isDarkMode ? 'rgba(37, 139, 255, 0.2)' : 'rgba(13, 110, 253, 0.1)';
+        const defaultRiskPointColor = isDarkMode ? 'rgb(37, 139, 255)' : 'rgb(13, 110, 253)';
         
-        const breakoutBorderColor = isDarkMode ? 'rgb(76, 201, 100)' : 'rgb(40, 167, 69)';
-        const breakoutBgColor = isDarkMode ? 'rgba(76, 201, 100, 0.2)' : 'rgba(40, 167, 69, 0.1)';
-        const breakoutPointColor = isDarkMode ? 'rgb(76, 201, 100)' : 'rgb(40, 167, 69)';
+        const highRiskBorderColor = isDarkMode ? 'rgb(76, 201, 100)' : 'rgb(40, 167, 69)';
+        const highRiskBgColor = isDarkMode ? 'rgba(76, 201, 100, 0.2)' : 'rgba(40, 167, 69, 0.1)';
+        const highRiskPointColor = isDarkMode ? 'rgb(76, 201, 100)' : 'rgb(40, 167, 69)';
         
         const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
         const textColor = isDarkMode ? '#e0e0e0' : '#000';
@@ -205,25 +215,25 @@
             data: {
                 labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'],
                 datasets: [{
-                    label: 'Momentum Strategy',
-                    data: [12, 19, 15, 18, 22, 25, 20, 24, 28],
-                    borderColor: momentumBorderColor,
-                    backgroundColor: momentumBgColor,
+                    label: 'Default Risk Strategy',
+                    data: [8, 12, 10, 14, 16, 18, 15, 17, 20],
+                    borderColor: defaultRiskBorderColor,
+                    backgroundColor: defaultRiskBgColor,
                     tension: 0.3,
                     fill: true,
                     pointRadius: 3,
-                    pointBackgroundColor: momentumPointColor,
+                    pointBackgroundColor: defaultRiskPointColor,
                     pointBorderColor: isDarkMode ? '#121212' : '#fff',
                     pointBorderWidth: 1
                 }, {
-                    label: 'Breakout Strategy',
-                    data: [8, 12, 10, 14, 16, 18, 15, 17, 20],
-                    borderColor: breakoutBorderColor,
-                    backgroundColor: breakoutBgColor,
+                    label: 'High Risk Strategy',
+                    data: [12, 19, 15, 18, 22, 25, 20, 24, 28],
+                    borderColor: highRiskBorderColor,
+                    backgroundColor: highRiskBgColor,
                     tension: 0.3,
                     fill: true,
                     pointRadius: 3,
-                    pointBackgroundColor: breakoutPointColor,
+                    pointBackgroundColor: highRiskPointColor,
                     pointBorderColor: isDarkMode ? '#121212' : '#fff',
                     pointBorderWidth: 1
                 }]
@@ -295,6 +305,14 @@
                 }
             }
         });
+    }
+    
+    // View recommendations for a specific strategy
+    function viewRecommendations(strategyType) {
+        // Redirect to suggested stocks page with the selected strategy
+        const url = new URL('/suggested_stocks', window.location.origin);
+        url.searchParams.set('strategy', strategyType);
+        window.location.href = url.toString();
     }
     
     // Initialize page when loaded

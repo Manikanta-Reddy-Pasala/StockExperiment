@@ -25,7 +25,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
         """Get suggested stocks with comprehensive search and sort functionality."""
         try:
             if not strategies:
-                strategies = [StrategyType.MOMENTUM, StrategyType.VALUE, StrategyType.GROWTH]
+                strategies = [StrategyType.DEFAULT_RISK, StrategyType.HIGH_RISK]
             
             # Get watchlist suggestions with search and filtering
             suggestions_response = self.fyers_api.get_watchlist_suggestions(
@@ -510,31 +510,25 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
             recommendation='BUY'  # Will be refined based on analysis
         )
         
-        # Set strategy-specific targets
-        if strategy == StrategyType.MOMENTUM:
-            stock.target_price = suggestion['price'] * 1.15  # 15% upside
+        # Set risk-based strategy targets
+        if strategy == StrategyType.DEFAULT_RISK:
+            stock.target_price = suggestion['price'] * 1.12  # 12% upside (conservative)
             stock.stop_loss = suggestion['price'] * 0.92     # 8% stop loss
-            stock.reason = f"Strong momentum with {suggestion.get('change_percent', 0):.2f}% change"
-        elif strategy == StrategyType.VALUE:
-            stock.target_price = suggestion['price'] * 1.20  # 20% upside
-            stock.stop_loss = suggestion['price'] * 0.90     # 10% stop loss
-            stock.reason = "Undervalued based on fundamental metrics"
-        elif strategy == StrategyType.GROWTH:
-            stock.target_price = suggestion['price'] * 1.25  # 25% upside
-            stock.stop_loss = suggestion['price'] * 0.88     # 12% stop loss
-            stock.reason = "Strong growth prospects in expanding sector"
+            stock.reason = "Balanced risk profile with stable fundamentals"
+        elif strategy == StrategyType.HIGH_RISK:
+            stock.target_price = suggestion['price'] * 1.25  # 25% upside (aggressive)
+            stock.stop_loss = suggestion['price'] * 0.85     # 15% stop loss
+            stock.reason = "High growth potential with higher risk-reward"
         
         return stock
     
     def _meets_strategy_criteria(self, stock: SuggestedStock, strategy: StrategyType) -> bool:
-        """Check if stock meets strategy-specific criteria."""
-        # Simplified criteria - in reality you'd use complex algorithms
-        if strategy == StrategyType.MOMENTUM:
-            return True  # All stocks can be momentum plays
-        elif strategy == StrategyType.VALUE:
-            return stock.current_price > 100  # Simplified value criteria
-        elif strategy == StrategyType.GROWTH:
-            return stock.current_price < 3000  # Growth stocks tend to be smaller
+        """Check if stock meets risk-based strategy criteria."""
+        # Risk-based criteria
+        if strategy == StrategyType.DEFAULT_RISK:
+            return stock.current_price > 100  # Stable, established stocks
+        elif strategy == StrategyType.HIGH_RISK:
+            return stock.current_price < 2000  # Smaller, growth-oriented stocks
         return True
     
     def _applies_search_filters(self, result: Dict[str, Any], filters: Dict[str, Any]) -> bool:

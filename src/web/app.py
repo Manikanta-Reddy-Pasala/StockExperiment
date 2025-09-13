@@ -822,8 +822,7 @@ def create_app():
             
             strategy_types = [StrategyType(s) for s in strategies if s in StrategyType._value2member_map_]
             if not strategy_types:
-                strategy_types = [StrategyType.MOMENTUM, StrategyType.VALUE, StrategyType.GROWTH, 
-                                StrategyType.MEAN_REVERSION, StrategyType.BREAKOUT]
+                strategy_types = [StrategyType.DEFAULT_RISK, StrategyType.HIGH_RISK]
 
             suggested_stocks = stock_screening_service.screen_stocks(strategy_types, current_user.id)
             
@@ -936,6 +935,15 @@ def create_app():
     except ImportError as e:
         app.logger.warning(f"ML prediction routes not available: {e}")
         app.logger.warning("ML functionality will be disabled")
+
+    # Register enhanced strategy blueprints
+    try:
+        from .routes.strategy_routes import strategy_bp
+        app.register_blueprint(strategy_bp)
+        app.logger.info("Enhanced strategy routes registered successfully")
+    except ImportError as e:
+        app.logger.warning(f"Enhanced strategy routes not available: {e}")
+        app.logger.warning("Enhanced strategy functionality will be disabled")
 
     # Individual broker page routes
     @app.route('/brokers/fyers')

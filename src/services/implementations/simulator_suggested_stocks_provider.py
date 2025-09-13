@@ -17,7 +17,7 @@ class SimulatorSuggestedStocksProvider(ISuggestedStocksProvider):
                            limit: int = 50) -> Dict[str, Any]:
         """Get simulated suggested stocks."""
         if not strategies:
-            strategies = [StrategyType.MOMENTUM, StrategyType.VALUE, StrategyType.GROWTH]
+            strategies = [StrategyType.DEFAULT_RISK, StrategyType.HIGH_RISK]
         
         suggested_stocks = []
         sample_stocks = [

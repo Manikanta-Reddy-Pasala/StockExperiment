@@ -12,14 +12,9 @@ from enum import Enum
 
 
 class StrategyType(Enum):
-    """Stock screening strategy types."""
-    MOMENTUM = "momentum"
-    VALUE = "value"
-    GROWTH = "growth"
-    MEAN_REVERSION = "mean_reversion"
-    BREAKOUT = "breakout"
-    TECHNICAL = "technical"
-    FUNDAMENTAL = "fundamental"
+    """Risk-based strategy types."""
+    DEFAULT_RISK = "default_risk"
+    HIGH_RISK = "high_risk"
 
 
 class ISuggestedStocksProvider(ABC):
