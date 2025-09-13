@@ -170,6 +170,7 @@ class BrokerService:
             is_expired = self.is_token_expired(config.access_token)
             
             # Return data dictionary instead of SQLAlchemy object
+            is_connected = config.is_connected and not is_expired
             return {
                 'id': config.id,
                 'user_id': config.user_id,
@@ -182,10 +183,10 @@ class BrokerService:
                 'redirect_url': config.redirect_url,
                 'app_type': config.app_type,
                 'is_active': config.is_active,
-                'is_connected': config.is_connected and not is_expired,  # Mark as disconnected if token expired
+                'is_connected': is_connected,
                 'is_token_expired': is_expired,
                 'last_connection_test': config.last_connection_test,
-                'connection_status': 'expired' if is_expired else config.connection_status,
+                'connection_status': 'expired' if is_expired else ('connected' if is_connected else 'disconnected'),
                 'error_message': config.error_message,
                 'created_at': config.created_at,
                 'updated_at': config.updated_at
