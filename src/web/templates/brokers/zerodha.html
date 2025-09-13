@@ -259,7 +259,7 @@
                 
                 // Update connection status from database
                 const connectionStatus = data.connection_status || 'unknown';
-                const isConnected = data.connected || false;
+                const isConnected = data.is_connected || false;
                 
                 document.getElementById('zerodha-connection-status').textContent = connectionStatus.charAt(0).toUpperCase() + connectionStatus.slice(1);
                 document.getElementById('zerodha-connection-status').className = 
