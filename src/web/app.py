@@ -49,6 +49,7 @@ def create_app():
     # Generate a secret key for sessions
     app.secret_key = secrets.token_hex(16)
     
+    
     # Initialize Flask-Login
     login_manager = LoginManager()
     login_manager.init_app(app)
@@ -954,6 +955,78 @@ def create_app():
     def brokers_simulator():
         """Simulator broker page."""
         return render_template('brokers/simulator.html')
+
+
+    # Add missing API endpoints that frontend expects
+    @app.route('/api/portfolio', methods=['GET'])
+    @login_required
+    def api_get_portfolio():
+        """Get portfolio summary - redirect to unified endpoint."""
+        try:
+            from .routes.unified_routes import api_get_portfolio_summary_detailed
+            return api_get_portfolio_summary_detailed()
+        except Exception as e:
+            app.logger.error(f"Error fetching portfolio: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+    @app.route('/api/orders/', methods=['GET'])
+    @login_required
+    def api_get_orders():
+        """Get orders history - redirect to unified endpoint."""
+        try:
+            from .routes.unified_routes import api_get_orders_history
+            return api_get_orders_history()
+        except Exception as e:
+            app.logger.error(f"Error fetching orders: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+    @app.route('/api/orders', methods=['GET'])
+    @login_required
+    def api_get_orders_no_slash():
+        """Get orders history - redirect to unified endpoint (without trailing slash)."""
+        try:
+            from .routes.unified_routes import api_get_orders_history
+            return api_get_orders_history()
+        except Exception as e:
+            app.logger.error(f"Error fetching orders: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+    @app.route('/api/portfolio/positions', methods=['GET'])
+    @login_required
+    def api_get_portfolio_positions_unified():
+        """Get portfolio positions - redirect to unified endpoint."""
+        try:
+            from .routes.unified_routes import api_get_positions
+            return api_get_positions()
+        except Exception as e:
+            app.logger.error(f"Error fetching portfolio positions: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+    @app.route('/api/orders/history', methods=['GET'])
+    @login_required
+    def api_get_orders_history_unified():
+        """Get orders history - redirect to unified endpoint."""
+        try:
+            from .routes.unified_routes import api_get_orders_history as unified_orders_history
+            return unified_orders_history()
+        except Exception as e:
+            app.logger.error(f"Error fetching orders history: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
 
     return app
 

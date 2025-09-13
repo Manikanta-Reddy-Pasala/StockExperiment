@@ -10,8 +10,14 @@ from typing import Dict, List, Optional, Any, Union
 from datetime import datetime, timedelta
 import json
 from fyers_apiv3 import fyersModel
-from ..broker_service import get_broker_service
-from ..user_settings_service import get_user_settings_service
+try:
+    from ..broker_service import get_broker_service
+except ImportError:
+    from src.services.broker_service import get_broker_service
+try:
+    from ..user_settings_service import get_user_settings_service
+except ImportError:
+    from src.services.user_settings_service import get_user_settings_service
 
 logger = logging.getLogger(__name__)
 

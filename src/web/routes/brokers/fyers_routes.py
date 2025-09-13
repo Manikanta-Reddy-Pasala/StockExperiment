@@ -12,7 +12,10 @@ logger = logging.getLogger(__name__)
 try:
     from ...services.brokers.fyers_service import get_fyers_service
 except ImportError:
-    from services.brokers.fyers_service import get_fyers_service
+    try:
+        from services.brokers.fyers_service import get_fyers_service
+    except ImportError:
+        from src.services.brokers.fyers_service import get_fyers_service
 
 # Create Blueprint for FYERS routes
 fyers_bp = Blueprint('fyers', __name__, url_prefix='/brokers/fyers')

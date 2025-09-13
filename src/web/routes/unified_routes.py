@@ -250,9 +250,21 @@ def api_get_watchlist_quotes():
 def api_get_suggested_stocks():
     """Get suggested stocks using user's selected broker."""
     try:
-        strategies_param = request.args.get('strategies', '')
-        strategies = [StrategyType(s) for s in strategies_param.split(',')] if strategies_param else None
+        strategies_list = request.args.getlist('strategies')
+        strategies = []
+        if strategies_list:
+            for s in strategies_list:
+                try:
+                    strategies.append(StrategyType(s))
+                except ValueError:
+                    logger.warning(f"Invalid strategy type: {s}")
+                    continue
+        
+        if not strategies:
+            strategies = None
+            
         limit = request.args.get('limit', 50, type=int)
+        time_filter = request.args.get('time_filter', 'week')  # For future use
         
         factory = get_broker_feature_factory()
         provider = factory.get_suggested_stocks_provider(current_user.id)

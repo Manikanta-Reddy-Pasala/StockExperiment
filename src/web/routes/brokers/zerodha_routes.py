@@ -11,7 +11,10 @@ logger = logging.getLogger(__name__)
 try:
     from ...services.brokers.zerodha_service import get_zerodha_service
 except ImportError:
-    from services.brokers.zerodha_service import get_zerodha_service
+    try:
+        from services.brokers.zerodha_service import get_zerodha_service
+    except ImportError:
+        from src.services.brokers.zerodha_service import get_zerodha_service
 
 # Create Blueprint for Zerodha routes
 zerodha_bp = Blueprint('zerodha', __name__, url_prefix='/brokers/zerodha')

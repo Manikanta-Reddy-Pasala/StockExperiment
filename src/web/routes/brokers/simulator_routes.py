@@ -11,7 +11,10 @@ logger = logging.getLogger(__name__)
 try:
     from ...services.brokers.simulator_service import get_simulator_service
 except ImportError:
-    from services.brokers.simulator_service import get_simulator_service
+    try:
+        from services.brokers.simulator_service import get_simulator_service
+    except ImportError:
+        from src.services.brokers.simulator_service import get_simulator_service
 
 # Create Blueprint for Simulator routes
 simulator_bp = Blueprint('simulator', __name__, url_prefix='/brokers/simulator')
