@@ -246,7 +246,7 @@
                 
                 // Update connection status from database
                 const connectionStatus = data.connection_status || 'unknown';
-                const isConnected = data.connected || false;
+                const isConnected = data.is_connected || false;
                 const isTokenExpired = data.is_token_expired || false;
                 
                 // Handle token expiration

@@ -558,17 +558,14 @@ def create_app():
             app.logger.error(f"Error getting FYERS historical data for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
     
-    # Dashboard API Routes
+    # Dashboard API Routes - Updated to use unified multi-broker system
     @app.route('/api/dashboard/metrics', methods=['GET'])
     @login_required
     def api_get_dashboard_metrics():
-        """Get dashboard metrics using FYERS API."""
+        """Get dashboard metrics using unified multi-broker system."""
         try:
-            app.logger.info(f"Fetching dashboard metrics for user {current_user.id}")
-            metrics = dashboard_service.get_dashboard_metrics(current_user.id)
-            return jsonify({'success': True, 'data': metrics})
-        except ValueError as e:
-            return jsonify({'success': False, 'error': str(e)}), 400
+            from .routes.unified_routes import api_get_portfolio_summary
+            return api_get_portfolio_summary()
         except Exception as e:
             app.logger.error(f"Error fetching dashboard metrics for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
@@ -748,15 +745,10 @@ def create_app():
     @app.route('/api/dashboard/portfolio-holdings', methods=['GET'])
     @login_required
     def api_get_portfolio_holdings():
-        """Get portfolio holdings using broker-specific APIs."""
+        """Get portfolio holdings using unified multi-broker system."""
         try:
-            app.logger.info(f"Fetching portfolio holdings for user {current_user.id}")
-            
-            dashboard_service = get_dashboard_service()
-            result = dashboard_service.get_portfolio_holdings(current_user.id)
-            
-            return jsonify(result)
-                
+            from .routes.unified_routes import api_get_holdings
+            return api_get_holdings()
         except Exception as e:
             app.logger.error(f"Error fetching portfolio holdings: {e}")
             return jsonify({
@@ -767,15 +759,10 @@ def create_app():
     @app.route('/api/dashboard/pending-orders', methods=['GET'])
     @login_required
     def api_get_pending_orders():
-        """Get pending orders using broker-specific APIs."""
+        """Get pending orders using unified multi-broker system."""
         try:
-            app.logger.info(f"Fetching pending orders for user {current_user.id}")
-            
-            dashboard_service = get_dashboard_service()
-            result = dashboard_service.get_pending_orders(current_user.id)
-            
-            return jsonify(result)
-                
+            from .routes.unified_routes import api_get_pending_orders as unified_pending_orders
+            return unified_pending_orders()
         except Exception as e:
             app.logger.error(f"Error fetching pending orders: {e}")
             return jsonify({
@@ -786,16 +773,10 @@ def create_app():
     @app.route('/api/dashboard/recent-orders', methods=['GET'])
     @login_required
     def api_get_recent_orders():
-        """Get recent orders using broker-specific APIs."""
+        """Get recent orders using unified multi-broker system."""
         try:
-            app.logger.info(f"Fetching recent orders for user {current_user.id}")
-            
-            limit = request.args.get('limit', 10, type=int)
-            dashboard_service = get_dashboard_service()
-            result = dashboard_service.get_recent_orders(current_user.id, limit)
-            
-            return jsonify(result)
-                
+            from .routes.unified_routes import api_get_recent_activity as unified_recent_activity
+            return unified_recent_activity()
         except Exception as e:
             app.logger.error(f"Error fetching recent orders: {e}")
             return jsonify({
@@ -806,16 +787,10 @@ def create_app():
     @app.route('/api/dashboard/portfolio-performance', methods=['GET'])
     @login_required
     def api_get_portfolio_performance():
-        """Get portfolio performance data using broker-specific APIs."""
+        """Get portfolio performance data using unified multi-broker system."""
         try:
-            app.logger.info(f"Fetching portfolio performance for user {current_user.id}")
-            
-            period = request.args.get('period', '1W')
-            dashboard_service = get_dashboard_service()
-            result = dashboard_service.get_portfolio_performance(current_user.id, period)
-            
-            return jsonify(result)
-                
+            from .routes.unified_routes import api_get_portfolio_performance as unified_portfolio_performance
+            return unified_portfolio_performance()
         except Exception as e:
             app.logger.error(f"Error fetching portfolio performance: {e}")
             return jsonify({
@@ -823,39 +798,14 @@ def create_app():
                 'error': str(e)
             }), 500
 
-    # Suggested Stocks API Routes
+    # Suggested Stocks API Routes - Updated to use unified multi-broker system
     @app.route('/api/suggested-stocks', methods=['GET'])
     @login_required
     def api_get_suggested_stocks():
-        """Get suggested stocks based on screening criteria."""
+        """Get suggested stocks using unified multi-broker system."""
         try:
-            app.logger.info(f"Fetching suggested stocks for user {current_user.id}")
-            strategies = request.args.getlist('strategies')
-            time_filter = request.args.get('time_filter', 'week')
-            
-            strategy_types = [StrategyType(s) for s in strategies if s in StrategyType._value2member_map_]
-            if not strategy_types:
-                strategy_types = [StrategyType.MOMENTUM, StrategyType.VALUE, StrategyType.GROWTH, 
-                                StrategyType.MEAN_REVERSION, StrategyType.BREAKOUT]
-
-            suggested_stocks = stock_screening_service.screen_stocks(strategy_types, current_user.id)
-            
-            # The data formatting can also be moved to the service
-            stocks_data = [
-                {
-                    'symbol': stock.symbol, 'name': stock.name, 'selection_date': datetime.now().strftime('%Y-%m-%d'),
-                    'selection_price': round(stock.current_price, 2), 'current_price': round(stock.current_price, 2),
-                    'quantity': 10, 'investment': round(stock.current_price * 10, 2),
-                    'current_value': round(stock.current_price * 10, 2), 'strategy': stock.strategy, 'status': 'Active',
-                    'recommendation': stock.recommendation, 'target_price': round(stock.target_price, 2) if stock.target_price else None,
-                    'stop_loss': round(stock.stop_loss, 2) if stock.stop_loss else None, 'reason': stock.reason,
-                    'market_cap': round(stock.market_cap, 2), 'pe_ratio': round(stock.pe_ratio, 2) if stock.pe_ratio else None,
-                    'pb_ratio': round(stock.pb_ratio, 2) if stock.pb_ratio else None, 'roe': round(stock.roe * 100, 2) if stock.roe else None,
-                    'sales_growth': round(stock.sales_growth, 2) if stock.sales_growth else None
-                } for stock in suggested_stocks
-            ]
-            
-            return jsonify({'success': True, 'data': stocks_data, 'total': len(stocks_data), 'strategies': [s.value for s in strategy_types], 'time_filter': time_filter})
+            from .routes.unified_routes import api_get_suggested_stocks as unified_suggested_stocks
+            return unified_suggested_stocks()
         except Exception as e:
             app.logger.error(f"Error getting suggested stocks for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
@@ -962,6 +912,14 @@ def create_app():
         except Exception as e:
             app.logger.error(f"Error setting current broker for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+    # Register unified multi-broker routes
+    try:
+        from .routes.unified_routes import unified_bp
+        app.register_blueprint(unified_bp)
+        app.logger.info("Unified multi-broker routes registered successfully")
+    except ImportError as e:
+        app.logger.warning(f"Unified routes not available: {e}")
 
     # Register broker-specific blueprints
     from .routes.brokers import fyers_bp, zerodha_bp, simulator_bp

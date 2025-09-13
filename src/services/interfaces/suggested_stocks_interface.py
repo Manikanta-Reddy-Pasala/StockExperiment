@@ -161,7 +161,7 @@ class SuggestedStock:
         return {
             'symbol': self.symbol,
             'name': self.name,
-            'strategy': self.strategy.value,
+            'strategy': self.strategy.value if hasattr(self.strategy, 'value') else str(self.strategy),
             'current_price': self.current_price,
             'recommendation': self.recommendation,
             'target_price': self.target_price,

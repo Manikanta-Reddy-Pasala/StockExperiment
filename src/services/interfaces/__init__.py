@@ -10,7 +10,7 @@ from .suggested_stocks_interface import ISuggestedStocksProvider
 from .orders_interface import IOrdersProvider
 from .portfolio_interface import IPortfolioProvider
 from .reports_interface import IReportsProvider
-from .broker_feature_factory import BrokerFeatureFactory
+from .broker_feature_factory import BrokerFeatureFactory, get_broker_feature_factory
 
 __all__ = [
     'IDashboardProvider',
@@ -18,5 +18,6 @@ __all__ = [
     'IOrdersProvider',
     'IPortfolioProvider',
     'IReportsProvider',
-    'BrokerFeatureFactory'
+    'BrokerFeatureFactory',
+    'get_broker_feature_factory'
 ]

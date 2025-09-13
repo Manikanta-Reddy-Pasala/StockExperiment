@@ -5,46 +5,61 @@ This package contains the concrete implementations of the broker interfaces
 for different brokers like FYERS, Zerodha, and Simulator.
 """
 
-# FYERS implementations
-from .fyers_dashboard_provider import FyersDashboardProvider
-from .fyers_suggested_stocks_provider import FyersSuggestedStocksProvider
-from .fyers_orders_provider import FyersOrdersProvider
-from .fyers_portfolio_provider import FyersPortfolioProvider
-from .fyers_reports_provider import FyersReportsProvider
+# FYERS implementations (conditional import)
+try:
+    from .fyers_dashboard_provider import FyersDashboardProvider
+    from .fyers_suggested_stocks_provider import FyersSuggestedStocksProvider
+    from .fyers_orders_provider import FyersOrdersProvider
+    from .fyers_portfolio_provider import FyersPortfolioProvider
+    from .fyers_reports_provider import FyersReportsProvider
+    FYERS_AVAILABLE = True
+except ImportError:
+    FYERS_AVAILABLE = False
 
-# Zerodha implementations
-from .zerodha_dashboard_provider import ZerodhaDashboardProvider
-from .zerodha_suggested_stocks_provider import ZerodhaSuggestedStocksProvider
-from .zerodha_orders_provider import ZerodhaOrdersProvider
-from .zerodha_portfolio_provider import ZerodhaPortfolioProvider
-from .zerodha_reports_provider import ZerodhaReportsProvider
+# Zerodha implementations (conditional import)
+try:
+    from .zerodha_dashboard_provider import ZerodhaDashboardProvider
+    from .zerodha_suggested_stocks_provider import ZerodhaSuggestedStocksProvider
+    from .zerodha_orders_provider import ZerodhaOrdersProvider
+    from .zerodha_portfolio_provider import ZerodhaPortfolioProvider
+    from .zerodha_reports_provider import ZerodhaReportsProvider
+    ZERODHA_AVAILABLE = True
+except ImportError:
+    ZERODHA_AVAILABLE = False
 
-# Simulator implementations
+# Simulator implementations (always available)
 from .simulator_dashboard_provider import SimulatorDashboardProvider
 from .simulator_suggested_stocks_provider import SimulatorSuggestedStocksProvider
 from .simulator_orders_provider import SimulatorOrdersProvider
 from .simulator_portfolio_provider import SimulatorPortfolioProvider
 from .simulator_reports_provider import SimulatorReportsProvider
 
+# Build __all__ list conditionally
 __all__ = [
-    # FYERS
-    'FyersDashboardProvider',
-    'FyersSuggestedStocksProvider',
-    'FyersOrdersProvider',
-    'FyersPortfolioProvider',
-    'FyersReportsProvider',
-    
-    # Zerodha
-    'ZerodhaDashboardProvider',
-    'ZerodhaSuggestedStocksProvider',
-    'ZerodhaOrdersProvider',
-    'ZerodhaPortfolioProvider',
-    'ZerodhaReportsProvider',
-    
-    # Simulator
+    # Simulator (always available)
     'SimulatorDashboardProvider',
     'SimulatorSuggestedStocksProvider',
     'SimulatorOrdersProvider',
     'SimulatorPortfolioProvider',
     'SimulatorReportsProvider'
 ]
+
+# Add FYERS if available
+if FYERS_AVAILABLE:
+    __all__.extend([
+        'FyersDashboardProvider',
+        'FyersSuggestedStocksProvider',
+        'FyersOrdersProvider',
+        'FyersPortfolioProvider',
+        'FyersReportsProvider'
+    ])
+
+# Add Zerodha if available
+if ZERODHA_AVAILABLE:
+    __all__.extend([
+        'ZerodhaDashboardProvider',
+        'ZerodhaSuggestedStocksProvider',
+        'ZerodhaOrdersProvider',
+        'ZerodhaPortfolioProvider',
+        'ZerodhaReportsProvider'
+    ])

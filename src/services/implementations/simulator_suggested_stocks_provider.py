@@ -39,7 +39,8 @@ class SimulatorSuggestedStocksProvider(ISuggestedStocksProvider):
             
             stock.target_price = price * random.uniform(1.05, 1.20)
             stock.stop_loss = price * random.uniform(0.85, 0.95)
-            stock.reason = f"Selected based on {strategy.value} strategy analysis"
+            strategy_name = strategy.value if hasattr(strategy, 'value') else str(strategy)
+            stock.reason = f"Selected based on {strategy_name} strategy analysis"
             stock.market_cap = price * random.uniform(100000, 5000000)
             stock.pe_ratio = random.uniform(10, 30)
             stock.pb_ratio = random.uniform(1, 5)
@@ -51,7 +52,7 @@ class SimulatorSuggestedStocksProvider(ISuggestedStocksProvider):
         return {
             'success': True,
             'data': suggested_stocks,
-            'strategies_applied': [s.value for s in strategies],
+            'strategies_applied': [s.value if hasattr(s, 'value') else str(s) for s in strategies],
             'last_updated': datetime.now().isoformat()
         }
     

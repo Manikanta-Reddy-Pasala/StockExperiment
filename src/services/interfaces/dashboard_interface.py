@@ -153,14 +153,18 @@ class IDashboardProvider(ABC):
 class DashboardMetrics:
     """Data class for standardized dashboard metrics."""
     
-    def __init__(self):
-        self.total_pnl: float = 0.0
-        self.total_portfolio_value: float = 0.0
-        self.available_cash: float = 0.0
-        self.holdings_count: int = 0
-        self.positions_count: int = 0
-        self.daily_pnl: float = 0.0
-        self.daily_pnl_percent: float = 0.0
+    def __init__(self, total_pnl: float = 0.0, total_portfolio_value: float = 0.0, 
+                 available_cash: float = 0.0, holdings_count: int = 0, 
+                 positions_count: int = 0, daily_pnl: float = 0.0, 
+                 daily_pnl_percent: float = 0.0, total_pnl_percent: float = 0.0):
+        self.total_pnl: float = total_pnl
+        self.total_portfolio_value: float = total_portfolio_value
+        self.available_cash: float = available_cash
+        self.holdings_count: int = holdings_count
+        self.positions_count: int = positions_count
+        self.daily_pnl: float = daily_pnl
+        self.daily_pnl_percent: float = daily_pnl_percent
+        self.total_pnl_percent: float = total_pnl_percent
         self.last_updated: datetime = datetime.now()
 
     def to_dict(self) -> Dict[str, Any]:
@@ -173,6 +177,7 @@ class DashboardMetrics:
             'positions_count': self.positions_count,
             'daily_pnl': self.daily_pnl,
             'daily_pnl_percent': self.daily_pnl_percent,
+            'total_pnl_percent': self.total_pnl_percent,
             'last_updated': self.last_updated.isoformat()
         }
 class MarketIndex:
