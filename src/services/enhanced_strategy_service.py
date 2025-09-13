@@ -145,7 +145,7 @@ class AdvancedStrategyService:
             
             for i, stock_info in enumerate(stock_candidates[:config.max_stocks]):
                 # Get ML prediction (real or mock)
-                ml_prediction = self._get_ml_prediction(stock_info.symbol)
+                ml_prediction = self._get_ml_prediction(stock_info.symbol, user_id)
                 
                 # Calculate mock selection score
                 selection_score = 85.0 - (i * 2.5)  # Decreasing scores
@@ -225,27 +225,25 @@ class AdvancedStrategyService:
             logger.error(f"Error getting stock candidates: {e}")
             return []
     
-    def _get_ml_prediction(self, symbol: str) -> Dict:
+    def _get_ml_prediction(self, symbol: str, user_id: int = 1) -> Dict:
         """Get ML prediction for a stock using the real ML service."""
         try:
             # Try to use the real ML prediction service
-            from .ml.prediction_service import get_prediction_service
+            from .ml.prediction_service import get_prediction
             
-            prediction_service = get_prediction_service()
-            if prediction_service:
-                # Get real ML prediction
-                prediction = prediction_service.predict_stock_price(symbol)
-                
-                if prediction and prediction.get('success'):
-                    return {
-                        "rf_predicted_price": prediction.get('rf_predicted_price', 0),
-                        "xgb_predicted_price": prediction.get('xgb_predicted_price', 0),
-                        "lstm_predicted_price": prediction.get('lstm_predicted_price', 0),
-                        "final_predicted_price": prediction.get('final_predicted_price', 0),
-                        "predicted_change_percent": prediction.get('predicted_change_percent', 0),
-                        "signal": prediction.get('signal', 'HOLD'),
-                        "confidence": prediction.get('confidence', 0.5)
-                    }
+            # Get real ML prediction
+            prediction = get_prediction(symbol, user_id)
+            
+            if prediction:
+                return {
+                    "rf_predicted_price": prediction.get('rf_predicted_price', 0),
+                    "xgb_predicted_price": prediction.get('xgb_predicted_price', 0),
+                    "lstm_predicted_price": prediction.get('lstm_predicted_price', 0),
+                    "final_predicted_price": prediction.get('final_predicted_price', 0),
+                    "predicted_change_percent": prediction.get('predicted_change_percent', 0),
+                    "signal": prediction.get('signal', 'HOLD'),
+                    "confidence": 0.75  # Default confidence for real ML predictions
+                }
             
             # Fallback to mock prediction if ML service fails
             logger.warning(f"ML service not available for {symbol}, using mock prediction")
