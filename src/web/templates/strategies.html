@@ -78,41 +78,13 @@
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="strategies-table-body">
                             <tr>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <i class="bi bi-shield-check text-success me-2"></i>
-                                        <strong>Default Risk Strategy</strong>
+                                <td colspan="4" class="text-center py-4">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading strategies...</span>
                                     </div>
-                                </td>
-                                <td>Balanced portfolio with 60% large cap, 30% mid cap, and 10% small cap allocation</td>
-                                <td><span class="badge bg-success">Active</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary me-1" title="View Recommendations" onclick="viewRecommendations('default_risk')">
-                                        <i class="bi bi-eye-fill"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-secondary" title="Configure">
-                                        <i class="bi bi-gear-fill"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <i class="bi bi-lightning-charge text-warning me-2"></i>
-                                        <strong>High Risk Strategy</strong>
-                                    </div>
-                                </td>
-                                <td>Aggressive portfolio with 80% small cap and 20% mid cap allocation for higher returns</td>
-                                <td><span class="badge bg-success">Active</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary me-1" title="View Recommendations" onclick="viewRecommendations('high_risk')">
-                                        <i class="bi bi-eye-fill"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-secondary" title="Configure">
-                                        <i class="bi bi-gear-fill"></i>
-                                    </button>
+                                    <p class="mt-2 text-muted">Loading strategy data...</p>
                                 </td>
                             </tr>
                         </tbody>
@@ -173,7 +145,7 @@
 <script>
     
     // Initialize strategy performance chart
-    function initStrategyChart() {
+    function initStrategyChart(activeStrategies = null) {
         const ctx = document.getElementById('strategy-performance-chart').getContext('2d');
         
         // Check if dark mode is enabled
@@ -196,29 +168,15 @@
             type: 'line',
             data: {
                 labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'],
-                datasets: [{
-                    label: 'Default Risk Strategy',
-                    data: [8, 12, 10, 14, 16, 18, 15, 17, 20],
-                    borderColor: defaultRiskBorderColor,
-                    backgroundColor: defaultRiskBgColor,
-                    tension: 0.3,
-                    fill: true,
-                    pointRadius: 3,
-                    pointBackgroundColor: defaultRiskPointColor,
-                    pointBorderColor: isDarkMode ? '#121212' : '#fff',
-                    pointBorderWidth: 1
-                }, {
-                    label: 'High Risk Strategy',
-                    data: [12, 19, 15, 18, 22, 25, 20, 24, 28],
-                    borderColor: highRiskBorderColor,
-                    backgroundColor: highRiskBgColor,
-                    tension: 0.3,
-                    fill: true,
-                    pointRadius: 3,
-                    pointBackgroundColor: highRiskPointColor,
-                    pointBorderColor: isDarkMode ? '#121212' : '#fff',
-                    pointBorderWidth: 1
-                }]
+                datasets: getActiveStrategyDatasets(activeStrategies, {
+                    defaultRiskBorderColor,
+                    defaultRiskBgColor,
+                    defaultRiskPointColor,
+                    highRiskBorderColor,
+                    highRiskBgColor,
+                    highRiskPointColor,
+                    isDarkMode
+                })
             },
             options: {
                 responsive: true,
@@ -289,6 +247,81 @@
         });
     }
     
+    // Get datasets for active strategies only
+    function getActiveStrategyDatasets(activeStrategies, colors) {
+        const datasets = [];
+        
+        if (!activeStrategies) {
+            // Fallback to show all strategies if no data
+            return [{
+                label: 'Default Risk Strategy',
+                data: [8, 12, 10, 14, 16, 18, 15, 17, 20],
+                borderColor: colors.defaultRiskBorderColor,
+                backgroundColor: colors.defaultRiskBgColor,
+                tension: 0.3,
+                fill: true,
+                pointRadius: 3,
+                pointBackgroundColor: colors.defaultRiskPointColor,
+                pointBorderColor: colors.isDarkMode ? '#121212' : '#fff',
+                pointBorderWidth: 1
+            }, {
+                label: 'High Risk Strategy',
+                data: [12, 19, 15, 18, 22, 25, 20, 24, 28],
+                borderColor: colors.highRiskBorderColor,
+                backgroundColor: colors.highRiskBgColor,
+                tension: 0.3,
+                fill: true,
+                pointRadius: 3,
+                pointBackgroundColor: colors.highRiskPointColor,
+                pointBorderColor: colors.isDarkMode ? '#121212' : '#fff',
+                pointBorderWidth: 1
+            }];
+        }
+        
+        // Only show active strategies
+        Object.entries(activeStrategies).forEach(([strategyName, strategyData]) => {
+            if (strategyData.is_active && strategyData.is_enabled) {
+                const metadata = strategyData.metadata || {};
+                const displayName = metadata.display_name || strategyName.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+                
+                let dataset;
+                if (strategyName === 'default_risk') {
+                    dataset = {
+                        label: displayName,
+                        data: [8, 12, 10, 14, 16, 18, 15, 17, 20],
+                        borderColor: colors.defaultRiskBorderColor,
+                        backgroundColor: colors.defaultRiskBgColor,
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 3,
+                        pointBackgroundColor: colors.defaultRiskPointColor,
+                        pointBorderColor: colors.isDarkMode ? '#121212' : '#fff',
+                        pointBorderWidth: 1
+                    };
+                } else if (strategyName === 'high_risk') {
+                    dataset = {
+                        label: displayName,
+                        data: [12, 19, 15, 18, 22, 25, 20, 24, 28],
+                        borderColor: colors.highRiskBorderColor,
+                        backgroundColor: colors.highRiskBgColor,
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 3,
+                        pointBackgroundColor: colors.highRiskPointColor,
+                        pointBorderColor: colors.isDarkMode ? '#121212' : '#fff',
+                        pointBorderWidth: 1
+                    };
+                }
+                
+                if (dataset) {
+                    datasets.push(dataset);
+                }
+            }
+        });
+        
+        return datasets;
+    }
+    
     // View recommendations for a specific strategy
     function viewRecommendations(strategyType) {
         // Redirect to suggested stocks page with the selected strategy
@@ -297,9 +330,128 @@
         window.location.href = url.toString();
     }
     
+    // Load strategies data from API
+    async function loadStrategiesData() {
+        try {
+            const response = await fetch('/api/strategy-settings/');
+            const data = await response.json();
+            
+            if (data.success) {
+                renderStrategiesTable(data.data.strategies);
+                updateActiveStrategiesCount(data.data.strategies);
+                return data.data.strategies; // Return strategies for chart
+            } else {
+                console.error('Failed to load strategies:', data.error);
+                showErrorInTable('Failed to load strategy data');
+                return null;
+            }
+        } catch (error) {
+            console.error('Error loading strategies:', error);
+            showErrorInTable('Error loading strategy data');
+            return null;
+        }
+    }
+    
+    // Render strategies table with real data
+    function renderStrategiesTable(strategies) {
+        const tbody = document.getElementById('strategies-table-body');
+        tbody.innerHTML = '';
+        
+        // Sort strategies by priority
+        const sortedStrategies = Object.entries(strategies).sort((a, b) => {
+            return (a[1].priority || 1) - (b[1].priority || 1);
+        });
+        
+        sortedStrategies.forEach(([strategyName, strategyData]) => {
+            const row = createStrategyRow(strategyName, strategyData);
+            tbody.appendChild(row);
+        });
+    }
+    
+    // Create a strategy table row
+    function createStrategyRow(strategyName, strategyData) {
+        const row = document.createElement('tr');
+        
+        // Determine icon and color based on strategy
+        let iconClass, iconColor;
+        if (strategyName === 'default_risk') {
+            iconClass = 'bi-shield-check';
+            iconColor = 'text-success';
+        } else if (strategyName === 'high_risk') {
+            iconClass = 'bi-lightning-charge';
+            iconColor = 'text-warning';
+        } else {
+            iconClass = 'bi-gear';
+            iconColor = 'text-primary';
+        }
+        
+        // Determine status badge
+        const isActive = strategyData.is_active && strategyData.is_enabled;
+        const statusBadge = isActive 
+            ? '<span class="badge bg-success">Active</span>'
+            : '<span class="badge bg-secondary">Inactive</span>';
+        
+        // Get strategy metadata
+        const metadata = strategyData.metadata || {};
+        const displayName = metadata.display_name || strategyName.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+        const description = metadata.description || 'Strategy description not available';
+        
+        row.innerHTML = `
+            <td>
+                <div class="d-flex align-items-center">
+                    <i class="bi ${iconClass} ${iconColor} me-2"></i>
+                    <strong>${displayName}</strong>
+                </div>
+            </td>
+            <td>${description}</td>
+            <td>${statusBadge}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary me-1" title="View Recommendations" onclick="viewRecommendations('${strategyName}')">
+                    <i class="bi bi-eye-fill"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" title="Configure" onclick="configureStrategy('${strategyName}')">
+                    <i class="bi bi-gear-fill"></i>
+                </button>
+            </td>
+        `;
+        
+        return row;
+    }
+    
+    // Update active strategies count
+    function updateActiveStrategiesCount(strategies) {
+        const activeCount = Object.values(strategies).filter(s => s.is_active && s.is_enabled).length;
+        const countElement = document.getElementById('active-strategies-count');
+        if (countElement) {
+            countElement.textContent = activeCount;
+        }
+    }
+    
+    // Show error in table
+    function showErrorInTable(message) {
+        const tbody = document.getElementById('strategies-table-body');
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="text-center py-4">
+                    <div class="text-danger">
+                        <i class="bi bi-exclamation-triangle fs-4"></i>
+                        <p class="mt-2 mb-0">${message}</p>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+    
+    // Configure strategy (redirect to settings)
+    function configureStrategy(strategyName) {
+        window.location.href = '/settings#strategy-settings';
+    }
+    
     // Initialize page when loaded
     document.addEventListener('DOMContentLoaded', function() {
-        initStrategyChart();
+        loadStrategiesData().then((strategies) => {
+            initStrategyChart(strategies);
+        });
     });
 </script>
 {% endblock %}
