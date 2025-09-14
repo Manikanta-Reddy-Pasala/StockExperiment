@@ -195,7 +195,7 @@ CREATE TABLE IF NOT EXISTS broker_configurations (
     UNIQUE(user_id, broker_name)
 );
 
--- Enhanced Stock Strategy Tables
+-- Stock Strategy Tables
 CREATE TABLE IF NOT EXISTS stocks (
     id SERIAL PRIMARY KEY,
     symbol VARCHAR(50) UNIQUE NOT NULL,

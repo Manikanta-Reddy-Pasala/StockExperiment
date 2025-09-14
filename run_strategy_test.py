@@ -1,5 +1,5 @@
 import json
-from src.services.enhanced_strategy_service import get_advanced_strategy_service
+from src.services.strategy_service import get_advanced_strategy_service
 
 def run_test():
     """

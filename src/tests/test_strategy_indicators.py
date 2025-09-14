@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 # Import the services to be tested
 from src.services.stock_screening_service import StockScreeningService
-from src.services.enhanced_strategy_service import AdvancedStrategyService
+from src.services.strategy_service import AdvancedStrategyService
 
 @pytest.fixture
 def sample_stock_data():
@@ -85,7 +85,7 @@ class TestStrategyIndicators:
         assert 'avg_volume_20d' in indicators
         assert indicators['avg_volume_20d'] == expected_avg_volume_20d
 
-    @patch('src.services.enhanced_strategy_service.AdvancedStrategyService._get_entry_indicators')
+    @patch('src.services.strategy_service.AdvancedStrategyService._get_entry_indicators')
     def test_passes_entry_rules(self, mock_get_entry_indicators):
         """Test the logic of the _passes_entry_rules method."""
         service = AdvancedStrategyService()

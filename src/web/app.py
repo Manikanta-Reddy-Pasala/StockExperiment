@@ -958,14 +958,14 @@ def create_app():
         app.logger.warning(f"ML prediction routes not available: {e}")
         app.logger.warning("ML functionality will be disabled")
 
-    # Register enhanced strategy blueprints
+    # Register strategy blueprints
     try:
         from .routes.strategy_routes import strategy_bp
         app.register_blueprint(strategy_bp)
-        app.logger.info("Enhanced strategy routes registered successfully")
+        app.logger.info("Strategy routes registered successfully")
     except ImportError as e:
-        app.logger.warning(f"Enhanced strategy routes not available: {e}")
-        app.logger.warning("Enhanced strategy functionality will be disabled")
+        app.logger.warning(f"Strategy routes not available: {e}")
+        app.logger.warning("Strategy functionality will be disabled")
 
     # Individual broker page routes
     @app.route('/brokers/fyers')

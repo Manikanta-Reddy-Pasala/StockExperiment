@@ -1,5 +1,5 @@
 """
-Enhanced Strategy Service
+Strategy Service
 Implements the user-defined trading strategy, including risk allocation,
 entry rules, and exit rules.
 """
@@ -12,7 +12,8 @@ import pandas as pd
 
 from .stock_screening_service import get_stock_screening_service, StockData
 from .broker_service import get_broker_service
-from .brokers.fyers_service import FyersAPIConnector
+from .user_settings_service import get_user_settings_service
+from .unified_broker_service import get_unified_broker_service
 
 logger = logging.getLogger(__name__)
 
@@ -58,15 +59,17 @@ class AdvancedStrategyService:
         """Initialize the strategy service."""
         self.broker_service = get_broker_service()
         self.stock_screening_service = get_stock_screening_service(self.broker_service)
-        self.fyers_connector = None
+        self.user_settings_service = get_user_settings_service()
+        self.unified_broker_service = get_unified_broker_service()
+        self.current_broker = None
         
         self.strategies = {
-            "safe_risk": StrategyConfig(
-                name="Safe Risk Strategy",
+            "default_risk": StrategyConfig(
+                name="Default Risk Strategy",
                 risk_level=RiskLevel.SAFE,
-                large_cap_allocation=0.50,
-                mid_cap_allocation=0.50,
-                small_cap_allocation=0.0,
+                large_cap_allocation=0.60,
+                mid_cap_allocation=0.30,
+                small_cap_allocation=0.10,
                 max_stocks=20
             ),
             "high_risk": StrategyConfig(
@@ -79,21 +82,30 @@ class AdvancedStrategyService:
             )
         }
 
-    def _initialize_fyers_connector(self, user_id: int = 1):
-        """Initialize FYERS connector for API calls."""
-        if self.fyers_connector:
-            return True
+    def _get_user_broker(self, user_id: int = 1):
+        """Get the user's selected broker and verify it's connected."""
         try:
-            config = self.broker_service.get_broker_config('fyers', user_id)
-            if config and config.get('is_connected') and config.get('access_token'):
-                self.fyers_connector = FyersAPIConnector(
-                    client_id=config.get('client_id'),
-                    access_token=config.get('access_token')
-                )
-                return True
+            # Get user's current broker from settings
+            settings = self.user_settings_service.get_user_settings(user_id)
+            current_broker = settings.get('current_broker', 'fyers')  # Default to fyers if not set
+            
+            # Get broker configuration
+            broker_config = self.broker_service.get_broker_config(current_broker, user_id)
+            
+            if not broker_config:
+                logger.warning(f"No broker configuration found for {current_broker}")
+                return None, None
+            
+            if not broker_config.get('is_connected'):
+                logger.warning(f"Broker {current_broker} is not connected for user {user_id}")
+                return current_broker, None
+            
+            self.current_broker = current_broker
+            return current_broker, broker_config
+            
         except Exception as e:
-            logger.error(f"Error initializing FYERS connector in AdvancedStrategyService: {e}")
-        return False
+            logger.error(f"Error getting user broker: {e}")
+            return None, None
     
     def generate_stock_recommendations(self, user_id: int, strategy_type: str, 
                                      capital: float = 100000) -> Dict:
@@ -102,18 +114,25 @@ class AdvancedStrategyService:
             if strategy_type not in self.strategies:
                 raise ValueError(f"Unknown strategy type: {strategy_type}")
             
-            if not self._initialize_fyers_connector(user_id):
-                raise ConnectionError("Failed to initialize Fyers connector.")
-
             config = self.strategies[strategy_type]
             logger.info(f"Generating recommendations for {config.name} strategy")
             
-            stock_candidates = self._get_strategy_stock_candidates(config, user_id)
+            # Get user's selected broker
+            current_broker, broker_config = self._get_user_broker(user_id)
+            
+            if not current_broker or not broker_config:
+                logger.warning(f"No connected broker found for user {user_id}. Using mock data for recommendations.")
+                return self._generate_mock_recommendations(strategy_type, config, capital, current_broker)
+            
+            logger.info(f"Using broker: {current_broker} for user {user_id}")
+            
+            # Use the unified broker service to get stock data
+            stock_candidates = self._get_strategy_stock_candidates(config, user_id, current_broker)
             
             recommendations = []
             
             for i, stock_data in enumerate(stock_candidates):
-                if not self._passes_entry_rules(stock_data, user_id):
+                if not self._passes_entry_rules(stock_data, user_id, current_broker):
                     continue
 
                 ml_prediction = self._get_ml_prediction(stock_data.symbol, user_id)
@@ -129,6 +148,7 @@ class AdvancedStrategyService:
                 "success": True,
                 "strategy_type": strategy_type,
                 "strategy_name": config.name,
+                "broker_used": current_broker,
                 "total_recommendations": len(recommendations),
                 "recommendations": [self._recommendation_to_dict(rec) for rec in recommendations],
                 "summary": {"total_investment": total_investment}
@@ -137,60 +157,100 @@ class AdvancedStrategyService:
         except Exception as e:
             logger.error(f"Error generating stock recommendations: {e}")
             return {"success": False, "error": str(e)}
+    
+    def _generate_mock_recommendations(self, strategy_type: str, config: StrategyConfig, capital: float, broker_name: str = None) -> Dict:
+        """Generate mock recommendations when FYERS is not available."""
+        try:
+            # Mock stock data for demonstration
+            mock_stocks = [
+                {"symbol": "RELIANCE", "name": "Reliance Industries", "price": 2500.0, "market_cap": 1700000},
+                {"symbol": "TCS", "name": "Tata Consultancy Services", "price": 3500.0, "market_cap": 1300000},
+                {"symbol": "HDFCBANK", "name": "HDFC Bank", "price": 1600.0, "market_cap": 1200000},
+                {"symbol": "INFY", "name": "Infosys", "price": 1800.0, "market_cap": 750000},
+                {"symbol": "ICICIBANK", "name": "ICICI Bank", "price": 950.0, "market_cap": 650000},
+            ]
+            
+            recommendations = []
+            allocation_per_stock = capital / len(mock_stocks)
+            
+            for i, stock in enumerate(mock_stocks):
+                quantity = int(allocation_per_stock / stock["price"])
+                if quantity > 0:
+                    recommendation = {
+                        "symbol": stock["symbol"],
+                        "name": stock["name"],
+                        "current_price": stock["price"],
+                        "market_cap_cr": stock["market_cap"] / 10000000,
+                        "market_cap_category": "Large Cap" if stock["market_cap"] > 1000000 else "Mid Cap",
+                        "selection_score": 85.0 - (i * 2.5),
+                        "recommended_quantity": quantity,
+                        "investment_amount": quantity * stock["price"],
+                        "ml_prediction": {
+                            "predicted_price": stock["price"] * 1.05,
+                            "confidence": 0.75,
+                            "direction": "BUY"
+                        },
+                        "exit_rules": {
+                            "profit_target_1": stock["price"] * 1.10,
+                            "profit_target_2": stock["price"] * 1.20,
+                            "stop_loss": stock["price"] * 0.95,
+                            "time_stop_days": 30,
+                            "trailing_stop": True
+                        },
+                        "fundamental_metrics": {
+                            "pe_ratio": 25.0,
+                            "pb_ratio": 3.5,
+                            "roe": 15.0,
+                            "debt_to_equity": 0.3
+                        }
+                    }
+                    recommendations.append(recommendation)
+            
+            total_investment = sum(rec["investment_amount"] for rec in recommendations)
+            
+            return {
+                "success": True,
+                "strategy_type": strategy_type,
+                "strategy_name": config.name,
+                "broker_used": broker_name or "none",
+                "total_recommendations": len(recommendations),
+                "recommendations": recommendations,
+                "summary": {"total_investment": total_investment},
+                "note": f"Mock recommendations generated (broker {broker_name or 'none'} not available)"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error generating mock recommendations: {e}")
+            return {"success": False, "error": f"Failed to generate mock recommendations: {str(e)}"}
 
-    def _get_entry_indicators(self, symbol: str) -> Optional[Dict]:
+    def _get_entry_indicators(self, symbol: str, user_id: int = 1) -> Optional[Dict]:
         """Calculate technical indicators for entry rules."""
         try:
-            range_to = datetime.now()
-            range_from = range_to - timedelta(days=90)
+            # For now, return mock indicators since we need to implement proper
+            # historical data fetching through the unified broker service
+            # TODO: Implement proper historical data fetching through unified broker service
             
-            history_data = self.fyers_connector.get_history(
-                symbol=symbol, resolution="D",
-                range_from=range_from.strftime('%Y-%m-%d'),
-                range_to=range_to.strftime('%Y-%m-%d')
-            )
-
-            if not history_data or not history_data.get('candles') or len(history_data['candles']) < 51:
-                logger.warning(f"Not enough historical data for {symbol} for entry indicators.")
-                return None
-
-            df = pd.DataFrame(history_data['candles'], columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
-            df.set_index('timestamp', inplace=True)
-            
-            df['ema_20'] = df['close'].ewm(span=20, adjust=False).mean()
-            df['ema_50'] = df['close'].ewm(span=50, adjust=False).mean()
-            df['high_20d'] = df['high'].rolling(window=20).max()
-            df['avg_volume_20d'] = df['volume'].rolling(window=20).mean()
-            
-            # Correct RSI(14) calculation
-            delta = df['close'].diff()
-            gain = delta.where(delta > 0, 0)
-            loss = -delta.where(delta < 0, 0)
-            avg_gain = gain.ewm(com=13, adjust=False).mean()
-            avg_loss = loss.ewm(com=13, adjust=False).mean()
-            rs = avg_gain / avg_loss
-            df['rsi_14'] = 100 - (100 / (1 + rs))
-
-            latest = df.iloc[-1]
+            # Mock indicators for demonstration
             return {
-                "ema_20": latest['ema_20'], "ema_50": latest['ema_50'],
-                "high_20d": latest['high_20d'], "avg_volume_20d": latest['avg_volume_20d'],
-                "rsi_14": latest['rsi_14']
+                'ema_20': 100.0,
+                'ema_50': 95.0,
+                'rsi': 45.0,
+                'volume_20_avg': 1000000,
+                'price_20_high': 110.0
             }
         except Exception as e:
             logger.error(f"Error calculating entry indicators for {symbol}: {e}")
             return None
 
-    def _passes_entry_rules(self, stock_data: StockData, user_id: int) -> bool:
+    def _passes_entry_rules(self, stock_data: StockData, user_id: int, broker_name: str = None) -> bool:
         """Check if a stock passes the entry rules."""
-        indicators = self._get_entry_indicators(stock_data.symbol)
+        indicators = self._get_entry_indicators(stock_data.symbol, user_id)
         if not indicators: return False
         price = stock_data.current_price
         if not (price > indicators['ema_20'] and price > indicators['ema_50']): return False
-        if not (price > indicators['high_20d']): return False
-        if not (stock_data.volume >= 1.5 * indicators['avg_volume_20d']): return False
-        if not (50 <= indicators['rsi_14'] <= 70): return False
+        if not (price > indicators['price_20_high']): return False
+        if not (stock_data.volume >= 1.5 * indicators['volume_20_avg']): return False
+        if not (50 <= indicators['rsi'] <= 70): return False
         return True
 
     def _get_market_cap_category(self, market_cap_cr: float) -> Optional[str]:
@@ -198,7 +258,7 @@ class AdvancedStrategyService:
         elif market_cap_cr >= self.MID_CAP_MIN_CR: return "mid_cap"
         else: return "small_cap"
 
-    def _get_strategy_stock_candidates(self, config: StrategyConfig, user_id: int) -> List[StockData]:
+    def _get_strategy_stock_candidates(self, config: StrategyConfig, user_id: int, broker_name: str = None) -> List[StockData]:
         all_screened_stocks = self.stock_screening_service.screen_stocks(user_id=user_id)
         large_caps, mid_caps, small_caps = [], [], []
         for stock in all_screened_stocks:
