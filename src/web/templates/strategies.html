@@ -11,7 +11,7 @@
                 <div class="d-flex align-items-center">
                     <div class="flex-grow-1">
                         <h6 class="text-muted mb-2 fw-semibold">Active Strategies</h6>
-                        <h2 class="fw-bold mb-0" id="active-strategies-count">2</h2>
+                        <h2 class="fw-bold mb-0" id="active-strategies-count">0</h2>
                         <small class="text-primary">
                             <i class="bi bi-gear-fill"></i> Running strategies
                         </small>
@@ -29,7 +29,7 @@
                 <div class="d-flex align-items-center">
                     <div class="flex-grow-1">
                         <h6 class="text-muted mb-2 fw-semibold">Avg Return</h6>
-                        <h2 class="fw-bold mb-0" id="avg-return">12.5%</h2>
+                        <h2 class="fw-bold mb-0" id="avg-return">0%</h2>
                         <small class="text-success">
                             <i class="bi bi-graph-up-arrow"></i> Performance
                         </small>
@@ -47,7 +47,7 @@
                 <div class="d-flex align-items-center">
                     <div class="flex-grow-1">
                         <h6 class="text-muted mb-2 fw-semibold">Total Signals</h6>
-                        <h2 class="fw-bold mb-0" id="total-signals">124</h2>
+                        <h2 class="fw-bold mb-0" id="total-signals">0</h2>
                         <small class="text-info">
                             <i class="bi bi-bell-fill"></i> Generated signals
                         </small>
@@ -156,29 +156,11 @@
                     </tr>
                 </thead>
                 <tbody>
+                    <!-- Strategy signals will be loaded dynamically -->
                     <tr>
-                        <td>2025-09-14 10:30</td>
-                        <td><span class="badge bg-success">Default Risk</span></td>
-                        <td>NSE:RELIANCE-EQ</td>
-                        <td class="text-success">BUY</td>
-                        <td>₹2,750.50</td>
-                        <td><span class="badge bg-success">ML Signal</span></td>
-                    </tr>
-                    <tr>
-                        <td>2025-09-14 09:45</td>
-                        <td><span class="badge bg-warning">High Risk</span></td>
-                        <td>NSE:SMALLCAP-EQ</td>
-                        <td class="text-success">BUY</td>
-                        <td>₹850.75</td>
-                        <td><span class="badge bg-info">AI Recommended</span></td>
-                    </tr>
-                    <tr>
-                        <td>2025-09-14 09:15</td>
-                        <td><span class="badge bg-success">Default Risk</span></td>
-                        <td>NSE:TCS-EQ</td>
-                        <td class="text-success">BUY</td>
-                        <td>₹3,850.00</td>
-                        <td><span class="badge bg-success">ML Signal</span></td>
+                        <td colspan="6" class="text-center text-muted">
+                            <i class="bi bi-hourglass-split me-2"></i>Loading strategy signals...
+                        </td>
                     </tr>
                 </tbody>
             </table>

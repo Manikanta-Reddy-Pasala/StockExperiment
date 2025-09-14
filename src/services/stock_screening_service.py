@@ -66,15 +66,9 @@ class StockScreeningService:
     def _load_nse_symbols(self) -> List[str]:
         """Load NSE symbols for screening."""
         # Common NSE symbols for mid-cap and small-cap stocks
-        # In a real implementation, this would be loaded from a database or API
-        return [
-            'NSE:RELIANCE-EQ', 'NSE:TCS-EQ', 'NSE:INFY-EQ', 'NSE:HDFC-EQ', 'NSE:WIPRO-EQ',
-            'NSE:HCLTECH-EQ', 'NSE:BHARTIARTL-EQ', 'NSE:ITC-EQ', 'NSE:SBIN-EQ', 'NSE:LT-EQ',
-            'NSE:ASIANPAINT-EQ', 'NSE:MARUTI-EQ', 'NSE:AXISBANK-EQ', 'NSE:KOTAKBANK-EQ', 'NSE:NESTLEIND-EQ',
-            'NSE:TITAN-EQ', 'NSE:POWERGRID-EQ', 'NSE:NTPC-EQ', 'NSE:ULTRACEMCO-EQ', 'NSE:TECHM-EQ',
-            'NSE:SUNPHARMA-EQ', 'NSE:TATAMOTORS-EQ', 'NSE:BAJFINANCE-EQ', 'NSE:DRREDDY-EQ', 'NSE:CIPLA-EQ',
-            'NSE:EICHERMOT-EQ', 'NSE:GRASIM-EQ', 'NSE:JSWSTEEL-EQ', 'NSE:TATASTEEL-EQ', 'NSE:COALINDIA-EQ'
-        ]
+        # TODO: Load stock universe from database or broker API
+        # For now, return empty list - stocks should be fetched from connected broker
+        return []
     
     def _initialize_fyers_connector(self, user_id: int = 1):
         """Initialize FYERS connector for API calls."""
@@ -146,8 +140,8 @@ class StockScreeningService:
             strategy_types = [StrategyType.DEFAULT_RISK, StrategyType.HIGH_RISK]
         
         if not self._initialize_fyers_connector(user_id):
-            logger.warning("FYERS connector not available, using mock data for screening")
-            return self._get_mock_stocks(strategy_types)
+            logger.warning("FYERS connector not available, cannot screen stocks without broker connection")
+            return []
         
         screened_stocks = []
         
@@ -253,20 +247,10 @@ class StockScreeningService:
 
     def _estimate_market_cap(self, symbol: str, current_price: float) -> float:
         """Estimate market cap (simplified)."""
-        mock_market_caps = {
-            'NSE:RELIANCE-EQ': 1800000, 'NSE:TCS-EQ': 1400000, 'NSE:HDFCBANK-EQ': 1200000,
-            'NSE:INFY-EQ': 700000, 'NSE:ICICIBANK-EQ': 600000, 'NSE:HINDUNILVR-EQ': 580000,
-            'NSE:SBIN-EQ': 500000, 'NSE:BHARTIARTL-EQ': 450000, 'NSE:ITC-EQ': 430000,
-            'NSE:KOTAKBANK-EQ': 380000, 'NSE:LT-EQ': 350000, 'NSE:WIPRO-EQ': 280000,
-            'NSE:ASIANPAINT-EQ': 320000, 'NSE:MARUTI-EQ': 300000, 'NSE:AXISBANK-EQ': 280000,
-            'NSE:NESTLEIND-EQ': 200000, 'NSE:TITAN-EQ': 250000, 'NSE:POWERGRID-EQ': 150000,
-            'NSE:NTPC-EQ': 140000, 'NSE:ULTRACEMCO-EQ': 210000, 'NSE:TECHM-EQ': 130000,
-            'NSE:SUNPHARMA-EQ': 240000, 'NSE:TATAMOTORS-EQ': 220000, 'NSE:BAJFINANCE-EQ': 450000,
-            'NSE:DRREDDY-EQ': 100000, 'NSE:CIPLA-EQ': 90000, 'NSE:EICHERMOT-EQ': 80000,
-            'NSE:GRASIM-EQ': 120000, 'NSE:JSWSTEEL-EQ': 160000, 'NSE:TATASTEEL-EQ': 140000,
-            'NSE:COALINDIA-EQ': 130000, 'NSE:ADANIENT-EQ': 250000, 'NSE:ADANIPORTS-EQ': 180000,
-        }
-        return mock_market_caps.get(symbol, 20000) * 10000000 # Return in Cr
+        # TODO: Fetch real market cap from broker API or financial data provider
+        # For now, return a basic estimation
+        estimated_cap = current_price * 1000000  # Rough estimation
+        return min(estimated_cap, 2000000)  # Cap at 2M cr
 
     def _get_stock_name(self, symbol: str) -> str:
         """Get stock name from symbol."""
@@ -304,10 +288,6 @@ class StockScreeningService:
         import random
         return round(random.uniform(5, 9), 1)
 
-    def _get_mock_stocks(self, strategy_types: List[StrategyType]) -> List[StockData]:
-        """Get mock stocks when FYERS is not available."""
-        # This method is now less relevant as we fetch real data, but kept for fallback.
-        return []
 
     def _passes_strategy_screening(self, stock: StockData, strategy: StrategyType) -> bool:
         # This will be used in the next step

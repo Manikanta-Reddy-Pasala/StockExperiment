@@ -549,7 +549,7 @@ def create_app():
     def api_get_fyers_quotes():
         """Get FYERS market quotes."""
         try:
-            symbols = request.args.get('symbols', 'NSE:SBIN-EQ')
+            symbols = request.args.get('symbols', '')
             app.logger.info(f"Fetching FYERS quotes for symbols: {symbols} for user {current_user.id}")
             result = broker_service.get_fyers_quotes(current_user.id, symbols)
             if 'error' in result:
@@ -566,7 +566,7 @@ def create_app():
     def api_get_fyers_history():
         """Get FYERS historical data."""
         try:
-            symbol = request.args.get('symbol', 'NSE:SBIN-EQ')
+            symbol = request.args.get('symbol', '')
             resolution = request.args.get('resolution', 'D')
             range_from = request.args.get('range_from')
             range_to = request.args.get('range_to')

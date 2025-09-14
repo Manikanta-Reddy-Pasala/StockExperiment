@@ -302,15 +302,9 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
     def get_sector_analysis(self, user_id: int) -> Dict[str, Any]:
         """Get sector-wise analysis and recommendations."""
         try:
-            # Get market data for sector representatives
-            sector_stocks = {
-                'Technology': ['NSE:TCS-EQ', 'NSE:INFY-EQ', 'NSE:WIPRO-EQ', 'NSE:HCLTECH-EQ'],
-                'Banking': ['NSE:HDFCBANK-EQ', 'NSE:ICICIBANK-EQ', 'NSE:SBIN-EQ', 'NSE:AXISBANK-EQ'],
-                'Energy': ['NSE:RELIANCE-EQ', 'NSE:ONGC-EQ', 'NSE:BPCL-EQ', 'NSE:IOC-EQ'],
-                'FMCG': ['NSE:HINDUNILVR-EQ', 'NSE:ITC-EQ', 'NSE:NESTLEIND-EQ', 'NSE:BRITANNIA-EQ'],
-                'Auto': ['NSE:MARUTI-EQ', 'NSE:M&M-EQ', 'NSE:TATAMOTORS-EQ', 'NSE:BAJAJ-AUTO-EQ'],
-                'Pharma': ['NSE:SUNPHARMA-EQ', 'NSE:DRREDDY-EQ', 'NSE:CIPLA-EQ', 'NSE:LUPIN-EQ']
-            }
+            # TODO: Get sector representatives from broker API or database
+            # For now, return empty sector analysis as we don't want hardcoded stocks
+            sector_stocks = {}
             
             sector_analysis = []
             

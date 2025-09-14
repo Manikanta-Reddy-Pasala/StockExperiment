@@ -121,8 +121,16 @@ class AdvancedStrategyService:
             current_broker, broker_config = self._get_user_broker(user_id)
             
             if not current_broker or not broker_config:
-                logger.warning(f"No connected broker found for user {user_id}. Using mock data for recommendations.")
-                return self._generate_mock_recommendations(strategy_type, config, capital, current_broker)
+                logger.warning(f"No connected broker found for user {user_id}. Cannot generate recommendations without broker connection.")
+                return {
+                    "success": False, 
+                    "error": "No connected broker found. Please connect a broker to generate stock recommendations.",
+                    "recommendations": [],
+                    "strategy_type": strategy_type,
+                    "total_capital": capital,
+                    "allocated_capital": 0.0,
+                    "broker_name": current_broker
+                }
             
             logger.info(f"Using broker: {current_broker} for user {user_id}")
             
@@ -158,70 +166,6 @@ class AdvancedStrategyService:
             logger.error(f"Error generating stock recommendations: {e}")
             return {"success": False, "error": str(e)}
     
-    def _generate_mock_recommendations(self, strategy_type: str, config: StrategyConfig, capital: float, broker_name: str = None) -> Dict:
-        """Generate mock recommendations when FYERS is not available."""
-        try:
-            # Mock stock data for demonstration
-            mock_stocks = [
-                {"symbol": "RELIANCE", "name": "Reliance Industries", "price": 2500.0, "market_cap": 1700000},
-                {"symbol": "TCS", "name": "Tata Consultancy Services", "price": 3500.0, "market_cap": 1300000},
-                {"symbol": "HDFCBANK", "name": "HDFC Bank", "price": 1600.0, "market_cap": 1200000},
-                {"symbol": "INFY", "name": "Infosys", "price": 1800.0, "market_cap": 750000},
-                {"symbol": "ICICIBANK", "name": "ICICI Bank", "price": 950.0, "market_cap": 650000},
-            ]
-            
-            recommendations = []
-            allocation_per_stock = capital / len(mock_stocks)
-            
-            for i, stock in enumerate(mock_stocks):
-                quantity = int(allocation_per_stock / stock["price"])
-                if quantity > 0:
-                    recommendation = {
-                        "symbol": stock["symbol"],
-                        "name": stock["name"],
-                        "current_price": stock["price"],
-                        "market_cap_cr": stock["market_cap"] / 10000000,
-                        "market_cap_category": "Large Cap" if stock["market_cap"] > 1000000 else "Mid Cap",
-                        "selection_score": 85.0 - (i * 2.5),
-                        "recommended_quantity": quantity,
-                        "investment_amount": quantity * stock["price"],
-                        "ml_prediction": {
-                            "predicted_price": stock["price"] * 1.05,
-                            "confidence": 0.75,
-                            "direction": "BUY"
-                        },
-                        "exit_rules": {
-                            "profit_target_1": stock["price"] * 1.10,
-                            "profit_target_2": stock["price"] * 1.20,
-                            "stop_loss": stock["price"] * 0.95,
-                            "time_stop_days": 30,
-                            "trailing_stop": True
-                        },
-                        "fundamental_metrics": {
-                            "pe_ratio": 25.0,
-                            "pb_ratio": 3.5,
-                            "roe": 15.0,
-                            "debt_to_equity": 0.3
-                        }
-                    }
-                    recommendations.append(recommendation)
-            
-            total_investment = sum(rec["investment_amount"] for rec in recommendations)
-            
-            return {
-                "success": True,
-                "strategy_type": strategy_type,
-                "strategy_name": config.name,
-                "broker_used": broker_name or "none",
-                "total_recommendations": len(recommendations),
-                "recommendations": recommendations,
-                "summary": {"total_investment": total_investment},
-                "note": f"Mock recommendations generated (broker {broker_name or 'none'} not available)"
-            }
-            
-        except Exception as e:
-            logger.error(f"Error generating mock recommendations: {e}")
-            return {"success": False, "error": f"Failed to generate mock recommendations: {str(e)}"}
 
     def _get_entry_indicators(self, symbol: str, user_id: int = 1) -> Optional[Dict]:
         """Calculate technical indicators for entry rules."""
