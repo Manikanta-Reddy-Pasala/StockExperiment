@@ -33,6 +33,10 @@ protobuf==5.29.3   # aligns TensorFlow (>=5.28.0) and fyers-apiv3 (==5.29.3)
 pytest==7.4.0
 pytest-mock==3.11.1
 
+# Redis for caching and session management
+redis==5.0.1
+celery==5.3.4
+
 # Development tools
 black==23.7.0
 flake8==6.0.0

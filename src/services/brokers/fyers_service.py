@@ -15,9 +15,13 @@ logger = logging.getLogger(__name__)
 try:
     from ...models.database import get_database_manager
     from ...models.models import BrokerConfiguration, Order, Trade
+    from ...services.token_manager_service import get_token_manager
+    from ...services.cache_service import get_cache_service
 except ImportError:
     from models.database import get_database_manager
     from models.models import BrokerConfiguration, Order, Trade
+    from services.token_manager_service import get_token_manager
+    from services.cache_service import get_cache_service
 
 try:
     from fyers_apiv3 import fyersModel
@@ -32,13 +36,16 @@ class FyersService:
     def __init__(self):
         self.db_manager = get_database_manager()
         self.broker_name = 'fyers'
+        self.token_manager = get_token_manager()
+        self.cache_service = get_cache_service()
 
     def _get_fyers_connector(self, user_id: int) -> 'FyersAPIConnector':
         """Helper to get an initialized FyersAPIConnector for a user."""
-        config = self.get_broker_config(user_id)
-        if not config or not config.get('client_id') or not config.get('access_token'):
+        # Use token manager to get valid token
+        token_data = self.token_manager.get_valid_token(user_id, self.broker_name)
+        if not token_data or not token_data.get('client_id') or not token_data.get('access_token'):
             raise ValueError('FYERS credentials not configured or access token missing.')
-        return FyersAPIConnector(config['client_id'], config['access_token'])
+        return FyersAPIConnector(token_data['client_id'], token_data['access_token'])
 
     def test_connection(self, user_id: int):
         """Test FYERS broker connection."""
@@ -335,6 +342,25 @@ class FyersService:
                 'last_order_time': last_order_time,
                 'api_response_time': '-'
             }
+    
+    def start_auto_refresh(self, user_id: int, check_interval_minutes: int = 30):
+        """Start automatic token refresh for the user."""
+        self.token_manager.start_auto_refresh(user_id, self.broker_name, check_interval_minutes)
+        logger.info(f"Started auto-refresh for FYERS user {user_id}")
+    
+    def stop_auto_refresh(self, user_id: int):
+        """Stop automatic token refresh for the user."""
+        self.token_manager.stop_auto_refresh(user_id, self.broker_name)
+        logger.info(f"Stopped auto-refresh for FYERS user {user_id}")
+    
+    def get_token_status(self, user_id: int) -> Dict[str, Any]:
+        """Get detailed token status for the user."""
+        return self.token_manager.get_token_status(user_id, self.broker_name)
+    
+    def invalidate_token_cache(self, user_id: int):
+        """Invalidate cached token data for the user."""
+        self.token_manager.invalidate_user_tokens(user_id, self.broker_name)
+        logger.info(f"Invalidated token cache for FYERS user {user_id}")
 
 
 class FyersOAuth2Flow:

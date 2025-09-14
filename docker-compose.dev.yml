@@ -6,8 +6,11 @@ services:
     depends_on:
       database:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://trader:trader_password@database:5432/trading_system
+      - REDIS_URL=redis://redis:6379/0
       - FLASK_ENV=development
       - FLASK_DEBUG=1
       - PYTHONPATH=/app
