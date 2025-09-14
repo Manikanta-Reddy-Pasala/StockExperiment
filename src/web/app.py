@@ -37,13 +37,8 @@ import sys
 import os
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
-)
+from ..config.logging_config import setup_logging
+setup_logging()
 
 
 def create_app():

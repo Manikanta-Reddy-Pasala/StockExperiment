@@ -28,7 +28,7 @@ def setup_logging():
                 'format': '%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s'
             },
             'json': {
-                'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+                'format': '%(message)s'
             }
         },
         'handlers': {
