@@ -70,6 +70,28 @@ def create_app():
     portfolio_service = get_portfolio_service()
     stock_screening_service = get_stock_screening_service(broker_service)
     
+    # Initialize new services
+    from ..services.cache_service import get_cache_service
+    from ..services.token_manager_service import get_token_manager
+    from ..services.scheduler_service import get_scheduler
+    
+    cache_service = get_cache_service()
+    token_manager = get_token_manager()
+    scheduler = get_scheduler()
+    
+    # Start scheduler service
+    scheduler.start()
+    
+    # Register FYERS token refresh callback
+    try:
+        from ..services.brokers.fyers_token_refresh import register_fyers_refresh_callback
+        register_fyers_refresh_callback()
+    except Exception as e:
+        app.logger.warning(f"Could not register FYERS refresh callback: {e}")
+    
+    # Schedule default tasks
+    scheduler.schedule_data_cleanup(interval_hours=24)
+    
     # Initialize charting
     charts = DatabaseCharts(db_manager)
     

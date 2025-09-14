@@ -268,3 +268,70 @@ def api_get_fyers_profile():
     except Exception as e:
         logger.error(f"Error getting FYERS profile for user {current_user.id}: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@fyers_bp.route('/api/token/status', methods=['GET'])
+@login_required
+def api_get_token_status():
+    """Get FYERS token status and information."""
+    try:
+        fyers_service = get_fyers_service()
+        token_status = fyers_service.get_token_status(current_user.id)
+        return jsonify({'success': True, 'data': token_status})
+        
+    except Exception as e:
+        logger.error(f"Error getting FYERS token status for user {current_user.id}: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@fyers_bp.route('/api/token/auto-refresh/start', methods=['POST'])
+@login_required
+def api_start_auto_refresh():
+    """Start automatic token refresh for the user."""
+    try:
+        data = request.get_json() or {}
+        check_interval = data.get('check_interval_minutes', 30)
+        
+        fyers_service = get_fyers_service()
+        fyers_service.start_auto_refresh(current_user.id, check_interval)
+        
+        return jsonify({
+            'success': True, 
+            'message': f'Started auto-refresh with {check_interval} minute intervals'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error starting auto-refresh for user {current_user.id}: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@fyers_bp.route('/api/token/auto-refresh/stop', methods=['POST'])
+@login_required
+def api_stop_auto_refresh():
+    """Stop automatic token refresh for the user."""
+    try:
+        fyers_service = get_fyers_service()
+        fyers_service.stop_auto_refresh(current_user.id)
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Stopped auto-refresh'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error stopping auto-refresh for user {current_user.id}: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@fyers_bp.route('/api/token/cache/invalidate', methods=['POST'])
+@login_required
+def api_invalidate_token_cache():
+    """Invalidate cached token data for the user."""
+    try:
+        fyers_service = get_fyers_service()
+        fyers_service.invalidate_token_cache(current_user.id)
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Token cache invalidated'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error invalidating token cache for user {current_user.id}: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
