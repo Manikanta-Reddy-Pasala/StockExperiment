@@ -3,6 +3,7 @@ try:
     # Try relative imports first (for normal usage)
     from .data_service import get_stock_data, create_features
     from ...utils.ml_helpers import load_model, load_lstm_model, load_scaler
+    from ...utils.api_logger import APILogger, log_api_call
 except ImportError:
     # Fall back to absolute imports (for testing)
     from data_service import get_stock_data, create_features
@@ -10,13 +11,23 @@ except ImportError:
     import os
     sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'utils'))
     from ml_helpers import load_model, load_lstm_model, load_scaler
+    from api_logger import APILogger, log_api_call
 
 def get_prediction(symbol: str, user_id: int = 1):
     """Generates a regression-based price prediction for a given stock symbol."""
-    # Load models
-    rf_model = load_model(f"{symbol}_rf")
-    xgb_model = load_model(f"{symbol}_xgb")
-    lstm_model = load_lstm_model(f"{symbol}_lstm")
+    # Log API call
+    APILogger.log_request(
+        service_name="MLPredictionService",
+        method_name="get_prediction",
+        request_data={'symbol': symbol},
+        user_id=user_id
+    )
+    
+    try:
+        # Load models
+        rf_model = load_model(f"{symbol}_rf")
+        xgb_model = load_model(f"{symbol}_xgb")
+        lstm_model = load_lstm_model(f"{symbol}_lstm")
 
     # Load the two scalers for the LSTM model
     feature_scaler = load_scaler(f"{symbol}_lstm_feature")

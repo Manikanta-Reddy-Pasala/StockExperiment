@@ -1,0 +1,42 @@
+{
+  "filtering": {
+    "min_price": 50.0,
+    "min_volume": 500000,
+    "max_atr_percent": 10.0
+  },
+  "risk_allocation": {
+    "large_cap_threshold": 50000.0,
+    "mid_cap_min": 10000.0,
+    "mid_cap_max": 50000.0,
+    "safe_large_cap_percent": 0.5,
+    "safe_mid_cap_percent": 0.5,
+    "high_risk_mid_cap_percent": 0.5,
+    "high_risk_small_cap_percent": 0.5
+  },
+  "entry": {
+    "ema_20_enabled": true,
+    "ema_50_enabled": true,
+    "breakout_days": 20,
+    "volume_multiplier": 1.5,
+    "rsi_min": 50.0,
+    "rsi_max": 70.0
+  },
+  "exit": {
+    "target1": 5.0,
+    "target1_qty_percent": 50.0,
+    "target2": 10.0,
+    "stop_loss": 3.0,
+    "max_days": 10,
+    "trailing_stop": true,
+    "trailing_stop_percent": 3.0
+  },
+  "portfolio": {
+    "max_positions": 10,
+    "position_size_percent": 10.0
+  },
+  "ml_integration": {
+    "use_ml_predictions": true,
+    "ml_confidence_threshold": 0.6,
+    "ml_weight_in_decision": 0.3
+  }
+}

@@ -6,6 +6,7 @@ import logging
 from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_required, current_user
 from datetime import datetime
+from ...utils.api_logger import APILogger, log_flask_route
 
 logger = logging.getLogger(__name__)
 

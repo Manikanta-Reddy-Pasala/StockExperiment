@@ -297,6 +297,24 @@
                 portfolioValueElement.textContent = '₹' + data.total_portfolio_value.toFixed(2);
             }
 
+            // Update active strategies
+            const activeStrategiesElement = document.getElementById('active-strategies');
+            if (activeStrategiesElement && data.active_strategies_count !== undefined) {
+                activeStrategiesElement.textContent = data.active_strategies_count;
+                
+                // Update the status text
+                const statusElement = activeStrategiesElement.parentElement.querySelector('small');
+                if (statusElement) {
+                    if (data.active_strategies_count > 0) {
+                        statusElement.innerHTML = '<i class="bi bi-lightning-fill"></i> Running strategies';
+                        statusElement.className = 'text-success';
+                    } else {
+                        statusElement.innerHTML = '<i class="bi bi-pause-circle"></i> No active strategies';
+                        statusElement.className = 'text-warning';
+                    }
+                }
+            }
+
             // Update market data
             if (data.market_data) {
                 updateMarketData(data.market_data);

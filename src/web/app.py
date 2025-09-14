@@ -5,6 +5,8 @@ import logging
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_bcrypt import Bcrypt
+import uuid
+from datetime import datetime
 try:
     # Try relative imports first (for normal usage)
     from ..models.database import get_database_manager
@@ -16,6 +18,7 @@ try:
     from ..services.dashboard_service import get_dashboard_service
     from ..services.portfolio_service import get_portfolio_service
     from ..services.stock_screening_service import get_stock_screening_service, StrategyType
+    from ..utils.api_logger import APILogger, log_flask_route
 except ImportError:
     # Fall back to absolute imports (for testing)
     from models.database import get_database_manager
@@ -27,6 +30,7 @@ except ImportError:
     from services.dashboard_service import get_dashboard_service
     from services.portfolio_service import get_portfolio_service
     from services.stock_screening_service import get_stock_screening_service, StrategyType
+    from utils.api_logger import APILogger, log_flask_route
 from datetime import datetime
 import secrets
 import sys
@@ -546,19 +550,50 @@ def create_app():
 
     @app.route('/api/brokers/fyers/quotes', methods=['GET'])
     @login_required
+    @log_flask_route("get_fyers_quotes")
     def api_get_fyers_quotes():
         """Get FYERS market quotes."""
         try:
             symbols = request.args.get('symbols', '')
             app.logger.info(f"Fetching FYERS quotes for symbols: {symbols} for user {current_user.id}")
+            
+            # Log API call to broker service
+            APILogger.log_request(
+                service_name="BrokerService",
+                method_name="get_fyers_quotes",
+                request_data={'symbols': symbols},
+                user_id=current_user.id
+            )
+            
             result = broker_service.get_fyers_quotes(current_user.id, symbols)
+            
+            # Log response from broker service
+            APILogger.log_response(
+                service_name="BrokerService",
+                method_name="get_fyers_quotes",
+                response_data=result,
+                user_id=current_user.id
+            )
+            
             if 'error' in result:
                 return jsonify({'success': False, 'error': result['error']}), 400
             return jsonify({'success': True, 'data': result})
         except ValueError as e:
+            APILogger.log_error(
+                service_name="FlaskAPI",
+                method_name="get_fyers_quotes",
+                error=e,
+                user_id=current_user.id if current_user else None
+            )
             return jsonify({'success': False, 'error': str(e)}), 400
         except Exception as e:
             app.logger.error(f"Error getting FYERS quotes for user {current_user.id}: {str(e)}")
+            APILogger.log_error(
+                service_name="FlaskAPI",
+                method_name="get_fyers_quotes",
+                error=e,
+                user_id=current_user.id if current_user else None
+            )
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
     @app.route('/api/brokers/fyers/history', methods=['GET'])
@@ -965,6 +1000,14 @@ def create_app():
         app.logger.info("Strategy routes registered successfully")
     except ImportError as e:
         app.logger.warning(f"Strategy routes not available: {e}")
+    
+    # Register strategy settings blueprints
+    try:
+        from .routes.strategy_settings_routes import strategy_settings_bp
+        app.register_blueprint(strategy_settings_bp)
+        app.logger.info("Strategy settings routes registered successfully")
+    except ImportError as e:
+        app.logger.warning(f"Strategy settings routes not available: {e}")
         app.logger.warning("Strategy functionality will be disabled")
 
     # Individual broker page routes

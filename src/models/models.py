@@ -41,6 +41,7 @@ class User(UserMixin, Base):
     logs = relationship("Log", back_populates="user")
     suggested_stocks = relationship("SuggestedStock", back_populates="user")
     broker_configurations = relationship("BrokerConfiguration", back_populates="user")
+    strategy_settings = relationship("UserStrategySettings", back_populates="user")
     
     def __repr__(self):
         return f'<User {self.username}>'
@@ -218,6 +219,32 @@ class Configuration(Base):
     __table_args__ = (
         UniqueConstraint('user_id', 'key', name='_user_key_uc'),
     )
+
+
+class UserStrategySettings(Base):
+    """User-specific strategy settings and preferences."""
+    __tablename__ = 'user_strategy_settings'
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    strategy_name = Column(String(100), nullable=False)  # 'default_risk', 'high_risk'
+    is_active = Column(Boolean, default=True)
+    is_enabled = Column(Boolean, default=True)  # User can enable/disable
+    priority = Column(Integer, default=1)  # Display order
+    custom_parameters = Column(Text)  # JSON string for custom strategy parameters
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User")
+    
+    # Unique constraint to ensure one setting per user per strategy
+    __table_args__ = (
+        UniqueConstraint('user_id', 'strategy_name', name='unique_user_strategy'),
+    )
+    
+    def __repr__(self):
+        return f'<UserStrategySettings user_id={self.user_id} strategy={self.strategy_name} active={self.is_active}>'
 
 
 class Log(Base):

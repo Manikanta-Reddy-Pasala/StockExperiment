@@ -8,6 +8,7 @@ from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 from enum import Enum
 import math
+from ..utils.api_logger import APILogger, log_api_call
 import pandas as pd
 
 from .stock_screening_service import get_stock_screening_service, StockData
@@ -110,6 +111,14 @@ class AdvancedStrategyService:
     def generate_stock_recommendations(self, user_id: int, strategy_type: str, 
                                      capital: float = 100000) -> Dict:
         """Generate stock recommendations based on strategy and ML predictions."""
+        # Log API call
+        APILogger.log_request(
+            service_name="StrategyService",
+            method_name="generate_stock_recommendations",
+            request_data={'strategy_type': strategy_type, 'capital': capital},
+            user_id=user_id
+        )
+        
         try:
             if strategy_type not in self.strategies:
                 raise ValueError(f"Unknown strategy type: {strategy_type}")
@@ -152,7 +161,7 @@ class AdvancedStrategyService:
             
             total_investment = sum(rec.recommended_quantity * rec.stock_data.current_price for rec in recommendations)
             
-            return {
+            result = {
                 "success": True,
                 "strategy_type": strategy_type,
                 "strategy_name": config.name,
@@ -162,8 +171,25 @@ class AdvancedStrategyService:
                 "summary": {"total_investment": total_investment}
             }
             
+            # Log response
+            APILogger.log_response(
+                service_name="StrategyService",
+                method_name="generate_stock_recommendations",
+                response_data=result,
+                user_id=user_id
+            )
+            
+            return result
+            
         except Exception as e:
             logger.error(f"Error generating stock recommendations: {e}")
+            APILogger.log_error(
+                service_name="StrategyService",
+                method_name="generate_stock_recommendations",
+                error=e,
+                request_data={'strategy_type': strategy_type, 'capital': capital},
+                user_id=user_id
+            )
             return {"success": False, "error": str(e)}
     
 

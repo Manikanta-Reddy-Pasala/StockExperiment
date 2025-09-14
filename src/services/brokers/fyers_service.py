@@ -17,11 +17,13 @@ try:
     from ...models.models import BrokerConfiguration, Order, Trade
     from ...services.token_manager_service import get_token_manager
     from ...services.cache_service import get_cache_service
+    from ...utils.api_logger import APILogger, log_api_call
 except ImportError:
     from models.database import get_database_manager
     from models.models import BrokerConfiguration, Order, Trade
     from services.token_manager_service import get_token_manager
     from services.cache_service import get_cache_service
+    from utils.api_logger import APILogger, log_api_call
 
 try:
     from fyers_apiv3 import fyersModel
@@ -141,8 +143,36 @@ class FyersService:
 
     def get_holdings(self, user_id: int):
         """Get user holdings."""
-        connector = self._get_fyers_connector(user_id)
-        return connector.get_holdings()
+        # Log API call
+        APILogger.log_request(
+            service_name="FyersService",
+            method_name="get_holdings",
+            request_data={},
+            user_id=user_id
+        )
+        
+        try:
+            connector = self._get_fyers_connector(user_id)
+            result = connector.get_holdings()
+            
+            # Log response
+            APILogger.log_response(
+                service_name="FyersService",
+                method_name="get_holdings",
+                response_data=result,
+                user_id=user_id
+            )
+            
+            return result
+        except Exception as e:
+            APILogger.log_error(
+                service_name="FyersService",
+                method_name="get_holdings",
+                error=e,
+                request_data={},
+                user_id=user_id
+            )
+            raise
 
     def get_positions(self, user_id: int):
         """Get user positions."""
@@ -161,8 +191,36 @@ class FyersService:
 
     def get_quotes(self, user_id: int, symbols: str):
         """Get market quotes for symbols."""
-        connector = self._get_fyers_connector(user_id)
-        return connector.get_quotes(symbols)
+        # Log API call
+        APILogger.log_request(
+            service_name="FyersService",
+            method_name="get_quotes",
+            request_data={'symbols': symbols},
+            user_id=user_id
+        )
+        
+        try:
+            connector = self._get_fyers_connector(user_id)
+            result = connector.get_quotes(symbols)
+            
+            # Log response
+            APILogger.log_response(
+                service_name="FyersService",
+                method_name="get_quotes",
+                response_data=result,
+                user_id=user_id
+            )
+            
+            return result
+        except Exception as e:
+            APILogger.log_error(
+                service_name="FyersService",
+                method_name="get_quotes",
+                error=e,
+                request_data={'symbols': symbols},
+                user_id=user_id
+            )
+            raise
 
     def get_history(self, user_id: int, symbol: str, resolution: str, range_from: str, range_to: str):
         """Get historical data for a symbol."""

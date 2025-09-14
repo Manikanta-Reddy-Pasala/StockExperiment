@@ -165,6 +165,20 @@ CREATE TABLE IF NOT EXISTS configurations (
     UNIQUE(user_id, key)
 );
 
+-- User Strategy Settings table
+CREATE TABLE IF NOT EXISTS user_strategy_settings (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) NOT NULL,
+    strategy_name VARCHAR(100) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    is_enabled BOOLEAN DEFAULT TRUE,
+    priority INTEGER DEFAULT 1,
+    custom_parameters TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, strategy_name)
+);
+
 CREATE TABLE IF NOT EXISTS logs (
     id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(id),
@@ -346,6 +360,26 @@ INSERT INTO strategy_types (
     'high', 0.08, 0.30, TRUE
 ) ON CONFLICT (name) DO NOTHING;
 
+-- Insert default strategy settings for admin user
+INSERT INTO user_strategy_settings (user_id, strategy_name, is_active, is_enabled, priority, custom_parameters)
+VALUES 
+(
+    (SELECT id FROM users WHERE username = 'admin'),
+    'default_risk',
+    TRUE,
+    TRUE,
+    1,
+    '{}'
+),
+(
+    (SELECT id FROM users WHERE username = 'admin'),
+    'high_risk',
+    TRUE,
+    TRUE,
+    2,
+    '{}'
+) ON CONFLICT (user_id, strategy_name) DO NOTHING;
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_stocks_symbol ON stocks(symbol);
 CREATE INDEX IF NOT EXISTS idx_stocks_market_cap_category ON stocks(market_cap_category);
@@ -353,4 +387,6 @@ CREATE INDEX IF NOT EXISTS idx_stock_prices_stock_date ON stock_prices(stock_id,
 CREATE INDEX IF NOT EXISTS idx_strategy_stock_selections_strategy ON strategy_stock_selections(strategy_type_id);
 CREATE INDEX IF NOT EXISTS idx_ml_predictions_stock_date ON ml_predictions(stock_id, prediction_date);
 CREATE INDEX IF NOT EXISTS idx_portfolio_strategies_user ON portfolio_strategies(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_strategy_settings_user ON user_strategy_settings(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_strategy_settings_active ON user_strategy_settings(user_id, is_active, is_enabled);
 CREATE INDEX IF NOT EXISTS idx_portfolio_positions_portfolio ON portfolio_positions(portfolio_strategy_id);
