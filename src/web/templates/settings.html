@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="row g-4">
-    <div class="col-md-8">
+    <div class="col-12">
         <div class="card hover-lift animate-fade-in-up">
             <div class="card-header bg-gradient-primary text-white">
                 <h5 class="card-title mb-0 text-white">
@@ -195,77 +195,6 @@
         </div>
     </div>
     
-    <div class="col-md-4">
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-white">
-                <h5 class="card-title mb-0">System Status</h5>
-            </div>
-            <div class="card-body">
-                <div class="d-flex align-items-center mb-3">
-                    <div class="flex-grow-1">
-                        <h6 class="mb-0">Broker Connection</h6>
-                        <small class="text-muted">FYERS API</small>
-                    </div>
-                    <span class="badge bg-success" id="broker-connection-status">Connected</span>
-                </div>
-                
-                <div class="d-flex align-items-center mb-3">
-                    <div class="flex-grow-1">
-                        <h6 class="mb-0">Database</h6>
-                        <small class="text-muted">SQLite</small>
-                    </div>
-                    <span class="badge bg-success">Connected</span>
-                </div>
-                
-                <div class="d-flex align-items-center mb-3">
-                    <div class="flex-grow-1">
-                        <h6 class="mb-0">Scheduler</h6>
-                        <small class="text-muted">Job Scheduler</small>
-                    </div>
-                    <span class="badge bg-success">Running</span>
-                </div>
-                
-                <div class="d-flex align-items-center mb-3">
-                    <div class="flex-grow-1">
-                        <h6 class="mb-0">Risk Manager</h6>
-                        <small class="text-muted">Risk Controls</small>
-                    </div>
-                    <span class="badge bg-success">Active</span>
-                </div>
-                
-                <div class="d-flex align-items-center">
-                    <div class="flex-grow-1">
-                        <h6 class="mb-0">Data Provider</h6>
-                        <small class="text-muted">yFinance</small>
-                    </div>
-                    <span class="badge bg-warning">Degraded</span>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card shadow-sm">
-            <div class="card-header bg-white">
-                <h5 class="card-title mb-0">System Actions</h5>
-            </div>
-            <div class="card-body">
-                <button class="btn btn-outline-primary w-100 mb-2" id="test-email">
-                    <i class="bi bi-envelope-fill"></i> Test Email Configuration
-                </button>
-                <button class="btn btn-outline-secondary w-100 mb-2" id="backup-config">
-                    <i class="bi bi-download"></i> Backup Configuration
-                </button>
-                <button class="btn btn-outline-info w-100 mb-2" id="export-data">
-                    <i class="bi bi-upload"></i> Export Trading Data
-                </button>
-                <button class="btn btn-outline-warning w-100 mb-2" id="clear-cache">
-                    <i class="bi bi-trash-fill"></i> Clear Data Cache
-                </button>
-                <button class="btn btn-outline-danger w-100" id="reset-system">
-                    <i class="bi bi-arrow-clockwise"></i> Factory Reset
-                </button>
-            </div>
-        </div>
-    </div>
 </div>
 {% endblock %}
 
@@ -360,34 +289,10 @@
         }
     });
     
-    // Event listeners for action buttons
-    document.getElementById('test-email').addEventListener('click', function() {
-        alert('Email configuration test initiated!');
-    });
-    
-    document.getElementById('backup-config').addEventListener('click', function() {
-        alert('Configuration backup initiated!');
-    });
-    
-    document.getElementById('export-data').addEventListener('click', function() {
-        alert('Trading data export initiated!');
-    });
-    
-    document.getElementById('clear-cache').addEventListener('click', function() {
-        if (confirm('Are you sure you want to clear the data cache?')) {
-            alert('Data cache cleared!');
-        }
-    });
-    
+    // Event listener for reset config button
     document.getElementById('reset-config').addEventListener('click', function() {
         if (confirm('Are you sure you want to reset all settings to defaults?')) {
             alert('Configuration reset to defaults!');
-        }
-    });
-    
-    document.getElementById('reset-system').addEventListener('click', function() {
-        if (confirm('WARNING: This will reset the entire system to factory defaults. All data will be lost. Are you sure?')) {
-            alert('System reset initiated!');
         }
     });
     
@@ -396,7 +301,6 @@
         const button = this;
         const originalText = button.innerHTML;
         const statusBadge = document.getElementById('broker-status-badge');
-        const systemStatusBadge = document.getElementById('broker-connection-status');
         const brokerProvider = document.getElementById('broker-provider').value;
         
         button.innerHTML = '<i class="bi bi-hourglass-split"></i> Testing...';
@@ -411,14 +315,10 @@
             if (data.success) {
                 statusBadge.textContent = 'Connected';
                 statusBadge.className = 'badge bg-success me-2';
-                systemStatusBadge.textContent = 'Connected';
-                systemStatusBadge.className = 'badge bg-success';
                 showNotification(`${brokerProvider.toUpperCase()} connection test successful!`, 'success');
             } else {
                 statusBadge.textContent = 'Disconnected';
                 statusBadge.className = 'badge bg-danger me-2';
-                systemStatusBadge.textContent = 'Disconnected';
-                systemStatusBadge.className = 'badge bg-danger';
                 showNotification(`${brokerProvider.toUpperCase()} connection test failed: ${data.message || 'Unknown error'}`, 'error');
             }
             
@@ -427,8 +327,6 @@
         } catch (error) {
             statusBadge.textContent = 'Error';
             statusBadge.className = 'badge bg-danger me-2';
-            systemStatusBadge.textContent = 'Error';
-            systemStatusBadge.className = 'badge bg-danger';
             showNotification(`Error testing ${brokerProvider.toUpperCase()} connection: ${error.message}`, 'error');
         } finally {
             button.innerHTML = originalText;
@@ -443,7 +341,6 @@
             const data = await response.json();
             
             const statusBadge = document.getElementById('broker-status-badge');
-            const systemStatusBadge = document.getElementById('broker-connection-status');
             
             if (data.success) {
                 const connectionStatus = data.connection_status || 'unknown';
@@ -454,28 +351,19 @@
                 if (isConnected) {
                     statusBadge.textContent = statusText;
                     statusBadge.className = 'badge bg-success me-2';
-                    systemStatusBadge.textContent = statusText;
-                    systemStatusBadge.className = 'badge bg-success';
                 } else {
                     statusBadge.textContent = statusText;
                     statusBadge.className = 'badge bg-danger me-2';
-                    systemStatusBadge.textContent = statusText;
-                    systemStatusBadge.className = 'badge bg-danger';
                 }
             } else {
                 statusBadge.textContent = 'Unknown';
                 statusBadge.className = 'badge bg-secondary me-2';
-                systemStatusBadge.textContent = 'Unknown';
-                systemStatusBadge.className = 'badge bg-secondary';
             }
         } catch (error) {
             console.error('Error fetching broker status:', error);
             const statusBadge = document.getElementById('broker-status-badge');
-            const systemStatusBadge = document.getElementById('broker-connection-status');
             statusBadge.textContent = 'Error';
             statusBadge.className = 'badge bg-danger me-2';
-            systemStatusBadge.textContent = 'Error';
-            systemStatusBadge.className = 'badge bg-danger';
         }
     }
     
