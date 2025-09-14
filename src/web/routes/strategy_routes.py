@@ -1,5 +1,5 @@
 """
-API Routes for Enhanced Strategy System
+API Routes for Strategy System
 Provides endpoints for Default Risk and High Risk strategies
 """
 import logging
@@ -73,7 +73,7 @@ def api_update_stock_prices():
 def api_create_portfolio_strategy():
     """Create a new portfolio strategy (Default Risk or High Risk)."""
     try:
-        from ...services.enhanced_strategy_service import get_advanced_strategy_service
+        from ...services.strategy_service import get_advanced_strategy_service
         
         data = request.get_json()
         
@@ -121,20 +121,25 @@ def api_create_portfolio_strategy():
 def api_generate_recommendations():
     """Generate stock recommendations based on strategy type."""
     try:
-        from ...services.enhanced_strategy_service import get_advanced_strategy_service
+        from ...services.strategy_service import get_advanced_strategy_service
         
         data = request.get_json()
+        current_app.logger.info(f"Received request data: {data}")
         
         if not data:
+            current_app.logger.error("No request data provided")
             return jsonify({'success': False, 'error': 'Request data is required'}), 400
         
         strategy_type = data.get('strategy_type')
         capital = data.get('capital', 100000)  # Default 1 lakh
         
+        current_app.logger.info(f"Strategy type: {strategy_type}, Capital: {capital}")
+        
         if not strategy_type or strategy_type not in ['default_risk', 'high_risk']:
+            current_app.logger.error(f"Invalid strategy_type: {strategy_type}")
             return jsonify({
                 'success': False, 
-                'error': 'Invalid strategy_type. Must be "default_risk" or "high_risk"'
+                'error': f'Invalid strategy_type: "{strategy_type}". Must be "default_risk" or "high_risk"'
             }), 400
         
         current_app.logger.info(f"Generating {strategy_type} recommendations for user {current_user.id}")
@@ -144,13 +149,16 @@ def api_generate_recommendations():
             current_user.id, strategy_type, capital
         )
         
+        current_app.logger.info(f"Strategy service result: {result}")
+        
         if result.get('success'):
             return jsonify(result)
         else:
+            current_app.logger.error(f"Strategy service returned error: {result.get('error', 'Unknown error')}")
             return jsonify(result), 400
         
     except Exception as e:
-        current_app.logger.error(f"Error generating recommendations: {e}")
+        current_app.logger.error(f"Error generating recommendations: {e}", exc_info=True)
         return jsonify({
             'success': False,
             'error': str(e)
@@ -164,7 +172,7 @@ def api_strategy_health():
     try:
         return jsonify({
             'success': True,
-            'service': 'Enhanced Strategy Service',
+            'service': 'Strategy Service',
             'version': '1.0',
             'timestamp': datetime.utcnow().isoformat(),
             'available_strategies': ['default_risk', 'high_risk']

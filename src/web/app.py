@@ -549,7 +549,7 @@ def create_app():
     def api_get_fyers_quotes():
         """Get FYERS market quotes."""
         try:
-            symbols = request.args.get('symbols', 'NSE:SBIN-EQ')
+            symbols = request.args.get('symbols', '')
             app.logger.info(f"Fetching FYERS quotes for symbols: {symbols} for user {current_user.id}")
             result = broker_service.get_fyers_quotes(current_user.id, symbols)
             if 'error' in result:
@@ -566,7 +566,7 @@ def create_app():
     def api_get_fyers_history():
         """Get FYERS historical data."""
         try:
-            symbol = request.args.get('symbol', 'NSE:SBIN-EQ')
+            symbol = request.args.get('symbol', '')
             resolution = request.args.get('resolution', 'D')
             range_from = request.args.get('range_from')
             range_to = request.args.get('range_to')
@@ -958,14 +958,14 @@ def create_app():
         app.logger.warning(f"ML prediction routes not available: {e}")
         app.logger.warning("ML functionality will be disabled")
 
-    # Register enhanced strategy blueprints
+    # Register strategy blueprints
     try:
         from .routes.strategy_routes import strategy_bp
         app.register_blueprint(strategy_bp)
-        app.logger.info("Enhanced strategy routes registered successfully")
+        app.logger.info("Strategy routes registered successfully")
     except ImportError as e:
-        app.logger.warning(f"Enhanced strategy routes not available: {e}")
-        app.logger.warning("Enhanced strategy functionality will be disabled")
+        app.logger.warning(f"Strategy routes not available: {e}")
+        app.logger.warning("Strategy functionality will be disabled")
 
     # Individual broker page routes
     @app.route('/brokers/fyers')

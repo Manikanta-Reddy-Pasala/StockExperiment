@@ -759,17 +759,9 @@ class FyersAPIService:
                                  sort_order: str = 'desc', limit: int = 50) -> Dict[str, Any]:
         """Get suggested stocks for watchlist with search and filtering."""
         try:
-            # Popular Indian stocks for suggestions
-            popular_symbols = [
-                'NSE:RELIANCE-EQ', 'NSE:TCS-EQ', 'NSE:HDFCBANK-EQ', 'NSE:INFY-EQ',
-                'NSE:HINDUNILVR-EQ', 'NSE:ICICIBANK-EQ', 'NSE:SBIN-EQ', 'NSE:BHARTIARTL-EQ',
-                'NSE:ITC-EQ', 'NSE:ASIANPAINT-EQ', 'NSE:MARUTI-EQ', 'NSE:AXISBANK-EQ',
-                'NSE:LT-EQ', 'NSE:SUNPHARMA-EQ', 'NSE:WIPRO-EQ', 'NSE:ULTRACEMCO-EQ',
-                'NSE:ONGC-EQ', 'NSE:TITAN-EQ', 'NSE:TECHM-EQ', 'NSE:HCLTECH-EQ',
-                'NSE:POWERGRID-EQ', 'NSE:BAJFINANCE-EQ', 'NSE:NESTLEIND-EQ', 'NSE:KOTAKBANK-EQ',
-                'NSE:M&M-EQ', 'NSE:TATASTEEL-EQ', 'NSE:NTPC-EQ', 'NSE:COALINDIA-EQ',
-                'NSE:BAJAJFINSV-EQ', 'NSE:DRREDDY-EQ'
-            ]
+            # TODO: Get popular stocks from broker API or database
+            # For now, return empty suggestions as we don't want hardcoded stocks
+            popular_symbols = []
             
             # Get quotes for popular symbols
             quotes_response = self.get_quotes(user_id, popular_symbols)
@@ -893,38 +885,9 @@ class FyersAPIService:
     
     def _get_sector_for_symbol(self, symbol: str) -> str:
         """Get sector classification for symbol (simplified mapping)."""
-        sector_mapping = {
-            'RELIANCE': 'Energy',
-            'TCS': 'Technology',
-            'INFY': 'Technology',
-            'WIPRO': 'Technology',
-            'HCLTECH': 'Technology',
-            'TECHM': 'Technology',
-            'HDFCBANK': 'Banking',
-            'ICICIBANK': 'Banking',
-            'SBIN': 'Banking',
-            'AXISBANK': 'Banking',
-            'KOTAKBANK': 'Banking',
-            'HINDUNILVR': 'FMCG',
-            'ITC': 'FMCG',
-            'NESTLEIND': 'FMCG',
-            'BHARTIARTL': 'Telecom',
-            'ASIANPAINT': 'Paints',
-            'MARUTI': 'Auto',
-            'M&M': 'Auto',
-            'TATASTEEL': 'Steel',
-            'LT': 'Construction',
-            'SUNPHARMA': 'Pharma',
-            'DRREDDY': 'Pharma',
-            'ONGC': 'Oil & Gas',
-            'TITAN': 'Jewellery',
-            'ULTRACEMCO': 'Cement',
-            'POWERGRID': 'Power',
-            'NTPC': 'Power',
-            'COALINDIA': 'Mining',
-            'BAJFINANCE': 'Finance',
-            'BAJAJFINSV': 'Finance'
-        }
+        # TODO: Get sector information from broker API or database
+        # For now, return generic sector
+        sector_mapping = {}
         
         for key, sector in sector_mapping.items():
             if key in symbol.upper():

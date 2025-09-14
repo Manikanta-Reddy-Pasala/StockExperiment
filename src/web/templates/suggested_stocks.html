@@ -96,7 +96,7 @@
             const riskStrategy = getSelectedRiskStrategy();
             const timeFilter = document.getElementById('time-filter').value;
             
-            // Use the new enhanced strategy API
+            // Use the new strategy API
             const response = await fetch('/api/strategy/generate-recommendations', {
                 method: 'POST',
                 headers: {

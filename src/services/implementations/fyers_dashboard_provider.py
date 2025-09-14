@@ -405,11 +405,18 @@ class FyersDashboardProvider(IDashboardProvider):
                     suggestions = suggestions_response.get('data', [])
                     symbols = [stock['symbol'] for stock in suggestions[:5]]
                 else:
-                    # Fallback to popular stocks
-                    symbols = [
-                        'NSE:RELIANCE-EQ', 'NSE:TCS-EQ', 'NSE:HDFCBANK-EQ', 
-                        'NSE:INFY-EQ', 'NSE:ICICIBANK-EQ'
-                    ]
+                    # No fallback stocks - return empty dashboard
+                    return {
+                        'success': False,
+                        'error': 'No stock suggestions available. Please add stocks to your watchlist.',
+                        'data': {
+                            'market_overview': {},
+                            'top_gainers': [],
+                            'top_losers': [],
+                            'most_active': [],
+                            'sector_performance': []
+                        }
+                    }
             
             quotes_response = self.fyers_api.get_quotes(user_id, symbols)
             
