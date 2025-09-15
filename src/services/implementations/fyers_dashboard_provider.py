@@ -1,14 +1,14 @@
 """
 Enhanced FYERS Dashboard Provider Implementation
 
-Uses the comprehensive FYERS API service for full feature implementation.
+Uses the official FYERS API library for full feature implementation.
 """
 
 import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from ..interfaces.dashboard_interface import IDashboardProvider, DashboardMetrics, MarketIndex
-from ..fyers_api_service import get_fyers_api_service
+from ..brokers.fyers_service import get_fyers_service
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ class FyersDashboardProvider(IDashboardProvider):
     """Enhanced FYERS implementation of dashboard provider with full API integration."""
     
     def __init__(self):
-        self.fyers_api = get_fyers_api_service()
+        self.fyers_service = get_fyers_service()
     
     def get_market_overview(self, user_id: int) -> Dict[str, Any]:
         """Get market overview data for major indices using FYERS API."""
@@ -32,13 +32,13 @@ class FyersDashboardProvider(IDashboardProvider):
                 'NSE:NIFTYAUTO-INDEX'
             ]
             
-            # Get quotes for indices
-            quotes_response = self.fyers_api.quotes(user_id, indices_symbols)
+            # Get quotes for indices using FYERS service
+            quotes_response = self.fyers_service.quotes_multiple(user_id, indices_symbols)
             
-            if not quotes_response.get('success'):
+            if quotes_response.get('status') != 'success':
                 return {
                     'success': False,
-                    'error': quotes_response.get('error', 'Failed to fetch market data'),
+                    'error': quotes_response.get('message', 'Failed to fetch market data'),
                     'data': [],
                     'last_updated': datetime.now().isoformat()
                 }
@@ -57,14 +57,14 @@ class FyersDashboardProvider(IDashboardProvider):
             }
             
             for symbol in indices_symbols:
-                if symbol in quotes_data and quotes_data[symbol].get('v'):
-                    quote_data = quotes_data[symbol]['v']
+                if symbol in quotes_data:
+                    quote_data = quotes_data[symbol]
                     index = MarketIndex(
                         symbol=symbol,
                         name=symbol_mapping.get(symbol, symbol),
-                        price=quote_data.get('lp', 0),
-                        change=quote_data.get('ch', 0),
-                        change_percent=quote_data.get('chp', 0)
+                        price=float(quote_data.get('ltp', 0)),
+                        change=float(quote_data.get('change', 0)),
+                        change_percent=float(quote_data.get('change_percent', 0))
                     )
                     market_indices.append(index.to_dict())
             
@@ -87,17 +87,17 @@ class FyersDashboardProvider(IDashboardProvider):
         """Get portfolio summary metrics using FYERS API."""
         try:
             # Get comprehensive portfolio report
-            portfolio_report = self.fyers_api.generate_portfolio_summary_report(user_id)
+            portfolio_report = self.fyers_service.generate_portfolio_summary_report(user_id)
             
-            if not portfolio_report.get('success'):
+            if portfolio_report.get('status') != 'success':
                 return {
                     'success': False,
-                    'error': portfolio_report.get('error', 'Failed to generate portfolio summary'),
+                    'error': portfolio_report.get('message', 'Failed to generate portfolio summary'),
                     'data': DashboardMetrics().to_dict(),
                     'last_updated': datetime.now().isoformat()
                 }
             
-            summary = portfolio_report.get('summary', {})
+            summary = portfolio_report.get('data', {})
             metrics = DashboardMetrics()
             
             metrics.total_pnl = summary.get('total_pnl', 0)
@@ -126,16 +126,12 @@ class FyersDashboardProvider(IDashboardProvider):
     def get_top_holdings(self, user_id: int, limit: int = 5) -> Dict[str, Any]:
         """Get top holdings by value using FYERS API."""
         try:
-            holdings_response = self.fyers_api.holdings(
-                user_id, 
-                sort_by='market_value', 
-                sort_order='desc'
-            )
+            holdings_response = self.fyers_service.holdings(user_id)
             
-            if not holdings_response.get('success'):
+            if holdings_response.get('status') != 'success':
                 return {
                     'success': False,
-                    'error': holdings_response.get('error', 'Failed to fetch holdings'),
+                    'error': holdings_response.get('message', 'Failed to fetch holdings'),
                     'data': [],
                     'last_updated': datetime.now().isoformat()
                 }
@@ -174,22 +170,13 @@ class FyersDashboardProvider(IDashboardProvider):
         """Get recent trading activity using FYERS API."""
         try:
             # Get recent orders and trades
-            orderbook_response = self.fyers_api.orderbook(
-                user_id,
-                sort_by='order_date_time',
-                sort_order='desc'
-            )
-            
-            tradebook_response = self.fyers_api.tradebook(
-                user_id,
-                sort_by='trade_date_time', 
-                sort_order='desc'
-            )
+            orderbook_response = self.fyers_service.orderbook(user_id)
+            tradebook_response = self.fyers_service.tradebook(user_id)
             
             activities = []
             
             # Add recent orders
-            if orderbook_response.get('success'):
+            if orderbook_response.get('status') == 'success':
                 orders = orderbook_response.get('data', [])[:limit//2]
                 for order in orders:
                     activities.append({
@@ -206,7 +193,7 @@ class FyersDashboardProvider(IDashboardProvider):
                     })
             
             # Add recent trades
-            if tradebook_response.get('success'):
+            if tradebook_response.get('status') == 'success':
                 trades = tradebook_response.get('data', [])[:limit//2]
                 for trade in trades:
                     activities.append({
@@ -243,12 +230,12 @@ class FyersDashboardProvider(IDashboardProvider):
     def get_account_balance(self, user_id: int) -> Dict[str, Any]:
         """Get account balance and available funds using FYERS API."""
         try:
-            funds_response = self.fyers_api.funds(user_id)
+            funds_response = self.fyers_service.funds(user_id)
             
-            if not funds_response.get('success'):
+            if funds_response.get('status') != 'success':
                 return {
                     'success': False,
-                    'error': funds_response.get('error', 'Failed to fetch funds'),
+                    'error': funds_response.get('message', 'Failed to fetch funds'),
                     'data': {'available_cash': 0, 'total_balance': 0, 'margin_used': 0},
                     'last_updated': datetime.now().isoformat()
                 }
@@ -296,9 +283,9 @@ class FyersDashboardProvider(IDashboardProvider):
         """Get daily P&L data for charting using historical data."""
         try:
             # Get portfolio holdings to calculate historical P&L
-            holdings_response = self.fyers_api.holdings(user_id)
+            holdings_response = self.fyers_service.holdings(user_id)
             
-            if not holdings_response.get('success'):
+            if holdings_response.get('status') != 'success':
                 return {
                     'success': False,
                     'error': 'Unable to fetch holdings for P&L calculation',
@@ -346,10 +333,10 @@ class FyersDashboardProvider(IDashboardProvider):
         """Get performance metrics for a given period."""
         try:
             # Get portfolio summary and trading summary
-            portfolio_report = self.fyers_api.generate_portfolio_summary_report(user_id)
+            portfolio_report = self.fyers_service.generate_portfolio_summary_report(user_id)
             
             # Calculate performance metrics based on available data
-            if not portfolio_report.get('success'):
+            if portfolio_report.get('status') != 'success':
                 return {
                     'success': False,
                     'error': 'Unable to calculate performance metrics',
@@ -357,7 +344,7 @@ class FyersDashboardProvider(IDashboardProvider):
                     'last_updated': datetime.now().isoformat()
                 }
             
-            summary = portfolio_report.get('summary', {})
+            summary = portfolio_report.get('data', {})
             
             # Calculate basic performance metrics
             total_portfolio_value = summary.get('total_portfolio_value', 0)
@@ -396,34 +383,21 @@ class FyersDashboardProvider(IDashboardProvider):
         """Get real-time quotes for watchlist symbols using FYERS API."""
         try:
             if not symbols:
-                # Get suggested stocks as default watchlist
-                suggestions_response = self.fyers_api.get_watchlist_suggestions(
-                    user_id, limit=10, sort_by='volume'
-                )
-                
-                if suggestions_response.get('success'):
-                    suggestions = suggestions_response.get('data', [])
-                    symbols = [stock['symbol'] for stock in suggestions[:5]]
-                else:
-                    # No fallback stocks - return empty dashboard
-                    return {
-                        'success': False,
-                        'error': 'No stock suggestions available. Please add stocks to your watchlist.',
-                        'data': {
-                            'market_overview': {},
-                            'top_gainers': [],
-                            'top_losers': [],
-                            'most_active': [],
-                            'sector_performance': []
-                        }
-                    }
+                # Use default popular stocks for watchlist
+                symbols = [
+                    'NSE:RELIANCE-EQ',
+                    'NSE:TCS-EQ', 
+                    'NSE:HDFCBANK-EQ',
+                    'NSE:INFY-EQ',
+                    'NSE:HINDUNILVR-EQ'
+                ]
             
-            quotes_response = self.fyers_api.quotes(user_id, symbols)
+            quotes_response = self.fyers_service.quotes_multiple(user_id, symbols)
             
-            if not quotes_response.get('success'):
+            if quotes_response.get('status') != 'success':
                 return {
                     'success': False,
-                    'error': quotes_response.get('error', 'Failed to fetch quotes'),
+                    'error': quotes_response.get('message', 'Failed to fetch quotes'),
                     'data': [],
                     'last_updated': datetime.now().isoformat()
                 }
@@ -432,19 +406,19 @@ class FyersDashboardProvider(IDashboardProvider):
             watchlist_quotes = []
             
             for symbol in symbols:
-                if symbol in quotes_data and quotes_data[symbol].get('v'):
-                    quote_data = quotes_data[symbol]['v']
+                if symbol in quotes_data:
+                    quote_data = quotes_data[symbol]
                     watchlist_quotes.append({
                         'symbol': symbol,
-                        'symbol_name': self.fyers_api._extract_symbol_name(symbol),
-                        'price': quote_data.get('lp', 0),
-                        'change': quote_data.get('ch', 0),
-                        'change_percent': quote_data.get('chp', 0),
-                        'volume': quote_data.get('volume', 0),
-                        'high': quote_data.get('h', 0),
-                        'low': quote_data.get('l', 0),
-                        'open': quote_data.get('open_price', 0),
-                        'prev_close': quote_data.get('prev_close_price', 0)
+                        'symbol_name': symbol.replace('NSE:', '').replace('-EQ', ''),
+                        'price': float(quote_data.get('ltp', 0)),
+                        'change': float(quote_data.get('change', 0)),
+                        'change_percent': float(quote_data.get('change_percent', 0)),
+                        'volume': int(quote_data.get('volume', 0)),
+                        'high': float(quote_data.get('high', 0)),
+                        'low': float(quote_data.get('low', 0)),
+                        'open': float(quote_data.get('open', 0)),
+                        'prev_close': float(quote_data.get('prev_close', 0))
                     })
             
             return {

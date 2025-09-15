@@ -352,9 +352,13 @@ class FyersAPIConnector:
     def __init__(self, client_id: str, access_token: str):
         self.client_id = client_id
         self.access_token = access_token
-        # Official library handles everything internally
+        self.base_url = "https://api-t1.fyers.in/api/v3"
         
-        # Initialize FYERS API client if available
+        # Initialize requests session for fallback API calls
+        import requests
+        self.session = requests.Session()
+        
+        # Official library handles everything internally
         if FYERS_AVAILABLE:
             self.fyers_client = fyersModel.FyersModel(
                 token=access_token,
@@ -454,6 +458,7 @@ class FyersAPIConnector:
             if self.fyers_client:
                 try:
                     response = self.fyers_client.funds()
+                    logger.info(f"FYERS funds response: {response}")
                     logger.info("FYERS funds fetched successfully using fyers-apiv3")
                     return response
                 except Exception as e:
@@ -464,6 +469,7 @@ class FyersAPIConnector:
             response = self.session.get(url, params={'access_token': self.access_token})
             if response.status_code == 200:
                 data = response.json()
+                logger.info(f"FYERS funds response: {data}")
                 logger.info("FYERS funds fetched successfully using requests")
                 return data
             else:
@@ -484,6 +490,7 @@ class FyersAPIConnector:
             if self.fyers_client:
                 try:
                     response = self.fyers_client.holdings()
+                    logger.info(f"FYERS holdings response: {response}")
                     logger.info("FYERS holdings fetched successfully using fyers-apiv3")
                     return response
                 except Exception as e:
@@ -494,6 +501,7 @@ class FyersAPIConnector:
             response = self.session.get(url, params={'access_token': self.access_token})
             if response.status_code == 200:
                 data = response.json()
+                logger.info(f"FYERS holdings response: {data}")
                 logger.info("FYERS holdings fetched successfully using requests")
                 return data
             else:
@@ -514,6 +522,7 @@ class FyersAPIConnector:
             if self.fyers_client:
                 try:
                     response = self.fyers_client.positions()
+                    logger.info(f"FYERS positions response: {response}")
                     logger.info("FYERS positions fetched successfully using fyers-apiv3")
                     return response
                 except Exception as e:
@@ -524,6 +533,7 @@ class FyersAPIConnector:
             response = self.session.get(url, params={'access_token': self.access_token})
             if response.status_code == 200:
                 data = response.json()
+                logger.info(f"FYERS positions response: {data}")
                 logger.info("FYERS positions fetched successfully using requests")
                 return data
             else:
@@ -544,6 +554,7 @@ class FyersAPIConnector:
             if self.fyers_client:
                 try:
                     response = self.fyers_client.tradebook()
+                    logger.info(f"FYERS tradebook response: {response}")
                     logger.info("FYERS tradebook fetched successfully using fyers-apiv3")
                     return response
                 except Exception as e:
@@ -554,6 +565,7 @@ class FyersAPIConnector:
             response = self.session.get(url, params={'access_token': self.access_token})
             if response.status_code == 200:
                 data = response.json()
+                logger.info(f"FYERS tradebook response: {data}")
                 logger.info("FYERS tradebook fetched successfully using requests")
                 return data
             else:
@@ -623,6 +635,52 @@ class FyersAPIConnector:
         except Exception as e:
             error_msg = str(e)
             logger.error(f"Exception while placing FYERS order: {error_msg}")
+            return {'error': error_msg}
+    
+    def positions(self) -> Dict[str, Any]:
+        """Get user positions - alias for get_positions."""
+        return self.get_positions()
+    
+    def quotes(self, symbols: str) -> Dict[str, Any]:
+        """Get quotes for symbols."""
+        try:
+            logger.info(f"Fetching FYERS quotes for symbols: {symbols}")
+            
+            # Use FYERS API client if available
+            if self.fyers_client:
+                try:
+                    # Fix the quotes method call - use correct parameter name
+                    response = self.fyers_client.quotes(symbols)
+                    logger.info(f"FYERS quotes raw response: {response}")
+                    logger.info("FYERS quotes fetched successfully using fyers-apiv3")
+                    return response
+                except Exception as e:
+                    logger.warning(f"fyers-apiv3 quotes fetch failed, falling back to requests: {str(e)}")
+            
+            # Fallback to direct API call
+            url = f"{self.base_url}/quotes"
+            params = {
+                'access_token': self.access_token,
+                'symbols': symbols
+            }
+            logger.info(f"Making fallback request to: {url} with params: {params}")
+            
+            response = self.session.get(url, params=params)
+            logger.info(f"Fallback response status: {response.status_code}")
+            logger.info(f"Fallback response text: {response.text}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                logger.info(f"FYERS quotes fallback response: {data}")
+                logger.info("FYERS quotes fetched successfully using requests")
+                return data
+            else:
+                error_msg = f'HTTP {response.status_code}: {response.text}'
+                logger.error(f"Error fetching FYERS quotes: {error_msg}")
+                return {'error': error_msg}
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Exception while fetching FYERS quotes: {error_msg}")
             return {'error': error_msg}
     
     def place_basket_orders(self, orders_data: list) -> Dict[str, Any]:

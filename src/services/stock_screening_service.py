@@ -75,13 +75,20 @@ class StockScreeningService:
         try:
             if self.broker_service:
                 config = self.broker_service.get_broker_config('fyers', user_id)
-                if config and config.get('is_connected') and config.get('access_token'):
+                logger.info(f"FYERS config for user {user_id}: {config}")
+                
+                # Check if we have the required credentials (don't require is_connected to be True)
+                if config and config.get('client_id') and config.get('access_token'):
+                    logger.info("FYERS credentials found, initializing connector")
                     from .brokers.fyers_service import FyersAPIConnector
                     self.fyers_connector = FyersAPIConnector(
                         client_id=config.get('client_id'),
                         access_token=config.get('access_token')
                     )
+                    logger.info("FYERS connector initialized successfully")
                     return True
+                else:
+                    logger.warning(f"FYERS credentials missing: client_id={bool(config.get('client_id'))}, access_token={bool(config.get('access_token'))}")
         except Exception as e:
             logger.error(f"Error initializing FYERS connector: {e}")
         return False

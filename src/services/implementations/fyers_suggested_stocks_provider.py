@@ -8,7 +8,7 @@ import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from ..interfaces.suggested_stocks_interface import ISuggestedStocksProvider, StrategyType, SuggestedStock
-from ..fyers_api_service import get_fyers_api_service
+from ..brokers.fyers_service import get_fyers_service
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
     """Enhanced FYERS implementation with full search and sort functionality."""
     
     def __init__(self):
-        self.fyers_api = get_fyers_service()
+        self.fyers_service = get_fyers_service()
     
     def get_suggested_stocks(self, user_id: int, strategies: List[StrategyType] = None, 
                            limit: int = 50, search: str = None, sort_by: str = None,
@@ -27,20 +27,22 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
             if not strategies:
                 strategies = [StrategyType.DEFAULT_RISK, StrategyType.HIGH_RISK]
             
-            # Get watchlist suggestions with search and filtering
-            suggestions_response = self.fyers_api.get_watchlist_suggestions(
-                user_id=user_id,
-                search=search,
-                sector=sector,
-                sort_by=sort_by or 'volume',
-                sort_order=sort_order,
-                limit=limit * 2  # Get more to apply strategy filtering
-            )
+            # Get popular stocks as suggestions (since get_watchlist_suggestions doesn't exist)
+            popular_symbols = [
+                'NSE:RELIANCE-EQ', 'NSE:TCS-EQ', 'NSE:HDFCBANK-EQ', 'NSE:INFY-EQ',
+                'NSE:HINDUNILVR-EQ', 'NSE:ITC-EQ', 'NSE:KOTAKBANK-EQ', 'NSE:LT-EQ',
+                'NSE:SBIN-EQ', 'NSE:BHARTIARTL-EQ', 'NSE:ASIANPAINT-EQ', 'NSE:MARUTI-EQ',
+                'NSE:AXISBANK-EQ', 'NSE:NESTLEIND-EQ', 'NSE:ULTRACEMCO-EQ', 'NSE:TITAN-EQ',
+                'NSE:SUNPHARMA-EQ', 'NSE:TECHM-EQ', 'NSE:WIPRO-EQ', 'NSE:ONGC-EQ'
+            ]
             
-            if not suggestions_response.get('success'):
+            # Get quotes for popular stocks
+            quotes_response = self.fyers_service.quotes_multiple(user_id, popular_symbols)
+            
+            if quotes_response.get('status') != 'success':
                 return {
                     'success': False,
-                    'error': suggestions_response.get('error', 'Failed to fetch stock suggestions'),
+                    'error': quotes_response.get('message', 'Failed to fetch stock suggestions'),
                     'data': [],
                     'total': 0,
                     'search': search,
@@ -50,7 +52,23 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
                     'last_updated': datetime.now().isoformat()
                 }
             
-            suggestions = suggestions_response.get('data', [])
+            quotes_data = quotes_response.get('data', {})
+            
+            # Convert quotes to suggested stocks format
+            suggestions = []
+            for symbol, quote_data in quotes_data.items():
+                suggestions.append({
+                    'symbol': symbol,
+                    'symbol_name': symbol.replace('NSE:', '').replace('-EQ', ''),
+                    'price': float(quote_data.get('ltp', 0)),
+                    'change': float(quote_data.get('change', 0)),
+                    'change_percent': float(quote_data.get('change_percent', 0)),
+                    'volume': int(quote_data.get('volume', 0)),
+                    'high': float(quote_data.get('high', 0)),
+                    'low': float(quote_data.get('low', 0)),
+                    'open': float(quote_data.get('open', 0)),
+                    'prev_close': float(quote_data.get('prev_close', 0))
+                })
             
             # Apply strategy-based filtering and scoring
             suggested_stocks = []
@@ -97,7 +115,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
         """Search for stocks by name or symbol with advanced filtering."""
         try:
             # Use FYERS search API
-            search_response = self.fyers_api.search_symbols(user_id, query, limit)
+            search_response = self.fyers_service.search_symbols(user_id, query, limit)
             
             if not search_response.get('success'):
                 return {
@@ -124,7 +142,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
             symbols = [result['symbol'] for result in search_results[:20]]  # Limit for quotes API
             
             if symbols:
-                quotes_response = self.fyers_api.quotes(user_id, symbols)
+                quotes_response = self.fyers_service.quotes(user_id, symbols)
                 quotes_data = quotes_response.get('data', {}) if quotes_response.get('success') else {}
                 
                 for result in search_results:
@@ -170,20 +188,20 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
         """Get comprehensive analysis for a specific stock."""
         try:
             # Get real-time quote
-            quotes_response = self.fyers_api.quotes(user_id, symbol)
+            quotes_response = self.fyers_service.quotes(user_id, symbol)
             
             # Get historical data for technical analysis
-            historical_response = self.fyers_api.get_historical_data(
+            historical_response = self.fyers_service.get_historical_data(
                 user_id, symbol, resolution='D', 
                 range_from=(datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
             )
             
             # Get market depth
-            depth_response = self.fyers_api.get_market_depth(user_id, symbol)
+            depth_response = self.fyers_service.get_market_depth(user_id, symbol)
             
             analysis_data = {
                 'symbol': symbol,
-                'symbol_name': self.fyers_api._extract_symbol_name(symbol),
+                'symbol_name': self.fyers_service._extract_symbol_name(symbol),
                 'analysis_timestamp': datetime.now().isoformat()
             }
             
@@ -310,7 +328,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
             
             for sector, symbols in sector_stocks.items():
                 # Get quotes for sector stocks
-                quotes_response = self.fyers_api.quotes(user_id, symbols)
+                quotes_response = self.fyers_service.quotes(user_id, symbols)
                 
                 if quotes_response.get('success'):
                     quotes_data = quotes_response.get('data', {})
@@ -331,7 +349,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
                             
                             top_performers.append({
                                 'symbol': symbol,
-                                'symbol_name': self.fyers_api._extract_symbol_name(symbol),
+                                'symbol_name': self.fyers_service._extract_symbol_name(symbol),
                                 'change_percent': change_percent,
                                 'price': quote.get('lp', 0)
                             })
@@ -384,7 +402,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
         """Screen stocks based on technical criteria."""
         try:
             # Get a broader list of stocks to screen
-            suggestions_response = self.fyers_api.get_watchlist_suggestions(
+            suggestions_response = self.fyers_service.get_watchlist_suggestions(
                 user_id, limit=100, sort_by='volume'
             )
             
@@ -401,7 +419,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
             
             for stock in stocks:
                 # Get historical data for technical analysis
-                historical_response = self.fyers_api.get_historical_data(
+                historical_response = self.fyers_service.get_historical_data(
                     user_id, stock['symbol'], resolution='D',
                     range_from=(datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
                 )
@@ -444,7 +462,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
         """Screen stocks based on fundamental criteria."""
         try:
             # Get stocks for screening
-            suggestions_response = self.fyers_api.get_watchlist_suggestions(
+            suggestions_response = self.fyers_service.get_watchlist_suggestions(
                 user_id, limit=100, sort_by='volume'
             )
             
@@ -664,7 +682,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
         # In a real implementation, you'd fetch this from external data sources
         # This is a simplified version with estimated values
         
-        sector = self.fyers_api._get_sector_for_symbol(symbol)
+        sector = self.fyers_service._get_sector_for_symbol(symbol)
         
         # Simplified fundamental metrics based on sector and price
         if 'BANK' in symbol.upper():
@@ -688,7 +706,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
             'dividend_yield': round(1.5 + (price / 3000) * 1.0, 2),
             'revenue_growth': round(8.0 + (price / 2000) * 5.0, 2),
             'profit_margin': round(10.0 + (price / 1500) * 3.0, 2),
-            'market_cap_category': self.fyers_api._get_market_cap_category(price),
+            'market_cap_category': self.fyers_service._get_market_cap_category(price),
             'sector': sector
         }
     

@@ -8,7 +8,7 @@ import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from ..interfaces.portfolio_interface import IPortfolioProvider, Holding, Position
-from ..fyers_api_service import get_fyers_api_service
+from ..brokers.fyers_service import get_fyers_service
 
 logger = logging.getLogger(__name__)
 
@@ -17,23 +17,23 @@ class FyersPortfolioProvider(IPortfolioProvider):
     """Enhanced FYERS implementation of portfolio provider with search and sort."""
     
     def __init__(self):
-        self.fyers_api = get_fyers_service()
+        self.fyers_service = get_fyers_service()
+    
+    def holdings(self, user_id: int, search: str = None, sort_by: str = None,
+                sort_order: str = 'desc', filters: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Get current holdings - alias for get_holdings."""
+        return self.get_holdings(user_id, search, sort_by, sort_order, filters)
     
     def get_holdings(self, user_id: int, search: str = None, sort_by: str = None,
                     sort_order: str = 'desc', filters: Dict[str, Any] = None) -> Dict[str, Any]:
         """Get current holdings with advanced search, sort, and filter capabilities."""
         try:
-            holdings_response = self.fyers_api.holdings(
-                user_id=user_id,
-                search=search,
-                sort_by=sort_by,
-                sort_order=sort_order
-            )
+            holdings_response = self.fyers_service.holdings(user_id)
             
-            if not holdings_response.get('success'):
+            if holdings_response.get('status') != 'success':
                 return {
                     'success': False,
-                    'error': holdings_response.get('error', 'Failed to fetch holdings'),
+                    'error': holdings_response.get('message', 'Failed to fetch holdings'),
                     'data': [],
                     'total_value': 0,
                     'total_pnl': 0,
@@ -94,17 +94,12 @@ class FyersPortfolioProvider(IPortfolioProvider):
                      sort_order: str = 'desc', filters: Dict[str, Any] = None) -> Dict[str, Any]:
         """Get current positions with advanced search, sort, and filter capabilities."""
         try:
-            positions_response = self.fyers_api.positions(
-                user_id=user_id,
-                search=search,
-                sort_by=sort_by,
-                sort_order=sort_order
-            )
+            positions_response = self.fyers_service.positions(user_id)
             
-            if not positions_response.get('success'):
+            if positions_response.get('status') != 'success':
                 return {
                     'success': False,
-                    'error': positions_response.get('error', 'Failed to fetch positions'),
+                    'error': positions_response.get('message', 'Failed to fetch positions'),
                     'data': [],
                     'total_value': 0,
                     'total_pnl': 0,
@@ -164,20 +159,20 @@ class FyersPortfolioProvider(IPortfolioProvider):
         """Get comprehensive portfolio summary."""
         try:
             # Get comprehensive portfolio report from FYERS API service
-            portfolio_report = self.fyers_api.generate_portfolio_summary_report(user_id)
+            portfolio_report = self.fyers_service.generate_portfolio_summary_report(user_id)
             
-            if not portfolio_report.get('success'):
+            if portfolio_report.get('status') != 'success':
                 return {
                     'success': False,
-                    'error': portfolio_report.get('error', 'Failed to generate portfolio summary'),
+                    'error': portfolio_report.get('message', 'Failed to generate portfolio summary'),
                     'data': {},
                     'last_updated': datetime.now().isoformat()
                 }
             
-            summary = portfolio_report.get('summary', {})
-            holdings = portfolio_report.get('holdings', [])
-            positions = portfolio_report.get('positions', [])
-            funds = portfolio_report.get('funds', [])
+            summary = portfolio_report.get('data', {})
+            holdings = summary.get('holdings', [])
+            positions = summary.get('positions', [])
+            funds = summary.get('funds', [])
             
             # Enhanced summary with additional metrics
             enhanced_summary = {
@@ -458,7 +453,7 @@ class FyersPortfolioProvider(IPortfolioProvider):
             
             # Sector filter
             if 'sector' in filters and filters['sector']:
-                holding_sector = self.fyers_api._get_sector_for_symbol(holding.get('symbol', ''))
+                holding_sector = self.fyers_service._get_sector_for_symbol(holding.get('symbol', ''))
                 if holding_sector.lower() != filters['sector'].lower():
                     continue
             
@@ -507,7 +502,7 @@ class FyersPortfolioProvider(IPortfolioProvider):
         sector_allocation = {}
         
         for holding in holdings:
-            sector = self.fyers_api._get_sector_for_symbol(holding.get('symbol', ''))
+            sector = self.fyers_service._get_sector_for_symbol(holding.get('symbol', ''))
             value = holding.get('market_value', 0)
             
             if sector not in sector_allocation:
@@ -541,7 +536,7 @@ class FyersPortfolioProvider(IPortfolioProvider):
         for holding in holdings:
             price = holding.get('current_price', 0)
             value = holding.get('market_value', 0)
-            cap_category = self.fyers_api._get_market_cap_category(price)
+            cap_category = self.fyers_service._get_market_cap_category(price)
             cap_allocation[cap_category] += value
         
         allocation_list = []
@@ -634,13 +629,12 @@ class FyersPortfolioProvider(IPortfolioProvider):
         """Compare portfolio performance with benchmarks."""
         # Get benchmark data (NIFTY 50 as primary benchmark)
         try:
-            benchmark_response = self.fyers_api.quotes(user_id, 'NSE:NIFTY50-INDEX')
+            benchmark_response = self.fyers_service.quotes(user_id, 'NSE:NIFTY50-INDEX')
             
             benchmark_return = 0
-            if benchmark_response.get('success'):
+            if benchmark_response.get('status') == 'success':
                 benchmark_data = benchmark_response.get('data', {})
-                nifty_data = benchmark_data.get('NSE:NIFTY50-INDEX', {}).get('v', {})
-                benchmark_return = nifty_data.get('chp', 0)  # Change percent
+                benchmark_return = float(benchmark_data.get('change_percent', 0))
             
             return {
                 'benchmark_name': 'NIFTY 50',
@@ -701,7 +695,7 @@ class FyersPortfolioProvider(IPortfolioProvider):
         }
         
         for holding in holdings:
-            sector = self.fyers_api._get_sector_for_symbol(holding.get('symbol', ''))
+            sector = self.fyers_service._get_sector_for_symbol(holding.get('symbol', ''))
             weight = (holding.get('market_value', 0) / total_value) if total_value > 0 else 0
             beta = sector_betas.get(sector, 1.0)
             weighted_beta += weight * beta
@@ -789,7 +783,7 @@ class FyersPortfolioProvider(IPortfolioProvider):
         
         sectors = set()
         for holding in holdings:
-            sector = self.fyers_api._get_sector_for_symbol(holding.get('symbol', ''))
+            sector = self.fyers_service._get_sector_for_symbol(holding.get('symbol', ''))
             sectors.add(sector)
         
         # More sectors = lower correlation risk
@@ -919,3 +913,48 @@ class FyersPortfolioProvider(IPortfolioProvider):
         volatility = variance ** 0.5
         
         return round(volatility, 2)
+    
+    def _calculate_asset_allocation(self, holdings: List[Dict], positions: List[Dict]) -> Dict[str, Any]:
+        """Calculate asset allocation breakdown."""
+        try:
+            # Calculate total portfolio value
+            total_holdings_value = sum(h.get('market_value', 0) for h in holdings)
+            total_positions_value = sum(abs(p.get('quantity', 0) * p.get('market_price', 0)) for p in positions)
+            total_portfolio_value = total_holdings_value + total_positions_value
+            
+            if total_portfolio_value == 0:
+                return {
+                    'equity': 0,
+                    'derivatives': 0,
+                    'cash': 0,
+                    'others': 0
+                }
+            
+            # Calculate equity allocation from holdings
+            equity_value = total_holdings_value
+            
+            # Calculate derivatives allocation from positions
+            derivatives_value = total_positions_value
+            
+            # Calculate cash (this would need to come from funds data)
+            cash_value = 0  # Placeholder - would need funds data
+            
+            # Calculate others
+            others_value = max(0, total_portfolio_value - equity_value - derivatives_value - cash_value)
+            
+            return {
+                'equity': round((equity_value / total_portfolio_value * 100), 2),
+                'derivatives': round((derivatives_value / total_portfolio_value * 100), 2),
+                'cash': round((cash_value / total_portfolio_value * 100), 2),
+                'others': round((others_value / total_portfolio_value * 100), 2),
+                'total_value': round(total_portfolio_value, 2)
+            }
+        except Exception as e:
+            logger.warning(f"Error calculating asset allocation: {e}")
+            return {
+                'equity': 0,
+                'derivatives': 0,
+                'cash': 0,
+                'others': 0,
+                'total_value': 0
+            }

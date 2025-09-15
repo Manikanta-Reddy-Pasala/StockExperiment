@@ -46,7 +46,128 @@ class FyersAPI:
         except ImportError:
             logger.error("fyers_apiv3 library not available. Please install it using: pip install fyers-apiv3")
             raise ImportError("fyers_apiv3 library not available")
-        
+    
+    def _make_request(self, method: str, endpoint: str, data: dict = None, params: dict = None) -> Dict[str, Any]:
+        """
+        Make API request using the official FYERS library.
+        This is a compatibility method for existing code.
+        """
+        try:
+            if method == 'GET':
+                if endpoint == 'quotes':
+                    symbols = params.get('symbols', '') if params else ''
+                    response = self.fyers_client.quotes(symbols)
+                elif endpoint == 'orderbook':
+                    response = self.fyers_client.orderbook()
+                elif endpoint == 'tradebook':
+                    response = self.fyers_client.tradebook()
+                elif endpoint == 'positions':
+                    response = self.fyers_client.positions()
+                elif endpoint == 'holdings':
+                    response = self.fyers_client.holdings()
+                elif endpoint == 'funds':
+                    response = self.fyers_client.funds()
+                else:
+                    return {'status': 'error', 'message': f'GET endpoint {endpoint} not implemented'}
+                
+                # Standardize response format
+                return self._standardize_response(response)
+            
+            elif method == 'POST':
+                if endpoint == 'orders':
+                    response = self.fyers_client.placeorder(**data)
+                elif endpoint == 'depth':
+                    response = self.fyers_client.depth(**data)
+                elif endpoint == 'history':
+                    response = self.fyers_client.history(**data)
+                elif endpoint == 'search_scrips':
+                    response = self.fyers_client.search_scrips(**data)
+                else:
+                    return {'status': 'error', 'message': f'POST endpoint {endpoint} not implemented'}
+                
+                # Standardize response format
+                return self._standardize_response(response)
+            
+            elif method == 'PUT':
+                if endpoint == 'orders':
+                    response = self.fyers_client.modifyorder(**data)
+                else:
+                    return {'status': 'error', 'message': f'PUT endpoint {endpoint} not implemented'}
+                
+                # Standardize response format
+                return self._standardize_response(response)
+            
+            elif method == 'DELETE':
+                if endpoint == 'orders':
+                    response = self.fyers_client.cancelorder(**data)
+                else:
+                    return {'status': 'error', 'message': f'DELETE endpoint {endpoint} not implemented'}
+                
+                # Standardize response format
+                return self._standardize_response(response)
+            
+            else:
+                return {'status': 'error', 'message': f'Method {method} not supported'}
+                
+        except Exception as e:
+            logger.error(f"API request error for {method} {endpoint}: {str(e)}")
+            return {
+                'status': 'error',
+                'message': str(e),
+                'error_code': 'API_REQUEST_FAILED'
+            }
+    
+    def _standardize_response(self, response: Dict[str, Any]) -> Dict[str, Any]:
+        """Standardize FYERS API response format."""
+        try:
+            # Log the raw response for debugging
+            logger.info(f"Raw FYERS API response: {response}")
+            logger.info(f"Response type: {type(response)}")
+            logger.info(f"Response keys: {list(response.keys()) if isinstance(response, dict) else 'Not a dict'}")
+            
+            # Check if response has 's' field (FYERS status)
+            if isinstance(response, dict) and 's' in response:
+                if response['s'] == 'ok':
+                    logger.info("FYERS API response: SUCCESS")
+                    return {
+                        'status': 'success',
+                        'data': response.get('data', {}),
+                        'message': 'Success'
+                    }
+                else:
+                    logger.warning(f"FYERS API response: ERROR - {response.get('message', 'Unknown error')}")
+                    return {
+                        'status': 'error',
+                        'message': response.get('message', 'API Error'),
+                        'error_code': response.get('code', 'UNKNOWN_ERROR')
+                    }
+            
+            # If no 's' field, assume success if response is not empty
+            elif response:
+                logger.info("FYERS API response: SUCCESS (no 's' field)")
+                return {
+                    'status': 'success',
+                    'data': response,
+                    'message': 'Success'
+                }
+            
+            # Empty response
+            else:
+                logger.warning("FYERS API response: EMPTY")
+                return {
+                    'status': 'error',
+                    'message': 'Empty response from API',
+                    'error_code': 'EMPTY_RESPONSE'
+                }
+                
+        except Exception as e:
+            logger.error(f"Error standardizing response: {str(e)}")
+            logger.error(f"Response that caused error: {response}")
+            return {
+                'status': 'error',
+                'message': f'Response parsing error: {str(e)}',
+                'error_code': 'RESPONSE_PARSE_ERROR'
+            }
     
     # Authentication and Session Management
     def login(self) -> Dict[str, Any]:
@@ -264,10 +385,9 @@ class FyersAPI:
         Get order book with standard format using official library.
         """
         try:
-            # Use official library to get order book
-            result = self.fyers_client.orderbook()
+            result = self._make_request('GET', 'orderbook')
             
-            if result.get('s') == 'ok':
+            if result.get('status') == 'success':
                 orders = result.get('data', {}).get('orderBook', [])
                 formatted_orders = []
                 
@@ -313,7 +433,7 @@ class FyersAPI:
         try:
             result = self._make_request('GET', 'tradebook')
             
-            if result['status'] == 'success':
+            if result.get('status') == 'success':
                 trades = result.get('data', {}).get('tradeBook', [])
                 formatted_trades = []
                 
@@ -354,7 +474,7 @@ class FyersAPI:
         try:
             result = self._make_request('GET', 'positions')
             
-            if result['status'] == 'success':
+            if result.get('status') == 'success':
                 positions = result.get('data', {}).get('netPositions', [])
                 formatted_positions = []
                 
@@ -392,7 +512,7 @@ class FyersAPI:
         try:
             result = self._make_request('GET', 'holdings')
             
-            if result['status'] == 'success':
+            if result.get('status') == 'success':
                 holdings = result.get('data', {}).get('holdings', [])
                 formatted_holdings = []
                 
@@ -429,7 +549,7 @@ class FyersAPI:
         try:
             result = self._make_request('GET', 'funds')
             
-            if result['status'] == 'success':
+            if result.get('status') == 'success':
                 fund_data = result.get('data', {}).get('fund_limit', [])
                 
                 # Extract key fund information
@@ -465,7 +585,7 @@ class FyersAPI:
     # Market Data
     def quotes(self, symbol: str, exchange: str = "") -> Dict[str, Any]:
         """
-        Get real-time quotes with standard format.
+        Get real-time quotes with standard format using official library.
         """
         try:
             # Format symbol for Fyers API
@@ -474,11 +594,11 @@ class FyersAPI:
             else:
                 formatted_symbol = symbol
             
-            params = {"symbols": formatted_symbol}
-            result = self._make_request('GET', 'quotes', params=params)
+            # Use official library to get quotes
+            result = self.fyers_client.quotes(symbols=formatted_symbol)
             
-            if result['status'] == 'success':
-                quotes_data = result.get('data', {}).get('d', {})
+            if result.get('s') == 'ok':
+                quotes_data = result.get('d', {})
                 
                 if formatted_symbol in quotes_data:
                     quote = quotes_data[formatted_symbol]['v']
@@ -510,7 +630,11 @@ class FyersAPI:
                         'error_code': 'SYMBOL_NOT_FOUND'
                     }
             else:
-                return result
+                return {
+                    'status': 'error',
+                    'message': result.get('message', 'Failed to get quotes'),
+                    'error_code': 'QUOTES_FAILED'
+                }
                 
         except Exception as e:
             logger.error(f"Quotes error: {str(e)}")
@@ -518,6 +642,66 @@ class FyersAPI:
                 'status': 'error',
                 'message': str(e),
                 'error_code': 'QUOTES_FAILED'
+            }
+    
+    def quotes_multiple(self, symbols: list) -> Dict[str, Any]:
+        """
+        Get real-time quotes for multiple symbols with standard format.
+        """
+        try:
+            # Format symbols for Fyers API
+            formatted_symbols = []
+            for symbol in symbols:
+                if ":" not in symbol:
+                    formatted_symbols.append(symbol)
+                else:
+                    formatted_symbols.append(symbol)
+            
+            # Join symbols with comma for FYERS API
+            symbols_string = ",".join(formatted_symbols)
+            
+            # Use official library to get quotes
+            result = self.fyers_client.quotes(symbols=symbols_string)
+            
+            if result.get('s') == 'ok':
+                quotes_data = result.get('d', {})
+                formatted_quotes = {}
+                
+                for symbol in symbols:
+                    if symbol in quotes_data and quotes_data[symbol].get('v'):
+                        quote = quotes_data[symbol]['v']
+                        formatted_quotes[symbol] = {
+                            'symbol': symbol,
+                            'ltp': str(quote.get('lp', 0)),
+                            'open': str(quote.get('open_price', 0)),
+                            'high': str(quote.get('h', 0)),
+                            'low': str(quote.get('l', 0)),
+                            'prev_close': str(quote.get('prev_close_price', 0)),
+                            'change': str(quote.get('ch', 0)),
+                            'change_percent': str(quote.get('chp', 0)),
+                            'volume': str(quote.get('volume', 0)),
+                            'bid': str(quote.get('bid', 0)),
+                            'ask': str(quote.get('ask', 0)),
+                            'timestamp': str(quote.get('timestamp', ''))
+                        }
+                
+                return {
+                    'status': 'success',
+                    'data': formatted_quotes
+                }
+            else:
+                return {
+                    'status': 'error',
+                    'message': result.get('message', 'Failed to get quotes'),
+                    'error_code': 'QUOTES_MULTIPLE_FAILED'
+                }
+                
+        except Exception as e:
+            logger.error(f"Multiple quotes error: {str(e)}")
+            return {
+                'status': 'error',
+                'message': str(e),
+                'error_code': 'QUOTES_MULTIPLE_FAILED'
             }
     
     def depth(self, symbol: str, exchange: str = "") -> Dict[str, Any]:

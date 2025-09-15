@@ -9,9 +9,9 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 from ..interfaces.orders_interface import IOrdersProvider, Order, OrderType, OrderSide, OrderStatus
 try:
-    from ..broker_service import get_broker_service
+    from ..brokers.fyers_service import get_fyers_service
 except ImportError:
-    from src.services.broker_service import get_broker_service
+    from src.services.brokers.fyers_service import get_fyers_service
 
 logger = logging.getLogger(__name__)
 
@@ -20,24 +20,24 @@ class FyersOrdersProvider(IOrdersProvider):
     """FYERS implementation of orders provider."""
     
     def __init__(self):
-        self.broker_service = get_broker_service()
+        self.fyers_service = get_fyers_service()
     
     def get_orders_history(self, user_id: int, start_date: datetime = None, 
                           end_date: datetime = None, limit: int = 100) -> Dict[str, Any]:
         """Get orders history using FYERS API."""
         try:
-            orderbook_data = self.broker_service.get_fyers_orderbook(user_id)
+            orderbook_data = self.fyers_service.orderbook(user_id)
             
-            if not orderbook_data.get('success'):
+            if orderbook_data.get('status') != 'success':
                 return {
                     'success': False,
-                    'error': orderbook_data.get('error', 'Failed to fetch orders'),
+                    'error': orderbook_data.get('message', 'Failed to fetch orders'),
                     'data': [],
                     'total': 0,
                     'last_updated': datetime.now().isoformat()
                 }
             
-            orders = orderbook_data['data'].get('orderBook', [])
+            orders = orderbook_data.get('data', [])
             
             # Process and format orders
             processed_orders = []
@@ -85,7 +85,7 @@ class FyersOrdersProvider(IOrdersProvider):
     def get_pending_orders(self, user_id: int) -> Dict[str, Any]:
         """Get pending orders using FYERS API."""
         try:
-            orderbook_data = self.broker_service.get_fyers_orderbook(user_id)
+            orderbook_data = self.fyers_service.orderbook(user_id)
             
             if not orderbook_data.get('success'):
                 return {
@@ -146,18 +146,18 @@ class FyersOrdersProvider(IOrdersProvider):
                           end_date: datetime = None, limit: int = 100) -> Dict[str, Any]:
         """Get trades history using FYERS API."""
         try:
-            tradebook_data = self.broker_service.get_fyers_tradebook(user_id)
+            tradebook_data = self.fyers_service.tradebook(user_id)
             
-            if not tradebook_data.get('success'):
+            if tradebook_data.get('status') != 'success':
                 return {
                     'success': False,
-                    'error': tradebook_data.get('error', 'Failed to fetch trades'),
+                    'error': tradebook_data.get('message', 'Failed to fetch trades'),
                     'data': [],
                     'total': 0,
                     'last_updated': datetime.now().isoformat()
                 }
             
-            trades = tradebook_data['data'].get('tradeBook', [])
+            trades = tradebook_data.get('data', [])
             
             # Process and format trades
             processed_trades = []
@@ -212,9 +212,9 @@ class FyersOrdersProvider(IOrdersProvider):
                 'offlineOrder': 'False'
             }
             
-            result = self.broker_service.place_fyers_order(user_id, fyers_order)
+            result = self.fyers_service.placeorder(user_id, fyers_order['symbol'], str(fyers_order['qty']), fyers_order['side'], fyers_order['productType'], fyers_order['limitPrice'], fyers_order['stopPrice'], fyers_order['validity'])
             
-            if result.get('success'):
+            if result.get('status') == 'success':
                 return {
                     'success': True,
                     'order_id': result.get('data', {}).get('id', ''),
@@ -223,7 +223,7 @@ class FyersOrdersProvider(IOrdersProvider):
             else:
                 return {
                     'success': False,
-                    'error': result.get('error', 'Failed to place order')
+                    'error': result.get('message', 'Failed to place order')
                 }
                 
         except Exception as e:
@@ -245,9 +245,9 @@ class FyersOrdersProvider(IOrdersProvider):
                 'stopPrice': order_data.get('stop_price', 0)
             }
             
-            result = self.broker_service.modify_fyers_order(user_id, fyers_order)
+            result = self.fyers_service.modifyorder(user_id, order_id, fyers_order.get('type', 1), fyers_order.get('limitPrice', 0), fyers_order.get('qty', 0))
             
-            if result.get('success'):
+            if result.get('status') == 'success':
                 return {
                     'success': True,
                     'message': 'Order modified successfully'
@@ -255,7 +255,7 @@ class FyersOrdersProvider(IOrdersProvider):
             else:
                 return {
                     'success': False,
-                    'error': result.get('error', 'Failed to modify order')
+                    'error': result.get('message', 'Failed to modify order')
                 }
                 
         except Exception as e:
@@ -268,9 +268,9 @@ class FyersOrdersProvider(IOrdersProvider):
     def cancel_order(self, user_id: int, order_id: str) -> Dict[str, Any]:
         """Cancel an order using FYERS API."""
         try:
-            result = self.broker_service.cancel_fyers_order(user_id, order_id)
+            result = self.fyers_service.cancelorder(user_id, order_id)
             
-            if result.get('success'):
+            if result.get('status') == 'success':
                 return {
                     'success': True,
                     'message': 'Order cancelled successfully'
@@ -278,7 +278,7 @@ class FyersOrdersProvider(IOrdersProvider):
             else:
                 return {
                     'success': False,
-                    'error': result.get('error', 'Failed to cancel order')
+                    'error': result.get('message', 'Failed to cancel order')
                 }
                 
         except Exception as e:
@@ -291,17 +291,17 @@ class FyersOrdersProvider(IOrdersProvider):
     def get_order_details(self, user_id: int, order_id: str) -> Dict[str, Any]:
         """Get order details using FYERS API."""
         try:
-            orderbook_data = self.broker_service.get_fyers_orderbook(user_id)
+            orderbook_data = self.fyers_service.orderbook(user_id)
             
-            if not orderbook_data.get('success'):
+            if orderbook_data.get('status') != 'success':
                 return {
                     'success': False,
-                    'error': orderbook_data.get('error', 'Failed to fetch order details'),
+                    'error': orderbook_data.get('message', 'Failed to fetch order details'),
                     'data': {},
                     'last_updated': datetime.now().isoformat()
                 }
             
-            orders = orderbook_data['data'].get('orderBook', [])
+            orders = orderbook_data.get('data', [])
             
             # Find the specific order
             for order_data in orders:

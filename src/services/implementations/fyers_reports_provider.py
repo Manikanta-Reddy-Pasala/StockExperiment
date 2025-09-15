@@ -12,9 +12,9 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from ..interfaces.reports_interface import IReportsProvider, Report, ReportType, ReportFormat
 try:
-    from ..broker_service import get_broker_service
+    from ..brokers.fyers_service import get_fyers_service
 except ImportError:
-    from src.services.broker_service import get_broker_service
+    from src.services.brokers.fyers_service import get_fyers_service
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ class FyersReportsProvider(IReportsProvider):
     """FYERS implementation of reports provider."""
     
     def __init__(self):
-        self.broker_service = get_broker_service()
+        self.fyers_service = get_fyers_service()
         self._report_storage = {}  # In-memory storage for demo
     
     def generate_pnl_report(self, user_id: int, start_date: datetime, 
@@ -31,13 +31,9 @@ class FyersReportsProvider(IReportsProvider):
         """Generate P&L report for FYERS."""
         try:
             # Get trading data from broker service
-            orders_response = self.broker_service.get_orders_history(
-                user_id=user_id,
-                start_date=start_date,
-                end_date=end_date
-            )
+            orders_response = self.fyers_service.orderbook(user_id)
             
-            if not orders_response.get('success'):
+            if orders_response.get('status') != 'success':
                 return {
                     'success': False,
                     'error': 'Failed to fetch trading data for P&L report',
@@ -142,13 +138,9 @@ class FyersReportsProvider(IReportsProvider):
                     end_date = datetime(current_year, 3, 31)
             
             # Get trading data for the financial year
-            orders_response = self.broker_service.get_orders_history(
-                user_id=user_id,
-                start_date=start_date,
-                end_date=end_date
-            )
+            orders_response = self.fyers_service.orderbook(user_id)
             
-            if not orders_response.get('success'):
+            if orders_response.get('status') != 'success':
                 return {
                     'success': False,
                     'error': 'Failed to fetch trading data for tax report',
@@ -231,9 +223,9 @@ class FyersReportsProvider(IReportsProvider):
         """Generate portfolio report for FYERS."""
         try:
             # Get portfolio data
-            portfolio_response = self.broker_service.get_portfolio_summary(user_id)
+            portfolio_response = self.fyers_service.generate_portfolio_summary_report(user_id)
             
-            if not portfolio_response.get('success'):
+            if portfolio_response.get('status') != 'success':
                 return {
                     'success': False,
                     'error': 'Failed to fetch portfolio data for portfolio report',
@@ -245,8 +237,8 @@ class FyersReportsProvider(IReportsProvider):
             portfolio_data = portfolio_response.get('data', {})
             
             # Get holdings data
-            holdings_response = self.broker_service.holdings(user_id)
-            holdings = holdings_response.get('data', []) if holdings_response.get('success') else []
+            holdings_response = self.fyers_service.holdings(user_id)
+            holdings = holdings_response.get('data', []) if holdings_response.get('status') == 'success' else []
             
             # Create portfolio report data
             report_data = {
@@ -301,13 +293,9 @@ class FyersReportsProvider(IReportsProvider):
         """Generate trading summary for FYERS."""
         try:
             # Get trading data
-            orders_response = self.broker_service.get_orders_history(
-                user_id=user_id,
-                start_date=start_date,
-                end_date=end_date
-            )
+            orders_response = self.fyers_service.orderbook(user_id)
             
-            if not orders_response.get('success'):
+            if orders_response.get('status') != 'success':
                 return {
                     'success': False,
                     'error': 'Failed to fetch trading data for trading summary',

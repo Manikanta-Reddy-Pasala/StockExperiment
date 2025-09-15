@@ -370,6 +370,98 @@ class FyersService:
             APILogger.log_error("FyersService", "quotes", e, request_data, user_id)
             raise
     
+    def quotes_multiple(self, user_id: int, symbols: list):
+        """Get quotes for multiple symbols using standardized format."""
+        request_data = {'symbols': symbols}
+        
+        APILogger.log_request("FyersService", "quotes_multiple", request_data, user_id)
+        try:
+            api = self._get_api_instance(user_id)
+            result = api.quotes_multiple(symbols)
+            APILogger.log_response("FyersService", "quotes_multiple", result, user_id)
+            return result
+        except Exception as e:
+            APILogger.log_error("FyersService", "quotes_multiple", e, request_data, user_id)
+            raise
+    
+    def generate_portfolio_summary_report(self, user_id: int):
+        """Generate comprehensive portfolio summary report."""
+        APILogger.log_request("FyersService", "generate_portfolio_summary_report", {}, user_id)
+        try:
+            # Get holdings and positions
+            holdings_result = self.holdings(user_id)
+            positions_result = self.positions(user_id)
+            funds_result = self.funds(user_id)
+            
+            # Calculate summary metrics
+            total_value = 0
+            total_pnl = 0
+            total_investment = 0
+            
+            holdings_data = holdings_result.get('data', []) if holdings_result.get('status') == 'success' else []
+            positions_data = positions_result.get('data', []) if positions_result.get('status') == 'success' else []
+            funds_data = funds_result.get('data', {}) if funds_result.get('status') == 'success' else {}
+            
+            # Calculate holdings metrics
+            for holding in holdings_data:
+                if isinstance(holding, dict):
+                    qty = float(holding.get('quantity', 0))
+                    ltp = float(holding.get('ltp', 0))
+                    avg_price = float(holding.get('avgPrice', 0))
+                    
+                    current_value = qty * ltp
+                    investment = qty * avg_price
+                    pnl = current_value - investment
+                    
+                    total_value += current_value
+                    total_investment += investment
+                    total_pnl += pnl
+            
+            # Calculate positions metrics
+            for position in positions_data:
+                if isinstance(position, dict):
+                    qty = float(position.get('quantity', 0))
+                    ltp = float(position.get('ltp', 0))
+                    avg_price = float(position.get('avgPrice', 0))
+                    
+                    current_value = qty * ltp
+                    investment = qty * avg_price
+                    pnl = current_value - investment
+                    
+                    total_value += current_value
+                    total_investment += investment
+                    total_pnl += pnl
+            
+            # Get available funds
+            available_cash = float(funds_data.get('fund_limit', 0))
+            
+            summary = {
+                'total_portfolio_value': total_value,
+                'total_investment': total_investment,
+                'total_pnl': total_pnl,
+                'total_pnl_percent': (total_pnl / total_investment * 100) if total_investment > 0 else 0,
+                'available_cash': available_cash,
+                'total_holdings': len(holdings_data),
+                'total_positions': len(positions_data),
+                'last_updated': datetime.now().isoformat()
+            }
+            
+            result = {
+                'status': 'success',
+                'data': summary
+            }
+            
+            APILogger.log_response("FyersService", "generate_portfolio_summary_report", result, user_id)
+            return result
+            
+        except Exception as e:
+            APILogger.log_error("FyersService", "generate_portfolio_summary_report", e, {}, user_id)
+            return {
+                'status': 'error',
+                'message': str(e),
+                'data': {}
+            }
+    
     def depth(self, user_id: int, symbol: str, exchange: str = ""):
         """Get market depth using standardized format."""
         request_data = {'symbol': symbol, 'exchange': exchange}
@@ -599,6 +691,80 @@ class FyersService:
                 'last_order_time': '-',
                 'api_response_time': '-'
             }
+    
+    def _get_sector_for_symbol(self, symbol: str) -> str:
+        """Get sector for a given symbol - simplified implementation."""
+        # This is a simplified implementation
+        # In a real system, you would have a database of symbols and their sectors
+        # or use an external API to get sector information
+        
+        # Common sector mappings for Indian stocks
+        sector_mappings = {
+            'RELIANCE': 'Energy',
+            'TCS': 'Technology',
+            'INFY': 'Technology',
+            'HDFC': 'Banking',
+            'HDFCBANK': 'Banking',
+            'ICICIBANK': 'Banking',
+            'SBIN': 'Banking',
+            'ITC': 'FMCG',
+            'HINDUNILVR': 'FMCG',
+            'MARUTI': 'Auto',
+            'BAJFINANCE': 'Financial Services',
+            'BHARTIARTL': 'Telecom',
+            'ASIANPAINT': 'Paints',
+            'NESTLEIND': 'FMCG',
+            'ULTRACEMCO': 'Cement',
+            'TITAN': 'Consumer Goods',
+            'SUNPHARMA': 'Pharma',
+            'DRREDDY': 'Pharma',
+            'CIPLA': 'Pharma',
+            'WIPRO': 'Technology',
+            'LT': 'Infrastructure',
+            'BAJAJFINSV': 'Financial Services',
+            'KOTAKBANK': 'Banking',
+            'AXISBANK': 'Banking',
+            'POWERGRID': 'Power',
+            'NTPC': 'Power',
+            'ONGC': 'Energy',
+            'COALINDIA': 'Energy',
+            'TATAMOTORS': 'Auto',
+            'M&M': 'Auto',
+            'HEROMOTOCO': 'Auto',
+            'EICHERMOT': 'Auto',
+            'BAJAJ-AUTO': 'Auto',
+            'TECHM': 'Technology',
+            'HCLTECH': 'Technology',
+            'MINDTREE': 'Technology',
+            'LTI': 'Technology',
+            'MPHASIS': 'Technology'
+        }
+        
+        # Extract clean symbol name
+        clean_symbol = symbol.split(':')[-1].split('-')[0] if ':' in symbol else symbol.split('-')[0]
+        
+        return sector_mappings.get(clean_symbol, 'Others')
+    
+    def _get_market_cap_category(self, price: float) -> str:
+        """Get market cap category based on price - simplified implementation."""
+        # This is a very simplified implementation
+        # In reality, you would need market cap data from external sources
+        
+        if price > 2000:
+            return 'Large Cap'
+        elif price > 500:
+            return 'Mid Cap'
+        else:
+            return 'Small Cap'
+    
+    def _extract_symbol_name(self, symbol: str) -> str:
+        """Extract clean symbol name from formatted symbol."""
+        if ':' in symbol:
+            parts = symbol.split(':')
+            if len(parts) > 1:
+                name_part = parts[1].split('-')[0]
+                return name_part
+        return symbol
 
 
 # Global service instance
