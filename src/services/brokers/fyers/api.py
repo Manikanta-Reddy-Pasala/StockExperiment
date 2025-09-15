@@ -795,7 +795,7 @@ class FyersAuth:
         self.client_id = client_id
         self.secret_key = secret_key
         self.redirect_uri = redirect_uri
-        self.base_url = "https://api-t2.fyers.in/vagator/v2"
+        self.base_url = "https://api-t2.fyers.in/vagator/v3"
     
     def generate_auth_url(self, state: str = "trading") -> str:
         """Generate authorization URL for OAuth flow."""
@@ -806,7 +806,7 @@ class FyersAuth:
             "state": state
         }
         
-        auth_url = f"https://api.fyers.in/api/v2/generate-authcode?{urlencode(params)}"
+        auth_url = f"https://api.fyers.in/api/v3/generate-authcode?{urlencode(params)}"
         return auth_url
     
     def generate_access_token(self, auth_code: str) -> Dict[str, Any]:
