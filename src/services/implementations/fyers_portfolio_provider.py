@@ -298,6 +298,28 @@ class FyersPortfolioProvider(IPortfolioProvider):
                 'data': {},
                 'last_updated': datetime.now().isoformat()
             }
+
+    def _calculate_performance_metrics(self, holdings: List[Dict], positions: List[Dict]) -> Dict[str, Any]:
+        """Compute basic performance metrics from current holdings/positions."""
+        try:
+            total_value = sum(h.get('market_value', 0) for h in holdings)
+            total_pnl = sum(h.get('pnl', 0) for h in holdings) + sum(p.get('pnl', 0) for p in positions)
+            day_change = sum(p.get('day_change', 0) for p in positions)
+
+            return {
+                'total_value': round(total_value, 2),
+                'total_pnl': round(total_pnl, 2),
+                'total_pnl_percent': round((total_pnl / total_value * 100) if total_value > 0 else 0, 2),
+                'day_change': round(day_change, 2)
+            }
+        except Exception as e:
+            logger.warning(f"Error calculating performance metrics: {e}")
+            return {
+                'total_value': 0,
+                'total_pnl': 0,
+                'total_pnl_percent': 0,
+                'day_change': 0
+            }
     
     def get_dividend_history(self, user_id: int, start_date: datetime = None, 
                            end_date: datetime = None) -> Dict[str, Any]:
@@ -640,6 +662,22 @@ class FyersPortfolioProvider(IPortfolioProvider):
             }
     
     # Risk Calculation Methods
+    def _calculate_risk_metrics(self, holdings: List[Dict], positions: List[Dict]) -> Dict[str, Any]:
+        """Aggregate key risk metrics into a single structure."""
+        try:
+            return {
+                'portfolio_beta': self._calculate_portfolio_beta(holdings),
+                'value_at_risk': self._calculate_var(holdings, positions),
+                'concentration_risk': self._calculate_concentration_risk(holdings),
+                'sector_risk': self._calculate_sector_risk(holdings),
+                'correlation_risk': self._calculate_correlation_risk(holdings),
+                'leverage_ratio': self._calculate_leverage_ratio(holdings, positions),
+                'diversification_ratio': self._calculate_diversification_ratio(holdings),
+                'risk_rating': self._calculate_overall_risk_rating(holdings, positions)
+            }
+        except Exception as e:
+            logger.warning(f"Error aggregating risk metrics: {e}")
+            return {}
     def _calculate_portfolio_beta(self, holdings: List[Dict]) -> float:
         """Calculate portfolio beta (simplified)."""
         # In reality, this would require correlation analysis with market

@@ -19,9 +19,9 @@ class MarketDataService:
         # Market indices symbols for Fyers API
         self.market_indices = {
             'NIFTY 50': 'NSE:NIFTY50-INDEX',
-            'SENSEX': 'BSE:SENSEX-INDEX', 
             'BANK NIFTY': 'NSE:NIFTYBANK-INDEX',
-            'NIFTY IT': 'NSE:NIFTYIT-INDEX'
+            'NIFTY MIDCAP 150': 'NSE:NIFTYMIDCAP150-INDEX',
+            'NIFTY SMALLCAP 250': 'NSE:NIFTYSMALLCAP250-INDEX'
         }
     
     def _initialize_fyers_connector(self, user_id: int = 1):
@@ -63,25 +63,34 @@ class MarketDataService:
             try:
                 # Get batch quotes for all indices
                 quotes_data = self.fyers_connector.get_quotes(symbols_str)
-                
-                if quotes_data and 'd' in quotes_data and quotes_data['d']:
-                    # Process the response
-                    if isinstance(quotes_data['d'], list):
-                        # Handle list response format
-                        for item in quotes_data['d']:
+
+                # Support multiple possible payload shapes from FYERS
+                payload = None
+                if quotes_data:
+                    if isinstance(quotes_data, dict) and quotes_data.get('d'):
+                        payload = quotes_data['d']
+                    elif isinstance(quotes_data, dict) and quotes_data.get('data'):
+                        payload = quotes_data['data']
+
+                if payload:
+                    # Process list format
+                    if isinstance(payload, list):
+                        for item in payload:
                             if isinstance(item, dict):
                                 symbol = item.get('symbol') or item.get('n')
-                                if symbol in symbols:
-                                    index_name = self._get_index_name_from_symbol(symbol)
-                                    if index_name:
-                                        market_data[index_name] = self._extract_index_data(item)
-                    else:
-                        # Handle dict response format
-                        for symbol, quote in quotes_data['d'].items():
-                            if symbol in symbols:
-                                index_name = self._get_index_name_from_symbol(symbol)
+                                index_name = self._get_index_name_from_symbol(symbol) if symbol else None
                                 if index_name:
-                                    market_data[index_name] = self._extract_index_data(quote)
+                                    extracted = self._extract_index_data(item)
+                                    if extracted:
+                                        market_data[index_name] = extracted
+                    # Process dict format
+                    elif isinstance(payload, dict):
+                        for symbol, quote in payload.items():
+                            index_name = self._get_index_name_from_symbol(symbol)
+                            if index_name and index_name in self.market_indices:
+                                extracted = self._extract_index_data(quote)
+                                if extracted:
+                                    market_data[index_name] = extracted
                 
                 # Do not fill missing data with mock values; return only what was fetched
                 
@@ -123,10 +132,11 @@ class MarketDataService:
     def _extract_index_data(self, quote_data: Dict) -> Dict[str, Any]:
         """Extract index data from Fyers quote response."""
         try:
-            v_data = quote_data.get('v', {})
+            # FYERS may return either the quote data directly or nested under 'v'
+            v_data = quote_data.get('v', quote_data)
             
             current_price = float(v_data.get('lp', 0))  # Last price
-            prev_close = float(v_data.get('prev_close_price', current_price))  # Previous close
+            prev_close = float(v_data.get('prev_close_price', v_data.get('pc', current_price)))  # Previous close
             
             # Calculate percentage change
             if prev_close > 0:
@@ -137,14 +147,19 @@ class MarketDataService:
             # Determine if positive or negative change
             is_positive = change_percent >= 0
             
+            # Handle multiple possible key names from FYERS response
+            high_value = v_data.get('high_price', v_data.get('h', current_price))
+            low_value = v_data.get('low_price', v_data.get('l', current_price))
+            volume_value = v_data.get('tt', v_data.get('volume', v_data.get('ttv', 0)))
+
             return {
                 'current_price': round(current_price, 2),
                 'change_percent': round(change_percent, 2),
                 'is_positive': is_positive,
                 'prev_close': round(prev_close, 2),
-                'high': round(float(v_data.get('high_price', current_price)), 2),
-                'low': round(float(v_data.get('low_price', current_price)), 2),
-                'volume': int(v_data.get('tt', 0))  # Total traded quantity
+                'high': round(float(high_value), 2) if high_value is not None else None,
+                'low': round(float(low_value), 2) if low_value is not None else None,
+                'volume': int(volume_value) if volume_value is not None else 0
             }
             
         except Exception as e:
