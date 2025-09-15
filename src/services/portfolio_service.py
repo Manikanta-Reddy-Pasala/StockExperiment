@@ -1,8 +1,11 @@
 """
 Service for portfolio-related logic.
 """
+import logging
 from datetime import datetime
 from .broker_service import get_broker_service
+
+logger = logging.getLogger(__name__)
 
 class PortfolioService:
     def __init__(self, broker_service):
@@ -40,33 +43,43 @@ class PortfolioService:
 
     def get_portfolio_positions(self, user_id: int):
         """Get portfolio positions using FYERS API."""
-        positions_data = self.broker_service.get_fyers_positions(user_id)
+        try:
+            positions_data = self.broker_service.get_fyers_positions(user_id)
+            logger.info(f"Portfolio positions response: {positions_data}")
 
-        if positions_data.get('success') and positions_data.get('data'):
-            positions = positions_data['data']
+            if positions_data.get('success') and positions_data.get('data'):
+                positions = positions_data['data']
 
-            processed_positions = []
-            for position in positions:
-                processed_positions.append({
-                    'symbol': position.get('symbol', ''),
-                    'quantity': position.get('netQty', 0),
-                    'average_price': position.get('avgPrice', 0),
-                    'ltp': position.get('ltp', 0),
-                    'pnl': position.get('pl', 0),
-                    'pnl_percent': position.get('plPercent', 0),
-                    'side': position.get('side', ''),
-                    'product': position.get('product', '')
-                })
+                processed_positions = []
+                for position in positions:
+                    processed_positions.append({
+                        'symbol': position.get('symbol', ''),
+                        'quantity': position.get('netQty', 0),
+                        'average_price': position.get('avgPrice', 0),
+                        'ltp': position.get('ltp', 0),
+                        'pnl': position.get('pl', 0),
+                        'pnl_percent': position.get('plPercent', 0),
+                        'side': position.get('side', ''),
+                        'product': position.get('product', '')
+                    })
 
-            return {
-                'success': True,
-                'data': processed_positions,
-                'last_updated': datetime.now().isoformat()
-            }
-        else:
+                return {
+                    'success': True,
+                    'data': processed_positions,
+                    'last_updated': datetime.now().isoformat()
+                }
+            else:
+                error_msg = positions_data.get('error', 'Unknown error')
+                logger.error(f"Failed to fetch positions data: {error_msg}")
+                return {
+                    'success': False,
+                    'error': f'Failed to fetch positions data from FYERS: {error_msg}'
+                }
+        except Exception as e:
+            logger.error(f"Exception in get_portfolio_positions: {str(e)}")
             return {
                 'success': False,
-                'error': 'Failed to fetch positions data from FYERS'
+                'error': f'Failed to fetch positions data from FYERS: {str(e)}'
             }
 
 _portfolio_service = None

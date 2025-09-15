@@ -159,12 +159,16 @@ class FyersPortfolioProvider(IPortfolioProvider):
         """Get comprehensive portfolio summary."""
         try:
             # Get comprehensive portfolio report from FYERS API service
+            logger.info(f"Getting portfolio summary for user {user_id}")
             portfolio_report = self.fyers_service.generate_portfolio_summary_report(user_id)
+            logger.info(f"Portfolio report response: {portfolio_report}")
             
             if portfolio_report.get('status') != 'success':
+                error_msg = portfolio_report.get('message', 'Failed to generate portfolio summary')
+                logger.error(f"Portfolio summary failed: {error_msg}")
                 return {
                     'success': False,
-                    'error': portfolio_report.get('message', 'Failed to generate portfolio summary'),
+                    'error': error_msg,
                     'data': {},
                     'last_updated': datetime.now().isoformat()
                 }
