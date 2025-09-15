@@ -245,7 +245,7 @@ class FyersReportsProvider(IReportsProvider):
             portfolio_data = portfolio_response.get('data', {})
             
             # Get holdings data
-            holdings_response = self.broker_service.get_holdings(user_id)
+            holdings_response = self.broker_service.holdings(user_id)
             holdings = holdings_response.get('data', []) if holdings_response.get('success') else []
             
             # Create portfolio report data

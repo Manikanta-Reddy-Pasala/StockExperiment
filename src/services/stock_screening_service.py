@@ -96,7 +96,7 @@ class StockScreeningService:
             range_to = datetime.now()
             range_from = range_to - timedelta(days=45) # Fetch more to ensure we get 30 trading days
 
-            history_data = self.fyers_connector.get_history(
+            history_data = self.fyers_connector.history(
                 symbol=symbol,
                 resolution="D",
                 range_from=range_from.strftime('%Y-%m-%d'),
@@ -184,7 +184,7 @@ class StockScreeningService:
             if not self.fyers_connector:
                 return None
             
-            quotes_data = self.fyers_connector.get_quotes(symbol)
+            quotes_data = self.fyers_connector.quotes(symbol)
             
             if not quotes_data or 'd' not in quotes_data or not quotes_data['d']:
                 logger.warning(f"No quotes data for {symbol}")

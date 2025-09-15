@@ -88,8 +88,8 @@ class SimulatorPortfolioProvider(IPortfolioProvider):
     def get_portfolio_summary(self, user_id: int) -> Dict[str, Any]:
         """Get simulated portfolio summary."""
         try:
-            holdings_response = self.get_holdings(user_id)
-            positions_response = self.get_positions(user_id)
+            holdings_response = self.holdings(user_id)
+            positions_response = self.positions(user_id)
             
             if not holdings_response.get('success'):
                 return {
@@ -149,7 +149,7 @@ class SimulatorPortfolioProvider(IPortfolioProvider):
     def get_portfolio_allocation(self, user_id: int) -> Dict[str, Any]:
         """Get simulated portfolio allocation."""
         try:
-            holdings_response = self.get_holdings(user_id)
+            holdings_response = self.holdings(user_id)
             
             if not holdings_response.get('success'):
                 return {
@@ -278,7 +278,7 @@ class SimulatorPortfolioProvider(IPortfolioProvider):
                            end_date: datetime = None) -> Dict[str, Any]:
         """Get simulated dividend history."""
         try:
-            holdings_response = self.get_holdings(user_id)
+            holdings_response = self.holdings(user_id)
             
             if not holdings_response.get('success'):
                 return {
@@ -333,8 +333,8 @@ class SimulatorPortfolioProvider(IPortfolioProvider):
     def get_portfolio_risk_metrics(self, user_id: int) -> Dict[str, Any]:
         """Get simulated portfolio risk metrics."""
         try:
-            holdings_response = self.get_holdings(user_id)
-            positions_response = self.get_positions(user_id)
+            holdings_response = self.holdings(user_id)
+            positions_response = self.positions(user_id)
             
             if not holdings_response.get('success'):
                 return {

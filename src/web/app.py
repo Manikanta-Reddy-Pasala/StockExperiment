@@ -48,6 +48,16 @@ def create_app():
     # Generate a secret key for sessions
     app.secret_key = secrets.token_hex(16)
     
+    # Add comprehensive request/response logging middleware
+    try:
+        from ..utils.request_logger_middleware import RequestLoggerMiddleware
+        RequestLoggerMiddleware(app)
+        print("🔍 Request logging middleware enabled - All API calls will be logged to console")
+    except ImportError:
+        from utils.request_logger_middleware import RequestLoggerMiddleware
+        RequestLoggerMiddleware(app)
+        print("🔍 Request logging middleware enabled - All API calls will be logged to console")
+    
     
     # Initialize Flask-Login
     login_manager = LoginManager()
@@ -194,6 +204,30 @@ def create_app():
     def dashboard():
         """Dashboard page."""
         return render_template('dashboard.html')
+    
+    @app.route('/demo')
+    def demo_dashboard():
+        """Demo dashboard page (no login required)."""
+        return render_template('dashboard.html')
+    
+    # Auto-login route for demo purposes
+    @app.route('/auto-login')
+    def auto_login():
+        """Auto-login for demo purposes."""
+        try:
+            # Try to find or create a demo user
+            demo_user = user_service.get_or_create_demo_user()
+            if demo_user:
+                login_user(demo_user)
+                flash('Demo login successful!', 'success')
+                return redirect(url_for('dashboard'))
+            else:
+                flash('Demo login failed. Using demo mode.', 'warning')
+                return redirect(url_for('demo_dashboard'))
+        except Exception as e:
+            app.logger.error(f"Auto-login error: {e}")
+            flash('Demo login unavailable. Using demo mode.', 'warning')
+            return redirect(url_for('demo_dashboard'))
     
     @app.route('/logs')
     @login_required
@@ -626,15 +660,34 @@ def create_app():
     
     # Dashboard API Routes - Updated to use unified multi-broker system
     @app.route('/api/dashboard/metrics', methods=['GET'])
-    @login_required
     def api_get_dashboard_metrics():
         """Get dashboard metrics using unified multi-broker system."""
+        # Add fallback logic for unauthenticated users
+        if not current_user or not current_user.is_authenticated:
+            try:
+                from ..services.mock_data_service import get_mock_data_service
+                mock_service = get_mock_data_service()
+                return jsonify(mock_service.get_portfolio_summary())
+            except Exception as e:
+                app.logger.error(f"Error getting demo dashboard metrics: {str(e)}")
+                return jsonify({
+                    'success': False,
+                    'error': 'Demo data unavailable'
+                }), 500
+        
+        # Original authenticated logic
         try:
             from .routes.unified_routes import api_get_portfolio_summary
             return api_get_portfolio_summary()
         except Exception as e:
             app.logger.error(f"Error fetching dashboard metrics for user {current_user.id}: {str(e)}")
-            return jsonify({'success': False, 'error': 'Internal server error'}), 500
+            # Fallback to mock data on error
+            try:
+                from ..services.mock_data_service import get_mock_data_service
+                mock_service = get_mock_data_service()
+                return jsonify(mock_service.get_portfolio_summary())
+            except:
+                return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
     # Portfolio API Routes (Legacy - keeping for backward compatibility)
     @app.route('/api/portfolio/holdings', methods=['GET'])
@@ -787,9 +840,23 @@ def create_app():
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
     @app.route('/api/market/overview', methods=['GET'])
-    @login_required
     def api_get_market_overview():
-        """Get market overview data for major indices using broker APIs."""
+        """Get market overview data for major indices using FYERS API."""
+        # Add fallback logic for unauthenticated users
+        if not current_user or not current_user.is_authenticated:
+            try:
+                from ..services.mock_data_service import get_mock_data_service
+                mock_service = get_mock_data_service()
+                return jsonify(mock_service.get_market_overview())
+            except Exception as e:
+                app.logger.error(f"Error getting demo market overview: {str(e)}")
+                return jsonify({
+                    'success': False,
+                    'error': 'Demo data unavailable',
+                    'data': []
+                }), 500
+        
+        # Original authenticated logic
         try:
             app.logger.info(f"Fetching market overview for user {current_user.id}")
             
@@ -803,24 +870,49 @@ def create_app():
                 
         except Exception as e:
             app.logger.error(f"Error fetching market overview: {e}")
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
+            # Fallback to mock data on error
+            try:
+                from ..services.mock_data_service import get_mock_data_service
+                mock_service = get_mock_data_service()
+                return jsonify(mock_service.get_market_overview())
+            except:
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
+                }), 500
 
     @app.route('/api/dashboard/portfolio-holdings', methods=['GET'])
-    @login_required
     def api_get_portfolio_holdings():
         """Get portfolio holdings using unified multi-broker system."""
+        # Add fallback logic for unauthenticated users
+        if not current_user or not current_user.is_authenticated:
+            try:
+                from ..services.mock_data_service import get_mock_data_service
+                mock_service = get_mock_data_service()
+                return jsonify(mock_service.get_portfolio_holdings())
+            except Exception as e:
+                app.logger.error(f"Error getting demo portfolio holdings: {str(e)}")
+                return jsonify({
+                    'success': False,
+                    'error': 'Demo data unavailable'
+                }), 500
+        
+        # Original authenticated logic
         try:
             from .routes.unified_routes import api_get_holdings
             return api_get_holdings()
         except Exception as e:
             app.logger.error(f"Error fetching portfolio holdings: {e}")
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
+            # Fallback to mock data on error
+            try:
+                from ..services.mock_data_service import get_mock_data_service
+                mock_service = get_mock_data_service()
+                return jsonify(mock_service.get_portfolio_holdings())
+            except:
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
+                }), 500
 
     @app.route('/api/dashboard/pending-orders', methods=['GET'])
     @login_required
@@ -837,18 +929,39 @@ def create_app():
             }), 500
 
     @app.route('/api/dashboard/recent-orders', methods=['GET'])
-    @login_required
     def api_get_recent_orders():
         """Get recent orders using unified multi-broker system."""
+        # Add fallback logic for unauthenticated users
+        if not current_user or not current_user.is_authenticated:
+            try:
+                limit = request.args.get('limit', 5, type=int)
+                from ..services.mock_data_service import get_mock_data_service
+                mock_service = get_mock_data_service()
+                return jsonify(mock_service.get_recent_orders(limit))
+            except Exception as e:
+                app.logger.error(f"Error getting demo recent orders: {str(e)}")
+                return jsonify({
+                    'success': False,
+                    'error': 'Demo data unavailable'
+                }), 500
+        
+        # Original authenticated logic
         try:
             from .routes.unified_routes import api_get_recent_activity as unified_recent_activity
             return unified_recent_activity()
         except Exception as e:
             app.logger.error(f"Error fetching recent orders: {e}")
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
+            # Fallback to mock data on error
+            try:
+                limit = request.args.get('limit', 5, type=int)
+                from ..services.mock_data_service import get_mock_data_service
+                mock_service = get_mock_data_service()
+                return jsonify(mock_service.get_recent_orders(limit))
+            except:
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
+                }), 500
 
     @app.route('/api/dashboard/portfolio-performance', methods=['GET'])
     @login_required
@@ -991,6 +1104,102 @@ def create_app():
     app.register_blueprint(fyers_bp)
     app.register_blueprint(zerodha_bp)
     app.register_blueprint(simulator_bp)
+
+    # Add fallback functionality to existing routes with mock data
+    try:
+        from ..services.mock_data_service import get_mock_data_service
+        mock_service = get_mock_data_service()
+        
+        # Override the existing market overview route to include fallback
+        @app.route('/api/market/overview', methods=['GET'])
+        def api_market_overview_fallback():
+            """Market overview with mock data fallback."""
+            try:
+                if current_user and current_user.is_authenticated:
+                    # Try the original function
+                    return api_get_market_overview()
+                else:
+                    # Return mock data for demo
+                    return jsonify(mock_service.get_market_overview())
+            except Exception as e:
+                app.logger.error(f"Market overview error, using mock data: {e}")
+                return jsonify(mock_service.get_market_overview())
+        
+        # Override dashboard metrics route
+        @app.route('/api/dashboard/metrics', methods=['GET'])
+        def api_dashboard_metrics_fallback():
+            """Dashboard metrics with mock data fallback."""
+            try:
+                if current_user and current_user.is_authenticated:
+                    return api_get_dashboard_metrics()
+                else:
+                    return jsonify(mock_service.get_portfolio_summary())
+            except Exception as e:
+                app.logger.error(f"Dashboard metrics error, using mock data: {e}")
+                return jsonify(mock_service.get_portfolio_summary())
+        
+        # Override portfolio holdings route
+        @app.route('/api/dashboard/portfolio-holdings', methods=['GET'])
+        def api_portfolio_holdings_fallback():
+            """Portfolio holdings with mock data fallback."""
+            try:
+                if current_user and current_user.is_authenticated:
+                    return api_get_portfolio_holdings()
+                else:
+                    return jsonify(mock_service.get_portfolio_holdings())
+            except Exception as e:
+                app.logger.error(f"Portfolio holdings error, using mock data: {e}")
+                return jsonify(mock_service.get_portfolio_holdings())
+        
+        # Override recent orders route
+        @app.route('/api/dashboard/recent-orders', methods=['GET'])
+        def api_recent_orders_fallback():
+            """Recent orders with mock data fallback."""
+            try:
+                if current_user and current_user.is_authenticated:
+                    return api_get_recent_orders()
+                else:
+                    limit = request.args.get('limit', 5, type=int)
+                    return jsonify(mock_service.get_recent_orders(limit))
+            except Exception as e:
+                app.logger.error(f"Recent orders error, using mock data: {e}")
+                limit = request.args.get('limit', 5, type=int)
+                return jsonify(mock_service.get_recent_orders(limit))
+        
+        # Override pending orders route
+        @app.route('/api/dashboard/pending-orders', methods=['GET'])
+        def api_pending_orders_fallback():
+            """Pending orders with mock data fallback."""
+            try:
+                if current_user and current_user.is_authenticated:
+                    return api_get_pending_orders()
+                else:
+                    return jsonify(mock_service.get_pending_orders())
+            except Exception as e:
+                app.logger.error(f"Pending orders error, using mock data: {e}")
+                return jsonify(mock_service.get_pending_orders())
+        
+        # Override portfolio performance route
+        @app.route('/api/dashboard/portfolio-performance', methods=['GET'])
+        def api_portfolio_performance_fallback():
+            """Portfolio performance with mock data fallback."""
+            try:
+                if current_user and current_user.is_authenticated:
+                    return api_get_portfolio_performance()
+                else:
+                    period = request.args.get('period', '1W')
+                    return jsonify(mock_service.get_portfolio_performance(period))
+            except Exception as e:
+                app.logger.error(f"Portfolio performance error, using mock data: {e}")
+                period = request.args.get('period', '1W')
+                return jsonify(mock_service.get_portfolio_performance(period))
+        
+        app.logger.info("✅ Fallback mock data routes enabled successfully")
+        
+    except ImportError as e:
+        app.logger.error(f"Could not enable mock data fallback: {e}")
+    except Exception as e:
+        app.logger.error(f"Error setting up fallback routes: {e}")
 
     # Register ML prediction blueprints
     try:

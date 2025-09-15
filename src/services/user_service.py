@@ -158,6 +158,49 @@ class UserService:
             session.delete(user)
             session.commit()
             return True
+    
+    def get_or_create_demo_user(self):
+        """Gets or creates a demo user for demonstration purposes."""
+        demo_username = 'demo_user'
+        demo_email = 'demo@trading-system.com'
+        demo_password = 'demo123'
+        
+        try:
+            with self.db_manager.get_session() as session:
+                # Try to find existing demo user
+                demo_user = session.query(User).filter_by(username=demo_username).first()
+                
+                if demo_user:
+                    # Update last login and return existing user
+                    demo_user.last_login = datetime.utcnow()
+                    session.commit()
+                    session.refresh(demo_user)
+                    session.expunge(demo_user)
+                    return demo_user
+                
+                # Create new demo user
+                password_hash = self.bcrypt.generate_password_hash(demo_password).decode('utf-8')
+                new_demo_user = User(
+                    username=demo_username,
+                    email=demo_email,
+                    password_hash=password_hash,
+                    first_name='Demo',
+                    last_name='User',
+                    is_active=True,
+                    is_admin=False,
+                    created_at=datetime.now(),
+                    last_login=datetime.utcnow()
+                )
+                session.add(new_demo_user)
+                session.commit()
+                session.refresh(new_demo_user)
+                session.expunge(new_demo_user)
+                return new_demo_user
+                
+        except Exception as e:
+            # If there's any error, return None to fall back to demo mode
+            print(f"Error creating/getting demo user: {e}")
+            return None
 
 _user_service = None
 

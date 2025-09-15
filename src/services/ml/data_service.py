@@ -8,7 +8,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 try:
-    from ...services.brokers.fyers_service import FyersService
+    from ...services.brokers.fyers_service import get_fyers_service
     from ...models.database import get_database_manager
 except ImportError:
     from services.brokers.fyers_service import FyersService
@@ -29,7 +29,7 @@ def get_stock_data(
     """
     try:
         # Get Fyers service
-        fyers_service = FyersService()
+        fyers_service = get_fyers_service()
         
         # Get user's Fyers configuration
         config = fyers_service.get_broker_config(user_id)
@@ -38,7 +38,7 @@ def get_stock_data(
             return None
         
         # Create Fyers connector
-        from ...services.brokers.fyers_service import FyersAPIConnector
+        from ...services.brokers.fyers_service import get_fyers_service
         connector = FyersAPIConnector(config['client_id'], config['access_token'])
         
         # Convert period to date range if needed
@@ -76,7 +76,7 @@ def get_stock_data(
         
         # Get historical data from Fyers
         logger.info(f"Fetching historical data for {symbol} from {start_date} to {end_date}")
-        response = connector.get_history(symbol, resolution, str(range_from), str(range_to))
+        response = connector.history(symbol, resolution, str(range_from), str(range_to))
         
         if 'error' in response:
             logger.error(f"Error fetching data from Fyers: {response['error']}")

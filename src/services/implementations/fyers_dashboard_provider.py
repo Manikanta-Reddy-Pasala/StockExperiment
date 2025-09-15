@@ -33,7 +33,7 @@ class FyersDashboardProvider(IDashboardProvider):
             ]
             
             # Get quotes for indices
-            quotes_response = self.fyers_api.get_quotes(user_id, indices_symbols)
+            quotes_response = self.fyers_api.quotes(user_id, indices_symbols)
             
             if not quotes_response.get('success'):
                 return {
@@ -126,7 +126,7 @@ class FyersDashboardProvider(IDashboardProvider):
     def get_top_holdings(self, user_id: int, limit: int = 5) -> Dict[str, Any]:
         """Get top holdings by value using FYERS API."""
         try:
-            holdings_response = self.fyers_api.get_holdings(
+            holdings_response = self.fyers_api.holdings(
                 user_id, 
                 sort_by='market_value', 
                 sort_order='desc'
@@ -174,13 +174,13 @@ class FyersDashboardProvider(IDashboardProvider):
         """Get recent trading activity using FYERS API."""
         try:
             # Get recent orders and trades
-            orderbook_response = self.fyers_api.get_orderbook(
+            orderbook_response = self.fyers_api.orderbook(
                 user_id,
                 sort_by='order_date_time',
                 sort_order='desc'
             )
             
-            tradebook_response = self.fyers_api.get_tradebook(
+            tradebook_response = self.fyers_api.tradebook(
                 user_id,
                 sort_by='trade_date_time', 
                 sort_order='desc'
@@ -243,7 +243,7 @@ class FyersDashboardProvider(IDashboardProvider):
     def get_account_balance(self, user_id: int) -> Dict[str, Any]:
         """Get account balance and available funds using FYERS API."""
         try:
-            funds_response = self.fyers_api.get_funds(user_id)
+            funds_response = self.fyers_api.funds(user_id)
             
             if not funds_response.get('success'):
                 return {
@@ -296,7 +296,7 @@ class FyersDashboardProvider(IDashboardProvider):
         """Get daily P&L data for charting using historical data."""
         try:
             # Get portfolio holdings to calculate historical P&L
-            holdings_response = self.fyers_api.get_holdings(user_id)
+            holdings_response = self.fyers_api.holdings(user_id)
             
             if not holdings_response.get('success'):
                 return {
@@ -418,7 +418,7 @@ class FyersDashboardProvider(IDashboardProvider):
                         }
                     }
             
-            quotes_response = self.fyers_api.get_quotes(user_id, symbols)
+            quotes_response = self.fyers_api.quotes(user_id, symbols)
             
             if not quotes_response.get('success'):
                 return {

@@ -612,7 +612,7 @@ class PortfolioStrategyEngine:
         """Get current price for position monitoring."""
         try:
             if self.fyers_connector:
-                quotes = self.fyers_connector.get_quotes(symbol)
+                quotes = self.fyers_connector.quotes(symbol)
                 if quotes and 'd' in quotes and symbol in quotes['d']:
                     return float(quotes['d'][symbol]['v']['lp'])
             
@@ -855,7 +855,7 @@ _data("")
         """Get current price for position monitoring."""
         try:
             if self.fyers_connector:
-                quotes = self.fyers_connector.get_quotes(symbol)
+                quotes = self.fyers_connector.quotes(symbol)
                 if quotes and 'd' in quotes and symbol in quotes['d']:
                     return float(quotes['d'][symbol]['v']['lp'])
             

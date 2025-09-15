@@ -101,35 +101,35 @@ class BrokerService:
 
     def get_fyers_funds(self, user_id: int):
         connector = self._get_fyers_connector(user_id)
-        return connector.get_funds()
+        return connector.funds()
 
     def get_fyers_holdings(self, user_id: int):
         connector = self._get_fyers_connector(user_id)
-        return connector.get_holdings()
+        return connector.holdings()
 
     def get_fyers_positions(self, user_id: int):
         connector = self._get_fyers_connector(user_id)
-        return connector.get_positions()
+        return connector.positions()
 
     def get_fyers_orderbook(self, user_id: int):
         connector = self._get_fyers_connector(user_id)
-        return connector.get_orderbook()
+        return connector.orderbook()
 
     def get_fyers_tradebook(self, user_id: int):
         connector = self._get_fyers_connector(user_id)
-        return connector.get_tradebook()
+        return connector.tradebook()
 
     def get_fyers_quotes(self, user_id: int, symbols: str):
         connector = self._get_fyers_connector(user_id)
-        return connector.get_quotes(symbols)
+        return connector.quotes(symbols)
 
     def get_fyers_history(self, user_id: int, symbol: str, resolution: str, range_from: str, range_to: str):
         connector = self._get_fyers_connector(user_id)
-        return connector.get_history(symbol, resolution, range_from, range_to)
+        return connector.history(symbol, resolution, range_from, range_to)
 
     def get_fyers_profile(self, user_id: int):
         connector = self._get_fyers_connector(user_id)
-        return connector.get_profile()
+        return connector.login()
     
     def is_token_expired(self, access_token: str) -> bool:
         """Check if FYERS access token is expired."""
@@ -385,7 +385,7 @@ class FyersAPIConnector:
                 try:
                     logger.info("Using fyers-apiv3 library for connection test")
                     # Use the profile endpoint to test connection
-                    response = self.fyers_client.get_profile()
+                    response = self.fyers_client.login()
                     response_time = round((time.time() - start_time) * 1000, 2)
                     
                     logger.info(f"FYERS API response status: {response.get('s', 'unknown')}, time: {response_time}ms")
@@ -489,7 +489,7 @@ class FyersAPIConnector:
             # Use FYERS API client if available
             if self.fyers_client:
                 try:
-                    response = self.fyers_client.get_profile()
+                    response = self.fyers_client.login()
                     logger.info("FYERS profile fetched successfully using fyers-apiv3")
                     return response
                 except Exception as e:

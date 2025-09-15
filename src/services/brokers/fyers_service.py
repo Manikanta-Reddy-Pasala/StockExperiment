@@ -1,360 +1,65 @@
 """
-FYERS Broker Service - Dedicated service for FYERS broker operations
-"""
-import os
-import time
-import requests
-import json
-import logging
-from datetime import datetime
-from typing import Dict, Optional, Any
+Fyers Service
 
-# Configure logging
-logger = logging.getLogger(__name__)
+This service provides comprehensive Fyers broker integration with standardized
+API endpoints and response formats.
+"""
+
+import logging
+from typing import Dict, Optional, Any
+from datetime import datetime
 
 try:
     from ...models.database import get_database_manager
-    from ...models.models import BrokerConfiguration, Order, Trade
-    from ...services.token_manager_service import get_token_manager
-    from ...services.cache_service import get_cache_service
-    from ...utils.api_logger import APILogger, log_api_call
+    from ...models.models import BrokerConfiguration
+    from ...utils.api_logger import APILogger
+    from .fyers import create_fyers_api, create_fyers_auth
 except ImportError:
     from models.database import get_database_manager
-    from models.models import BrokerConfiguration, Order, Trade
-    from services.token_manager_service import get_token_manager
-    from services.cache_service import get_cache_service
-    from utils.api_logger import APILogger, log_api_call
+    from models.models import BrokerConfiguration
+    from utils.api_logger import APILogger
+    from .fyers import create_fyers_api, create_fyers_auth
 
-try:
-    from fyers_apiv3 import fyersModel
-    FYERS_AVAILABLE = True
-except ImportError:
-    FYERS_AVAILABLE = False
+logger = logging.getLogger(__name__)
 
 
 class FyersService:
-    """Dedicated service for FYERS broker operations."""
+    """
+    Comprehensive Fyers service with standardized API implementation.
+    """
     
     def __init__(self):
         self.db_manager = get_database_manager()
         self.broker_name = 'fyers'
-        self.token_manager = get_token_manager()
-        self.cache_service = get_cache_service()
-
-    def _get_fyers_connector(self, user_id: int) -> 'FyersAPIConnector':
-        """Helper to get an initialized FyersAPIConnector for a user."""
-        # Use token manager to get valid token
-        token_data = self.token_manager.get_valid_token(user_id, self.broker_name)
-        if not token_data or not token_data.get('client_id') or not token_data.get('access_token'):
-            raise ValueError('FYERS credentials not configured or access token missing.')
-        return FyersAPIConnector(token_data['client_id'], token_data['access_token'])
-
-    def test_connection(self, user_id: int):
-        """Test FYERS broker connection."""
-        config = self.get_broker_config(user_id)
-        
-        if not config:
-            raise ValueError('FYERS credentials not configured. Please configure your FYERS credentials first.')
-        
-        if not config.get('client_id'):
-            raise ValueError('FYERS client ID not configured.')
-        
-        if not config.get('access_token'):
-            raise ValueError('FYERS access token not configured. Please complete the OAuth flow.')
-        
-        # Check if token is expired and provide helpful message
-        if config.get('is_token_expired', False):
-            raise ValueError('FYERS access token has expired. Please refresh your token or complete the OAuth flow again.')
-
-        connector = FyersAPIConnector(config.get('client_id'), config.get('access_token'))
-        result = connector.test_connection()
-
-        with self.db_manager.get_session() as session:
-            db_config = session.query(BrokerConfiguration).filter_by(broker_name=self.broker_name, user_id=user_id).first()
-            if db_config:
-                db_config.is_connected = result['success']
-                db_config.connection_status = 'connected' if result['success'] else 'disconnected'
-                db_config.last_connection_test = datetime.utcnow()
-                db_config.error_message = result.get('message', '') if not result['success'] else None
-                session.commit()
-
-        return result
-
-    def generate_auth_url(self, user_id: int) -> str:
-        """Generate FYERS OAuth2 authorization URL."""
-        config = self.get_broker_config(user_id)
-        if not config or not config.get('client_id') or not config.get('api_secret'):
-            raise ValueError('FYERS configuration not found. Please save your Client ID and Secret Key first.')
-
-        # Debug logging
-        logger.info(f"Generating auth URL for user {user_id}")
-        logger.info(f"Using client_id: {config.get('client_id')}")
-        logger.info(f"Using redirect_uri: {config.get('redirect_url')}")
-
-        oauth_flow = FyersOAuth2Flow(
-            client_id=config.get('client_id'),
-            secret_key=config.get('api_secret'),
-            redirect_uri=config.get('redirect_url')
-        )
-        return oauth_flow.generate_auth_url(user_id)
-
-    def exchange_auth_code(self, user_id: int, auth_code: str) -> dict:
-        """Exchange FYERS auth code for an access token and save it."""
-        config = self.get_broker_config(user_id)
-        if not config or not config.get('client_id') or not config.get('api_secret'):
-            raise ValueError('FYERS configuration not found.')
-
-        # Debug logging
-        logger.info(f"Exchanging auth code for user {user_id}")
-        logger.info(f"Using client_id: {config.get('client_id')}")
-        logger.info(f"Using redirect_uri: {config.get('redirect_url')}")
-        logger.info(f"Auth code length: {len(auth_code) if auth_code else 0}")
-
-        oauth_flow = FyersOAuth2Flow(
-            client_id=config.get('client_id'),
-            secret_key=config.get('api_secret'),
-            redirect_uri=config.get('redirect_url')
-        )
-        token_response = oauth_flow.exchange_auth_code_for_token(auth_code)
-        
-        # Debug: Log the full response
-        logger.info(f"Token response received: {token_response}")
-        logger.info(f"Response type: {type(token_response)}")
-        logger.info(f"Response keys: {list(token_response.keys()) if isinstance(token_response, dict) else 'Not a dict'}")
-
-        if 'access_token' in token_response:
-            access_token = token_response['access_token']
-
-            # Save the new tokens
-            self.save_broker_config({
-                'access_token': access_token,
-                'is_connected': True,
-                'connection_status': 'connected'
-            }, user_id)
-
-            return {'success': True, 'access_token': access_token}
-        else:
-            raise ValueError(token_response.get('message', 'Failed to obtain access token'))
-
-    def get_funds(self, user_id: int):
-        """Get user funds."""
-        connector = self._get_fyers_connector(user_id)
-        return connector.get_funds()
-
-    def get_holdings(self, user_id: int):
-        """Get user holdings."""
-        # Log API call
-        APILogger.log_request(
-            service_name="FyersService",
-            method_name="get_holdings",
-            request_data={},
-            user_id=user_id
-        )
-        
-        try:
-            connector = self._get_fyers_connector(user_id)
-            result = connector.get_holdings()
-            
-            # Log response
-            APILogger.log_response(
-                service_name="FyersService",
-                method_name="get_holdings",
-                response_data=result,
-                user_id=user_id
-            )
-            
-            return result
-        except Exception as e:
-            APILogger.log_error(
-                service_name="FyersService",
-                method_name="get_holdings",
-                error=e,
-                request_data={},
-                user_id=user_id
-            )
-            raise
-
-    def get_positions(self, user_id: int):
-        """Get user positions."""
-        connector = self._get_fyers_connector(user_id)
-        return connector.get_positions()
-
-    def get_orderbook(self, user_id: int):
-        """Get user orderbook."""
-        connector = self._get_fyers_connector(user_id)
-        return connector.get_orderbook()
-
-    def get_tradebook(self, user_id: int):
-        """Get user tradebook."""
-        connector = self._get_fyers_connector(user_id)
-        return connector.get_tradebook()
-
-    def get_quotes(self, user_id: int, symbols: str):
-        """Get market quotes for symbols."""
-        # Log API call
-        APILogger.log_request(
-            service_name="FyersService",
-            method_name="get_quotes",
-            request_data={'symbols': symbols},
-            user_id=user_id
-        )
-        
-        try:
-            connector = self._get_fyers_connector(user_id)
-            result = connector.get_quotes(symbols)
-            
-            # Log response
-            APILogger.log_response(
-                service_name="FyersService",
-                method_name="get_quotes",
-                response_data=result,
-                user_id=user_id
-            )
-            
-            return result
-        except Exception as e:
-            APILogger.log_error(
-                service_name="FyersService",
-                method_name="get_quotes",
-                error=e,
-                request_data={'symbols': symbols},
-                user_id=user_id
-            )
-            raise
-
-    def get_history(self, user_id: int, symbol: str, resolution: str, range_from: str, range_to: str):
-        """Get historical data for a symbol."""
-        connector = self._get_fyers_connector(user_id)
-        return connector.get_history(symbol, resolution, range_from, range_to)
-
-    def get_profile(self, user_id: int):
-        """Get user profile."""
-        connector = self._get_fyers_connector(user_id)
-        return connector.get_profile()
     
-    def is_token_expired(self, access_token: str) -> bool:
-        """Check if FYERS access token is expired."""
-        if not access_token:
-            return True
+    def _get_api_instance(self, user_id: int):
+        """Get standardized API instance for user."""
+        config = self.get_broker_config(user_id)
+        if not config:
+            raise ValueError('Fyers configuration not found')
         
-        try:
-            import jwt
-            import datetime
-            
-            # Decode JWT token without verification to get expiration
-            decoded = jwt.decode(access_token, options={"verify_signature": False})
-            exp_timestamp = decoded.get('exp', 0)
-            
-            if not exp_timestamp:
-                logger.warning("No expiration timestamp found in token")
-                return False  # Don't assume expired if we can't determine expiration
-            
-            # Convert to datetime and check if expired
-            exp_datetime = datetime.datetime.fromtimestamp(exp_timestamp)
-            current_time = datetime.datetime.now()
-            
-            # Add a 5-minute buffer to avoid edge cases
-            buffer_time = datetime.timedelta(minutes=5)
-            return current_time >= (exp_datetime - buffer_time)
-            
-        except Exception as e:
-            logger.warning(f"Error checking token expiration: {e}")
-            return False  # Don't assume expired if we can't check - let the API call determine if it's valid
+        api_key = config.get('client_id')
+        api_secret = config.get('api_secret')
+        access_token = config.get('access_token')
+        
+        if not all([api_key, api_secret, access_token]):
+            raise ValueError('Incomplete Fyers configuration')
+        
+        return create_fyers_api(api_key, api_secret, access_token)
     
     def get_broker_config(self, user_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
-        """Get FYERS broker configuration from database."""
+        """Get Fyers broker configuration from database."""
         with self.db_manager.get_session() as session:
             query = session.query(BrokerConfiguration).filter_by(broker_name=self.broker_name)
             if user_id:
                 query = query.filter_by(user_id=user_id)
             else:
-                query = query.filter_by(user_id=None)  # Global config
+                query = query.filter_by(user_id=None)
             
             config = query.first()
             if not config:
                 return None
             
-            # Check if token is expired
-            is_expired = self.is_token_expired(config.access_token)
-            
-            # Determine connection status based on available credentials and token expiration
-            has_credentials = bool(config.client_id and config.api_secret)
-            has_token = bool(config.access_token)
-            is_connected = has_credentials and has_token and not is_expired
-            
-            # Return data dictionary instead of SQLAlchemy object
-            return {
-                'id': config.id,
-                'user_id': config.user_id,
-                'broker_name': config.broker_name,
-                'client_id': config.client_id,
-                'access_token': config.access_token,
-                'refresh_token': config.refresh_token,
-                'api_key': config.api_key,
-                'api_secret': config.api_secret,
-                'redirect_url': config.redirect_url,
-                'app_type': config.app_type,
-                'is_active': config.is_active,
-                'is_connected': is_connected,  # Based on credentials and token validity
-                'is_token_expired': is_expired,
-                'last_connection_test': config.last_connection_test,
-                'connection_status': 'expired' if is_expired else ('connected' if is_connected else 'disconnected'),
-                'error_message': config.error_message,
-                'created_at': config.created_at,
-                'updated_at': config.updated_at
-            }
-    
-    def save_broker_config(self, config_data: Dict[str, Any], user_id: Optional[int] = None) -> Dict[str, Any]:
-        """Save FYERS broker configuration to database."""
-        with self.db_manager.get_session() as session:
-            # Check if config exists within this session
-            query = session.query(BrokerConfiguration).filter_by(broker_name=self.broker_name)
-            if user_id:
-                query = query.filter_by(user_id=user_id)
-            else:
-                query = query.filter_by(user_id=None)  # Global config
-            
-            existing_config = query.first()
-            
-            if existing_config:
-                # Update existing config
-                config = existing_config
-            else:
-                # Create new config
-                config = BrokerConfiguration(
-                    broker_name=self.broker_name,
-                    user_id=user_id
-                )
-                session.add(config)
-            
-            # Update fields (storing directly without encryption for simplicity)
-            # Only update fields that are provided in config_data
-            if config_data.get('client_id') is not None:
-                config.client_id = config_data.get('client_id', '')
-            if config_data.get('access_token') is not None:
-                config.access_token = config_data.get('access_token', '')
-            if config_data.get('refresh_token') is not None:
-                config.refresh_token = config_data.get('refresh_token', '')
-            if config_data.get('api_key') is not None:
-                config.api_key = config_data.get('api_key', '')
-            if config_data.get('api_secret') is not None:
-                config.api_secret = config_data.get('api_secret', '')
-            if config_data.get('redirect_url') is not None:
-                config.redirect_url = config_data.get('redirect_url', '')
-            if config_data.get('app_type') is not None:
-                config.app_type = config_data.get('app_type', '100')
-            if 'is_active' in config_data:
-                config.is_active = config_data.get('is_active', True)
-            if 'is_connected' in config_data:
-                config.is_connected = config_data.get('is_connected', False)
-            if 'connection_status' in config_data:
-                config.connection_status = config_data.get('connection_status', 'disconnected')
-            config.updated_at = datetime.utcnow()
-            
-            session.commit()
-            session.refresh(config)  # Refresh to get the updated object
-            
-            # Return data dictionary instead of SQLAlchemy object
             return {
                 'id': config.id,
                 'user_id': config.user_id,
@@ -375,515 +80,394 @@ class FyersService:
                 'updated_at': config.updated_at
             }
     
-    def get_broker_stats(self, user_id: Optional[int] = None) -> Dict[str, Any]:
-        """Get FYERS broker statistics from database."""
+    def save_broker_config(self, config_data: Dict[str, Any], user_id: Optional[int] = None) -> Dict[str, Any]:
+        """Save Fyers broker configuration to database."""
         with self.db_manager.get_session() as session:
-            # Get order statistics
-            query = session.query(Order)
+            query = session.query(BrokerConfiguration).filter_by(broker_name=self.broker_name)
             if user_id:
                 query = query.filter_by(user_id=user_id)
+            else:
+                query = query.filter_by(user_id=None)
             
-            total_orders = query.count()
-            successful_orders = query.filter_by(order_status='COMPLETE').count()
-            pending_orders = query.filter_by(order_status='PENDING').count()
-            failed_orders = query.filter_by(order_status='REJECTED').count()
+            existing_config = query.first()
             
-            # Get last order time
-            last_order = query.order_by(Order.created_at.desc()).first()
-            last_order_time = last_order.created_at.strftime('%Y-%m-%d %H:%M:%S') if last_order else '-'
+            if existing_config:
+                config = existing_config
+            else:
+                config = BrokerConfiguration(
+                    broker_name=self.broker_name,
+                    user_id=user_id
+                )
+                session.add(config)
             
-            return {
-                'total_orders': total_orders,
-                'successful_orders': successful_orders,
-                'pending_orders': pending_orders,
-                'failed_orders': failed_orders,
-                'last_order_time': last_order_time,
-                'api_response_time': '-'
-            }
+            # Update fields
+            for key, value in config_data.items():
+                if hasattr(config, key) and value is not None:
+                    setattr(config, key, value)
+            
+            config.updated_at = datetime.utcnow()
+            session.commit()
+            session.refresh(config)
+            
+            return self.get_broker_config(user_id)
     
-    def start_auto_refresh(self, user_id: int, check_interval_minutes: int = 30):
-        """Start automatic token refresh for the user."""
-        self.token_manager.start_auto_refresh(user_id, self.broker_name, check_interval_minutes)
-        logger.info(f"Started auto-refresh for FYERS user {user_id}")
-    
-    def stop_auto_refresh(self, user_id: int):
-        """Stop automatic token refresh for the user."""
-        self.token_manager.stop_auto_refresh(user_id, self.broker_name)
-        logger.info(f"Stopped auto-refresh for FYERS user {user_id}")
-    
-    def get_token_status(self, user_id: int) -> Dict[str, Any]:
-        """Get detailed token status for the user."""
-        return self.token_manager.get_token_status(user_id, self.broker_name)
-    
-    def invalidate_token_cache(self, user_id: int):
-        """Invalidate cached token data for the user."""
-        self.token_manager.invalidate_user_tokens(user_id, self.broker_name)
-        logger.info(f"Invalidated token cache for FYERS user {user_id}")
-
-
-class FyersOAuth2Flow:
-    """FYERS OAuth2 authentication flow handler."""
-    
-    def __init__(self, client_id: str, secret_key: str, redirect_uri: str):
-        self.client_id = client_id
-        self.secret_key = secret_key
-        self.redirect_uri = redirect_uri
-        self.grant_type = "authorization_code"
-        self.response_type = "code"
-        self.state = "sample"
-    
-    def generate_auth_url(self, user_id: int = 1) -> str:
-        """Generate the authorization URL for user login."""
-        if not FYERS_AVAILABLE:
-            raise Exception("fyers-apiv3 library not available")
+    # Authentication Methods
+    def generate_auth_url(self, user_id: int) -> str:
+        """Generate Fyers OAuth2 authorization URL."""
+        config = self.get_broker_config(user_id)
+        if not config or not config.get('client_id') or not config.get('api_secret'):
+            raise ValueError('Fyers configuration not found. Please save your Client ID and Secret Key first.')
         
-        try:
-            # Use the configured redirect URI from initialization
-            # The redirect_uri should be the one configured in the FYERS app
-            
-            # Create session model for OAuth flow
-            app_session = fyersModel.SessionModel(
-                client_id=self.client_id,
-                redirect_uri=self.redirect_uri,  # Use the actual redirect URI from config
-                response_type=self.response_type,
-                state=str(user_id),  # Pass user_id in state for callback
-                secret_key=self.secret_key,
-                grant_type=self.grant_type
-            )
-            
-            # Generate the authorization URL
-            auth_url = app_session.generate_authcode()
-            logger.info(f"Generated FYERS authorization URL: {auth_url}")
-            return auth_url
-            
-        except Exception as e:
-            logger.error(f"Error generating FYERS auth URL: {str(e)}")
-            raise
-    
-    def exchange_auth_code_for_token(self, auth_code: str) -> Dict[str, Any]:
-        """Exchange authorization code for access token."""
-        if not FYERS_AVAILABLE:
-            raise Exception("fyers-apiv3 library not available")
+        auth = create_fyers_auth(
+            client_id=config.get('client_id'),
+            secret_key=config.get('api_secret'),
+            redirect_uri=config.get('redirect_url')
+        )
         
-        try:
-            # Create session model for OAuth flow
-            app_session = fyersModel.SessionModel(
-                client_id=self.client_id,
-                redirect_uri=self.redirect_uri,
-                response_type=self.response_type,
-                state=self.state,
-                secret_key=self.secret_key,
-                grant_type=self.grant_type
-            )
-            
-            # Set the auth code and generate token
-            app_session.set_token(auth_code)
-            response = app_session.generate_token()
-            
-            logger.info("Successfully exchanged auth code for access token")
-            logger.info(f"Token response: {response}")
-            return response
-            
-        except Exception as e:
-            logger.error(f"Error exchanging auth code for token: {str(e)}")
-            raise
-
-
-class FyersAPIConnector:
-    """FYERS API connector for real-time connection testing and operations."""
+        return auth.generate_auth_url(str(user_id))
     
-    def __init__(self, client_id: str, access_token: str):
-        self.client_id = client_id
-        self.access_token = access_token
-        self.base_url = "https://api-t1.fyers.in/api/v3"
+    def exchange_auth_code(self, user_id: int, auth_code: str) -> dict:
+        """Exchange Fyers auth code for access token."""
+        config = self.get_broker_config(user_id)
+        if not config or not config.get('client_id') or not config.get('api_secret'):
+            raise ValueError('Fyers configuration not found.')
         
-        # Initialize FYERS API client if available
-        if FYERS_AVAILABLE:
-            self.fyers_client = fyersModel.FyersModel(
-                token=access_token,
-                is_async=False,
-                client_id=client_id,
-                log_path=""
-            )
+        auth = create_fyers_auth(
+            client_id=config.get('client_id'),
+            secret_key=config.get('api_secret'),
+            redirect_uri=config.get('redirect_url')
+        )
+        
+        token_response = auth.generate_access_token(auth_code)
+        
+        if token_response.get('status') == 'success':
+            access_token = token_response.get('access_token')
+            
+            # Save the new token
+            self.save_broker_config({
+                'access_token': access_token,
+                'is_connected': True,
+                'connection_status': 'connected'
+            }, user_id)
+            
+            return {'success': True, 'access_token': access_token}
         else:
-            self.fyers_client = None
-            logger.warning("fyers-apiv3 library not available, falling back to requests")
-        
-        # Fallback session for direct API calls
-        self.session = requests.Session()
-        self.session.headers.update({
-            'Authorization': f'{client_id}:{access_token}',
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        })
+            raise ValueError(token_response.get('message', 'Failed to obtain access token'))
     
-    def test_connection(self) -> Dict[str, Any]:
-        """Test FYERS API connection by making a real API call."""
+    def test_connection(self, user_id: int):
+        """Test Fyers broker connection using standardized API."""
         try:
-            logger.info(f"Testing FYERS connection with client_id: {self.client_id[:10]}...")
-            start_time = time.time()
+            api = self._get_api_instance(user_id)
+            result = api.login()
             
-            # Try using the fyers-apiv3 library first
-            if self.fyers_client:
-                try:
-                    logger.info("Using fyers-apiv3 library for connection test")
-                    # Use the profile endpoint to test connection
-                    response = self.fyers_client.get_profile()
-                    response_time = round((time.time() - start_time) * 1000, 2)
-                    
-                    logger.info(f"FYERS API response status: {response.get('s', 'unknown')}, time: {response_time}ms")
-                    
-                    if response.get('s') == 'ok':
-                        logger.info("FYERS connection test successful using fyers-apiv3")
-                        return {
-                            'success': True,
-                            'message': 'Connection successful',
-                            'response_time': f"{response_time}ms",
-                            'profile_data': response.get('profile', {}),
-                            'status_code': 200
-                        }
-                    else:
-                        error_msg = f"API Error: {response.get('message', 'Unknown error')}"
-                        logger.warning(f"FYERS API error: {error_msg}")
-                        return {
-                            'success': False,
-                            'message': error_msg,
-                            'response_time': f"{response_time}ms",
-                            'status_code': 400
-                        }
-                except Exception as e:
-                    logger.warning(f"fyers-apiv3 library failed, falling back to requests: {str(e)}")
-            
-            # Fallback to direct API calls
-            logger.info("Using direct API calls for connection test")
-            url = f"{self.base_url}/profile"
-            logger.info(f"Making request to FYERS API: {url}")
-            
-            # Try different authentication methods
-            auth_methods = [
-                {'Authorization': f'{self.client_id}:{self.access_token}'},
-                {'Authorization': f'Bearer {self.client_id}:{self.access_token}'},
-                {'Authorization': f'Bearer {self.access_token}'}
-            ]
-            
-            for i, headers in enumerate(auth_methods):
-                try:
-                    logger.info(f"Trying authentication method {i+1}: {headers}")
-                    test_session = requests.Session()
-                    test_session.headers.update({
-                        **headers,
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    })
-                    
-                    response = test_session.get(url)
-                    response_time = round((time.time() - start_time) * 1000, 2)
-                    
-                    logger.info(f"FYERS API response status: {response.status_code}, time: {response_time}ms")
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        if data.get('s') == 'ok':
-                            logger.info(f"FYERS connection test successful with method {i+1}")
-                            return {
-                                'success': True,
-                                'message': 'Connection successful',
-                                'response_time': f"{response_time}ms",
-                                'profile_data': data.get('profile', {}),
-                                'status_code': response.status_code
-                            }
-                    
-                    # Log the response for debugging
-                    response_text = response.text
-                    if len(response_text) > 500:
-                        logger.info(f"FYERS API response content (first 500 chars): {response_text[:500]}...")
-                    else:
-                        logger.info(f"FYERS API response content: {response_text}")
-                        
-                except Exception as e:
-                    logger.warning(f"Authentication method {i+1} failed: {str(e)}")
-                    continue
-            
-            # If all methods failed
-            error_msg = "All authentication methods failed"
-            logger.error(f"FYERS connection failed: {error_msg}")
-            return {
-                'success': False,
-                'message': error_msg,
-                'response_time': f"{round((time.time() - start_time) * 1000, 2)}ms",
-                'status_code': 0
-            }
+            # Update connection status in database
+            with self.db_manager.get_session() as session:
+                db_config = session.query(BrokerConfiguration).filter_by(
+                    broker_name=self.broker_name, user_id=user_id
+                ).first()
                 
+                if db_config:
+                    success = result.get('status') == 'success'
+                    db_config.is_connected = success
+                    db_config.connection_status = 'connected' if success else 'disconnected'
+                    db_config.last_connection_test = datetime.utcnow()
+                    db_config.error_message = result.get('message', '') if not success else None
+                    session.commit()
+            
+            return {
+                'success': result.get('status') == 'success',
+                'message': result.get('message', ''),
+                'response_time': '-'
+            }
+            
         except Exception as e:
-            error_msg = f'Connection failed: {str(e)}'
-            logger.error(f"FYERS unexpected error: {error_msg}")
+            logger.error(f"Connection test failed: {str(e)}")
             return {
                 'success': False,
-                'message': error_msg,
-                'response_time': '-',
-                'status_code': 0
+                'message': str(e),
+                'response_time': '-'
             }
     
-    def get_profile(self) -> Dict[str, Any]:
-        """Get user profile information."""
+    # Standardized API Methods
+    def login(self, user_id: int):
+        """Login to Fyers using standardized format."""
+        APILogger.log_request("FyersService", "login", {}, user_id)
         try:
-            logger.info("Fetching FYERS user profile")
-            
-            # Use FYERS API client if available
-            if self.fyers_client:
-                try:
-                    response = self.fyers_client.get_profile()
-                    logger.info("FYERS profile fetched successfully using fyers-apiv3")
-                    return response
-                except Exception as e:
-                    logger.warning(f"fyers-apiv3 profile fetch failed, falling back to requests: {str(e)}")
-            
-            # Fallback to direct API call
-            url = f"{self.base_url}/profile"
-            response = self.session.get(url, params={'access_token': self.access_token})
-            if response.status_code == 200:
-                data = response.json()
-                logger.info("FYERS profile fetched successfully using requests")
-                return data
-            else:
-                error_msg = f'HTTP {response.status_code}: {response.text}'
-                logger.error(f"Error fetching FYERS profile: {error_msg}")
-                return {'error': error_msg}
+            api = self._get_api_instance(user_id)
+            result = api.login()
+            APILogger.log_response("FyersService", "login", result, user_id)
+            return result
         except Exception as e:
-            error_msg = str(e)
-            logger.error(f"Exception while fetching FYERS profile: {error_msg}")
-            return {'error': error_msg}
+            APILogger.log_error("FyersService", "login", e, {}, user_id)
+            raise
     
-    def get_funds(self) -> Dict[str, Any]:
-        """Get user funds."""
+    def placeorder(self, user_id: int, symbol: str, quantity: str, action: str,
+                   product: str, pricetype: str, price: str = "0",
+                   trigger_price: str = "0", disclosed_quantity: str = "0",
+                   validity: str = "DAY", tag: str = ""):
+        """Place order using standardized format."""
+        request_data = {
+            'symbol': symbol, 'quantity': quantity, 'action': action,
+            'product': product, 'pricetype': pricetype, 'price': price,
+            'trigger_price': trigger_price, 'disclosed_quantity': disclosed_quantity,
+            'validity': validity, 'tag': tag
+        }
+        
+        APILogger.log_request("FyersService", "placeorder", request_data, user_id)
         try:
-            logger.info("Fetching FYERS user funds")
-            
-            # Use FYERS API client if available
-            if self.fyers_client:
-                try:
-                    response = self.fyers_client.funds()
-                    logger.info("FYERS funds fetched successfully using fyers-apiv3")
-                    return response
-                except Exception as e:
-                    logger.warning(f"fyers-apiv3 funds fetch failed, falling back to requests: {str(e)}")
-            
-            # Fallback to direct API call
-            url = f"{self.base_url}/funds"
-            response = self.session.get(url, params={'access_token': self.access_token})
-            if response.status_code == 200:
-                data = response.json()
-                logger.info("FYERS funds fetched successfully using requests")
-                return data
-            else:
-                error_msg = f'HTTP {response.status_code}: {response.text}'
-                logger.error(f"Error fetching FYERS funds: {error_msg}")
-                return {'error': error_msg}
+            api = self._get_api_instance(user_id)
+            result = api.placeorder(
+                symbol=symbol, quantity=quantity, action=action,
+                product=product, pricetype=pricetype, price=price,
+                trigger_price=trigger_price, disclosed_quantity=disclosed_quantity,
+                validity=validity, tag=tag
+            )
+            APILogger.log_response("FyersService", "placeorder", result, user_id)
+            return result
         except Exception as e:
-            error_msg = str(e)
-            logger.error(f"Exception while fetching FYERS funds: {error_msg}")
-            return {'error': error_msg}
+            APILogger.log_error("FyersService", "placeorder", e, request_data, user_id)
+            raise
     
-    def get_holdings(self) -> Dict[str, Any]:
-        """Get user holdings."""
+    def modifyorder(self, user_id: int, orderid: str, symbol: str = "", 
+                    quantity: str = "", price: str = "", trigger_price: str = "",
+                    disclosed_quantity: str = "", validity: str = ""):
+        """Modify order using standardized format."""
+        request_data = {
+            'orderid': orderid, 'symbol': symbol, 'quantity': quantity,
+            'price': price, 'trigger_price': trigger_price,
+            'disclosed_quantity': disclosed_quantity, 'validity': validity
+        }
+        
+        APILogger.log_request("FyersService", "modifyorder", request_data, user_id)
         try:
-            logger.info("Fetching FYERS user holdings")
-            
-            # Use FYERS API client if available
-            if self.fyers_client:
-                try:
-                    response = self.fyers_client.holdings()
-                    logger.info("FYERS holdings fetched successfully using fyers-apiv3")
-                    return response
-                except Exception as e:
-                    logger.warning(f"fyers-apiv3 holdings fetch failed, falling back to requests: {str(e)}")
-            
-            # Fallback to direct API call
-            url = f"{self.base_url}/holdings"
-            response = self.session.get(url, params={'access_token': self.access_token})
-            if response.status_code == 200:
-                data = response.json()
-                logger.info("FYERS holdings fetched successfully using requests")
-                return data
-            else:
-                error_msg = f'HTTP {response.status_code}: {response.text}'
-                logger.error(f"Error fetching FYERS holdings: {error_msg}")
-                return {'error': error_msg}
+            api = self._get_api_instance(user_id)
+            result = api.modifyorder(
+                orderid=orderid, symbol=symbol, quantity=quantity,
+                price=price, trigger_price=trigger_price,
+                disclosed_quantity=disclosed_quantity, validity=validity
+            )
+            APILogger.log_response("FyersService", "modifyorder", result, user_id)
+            return result
         except Exception as e:
-            error_msg = str(e)
-            logger.error(f"Exception while fetching FYERS holdings: {error_msg}")
-            return {'error': error_msg}
+            APILogger.log_error("FyersService", "modifyorder", e, request_data, user_id)
+            raise
     
-    def get_positions(self) -> Dict[str, Any]:
-        """Get user positions."""
+    def cancelorder(self, user_id: int, orderid: str):
+        """Cancel order using standardized format."""
+        request_data = {'orderid': orderid}
+        
+        APILogger.log_request("FyersService", "cancelorder", request_data, user_id)
         try:
-            logger.info("Fetching FYERS user positions")
-            
-            # Use FYERS API client if available
-            if self.fyers_client:
-                try:
-                    response = self.fyers_client.positions()
-                    logger.info("FYERS positions fetched successfully using fyers-apiv3")
-                    return response
-                except Exception as e:
-                    logger.warning(f"fyers-apiv3 positions fetch failed, falling back to requests: {str(e)}")
-            
-            # Fallback to direct API call
-            url = f"{self.base_url}/positions"
-            response = self.session.get(url, params={'access_token': self.access_token})
-            if response.status_code == 200:
-                data = response.json()
-                logger.info("FYERS positions fetched successfully using requests")
-                return data
-            else:
-                error_msg = f'HTTP {response.status_code}: {response.text}'
-                logger.error(f"Error fetching FYERS positions: {error_msg}")
-                return {'error': error_msg}
+            api = self._get_api_instance(user_id)
+            result = api.cancelorder(orderid=orderid)
+            APILogger.log_response("FyersService", "cancelorder", result, user_id)
+            return result
         except Exception as e:
-            error_msg = str(e)
-            logger.error(f"Exception while fetching FYERS positions: {error_msg}")
-            return {'error': error_msg}
+            APILogger.log_error("FyersService", "cancelorder", e, request_data, user_id)
+            raise
     
-    def get_tradebook(self) -> Dict[str, Any]:
-        """Get user tradebook."""
+    def placesmartorder(self, user_id: int, symbol: str, action: str, product: str,
+                       quantity: str = "", position_size: str = "", price: str = "0",
+                       trigger_price: str = "0", pricetype: str = "MARKET",
+                       strategy: str = "", tag: str = ""):
+        """Place smart order using standardized format."""
+        request_data = {
+            'symbol': symbol, 'action': action, 'product': product,
+            'quantity': quantity, 'position_size': position_size,
+            'price': price, 'trigger_price': trigger_price,
+            'pricetype': pricetype, 'strategy': strategy, 'tag': tag
+        }
+        
+        APILogger.log_request("FyersService", "placesmartorder", request_data, user_id)
         try:
-            logger.info("Fetching FYERS user tradebook")
-            
-            # Use FYERS API client if available
-            if self.fyers_client:
-                try:
-                    response = self.fyers_client.tradebook()
-                    logger.info("FYERS tradebook fetched successfully using fyers-apiv3")
-                    return response
-                except Exception as e:
-                    logger.warning(f"fyers-apiv3 tradebook fetch failed, falling back to requests: {str(e)}")
-            
-            # Fallback to direct API call
-            url = f"{self.base_url}/tradebook"
-            response = self.session.get(url, params={'access_token': self.access_token})
-            if response.status_code == 200:
-                data = response.json()
-                logger.info("FYERS tradebook fetched successfully using requests")
-                return data
-            else:
-                error_msg = f'HTTP {response.status_code}: {response.text}'
-                logger.error(f"Error fetching FYERS tradebook: {error_msg}")
-                return {'error': error_msg}
+            api = self._get_api_instance(user_id)
+            result = api.placesmartorder(
+                symbol=symbol, action=action, product=product,
+                quantity=quantity, position_size=position_size,
+                price=price, trigger_price=trigger_price,
+                pricetype=pricetype, strategy=strategy, tag=tag
+            )
+            APILogger.log_response("FyersService", "placesmartorder", result, user_id)
+            return result
         except Exception as e:
-            error_msg = str(e)
-            logger.error(f"Exception while fetching FYERS tradebook: {error_msg}")
-            return {'error': error_msg}
+            APILogger.log_error("FyersService", "placesmartorder", e, request_data, user_id)
+            raise
     
-    def get_orderbook(self) -> Dict[str, Any]:
-        """Get user orderbook."""
+    def orderbook(self, user_id: int):
+        """Get orderbook using standardized format."""
+        APILogger.log_request("FyersService", "orderbook", {}, user_id)
         try:
-            logger.info("Fetching FYERS user orderbook")
-            
-            # Use FYERS API client if available
-            if self.fyers_client:
-                try:
-                    response = self.fyers_client.orderbook()
-                    logger.info("FYERS orderbook fetched successfully using fyers-apiv3")
-                    return response
-                except Exception as e:
-                    logger.warning(f"fyers-apiv3 orderbook fetch failed, falling back to requests: {str(e)}")
-            
-            # Fallback to direct API call
-            url = f"{self.base_url}/orderbook"
-            response = self.session.get(url, params={'access_token': self.access_token})
-            if response.status_code == 200:
-                data = response.json()
-                logger.info("FYERS orderbook fetched successfully using requests")
-                return data
-            else:
-                error_msg = f'HTTP {response.status_code}: {response.text}'
-                logger.error(f"Error fetching FYERS orderbook: {error_msg}")
-                return {'error': error_msg}
+            api = self._get_api_instance(user_id)
+            result = api.orderbook()
+            APILogger.log_response("FyersService", "orderbook", result, user_id)
+            return result
         except Exception as e:
-            error_msg = str(e)
-            logger.error(f"Exception while fetching FYERS orderbook: {error_msg}")
-            return {'error': error_msg}
+            APILogger.log_error("FyersService", "orderbook", e, {}, user_id)
+            raise
     
-    def get_quotes(self, symbols: str) -> Dict[str, Any]:
-        """Get market quotes for symbols."""
+    def tradebook(self, user_id: int):
+        """Get tradebook using standardized format."""
+        APILogger.log_request("FyersService", "tradebook", {}, user_id)
         try:
-            logger.info(f"Fetching FYERS quotes for symbols: {symbols}")
-            
-            # Use FYERS API client if available
-            if self.fyers_client:
-                try:
-                    data = {"symbols": symbols}
-                    response = self.fyers_client.quotes(data)
-                    logger.info("FYERS quotes fetched successfully using fyers-apiv3")
-                    return response
-                except Exception as e:
-                    logger.warning(f"fyers-apiv3 quotes fetch failed, falling back to requests: {str(e)}")
-            
-            # Fallback to direct API call
-            url = f"{self.base_url}/quotes"
-            params = {'symbols': symbols, 'access_token': self.access_token}
-            response = self.session.get(url, params=params)
-            if response.status_code == 200:
-                data = response.json()
-                logger.info("FYERS quotes fetched successfully using requests")
-                return data
-            else:
-                error_msg = f'HTTP {response.status_code}: {response.text}'
-                logger.error(f"Error fetching FYERS quotes: {error_msg}")
-                return {'error': error_msg}
+            api = self._get_api_instance(user_id)
+            result = api.tradebook()
+            APILogger.log_response("FyersService", "tradebook", result, user_id)
+            return result
         except Exception as e:
-            error_msg = str(e)
-            logger.error(f"Exception while fetching FYERS quotes: {error_msg}")
-            return {'error': error_msg}
+            APILogger.log_error("FyersService", "tradebook", e, {}, user_id)
+            raise
     
-    def get_history(self, symbol: str, resolution: str = "D", range_from: str = None, range_to: str = None) -> Dict[str, Any]:
-        """Get historical data for a symbol."""
+    def positions(self, user_id: int):
+        """Get positions using standardized format."""
+        APILogger.log_request("FyersService", "positions", {}, user_id)
         try:
-            logger.info(f"Fetching FYERS historical data for symbol: {symbol}")
-            
-            # Use FYERS API client if available
-            if self.fyers_client:
-                try:
-                    data = {
-                        "symbol": symbol,
-                        "resolution": resolution,
-                        "date_format": "0",
-                        "range_from": range_from or "1622097600",
-                        "range_to": range_to or "1622097685",
-                        "cont_flag": "1"
-                    }
-                    response = self.fyers_client.history(data)
-                    logger.info("FYERS historical data fetched successfully using fyers-apiv3")
-                    return response
-                except Exception as e:
-                    logger.warning(f"fyers-apiv3 historical data fetch failed, falling back to requests: {str(e)}")
-            
-            # Fallback to direct API call
-            url = f"{self.base_url}/history"
-            params = {
-                'symbol': symbol,
-                'resolution': resolution,
-                'date_format': '0',
-                'range_from': range_from or '1622097600',
-                'range_to': range_to or '1622097685',
-                'cont_flag': '1',
-                'access_token': self.access_token
-            }
-            response = self.session.get(url, params=params)
-            if response.status_code == 200:
-                data = response.json()
-                logger.info("FYERS historical data fetched successfully using requests")
-                return data
-            else:
-                error_msg = f'HTTP {response.status_code}: {response.text}'
-                logger.error(f"Error fetching FYERS historical data: {error_msg}")
-                return {'error': error_msg}
+            api = self._get_api_instance(user_id)
+            result = api.positions()
+            APILogger.log_response("FyersService", "positions", result, user_id)
+            return result
         except Exception as e:
-            error_msg = str(e)
-            logger.error(f"Exception while fetching FYERS historical data: {error_msg}")
-            return {'error': error_msg}
+            APILogger.log_error("FyersService", "positions", e, {}, user_id)
+            raise
+    
+    def holdings(self, user_id: int):
+        """Get holdings using standardized format."""
+        APILogger.log_request("FyersService", "holdings", {}, user_id)
+        try:
+            api = self._get_api_instance(user_id)
+            result = api.holdings()
+            APILogger.log_response("FyersService", "holdings", result, user_id)
+            return result
+        except Exception as e:
+            APILogger.log_error("FyersService", "holdings", e, {}, user_id)
+            raise
+    
+    def funds(self, user_id: int):
+        """Get funds using standardized format."""
+        APILogger.log_request("FyersService", "funds", {}, user_id)
+        try:
+            api = self._get_api_instance(user_id)
+            result = api.funds()
+            APILogger.log_response("FyersService", "funds", result, user_id)
+            return result
+        except Exception as e:
+            APILogger.log_error("FyersService", "funds", e, {}, user_id)
+            raise
+    
+    def quotes(self, user_id: int, symbol: str, exchange: str = ""):
+        """Get quotes using standardized format."""
+        request_data = {'symbol': symbol, 'exchange': exchange}
+        
+        APILogger.log_request("FyersService", "quotes", request_data, user_id)
+        try:
+            api = self._get_api_instance(user_id)
+            result = api.quotes(symbol=symbol, exchange=exchange)
+            APILogger.log_response("FyersService", "quotes", result, user_id)
+            return result
+        except Exception as e:
+            APILogger.log_error("FyersService", "quotes", e, request_data, user_id)
+            raise
+    
+    def depth(self, user_id: int, symbol: str, exchange: str = ""):
+        """Get market depth using standardized format."""
+        request_data = {'symbol': symbol, 'exchange': exchange}
+        
+        APILogger.log_request("FyersService", "depth", request_data, user_id)
+        try:
+            api = self._get_api_instance(user_id)
+            result = api.depth(symbol=symbol, exchange=exchange)
+            APILogger.log_response("FyersService", "depth", result, user_id)
+            return result
+        except Exception as e:
+            APILogger.log_error("FyersService", "depth", e, request_data, user_id)
+            raise
+    
+    def history(self, user_id: int, symbol: str, exchange: str, interval: str,
+                start_date: str, end_date: str):
+        """Get historical data using standardized format."""
+        request_data = {
+            'symbol': symbol, 'exchange': exchange, 'interval': interval,
+            'start_date': start_date, 'end_date': end_date
+        }
+        
+        APILogger.log_request("FyersService", "history", request_data, user_id)
+        try:
+            api = self._get_api_instance(user_id)
+            result = api.history(
+                symbol=symbol, exchange=exchange, interval=interval,
+                start_date=start_date, end_date=end_date
+            )
+            APILogger.log_response("FyersService", "history", result, user_id)
+            return result
+        except Exception as e:
+            APILogger.log_error("FyersService", "history", e, request_data, user_id)
+            raise
+    
+    def search(self, user_id: int, symbol: str, exchange: str = ""):
+        """Search symbols using standardized format."""
+        request_data = {'symbol': symbol, 'exchange': exchange}
+        
+        APILogger.log_request("FyersService", "search", request_data, user_id)
+        try:
+            api = self._get_api_instance(user_id)
+            result = api.search(symbol=symbol, exchange=exchange)
+            APILogger.log_response("FyersService", "search", result, user_id)
+            return result
+        except Exception as e:
+            APILogger.log_error("FyersService", "search", e, request_data, user_id)
+            raise
+    
+    # Legacy compatibility methods (for backward compatibility)
+    def get_funds(self, user_id: int):
+        """Legacy method - redirects to standardized format."""
+        return self.funds(user_id)
+    
+    def get_holdings(self, user_id: int):
+        """Legacy method - redirects to standardized format."""
+        return self.holdings(user_id)
+    
+    def get_positions(self, user_id: int):
+        """Legacy method - redirects to standardized format."""
+        return self.positions(user_id)
+    
+    def get_orderbook(self, user_id: int):
+        """Legacy method - redirects to standardized format."""
+        return self.orderbook(user_id)
+    
+    def get_tradebook(self, user_id: int):
+        """Legacy method - redirects to standardized format."""
+        return self.tradebook(user_id)
+    
+    def get_quotes(self, user_id: int, symbols: str):
+        """Legacy method - redirects to standardized format."""
+        # Handle multiple symbols (legacy format)
+        if ',' in symbols:
+            symbol = symbols.split(',')[0]  # Take first symbol for now
+        else:
+            symbol = symbols
+        
+        return self.quotes(user_id, symbol)
+    
+    def get_history(self, user_id: int, symbol: str, resolution: str, 
+                    range_from: str, range_to: str):
+        """Legacy method - redirects to standardized format."""
+        # Map legacy parameters to standard format
+        exchange = "NSE"  # Default
+        if ":" in symbol:
+            exchange = symbol.split(":")[0]
+        
+        return self.history(user_id, symbol, exchange, resolution, range_from, range_to)
+    
+    def get_profile(self, user_id: int):
+        """Legacy method - redirects to login."""
+        return self.login(user_id)
 
+
+# Global service instance
+_fyers_service = None
 
 def get_fyers_service() -> FyersService:
-    """Get FYERS service instance."""
-    return FyersService()
+    """Get the global Fyers service instance."""
+    global _fyers_service
+    if _fyers_service is None:
+        _fyers_service = FyersService()
+    return _fyers_service

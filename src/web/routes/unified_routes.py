@@ -662,7 +662,7 @@ def api_get_holdings():
                 'error': 'No portfolio provider available for your selected broker'
             }), 400
         
-        result = provider.get_holdings(current_user.id)
+        result = provider.holdings(current_user.id)
         return jsonify(result)
         
     except Exception as e:
@@ -687,7 +687,7 @@ def api_get_positions():
                 'error': 'No portfolio provider available for your selected broker'
             }), 400
         
-        result = provider.get_positions(current_user.id)
+        result = provider.positions(current_user.id)
         return jsonify(result)
         
     except Exception as e:

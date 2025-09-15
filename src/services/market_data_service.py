@@ -62,7 +62,7 @@ class MarketDataService:
             
             try:
                 # Get batch quotes for all indices
-                quotes_data = self.fyers_connector.get_quotes(symbols_str)
+                quotes_data = self.fyers_connector.quotes(symbols_str)
 
                 # Support multiple possible payload shapes from FYERS
                 payload = None

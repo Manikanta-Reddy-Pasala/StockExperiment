@@ -73,32 +73,32 @@ class ZerodhaService:
     def get_funds(self, user_id: int):
         """Get user funds."""
         connector = self._get_kite_connector(user_id)
-        return connector.get_funds()
+        return connector.funds()
 
     def get_holdings(self, user_id: int):
         """Get user holdings."""
         connector = self._get_kite_connector(user_id)
-        return connector.get_holdings()
+        return connector.holdings()
 
     def get_positions(self, user_id: int):
         """Get user positions."""
         connector = self._get_kite_connector(user_id)
-        return connector.get_positions()
+        return connector.positions()
 
     def get_orderbook(self, user_id: int):
         """Get user orderbook."""
         connector = self._get_kite_connector(user_id)
-        return connector.get_orderbook()
+        return connector.orderbook()
 
     def get_tradebook(self, user_id: int):
         """Get user tradebook."""
         connector = self._get_kite_connector(user_id)
-        return connector.get_tradebook()
+        return connector.tradebook()
 
     def get_quotes(self, user_id: int, symbols: str):
         """Get market quotes for symbols."""
         connector = self._get_kite_connector(user_id)
-        return connector.get_quotes(symbols)
+        return connector.quotes(symbols)
 
     def get_instruments(self, user_id: int, exchange: str = None):
         """Get instruments list."""
@@ -108,7 +108,7 @@ class ZerodhaService:
     def get_profile(self, user_id: int):
         """Get user profile."""
         connector = self._get_kite_connector(user_id)
-        return connector.get_profile()
+        return connector.login()
     
     def get_broker_config(self, user_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
         """Get Zerodha broker configuration from database."""

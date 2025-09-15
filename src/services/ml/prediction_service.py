@@ -28,10 +28,12 @@ def get_prediction(symbol: str, user_id: int = 1):
         rf_model = load_model(f"{symbol}_rf")
         xgb_model = load_model(f"{symbol}_xgb")
         lstm_model = load_lstm_model(f"{symbol}_lstm")
-
-    # Load the two scalers for the LSTM model
-    feature_scaler = load_scaler(f"{symbol}_lstm_feature")
-    target_scaler = load_scaler(f"{symbol}_lstm_target")
+        
+        # Load the two scalers for the LSTM model
+        feature_scaler = load_scaler(f"{symbol}_lstm_feature")
+        target_scaler = load_scaler(f"{symbol}_lstm_target")
+    except Exception as e:
+        raise RuntimeError(f"Error loading models or scalers for {symbol}: {e}")
 
     if not all([rf_model, xgb_model, lstm_model, feature_scaler, target_scaler]):
         raise FileNotFoundError(f"Models or scalers for symbol {symbol} not found. Please train them first.")

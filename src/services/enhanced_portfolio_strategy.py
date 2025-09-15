@@ -228,7 +228,7 @@ class EnhancedPortfolioStrategy:
         
         # Initialize services
         self.broker_service = get_broker_service()
-        self.fyers_api = FyersAPIService()
+        self.fyers_api = get_fyers_service()
         self.cache_service = CacheService()
         
         # Strategy configuration

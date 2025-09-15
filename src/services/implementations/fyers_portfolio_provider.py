@@ -17,13 +17,13 @@ class FyersPortfolioProvider(IPortfolioProvider):
     """Enhanced FYERS implementation of portfolio provider with search and sort."""
     
     def __init__(self):
-        self.fyers_api = get_fyers_api_service()
+        self.fyers_api = get_fyers_service()
     
     def get_holdings(self, user_id: int, search: str = None, sort_by: str = None,
                     sort_order: str = 'desc', filters: Dict[str, Any] = None) -> Dict[str, Any]:
         """Get current holdings with advanced search, sort, and filter capabilities."""
         try:
-            holdings_response = self.fyers_api.get_holdings(
+            holdings_response = self.fyers_api.holdings(
                 user_id=user_id,
                 search=search,
                 sort_by=sort_by,
@@ -94,7 +94,7 @@ class FyersPortfolioProvider(IPortfolioProvider):
                      sort_order: str = 'desc', filters: Dict[str, Any] = None) -> Dict[str, Any]:
         """Get current positions with advanced search, sort, and filter capabilities."""
         try:
-            positions_response = self.fyers_api.get_positions(
+            positions_response = self.fyers_api.positions(
                 user_id=user_id,
                 search=search,
                 sort_by=sort_by,
@@ -208,7 +208,7 @@ class FyersPortfolioProvider(IPortfolioProvider):
     def get_portfolio_allocation(self, user_id: int, allocation_type: str = 'sector') -> Dict[str, Any]:
         """Get portfolio allocation breakdown by sector, market cap, or asset class."""
         try:
-            holdings_response = self.get_holdings(user_id)
+            holdings_response = self.holdings(user_id)
             
             if not holdings_response.get('success'):
                 return {
@@ -329,7 +329,7 @@ class FyersPortfolioProvider(IPortfolioProvider):
             # This would need to be implemented using external data sources
             # For now, providing a placeholder structure
             
-            holdings_response = self.get_holdings(user_id)
+            holdings_response = self.holdings(user_id)
             
             if not holdings_response.get('success'):
                 return {
@@ -386,8 +386,8 @@ class FyersPortfolioProvider(IPortfolioProvider):
     def get_portfolio_risk_metrics(self, user_id: int) -> Dict[str, Any]:
         """Get comprehensive portfolio risk analysis."""
         try:
-            holdings_response = self.get_holdings(user_id)
-            positions_response = self.get_positions(user_id)
+            holdings_response = self.holdings(user_id)
+            positions_response = self.positions(user_id)
             
             if not holdings_response.get('success'):
                 return {
@@ -634,7 +634,7 @@ class FyersPortfolioProvider(IPortfolioProvider):
         """Compare portfolio performance with benchmarks."""
         # Get benchmark data (NIFTY 50 as primary benchmark)
         try:
-            benchmark_response = self.fyers_api.get_quotes(user_id, 'NSE:NIFTY50-INDEX')
+            benchmark_response = self.fyers_api.quotes(user_id, 'NSE:NIFTY50-INDEX')
             
             benchmark_return = 0
             if benchmark_response.get('success'):

@@ -180,7 +180,7 @@ def api_get_fyers_funds():
     """Get FYERS user funds."""
     try:
         fyers_service = get_fyers_service()
-        funds = fyers_service.get_funds(current_user.id)
+        funds = fyers_service.funds(current_user.id)
         return jsonify({'success': True, 'data': funds})
         
     except Exception as e:
@@ -193,7 +193,7 @@ def api_get_fyers_holdings():
     """Get FYERS user holdings."""
     try:
         fyers_service = get_fyers_service()
-        holdings = fyers_service.get_holdings(current_user.id)
+        holdings = fyers_service.holdings(current_user.id)
         return jsonify({'success': True, 'data': holdings})
         
     except Exception as e:
@@ -206,7 +206,7 @@ def api_get_fyers_positions():
     """Get FYERS user positions."""
     try:
         fyers_service = get_fyers_service()
-        positions = fyers_service.get_positions(current_user.id)
+        positions = fyers_service.positions(current_user.id)
         return jsonify({'success': True, 'data': positions})
         
     except Exception as e:
@@ -219,7 +219,7 @@ def api_get_fyers_orders():
     """Get FYERS user orders."""
     try:
         fyers_service = get_fyers_service()
-        orders = fyers_service.get_orderbook(current_user.id)
+        orders = fyers_service.orderbook(current_user.id)
         return jsonify({'success': True, 'data': orders})
         
     except Exception as e:
@@ -232,7 +232,7 @@ def api_get_fyers_trades():
     """Get FYERS user trades."""
     try:
         fyers_service = get_fyers_service()
-        trades = fyers_service.get_tradebook(current_user.id)
+        trades = fyers_service.tradebook(current_user.id)
         return jsonify({'success': True, 'data': trades})
         
     except Exception as e:
@@ -249,7 +249,7 @@ def api_get_fyers_quotes():
             return jsonify({'success': False, 'error': 'Symbols parameter required'}), 400
             
         fyers_service = get_fyers_service()
-        quotes = fyers_service.get_quotes(current_user.id, symbols)
+        quotes = fyers_service.quotes(current_user.id, symbols)
         return jsonify({'success': True, 'data': quotes})
         
     except Exception as e:
@@ -262,7 +262,7 @@ def api_get_fyers_profile():
     """Get FYERS user profile."""
     try:
         fyers_service = get_fyers_service()
-        profile = fyers_service.get_profile(current_user.id)
+        profile = fyers_service.login(current_user.id)
         return jsonify({'success': True, 'data': profile})
         
     except Exception as e:

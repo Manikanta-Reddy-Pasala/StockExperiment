@@ -17,7 +17,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
     """Enhanced FYERS implementation with full search and sort functionality."""
     
     def __init__(self):
-        self.fyers_api = get_fyers_api_service()
+        self.fyers_api = get_fyers_service()
     
     def get_suggested_stocks(self, user_id: int, strategies: List[StrategyType] = None, 
                            limit: int = 50, search: str = None, sort_by: str = None,
@@ -124,7 +124,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
             symbols = [result['symbol'] for result in search_results[:20]]  # Limit for quotes API
             
             if symbols:
-                quotes_response = self.fyers_api.get_quotes(user_id, symbols)
+                quotes_response = self.fyers_api.quotes(user_id, symbols)
                 quotes_data = quotes_response.get('data', {}) if quotes_response.get('success') else {}
                 
                 for result in search_results:
@@ -170,7 +170,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
         """Get comprehensive analysis for a specific stock."""
         try:
             # Get real-time quote
-            quotes_response = self.fyers_api.get_quotes(user_id, symbol)
+            quotes_response = self.fyers_api.quotes(user_id, symbol)
             
             # Get historical data for technical analysis
             historical_response = self.fyers_api.get_historical_data(
@@ -310,7 +310,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
             
             for sector, symbols in sector_stocks.items():
                 # Get quotes for sector stocks
-                quotes_response = self.fyers_api.get_quotes(user_id, symbols)
+                quotes_response = self.fyers_api.quotes(user_id, symbols)
                 
                 if quotes_response.get('success'):
                     quotes_data = quotes_response.get('data', {})

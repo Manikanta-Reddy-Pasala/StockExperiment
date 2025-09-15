@@ -25,7 +25,7 @@ from src.services.enhanced_portfolio_strategy import (
     EntryRules,
     ExitRules
 )
-from src.services.fyers_api_service import FyersAPIService
+from src.services.brokers.fyers_service import get_fyers_service
 from src.services.ml.prediction_service import get_prediction
 from src.config.settings import get_settings
 
@@ -47,7 +47,7 @@ class PortfolioManager:
         """Initialize the portfolio manager."""
         self.capital = capital
         self.strategy = EnhancedPortfolioStrategy(capital=capital)
-        self.fyers_api = FyersAPIService()
+        self.fyers_api = get_fyers_service()
         
         logger.info(f"Portfolio Manager initialized with capital: ₹{capital:,.2f}")
     

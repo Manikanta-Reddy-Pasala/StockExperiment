@@ -82,10 +82,10 @@ class DashboardIntegrationService:
                 }
             
             # Fetch data from broker
-            funds_data = broker.get_funds()
-            holdings_data = broker.get_holdings()
-            positions_data = broker.get_positions()
-            orderbook_data = broker.get_orderbook()
+            funds_data = broker.funds()
+            holdings_data = broker.holdings()
+            positions_data = broker.positions()
+            orderbook_data = broker.orderbook()
             
             # Calculate metrics
             total_pnl = self._calculate_total_pnl(positions_data, holdings_data)
@@ -124,8 +124,8 @@ class DashboardIntegrationService:
                     'data': []
                 }
             
-            holdings_data = broker.get_holdings()
-            positions_data = broker.get_positions()
+            holdings_data = broker.holdings()
+            positions_data = broker.positions()
             
             # Process and combine holdings and positions
             processed_holdings = self._process_holdings_data(holdings_data, positions_data)
@@ -156,7 +156,7 @@ class DashboardIntegrationService:
                     'data': []
                 }
             
-            orderbook_data = broker.get_orderbook()
+            orderbook_data = broker.orderbook()
             processed_orders = self._process_orders_data(orderbook_data, status_filter='pending')
             
             return {
@@ -185,7 +185,7 @@ class DashboardIntegrationService:
                     'data': []
                 }
             
-            orderbook_data = broker.get_orderbook()
+            orderbook_data = broker.orderbook()
             processed_orders = self._process_orders_data(orderbook_data, limit=limit)
             
             return {

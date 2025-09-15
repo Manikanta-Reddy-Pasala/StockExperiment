@@ -124,7 +124,7 @@ def api_get_simulator_funds():
     """Get Simulator user funds."""
     try:
         simulator_service = get_simulator_service()
-        funds = simulator_service.get_funds(current_user.id)
+        funds = simulator_service.funds(current_user.id)
         return jsonify({'success': True, 'data': funds})
         
     except Exception as e:
@@ -137,7 +137,7 @@ def api_get_simulator_holdings():
     """Get Simulator user holdings."""
     try:
         simulator_service = get_simulator_service()
-        holdings = simulator_service.get_holdings(current_user.id)
+        holdings = simulator_service.holdings(current_user.id)
         return jsonify({'success': True, 'data': holdings})
         
     except Exception as e:
@@ -150,7 +150,7 @@ def api_get_simulator_positions():
     """Get Simulator user positions."""
     try:
         simulator_service = get_simulator_service()
-        positions = simulator_service.get_positions(current_user.id)
+        positions = simulator_service.positions(current_user.id)
         return jsonify({'success': True, 'data': positions})
         
     except Exception as e:
@@ -163,7 +163,7 @@ def api_get_simulator_orders():
     """Get Simulator user orders."""
     try:
         simulator_service = get_simulator_service()
-        orders = simulator_service.get_orderbook(current_user.id)
+        orders = simulator_service.orderbook(current_user.id)
         return jsonify({'success': True, 'data': orders})
         
     except Exception as e:
@@ -176,7 +176,7 @@ def api_get_simulator_trades():
     """Get Simulator user trades."""
     try:
         simulator_service = get_simulator_service()
-        trades = simulator_service.get_tradebook(current_user.id)
+        trades = simulator_service.tradebook(current_user.id)
         return jsonify({'success': True, 'data': trades})
         
     except Exception as e:
@@ -193,7 +193,7 @@ def api_get_simulator_quotes():
             return jsonify({'success': False, 'error': 'Symbols parameter required'}), 400
             
         simulator_service = get_simulator_service()
-        quotes = simulator_service.get_quotes(current_user.id, symbols)
+        quotes = simulator_service.quotes(current_user.id, symbols)
         return jsonify({'success': True, 'data': quotes})
         
     except Exception as e:
@@ -206,7 +206,7 @@ def api_get_simulator_profile():
     """Get Simulator user profile."""
     try:
         simulator_service = get_simulator_service()
-        profile = simulator_service.get_profile(current_user.id)
+        profile = simulator_service.login(current_user.id)
         return jsonify({'success': True, 'data': profile})
         
     except Exception as e:

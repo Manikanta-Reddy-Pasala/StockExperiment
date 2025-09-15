@@ -186,14 +186,14 @@ class UnifiedBrokerService:
         provider = self.factory.get_portfolio_provider(user_id)
         if not provider:
             return self._no_provider_error('portfolio')
-        return provider.get_holdings(user_id)
+        return provider.holdings(user_id)
     
     def get_positions(self, user_id: int) -> Dict[str, Any]:
         """Get positions using user's selected broker."""
         provider = self.factory.get_portfolio_provider(user_id)
         if not provider:
             return self._no_provider_error('portfolio')
-        return provider.get_positions(user_id)
+        return provider.positions(user_id)
     
     def get_portfolio_allocation(self, user_id: int) -> Dict[str, Any]:
         """Get portfolio allocation using user's selected broker."""
