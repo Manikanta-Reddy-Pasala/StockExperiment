@@ -3,6 +3,16 @@
 {% block title %}FYERS Broker{% endblock %}
 
 {% block content %}
+<style>
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+</style>
 <div class="row g-4">
     <div class="col-12">
         <div class="card hover-lift animate-fade-in-up">
@@ -75,9 +85,14 @@
                     <div class="col-lg-6 mb-4">
                         <div class="card h-100 broker-stats-card">
                             <div class="card-header bg-light">
-                                <h6 class="card-title mb-0">
-                                    <i class="bi bi-graph-up me-2"></i>FYERS Statistics
-                                </h6>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6 class="card-title mb-0">
+                                        <i class="bi bi-graph-up me-2"></i>FYERS Statistics
+                                    </h6>
+                                    <button class="btn btn-outline-primary btn-sm" id="refresh-stats">
+                                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                                    </button>
+                                </div>
                             </div>
                             <div class="card-body">
                                 <div class="row text-center">
@@ -447,6 +462,47 @@
         }
     }
 
+    // Refresh detailed statistics
+    async function refreshDetailedStats() {
+        const refreshBtn = document.getElementById('refresh-stats');
+        const originalText = refreshBtn.innerHTML;
+        
+        try {
+            refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Loading...';
+            refreshBtn.disabled = true;
+            
+            const response = await fetch('/brokers/fyers/api/stats/detailed', {
+                credentials: 'same-origin'
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.stats) {
+                    // Update statistics with detailed data
+                    document.getElementById('total-orders').textContent = data.stats.total_orders || 0;
+                    document.getElementById('successful-orders').textContent = data.stats.successful_orders || 0;
+                    document.getElementById('pending-orders').textContent = data.stats.pending_orders || 0;
+                    document.getElementById('failed-orders').textContent = data.stats.failed_orders || 0;
+                    document.getElementById('last-order-time').textContent = data.stats.last_order_time || '-';
+                    document.getElementById('api-response-time').textContent = data.stats.api_response_time || '-';
+                    
+                    // Show success message
+                    showNotification('Statistics refreshed successfully!', 'success');
+                } else {
+                    showNotification('Failed to refresh statistics', 'error');
+                }
+            } else {
+                showNotification('Failed to refresh statistics', 'error');
+            }
+        } catch (error) {
+            console.error('Error refreshing detailed stats:', error);
+            showNotification('Error refreshing statistics', 'error');
+        } finally {
+            refreshBtn.innerHTML = originalText;
+            refreshBtn.disabled = false;
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         fetchFyersInfo();
         
@@ -459,7 +515,10 @@
             document.getElementById('refresh-fyers-token').click();
         });
         
-        // Refresh data every 30 seconds
+        // Refresh stats button
+        document.getElementById('refresh-stats').addEventListener('click', refreshDetailedStats);
+        
+        // Refresh data every 30 seconds (but not the detailed stats)
         setInterval(function() {
             // Only refresh if the page is visible to avoid unnecessary API calls
             if (!document.hidden) {

@@ -335,3 +335,16 @@ def api_invalidate_token_cache():
     except Exception as e:
         logger.error(f"Error invalidating token cache for user {current_user.id}: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@fyers_bp.route('/api/stats/detailed', methods=['GET'])
+@login_required
+def api_get_detailed_stats():
+    """Get detailed broker statistics with actual API calls."""
+    try:
+        fyers_service = get_fyers_service()
+        stats = fyers_service.get_detailed_broker_stats(current_user.id)
+        return jsonify({'success': True, 'stats': stats})
+        
+    except Exception as e:
+        logger.error(f"Error getting detailed FYERS stats for user {current_user.id}: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
