@@ -352,25 +352,11 @@ def api_strategy_backtest():
         if not data:
             return jsonify({'success': False, 'error': 'Request data is required'}), 400
         
-        # Mock backtest results for now
-        mock_results = {
-            'success': True,
-            'backtest_results': {
-                'period': f"{data.get('start_date', '2024-01-01')} to {data.get('end_date', '2024-12-31')}",
-                'risk_bucket': data.get('risk_bucket', 'safe'),
-                'initial_capital': data.get('initial_capital', 100000),
-                'final_value': data.get('initial_capital', 100000) * 1.15,  # 15% return
-                'total_return': '15.0%',
-                'max_drawdown': '-8.5%',
-                'sharpe_ratio': 1.2,
-                'total_trades': 45,
-                'win_rate': '67%',
-                'avg_holding_period': '8.5 days',
-                'note': 'Backtest feature coming soon - this is mock data'
-            }
-        }
-        
-        return jsonify(mock_results)
+        # Not implemented yet – avoid returning mock data
+        return jsonify({
+            'success': False,
+            'error': 'Backtest is not implemented yet. Please check back later.'
+        }), 501
         
     except Exception as e:
         current_app.logger.error(f"Error in strategy backtest: {e}")

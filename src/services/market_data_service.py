@@ -45,8 +45,14 @@ class MarketDataService:
         try:
             # Initialize FYERS connector
             if not self._initialize_fyers_connector(user_id):
-                logger.warning("FYERS connector not available, using mock data for market overview")
-                return self._get_mock_market_data()
+                logger.warning("FYERS connector not available for market overview")
+                return {
+                    'success': False,
+                    'error': 'FYERS connection not available. Please configure and connect your broker.',
+                    'data': {},
+                    'timestamp': datetime.now().isoformat(),
+                    'source': 'unavailable'
+                }
             
             market_data = {}
             
@@ -77,10 +83,7 @@ class MarketDataService:
                                 if index_name:
                                     market_data[index_name] = self._extract_index_data(quote)
                 
-                # Fill in any missing data with mock data
-                for index_name in self.market_indices.keys():
-                    if index_name not in market_data:
-                        market_data[index_name] = self._get_mock_index_data(index_name)
+                # Do not fill missing data with mock values; return only what was fetched
                 
                 logger.info("Market overview data fetched successfully from Fyers API")
                 return {
@@ -92,11 +95,23 @@ class MarketDataService:
                 
             except Exception as e:
                 logger.error(f"Error fetching market data from Fyers API: {e}")
-                return self._get_mock_market_data()
+                return {
+                    'success': False,
+                    'error': 'Failed to fetch market data from FYERS',
+                    'data': {},
+                    'timestamp': datetime.now().isoformat(),
+                    'source': 'error'
+                }
                 
         except Exception as e:
             logger.error(f"Error in get_market_overview: {e}")
-            return self._get_mock_market_data()
+            return {
+                'success': False,
+                'error': 'Unexpected error while fetching market overview',
+                'data': {},
+                'timestamp': datetime.now().isoformat(),
+                'source': 'error'
+            }
     
     def _get_index_name_from_symbol(self, symbol: str) -> Optional[str]:
         """Get index name from Fyers symbol."""
