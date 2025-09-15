@@ -21,6 +21,7 @@ class FyersDashboardProvider(IDashboardProvider):
     
     def get_market_overview(self, user_id: int) -> Dict[str, Any]:
         """Get market overview data for major indices using FYERS API."""
+        print(f"DEBUG: FyersDashboardProvider.get_market_overview called for user {user_id}")
         try:
             # Major Indian indices symbols
             indices_symbols = [
@@ -32,8 +33,10 @@ class FyersDashboardProvider(IDashboardProvider):
                 'NSE:NIFTYAUTO-INDEX'
             ]
             
+            print(f"DEBUG: Fetching quotes for symbols: {indices_symbols}")
             # Get quotes for indices using FYERS service
             quotes_response = self.fyers_service.quotes_multiple(user_id, indices_symbols)
+            print(f"DEBUG: quotes_response: {quotes_response}")
             
             if quotes_response.get('status') != 'success':
                 return {

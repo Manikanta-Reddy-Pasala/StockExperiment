@@ -513,8 +513,11 @@
     
     // Fetch market overview data
     async function fetchMarketOverview() {
+        console.log('DEBUG: fetchMarketOverview called');
         try {
+            console.log('DEBUG: Making request to /api/market/overview');
             const response = await fetch('/api/market/overview');
+            console.log('DEBUG: Response received:', response.status);
             const result = await response.json();
             console.debug('MarketOverview API result:', result);
             

@@ -35,39 +35,54 @@ class MarketDataService:
     
     def _initialize_fyers_connector(self, user_id: int = 1):
         """Initialize FYERS connector for API calls."""
+        print(f"DEBUG: _initialize_fyers_connector called for user {user_id}")
         try:
             if self.broker_service:
+                print("DEBUG: broker_service is available")
                 config = self.broker_service.get_broker_config('fyers', user_id)
+                print(f"DEBUG: config retrieved: {config}")
                 logger.info(f"FYERS config for user {user_id}: {config}")
                 
                 # Check if we have the required credentials (don't require is_connected to be True)
                 client_id = config.get('client_id') if config else None
                 access_token = config.get('access_token') if config else None
                 
+                print(f"DEBUG: client_id={client_id}, access_token length={len(access_token) if access_token else 0}")
                 logger.info(f"FYERS credential check: config={bool(config)}, client_id={bool(client_id)}, access_token={bool(access_token)}")
                 logger.info(f"FYERS client_id value: {client_id}")
                 logger.info(f"FYERS access_token length: {len(access_token) if access_token else 0}")
                 
                 if config and client_id and access_token:
+                    print("DEBUG: All credentials found, initializing connector")
                     logger.info("FYERS credentials found, initializing connector")
                     from ..broker_service import FyersAPIConnector
                     self.fyers_connector = FyersAPIConnector(
                         client_id=client_id,
                         access_token=access_token
                     )
+                    print("DEBUG: FyersAPIConnector created successfully")
                     logger.info("FYERS connector initialized successfully")
                     return True
                 else:
+                    print(f"DEBUG: Missing credentials - config={bool(config)}, client_id={bool(client_id)}, access_token={bool(access_token)}")
                     logger.warning(f"FYERS credentials missing: config={bool(config)}, client_id={bool(client_id)}, access_token={bool(access_token)}")
+            else:
+                print("DEBUG: broker_service is None")
         except Exception as e:
+            print(f"DEBUG: Exception in _initialize_fyers_connector: {e}")
             logger.error(f"Error initializing FYERS connector: {e}")
+        print("DEBUG: _initialize_fyers_connector returning False")
         return False
     
     def get_market_overview(self, user_id: int = 1) -> Dict[str, Any]:
         """Get market overview data for all major indices."""
+        print(f"DEBUG: MarketDataService.get_market_overview called for user {user_id}")
+        print(f"DEBUG: broker_service: {self.broker_service}")
         try:
             # Initialize FYERS connector
+            print("DEBUG: Calling _initialize_fyers_connector")
             if not self._initialize_fyers_connector(user_id):
+                print("DEBUG: _initialize_fyers_connector returned False")
                 logger.warning("FYERS connector not available for market overview")
                 return {
                     'success': False,

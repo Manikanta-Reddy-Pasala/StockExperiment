@@ -372,15 +372,21 @@ class FyersService:
     
     def quotes_multiple(self, user_id: int, symbols: list):
         """Get quotes for multiple symbols using standardized format."""
+        print(f"DEBUG: FyersService.quotes_multiple called for user {user_id} with symbols: {symbols}")
         request_data = {'symbols': symbols}
         
         APILogger.log_request("FyersService", "quotes_multiple", request_data, user_id)
         try:
+            print("DEBUG: Getting API instance")
             api = self._get_api_instance(user_id)
+            print(f"DEBUG: API instance: {api}")
+            print("DEBUG: Calling api.quotes_multiple")
             result = api.quotes_multiple(symbols)
+            print(f"DEBUG: api.quotes_multiple result: {result}")
             APILogger.log_response("FyersService", "quotes_multiple", result, user_id)
             return result
         except Exception as e:
+            print(f"DEBUG: Exception in quotes_multiple: {e}")
             APILogger.log_error("FyersService", "quotes_multiple", e, request_data, user_id)
             raise
     

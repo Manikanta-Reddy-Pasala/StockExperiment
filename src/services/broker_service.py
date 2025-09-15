@@ -34,10 +34,16 @@ class BrokerService:
 
     def _get_fyers_connector(self, user_id: int) -> 'FyersAPIConnector':
         """Helper to get an initialized FyersAPIConnector for a user."""
+        print(f"DEBUG: _get_fyers_connector called for user {user_id}")
         config = self.get_broker_config('fyers', user_id)
+        print(f"DEBUG: config retrieved: {config}")
         if not config or not config.get('client_id') or not config.get('access_token'):
+            print("DEBUG: Missing credentials, raising ValueError")
             raise ValueError('FYERS credentials not configured or access token missing.')
-        return FyersAPIConnector(config['client_id'], config['access_token'])
+        print("DEBUG: Creating FyersAPIConnector")
+        connector = FyersAPIConnector(config['client_id'], config['access_token'])
+        print(f"DEBUG: FyersAPIConnector created: {connector}")
+        return connector
 
     def test_fyers_connection(self, user_id: int):
         """Test FYERS broker connection."""
@@ -108,8 +114,18 @@ class BrokerService:
         return connector.holdings()
 
     def get_fyers_positions(self, user_id: int):
-        connector = self._get_fyers_connector(user_id)
-        return connector.positions()
+        print(f"DEBUG: get_fyers_positions called for user {user_id}")
+        try:
+            print("DEBUG: Getting FyersAPIConnector")
+            connector = self._get_fyers_connector(user_id)
+            print(f"DEBUG: Connector created: {connector}")
+            print("DEBUG: Calling connector.positions()")
+            result = connector.positions()
+            print(f"DEBUG: positions() result: {result}")
+            return result
+        except Exception as e:
+            print(f"DEBUG: Exception in get_fyers_positions: {e}")
+            return {'success': False, 'error': str(e)}
 
     def get_fyers_orderbook(self, user_id: int):
         connector = self._get_fyers_connector(user_id)
