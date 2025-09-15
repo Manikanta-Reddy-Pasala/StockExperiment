@@ -149,49 +149,7 @@ class MarketDataService:
             
         except Exception as e:
             logger.error(f"Error extracting index data: {e}")
-            return self._get_mock_index_data("UNKNOWN")
-    
-    def _get_mock_market_data(self) -> Dict[str, Any]:
-        """Get mock market data when Fyers API is not available."""
-        mock_data = {}
-        for index_name in self.market_indices.keys():
-            mock_data[index_name] = self._get_mock_index_data(index_name)
-        
-        return {
-            'success': True,
-            'data': mock_data,
-            'timestamp': datetime.now().isoformat(),
-            'source': 'mock_data'
-        }
-    
-    def _get_mock_index_data(self, index_name: str) -> Dict[str, Any]:
-        """Get mock data for a specific index."""
-        import random
-        
-        # Base prices for different indices
-        base_prices = {
-            'NIFTY 50': 19800,
-            'SENSEX': 66200,
-            'BANK NIFTY': 44500,
-            'NIFTY IT': 28400
-        }
-        
-        base_price = base_prices.get(index_name, 10000)
-        
-        # Generate realistic price and change
-        current_price = base_price + random.uniform(-200, 200)
-        change_percent = random.uniform(-2.0, 2.0)
-        is_positive = change_percent >= 0
-        
-        return {
-            'current_price': round(current_price, 2),
-            'change_percent': round(change_percent, 2),
-            'is_positive': is_positive,
-            'prev_close': round(current_price - (current_price * change_percent / 100), 2),
-            'high': round(current_price + random.uniform(0, 100), 2),
-            'low': round(current_price - random.uniform(0, 100), 2),
-            'volume': random.randint(1000000, 10000000)
-        }
+            return {}
 
 
 def get_market_data_service(broker_service=None) -> MarketDataService:

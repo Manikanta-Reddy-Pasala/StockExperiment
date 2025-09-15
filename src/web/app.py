@@ -55,6 +55,19 @@ def create_app():
     login_manager.login_view = 'login'
     login_manager.login_message = 'Please log in to access this page.'
     login_manager.login_message_category = 'info'
+
+    @login_manager.unauthorized_handler
+    def handle_unauthorized():
+        # Return JSON for API requests instead of redirecting to HTML
+        try:
+            path = request.path or ''
+            accepts_json = 'application/json' in (request.headers.get('Accept') or '')
+            is_api_request = path.startswith('/api') or '/api/' in path or path.startswith('/brokers/') and '/api/' in path
+            if is_api_request or accepts_json:
+                return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        except Exception:
+            pass
+        return redirect(url_for('login'))
     
     # Initialize Flask-Bcrypt
     bcrypt = Bcrypt(app)
