@@ -102,18 +102,32 @@ class RequestLoggerMiddleware:
             'timestamp': datetime.now().isoformat()
         }
         
-        # Try to get response data if it's JSON
+        # Try to get response data safely
         response_content = None
-        if response.is_json:
-            try:
-                response_content = response.get_json()
-            except Exception:
-                response_content = 'Invalid JSON response'
-        elif response.data and len(response.data) < 1000:  # Only log small responses
-            try:
-                response_content = response.data.decode('utf-8')
-            except Exception:
-                response_content = 'Binary data'
+        try:
+            if response.is_json:
+                try:
+                    response_content = response.get_json()
+                except Exception:
+                    response_content = 'Invalid JSON response'
+            elif hasattr(response, 'data') and response.data:
+                # Check if response is in direct passthrough mode
+                try:
+                    # Try to access data length first to detect passthrough mode
+                    data_length = len(response.data)
+                    if data_length < 1000:  # Only log small responses
+                        response_content = response.data.decode('utf-8')
+                    else:
+                        response_content = f'Large response ({data_length} bytes)'
+                except RuntimeError as e:
+                    if "direct passthrough mode" in str(e):
+                        response_content = 'Response data not accessible (direct passthrough mode)'
+                    else:
+                        response_content = f'Data access error: {str(e)}'
+                except Exception:
+                    response_content = 'Binary data'
+        except Exception as e:
+            response_content = f'Response logging error: {str(e)}'
         
         # Print to console with clear formatting
         print("\n" + "="*80)

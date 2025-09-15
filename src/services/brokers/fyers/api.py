@@ -11,102 +11,74 @@ import hashlib
 import hmac
 import base64
 import json
-import requests
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Union
 from urllib.parse import urlencode
+
+# No custom config needed - using official fyers_apiv3 library
 
 logger = logging.getLogger(__name__)
 
 class FyersAPI:
     """
-    Comprehensive Fyers API implementation with standardized response formats.
+    Comprehensive Fyers API implementation using the official fyers_apiv3 library.
     """
     
     def __init__(self, api_key: str, api_secret: str, access_token: str):
-        """Initialize Fyers API with credentials."""
+        """Initialize Fyers API with credentials using official library."""
         self.api_key = api_key
         self.api_secret = api_secret
         self.access_token = access_token
-        self.base_url = "https://api-t1.fyers.in/api/v3"
-        self.session = requests.Session()
+        # Official library handles everything internally
         
-        # Set default headers for all requests
-        self.session.headers.update({
-            'Authorization': f'{api_key}:{access_token}',
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        })
-    
-    def _make_request(self, method: str, endpoint: str, params: Dict = None, data: Dict = None) -> Dict[str, Any]:
-        """Make authenticated request to Fyers API."""
+        # Import the official library
         try:
-            url = f"{self.base_url}/{endpoint}"
+            from fyers_apiv3 import fyersModel
+            self.fyersModel = fyersModel
             
-            response = self.session.request(
-                method=method,
-                url=url,
-                params=params,
-                json=data,
-                timeout=30
+            # Create FyersModel instance for API calls
+            self.fyers_client = fyersModel.FyersModel(
+                token=access_token,
+                is_async=False,
+                client_id=api_key,
+                log_path=""
             )
-            
-            # Log request details
-            logger.info(f"Fyers API {method} {endpoint} - Status: {response.status_code}")
-            
-            if response.status_code == 200:
-                result = response.json()
-                
-                # Check Fyers API response status
-                if result.get('s') == 'ok':
-                    return {
-                        'status': 'success',
-                        'data': result.get('data', result),
-                        'message': 'Request successful'
-                    }
-                else:
-                    return {
-                        'status': 'error',
-                        'message': result.get('message', 'API request failed'),
-                        'error_code': result.get('code', 'UNKNOWN_ERROR')
-                    }
-            else:
-                return {
-                    'status': 'error',
-                    'message': f'HTTP {response.status_code}: {response.text}',
-                    'error_code': f'HTTP_{response.status_code}'
-                }
-                
-        except Exception as e:
-            logger.error(f"Request failed: {str(e)}")
-            return {
-                'status': 'error',
-                'message': str(e),
-                'error_code': 'REQUEST_FAILED'
-            }
+        except ImportError:
+            logger.error("fyers_apiv3 library not available. Please install it using: pip install fyers-apiv3")
+            raise ImportError("fyers_apiv3 library not available")
+        
     
     # Authentication and Session Management
     def login(self) -> Dict[str, Any]:
         """
-        Validate login credentials and session.
+        Validate login credentials and session using official library.
         Check if access token is valid.
         """
         try:
-            result = self._make_request('GET', 'profile')
+            # Use official library to get profile
+            result = self.fyers_client.get_profile()
             
-            if result['status'] == 'success':
-                return {
-                    'status': 'success',
-                    'message': 'Login successful',
-                    'data': {
-                        'login_status': True,
-                        'profile': result.get('data', {})
+            # Handle response from FYERS API
+            if isinstance(result, dict):
+                if result.get('s') == 'ok':
+                    return {
+                        'status': 'success',
+                        'message': 'Login successful',
+                        'data': {
+                            'login_status': True,
+                            'profile': result.get('data', {})
+                        }
                     }
-                }
+                else:
+                    return {
+                        'status': 'error',
+                        'message': result.get('message', 'Login failed - Invalid credentials or expired token'),
+                        'data': {'login_status': False}
+                    }
             else:
                 return {
                     'status': 'error',
-                    'message': 'Login failed - Invalid credentials or expired token',
+                    'message': 'Unexpected response format from FYERS API',
                     'data': {'login_status': False}
                 }
                 
@@ -157,9 +129,10 @@ class FyersAPI:
             if pricetype.upper() in ['SL', 'SL-M', 'SL-L']:
                 order_data["stopPrice"] = float(trigger_price) if trigger_price and trigger_price != "0" else 0
             
-            result = self._make_request('POST', 'orders', data=order_data)
+            # Use official library to place order
+            result = self.fyers_client.place_order(order_data)
             
-            if result['status'] == 'success':
+            if result.get('s') == 'ok':
                 order_id = result.get('data', {}).get('id', '')
                 return {
                     'status': 'success',
@@ -167,7 +140,11 @@ class FyersAPI:
                     'data': {'orderid': order_id}
                 }
             else:
-                return result
+                return {
+                    'status': 'error',
+                    'message': result.get('message', 'Order placement failed'),
+                    'error_code': result.get('code', 'ORDER_ERROR')
+                }
                 
         except Exception as e:
             logger.error(f"Place order error: {str(e)}")
@@ -284,12 +261,13 @@ class FyersAPI:
     # Account Information
     def orderbook(self) -> Dict[str, Any]:
         """
-        Get order book with standard format.
+        Get order book with standard format using official library.
         """
         try:
-            result = self._make_request('GET', 'orderbook')
+            # Use official library to get order book
+            result = self.fyers_client.orderbook()
             
-            if result['status'] == 'success':
+            if result.get('s') == 'ok':
                 orders = result.get('data', {}).get('orderBook', [])
                 formatted_orders = []
                 
@@ -785,64 +763,76 @@ class FyersAPI:
         return symbol
 
 
-# Authentication and session management utilities
+# Authentication and session management utilities using official fyers_apiv3 library
 class FyersAuth:
     """
-    Fyers authentication utilities.
+    Fyers authentication utilities using the official fyers_apiv3 library.
     """
     
     def __init__(self, client_id: str, secret_key: str, redirect_uri: str):
         self.client_id = client_id
         self.secret_key = secret_key
         self.redirect_uri = redirect_uri
-        self.base_url = "https://api-t2.fyers.in/vagator/v3"
+        
+        # Import the official library
+        try:
+            from fyers_apiv3 import fyersModel
+            self.fyersModel = fyersModel
+        except ImportError:
+            logger.error("fyers_apiv3 library not available. Please install it using: pip install fyers-apiv3")
+            raise ImportError("fyers_apiv3 library not available")
     
     def generate_auth_url(self, state: str = "trading") -> str:
-        """Generate authorization URL for OAuth flow."""
-        params = {
-            "client_id": self.client_id,
-            "redirect_uri": self.redirect_uri,
-            "response_type": "code",
-            "state": state
-        }
-        
-        auth_url = f"https://api.fyers.in/api/v3/generate-authcode?{urlencode(params)}"
-        return auth_url
+        """Generate authorization URL for OAuth flow using official library."""
+        try:
+            # Create session model using official library
+            session = self.fyersModel.SessionModel(
+                client_id=self.client_id,
+                secret_key=self.secret_key,
+                redirect_uri=self.redirect_uri,
+                response_type="code",
+                state=state,
+                grant_type="authorization_code"
+            )
+            
+            # Generate the auth code URL
+            auth_url = session.generate_authcode()
+            return auth_url
+            
+        except Exception as e:
+            logger.error(f"Error generating auth URL: {str(e)}")
+            raise
     
     def generate_access_token(self, auth_code: str) -> Dict[str, Any]:
-        """Exchange authorization code for access token."""
+        """Exchange authorization code for access token using official library."""
         try:
-            url = f"{self.base_url}/generate_access_token"
+            # Create session model for token exchange
+            session = self.fyersModel.SessionModel(
+                client_id=self.client_id,
+                secret_key=self.secret_key,
+                redirect_uri=self.redirect_uri,
+                response_type="code",
+                grant_type="authorization_code"
+            )
             
-            data = {
-                "grant_type": "authorization_code",
-                "appIdHash": hashlib.sha256(f"{self.client_id}:{self.secret_key}".encode()).hexdigest(),
-                "code": auth_code
-            }
+            # Set the auth code
+            session.set_token(auth_code)
             
-            response = requests.post(url, json=data, timeout=30)
+            # Generate access token
+            response = session.generate_token()
             
-            if response.status_code == 200:
-                result = response.json()
-                
-                if result.get('s') == 'ok':
-                    return {
-                        'status': 'success',
-                        'access_token': result.get('access_token'),
-                        'refresh_token': result.get('refresh_token', ''),
-                        'message': 'Token generated successfully'
-                    }
-                else:
-                    return {
-                        'status': 'error',
-                        'message': result.get('message', 'Token generation failed'),
-                        'error_code': result.get('code', 'TOKEN_ERROR')
-                    }
+            if response.get('s') == 'ok':
+                return {
+                    'status': 'success',
+                    'access_token': response.get('access_token'),
+                    'refresh_token': response.get('refresh_token', ''),
+                    'message': 'Token generated successfully'
+                }
             else:
                 return {
                     'status': 'error',
-                    'message': f'HTTP {response.status_code}: {response.text}',
-                    'error_code': f'HTTP_{response.status_code}'
+                    'message': response.get('message', 'Token generation failed'),
+                    'error_code': response.get('code', 'TOKEN_ERROR')
                 }
                 
         except Exception as e:

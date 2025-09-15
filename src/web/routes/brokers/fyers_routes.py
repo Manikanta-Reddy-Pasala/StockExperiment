@@ -269,6 +269,8 @@ def api_get_fyers_profile():
         logger.error(f"Error getting FYERS profile for user {current_user.id}: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
+# Config endpoint removed - using official fyers_apiv3 library
+
 @fyers_bp.route('/api/token/status', methods=['GET'])
 @login_required
 def api_get_token_status():

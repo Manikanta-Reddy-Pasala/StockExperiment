@@ -12,7 +12,8 @@ class FyersTokenRefreshService:
     """Service for refreshing FYERS tokens automatically."""
     
     def __init__(self):
-        self.base_url = "https://api-t1.fyers.in/api/v3"
+        # Official library handles everything internally
+        pass
     
     def refresh_fyers_token(self, user_id: int, refresh_token: str) -> Optional[Dict[str, Any]]:
         """
@@ -51,11 +52,16 @@ class FyersTokenRefreshService:
                     logger.error(f"FYERS credentials not found for user {user_id}")
                     return None
                 
+                # Check if redirect URL is configured
+                if not config.redirect_url:
+                    logger.error(f"FYERS redirect URL not configured for user {user_id}")
+                    return None
+                
                 # Generate new auth URL for re-authentication
                 auth_url = self._generate_fyers_auth_url(
                     config.client_id,
                     config.api_secret,
-                    config.redirect_url or "https://api-t1.fyers.in/api/v3/redirect",
+                    config.redirect_url,
                     user_id
                 )
                 

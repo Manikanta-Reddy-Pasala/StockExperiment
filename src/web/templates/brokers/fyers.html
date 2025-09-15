@@ -191,7 +191,7 @@
                                                     <i class="bi bi-link-45deg me-1"></i>Redirect URI
                                                 </label>
                                                 <input type="url" class="form-control" id="fyers-oauth-redirect-uri" 
-                                                       value="https://trade.fyers.in/api-login/redirect-uri/index.html" required>
+                                                       placeholder="Loading default redirect URI..." required>
                                                 <div class="form-text">Your App's Redirect URI from API dashboard</div>
                                             </div>
                                         </div>
@@ -236,6 +236,14 @@
         }, 5000);
     }
     
+    // Set default redirect URI placeholder
+    function setDefaultRedirectUri() {
+        const redirectUriInput = document.getElementById('fyers-oauth-redirect-uri');
+        if (redirectUriInput && !redirectUriInput.value) {
+            redirectUriInput.placeholder = 'Enter your FYERS redirect URI (e.g., https://trade.fyers.in/api-login/redirect-uri/index.html)';
+        }
+    }
+
     // Fetch FYERS broker information
     async function fetchFyersInfo() {
         try {
@@ -326,7 +334,11 @@
                 // Show placeholder for secret key if it exists, empty if not
                 document.getElementById('fyers-oauth-secret-key').value = data.api_secret ? '••••••••••••••••' : '';
                 document.getElementById('fyers-oauth-secret-key').placeholder = data.api_secret ? 'Secret key is saved' : 'Enter your App Secret';
-                document.getElementById('fyers-oauth-redirect-uri').value = data.redirect_url || 'https://trade.fyers.in/api-login/redirect-uri/index.html';
+                // Set redirect URI from database
+                const redirectUriInput = document.getElementById('fyers-oauth-redirect-uri');
+                if (data.redirect_url) {
+                    redirectUriInput.value = data.redirect_url;
+                }
                 
                 // Show error message if there's one
                 if (data.error_message) {
@@ -549,6 +561,8 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
+        // Set default redirect URI and fetch broker info
+        setDefaultRedirectUri();
         fetchFyersInfo();
         
         // OAuth2 event listeners

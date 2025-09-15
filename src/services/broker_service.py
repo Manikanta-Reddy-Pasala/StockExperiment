@@ -352,7 +352,7 @@ class FyersAPIConnector:
     def __init__(self, client_id: str, access_token: str):
         self.client_id = client_id
         self.access_token = access_token
-        self.base_url = "https://api-t1.fyers.in/api/v3"
+        # Official library handles everything internally
         
         # Initialize FYERS API client if available
         if FYERS_AVAILABLE:
@@ -364,15 +364,7 @@ class FyersAPIConnector:
             )
         else:
             self.fyers_client = None
-            logger.warning("fyers-apiv3 library not available, falling back to requests")
-        
-        # Fallback session for direct API calls
-        self.session = requests.Session()
-        self.session.headers.update({
-            'Authorization': f'{client_id}:{access_token}',
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        })
+            logger.warning("fyers-apiv3 library not available")
     
     def test_connection(self) -> Dict[str, Any]:
         """Test FYERS API connection by making a real API call."""
@@ -380,96 +372,38 @@ class FyersAPIConnector:
             logger.info(f"Testing FYERS connection with client_id: {self.client_id[:10]}...")
             start_time = time.time()
             
-            # Try using the fyers-apiv3 library first
-            if self.fyers_client:
-                try:
-                    logger.info("Using fyers-apiv3 library for connection test")
-                    # Use the profile endpoint to test connection
-                    response = self.fyers_client.login()
-                    response_time = round((time.time() - start_time) * 1000, 2)
-                    
-                    logger.info(f"FYERS API response status: {response.get('s', 'unknown')}, time: {response_time}ms")
-                    
-                    if response.get('s') == 'ok':
-                        logger.info("FYERS connection test successful using fyers-apiv3")
-                        return {
-                            'success': True,
-                            'message': 'Connection successful',
-                            'response_time': f"{response_time}ms",
-                            'profile_data': response.get('profile', {}),
-                            'status_code': 200
-                        }
-                    else:
-                        error_msg = f"API Error: {response.get('message', 'Unknown error')}"
-                        logger.warning(f"FYERS API error: {error_msg}")
-                        return {
-                            'success': False,
-                            'message': error_msg,
-                            'response_time': f"{response_time}ms",
-                            'status_code': 400
-                        }
-                except Exception as e:
-                    logger.warning(f"fyers-apiv3 library failed, falling back to requests: {str(e)}")
+            if not self.fyers_client:
+                return {
+                    'success': False,
+                    'message': 'FYERS client not available',
+                    'response_time': '0ms',
+                    'status_code': 500
+                }
             
-            # Fallback to direct API calls
-            logger.info("Using direct API calls for connection test")
-            url = f"{self.base_url}/profile"
-            logger.info(f"Making request to FYERS API: {url}")
+            # Use official library to test connection
+            response = self.fyers_client.get_profile()
+            response_time = round((time.time() - start_time) * 1000, 2)
             
-            # Try different authentication methods
-            auth_methods = [
-                {'Authorization': f'{self.client_id}:{self.access_token}'},
-                {'Authorization': f'Bearer {self.client_id}:{self.access_token}'},
-                {'Authorization': f'Bearer {self.access_token}'}
-            ]
+            logger.info(f"FYERS API response status: {response.get('s', 'unknown')}, time: {response_time}ms")
             
-            for i, headers in enumerate(auth_methods):
-                try:
-                    logger.info(f"Trying authentication method {i+1}: {headers}")
-                    test_session = requests.Session()
-                    test_session.headers.update({
-                        **headers,
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    })
-                    
-                    response = test_session.get(url)
-                    response_time = round((time.time() - start_time) * 1000, 2)
-                    
-                    logger.info(f"FYERS API response status: {response.status_code}, time: {response_time}ms")
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        if data.get('s') == 'ok':
-                            logger.info(f"FYERS connection test successful with method {i+1}")
-                            return {
-                                'success': True,
-                                'message': 'Connection successful',
-                                'response_time': f"{response_time}ms",
-                                'profile_data': data.get('profile', {}),
-                                'status_code': response.status_code
-                            }
-                    
-                    # Log the response for debugging
-                    response_text = response.text
-                    if len(response_text) > 500:
-                        logger.info(f"FYERS API response content (first 500 chars): {response_text[:500]}...")
-                    else:
-                        logger.info(f"FYERS API response content: {response_text}")
-                        
-                except Exception as e:
-                    logger.warning(f"Authentication method {i+1} failed: {str(e)}")
-                    continue
-            
-            # If all methods failed
-            error_msg = "All authentication methods failed"
-            logger.error(f"FYERS connection failed: {error_msg}")
-            return {
-                'success': False,
-                'message': error_msg,
-                'response_time': f"{round((time.time() - start_time) * 1000, 2)}ms",
-                'status_code': 0
-            }
+            if response.get('s') == 'ok':
+                logger.info("FYERS connection test successful")
+                return {
+                    'success': True,
+                    'message': 'Connection successful',
+                    'response_time': f"{response_time}ms",
+                    'profile_data': response.get('data', {}),
+                    'status_code': 200
+                }
+            else:
+                error_msg = f"API Error: {response.get('message', 'Unknown error')}"
+                logger.warning(f"FYERS API error: {error_msg}")
+                return {
+                    'success': False,
+                    'message': error_msg,
+                    'response_time': f"{response_time}ms",
+                    'status_code': 400
+                }
                 
         except Exception as e:
             error_msg = f'Connection failed: {str(e)}'
@@ -489,7 +423,7 @@ class FyersAPIConnector:
             # Use FYERS API client if available
             if self.fyers_client:
                 try:
-                    response = self.fyers_client.login()
+                    response = self.fyers_client.get_profile()
                     logger.info("FYERS profile fetched successfully using fyers-apiv3")
                     return response
                 except Exception as e:

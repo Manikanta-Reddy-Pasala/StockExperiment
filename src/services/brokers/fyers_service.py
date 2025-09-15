@@ -118,6 +118,9 @@ class FyersService:
         if not config or not config.get('client_id') or not config.get('api_secret'):
             raise ValueError('Fyers configuration not found. Please save your Client ID and Secret Key first.')
         
+        if not config.get('redirect_url'):
+            raise ValueError('Fyers redirect URL not configured. Please save your redirect URL first.')
+        
         auth = create_fyers_auth(
             client_id=config.get('client_id'),
             secret_key=config.get('api_secret'),
