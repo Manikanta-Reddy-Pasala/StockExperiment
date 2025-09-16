@@ -421,6 +421,44 @@ CREATE TABLE IF NOT EXISTS portfolio_performance_history (
     UNIQUE(user_id, broker_name, date)
 );
 
+-- ML Training and Model Management Tables
+CREATE TABLE IF NOT EXISTS ml_training_jobs (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) NOT NULL,
+    symbol VARCHAR(50) NOT NULL,
+    model_type VARCHAR(50) NOT NULL,
+    start_date TIMESTAMP NOT NULL,
+    end_date TIMESTAMP NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending' NOT NULL,
+    progress DECIMAL(5,2) DEFAULT 0.0,
+    accuracy DECIMAL(5,4),
+    use_technical_indicators BOOLEAN DEFAULT TRUE,
+    error_message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS ml_trained_models (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) NOT NULL,
+    training_job_id INTEGER REFERENCES ml_training_jobs(id),
+    symbol VARCHAR(50) NOT NULL,
+    model_type VARCHAR(50) NOT NULL,
+    accuracy DECIMAL(5,4),
+    model_version VARCHAR(50),
+    model_file_path TEXT,
+    scaler_file_path TEXT,
+    feature_columns TEXT,
+    target_column VARCHAR(100),
+    training_start_date TIMESTAMP,
+    training_end_date TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, symbol, model_type, is_active)
+);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_stocks_symbol ON stocks(symbol);
 CREATE INDEX IF NOT EXISTS idx_stocks_market_cap_category ON stocks(market_cap_category);
@@ -433,3 +471,7 @@ CREATE INDEX IF NOT EXISTS idx_user_strategy_settings_active ON user_strategy_se
 CREATE INDEX IF NOT EXISTS idx_portfolio_positions_portfolio ON portfolio_positions(portfolio_strategy_id);
 CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_user_broker_date ON portfolio_snapshots(user_id, broker_name, snapshot_date);
 CREATE INDEX IF NOT EXISTS idx_portfolio_performance_user_broker_date ON portfolio_performance_history(user_id, broker_name, date);
+CREATE INDEX IF NOT EXISTS idx_ml_training_jobs_user_status ON ml_training_jobs(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_ml_training_jobs_symbol ON ml_training_jobs(symbol);
+CREATE INDEX IF NOT EXISTS idx_ml_trained_models_user_symbol ON ml_trained_models(user_id, symbol);
+CREATE INDEX IF NOT EXISTS idx_ml_trained_models_active ON ml_trained_models(user_id, is_active);

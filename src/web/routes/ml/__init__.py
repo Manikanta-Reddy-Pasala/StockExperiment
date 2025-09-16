@@ -4,8 +4,18 @@ Flask routes for ML stock prediction functionality
 from flask import Blueprint, request, jsonify, render_template
 from flask_login import login_required, current_user
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
+import threading
+from sqlalchemy import func, and_
+
+# Import database and models
+try:
+    from ...models.database import get_database_manager
+    from ...models.models import MLTrainingJob, MLTrainedModel
+except ImportError:
+    from models.database import get_database_manager
+    from models.models import MLTrainingJob, MLTrainedModel
 
 # Import ML services with robust error handling
 ml_available = False
@@ -38,6 +48,130 @@ except ImportError:
 ml_bp = Blueprint('ml', __name__, url_prefix='/api/v1/ml')  # API routes
 ml_web_bp = Blueprint('ml_web', __name__)  # Web routes
 logger = logging.getLogger(__name__)
+
+def parse_duration_to_dates(duration, end_date=None):
+    """Convert duration string to start_date and end_date."""
+    if end_date is None:
+        end_date = datetime.now().date()
+    elif isinstance(end_date, str):
+        end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+
+    duration_map = {
+        '1M': timedelta(days=30),
+        '3M': timedelta(days=90),
+        '6M': timedelta(days=180),
+        '1Y': timedelta(days=365),
+        '2Y': timedelta(days=730),
+        '3Y': timedelta(days=1095),
+        '5Y': timedelta(days=1825)
+    }
+
+    if duration in duration_map:
+        start_date = end_date - duration_map[duration]
+        return start_date, end_date
+    else:
+        # Default to 1 year if unknown duration
+        start_date = end_date - timedelta(days=365)
+        return start_date, end_date
+
+def run_training_job(job_id, symbol, model_type, start_date, end_date, use_technical_indicators, user_id):
+    """Run the actual ML training job in background."""
+    db = get_database_manager()
+    session = db.Session()
+
+    try:
+        # Get the training job from database
+        job = session.query(MLTrainingJob).filter(MLTrainingJob.id == job_id).first()
+        if not job:
+            logger.error(f"Training job {job_id} not found")
+            return
+
+        # Update job status to running
+        job.status = 'running'
+        job.started_at = datetime.now()
+        job.progress = 5.0
+        session.commit()
+        logger.info(f"Started training job {job_id} for {symbol}")
+
+        # Progress update: Data fetching
+        job.progress = 15.0
+        session.commit()
+
+        # Run the actual training
+        if ml_available:
+            result = train_and_tune_models(
+                symbol=symbol,
+                start_date=start_date,
+                end_date=end_date,
+                user_id=user_id
+            )
+
+            # Progress update: Training complete
+            job.progress = 90.0
+            session.commit()
+
+            # Create trained model record
+            if result.get('success', False):
+                trained_model = MLTrainedModel(
+                    training_job_id=job_id,
+                    user_id=user_id,
+                    symbol=symbol,
+                    model_type=model_type,
+                    model_file_path=result.get('model_path'),
+                    scaler_file_path=result.get('scaler_path'),
+                    accuracy=result.get('accuracy', 0),
+                    mse=result.get('mse'),
+                    mae=result.get('mae'),
+                    start_date=start_date,
+                    end_date=end_date
+                )
+                session.add(trained_model)
+
+                # Update job status to completed
+                job.status = 'completed'
+                job.progress = 100.0
+                job.accuracy = result.get('accuracy', 0)
+                job.completed_at = datetime.now()
+                logger.info(f"Training job {job_id} completed successfully")
+            else:
+                job.status = 'failed'
+                job.error_message = result.get('error', 'Training failed')
+                logger.error(f"Training job {job_id} failed: {job.error_message}")
+        else:
+            # ML not available - simulate training for demo
+            import time
+            for progress in [25, 50, 75, 90]:
+                time.sleep(2)  # Simulate training time
+                job.progress = progress
+                session.commit()
+
+            # Create mock trained model
+            trained_model = MLTrainedModel(
+                training_job_id=job_id,
+                user_id=user_id,
+                symbol=symbol,
+                model_type=model_type,
+                accuracy=75.0 + (hash(symbol) % 20),  # Mock accuracy
+                start_date=start_date,
+                end_date=end_date
+            )
+            session.add(trained_model)
+
+            job.status = 'completed'
+            job.progress = 100.0
+            job.accuracy = trained_model.accuracy
+            job.completed_at = datetime.now()
+            logger.info(f"Mock training job {job_id} completed")
+
+        session.commit()
+
+    except Exception as e:
+        logger.error(f"Error in training job {job_id}: {str(e)}", exc_info=True)
+        job.status = 'failed'
+        job.error_message = str(e)
+        session.commit()
+    finally:
+        session.close()
 
 # Only create ML functionality if ML services are available
 if ml_available:
@@ -187,18 +321,56 @@ if ml_available:
         Get ML dashboard overview data.
         """
         try:
-            # TODO: Implement actual data retrieval from database
-            overview_data = {
-                'trained_models': 12,  # Count of trained models for user
-                'success_rate': 75.5,  # Average training success rate
-                'active_trainings': 2,  # Number of currently running training jobs
-                'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M')
-            }
+            db = get_database_manager()
+            session = db.Session()
 
-            return jsonify({
-                'success': True,
-                'data': overview_data
-            })
+            try:
+                # Get trained stocks count
+                trained_stocks = session.query(MLTrainedModel).filter(
+                    and_(MLTrainedModel.user_id == current_user.id,
+                         MLTrainedModel.is_active == True)
+                ).count()
+
+                # Get active trainings count
+                active_trainings = session.query(MLTrainingJob).filter(
+                    and_(MLTrainingJob.user_id == current_user.id,
+                         MLTrainingJob.status.in_(['pending', 'running']))
+                ).count()
+
+                # Calculate success rate from completed training jobs
+                total_completed = session.query(MLTrainingJob).filter(
+                    and_(MLTrainingJob.user_id == current_user.id,
+                         MLTrainingJob.status.in_(['completed', 'failed']))
+                ).count()
+
+                successful = session.query(MLTrainingJob).filter(
+                    and_(MLTrainingJob.user_id == current_user.id,
+                         MLTrainingJob.status == 'completed')
+                ).count()
+
+                success_rate = (successful / total_completed * 100) if total_completed > 0 else 0
+
+                # Get last updated time from most recent training job
+                last_job = session.query(MLTrainingJob).filter(
+                    MLTrainingJob.user_id == current_user.id
+                ).order_by(MLTrainingJob.created_at.desc()).first()
+
+                last_updated = last_job.created_at.strftime('%Y-%m-%d %H:%M') if last_job else 'Never'
+
+                overview_data = {
+                    'trained_stocks': trained_stocks,
+                    'success_rate': round(success_rate, 1),
+                    'active_trainings': active_trainings,
+                    'last_updated': last_updated
+                }
+
+                return jsonify({
+                    'success': True,
+                    'data': overview_data
+                })
+
+            finally:
+                session.close()
 
         except Exception as e:
             logger.error(f"Error getting ML overview: {str(e)}")
@@ -206,44 +378,90 @@ if ml_available:
 
     @ml_bp.route('/models', methods=['GET'])
     @login_required
-    def get_trained_models():
+    def get_trained_stocks():
         """
-        Get list of trained models for the user.
+        Get list of trained stocks for the user.
         """
         try:
-            # TODO: Implement actual model retrieval from database/filesystem
-            models = [
-                {
-                    'id': 'model_1',
-                    'symbol': 'NSE:RELIANCE-EQ',
-                    'type': 'ensemble',
-                    'accuracy': 82.5,
-                    'trained_date': '2024-01-15',
-                },
-                {
-                    'id': 'model_2',
-                    'symbol': 'NSE:TCS-EQ',
-                    'type': 'random_forest',
-                    'accuracy': 78.3,
-                    'trained_date': '2024-01-14',
-                },
-                {
-                    'id': 'model_3',
-                    'symbol': 'NSE:HDFCBANK-EQ',
-                    'type': 'lstm',
-                    'accuracy': 71.2,
-                    'trained_date': '2024-01-13',
-                }
-            ]
+            db = get_database_manager()
+            session = db.Session()
 
-            return jsonify({
-                'success': True,
-                'data': models
-            })
+            try:
+                # Get trained models from database
+                trained_models = session.query(MLTrainedModel).filter(
+                    and_(MLTrainedModel.user_id == current_user.id,
+                         MLTrainedModel.is_active == True)
+                ).order_by(MLTrainedModel.created_at.desc()).all()
+
+                models = []
+                for model in trained_models:
+                    models.append({
+                        'id': f'model_{model.id}',
+                        'symbol': model.symbol,
+                        'type': model.model_type,
+                        'accuracy': round(model.accuracy, 1) if model.accuracy else 0,
+                        'trained_date': model.created_at.strftime('%Y-%m-%d'),
+                        'start_date': model.start_date.strftime('%Y-%m-%d'),
+                        'end_date': model.end_date.strftime('%Y-%m-%d'),
+                        'mse': round(model.mse, 4) if model.mse else None,
+                        'mae': round(model.mae, 4) if model.mae else None
+                    })
+
+                return jsonify({
+                    'success': True,
+                    'data': models
+                })
+
+            finally:
+                session.close()
 
         except Exception as e:
-            logger.error(f"Error getting trained models: {str(e)}")
-            return jsonify({'success': False, 'error': 'Failed to get trained models'}), 500
+            logger.error(f"Error getting trained stocks: {str(e)}")
+            return jsonify({'success': False, 'error': 'Failed to get trained stocks'}), 500
+
+    @ml_bp.route('/active-trainings', methods=['GET'])
+    @login_required
+    def get_active_trainings():
+        """
+        Get list of active training jobs for the user.
+        """
+        try:
+            db = get_database_manager()
+            session = db.Session()
+
+            try:
+                # Get active training jobs from database
+                active_jobs = session.query(MLTrainingJob).filter(
+                    and_(MLTrainingJob.user_id == current_user.id,
+                         MLTrainingJob.status.in_(['pending', 'running']))
+                ).order_by(MLTrainingJob.created_at.desc()).all()
+
+                trainings = []
+                for job in active_jobs:
+                    trainings.append({
+                        'id': job.id,
+                        'symbol': job.symbol,
+                        'model_type': job.model_type,
+                        'status': job.status,
+                        'progress': job.progress or 0,
+                        'start_date': job.start_date.strftime('%Y-%m-%d'),
+                        'end_date': job.end_date.strftime('%Y-%m-%d'),
+                        'duration': job.duration,
+                        'created_at': job.created_at.strftime('%Y-%m-%d %H:%M'),
+                        'started_at': job.started_at.strftime('%Y-%m-%d %H:%M') if job.started_at else None
+                    })
+
+                return jsonify({
+                    'success': True,
+                    'data': trainings
+                })
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Error getting active trainings: {str(e)}")
+            return jsonify({'success': False, 'error': 'Failed to get active trainings'}), 500
 
     @ml_bp.route('/train', methods=['POST'])
     @login_required
@@ -251,6 +469,8 @@ if ml_available:
         """
         Start training a new ML model with dashboard parameters.
         """
+        db = None
+        session = None
         try:
             data = request.get_json()
 
@@ -265,24 +485,195 @@ if ml_available:
             model_type = data['model_type']
             use_technical_indicators = data.get('use_technical_indicators', True)
 
+            # Parse start and end dates from duration
+            try:
+                start_date, end_date = parse_duration_to_dates(duration)
+
+                # If custom dates provided, use them instead
+                if data.get('start_date'):
+                    start_date = datetime.strptime(data['start_date'], '%Y-%m-%d')
+                if data.get('end_date'):
+                    end_date = datetime.strptime(data['end_date'], '%Y-%m-%d')
+
+            except ValueError as e:
+                logger.error(f"Invalid duration format: {duration}")
+                return jsonify({'error': f'Invalid duration format: {str(e)}'}), 400
+
             logger.info(f"Starting ML training for {symbol} with {model_type} model by user {current_user.id}")
 
-            # TODO: Start actual training job
-            training_id = f"training_{symbol}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            # Create training job record in database
+            db = get_database_manager()
+            session = db.Session()
 
-            # For now, return success with training ID
-            return jsonify({
-                'success': True,
-                'training_id': training_id,
-                'message': f'Training started for {symbol}',
-                'symbol': symbol,
-                'model_type': model_type,
-                'duration': duration
-            })
+            try:
+                training_job = MLTrainingJob(
+                    user_id=current_user.id,
+                    symbol=symbol,
+                    model_type=model_type,
+                    start_date=start_date,
+                    end_date=end_date,
+                    status='pending',
+                    progress=0.0,
+                    use_technical_indicators=use_technical_indicators,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now()
+                )
+
+                session.add(training_job)
+                session.commit()
+
+                job_id = training_job.id
+                logger.info(f"Created training job {job_id} in database")
+
+                # Start background training job
+                training_thread = threading.Thread(
+                    target=run_training_job,
+                    args=(job_id, symbol, model_type, start_date, end_date, use_technical_indicators, current_user.id),
+                    daemon=True
+                )
+                training_thread.start()
+
+                logger.info(f"Started background training thread for job {job_id}")
+
+                return jsonify({
+                    'success': True,
+                    'training_id': job_id,
+                    'message': f'Training started for {symbol}',
+                    'symbol': symbol,
+                    'model_type': model_type,
+                    'duration': duration,
+                    'start_date': start_date.isoformat(),
+                    'end_date': end_date.isoformat()
+                })
+
+            except Exception as db_error:
+                session.rollback()
+                logger.error(f"Database error creating training job: {str(db_error)}")
+                return jsonify({'success': False, 'error': 'Failed to create training job'}), 500
+            finally:
+                if session:
+                    session.close()
 
         except Exception as e:
             logger.error(f"Error starting training: {str(e)}")
             return jsonify({'success': False, 'error': 'Failed to start training'}), 500
+
+    @ml_bp.route('/validate_symbol', methods=['POST'])
+    @login_required
+    def validate_stock_symbol():
+        """
+        Validate stock symbol using Fyers exchange data.
+        """
+        try:
+            data = request.get_json()
+
+            if not data.get('symbol'):
+                return jsonify({'error': 'Symbol is required'}), 400
+
+            symbol = data['symbol'].upper().strip()
+
+            # Try to import FyersService
+            try:
+                from ...services.brokers.fyers_service import FyersService
+                fyers_service = FyersService()
+
+                # Check if user has Fyers configuration
+                fyers_config = fyers_service.get_broker_config(current_user.id)
+
+                if not fyers_config:
+                    # Return mock validation if no Fyers config available
+                    logger.info(f"No Fyers config for user {current_user.id}, using basic validation")
+
+                    # Basic validation - check format
+                    is_valid = len(symbol) > 0 and symbol.isalpha()
+                    return jsonify({
+                        'success': True,
+                        'valid': is_valid,
+                        'symbol': symbol,
+                        'message': 'Basic validation (Fyers not configured)',
+                        'exchange': 'NSE' if is_valid else None
+                    })
+
+                # Use Fyers search API to validate symbol
+                search_result = fyers_service.search(current_user.id, symbol)
+
+                if search_result and search_result.get('status') == 'success':
+                    # Symbol found in Fyers
+                    return jsonify({
+                        'success': True,
+                        'valid': True,
+                        'symbol': symbol,
+                        'message': 'Symbol validated with Fyers',
+                        'exchange': 'NSE',  # Default to NSE
+                        'fyers_data': search_result.get('data', [])[:5]  # Return first 5 matches
+                    })
+                else:
+                    return jsonify({
+                        'success': True,
+                        'valid': False,
+                        'symbol': symbol,
+                        'message': 'Symbol not found in Fyers exchange',
+                        'exchange': None
+                    })
+
+            except ImportError:
+                logger.warning("FyersService not available, using basic validation")
+                is_valid = len(symbol) > 0 and symbol.isalpha()
+                return jsonify({
+                    'success': True,
+                    'valid': is_valid,
+                    'symbol': symbol,
+                    'message': 'Basic validation (Fyers service not available)',
+                    'exchange': 'NSE' if is_valid else None
+                })
+
+        except Exception as e:
+            logger.error(f"Error validating symbol: {str(e)}")
+            return jsonify({'success': False, 'error': 'Failed to validate symbol'}), 500
+
+    @ml_bp.route('/training_progress/<int:job_id>', methods=['GET'])
+    @login_required
+    def get_training_progress(job_id):
+        """
+        Get training job progress by job ID.
+        """
+        try:
+            db = get_database_manager()
+            session = db.Session()
+
+            try:
+                # Get training job
+                training_job = session.query(MLTrainingJob).filter(
+                    and_(MLTrainingJob.id == job_id,
+                         MLTrainingJob.user_id == current_user.id)
+                ).first()
+
+                if not training_job:
+                    return jsonify({'success': False, 'error': 'Training job not found'}), 404
+
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'id': training_job.id,
+                        'symbol': training_job.symbol,
+                        'model_type': training_job.model_type,
+                        'status': training_job.status,
+                        'progress': training_job.progress,
+                        'accuracy': training_job.accuracy,
+                        'created_at': training_job.created_at.isoformat() if training_job.created_at else None,
+                        'updated_at': training_job.updated_at.isoformat() if training_job.updated_at else None,
+                        'completed_at': training_job.completed_at.isoformat() if training_job.completed_at else None,
+                        'error_message': training_job.error_message
+                    }
+                })
+
+            finally:
+                if session:
+                    session.close()
+
+        except Exception as e:
+            logger.error(f"Error getting training progress: {str(e)}")
+            return jsonify({'success': False, 'error': 'Failed to get training progress'}), 500
 
     @ml_bp.route('/predict', methods=['POST'])
     @login_required

@@ -14,15 +14,15 @@
             </div>
             <div class="card-body">
                 <div class="row g-4">
-                    <div class="col-lg-3 col-md-6">
+                    <div class="col-lg-4 col-md-6">
                         <div class="text-center">
                             <h3 class="text-primary mb-2" id="trained-models-count">
                                 <span class="spinner-border spinner-border-sm me-2"></span>Loading...
                             </h3>
-                            <p class="text-muted mb-0">Trained Models</p>
+                            <p class="text-muted mb-0">Trained Stocks</p>
                         </div>
                     </div>
-                    <div class="col-lg-3 col-md-6">
+                    <div class="col-lg-4 col-md-6">
                         <div class="text-center">
                             <h3 class="text-success mb-2" id="training-success-rate">
                                 <span class="spinner-border spinner-border-sm me-2"></span>Loading...
@@ -30,15 +30,7 @@
                             <p class="text-muted mb-0">Success Rate</p>
                         </div>
                     </div>
-                    <div class="col-lg-3 col-md-6">
-                        <div class="text-center">
-                            <h3 class="text-warning mb-2" id="active-trainings">
-                                <span class="spinner-border spinner-border-sm me-2"></span>Loading...
-                            </h3>
-                            <p class="text-muted mb-0">Active Trainings</p>
-                        </div>
-                    </div>
-                    <div class="col-lg-3 col-md-6">
+                    <div class="col-lg-4 col-md-6">
                         <div class="text-center">
                             <h3 class="text-info mb-2" id="last-updated">
                                 <span class="spinner-border spinner-border-sm me-2"></span>Loading...
@@ -53,12 +45,13 @@
 </div>
 
 <div class="row g-4">
-    <!-- Model Training Section -->
+    <!-- Left Column: Train Stock Form and Trained Stocks -->
     <div class="col-lg-6">
+        <!-- Train Stock Form -->
         <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.2s;">
             <div class="card-header bg-gradient-success text-white">
                 <h5 class="card-title mb-0 text-white">
-                    <i class="bi bi-gear-fill me-2"></i>Train New Model
+                    <i class="bi bi-gear-fill me-2"></i>Train Stock
                 </h5>
             </div>
             <div class="card-body">
@@ -75,29 +68,31 @@
                         <div class="form-text">Enter the full exchange:symbol format</div>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="training-duration" class="form-label">Training Duration</label>
-                        <select class="form-select" id="training-duration" required>
-                            <option value="">Select duration...</option>
-                            <option value="1M">1 Month</option>
-                            <option value="3M">3 Months</option>
-                            <option value="6M">6 Months</option>
-                            <option value="1Y">1 Year</option>
-                            <option value="2Y">2 Years</option>
-                            <option value="3Y">3 Years</option>
-                            <option value="5Y">5 Years</option>
-                        </select>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="start-date" class="form-label">Start Date</label>
+                                <input type="date" class="form-control" id="start-date" required>
+                                <div class="form-text">Training data start date</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="end-date" class="form-label">End Date</label>
+                                <input type="date" class="form-control" id="end-date" required>
+                                <div class="form-text">Training data end date</div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="mb-3">
-                        <label for="model-type" class="form-label">Model Type</label>
-                        <select class="form-select" id="model-type" required>
-                            <option value="">Select model...</option>
-                            <option value="ensemble">Ensemble (RF + XGBoost + LSTM)</option>
-                            <option value="random_forest">Random Forest</option>
-                            <option value="xgboost">XGBoost</option>
-                            <option value="lstm">LSTM Neural Network</option>
-                        </select>
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>Model:</strong> Advanced Ensemble (Random Forest + XGBoost + LSTM)
+                            <br>
+                            <small>Uses the best combination of models for optimal accuracy</small>
+                        </div>
                     </div>
 
                     <div class="mb-3">
@@ -130,15 +125,13 @@
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Trained Models Section -->
-    <div class="col-lg-6">
-        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.4s;">
+        <!-- Trained Stocks Section -->
+        <div class="card hover-lift animate-fade-in-up mt-4" style="animation-delay: 0.3s;">
             <div class="card-header bg-gradient-warning text-white">
                 <div class="d-flex justify-content-between align-items-center">
                     <h5 class="card-title mb-0 text-white">
-                        <i class="bi bi-cpu-fill me-2"></i>Trained Models
+                        <i class="bi bi-cpu-fill me-2"></i>Trained Stocks
                     </h5>
                     <button class="btn btn-light btn-sm" onclick="refreshTrainedModels()">
                         <i class="bi bi-arrow-clockwise"></i>
@@ -165,12 +158,10 @@
             </div>
         </div>
     </div>
-</div>
 
-<!-- Stock Prediction Section -->
-<div class="row g-4 mt-2">
-    <div class="col-12">
-        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.6s;">
+    <!-- Right Column: Stock Prediction -->
+    <div class="col-lg-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.4s;">
             <div class="card-header bg-gradient-info text-white">
                 <h5 class="card-title mb-0 text-white">
                     <i class="bi bi-graph-up-arrow me-2"></i>Stock Prediction
@@ -178,9 +169,8 @@
             </div>
             <div class="card-body">
                 <div class="row">
-                    <div class="col-lg-4">
+                    <div class="col-12">
                         <div class="mb-3">
-                            <label for="predict-symbol" class="form-label">Stock to Predict</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="bi bi-search"></i></span>
                                 <input type="text" class="form-control" id="predict-symbol" placeholder="e.g., NSE:RELIANCE-EQ">
@@ -190,7 +180,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-lg-8">
+                    <div class="col-12">
                         <div class="mb-3">
                             <label class="form-label">Prediction Horizon</label>
                             <div class="btn-group w-100" role="group" id="prediction-horizon-group">
@@ -218,7 +208,7 @@
                     <hr>
                     <h6>Prediction Results</h6>
                     <div class="row g-3">
-                        <div class="col-lg-3 col-md-6">
+                        <div class="col-lg-6 col-md-6">
                             <div class="card bg-light">
                                 <div class="card-body text-center">
                                     <h4 class="text-primary mb-1" id="predicted-price">₹0.00</h4>
@@ -226,7 +216,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-lg-3 col-md-6">
+                        <div class="col-lg-6 col-md-6">
                             <div class="card bg-light">
                                 <div class="card-body text-center">
                                     <h4 class="mb-1" id="price-change">0.00%</h4>
@@ -234,7 +224,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-lg-3 col-md-6">
+                        <div class="col-lg-6 col-md-6">
                             <div class="card bg-light">
                                 <div class="card-body text-center">
                                     <h4 class="text-info mb-1" id="confidence-score">0%</h4>
@@ -242,7 +232,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-lg-3 col-md-6">
+                        <div class="col-lg-6 col-md-6">
                             <div class="card bg-light">
                                 <div class="card-body text-center">
                                     <h4 class="mb-1" id="signal-strength">HOLD</h4>
@@ -276,11 +266,49 @@
     </div>
 </div>
 
+<!-- Active Trainings Section (Only shown when there are active trainings) -->
+<div class="row g-4 mt-2" id="active-trainings-section" style="display: none;">
+    <div class="col-12">
+        <div class="card hover-lift animate-fade-in-up">
+            <div class="card-header bg-gradient-info text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0 text-white">
+                        <i class="bi bi-hourglass-split me-2"></i>Active Trainings
+                    </h5>
+                    <button class="btn btn-light btn-sm" onclick="refreshActiveTrainings()">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                    <table class="table table-hover mb-0" id="active-trainings-table">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th class="border-0">Symbol</th>
+                                <th class="border-0">Model</th>
+                                <th class="border-0">Status</th>
+                                <th class="border-0">Progress</th>
+                                <th class="border-0">Started</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Active trainings will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
 <script>
 // ML Dashboard JavaScript
 document.addEventListener('DOMContentLoaded', function() {
     loadMLDashboardData();
     loadTrainedModels();
+    loadActiveTrainings();
 
     // Training form submission
     document.getElementById('training-form').addEventListener('submit', handleTrainingSubmit);
@@ -299,9 +327,8 @@ async function loadMLDashboardData() {
         const result = await response.json();
 
         if (result.success) {
-            document.getElementById('trained-models-count').textContent = result.data.trained_models || 0;
+            document.getElementById('trained-models-count').textContent = result.data.trained_stocks || 0;
             document.getElementById('training-success-rate').textContent = (result.data.success_rate || 0) + '%';
-            document.getElementById('active-trainings').textContent = result.data.active_trainings || 0;
             document.getElementById('last-updated').textContent = result.data.last_updated || 'Never';
         }
     } catch (error) {
@@ -309,7 +336,7 @@ async function loadMLDashboardData() {
     }
 }
 
-// Load Trained Models
+// Load Trained Stocks
 async function loadTrainedModels() {
     try {
         const response = await fetch('/api/v1/ml/models');
@@ -324,7 +351,7 @@ async function loadTrainedModels() {
     }
 }
 
-// Update Trained Models Table
+// Update Trained Stocks Table
 function updateTrainedModelsTable(models) {
     const tbody = document.querySelector('#trained-models-table tbody');
     tbody.innerHTML = '';
@@ -372,6 +399,93 @@ function updateTrainedModelsTable(models) {
     });
 }
 
+// Load Active Trainings
+async function loadActiveTrainings() {
+    try {
+        const response = await fetch('/api/v1/ml/active-trainings');
+        const result = await response.json();
+
+        if (result.success) {
+            updateActiveTrainingsTable(result.data);
+        } else {
+            showActiveTrainingsError();
+        }
+    } catch (error) {
+        console.error('Error loading active trainings:', error);
+        showActiveTrainingsError();
+    }
+}
+
+// Update Active Trainings Table
+function updateActiveTrainingsTable(trainings) {
+    const tbody = document.querySelector('#active-trainings-table tbody');
+    const activeTrainingsSection = document.getElementById('active-trainings-section');
+
+    tbody.innerHTML = '';
+
+    if (trainings.length === 0) {
+        // Hide the entire Active Trainings section when no trainings
+        activeTrainingsSection.style.display = 'none';
+        return;
+    }
+
+    // Show the Active Trainings section when there are trainings
+    activeTrainingsSection.style.display = 'block';
+
+    trainings.forEach(training => {
+        const row = tbody.insertRow();
+
+        // Symbol
+        row.insertCell(0).innerHTML = `<strong>${training.symbol}</strong>`;
+
+        // Model type
+        const typeCell = row.insertCell(1);
+        const typeBadge = getModelTypeBadge(training.model_type);
+        typeCell.innerHTML = `<span class="badge ${typeBadge}">${training.model_type}</span>`;
+
+        // Status
+        const statusCell = row.insertCell(2);
+        const statusBadge = training.status === 'running' ? 'bg-success' : 'bg-warning';
+        statusCell.innerHTML = `<span class="badge ${statusBadge}">${training.status}</span>`;
+
+        // Progress
+        const progressCell = row.insertCell(3);
+        const progress = training.progress || 0;
+        progressCell.innerHTML = `
+            <div class="progress" style="width: 80px; height: 20px;">
+                <div class="progress-bar" role="progressbar"
+                     style="width: ${progress}%"
+                     aria-valuenow="${progress}"
+                     aria-valuemin="0"
+                     aria-valuemax="100">
+                    ${Math.round(progress)}%
+                </div>
+            </div>
+        `;
+
+        // Started
+        row.insertCell(4).innerHTML = `<small class="text-muted">${training.started_at || training.created_at}</small>`;
+    });
+}
+
+function showActiveTrainingsError() {
+    const activeTrainingsSection = document.getElementById('active-trainings-section');
+    const tbody = document.querySelector('#active-trainings-table tbody');
+
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="5" class="text-center text-danger py-4">
+                <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
+                <br>
+                Error loading active trainings
+            </td>
+        </tr>
+    `;
+
+    // Show section even for errors so user can see the error
+    activeTrainingsSection.style.display = 'block';
+}
+
 // Handle Training Form Submission
 async function handleTrainingSubmit(event) {
     event.preventDefault();
@@ -379,8 +493,10 @@ async function handleTrainingSubmit(event) {
     const formData = {
         symbol: document.getElementById('stock-symbol').value,
         duration: document.getElementById('training-duration').value,
-        model_type: document.getElementById('model-type').value,
-        use_technical_indicators: document.getElementById('use-technical-indicators').checked
+        model_type: 'ensemble', // Always use ensemble model
+        use_technical_indicators: document.getElementById('use-technical-indicators').checked,
+        start_date: document.getElementById('start-date').value,
+        end_date: document.getElementById('end-date').value
     };
 
     try {
@@ -514,12 +630,114 @@ function hideTrainingProgress() {
 }
 
 function pollTrainingProgress(trainingId) {
-    // Implement training progress polling
-    // This would check the training status periodically
+    const progressBar = document.getElementById('progress-bar');
+    const progressStatus = document.getElementById('progress-status');
+    const progressPercent = document.getElementById('progress-percent');
+
+    let pollInterval;
+    let attempts = 0;
+    const maxAttempts = 300; // 5 minutes at 1-second intervals
+
+    async function checkProgress() {
+        attempts++;
+
+        try {
+            const response = await fetch(`/api/v1/ml/training_progress/${trainingId}`);
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                const data = result.data;
+                const progress = Math.round(data.progress || 0);
+
+                // Update progress bar
+                progressBar.style.width = `${progress}%`;
+                progressPercent.textContent = `${progress}%`;
+
+                // Update status message
+                if (data.status === 'running') {
+                    progressStatus.textContent = `Training ${data.symbol} with ${data.model_type}...`;
+                    progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated bg-info';
+                } else if (data.status === 'completed') {
+                    progressStatus.textContent = `Training completed successfully! Accuracy: ${data.accuracy ? (data.accuracy * 100).toFixed(1) + '%' : 'N/A'}`;
+                    progressBar.className = 'progress-bar bg-success';
+
+                    // Stop polling
+                    clearInterval(pollInterval);
+
+                    // Hide progress after 3 seconds and refresh data
+                    setTimeout(() => {
+                        hideTrainingProgress();
+                        loadMLDashboardData();
+                        loadActiveTrainings();
+                        loadTrainedModels();
+                    }, 3000);
+
+                    return;
+                } else if (data.status === 'failed') {
+                    progressStatus.textContent = `Training failed: ${data.error_message || 'Unknown error'}`;
+                    progressBar.className = 'progress-bar bg-danger';
+
+                    // Stop polling
+                    clearInterval(pollInterval);
+
+                    // Hide progress after 5 seconds
+                    setTimeout(() => {
+                        hideTrainingProgress();
+                        loadMLDashboardData();
+                        loadActiveTrainings();
+                    }, 5000);
+
+                    return;
+                } else if (data.status === 'pending') {
+                    progressStatus.textContent = `Training job queued for ${data.symbol}...`;
+                    progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated bg-warning';
+                }
+
+                // Continue polling if still in progress
+                if (progress >= 100 || data.status === 'completed') {
+                    clearInterval(pollInterval);
+                }
+
+            } else {
+                console.error('Failed to get training progress:', result.error);
+                if (attempts >= 3) {
+                    progressStatus.textContent = 'Error checking training progress';
+                    progressBar.className = 'progress-bar bg-warning';
+                }
+            }
+
+        } catch (error) {
+            console.error('Error polling training progress:', error);
+            if (attempts >= 3) {
+                progressStatus.textContent = 'Network error checking progress';
+                progressBar.className = 'progress-bar bg-warning';
+            }
+        }
+
+        // Stop polling after max attempts (5 minutes)
+        if (attempts >= maxAttempts) {
+            clearInterval(pollInterval);
+            progressStatus.textContent = 'Training timeout - check Active Trainings for status';
+            progressBar.className = 'progress-bar bg-secondary';
+
+            setTimeout(() => {
+                hideTrainingProgress();
+                loadActiveTrainings();
+            }, 3000);
+        }
+    }
+
+    // Start polling immediately and then every second
+    checkProgress();
+    pollInterval = setInterval(checkProgress, 1000);
 }
 
 function refreshTrainedModels() {
     loadTrainedModels();
+}
+
+function refreshActiveTrainings() {
+    loadActiveTrainings();
 }
 
 function predictStock(symbol) {
@@ -539,9 +757,142 @@ function deleteModel(modelId) {
     }
 }
 
-function searchSymbol() {
-    // Implement symbol search functionality
-    alert('Symbol search functionality to be implemented');
+async function searchSymbol() {
+    const symbolInput = document.getElementById('stock-symbol');
+    const symbol = symbolInput.value.trim();
+
+    if (!symbol) {
+        alert('Please enter a stock symbol');
+        return;
+    }
+
+    const searchBtn = document.getElementById('search-symbol-btn');
+    const originalText = searchBtn.innerHTML;
+    searchBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    searchBtn.disabled = true;
+
+    try {
+        const response = await fetch('/api/v1/ml/validate_symbol', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ symbol: symbol })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            if (result.valid) {
+                // Symbol is valid
+                symbolInput.classList.remove('is-invalid');
+                symbolInput.classList.add('is-valid');
+
+                // Show success message
+                showSymbolValidationMessage(result.message, 'success');
+
+                // If Fyers data is available, show options
+                if (result.fyers_data && result.fyers_data.length > 0) {
+                    showSymbolOptions(result.fyers_data, symbolInput);
+                }
+            } else {
+                // Symbol is invalid
+                symbolInput.classList.remove('is-valid');
+                symbolInput.classList.add('is-invalid');
+                showSymbolValidationMessage(result.message, 'danger');
+            }
+        } else {
+            symbolInput.classList.remove('is-valid');
+            symbolInput.classList.add('is-invalid');
+            showSymbolValidationMessage('Symbol validation failed', 'danger');
+        }
+    } catch (error) {
+        console.error('Symbol validation error:', error);
+        symbolInput.classList.remove('is-valid');
+        symbolInput.classList.add('is-invalid');
+        showSymbolValidationMessage('Network error during validation', 'danger');
+    } finally {
+        searchBtn.innerHTML = originalText;
+        searchBtn.disabled = false;
+    }
+}
+
+function showSymbolValidationMessage(message, type) {
+    // Remove any existing validation message
+    const existingAlert = document.querySelector('#symbol-validation-alert');
+    if (existingAlert) {
+        existingAlert.remove();
+    }
+
+    // Create and show new message
+    const alertDiv = document.createElement('div');
+    alertDiv.id = 'symbol-validation-alert';
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show mt-2`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+
+    // Insert after the input group
+    const inputGroup = document.querySelector('#stock-symbol').closest('.mb-3');
+    inputGroup.appendChild(alertDiv);
+
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        if (alertDiv && alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+
+function showSymbolOptions(fyersData, symbolInput) {
+    // Create dropdown with symbol options
+    let dropdownDiv = document.getElementById('symbol-dropdown');
+
+    if (!dropdownDiv) {
+        dropdownDiv = document.createElement('div');
+        dropdownDiv.id = 'symbol-dropdown';
+        dropdownDiv.className = 'dropdown-menu show position-absolute w-100 mt-1';
+        dropdownDiv.style.maxHeight = '200px';
+        dropdownDiv.style.overflowY = 'auto';
+        dropdownDiv.style.zIndex = '1050';
+
+        const inputGroup = symbolInput.closest('.input-group');
+        inputGroup.style.position = 'relative';
+        inputGroup.appendChild(dropdownDiv);
+    }
+
+    dropdownDiv.innerHTML = '';
+
+    fyersData.forEach(item => {
+        const optionDiv = document.createElement('div');
+        optionDiv.className = 'dropdown-item';
+        optionDiv.style.cursor = 'pointer';
+        optionDiv.innerHTML = `
+            <div>
+                <strong>${item.symbol || item.trading_symbol}</strong>
+                <br>
+                <small class="text-muted">${item.company_name || item.name || ''}</small>
+            </div>
+        `;
+
+        optionDiv.addEventListener('click', function() {
+            symbolInput.value = item.symbol || item.trading_symbol;
+            symbolInput.classList.remove('is-invalid');
+            symbolInput.classList.add('is-valid');
+            dropdownDiv.remove();
+        });
+
+        dropdownDiv.appendChild(optionDiv);
+    });
+
+    // Hide dropdown when clicking outside
+    document.addEventListener('click', function hideDropdown(e) {
+        if (!dropdownDiv.contains(e.target) && !symbolInput.contains(e.target)) {
+            dropdownDiv.remove();
+            document.removeEventListener('click', hideDropdown);
+        }
+    });
 }
 
 function showTrainedModelsError() {
