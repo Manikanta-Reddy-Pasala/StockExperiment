@@ -280,11 +280,11 @@ class MLAPIService:
                         'symbol': model.symbol,
                         'type': model.model_type,
                         'model_type': model.model_type,
-                        'accuracy': model.accuracy_score * 100 if model.accuracy_score else 0,
-                        'accuracy_score': model.accuracy_score,
+                        'accuracy': model.accuracy * 100 if model.accuracy else 0,
+                        'accuracy_score': model.accuracy,
                         'trained_date': model.created_at.isoformat() if model.created_at else None,
                         'created_at': model.created_at.isoformat() if model.created_at else None,
-                        'last_prediction': model.last_prediction.isoformat() if model.last_prediction else None
+                        'last_prediction': None  # This field doesn't exist in the model
                     })
 
                 return {
