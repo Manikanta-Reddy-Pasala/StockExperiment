@@ -20,63 +20,71 @@ class FyersDashboardProvider(IDashboardProvider):
         self.fyers_service = get_fyers_service()
     
     def get_market_overview(self, user_id: int) -> Dict[str, Any]:
-        """Get market overview data for major indices using FYERS API."""
+        """Get market overview data using real Fyers API data only."""
         print(f"DEBUG: FyersDashboardProvider.get_market_overview called for user {user_id}")
         try:
-            # Major Indian indices symbols
-            indices_symbols = [
-                'NSE:NIFTY50-INDEX',
-                'NSE:SENSEX-INDEX', 
-                'NSE:NIFTYBANK-INDEX',
-                'NSE:NIFTYIT-INDEX',
-                'NSE:NIFTYFMCG-INDEX',
-                'NSE:NIFTYAUTO-INDEX'
-            ]
-            
-            print(f"DEBUG: Fetching quotes for symbols: {indices_symbols}")
-            # Get quotes for indices using FYERS service
-            quotes_response = self.fyers_service.quotes_multiple(user_id, indices_symbols)
-            print(f"DEBUG: quotes_response: {quotes_response}")
-            
-            if quotes_response.get('status') != 'success':
-                return {
-                    'success': False,
-                    'error': quotes_response.get('message', 'Failed to fetch market data'),
-                    'data': [],
-                    'last_updated': datetime.now().isoformat()
-                }
-            
-            quotes_data = quotes_response.get('data', {})
+            # Get real positions data to show as market overview
+            positions_response = self.fyers_service.positions(user_id)
             market_indices = []
-            
-            # Symbol name mapping
-            symbol_mapping = {
-                'NSE:NIFTY50-INDEX': 'NIFTY 50',
-                'NSE:SENSEX-INDEX': 'SENSEX',
-                'NSE:NIFTYBANK-INDEX': 'BANK NIFTY',
-                'NSE:NIFTYIT-INDEX': 'NIFTY IT',
-                'NSE:NIFTYFMCG-INDEX': 'NIFTY FMCG',
-                'NSE:NIFTYAUTO-INDEX': 'NIFTY AUTO'
-            }
-            
-            for symbol in indices_symbols:
-                if symbol in quotes_data:
-                    quote_data = quotes_data[symbol]
+
+            if positions_response.get('status') == 'success':
+                net_positions = positions_response.get('data', [])
+
+                # Use real data from positions - show actual holdings as market overview
+                for position in net_positions:
+                    symbol = position.get('symbol', '')
+                    ltp = position.get('ltp', 0)
+                    # Calculate change based on buy price vs current price
+                    buy_avg = position.get('buyAvg', ltp)
+                    change = ltp - buy_avg
+                    change_percent = (change / buy_avg * 100) if buy_avg > 0 else 0
+
                     index = MarketIndex(
                         symbol=symbol,
-                        name=symbol_mapping.get(symbol, symbol),
-                        price=float(quote_data.get('ltp', 0)),
-                        change=float(quote_data.get('change', 0)),
-                        change_percent=float(quote_data.get('change_percent', 0))
+                        name=symbol.replace('NSE:', '').replace('-EQ', ''),
+                        price=float(ltp),
+                        change=float(change),
+                        change_percent=float(change_percent)
                     )
                     market_indices.append(index.to_dict())
-            
+
+            # If no positions, try to get holdings data
+            if not market_indices:
+                holdings_response = self.fyers_service.holdings(user_id)
+                if holdings_response.get('status') == 'success':
+                    holdings = holdings_response.get('data', [])
+
+                    for holding in holdings:
+                        symbol = holding.get('symbol', '')
+                        ltp = holding.get('ltp', 0)
+                        costPrice = holding.get('costPrice', ltp)
+                        change = ltp - costPrice
+                        change_percent = (change / costPrice * 100) if costPrice > 0 else 0
+
+                        index = MarketIndex(
+                            symbol=symbol,
+                            name=symbol.replace('NSE:', '').replace('-EQ', ''),
+                            price=float(ltp),
+                            change=float(change),
+                            change_percent=float(change_percent)
+                        )
+                        market_indices.append(index.to_dict())
+
+            # If still no data, return empty with appropriate message
+            if not market_indices:
+                return {
+                    'success': True,
+                    'data': [],
+                    'message': 'No market data available. Please add some positions or holdings to view market overview.',
+                    'last_updated': datetime.now().isoformat()
+                }
+
             return {
                 'success': True,
                 'data': market_indices,
                 'last_updated': datetime.now().isoformat()
             }
-            
+
         except Exception as e:
             logger.error(f"Error fetching market overview for user {user_id}: {str(e)}")
             return {
@@ -87,36 +95,79 @@ class FyersDashboardProvider(IDashboardProvider):
             }
     
     def get_portfolio_summary(self, user_id: int) -> Dict[str, Any]:
-        """Get portfolio summary metrics using FYERS API."""
+        """Get portfolio summary metrics using real FYERS API data."""
         try:
-            # Get comprehensive portfolio report
-            portfolio_report = self.fyers_service.generate_portfolio_summary_report(user_id)
-            
-            if portfolio_report.get('status') != 'success':
-                return {
-                    'success': False,
-                    'error': portfolio_report.get('message', 'Failed to generate portfolio summary'),
-                    'data': DashboardMetrics().to_dict(),
-                    'last_updated': datetime.now().isoformat()
-                }
-            
-            summary = portfolio_report.get('data', {})
+            # Get real data from multiple API endpoints
+            funds_response = self.fyers_service.funds(user_id)
+            positions_response = self.fyers_service.positions(user_id)
+            holdings_response = self.fyers_service.holdings(user_id)
+
             metrics = DashboardMetrics()
-            
-            metrics.total_pnl = summary.get('total_pnl', 0)
-            metrics.total_portfolio_value = summary.get('total_portfolio_value', 0)
-            metrics.available_cash = summary.get('available_cash', 0)
-            metrics.holdings_count = summary.get('holdings_count', 0)
-            metrics.positions_count = summary.get('positions_count', 0)
-            metrics.daily_pnl = summary.get('total_day_change', 0)
-            metrics.daily_pnl_percent = summary.get('total_pnl_percent', 0)
-            
+
+            # Get funds data
+            if funds_response.get('status') == 'success':
+                fund_data = funds_response.get('data', {})
+
+                # Extract funds from standardized format
+                if isinstance(fund_data, dict):
+                    metrics.available_cash = float(fund_data.get('available_cash', 0))
+                    total_balance = float(fund_data.get('total_margin', 0))
+                else:
+                    # Fallback for list format
+                    for fund in fund_data:
+                        if fund.get('title') == 'Available Balance':
+                            metrics.available_cash = fund.get('equityAmount', 0)
+                        elif fund.get('title') == 'Total Balance':
+                            total_balance = fund.get('equityAmount', 0)
+
+            # Get positions data
+            total_positions_value = 0
+            total_positions_pnl = 0
+            if positions_response.get('status') == 'success':
+                net_positions = positions_response.get('data', [])
+                # Note: overall data is not available in standardized format, calculate manually
+                overall_pnl = sum(float(pos.get('pnl', 0)) for pos in net_positions)
+
+                metrics.positions_count = len(net_positions)
+                total_positions_pnl = overall_pnl
+
+                # Calculate total positions value using standardized field names
+                for position in net_positions:
+                    ltp = float(position.get('last_price', 0))
+                    qty = float(position.get('quantity', 0))
+                    total_positions_value += ltp * qty
+
+            # Get holdings data
+            total_holdings_value = 0
+            total_holdings_pnl = 0
+            if holdings_response.get('status') == 'success':
+                holdings = holdings_response.get('data', [])
+                # Calculate holdings metrics manually
+                total_holdings_pnl = sum(h.get('pnl', 0) for h in holdings)
+
+                metrics.holdings_count = len(holdings)
+
+                # Calculate total holdings value
+                for holding in holdings:
+                    market_val = holding.get('marketVal', 0)
+                    total_holdings_value += market_val
+
+            # Calculate summary metrics
+            metrics.total_portfolio_value = total_positions_value + total_holdings_value
+            metrics.total_pnl = total_positions_pnl + total_holdings_pnl
+            metrics.daily_pnl = total_positions_pnl  # Using positions PnL as daily PnL
+
+            # Calculate percentage values
+            if metrics.total_portfolio_value > 0:
+                metrics.total_pnl_percent = (metrics.total_pnl / metrics.total_portfolio_value) * 100
+                metrics.daily_pnl_percent = (metrics.daily_pnl / metrics.total_portfolio_value) * 100
+
             return {
                 'success': True,
                 'data': metrics.to_dict(),
                 'last_updated': datetime.now().isoformat()
             }
-            
+
         except Exception as e:
             logger.error(f"Error fetching portfolio summary for user {user_id}: {str(e)}")
             return {

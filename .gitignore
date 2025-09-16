@@ -7,3 +7,11 @@ logs/
 *.db
 .env
 :memory:*
+
+# Cookie files and debug files
+*.txt
+cookies.txt
+debug_*.txt
+test_*.txt
+raw_*.txt
+*.cookie

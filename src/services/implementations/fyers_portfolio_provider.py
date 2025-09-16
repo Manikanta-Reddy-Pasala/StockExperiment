@@ -30,7 +30,7 @@ class FyersPortfolioProvider(IPortfolioProvider):
         try:
             holdings_response = self.fyers_service.holdings(user_id)
             
-            if holdings_response.get('status') != 'success':
+            if holdings_response.get('s') != 'ok' or holdings_response.get('code') != 200:
                 return {
                     'success': False,
                     'error': holdings_response.get('message', 'Failed to fetch holdings'),
@@ -43,7 +43,7 @@ class FyersPortfolioProvider(IPortfolioProvider):
                     'last_updated': datetime.now().isoformat()
                 }
             
-            holdings_data = holdings_response.get('data', [])
+            holdings_data = holdings_response.get('holdings', [])
             
             # Apply additional filters if provided
             if filters:
@@ -96,7 +96,7 @@ class FyersPortfolioProvider(IPortfolioProvider):
         try:
             positions_response = self.fyers_service.positions(user_id)
             
-            if positions_response.get('status') != 'success':
+            if positions_response.get('s') != 'ok' or positions_response.get('code') != 200:
                 return {
                     'success': False,
                     'error': positions_response.get('message', 'Failed to fetch positions'),
@@ -109,7 +109,7 @@ class FyersPortfolioProvider(IPortfolioProvider):
                     'last_updated': datetime.now().isoformat()
                 }
             
-            positions_data = positions_response.get('data', [])
+            positions_data = positions_response.get('netPositions', [])
             
             # Apply additional filters if provided
             if filters:
@@ -158,35 +158,47 @@ class FyersPortfolioProvider(IPortfolioProvider):
     def get_portfolio_summary(self, user_id: int) -> Dict[str, Any]:
         """Get comprehensive portfolio summary."""
         try:
-            # Get comprehensive portfolio report from FYERS API service
+            # Get data from individual API endpoints
             logger.info(f"Getting portfolio summary for user {user_id}")
-            portfolio_report = self.fyers_service.generate_portfolio_summary_report(user_id)
-            logger.info(f"Portfolio report response: {portfolio_report}")
+            holdings_response = self.fyers_service.holdings(user_id)
+            positions_response = self.fyers_service.positions(user_id)
+            funds_response = self.fyers_service.funds(user_id)
+
+            # Initialize default values
+            holdings = []
+            positions = []
+            funds = []
+
+            # Process holdings
+            if holdings_response.get('s') == 'ok' and holdings_response.get('code') == 200:
+                holdings = holdings_response.get('holdings', [])
+
+            # Process positions
+            if positions_response.get('s') == 'ok' and positions_response.get('code') == 200:
+                positions = positions_response.get('netPositions', [])
+
+            # Process funds
+            if funds_response.get('s') == 'ok' and funds_response.get('code') == 200:
+                funds = funds_response.get('fund_limit', [])
             
-            if portfolio_report.get('status') != 'success':
-                error_msg = portfolio_report.get('message', 'Failed to generate portfolio summary')
-                logger.error(f"Portfolio summary failed: {error_msg}")
-                return {
-                    'success': False,
-                    'error': error_msg,
-                    'data': {},
-                    'last_updated': datetime.now().isoformat()
-                }
-            
-            summary = portfolio_report.get('data', {})
-            holdings = summary.get('holdings', [])
-            positions = summary.get('positions', [])
-            funds = summary.get('funds', [])
-            
+            # Calculate summary metrics
+            total_portfolio_value = sum(h.get('market_value', 0) for h in holdings) + sum(p.get('ltp', 0) * abs(p.get('netQty', 0)) for p in positions)
+            total_pnl = sum(h.get('pnl', 0) for h in holdings) + sum(p.get('unrealized_profit', 0) for p in positions)
+
             # Enhanced summary with additional metrics
             enhanced_summary = {
-                **summary,
+                'holdings': holdings,
+                'positions': positions,
+                'funds': funds,
+                'total_portfolio_value': total_portfolio_value,
+                'total_pnl': total_pnl,
+                'holdings_count': len(holdings),
+                'positions_count': len(positions),
                 'portfolio_diversity': self._calculate_portfolio_diversity(holdings),
                 'risk_metrics': self._calculate_risk_metrics(holdings, positions),
                 'performance_metrics': self._calculate_performance_metrics(holdings, positions),
                 'asset_allocation': self._calculate_asset_allocation(holdings, positions),
-                'top_holdings': sorted(holdings, key=lambda x: x.get('market_value', 0), reverse=True)[:5],
-                'recent_performance': self._calculate_recent_performance(holdings, positions)
+                'top_holdings': sorted(holdings, key=lambda x: x.get('market_value', 0), reverse=True)[:5]
             }
             
             return {

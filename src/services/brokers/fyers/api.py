@@ -124,14 +124,33 @@ class FyersAPI:
             logger.info(f"Raw FYERS API response: {response}")
             logger.info(f"Response type: {type(response)}")
             logger.info(f"Response keys: {list(response.keys()) if isinstance(response, dict) else 'Not a dict'}")
-            
+
             # Check if response has 's' field (FYERS status)
             if isinstance(response, dict) and 's' in response:
                 if response['s'] == 'ok':
                     logger.info("FYERS API response: SUCCESS")
+
+                    # Extract the correct data field based on what's available
+                    data = {}
+                    if 'netPositions' in response:
+                        data = response['netPositions']
+                    elif 'holdings' in response:
+                        data = response['holdings']
+                    elif 'orderBook' in response:
+                        data = response['orderBook']
+                    elif 'tradeBook' in response:
+                        data = response['tradeBook']
+                    elif 'fund_limit' in response:
+                        data = response['fund_limit']
+                    elif 'data' in response:
+                        data = response['data']
+                    else:
+                        # Return the whole response minus status fields
+                        data = {k: v for k, v in response.items() if k not in ['s', 'code', 'message']}
+
                     return {
                         'status': 'success',
-                        'data': response.get('data', {}),
+                        'data': data,
                         'message': 'Success'
                     }
                 else:
@@ -388,7 +407,7 @@ class FyersAPI:
             result = self._make_request('GET', 'orderbook')
             
             if result.get('status') == 'success':
-                orders = result.get('data', {}).get('orderBook', [])
+                orders = result.get('data', [])
                 formatted_orders = []
                 
                 for order in orders:
@@ -434,7 +453,7 @@ class FyersAPI:
             result = self._make_request('GET', 'tradebook')
             
             if result.get('status') == 'success':
-                trades = result.get('data', {}).get('tradeBook', [])
+                trades = result.get('data', [])
                 formatted_trades = []
                 
                 for trade in trades:
@@ -475,7 +494,7 @@ class FyersAPI:
             result = self._make_request('GET', 'positions')
             
             if result.get('status') == 'success':
-                positions = result.get('data', {}).get('netPositions', [])
+                positions = result.get('data', [])
                 formatted_positions = []
                 
                 for position in positions:
@@ -483,9 +502,9 @@ class FyersAPI:
                         'symbol': position.get('symbol', ''),
                         'product': position.get('productType', ''),
                         'quantity': str(position.get('netQty', 0)),
-                        'average_price': str(position.get('avgPrice', 0)),
+                        'average_price': str(position.get('netAvg', 0)),
                         'last_price': str(position.get('ltp', 0)),
-                        'pnl': str(position.get('unrealizedProfit', 0)),
+                        'pnl': str(position.get('pl', 0)),
                         'exchange': self._extract_exchange(position.get('symbol', ''))
                     }
                     formatted_positions.append(formatted_position)
@@ -513,7 +532,7 @@ class FyersAPI:
             result = self._make_request('GET', 'holdings')
             
             if result.get('status') == 'success':
-                holdings = result.get('data', {}).get('holdings', [])
+                holdings = result.get('data', [])
                 formatted_holdings = []
                 
                 for holding in holdings:
@@ -550,7 +569,7 @@ class FyersAPI:
             result = self._make_request('GET', 'funds')
             
             if result.get('status') == 'success':
-                fund_data = result.get('data', {}).get('fund_limit', [])
+                fund_data = result.get('data', [])
                 
                 # Extract key fund information
                 funds_info = {
@@ -595,7 +614,7 @@ class FyersAPI:
                 formatted_symbol = symbol
             
             # Use official library to get quotes
-            result = self.fyers_client.quotes(symbols=formatted_symbol)
+            result = self.fyers_client.quotes(data=formatted_symbol)
             
             if result.get('s') == 'ok':
                 quotes_data = result.get('d', {})
@@ -661,7 +680,7 @@ class FyersAPI:
             symbols_string = ",".join(formatted_symbols)
             
             # Use official library to get quotes
-            result = self.fyers_client.quotes(symbols=symbols_string)
+            result = self.fyers_client.quotes(data=symbols_string)
             
             if result.get('s') == 'ok':
                 quotes_data = result.get('d', {})

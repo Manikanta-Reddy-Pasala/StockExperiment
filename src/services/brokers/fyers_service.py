@@ -42,8 +42,8 @@ class FyersService:
         api_secret = config.get('api_secret')
         access_token = config.get('access_token')
         
-        if not all([api_key, api_secret, access_token]):
-            raise ValueError('Incomplete Fyers configuration')
+        if not all([api_key, access_token]):
+            raise ValueError('Incomplete Fyers configuration - missing client_id or access_token')
         
         return create_fyers_api(api_key, api_secret, access_token)
     
