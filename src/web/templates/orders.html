@@ -132,63 +132,179 @@
     // Fetch orders
     async function fetchOrders() {
         try {
+            console.log('Fetching orders from /api/orders...');
             const response = await fetch('/api/orders');
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
             const orders = await response.json();
-            
-            // Update summary cards
-            document.getElementById('total-orders').textContent = orders.length;
-            document.getElementById('completed-orders').textContent = orders.filter(o => o.status === 'COMPLETE').length;
-            document.getElementById('pending-orders').textContent = orders.filter(o => o.status === 'PLACED' || o.status === 'PARTIAL').length;
-            document.getElementById('failed-orders').textContent = orders.filter(o => o.status === 'CANCELLED' || o.status === 'REJECTED').length;
-            
-            const table = document.getElementById('orders-table').getElementsByTagName('tbody')[0];
-            table.innerHTML = '';
-            
-            orders.forEach(order => {
-                const row = table.insertRow();
-                row.insertCell(0).textContent = order.order_id.substring(0, 8) + '...';
-                row.insertCell(0).title = order.order_id; // Show full ID on hover
-                row.insertCell(1).textContent = order.symbol;
-                row.insertCell(2).textContent = order.type;
-                row.insertCell(3).textContent = order.transaction;
-                row.insertCell(4).textContent = order.quantity;
-                row.insertCell(5).textContent = order.filled;
-                
-                const statusCell = row.insertCell(6);
-                statusCell.textContent = order.status;
-                if (order.status === 'COMPLETE') {
-                    statusCell.className = 'text-success';
-                } else if (order.status === 'PLACED' || order.status === 'PARTIAL') {
-                    statusCell.className = 'text-warning';
-                } else if (order.status === 'CANCELLED' || order.status === 'REJECTED') {
-                    statusCell.className = 'text-danger';
-                }
-                
-                row.insertCell(7).textContent = order.price ? '₹' + order.price.toFixed(2) : '-';
-                row.insertCell(8).textContent = new Date(order.created_at).toLocaleString();
-                
-                // Action button
-                const actionCell = row.insertCell(9);
-                const viewBtn = document.createElement('button');
-                viewBtn.className = 'btn btn-sm btn-outline-primary';
-                viewBtn.innerHTML = '<i class="bi bi-eye-fill"></i>';
-                viewBtn.title = 'View Details';
-                actionCell.appendChild(viewBtn);
+            console.log('Orders received:', orders);
+
+            // Ensure orders is an array
+            if (!Array.isArray(orders)) {
+                console.error('Orders response is not an array:', orders);
+                return;
+            }
+
+            // Update summary cards with error checking
+            const totalEl = document.getElementById('total-orders');
+            const completedEl = document.getElementById('completed-orders');
+            const pendingEl = document.getElementById('pending-orders');
+            const failedEl = document.getElementById('failed-orders');
+
+            if (totalEl) totalEl.textContent = orders.length;
+            if (completedEl) completedEl.textContent = orders.filter(o => o.status === 'COMPLETE').length;
+            if (pendingEl) pendingEl.textContent = orders.filter(o => o.status === 'PLACED' || o.status === 'PARTIAL').length;
+            if (failedEl) failedEl.textContent = orders.filter(o => o.status === 'CANCELLED' || o.status === 'REJECTED').length;
+
+            console.log('✅ Updated summary cards:', {
+                total: orders.length,
+                completed: orders.filter(o => o.status === 'COMPLETE').length,
+                pending: orders.filter(o => o.status === 'PLACED' || o.status === 'PARTIAL').length,
+                failed: orders.filter(o => o.status === 'CANCELLED' || o.status === 'REJECTED').length
             });
+            
+            // Update orders table
+            const table = document.getElementById('orders-table');
+            if (table) {
+                const tbody = table.getElementsByTagName('tbody')[0];
+                if (tbody) {
+                    tbody.innerHTML = '';
+
+                    console.log(`📋 Rendering ${orders.length} orders in table...`);
+
+                    orders.forEach((order, index) => {
+                        console.log(`   Rendering order ${index + 1}:`, order.order_id);
+
+                        const row = tbody.insertRow();
+
+                        // Order ID (shortened with tooltip)
+                        const orderIdCell = row.insertCell(0);
+                        orderIdCell.textContent = order.order_id.substring(0, 8) + '...';
+                        orderIdCell.title = order.order_id;
+
+                        // Other cells
+                        row.insertCell(1).textContent = order.symbol || '-';
+                        row.insertCell(2).textContent = order.type || '-';
+                        row.insertCell(3).textContent = order.transaction || '-';
+                        row.insertCell(4).textContent = order.quantity || '-';
+                        row.insertCell(5).textContent = order.filled || '-';
+
+                        // Status with color
+                        const statusCell = row.insertCell(6);
+                        statusCell.textContent = order.status || '-';
+                        if (order.status === 'COMPLETE') {
+                            statusCell.className = 'text-success fw-bold';
+                        } else if (order.status === 'PLACED' || order.status === 'PARTIAL') {
+                            statusCell.className = 'text-warning fw-bold';
+                        } else if (order.status === 'CANCELLED' || order.status === 'REJECTED') {
+                            statusCell.className = 'text-danger fw-bold';
+                        }
+
+                        // Price
+                        row.insertCell(7).textContent = order.price ? '₹' + order.price.toFixed(2) : '-';
+
+                        // Created at
+                        row.insertCell(8).textContent = order.created_at || '-';
+
+                        // Action button
+                        const actionCell = row.insertCell(9);
+                        const viewBtn = document.createElement('button');
+                        viewBtn.className = 'btn btn-sm btn-outline-primary';
+                        viewBtn.innerHTML = '<i class="bi bi-eye-fill"></i>';
+                        viewBtn.title = 'View Details';
+                        actionCell.appendChild(viewBtn);
+                    });
+
+                    console.log('✅ Table rendered successfully');
+                } else {
+                    console.error('❌ Table tbody not found');
+                }
+            } else {
+                console.error('❌ orders-table element not found');
+            }
         } catch (error) {
             console.error('Error fetching orders:', error);
         }
     }
     
-    // Event listeners
-    document.getElementById('status-filter').addEventListener('change', fetchOrders);
-    document.getElementById('refresh-orders').addEventListener('click', fetchOrders);
-    
-    // Fetch data when page loads
+    // Multiple approaches to ensure execution
+
+    // Method 1: DOM Content Loaded
     document.addEventListener('DOMContentLoaded', function() {
-        fetchOrders();
-        // Refresh every 30 seconds
-        setInterval(fetchOrders, 30000);
+        console.log('DOM loaded, starting fetchOrders...');
+        initializeOrdersPage();
     });
+
+    // Method 2: Window Load (fallback)
+    window.addEventListener('load', function() {
+        console.log('Window loaded, ensuring fetchOrders...');
+        initializeOrdersPage();
+    });
+
+    // Method 3: Immediate execution with retry
+    setTimeout(function() {
+        console.log('Timeout execution, ensuring fetchOrders...');
+        initializeOrdersPage();
+    }, 1000);
+
+    function initializeOrdersPage() {
+        console.log('Initializing Orders page...');
+
+        // Add event listeners (safely)
+        const statusFilter = document.getElementById('status-filter');
+        const refreshButton = document.getElementById('refresh-orders');
+
+        if (statusFilter) {
+            statusFilter.addEventListener('change', fetchOrders);
+        }
+        if (refreshButton) {
+            refreshButton.addEventListener('click', fetchOrders);
+        }
+
+        // Fetch data
+        fetchOrders();
+
+        // Set up auto-refresh (only once)
+        if (!window.ordersAutoRefresh) {
+            window.ordersAutoRefresh = setInterval(fetchOrders, 30000);
+        }
+    }
+
+    // Immediate test to check if script loads
+    console.log('Orders page JavaScript loaded successfully');
+
+    // Test elements exist after short delay
+    setTimeout(function() {
+        const totalEl = document.getElementById('total-orders');
+        const completedEl = document.getElementById('completed-orders');
+        const pendingEl = document.getElementById('pending-orders');
+        const failedEl = document.getElementById('failed-orders');
+
+        console.log('Elements check:', {
+            totalExists: !!totalEl,
+            completedExists: !!completedEl,
+            pendingExists: !!pendingEl,
+            failedExists: !!failedEl
+        });
+
+        // Manual test - set values directly
+        if (totalEl) {
+            console.log('Setting total orders to manual test');
+            totalEl.textContent = '1 (manual test)';
+        } else {
+            console.error('total-orders element not found!');
+        }
+
+        if (completedEl) {
+            console.log('Setting completed orders to manual test');
+            completedEl.textContent = '1 (manual test)';
+        }
+
+        if (pendingEl) pendingEl.textContent = '0 (manual test)';
+        if (failedEl) failedEl.textContent = '0 (manual test)';
+    }, 500);
 </script>
 {% endblock %}
