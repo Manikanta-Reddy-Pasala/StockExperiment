@@ -191,53 +191,6 @@ def run_training_job(job_id, symbol, model_type, start_date, end_date, use_techn
 # Only create ML functionality if ML services are available
 if ml_available:
 
-    @ml_bp.route('/train', methods=['POST'])
-    @login_required
-    def train_model():
-        """
-        Train ML models for a specific stock symbol.
-        """
-        try:
-            data = request.get_json()
-            
-            # Validate input
-            if not data or 'symbol' not in data:
-                return jsonify({'error': 'Symbol is required'}), 400
-            
-            symbol = data['symbol'].upper()
-            start_date = data.get('start_date')
-            end_date = data.get('end_date')
-            
-            logger.info(f"Starting ML training for symbol {symbol} by user {current_user.id}")
-            
-            # Convert string dates to date objects if provided
-            if start_date:
-                start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
-            if end_date:
-                end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
-            
-            # Train the models
-            result = train_and_tune_models(
-                symbol=symbol,
-                start_date=start_date,
-                end_date=end_date,
-                user_id=current_user.id
-            )
-            
-            logger.info(f"ML training completed for symbol {symbol}")
-            return jsonify({
-                'success': True,
-                'message': result['message'],
-                'symbol': symbol,
-                'trained_at': datetime.now().isoformat()
-            })
-            
-        except ValueError as e:
-            logger.error(f"Validation error in ML training: {str(e)}")
-            return jsonify({'success': False, 'error': str(e)}), 400
-        except Exception as e:
-            logger.error(f"Error in ML training: {str(e)}", exc_info=True)
-            return jsonify({'success': False, 'error': 'Internal server error during training'}), 500
 
     @ml_bp.route('/predict/<symbol>', methods=['GET'])
     @login_required
@@ -524,17 +477,32 @@ if ml_available:
             session = db.Session()
 
             try:
+                # Calculate duration from date range
+                date_diff = (end_date - start_date).days
+                if date_diff <= 30:
+                    duration = '1M'
+                elif date_diff <= 90:
+                    duration = '3M'
+                elif date_diff <= 180:
+                    duration = '6M'
+                elif date_diff <= 365:
+                    duration = '1Y'
+                elif date_diff <= 730:
+                    duration = '2Y'
+                else:
+                    duration = '5Y'
+
                 training_job = MLTrainingJob(
                     user_id=current_user.id,
                     symbol=symbol,
                     model_type=model_type,
                     start_date=start_date,
                     end_date=end_date,
+                    duration=duration,
                     status='pending',
                     progress=0.0,
                     use_technical_indicators=use_technical_indicators,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now()
+                    created_at=datetime.now()
                 )
 
                 session.add(training_job)
@@ -678,7 +646,7 @@ if ml_available:
                         'progress': training_job.progress,
                         'accuracy': training_job.accuracy,
                         'created_at': training_job.created_at.isoformat() if training_job.created_at else None,
-                        'updated_at': training_job.updated_at.isoformat() if training_job.updated_at else None,
+                        'started_at': training_job.started_at.isoformat() if training_job.started_at else None,
                         'completed_at': training_job.completed_at.isoformat() if training_job.completed_at else None,
                         'error_message': training_job.error_message
                     }
