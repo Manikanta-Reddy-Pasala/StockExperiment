@@ -69,15 +69,29 @@ class PortfolioService:
 
                 processed_positions = []
                 for position in positions:
+                    # Normalize FYERS fields and add defensive defaults
+                    avg_price = position.get('average_price')
+                    if avg_price in (None, 0):
+                        avg_price = position.get('buyAvg', position.get('netAvg', 0))
+                    quantity = position.get('quantity', position.get('netQty', position.get('qty', 0)))
+                    pnl_val = position.get('pnl', position.get('pl', 0))
+                    ltp_val = position.get('ltp', position.get('last_price', 0))
+                    side_raw = position.get('side', '')
+                    side = 'long' if side_raw == 1 or str(side_raw).lower() == 'long' else ('short' if side_raw == -1 else side_raw)
+                    product = position.get('product', position.get('productType', ''))
+
+                    # Debug each mapped position clearly for docker logs
+                    print(f"DEBUG: Mapped position -> symbol={position.get('symbol','')}, qty={quantity}, avg={avg_price}, ltp={ltp_val}, pnl={pnl_val}, side={side}, product={product}")
+
                     processed_positions.append({
                         'symbol': position.get('symbol', ''),
-                        'quantity': position.get('netQty', 0),
-                        'average_price': position.get('avgPrice', 0),
-                        'ltp': position.get('ltp', 0),
-                        'pnl': position.get('pl', 0),
-                        'pnl_percent': position.get('plPercent', 0),
-                        'side': position.get('side', ''),
-                        'product': position.get('product', '')
+                        'quantity': quantity,
+                        'average_price': avg_price,
+                        'ltp': ltp_val,
+                        'pnl': pnl_val,
+                        'pnl_percent': position.get('plPercent', position.get('pnl_percent', 0)),
+                        'side': side,
+                        'product': product
                     })
 
                 return {

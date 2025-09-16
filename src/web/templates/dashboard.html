@@ -381,14 +381,18 @@
                     tbody.innerHTML = '';
                     
                     result.data.forEach(position => {
+                        const quantity = Number(position.quantity ?? position.netQty ?? position.qty ?? position.buyQty ?? 0);
+                        const avgPrice = Number(position.average_price ?? position.avg_price ?? position.buyAvg ?? position.netAvg ?? 0);
+                        const ltp = Number(position.ltp ?? position.last_price ?? position.current_price ?? 0);
+                        const pnlVal = Number(position.pnl ?? position.unrealized_profit ?? position.pl ?? 0);
                         const row = tbody.insertRow();
-                        row.insertCell(0).textContent = position.symbol;
-                        row.insertCell(1).textContent = position.quantity;
-                        row.insertCell(2).textContent = '₹' + position.average_price.toFixed(2);
-                        row.insertCell(3).textContent = '₹' + position.ltp.toFixed(2);
+                        row.insertCell(0).textContent = position.symbol || '';
+                        row.insertCell(1).textContent = Number.isFinite(quantity) ? quantity : '';
+                        row.insertCell(2).textContent = Number.isFinite(avgPrice) ? '₹' + avgPrice.toFixed(2) : '';
+                        row.insertCell(3).textContent = Number.isFinite(ltp) ? '₹' + ltp.toFixed(2) : '';
                         const pnlCell = row.insertCell(4);
-                        pnlCell.textContent = '₹' + position.pnl.toFixed(2);
-                        pnlCell.className = position.pnl >= 0 ? 'price-up' : 'price-down';
+                        pnlCell.textContent = Number.isFinite(pnlVal) ? '₹' + pnlVal.toFixed(2) : '';
+                        pnlCell.className = pnlVal >= 0 ? 'price-up' : 'price-down';
                         
                         const actionCell = row.insertCell(5);
                         const actionBtn = document.createElement('button');
