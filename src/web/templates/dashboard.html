@@ -267,6 +267,14 @@
     // Fetch dashboard metrics
     async function fetchDashboardMetrics() {
         try {
+            // Set loading state for Total P&L small label
+            const totalPnlElementPre = document.getElementById('total-pnl');
+            const totalPnlStatusPre = totalPnlElementPre?.parentElement?.querySelector('small');
+            if (totalPnlStatusPre) {
+                totalPnlStatusPre.style.display = '';
+                totalPnlStatusPre.className = 'text-muted';
+                totalPnlStatusPre.innerHTML = '<i class="bi bi-hourglass-split"></i> Loading...';
+            }
             const response = await fetch('/api/dashboard/metrics');
             const result = await response.json();
             
@@ -281,8 +289,15 @@
             // Update total P&L
             const totalPnlElement = document.getElementById('total-pnl');
             if (totalPnlElement && data.total_pnl !== undefined) {
+                const positive = data.total_pnl >= 0;
                 totalPnlElement.textContent = '₹' + data.total_pnl.toFixed(2);
-                totalPnlElement.className = data.total_pnl >= 0 ? 'price-up' : 'price-down';
+                totalPnlElement.className = positive ? 'price-up text-success' : 'price-down text-danger';
+                // Hide the loading label under Total P&L after update (no icon desired)
+                const statusElement = totalPnlElement.parentElement?.querySelector('small');
+                if (statusElement) {
+                    statusElement.textContent = '';
+                    statusElement.style.display = 'none';
+                }
             }
 
             // Update available funds
