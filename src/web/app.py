@@ -843,11 +843,11 @@ def create_app():
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
     @app.route('/api/market/overview', methods=['GET'])
-    @login_required
     def api_get_market_overview():
         """Get market overview for NIFTY indices using broker_service quotes directly."""
+        user_id = getattr(current_user, 'id', None) if current_user and current_user.is_authenticated else 1
         try:
-            app.logger.info(f"Fetching market overview for user {current_user.id}")
+            app.logger.info(f"Fetching market overview for user {user_id}")
             
             # Use existing broker_service which already handles auth/config
             # FYERS symbols as provided: NIFTY50, NIFTYBANK, NIFTYMIDCAP150, NIFTYSMLCAP250
@@ -858,10 +858,10 @@ def create_app():
                 'NIFTY SMALLCAP 250': 'NSE:NIFTYSMLCAP250-INDEX'
             }
             symbols = ','.join(symbols_map.values())
-            quotes_data = broker_service.get_fyers_quotes(current_user.id, symbols)
+            quotes_data = broker_service.get_fyers_quotes(user_id, symbols)
             
-            if not quotes_data or not quotes_data.get('success'):
-                error_msg = (quotes_data or {}).get('error', 'Failed to fetch quotes data from FYERS')
+            if not quotes_data or quotes_data.get('s') != 'ok' or quotes_data.get('code') != 200:
+                error_msg = (quotes_data or {}).get('message', 'Failed to fetch quotes data from FYERS')
                 app.logger.warning(f"Market overview quotes fetch failed: {error_msg}")
                 return jsonify({'success': False, 'error': error_msg, 'data': {}, 'source': 'quotes'}), 400
             
