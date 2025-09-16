@@ -833,8 +833,8 @@ def create_app():
             symbols_map = {
                 'NIFTY 50': 'NSE:NIFTY50-INDEX',
                 'BANK NIFTY': 'NSE:NIFTYBANK-INDEX',
-                'NIFTY MIDCAP 150': 'NSE:NIFTYMIDCAP150-INDEX',
-                'NIFTY SMALLCAP 250': 'NSE:NIFTYSMLCAP250-INDEX'
+                'MIDCAP 150': 'NSE:NIFTYMIDCAP150-INDEX',
+                'SMALLCAP 250': 'NSE:NIFTYSMLCAP250-INDEX'
             }
             symbols = ','.join(symbols_map.values())
             quotes_data = broker_service.get_fyers_quotes(user_id, symbols)
@@ -1240,6 +1240,97 @@ def create_app():
             return jsonify({
                 'success': False,
                 'error': str(e)
+            }), 500
+
+    @app.route('/api/reports', methods=['GET'])
+    def api_get_reports():
+        """Get comprehensive reports data using reports sync service with real trade data."""
+        try:
+            # Get user_id - default to 1 for testing (same pattern as other APIs)
+            user_id = getattr(current_user, 'id', None) if current_user and current_user.is_authenticated else 1
+
+            app.logger.info(f"Fetching reports data for user {user_id}")
+
+            from src.services.reports_sync_service import get_reports_sync_service
+            reports_sync_service = get_reports_sync_service()
+
+            force_refresh = request.args.get('force_refresh', 'false').lower() == 'true'
+            reports_data = reports_sync_service.get_reports_data(user_id, force_refresh=force_refresh)
+
+            return jsonify(reports_data)
+
+        except Exception as e:
+            app.logger.error(f"Error fetching reports: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+    @app.route('/api/reports/summary', methods=['GET'])
+    def api_get_reports_summary():
+        """Get reports summary data for cards display."""
+        try:
+            user_id = getattr(current_user, 'id', None) if current_user and current_user.is_authenticated else 1
+
+            from src.services.reports_sync_service import get_reports_sync_service
+            reports_sync_service = get_reports_sync_service()
+
+            force_refresh = request.args.get('force_refresh', 'false').lower() == 'true'
+            reports_data = reports_sync_service.get_reports_data(user_id, force_refresh=force_refresh)
+
+            # Return only the summary data needed for the reports cards
+            return jsonify(reports_data.get('summary', {}))
+
+        except Exception as e:
+            app.logger.error(f"Error fetching reports summary: {e}")
+            return jsonify({
+                'total_pnl': 0.0,
+                'total_trades': 0,
+                'win_rate': 0.0
+            }), 500
+
+    @app.route('/api/reports/performance', methods=['GET'])
+    def api_get_reports_performance():
+        """Get performance summary data for the performance table."""
+        try:
+            user_id = getattr(current_user, 'id', None) if current_user and current_user.is_authenticated else 1
+
+            from src.services.reports_sync_service import get_reports_sync_service
+            reports_sync_service = get_reports_sync_service()
+
+            force_refresh = request.args.get('force_refresh', 'false').lower() == 'true'
+            reports_data = reports_sync_service.get_reports_data(user_id, force_refresh=force_refresh)
+
+            return jsonify({
+                'performance_summary': reports_data.get('performance_summary', [])
+            })
+
+        except Exception as e:
+            app.logger.error(f"Error fetching performance data: {e}")
+            return jsonify({'performance_summary': []}), 500
+
+    @app.route('/api/reports/top-performers', methods=['GET'])
+    def api_get_top_performers():
+        """Get top performing stocks data."""
+        try:
+            user_id = getattr(current_user, 'id', None) if current_user and current_user.is_authenticated else 1
+
+            from src.services.reports_sync_service import get_reports_sync_service
+            reports_sync_service = get_reports_sync_service()
+
+            force_refresh = request.args.get('force_refresh', 'false').lower() == 'true'
+            reports_data = reports_sync_service.get_reports_data(user_id, force_refresh=force_refresh)
+
+            return jsonify({
+                'top_performers': reports_data.get('top_performers', []),
+                'worst_performers': reports_data.get('worst_performers', [])
+            })
+
+        except Exception as e:
+            app.logger.error(f"Error fetching top performers: {e}")
+            return jsonify({
+                'top_performers': [],
+                'worst_performers': []
             }), 500
 
     return app
