@@ -1054,8 +1054,9 @@ def create_app():
 
     # Register ML prediction blueprints
     try:
-        from .routes.ml import ml_bp
-        app.register_blueprint(ml_bp)
+        from .routes.ml import ml_bp, ml_web_bp
+        app.register_blueprint(ml_bp)  # API routes
+        app.register_blueprint(ml_web_bp)  # Web routes
         app.logger.info("ML prediction routes registered successfully")
     except ImportError as e:
         app.logger.warning(f"ML prediction routes not available: {e}")

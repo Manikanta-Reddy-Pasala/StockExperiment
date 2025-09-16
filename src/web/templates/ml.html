@@ -1,0 +1,552 @@
+{% extends "base.html" %}
+
+{% block title %}Machine Learning{% endblock %}
+
+{% block content %}
+<!-- ML Dashboard Header -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card hover-lift animate-fade-in-up">
+            <div class="card-header bg-gradient-primary text-white">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="bi bi-robot me-2"></i>Machine Learning Dashboard
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-lg-3 col-md-6">
+                        <div class="text-center">
+                            <h3 class="text-primary mb-2" id="trained-models-count">
+                                <span class="spinner-border spinner-border-sm me-2"></span>Loading...
+                            </h3>
+                            <p class="text-muted mb-0">Trained Models</p>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="text-center">
+                            <h3 class="text-success mb-2" id="training-success-rate">
+                                <span class="spinner-border spinner-border-sm me-2"></span>Loading...
+                            </h3>
+                            <p class="text-muted mb-0">Success Rate</p>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="text-center">
+                            <h3 class="text-warning mb-2" id="active-trainings">
+                                <span class="spinner-border spinner-border-sm me-2"></span>Loading...
+                            </h3>
+                            <p class="text-muted mb-0">Active Trainings</p>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="text-center">
+                            <h3 class="text-info mb-2" id="last-updated">
+                                <span class="spinner-border spinner-border-sm me-2"></span>Loading...
+                            </h3>
+                            <p class="text-muted mb-0">Last Updated</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Model Training Section -->
+    <div class="col-lg-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.2s;">
+            <div class="card-header bg-gradient-success text-white">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="bi bi-gear-fill me-2"></i>Train New Model
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="training-form">
+                    <div class="mb-3">
+                        <label for="stock-symbol" class="form-label">Stock Symbol</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-search"></i></span>
+                            <input type="text" class="form-control" id="stock-symbol" placeholder="e.g., NSE:RELIANCE-EQ" required>
+                            <button class="btn btn-outline-secondary" type="button" id="search-symbol-btn">
+                                <i class="bi bi-search"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">Enter the full exchange:symbol format</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="training-duration" class="form-label">Training Duration</label>
+                        <select class="form-select" id="training-duration" required>
+                            <option value="">Select duration...</option>
+                            <option value="1M">1 Month</option>
+                            <option value="3M">3 Months</option>
+                            <option value="6M">6 Months</option>
+                            <option value="1Y">1 Year</option>
+                            <option value="2Y">2 Years</option>
+                            <option value="3Y">3 Years</option>
+                            <option value="5Y">5 Years</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="model-type" class="form-label">Model Type</label>
+                        <select class="form-select" id="model-type" required>
+                            <option value="">Select model...</option>
+                            <option value="ensemble">Ensemble (RF + XGBoost + LSTM)</option>
+                            <option value="random_forest">Random Forest</option>
+                            <option value="xgboost">XGBoost</option>
+                            <option value="lstm">LSTM Neural Network</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="use-technical-indicators" checked>
+                            <label class="form-check-label" for="use-technical-indicators">
+                                Include Technical Indicators (RSI, MACD, Moving Averages)
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-play-circle me-2"></i>Start Training
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Training Progress -->
+                <div id="training-progress" class="mt-4" style="display: none;">
+                    <h6>Training Progress</h6>
+                    <div class="progress mb-2">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated"
+                             id="progress-bar" role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <small class="text-muted" id="progress-status">Starting training...</small>
+                        <small class="text-muted" id="progress-percent">0%</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trained Models Section -->
+    <div class="col-lg-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.4s;">
+            <div class="card-header bg-gradient-warning text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0 text-white">
+                        <i class="bi bi-cpu-fill me-2"></i>Trained Models
+                    </h5>
+                    <button class="btn btn-light btn-sm" onclick="refreshTrainedModels()">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-hover mb-0" id="trained-models-table">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th class="border-0">Symbol</th>
+                                <th class="border-0">Type</th>
+                                <th class="border-0">Accuracy</th>
+                                <th class="border-0">Trained</th>
+                                <th class="border-0">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Models will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stock Prediction Section -->
+<div class="row g-4 mt-2">
+    <div class="col-12">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.6s;">
+            <div class="card-header bg-gradient-info text-white">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="bi bi-graph-up-arrow me-2"></i>Stock Prediction
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-lg-4">
+                        <div class="mb-3">
+                            <label for="predict-symbol" class="form-label">Stock to Predict</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                <input type="text" class="form-control" id="predict-symbol" placeholder="e.g., NSE:RELIANCE-EQ">
+                                <button class="btn btn-info" type="button" id="predict-btn">
+                                    <i class="bi bi-magic"></i> Predict
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-8">
+                        <div class="mb-3">
+                            <label class="form-label">Prediction Horizon</label>
+                            <div class="btn-group w-100" role="group" id="prediction-horizon-group">
+                                <input type="radio" class="btn-check" name="horizon" id="horizon-1d" value="1" checked>
+                                <label class="btn btn-outline-info" for="horizon-1d">1 Day</label>
+
+                                <input type="radio" class="btn-check" name="horizon" id="horizon-3d" value="3">
+                                <label class="btn btn-outline-info" for="horizon-3d">3 Days</label>
+
+                                <input type="radio" class="btn-check" name="horizon" id="horizon-1w" value="7">
+                                <label class="btn btn-outline-info" for="horizon-1w">1 Week</label>
+
+                                <input type="radio" class="btn-check" name="horizon" id="horizon-2w" value="14">
+                                <label class="btn btn-outline-info" for="horizon-2w">2 Weeks</label>
+
+                                <input type="radio" class="btn-check" name="horizon" id="horizon-1m" value="30">
+                                <label class="btn btn-outline-info" for="horizon-1m">1 Month</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Prediction Results -->
+                <div id="prediction-results" style="display: none;">
+                    <hr>
+                    <h6>Prediction Results</h6>
+                    <div class="row g-3">
+                        <div class="col-lg-3 col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h4 class="text-primary mb-1" id="predicted-price">₹0.00</h4>
+                                    <small class="text-muted">Predicted Price</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h4 class="mb-1" id="price-change">0.00%</h4>
+                                    <small class="text-muted">Expected Change</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h4 class="text-info mb-1" id="confidence-score">0%</h4>
+                                    <small class="text-muted">Confidence</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h4 class="mb-1" id="signal-strength">HOLD</h4>
+                                    <small class="text-muted">Signal</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <h6>Model Breakdown</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Model</th>
+                                        <th>Prediction</th>
+                                        <th>Weight</th>
+                                        <th>Confidence</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="model-breakdown">
+                                    <!-- Model breakdown will be populated -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ML Dashboard JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    loadMLDashboardData();
+    loadTrainedModels();
+
+    // Training form submission
+    document.getElementById('training-form').addEventListener('submit', handleTrainingSubmit);
+
+    // Prediction button
+    document.getElementById('predict-btn').addEventListener('click', handlePrediction);
+
+    // Symbol search
+    document.getElementById('search-symbol-btn').addEventListener('click', searchSymbol);
+});
+
+// Load ML Dashboard Overview Data
+async function loadMLDashboardData() {
+    try {
+        const response = await fetch('/api/v1/ml/overview');
+        const result = await response.json();
+
+        if (result.success) {
+            document.getElementById('trained-models-count').textContent = result.data.trained_models || 0;
+            document.getElementById('training-success-rate').textContent = (result.data.success_rate || 0) + '%';
+            document.getElementById('active-trainings').textContent = result.data.active_trainings || 0;
+            document.getElementById('last-updated').textContent = result.data.last_updated || 'Never';
+        }
+    } catch (error) {
+        console.error('Error loading ML dashboard data:', error);
+    }
+}
+
+// Load Trained Models
+async function loadTrainedModels() {
+    try {
+        const response = await fetch('/api/v1/ml/models');
+        const result = await response.json();
+
+        if (result.success && result.data) {
+            updateTrainedModelsTable(result.data);
+        }
+    } catch (error) {
+        console.error('Error loading trained models:', error);
+        showTrainedModelsError();
+    }
+}
+
+// Update Trained Models Table
+function updateTrainedModelsTable(models) {
+    const tbody = document.querySelector('#trained-models-table tbody');
+    tbody.innerHTML = '';
+
+    if (models.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No trained models yet</td></tr>';
+        return;
+    }
+
+    models.forEach(model => {
+        const row = tbody.insertRow();
+
+        // Symbol
+        row.insertCell(0).innerHTML = `<strong>${model.symbol}</strong>`;
+
+        // Type
+        const typeCell = row.insertCell(1);
+        const typeBadge = getModelTypeBadge(model.type);
+        typeCell.innerHTML = `<span class="badge ${typeBadge}">${model.type}</span>`;
+
+        // Accuracy
+        const accuracyCell = row.insertCell(2);
+        const accuracy = parseFloat(model.accuracy || 0);
+        const accuracyColor = accuracy >= 80 ? 'text-success' : accuracy >= 60 ? 'text-warning' : 'text-danger';
+        accuracyCell.innerHTML = `<span class="${accuracyColor}">${accuracy.toFixed(1)}%</span>`;
+
+        // Trained date
+        row.insertCell(3).innerHTML = `<small class="text-muted">${formatDate(model.trained_date)}</small>`;
+
+        // Actions
+        const actionsCell = row.insertCell(4);
+        actionsCell.innerHTML = `
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-primary" onclick="predictStock('${model.symbol}')" title="Predict">
+                    <i class="bi bi-magic"></i>
+                </button>
+                <button class="btn btn-outline-info" onclick="viewModelDetails('${model.id}')" title="Details">
+                    <i class="bi bi-info-circle"></i>
+                </button>
+                <button class="btn btn-outline-danger" onclick="deleteModel('${model.id}')" title="Delete">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        `;
+    });
+}
+
+// Handle Training Form Submission
+async function handleTrainingSubmit(event) {
+    event.preventDefault();
+
+    const formData = {
+        symbol: document.getElementById('stock-symbol').value,
+        duration: document.getElementById('training-duration').value,
+        model_type: document.getElementById('model-type').value,
+        use_technical_indicators: document.getElementById('use-technical-indicators').checked
+    };
+
+    try {
+        showTrainingProgress();
+
+        const response = await fetch('/api/v1/ml/train', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Start polling for training progress
+            pollTrainingProgress(result.training_id);
+        } else {
+            hideTrainingProgress();
+            alert('Training failed: ' + (result.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Training error:', error);
+        hideTrainingProgress();
+        alert('Training failed: Network error');
+    }
+}
+
+// Handle Stock Prediction
+async function handlePrediction() {
+    const symbol = document.getElementById('predict-symbol').value;
+    const horizon = document.querySelector('input[name="horizon"]:checked').value;
+
+    if (!symbol) {
+        alert('Please enter a stock symbol');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/v1/ml/predict', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                symbol: symbol,
+                horizon: parseInt(horizon)
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            displayPredictionResults(result.data);
+        } else {
+            alert('Prediction failed: ' + (result.error || 'Model not found for this symbol'));
+        }
+    } catch (error) {
+        console.error('Prediction error:', error);
+        alert('Prediction failed: Network error');
+    }
+}
+
+// Display Prediction Results
+function displayPredictionResults(data) {
+    document.getElementById('prediction-results').style.display = 'block';
+
+    // Update prediction values
+    document.getElementById('predicted-price').textContent = `₹${parseFloat(data.predicted_price).toFixed(2)}`;
+
+    const priceChange = parseFloat(data.price_change_percent);
+    const priceChangeElement = document.getElementById('price-change');
+    priceChangeElement.textContent = `${priceChange >= 0 ? '+' : ''}${priceChange.toFixed(2)}%`;
+    priceChangeElement.className = priceChange >= 0 ? 'text-success' : 'text-danger';
+
+    document.getElementById('confidence-score').textContent = `${Math.round(data.confidence * 100)}%`;
+
+    const signalElement = document.getElementById('signal-strength');
+    signalElement.textContent = data.signal;
+    signalElement.className = getSignalColor(data.signal);
+
+    // Update model breakdown
+    const tbody = document.getElementById('model-breakdown');
+    tbody.innerHTML = '';
+
+    if (data.model_breakdown) {
+        data.model_breakdown.forEach(model => {
+            const row = tbody.insertRow();
+            row.insertCell(0).textContent = model.name;
+            row.insertCell(1).textContent = `₹${parseFloat(model.prediction).toFixed(2)}`;
+            row.insertCell(2).textContent = `${Math.round(model.weight * 100)}%`;
+            row.insertCell(3).textContent = `${Math.round(model.confidence * 100)}%`;
+        });
+    }
+}
+
+// Utility Functions
+function getModelTypeBadge(type) {
+    const badges = {
+        'ensemble': 'bg-primary',
+        'random_forest': 'bg-success',
+        'xgboost': 'bg-warning',
+        'lstm': 'bg-info'
+    };
+    return badges[type] || 'bg-secondary';
+}
+
+function getSignalColor(signal) {
+    const colors = {
+        'BUY': 'text-success mb-1',
+        'SELL': 'text-danger mb-1',
+        'HOLD': 'text-warning mb-1'
+    };
+    return colors[signal] || 'text-secondary mb-1';
+}
+
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString();
+}
+
+function showTrainingProgress() {
+    document.getElementById('training-progress').style.display = 'block';
+}
+
+function hideTrainingProgress() {
+    document.getElementById('training-progress').style.display = 'none';
+    document.getElementById('progress-bar').style.width = '0%';
+    document.getElementById('progress-percent').textContent = '0%';
+}
+
+function pollTrainingProgress(trainingId) {
+    // Implement training progress polling
+    // This would check the training status periodically
+}
+
+function refreshTrainedModels() {
+    loadTrainedModels();
+}
+
+function predictStock(symbol) {
+    document.getElementById('predict-symbol').value = symbol;
+    document.getElementById('predict-btn').click();
+}
+
+function viewModelDetails(modelId) {
+    // Implement model details view
+    alert('Model details for ID: ' + modelId);
+}
+
+function deleteModel(modelId) {
+    if (confirm('Are you sure you want to delete this model?')) {
+        // Implement model deletion
+        alert('Delete model ID: ' + modelId);
+    }
+}
+
+function searchSymbol() {
+    // Implement symbol search functionality
+    alert('Symbol search functionality to be implemented');
+}
+
+function showTrainedModelsError() {
+    const tbody = document.querySelector('#trained-models-table tbody');
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-warning">Error loading models</td></tr>';
+}
+</script>
+{% endblock %}
