@@ -232,36 +232,21 @@ class FyersDashboardProvider(IDashboardProvider):
             # Add recent orders
             if orderbook_response.get('status') == 'success':
                 orders = orderbook_response.get('data', [])[:limit//2]
+                print(f"DEBUG: Orders: {orders}")
                 for order in orders:
                     activities.append({
                         'type': 'order',
-                        'id': order.get('id', ''),
+                        'id': order.get('orderid', ''),
                         'symbol': order.get('symbol', ''),
-                        'symbol_name': order.get('symbol_name', ''),
-                        'side': order.get('side', ''),
+                        'symbol_name': order.get('symbol', '').replace('NSE:', '').replace('-EQ', ''),
+                        'side': order.get('action', ''),
                         'status': order.get('status', ''),
                         'quantity': order.get('quantity', 0),
-                        'price': order.get('limit_price', 0),
-                        'timestamp': order.get('order_date_time', ''),
-                        'order_type': order.get('type', '')
+                        'price': order.get('price', 0),
+                        'timestamp': order.get('timestamp', ''),
+                        'order_type': order.get('pricetype', '')
                     })
-            
-            # Add recent trades
-            if tradebook_response.get('status') == 'success':
-                trades = tradebook_response.get('data', [])[:limit//2]
-                for trade in trades:
-                    activities.append({
-                        'type': 'trade',
-                        'id': trade.get('id', ''),
-                        'symbol': trade.get('symbol', ''),
-                        'symbol_name': trade.get('symbol_name', ''),
-                        'side': trade.get('side', ''),
-                        'status': 'EXECUTED',
-                        'quantity': trade.get('quantity', 0),
-                        'price': trade.get('price', 0),
-                        'timestamp': trade.get('trade_date_time', ''),
-                        'pnl': trade.get('pnl', 0)
-                    })
+        
             
             # Sort all activities by timestamp
             activities.sort(key=lambda x: x.get('timestamp', ''), reverse=True)

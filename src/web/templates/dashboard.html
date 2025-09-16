@@ -701,20 +701,34 @@
         tbody.innerHTML = '';
         
         if (orders.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No recent orders</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No recent orders</td></tr>';
             return;
         }
         
         orders.forEach(order => {
             const row = document.createElement('tr');
-            const statusColor = getOrderStatusColor(order.status);
-            const typeColor = order.side === 'buy' ? 'text-success' : 'text-danger';
+            
+            // Normalize fields from different providers/shapes
+            const id = (order.order_id || order.id || order.orderId || '').toString();
+            const symbol = order.symbol || order.symbol_name || '';
+            const side = (order.side || order.action || '').toString().toLowerCase();
+            const type = order.type || order.order_type || order.pricetype || (side ? side.toUpperCase() : '');
+            const quantity = Number(order.quantity || order.qty || order.filled_quantity || 0);
+            const price = Number(order.price || order.average_price || order.avg_price || 0);
+            const status = (order.status || '').toString();
+            const timestamp = order.timestamp || order.time || order.order_time || '';
+            
+            const statusColor = getOrderStatusColor(status);
+            const typeColor = side === 'buy' ? 'text-success' : side === 'sell' ? 'text-danger' : '';
             
             row.innerHTML = `
-                <td class="small">${order.order_id}</td>
-                <td class="small">${order.symbol}</td>
-                <td class="small ${typeColor}">${order.type}</td>
-                <td class="small"><span class="badge bg-${statusColor}">${order.status}</span></td>
+                <td class="small">${id ? id : '—'}</td>
+                <td class="small">${symbol}</td>
+                <td class="small ${typeColor}">${type}</td>
+                <td class="small">${Number.isFinite(quantity) ? quantity : ''}</td>
+                <td class="small">${Number.isFinite(price) ? '₹' + price : ''}</td>
+                <td class="small"><span class="badge bg-${statusColor}">${status}</span></td>
+                <td class="small">${timestamp}</td>
             `;
             tbody.appendChild(row);
         });
