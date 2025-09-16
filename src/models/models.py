@@ -36,6 +36,7 @@ class User(UserMixin, Base):
     orders = relationship("Order", back_populates="user")
     trades = relationship("Trade", back_populates="user")
     positions = relationship("Position", back_populates="user")
+    holdings = relationship("Holding", back_populates="user")
     strategies = relationship("Strategy", back_populates="user")
     configurations = relationship("Configuration", back_populates="user")
     logs = relationship("Log", back_populates="user")
@@ -182,6 +183,36 @@ class Position(Base):
     
     # Relationship with user
     user = relationship("User", back_populates="positions")
+
+
+class Holding(Base):
+    """Portfolio holdings (long-term investments)."""
+    __tablename__ = 'holdings'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    tradingsymbol = Column(String(50), nullable=False)
+    exchange = Column(String(20))
+    instrument_token = Column(String(50))
+    product = Column(String(10))
+    quantity = Column(Integer)
+    average_price = Column(Float)
+    last_price = Column(Float)
+    market_value = Column(Float)
+    invested_value = Column(Float)
+    pnl = Column(Float)
+    pnl_percentage = Column(Float)
+    holding_type = Column(String(10))  # T1, T0, etc.
+    authorized_date = Column(String(20))
+    authorized_quantity = Column(Integer)
+    opening_quantity = Column(Integer)
+    holding_quantity = Column(Integer)
+    collateral_quantity = Column(Integer)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationship with user
+    user = relationship("User", back_populates="holdings")
 
 
 class Strategy(Base):

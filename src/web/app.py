@@ -1121,18 +1121,58 @@ def create_app():
 
     # Add missing API endpoints that frontend expects
     @app.route('/api/portfolio', methods=['GET'])
-    @login_required
     def api_get_portfolio():
-        """Get portfolio summary - redirect to unified endpoint."""
+        """Get portfolio data using portfolio sync service with real Fyers data."""
         try:
-            from .routes.unified_routes import api_get_portfolio_summary_detailed
-            return api_get_portfolio_summary_detailed()
+            # Get user_id - default to 1 for testing (same pattern as orders API)
+            user_id = getattr(current_user, 'id', None) if current_user and current_user.is_authenticated else 1
+
+            from src.services.portfolio_sync_service import get_portfolio_sync_service
+            portfolio_sync_service = get_portfolio_sync_service()
+
+            force_refresh = request.args.get('force_refresh', 'false').lower() == 'true'
+            portfolio_data = portfolio_sync_service.get_portfolio_data(user_id, force_refresh=force_refresh)
+
+            # Convert to format expected by frontend
+            positions = portfolio_data.get('positions', [])
+            holdings = portfolio_data.get('holdings', [])
+
+            # Combine positions and holdings for the portfolio view
+            combined_portfolio = []
+
+            # Add positions
+            for position in positions:
+                combined_portfolio.append({
+                    'symbol': position['symbol'],
+                    'quantity': position['quantity'],
+                    'avg_price': position['avg_price'],
+                    'last_price': position['last_price'],
+                    'pnl': position['pnl'],
+                    'pnl_percentage': position['pnl_percentage'],
+                    'current_value': position['current_value'],
+                    'investment_value': position['investment_value'],
+                    'type': 'position'
+                })
+
+            # Add holdings
+            for holding in holdings:
+                combined_portfolio.append({
+                    'symbol': holding['symbol'],
+                    'quantity': holding['quantity'],
+                    'avg_price': holding['avg_price'],
+                    'last_price': holding['last_price'],
+                    'pnl': holding['pnl'],
+                    'pnl_percentage': holding['pnl_percentage'],
+                    'current_value': holding['market_value'],
+                    'investment_value': holding['invested_value'],
+                    'type': 'holding'
+                })
+
+            return jsonify(combined_portfolio)
+
         except Exception as e:
-            app.logger.error(f"Error fetching portfolio: {e}")
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
+            app.logger.error(f"Error fetching portfolio with sync service: {e}", exc_info=True)
+            return jsonify([]), 500
 
     @app.route('/api/orders/', methods=['GET'])
     @login_required
