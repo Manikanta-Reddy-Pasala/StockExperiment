@@ -429,13 +429,14 @@ CREATE TABLE IF NOT EXISTS ml_training_jobs (
     model_type VARCHAR(50) NOT NULL,
     start_date TIMESTAMP NOT NULL,
     end_date TIMESTAMP NOT NULL,
+    duration VARCHAR(10) NOT NULL DEFAULT '1y',
     status VARCHAR(20) DEFAULT 'pending' NOT NULL,
     progress DECIMAL(5,2) DEFAULT 0.0,
     accuracy DECIMAL(5,4),
     use_technical_indicators BOOLEAN DEFAULT TRUE,
     error_message TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    started_at TIMESTAMP,
     completed_at TIMESTAMP
 );
 

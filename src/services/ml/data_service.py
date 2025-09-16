@@ -26,32 +26,16 @@ def get_stock_data(
     Fetches stock data from Fyers API.
     If start_date and end_date are provided, they are used.
     Otherwise, the 'period' is used.
-    If the requested symbol fails, tries fallback symbols.
+    Only uses the requested symbol - no fallback symbols.
     """
-    # First try the requested symbol
+    # Try to fetch data for the requested symbol only
     fyers_data = _try_fyers_data(symbol, start_date, end_date, period, interval, user_id)
     if fyers_data is not None and len(fyers_data) > 0:
         logger.info(f"Successfully fetched {len(fyers_data)} records from Fyers for {symbol}")
         return fyers_data
 
-    # If the requested symbol fails, try fallback symbols
-    logger.warning(f"Requested symbol {symbol} failed, trying fallback symbols...")
-    fallback_symbols = [
-        "NSE:UTKARSHBNK-EQ",  # We know this works
-    ]
-
-    for fallback_symbol in fallback_symbols:
-        if fallback_symbol == symbol:
-            continue  # Don't retry the same symbol
-
-        logger.info(f"Trying fallback symbol: {fallback_symbol}")
-        fyers_data = _try_fyers_data(fallback_symbol, start_date, end_date, period, interval, user_id)
-        if fyers_data is not None and len(fyers_data) > 0:
-            logger.info(f"Successfully fetched {len(fyers_data)} records from Fyers using fallback symbol {fallback_symbol}")
-            return fyers_data
-
-    # If all symbols fail, raise an error
-    raise Exception(f"Failed to fetch data from Fyers API for {symbol} and all fallback symbols. Please check API connection.")
+    # If the requested symbol fails, raise an error with the specific symbol
+    raise Exception(f"Failed to fetch data from Fyers API for symbol {symbol}. Please check if the symbol is valid and API connection is working.")
 
 def _try_fyers_data(symbol: str, start_date: Optional[date], end_date: Optional[date], period: str, interval: str, user_id: int):
     """
