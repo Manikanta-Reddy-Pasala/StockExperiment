@@ -856,13 +856,40 @@
             if (result.success && result.data) {
                 const metrics = result.data;
                 const chartDataPoints = Array.isArray(metrics.chart_data) ? metrics.chart_data : [];
+                let labels, values;
                 if (!chartDataPoints.length) {
-                    showPortfolioPerformanceError('No performance data available');
-                    return;
+                    // Build a zero chart for the selected period
+                    const periodDaysMap = { '1D': 1, '1W': 7, '1M': 30, '3M': 90, '1Y': 365 };
+                    const days = periodDaysMap[period] || 30;
+                    labels = [];
+                    values = [];
+                    if (period === '1D') {
+                        // Provide 24 hourly points for 1D so the chart renders meaningfully
+                        const now = new Date();
+                        for (let h = 23; h >= 0; h--) {
+                            const d = new Date(now);
+                            d.setHours(now.getHours() - h, 0, 0, 0);
+                            labels.push(d.toTimeString().slice(0, 5));
+                            values.push(0);
+                        }
+                    } else {
+                        const today = new Date();
+                        for (let i = days - 1; i >= 0; i--) {
+                            const d = new Date(today);
+                            d.setDate(today.getDate() - i);
+                            labels.push(d.toISOString().slice(0, 10));
+                            values.push(0);
+                        }
+                    }
+                } else {
+                    labels = chartDataPoints.map(p => p.date);
+                    values = chartDataPoints.map(p => Number(p.value || 0));
+                    // Ensure at least two points to render a line chart
+                    if (labels.length === 1) {
+                        labels = [labels[0], labels[0]];
+                        values = [values[0], values[0]];
+                    }
                 }
-
-                const labels = chartDataPoints.map(p => p.date);
-                const values = chartDataPoints.map(p => Number(p.value || 0));
 
                 const chartJsData = {
                     labels: labels,
@@ -880,12 +907,54 @@
                 };
                 updatePortfolioChart(chartJsData);
             } else {
-                console.error('Failed to fetch portfolio performance:', result.error);
-                showPortfolioPerformanceError(result.error || 'Failed to load performance data');
+                // On error, show zero chart for the selected period
+                const periodDaysMap = { '1D': 1, '1W': 7, '1M': 30, '3M': 90, '1Y': 365 };
+                const days = periodDaysMap[period] || 30;
+                let labels = [];
+                let values = [];
+                if (period === '1D') {
+                    const now = new Date();
+                    for (let h = 23; h >= 0; h--) {
+                        const d = new Date(now);
+                        d.setHours(now.getHours() - h, 0, 0, 0);
+                        labels.push(d.toTimeString().slice(0, 5));
+                        values.push(0);
+                    }
+                } else {
+                    const today = new Date();
+                    for (let i = days - 1; i >= 0; i--) {
+                        const d = new Date(today);
+                        d.setDate(today.getDate() - i);
+                        labels.push(d.toISOString().slice(0, 10));
+                        values.push(0);
+                    }
+                }
+                updatePortfolioChart({ labels, datasets: [{ label: 'Portfolio Value', data: values, borderColor: 'var(--primary-color)', backgroundColor: 'rgba(0, 123, 255, 0.1)', borderWidth: 2, fill: true, tension: 0.3 }] });
             }
         } catch (error) {
-            console.error('Error fetching portfolio performance:', error);
-            showPortfolioPerformanceError('Network error loading performance data');
+            // Network error: also render a zero chart
+            const periodDaysMap = { '1D': 1, '1W': 7, '1M': 30, '3M': 90, '1Y': 365 };
+            const days = periodDaysMap[period] || 30;
+            let labels = [];
+            let values = [];
+            if (period === '1D') {
+                const now = new Date();
+                for (let h = 23; h >= 0; h--) {
+                    const d = new Date(now);
+                    d.setHours(now.getHours() - h, 0, 0, 0);
+                    labels.push(d.toTimeString().slice(0, 5));
+                    values.push(0);
+                }
+            } else {
+                const today = new Date();
+                for (let i = days - 1; i >= 0; i--) {
+                    const d = new Date(today);
+                    d.setDate(today.getDate() - i);
+                    labels.push(d.toISOString().slice(0, 10));
+                    values.push(0);
+                }
+            }
+            updatePortfolioChart({ labels, datasets: [{ label: 'Portfolio Value', data: values, borderColor: 'var(--primary-color)', backgroundColor: 'rgba(0, 123, 255, 0.1)', borderWidth: 2, fill: true, tension: 0.3 }] });
         }
     }
     
