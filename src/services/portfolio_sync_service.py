@@ -9,6 +9,8 @@ from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 import logging
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 from src.models.database import get_database_manager
 from src.models.models import Position, Holding
@@ -51,11 +53,19 @@ class PortfolioSyncService:
         """
         try:
             # Check if we should use cached data
-            if not force_refresh and self._should_use_cache(user_id):
-                cached_portfolio = self._get_cached_portfolio(user_id)
-                if cached_portfolio is not None:
-                    logger.info(f"Returning cached portfolio for user {user_id}")
-                    return cached_portfolio
+            if not force_refresh:
+                if self._should_use_cache(user_id):
+                    cached_portfolio = self._get_cached_portfolio(user_id)
+                    if cached_portfolio is not None:
+                        logger.info(f"Returning cached portfolio for user {user_id}")
+                        return cached_portfolio
+                else:
+                    # If cache is slightly stale, return immediately and refresh in background
+                    cached_portfolio = self._get_cached_portfolio(user_id)
+                    if cached_portfolio is not None:
+                        logger.info(f"Returning stale cached portfolio for user {user_id} and refreshing in background")
+                        threading.Thread(target=self._background_refresh, args=(user_id,), daemon=True).start()
+                        return cached_portfolio
 
             # Try to get data from database first
             db_portfolio = self._get_db_portfolio(user_id)
@@ -89,8 +99,11 @@ class PortfolioSyncService:
             logger.info(f"Syncing portfolio from Fyers for user {user_id}")
 
             # Fetch positions and holdings concurrently
-            positions_result = self.broker_service.get_fyers_positions(user_id)
-            holdings_result = self.broker_service.get_fyers_holdings(user_id)
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                future_positions = executor.submit(self.broker_service.get_fyers_positions, user_id)
+                future_holdings = executor.submit(self.broker_service.get_fyers_holdings, user_id)
+                positions_result = future_positions.result()
+                holdings_result = future_holdings.result()
 
             # Parse positions
             positions = self._parse_fyers_positions(positions_result)
@@ -122,6 +135,15 @@ class PortfolioSyncService:
         except Exception as e:
             logger.error(f"Error syncing portfolio from Fyers: {e}")
             raise
+
+    def _background_refresh(self, user_id: int):
+        """Refresh portfolio data in background and update cache, swallowing errors."""
+        try:
+            db_portfolio = self._get_db_portfolio(user_id)
+            portfolio_data = self._sync_portfolio_from_fyers(user_id, db_portfolio)
+            self._cache_portfolio(user_id, portfolio_data)
+        except Exception as e:
+            logger.warning(f"Background refresh failed for user {user_id}: {e}")
 
     def _parse_fyers_positions(self, positions_result: Dict) -> List[Dict]:
         """Parse Fyers positions API response into standardized format."""

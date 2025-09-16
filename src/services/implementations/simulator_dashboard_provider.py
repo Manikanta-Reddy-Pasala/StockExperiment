@@ -117,18 +117,74 @@ class SimulatorDashboardProvider(IDashboardProvider):
         }
     
     def get_performance_metrics(self, user_id: int, period: str = '1M') -> Dict[str, Any]:
-        """Get simulated performance metrics."""
-        return {
-            'success': True,
-            'data': {
-                'return_percent': round(random.uniform(-5, 15), 2),
+        """Get simulated performance metrics with proper period support."""
+        try:
+            # Map period string to days
+            period_days_map = {
+                '1D': 1,
+                '1W': 7,
+                '1M': 30,
+                '3M': 90,
+                '6M': 180,
+                '1Y': 365
+            }
+
+            period_days = period_days_map.get(period, 30)
+
+            # Generate simulated chart data
+            from datetime import timedelta
+            chart_data = []
+            current_date = datetime.now()
+            base_value = 100000
+
+            for i in range(max(1, period_days)):
+                date = current_date - timedelta(days=period_days - i - 1)
+                # Simulate more volatile returns for simulator
+                daily_return = random.uniform(-0.02, 0.02)  # ±2% daily volatility
+                value = base_value * (1 + daily_return * (i / period_days))
+
+                chart_data.append({
+                    'date': date.strftime('%Y-%m-%d'),
+                    'value': round(value, 2),
+                    'return': round(daily_return * 100, 2),
+                    'drawdown': round(max(-0.1, min(0, daily_return * random.uniform(0.5, 1.5))) * 100, 2)
+                })
+
+            # Calculate overall period performance
+            period_return = random.uniform(-5, 15)
+
+            performance_data = {
+                'return_percent': round(period_return, 2),
+                'annualized_return': round(period_return * (365 / max(period_days, 1)), 2),
+                'total_pnl': round(base_value * period_return / 100, 2),
+                'portfolio_value': base_value,
+                'period': period,
+                'period_days': period_days,
                 'win_rate': round(random.uniform(45, 75), 2),
                 'sharpe_ratio': round(random.uniform(0.5, 2.5), 2),
                 'max_drawdown': round(random.uniform(-15, -2), 2),
-                'period': period
-            },
-            'last_updated': datetime.now().isoformat()
-        }
+                'volatility': round(random.uniform(15, 25), 2),
+                'best_day': round(random.uniform(2, 5), 2),
+                'worst_day': round(random.uniform(-5, -2), 2),
+                'total_trading_days': period_days,
+                'chart_data': chart_data
+            }
+
+            return {
+                'success': True,
+                'data': performance_data,
+                'note': f'Simulated data for {period} period - Realistic trading simulation',
+                'last_updated': datetime.now().isoformat()
+            }
+
+        except Exception as e:
+            logger.error(f"Error generating simulator performance metrics: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e),
+                'data': {},
+                'last_updated': datetime.now().isoformat()
+            }
     
     def get_watchlist_quotes(self, user_id: int, symbols: List[str] = None) -> Dict[str, Any]:
         """Get simulated watchlist quotes."""

@@ -864,9 +864,9 @@
     // Fetch portfolio performance data
     async function fetchPortfolioPerformance(period = '1W') {
         try {
-            const response = await fetch(`/api/dashboard/portfolio-performance?period=${period}`);
+            const response = await fetch(`/api/unified/dashboard/performance-metrics?period=${period}`);
             const result = await response.json();
-            
+
             if (result.success && result.data) {
                 updatePortfolioChart(result.data);
             } else {

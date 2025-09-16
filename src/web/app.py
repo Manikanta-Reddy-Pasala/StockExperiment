@@ -207,29 +207,7 @@ def create_app():
         """Dashboard page."""
         return render_template('dashboard.html')
     
-    @app.route('/demo')
-    def demo_dashboard():
-        """Demo dashboard page (no login required)."""
-        return render_template('dashboard.html')
     
-    # Auto-login route for demo purposes
-    @app.route('/auto-login')
-    def auto_login():
-        """Auto-login for demo purposes."""
-        try:
-            # Try to find or create a demo user
-            demo_user = user_service.get_or_create_demo_user()
-            if demo_user:
-                login_user(demo_user)
-                flash('Demo login successful!', 'success')
-                return redirect(url_for('dashboard'))
-            else:
-                flash('Demo login failed. Using demo mode.', 'warning')
-                return redirect(url_for('demo_dashboard'))
-        except Exception as e:
-            app.logger.error(f"Auto-login error: {e}")
-            flash('Demo login unavailable. Using demo mode.', 'warning')
-            return redirect(url_for('demo_dashboard'))
     
     @app.route('/logs')
     @login_required
@@ -822,9 +800,10 @@ def create_app():
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
     @app.route('/api/market/overview', methods=['GET'])
+    @login_required
     def api_get_market_overview():
         """Get market overview for NIFTY indices using broker_service quotes directly."""
-        user_id = getattr(current_user, 'id', None) if current_user and current_user.is_authenticated else 1
+        user_id = current_user.id
         try:
             app.logger.info(f"Fetching market overview for user {user_id}")
             
@@ -935,8 +914,8 @@ def create_app():
     def api_get_portfolio_performance():
         """Get portfolio performance data using unified multi-broker system."""
         try:
-            from .routes.unified_routes import api_get_portfolio_performance as unified_portfolio_performance
-            return unified_portfolio_performance()
+            from .routes.unified_routes import api_get_performance_metrics
+            return api_get_performance_metrics()
         except Exception as e:
             app.logger.error(f"Error fetching portfolio performance: {e}")
             return jsonify({
@@ -1332,6 +1311,7 @@ def create_app():
                 'top_performers': [],
                 'worst_performers': []
             }), 500
+
 
     return app
 

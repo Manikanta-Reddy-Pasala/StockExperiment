@@ -380,6 +380,47 @@ VALUES
     '{}'
 ) ON CONFLICT (user_id, strategy_name) DO NOTHING;
 
+-- Portfolio Performance Tracking Tables (Broker-Aware)
+CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) NOT NULL,
+    broker_name VARCHAR(50) NOT NULL,
+    snapshot_date DATE NOT NULL,
+    portfolio_value DECIMAL(15,2) NOT NULL,
+    cash_balance DECIMAL(15,2) DEFAULT 0.0,
+    total_invested DECIMAL(15,2) DEFAULT 0.0,
+    total_pnl DECIMAL(15,2) DEFAULT 0.0,
+    day_pnl DECIMAL(15,2) DEFAULT 0.0,
+    return_percent DECIMAL(8,4) DEFAULT 0.0,
+    holdings_data JSONB,
+    positions_data JSONB,
+    performance_metrics JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, broker_name, snapshot_date)
+);
+
+CREATE TABLE IF NOT EXISTS portfolio_performance_history (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) NOT NULL,
+    broker_name VARCHAR(50) NOT NULL,
+    date DATE NOT NULL,
+    portfolio_value DECIMAL(15,2) NOT NULL,
+    daily_return DECIMAL(8,4) DEFAULT 0.0,
+    cumulative_return DECIMAL(8,4) DEFAULT 0.0,
+    drawdown DECIMAL(8,4) DEFAULT 0.0,
+    volatility DECIMAL(8,4) DEFAULT 0.0,
+    sharpe_ratio DECIMAL(8,4) DEFAULT 0.0,
+    max_drawdown DECIMAL(8,4) DEFAULT 0.0,
+    win_rate DECIMAL(5,2) DEFAULT 0.0,
+    total_trades INTEGER DEFAULT 0,
+    winning_trades INTEGER DEFAULT 0,
+    losing_trades INTEGER DEFAULT 0,
+    best_day DECIMAL(8,4) DEFAULT 0.0,
+    worst_day DECIMAL(8,4) DEFAULT 0.0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, broker_name, date)
+);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_stocks_symbol ON stocks(symbol);
 CREATE INDEX IF NOT EXISTS idx_stocks_market_cap_category ON stocks(market_cap_category);
@@ -390,3 +431,5 @@ CREATE INDEX IF NOT EXISTS idx_portfolio_strategies_user ON portfolio_strategies
 CREATE INDEX IF NOT EXISTS idx_user_strategy_settings_user ON user_strategy_settings(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_strategy_settings_active ON user_strategy_settings(user_id, is_active, is_enabled);
 CREATE INDEX IF NOT EXISTS idx_portfolio_positions_portfolio ON portfolio_positions(portfolio_strategy_id);
+CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_user_broker_date ON portfolio_snapshots(user_id, broker_name, snapshot_date);
+CREATE INDEX IF NOT EXISTS idx_portfolio_performance_user_broker_date ON portfolio_performance_history(user_id, broker_name, date);
