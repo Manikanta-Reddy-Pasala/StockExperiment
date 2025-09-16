@@ -96,60 +96,98 @@ def _objective_lstm(trial, X, y):
     return mean_squared_error(y_test, preds)
 
 # --- Training Orchestrator ---
-def train_and_tune_models(symbol: str, start_date: Optional[date] = None, end_date: Optional[date] = None, user_id: int = 1):
+def train_and_tune_models(symbol: str, start_date: Optional[date] = None, end_date: Optional[date] = None, job_id: int = None):
     """Orchestrates the model training and tuning process for regression."""
-    df = get_stock_data(symbol=symbol, start_date=start_date, end_date=end_date, user_id=user_id)
-    if df is None or len(df) < 150:
-        raise ValueError(f"Not enough data for {symbol} in the given date range to train models.")
+    import logging
+    logger = logging.getLogger(__name__)
 
-    df, features = create_features(df)
-    X_tab = df[features]
-    y_tab = df['Target']
+    def update_progress(progress: float, message: str = ""):
+        """Update training job progress in database"""
+        if job_id:
+            try:
+                # Import here to avoid circular imports
+                from ...models.database import get_database_manager
+                from ...models.models import MLTrainingJob
+                from datetime import datetime
 
-    X_train_tab, X_test_tab, y_train_tab, y_test_tab = train_test_split(X_tab, y_tab, shuffle=False, test_size=0.2)
+                db_manager = get_database_manager()
+                with db_manager.get_session() as session:
+                    job = session.query(MLTrainingJob).filter(MLTrainingJob.id == job_id).first()
+                    if job:
+                        job.progress = progress
+                        if message:
+                            job.progress_message = message
+                        session.commit()
+                        logger.info(f"Updated training progress to {progress}% for job {job_id}: {message}")
+            except Exception as e:
+                logger.error(f"Failed to update progress for job {job_id}: {e}")
 
-    # --- Random Forest ---
-    study_rf = optuna.create_study(direction='minimize')
-    study_rf.optimize(lambda trial: _objective_rf(trial, X_tab, y_tab), n_trials=12, show_progress_bar=False)
-    rf_model = RandomForestRegressor(**study_rf.best_params, random_state=42)
-    rf_model.fit(X_train_tab, y_train_tab)
-    save_model(rf_model, f"{symbol}_rf")
+    try:
+        update_progress(10, "Fetching stock data...")
+        df = get_stock_data(symbol=symbol, start_date=start_date, end_date=end_date, user_id=1)
+        if df is None or len(df) < 150:
+            raise ValueError(f"Not enough data for {symbol} in the given date range to train models.")
 
-    # --- XGBoost ---
-    study_xgb = optuna.create_study(direction='minimize')
-    study_xgb.optimize(lambda trial: _objective_xgb(trial, X_tab, y_tab), n_trials=12, show_progress_bar=False)
-    xgb_model = XGBRegressor(**study_xgb.best_params, objective='reg:squarederror')
-    xgb_model.fit(X_train_tab, y_train_tab)
-    save_model(xgb_model, f"{symbol}_xgb")
+        update_progress(20, "Creating features...")
+        df, features = create_features(df)
+        X_tab = df[features]
+        y_tab = df['Target']
 
-    # --- LSTM ---
-    # A separate scaler for the target variable is crucial for regression
-    target_scaler = MinMaxScaler()
-    X_lstm, y_lstm, feature_scaler = prepare_lstm_data(df, features, target_scaler)
+        X_train_tab, X_test_tab, y_train_tab, y_test_tab = train_test_split(X_tab, y_tab, shuffle=False, test_size=0.2)
 
-    X_train_lstm, X_test_lstm, y_train_lstm, y_test_lstm = train_test_split(X_lstm, y_lstm, shuffle=False, test_size=0.2)
+        update_progress(30, "Training Random Forest model...")
+        # --- Random Forest ---
+        study_rf = optuna.create_study(direction='minimize')
+        study_rf.optimize(lambda trial: _objective_rf(trial, X_tab, y_tab), n_trials=12, show_progress_bar=False)
+        rf_model = RandomForestRegressor(**study_rf.best_params, random_state=42)
+        rf_model.fit(X_train_tab, y_train_tab)
+        save_model(rf_model, f"{symbol}_rf")
 
-    study_lstm = optuna.create_study(direction='minimize')
-    study_lstm.optimize(lambda trial: _objective_lstm(trial, X_lstm, y_lstm), n_trials=8, show_progress_bar=False)
+        update_progress(50, "Training XGBoost model...")
+        # --- XGBoost ---
+        study_xgb = optuna.create_study(direction='minimize')
+        study_xgb.optimize(lambda trial: _objective_xgb(trial, X_tab, y_tab), n_trials=12, show_progress_bar=False)
+        xgb_model = XGBRegressor(**study_xgb.best_params, objective='reg:squarederror')
+        xgb_model.fit(X_train_tab, y_train_tab)
+        save_model(xgb_model, f"{symbol}_xgb")
 
-    best_lstm_params = study_lstm.best_params
-    lstm_model = Sequential([
-        LSTM(best_lstm_params["units_1"], return_sequences=True, input_shape=(X_lstm.shape[1], X_lstm.shape[2])),
-        Dropout(best_lstm_params["dropout"]),
-        LSTM(best_lstm_params["units_2"]),
-        Dropout(best_lstm_params["dropout"]),
-        Dense(1, activation='linear')
-    ])
-    lstm_model.compile(loss='mean_squared_error', optimizer='adam', metrics=['mean_absolute_error'])
-    lstm_model.fit(X_train_lstm, y_train_lstm,
-                   epochs=best_lstm_params["epochs"],
-                   batch_size=best_lstm_params["batch_size"],
-                   validation_data=(X_test_lstm, y_test_lstm), verbose=0,
-                   callbacks=[EarlyStopping(monitor='val_loss', patience=5)])
+        update_progress(70, "Training LSTM model...")
+        # --- LSTM ---
+        # A separate scaler for the target variable is crucial for regression
+        target_scaler = MinMaxScaler()
+        X_lstm, y_lstm, feature_scaler = prepare_lstm_data(df, features, target_scaler)
 
-    save_lstm_model(lstm_model, f"{symbol}_lstm")
-    # Save both scalers: one for features, one for the target
-    save_scaler(feature_scaler, f"{symbol}_lstm_feature")
-    save_scaler(target_scaler, f"{symbol}_lstm_target")
+        X_train_lstm, X_test_lstm, y_train_lstm, y_test_lstm = train_test_split(X_lstm, y_lstm, shuffle=False, test_size=0.2)
 
-    return {"message": f"Successfully trained and saved models for {symbol}"}
+        study_lstm = optuna.create_study(direction='minimize')
+        study_lstm.optimize(lambda trial: _objective_lstm(trial, X_lstm, y_lstm), n_trials=8, show_progress_bar=False)
+
+        best_lstm_params = study_lstm.best_params
+        lstm_model = Sequential([
+            LSTM(best_lstm_params["units_1"], return_sequences=True, input_shape=(X_lstm.shape[1], X_lstm.shape[2])),
+            Dropout(best_lstm_params["dropout"]),
+            LSTM(best_lstm_params["units_2"]),
+            Dropout(best_lstm_params["dropout"]),
+            Dense(1, activation='linear')
+        ])
+        lstm_model.compile(loss='mean_squared_error', optimizer='adam', metrics=['mean_absolute_error'])
+        lstm_model.fit(X_train_lstm, y_train_lstm,
+                       epochs=best_lstm_params["epochs"],
+                       batch_size=best_lstm_params["batch_size"],
+                       validation_data=(X_test_lstm, y_test_lstm), verbose=0,
+                       callbacks=[EarlyStopping(monitor='val_loss', patience=5)])
+
+        update_progress(90, "Saving models...")
+        save_lstm_model(lstm_model, f"{symbol}_lstm")
+        # Save both scalers: one for features, one for the target
+        save_scaler(feature_scaler, f"{symbol}_lstm_feature")
+        save_scaler(target_scaler, f"{symbol}_lstm_target")
+
+        update_progress(100, "Training completed successfully")
+        return {"message": f"Successfully trained and saved models for {symbol}"}
+
+    except Exception as e:
+        logger.error(f"Training failed for {symbol}: {e}")
+        if job_id:
+            update_progress(0, f"Training failed: {str(e)}")
+        raise e

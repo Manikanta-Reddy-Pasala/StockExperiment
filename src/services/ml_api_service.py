@@ -152,12 +152,26 @@ class MLAPIService:
                         'existing_job_id': existing_job.id
                     }
 
+            # Calculate duration based on date range
+            duration_days = (end_dt - start_dt).days
+            if duration_days <= 90:
+                duration = '3M'
+            elif duration_days <= 180:
+                duration = '6M'
+            elif duration_days <= 365:
+                duration = '1Y'
+            else:
+                duration = '2Y'
+
             # Create new training job
             with self.db_manager.get_session() as session:
                 training_job = MLTrainingJob(
                     symbol=symbol,
+                    model_type='ensemble',  # Default to ensemble model
                     start_date=start_dt,
                     end_date=end_dt,
+                    duration=duration,
+                    use_technical_indicators=True,
                     status='running',
                     progress=0.0,
                     created_at=datetime.utcnow(),

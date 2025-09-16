@@ -26,7 +26,7 @@ def get_stock_data(
     Fetches stock data from Fyers API.
     If start_date and end_date are provided, they are used.
     Otherwise, the 'period' is used.
-    Only uses the requested symbol - no fallback symbols.
+    Only uses real data - no fallback to mock data.
     """
     # Try to fetch data for the requested symbol only
     fyers_data = _try_fyers_data(symbol, start_date, end_date, period, interval, user_id)
@@ -238,6 +238,7 @@ def _convert_fyers_to_dataframe(response: dict, symbol: str) -> pd.DataFrame:
     except Exception as e:
         logger.error(f"Error converting Fyers data to DataFrame: {str(e)}")
         return pd.DataFrame()
+
 
 def create_features(df):
     """Engineers features for the stock data."""
