@@ -273,38 +273,8 @@
         }
     }
 
-    // Immediate test to check if script loads
-    console.log('Orders page JavaScript loaded successfully');
+    // Orders page JavaScript loaded successfully
+    console.log('✅ Orders page initialized');
 
-    // Test elements exist after short delay
-    setTimeout(function() {
-        const totalEl = document.getElementById('total-orders');
-        const completedEl = document.getElementById('completed-orders');
-        const pendingEl = document.getElementById('pending-orders');
-        const failedEl = document.getElementById('failed-orders');
-
-        console.log('Elements check:', {
-            totalExists: !!totalEl,
-            completedExists: !!completedEl,
-            pendingExists: !!pendingEl,
-            failedExists: !!failedEl
-        });
-
-        // Manual test - set values directly
-        if (totalEl) {
-            console.log('Setting total orders to manual test');
-            totalEl.textContent = '1 (manual test)';
-        } else {
-            console.error('total-orders element not found!');
-        }
-
-        if (completedEl) {
-            console.log('Setting completed orders to manual test');
-            completedEl.textContent = '1 (manual test)';
-        }
-
-        if (pendingEl) pendingEl.textContent = '0 (manual test)';
-        if (failedEl) failedEl.textContent = '0 (manual test)';
-    }, 500);
 </script>
 {% endblock %}

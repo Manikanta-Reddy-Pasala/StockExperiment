@@ -73,10 +73,10 @@ start_app() {
 # Function to start the application in development mode
 start_dev() {
     print_status "Starting Trading System in Development Mode with Auto-reloading..."
-    
+
     # Build and start services with development override
     docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
-    
+
     print_success "Trading System started in Development Mode!"
     print_status "Services running:"
     echo "  - Web Interface: http://localhost:5001"
@@ -90,6 +90,44 @@ start_dev() {
     echo ""
     print_status "To view logs: docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f"
     print_status "To stop: docker compose -f docker-compose.yml -f docker-compose.dev.yml down"
+}
+
+# Function to start databases only and run Flask locally
+start_local() {
+    print_status "Starting databases only (PostgreSQL + Redis) and running Flask locally..."
+
+    # Start only databases
+    docker compose -f docker-compose.db-only.yml up -d
+
+    print_status "Waiting for databases to be ready..."
+    sleep 5
+
+    # Check if virtual environment exists
+    if [ ! -d "venv" ]; then
+        print_error "Virtual environment not found. Please create it first:"
+        echo "  python -m venv venv"
+        echo "  source venv/bin/activate"
+        echo "  pip install -r requirements.txt"
+        exit 1
+    fi
+
+    print_success "Databases started successfully!"
+    print_status "Docker services running:"
+    echo "  - Database: localhost:5432"
+    echo "  - Redis: localhost:6379"
+    echo ""
+    print_status "Now starting Flask app locally..."
+    echo ""
+    print_warning "Make sure to activate your virtual environment:"
+    echo "  source venv/bin/activate"
+    echo "  python run.py --dev"
+    echo ""
+    print_status "This will give you:"
+    echo "  - Immediate file reloading (templates, Python files)"
+    echo "  - Direct debugging access"
+    echo "  - Faster development cycle"
+    echo ""
+    print_status "To stop databases: docker compose -f docker-compose.db-only.yml down"
 }
 
 # Function to stop the application
@@ -154,6 +192,9 @@ case "${1:-start}" in
     dev)
         start_dev
         ;;
+    local)
+        start_local
+        ;;
     stop)
         stop_app
         ;;
@@ -170,11 +211,12 @@ case "${1:-start}" in
         cleanup
         ;;
     *)
-        echo "Usage: $0 {start|dev|stop|restart|logs|status|cleanup}"
+        echo "Usage: $0 {start|dev|local|stop|restart|logs|status|cleanup}"
         echo ""
         echo "Commands:"
         echo "  start   - Start the Trading System in production mode (default)"
         echo "  dev     - Start the Trading System in development mode with auto-reloading"
+        echo "  local   - Start databases only, run Flask locally for faster development"
         echo "  stop    - Stop the Trading System"
         echo "  restart - Restart the Trading System"
         echo "  logs    - Show application logs"
