@@ -703,15 +703,36 @@
     // Fetch portfolio holdings
     async function fetchPortfolioHoldings() {
         try {
-            const response = await fetch('/api/dashboard/portfolio-holdings');
-            const result = await response.json();
+            // Try unified endpoint first
+            let response = await fetch('/api/dashboard/portfolio-holdings');
+            let result = await response.json();
             
-            if (result.success && result.data) {
-                updatePortfolioHoldingsTable(result.data);
+            // Fallback: if empty or failed, use legacy positions endpoint and map
+            if (!(result.success && Array.isArray(result.data) && result.data.length)) {
+                const posResp = await fetch('/api/portfolio/positions');
+                const posResult = await posResp.json();
+                if (posResult.success && Array.isArray(posResult.data)) {
+                    const mapped = posResult.data.map(p => ({
+                        symbol: p.symbol,
+                        quantity: Number(p.quantity ?? p.netQty ?? p.qty ?? 0),
+                        avg_price: Number(p.average_price ?? p.avg_price ?? p.buyAvg ?? p.netAvg ?? 0),
+                        current_price: Number(p.ltp ?? p.last_price ?? 0),
+                        pnl: Number(p.pnl ?? p.unrealized_profit ?? p.pl ?? 0),
+                        pnl_percent: (function() {
+                            const avg = Number(p.average_price ?? p.avg_price ?? p.buyAvg ?? p.netAvg ?? 0);
+                            const ltp = Number(p.ltp ?? p.last_price ?? 0);
+                            return avg > 0 ? ((ltp - avg) / avg) * 100 : 0;
+                        })()
+                    }));
+                    updatePortfolioHoldingsTable(mapped);
+                    return;
+                }
             } else {
-                console.error('Failed to fetch portfolio holdings:', result.error);
-                showPortfolioHoldingsError(result.error || 'Failed to load portfolio data');
+                updatePortfolioHoldingsTable(result.data);
+                return;
             }
+            
+            showPortfolioHoldingsError(result.error || 'Failed to load portfolio data');
         } catch (error) {
             console.error('Error fetching portfolio holdings:', error);
             showPortfolioHoldingsError('Network error loading portfolio data');

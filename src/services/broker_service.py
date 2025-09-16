@@ -809,6 +809,30 @@ class FyersAPIConnector:
             logger.error(f"Exception while fetching FYERS historical data: {error_msg}")
             return {'error': error_msg}
 
+    def orderbook(self) -> Dict[str, Any]:
+        """Alias for get_orderbook method."""
+        return self.get_orderbook()
+
+    def tradebook(self) -> Dict[str, Any]:
+        """Alias for get_tradebook method."""
+        return self.get_tradebook()
+
+    def funds(self) -> Dict[str, Any]:
+        """Alias for get_funds method."""
+        return self.get_funds()
+
+    def holdings(self) -> Dict[str, Any]:
+        """Alias for get_holdings method."""
+        return self.get_holdings()
+
+    def login(self) -> Dict[str, Any]:
+        """Alias for get_profile method."""
+        return self.get_profile()
+
+    def history(self, symbol: str, resolution: str = "D", range_from: str = None, range_to: str = None) -> Dict[str, Any]:
+        """Alias for get_history method."""
+        return self.get_history(symbol, resolution, range_from, range_to)
+
 
 def get_broker_service() -> BrokerService:
     """Get broker service instance."""

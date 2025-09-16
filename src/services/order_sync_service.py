@@ -12,6 +12,7 @@ import json
 from enum import Enum
 
 from src.models.database import get_database_manager
+from src.models.models import Order
 from src.services.cache_service import get_cache_service
 from src.services.broker_service import get_broker_service
 
@@ -81,12 +82,14 @@ class OrderSyncService:
             # Fetch from Fyers API
             fyers_result = self.broker_service.get_fyers_orderbook(user_id)
 
-            if not fyers_result.get('success'):
-                logger.warning(f"Fyers API call failed for user {user_id}: {fyers_result.get('error')}")
+            # Check if Fyers API call was successful
+            if fyers_result.get('code') != 200 or fyers_result.get('s') != 'ok':
+                error_msg = fyers_result.get('message', 'Unknown error')
+                logger.warning(f"Fyers API call failed for user {user_id}: {error_msg}")
                 return db_orders  # Return existing DB orders
 
             # Parse Fyers orders
-            fyers_orders = self._parse_fyers_orders(fyers_result.get('data', {}))
+            fyers_orders = self._parse_fyers_orders(fyers_result)
 
             # Determine what needs to be synced
             new_orders = []
@@ -125,10 +128,10 @@ class OrderSyncService:
         """Get orders from database."""
         try:
             with self.db_manager.get_session() as session:
-                orders = session.query(self.db_manager.Order).filter(
-                    self.db_manager.Order.user_id == user_id
+                orders = session.query(Order).filter(
+                    Order.user_id == user_id
                 ).order_by(
-                    self.db_manager.Order.placed_at.desc()
+                    Order.placed_at.desc()
                 ).all()
 
                 return [self._db_order_to_dict(order) for order in orders]
@@ -206,7 +209,7 @@ class OrderSyncService:
         }
 
         # Handle both numeric and string status
-        return status_map.get(str(fyers_status), fyers_status.upper())
+        return status_map.get(str(fyers_status), str(fyers_status).upper())
 
     def _order_needs_update(self, db_order: Dict, fyers_order: Dict) -> bool:
         """Check if database order needs updating based on Fyers data."""
@@ -231,9 +234,9 @@ class OrderSyncService:
                 # Update existing orders
                 for order_data in updated_orders:
                     order_id = order_data['order_id']
-                    db_order = session.query(self.db_manager.Order).filter(
-                        self.db_manager.Order.order_id == order_id,
-                        self.db_manager.Order.user_id == user_id
+                    db_order = session.query(Order).filter(
+                        Order.order_id == order_id,
+                        Order.user_id == user_id
                     ).first()
 
                     if db_order:
@@ -247,7 +250,7 @@ class OrderSyncService:
 
     def _create_db_order(self, user_id: int, order_data: Dict):
         """Create database order from standardized order data."""
-        return self.db_manager.Order(
+        return Order(
             user_id=user_id,
             order_id=order_data['order_id'],
             parent_order_id=order_data.get('parent_order_id'),
@@ -344,10 +347,10 @@ class OrderSyncService:
         """Cache orders in Redis."""
         try:
             cache_key = self.ORDERS_CACHE_KEY.format(user_id=user_id)
-            self.cache_service.setex(
+            self.cache_service.set(
                 cache_key,
-                self.ORDERS_CACHE_TTL,
-                json.dumps(orders, default=str)
+                json.dumps(orders, default=str),
+                expire_seconds=self.ORDERS_CACHE_TTL
             )
 
         except Exception as e:
@@ -357,10 +360,10 @@ class OrderSyncService:
         """Update last sync timestamp."""
         try:
             sync_key = self.LAST_SYNC_KEY.format(user_id=user_id)
-            self.cache_service.setex(
+            self.cache_service.set(
                 sync_key,
-                self.ORDERS_CACHE_TTL * 2,  # Keep sync time longer than cache
-                datetime.utcnow().isoformat()
+                datetime.utcnow().isoformat(),
+                expire_seconds=self.ORDERS_CACHE_TTL * 2  # Keep sync time longer than cache
             )
 
         except Exception as e:
