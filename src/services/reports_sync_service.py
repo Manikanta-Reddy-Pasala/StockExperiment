@@ -138,32 +138,48 @@ class ReportsSyncService:
             return self._get_empty_reports_data()
 
     def _get_fresh_trade_data(self, user_id: int) -> List[Dict[str, Any]]:
-        """Get fresh trade data from extended tradebook file."""
+        """Get fresh trade data from live Fyers API only."""
         try:
-            # First try to get from actual broker API
-            try:
-                broker_trades = self.unified_broker_service.get_tradebook(user_id)
-                if broker_trades and 'tradeBook' in broker_trades:
-                    return self._process_broker_trades(broker_trades['tradeBook'])
-            except Exception as e:
-                logger.warning(f"Could not get trades from broker API: {e}")
+            # Get trade data from broker service (which handles real API calls)
+            from src.services.broker_service import BrokerService
 
-            # Fallback to extended tradebook file
-            with open('/Users/manip/Documents/codeRepo/poc/StockExperiment/raw_extended_tradebook.txt', 'r') as f:
-                content = f.read()
+            # Use the existing broker service functions that make real API calls
+            broker_service = BrokerService()
+            positions_data = broker_service.get_fyers_positions(user_id)
 
-            # Extract JSON from the file
-            json_match = re.search(r'\{.*\}', content, re.DOTALL)
-            if json_match:
-                trade_data = json.loads(json_match.group())
-                if 'tradeBook' in trade_data:
-                    return self._process_broker_trades(trade_data['tradeBook'])
+            if positions_data and positions_data.get('s') == 'ok':
+                trades = []
+                positions = positions_data.get('netPositions', [])
 
-            logger.warning("No trade data found in extended tradebook file")
-            return []
+                # Convert positions to trade-like format for reports
+                for pos in positions:
+                    if pos.get('buyQty', 0) > 0:
+                        trade = {
+                            'trade_id': f"pos_{pos.get('fyToken', '')}",
+                            'order_id': f"order_{pos.get('fyToken', '')}",
+                            'symbol': pos.get('symbol', '').split(':')[-1].replace('-EQ', ''),
+                            'exchange': 'NSE',
+                            'transaction_type': 'BUY',
+                            'quantity': pos.get('buyQty', 0),
+                            'price': pos.get('buyAvg', 0.0),
+                            'filled_quantity': pos.get('buyQty', 0),
+                            'trade_value': pos.get('buyVal', 0.0),
+                            'trade_time': datetime.now(),
+                            'side': 1,
+                            'product_type': pos.get('productType', 'CNC'),
+                            'current_price': pos.get('ltp', pos.get('buyAvg', 0.0)),
+                            'unrealized_pnl': pos.get('pl', 0.0)
+                        }
+                        trades.append(trade)
+
+                logger.info(f"Retrieved {len(trades)} positions from live Fyers API")
+                return trades
+            else:
+                logger.warning("No positions data from Fyers API")
+                return []
 
         except Exception as e:
-            logger.error(f"Error getting fresh trade data: {e}")
+            logger.error(f"Error getting fresh trade data from API: {e}")
             return []
 
     def _process_broker_trades(self, broker_trades: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -242,7 +258,7 @@ class ReportsSyncService:
             logger.error(f"Error updating database: {e}")
 
     def _calculate_reports_metrics(self, trades: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Calculate comprehensive reports metrics from trade data."""
+        """Calculate comprehensive reports metrics from trade data and current positions."""
         try:
             if not trades:
                 return self._get_empty_reports_data()
@@ -258,51 +274,35 @@ class ReportsSyncService:
                     symbol_trades[symbol] = []
                 symbol_trades[symbol].append(trade)
 
-            # Calculate P&L for each symbol
+            # Calculate P&L for each symbol using real API data
             symbol_pnl = {}
             total_pnl = 0.0
             winning_trades = 0
             losing_trades = 0
 
-            for symbol, symbol_trade_list in symbol_trades.items():
-                # Calculate P&L for this symbol
-                buy_qty = 0
-                sell_qty = 0
-                buy_value = 0.0
-                sell_value = 0.0
+            for trade in trades:
+                symbol = trade['symbol']
 
-                for trade in symbol_trade_list:
-                    qty = trade['quantity']
-                    value = trade['trade_value']
+                # Use unrealized P&L directly from API positions
+                unrealized_pnl = trade.get('unrealized_pnl', 0.0)
+                current_price = trade.get('current_price', 0.0)
+                avg_buy_price = trade.get('price', 0.0)
+                quantity = trade.get('quantity', 0)
 
-                    if trade['transaction_type'] == 'BUY':
-                        buy_qty += qty
-                        buy_value += value
-                    else:
-                        sell_qty += qty
-                        sell_value += value
+                symbol_pnl[symbol] = {
+                    'pnl': unrealized_pnl,
+                    'quantity_traded': quantity,
+                    'avg_buy_price': avg_buy_price,
+                    'avg_sell_price': current_price,
+                    'return_pct': (unrealized_pnl / (avg_buy_price * quantity)) * 100 if avg_buy_price > 0 and quantity > 0 else 0,
+                    'is_unrealized': True
+                }
 
-                # Calculate net P&L for this symbol
-                if buy_qty > 0 and sell_qty > 0:
-                    # Completed trades - calculate actual P&L
-                    min_qty = min(buy_qty, sell_qty)
-                    avg_buy_price = buy_value / buy_qty if buy_qty > 0 else 0
-                    avg_sell_price = sell_value / sell_qty if sell_qty > 0 else 0
-
-                    pnl = (avg_sell_price - avg_buy_price) * min_qty
-                    symbol_pnl[symbol] = {
-                        'pnl': pnl,
-                        'quantity_traded': min_qty,
-                        'avg_buy_price': avg_buy_price,
-                        'avg_sell_price': avg_sell_price,
-                        'return_pct': (pnl / (avg_buy_price * min_qty)) * 100 if avg_buy_price > 0 else 0
-                    }
-
-                    total_pnl += pnl
-                    if pnl > 0:
-                        winning_trades += 1
-                    else:
-                        losing_trades += 1
+                total_pnl += unrealized_pnl
+                if unrealized_pnl > 0:
+                    winning_trades += 1
+                else:
+                    losing_trades += 1
 
             # Calculate win rate
             completed_trades = winning_trades + losing_trades
