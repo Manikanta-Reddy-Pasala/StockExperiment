@@ -199,28 +199,7 @@ def create_app():
         """Health check endpoint."""
         return jsonify({'status': 'healthy', 'timestamp': datetime.utcnow().isoformat()})
 
-    @app.route('/test-orders')
-    def test_orders():
-        """Test Orders page without authentication."""
-        return render_template('orders.html')
 
-    @app.route('/api/test-orders')
-    def test_orders_api():
-        """Test Orders API without authentication."""
-        fallback_order = {
-            'order_id': '25091600096717',
-            'symbol': 'UTKARSHBNK',
-            'type': 'MARKET',
-            'transaction': 'BUY',
-            'quantity': 1,
-            'filled': 1,
-            'status': 'COMPLETE',
-            'price': 21.72,
-            'created_at': '16-Sep-2025 10:02:44',
-            'product_type': 'CNC',
-            'remaining_quantity': 0
-        }
-        return jsonify([fallback_order])
     
     @app.route('/')
     @login_required
@@ -1093,100 +1072,6 @@ def create_app():
     app.register_blueprint(zerodha_bp)
     app.register_blueprint(simulator_bp)
 
-    # Add fallback functionality to existing routes with mock data
-    try:
-        from ..services.mock_data_service import get_mock_data_service
-        mock_service = get_mock_data_service()
-        
-        # Override the existing market overview route to include fallback
-        @app.route('/api/market/overview', methods=['GET'])
-        def api_market_overview_fallback():
-            """Market overview with mock data fallback."""
-            try:
-                if current_user and current_user.is_authenticated:
-                    # Try the original function
-                    return api_get_market_overview()
-                else:
-                    # Return mock data for demo
-                    return jsonify(mock_service.get_market_overview())
-            except Exception as e:
-                app.logger.error(f"Market overview error, using mock data: {e}")
-                return jsonify(mock_service.get_market_overview())
-        
-        # Override dashboard metrics route
-        @app.route('/api/dashboard/metrics', methods=['GET'])
-        def api_dashboard_metrics_fallback():
-            """Dashboard metrics with mock data fallback."""
-            try:
-                if current_user and current_user.is_authenticated:
-                    return api_get_dashboard_metrics()
-                else:
-                    return jsonify(mock_service.get_portfolio_summary())
-            except Exception as e:
-                app.logger.error(f"Dashboard metrics error, using mock data: {e}")
-                return jsonify(mock_service.get_portfolio_summary())
-        
-        # Override portfolio holdings route
-        @app.route('/api/dashboard/portfolio-holdings', methods=['GET'])
-        def api_portfolio_holdings_fallback():
-            """Portfolio holdings with mock data fallback."""
-            try:
-                if current_user and current_user.is_authenticated:
-                    return api_get_portfolio_holdings()
-                else:
-                    return jsonify(mock_service.get_portfolio_holdings())
-            except Exception as e:
-                app.logger.error(f"Portfolio holdings error, using mock data: {e}")
-                return jsonify(mock_service.get_portfolio_holdings())
-        
-        # Override recent orders route
-        @app.route('/api/dashboard/recent-orders', methods=['GET'])
-        def api_recent_orders_fallback():
-            """Recent orders with mock data fallback."""
-            try:
-                if current_user and current_user.is_authenticated:
-                    return api_get_recent_orders()
-                else:
-                    limit = request.args.get('limit', 5, type=int)
-                    return jsonify(mock_service.get_recent_orders(limit))
-            except Exception as e:
-                app.logger.error(f"Recent orders error, using mock data: {e}")
-                limit = request.args.get('limit', 5, type=int)
-                return jsonify(mock_service.get_recent_orders(limit))
-        
-        # Override pending orders route
-        @app.route('/api/dashboard/pending-orders', methods=['GET'])
-        def api_pending_orders_fallback():
-            """Pending orders with mock data fallback."""
-            try:
-                if current_user and current_user.is_authenticated:
-                    return api_get_pending_orders()
-                else:
-                    return jsonify(mock_service.get_pending_orders())
-            except Exception as e:
-                app.logger.error(f"Pending orders error, using mock data: {e}")
-                return jsonify(mock_service.get_pending_orders())
-        
-        # Override portfolio performance route
-        @app.route('/api/dashboard/portfolio-performance', methods=['GET'])
-        def api_portfolio_performance_fallback():
-            """Portfolio performance with mock data fallback."""
-            try:
-                if current_user and current_user.is_authenticated:
-                    return api_get_portfolio_performance()
-                else:
-                    period = request.args.get('period', '1W')
-                    return jsonify(mock_service.get_portfolio_performance(period))
-            except Exception as e:
-                app.logger.error(f"Portfolio performance error, using mock data: {e}")
-                period = request.args.get('period', '1W')
-                return jsonify(mock_service.get_portfolio_performance(period))
-        
-        
-    except ImportError as e:
-        app.logger.error(f"Could not enable mock data fallback: {e}")
-    except Exception as e:
-        app.logger.error(f"Error setting up fallback routes: {e}")
 
     # Register ML prediction blueprints
     try:
@@ -1265,123 +1150,33 @@ def create_app():
 
     @app.route('/api/orders', methods=['GET'])
     def api_get_orders_no_slash():
-        """Get comprehensive orders data for Orders page including stats and history."""
+        """Get comprehensive orders data for Orders page using efficient caching."""
         try:
-            # Handle case with no authentication (use fallback data immediately)
+            # Get authenticated user
             user_id = getattr(current_user, 'id', None) if current_user and current_user.is_authenticated else None
 
             if not user_id:
-                app.logger.info("No authenticated user - using fallback order data")
-                # Use fallback data directly
-                fallback_order = {
-                    'order_id': '25091600096717',
-                    'symbol': 'UTKARSHBNK',
-                    'type': 'MARKET',
-                    'transaction': 'BUY',
-                    'quantity': 1,
-                    'filled': 1,
-                    'status': 'COMPLETE',
-                    'price': 21.72,
-                    'created_at': '16-Sep-2025 10:02:44',
-                    'product_type': 'CNC',
-                    'remaining_quantity': 0
-                }
-                return jsonify([fallback_order])
+                app.logger.warning("No authenticated user for orders request")
+                return jsonify([]), 200
 
-            app.logger.info(f"Fetching comprehensive orders data for user {user_id}")
+            app.logger.info(f"Fetching orders data for user {user_id} with caching")
 
-            # Fetch raw orderbook data
-            orderbook_result = broker_service.get_fyers_orderbook(user_id)
+            # Use order sync service for efficient data retrieval
+            from src.services.order_sync_service import get_order_sync_service
+            order_sync_service = get_order_sync_service()
 
-            if not orderbook_result.get('success'):
-                error_msg = orderbook_result.get('error', 'Failed to fetch orderbook')
-                app.logger.error(f"Orderbook fetch failed: {error_msg}")
-                return jsonify([]), 200  # Return empty array if no data
+            # Check if force refresh is requested
+            force_refresh = request.args.get('force_refresh', 'false').lower() == 'true'
 
-            # Extract orders from response
-            orders_data = orderbook_result.get('data', {})
-            if isinstance(orders_data, dict):
-                raw_orders = orders_data.get('orderBook', [])
-            elif isinstance(orders_data, list):
-                raw_orders = orders_data
-            else:
-                raw_orders = []
+            # Get orders using sync service (handles caching automatically)
+            orders = order_sync_service.get_user_orders(user_id, force_refresh=force_refresh)
 
-            # Fyers status code mapping
-            status_mapping = {
-                0: 'PLACED',       # Order placed
-                1: 'PARTIAL',      # Partially filled
-                2: 'COMPLETE',     # Complete/Executed
-                3: 'CANCELLED',    # Cancelled
-                4: 'REJECTED',     # Rejected
-                5: 'CANCELLED',    # Modified (treat as cancelled for old version)
-                6: 'PENDING'       # Pending
-            }
-
-            # Fyers side mapping
-            side_mapping = {
-                1: 'BUY',
-                -1: 'SELL'
-            }
-
-            # Fyers type mapping
-            type_mapping = {
-                1: 'LIMIT',
-                2: 'MARKET',
-                3: 'STOP_LOSS',
-                4: 'STOP_LOSS_MARKET'
-            }
-
-            # Transform orders to expected format
-            formatted_orders = []
-            for order in raw_orders:
-                status_code = order.get('status', 0)
-                side_code = order.get('side', 1)
-                type_code = order.get('type', 2)
-
-                formatted_order = {
-                    'order_id': str(order.get('id', '')),
-                    'symbol': order.get('symbol', '').replace('NSE:', '').replace('-EQ', ''),
-                    'type': type_mapping.get(type_code, 'MARKET'),
-                    'transaction': side_mapping.get(side_code, 'BUY'),
-                    'quantity': int(order.get('qty', 0)),
-                    'filled': int(order.get('filledQty', 0)),
-                    'status': status_mapping.get(status_code, 'UNKNOWN'),
-                    'price': float(order.get('limitPrice', order.get('tradedPrice', 0))),
-                    'created_at': order.get('orderDateTime', ''),
-                    'product_type': order.get('productType', ''),
-                    'remaining_quantity': int(order.get('remainingQuantity', 0))
-                }
-                formatted_orders.append(formatted_order)
-
-            app.logger.info(f"Formatted {len(formatted_orders)} orders for user {user_id}")
-            return jsonify(formatted_orders)
+            app.logger.info(f"Retrieved {len(orders)} orders for user {user_id}")
+            return jsonify(orders)
 
         except Exception as e:
-            app.logger.error(f"Error fetching orders: {e}", exc_info=True)
-
-            # Fallback: Use real data from raw files when API fails
-            app.logger.info("Using fallback data from raw_fyers_orderbook.txt")
-            try:
-                # Use the real order data from raw files as specified in requirements
-                fallback_order = {
-                    'order_id': '25091600096717',
-                    'symbol': 'UTKARSHBNK',
-                    'type': 'MARKET',
-                    'transaction': 'BUY',
-                    'quantity': 1,
-                    'filled': 1,
-                    'status': 'COMPLETE',
-                    'price': 21.72,
-                    'created_at': '16-Sep-2025 10:02:44',
-                    'product_type': 'CNC',
-                    'remaining_quantity': 0
-                }
-                app.logger.info("Returning fallback order data from raw files")
-                return jsonify([fallback_order])
-            except Exception as fallback_error:
-                app.logger.error(f"Fallback data error: {fallback_error}")
-                return jsonify([]), 200  # Return empty array if everything fails
+            app.logger.error(f"Error fetching orders with sync service: {e}", exc_info=True)
+            return jsonify([]), 500
 
     @app.route('/api/portfolio/positions', methods=['GET'])
     @login_required
