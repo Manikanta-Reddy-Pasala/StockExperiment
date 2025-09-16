@@ -38,9 +38,9 @@
                             </span>
                         </div>
                     </div>
-                    <div class="col-lg-3 col-md-6" data-index="NIFTY MIDCAP 150">
+                    <div class="col-lg-3 col-md-6" data-index="MIDCAP 150">
                         <div class="text-center">
-                            <h3 class="market-name text-muted fw-bold mb-1">NIFTY MIDCAP 150</h3>
+                            <h3 class="market-name text-muted fw-bold mb-1">MIDCAP 150</h3>
                             <p class="market-price text-muted mb-2">
                                 <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                                 Loading...
@@ -50,9 +50,9 @@
                             </span>
                         </div>
                     </div>
-                    <div class="col-lg-3 col-md-6" data-index="NIFTY SMALLCAP 250">
+                    <div class="col-lg-3 col-md-6" data-index="SMALLCAP 250">
                         <div class="text-center">
-                            <h3 class="market-name text-muted fw-bold mb-1">NIFTY SMALLCAP 250</h3>
+                            <h3 class="market-name text-muted fw-bold mb-1">SMALLCAP 250</h3>
                             <p class="market-price text-muted mb-2">
                                 <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                                 Loading...
@@ -554,8 +554,8 @@
                         const map = {
                             'NSE:NIFTY50-INDEX': 'NIFTY 50',
                             'NSE:NIFTYBANK-INDEX': 'BANK NIFTY',
-                            'NSE:NIFTYMIDCAP150-INDEX': 'NIFTY MIDCAP 150',
-                            'NSE:NIFTYSMLCAP250-INDEX': 'NIFTY SMALLCAP 250'
+                            'NSE:NIFTYMIDCAP150-INDEX': 'MIDCAP 150',
+                            'NSE:NIFTYSMLCAP250-INDEX': 'SMALLCAP 250'
                         };
                         const friendly = map[symbol];
                         if (friendly) {
@@ -582,8 +582,8 @@
                     const map = {
                         'NSE:NIFTY50-INDEX': 'NIFTY 50',
                         'NSE:NIFTYBANK-INDEX': 'BANK NIFTY',
-                        'NSE:NIFTYMIDCAP150-INDEX': 'NIFTY MIDCAP 150',
-                        'NSE:NIFTYSMLCAP250-INDEX': 'NIFTY SMALLCAP 250'
+                        'NSE:NIFTYMIDCAP150-INDEX': 'MIDCAP 150',
+                        'NSE:NIFTYSMLCAP250-INDEX': 'SMALLCAP 250'
                     };
                     const remapped = {};
                     Object.entries(normalized).forEach(([k, v]) => {
@@ -607,7 +607,7 @@
     
     // Show error state for market overview
     function showMarketOverviewError(message) {
-        const indices = ['NIFTY 50', 'BANK NIFTY', 'NIFTY MIDCAP 150', 'NIFTY SMALLCAP 250'];
+        const indices = ['NIFTY 50', 'BANK NIFTY', 'MIDCAP 150', 'SMALLCAP 250'];
         
         indices.forEach(indexName => {
             const indexElement = document.querySelector(`[data-index="${indexName}"]`);
@@ -637,7 +637,7 @@
     // Update market overview UI with real-time data
     function updateMarketOverviewUI(marketData) {
         try { console.debug('UpdateMarketOverview input keys:', Object.keys(marketData || {})); } catch (e) {}
-        const indices = ['NIFTY 50', 'BANK NIFTY', 'NIFTY MIDCAP 150', 'NIFTY SMALLCAP 250'];
+        const indices = ['NIFTY 50', 'BANK NIFTY', 'MIDCAP 150', 'SMALLCAP 250'];
         
         indices.forEach(indexName => {
             // Normalize data shape for each index
