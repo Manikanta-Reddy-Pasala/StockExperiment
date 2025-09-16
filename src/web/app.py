@@ -823,24 +823,61 @@ def create_app():
     @app.route('/api/market/overview', methods=['GET'])
     @login_required
     def api_get_market_overview():
-        """Get market overview data for major indices using broker APIs."""
+        """Get market overview for NIFTY indices using broker_service quotes directly."""
         try:
             app.logger.info(f"Fetching market overview for user {current_user.id}")
             
-            from ..services.market_data_service import get_market_data_service
-            broker_service = get_broker_service()
-            market_service = get_market_data_service(broker_service)
+            # Use existing broker_service which already handles auth/config
+            symbols_map = {
+                'NIFTY 50': 'NSE:NIFTY50-INDEX',
+                'BANK NIFTY': 'NSE:NIFTYBANK-INDEX',
+                'NIFTY MIDCAP 150': 'NSE:NIFTYMIDCAP150-INDEX',
+                'NIFTY SMALLCAP 250': 'NSE:NIFTYSMALLCAP250-INDEX'
+            }
+            symbols = ','.join(symbols_map.values())
+            quotes_data = broker_service.get_fyers_quotes(current_user.id, symbols)
             
-            result = market_service.get_market_overview(user_id=current_user.id)
+            if not quotes_data or not quotes_data.get('success'):
+                error_msg = (quotes_data or {}).get('error', 'Failed to fetch quotes data from FYERS')
+                app.logger.warning(f"Market overview quotes fetch failed: {error_msg}")
+                return jsonify({'success': False, 'error': error_msg, 'data': {}, 'source': 'quotes'}), 400
             
-            return jsonify(result)
-                
+            payload = quotes_data.get('data') or {}
+            market = {}
+            
+            # Handle payload either as dict keyed by symbol or list under 'd'
+            if isinstance(payload, dict):
+                for symbol, quote in payload.items():
+                    for name, fy_symbol in symbols_map.items():
+                        if symbol == fy_symbol:
+                            v = quote.get('v', quote)
+                            lp = float(v.get('lp', 0))
+                            pc = float(v.get('prev_close_price', v.get('pc', lp)))
+                            chp = float(v.get('chp', ((lp - pc) / pc * 100) if pc > 0 else 0))
+                            market[name] = {
+                                'current_price': round(lp, 2),
+                                'change_percent': round(chp, 2),
+                                'is_positive': chp >= 0
+                            }
+            elif isinstance(payload, list):
+                for item in payload:
+                    symbol = item.get('symbol') or item.get('n')
+                    for name, fy_symbol in symbols_map.items():
+                        if symbol == fy_symbol:
+                            v = item.get('v', item)
+                            lp = float(v.get('lp', 0))
+                            pc = float(v.get('prev_close_price', v.get('pc', lp)))
+                            chp = float(v.get('chp', ((lp - pc) / pc * 100) if pc > 0 else 0))
+                            market[name] = {
+                                'current_price': round(lp, 2),
+                                'change_percent': round(chp, 2),
+                                'is_positive': chp >= 0
+                            }
+            
+            return jsonify({'success': True, 'data': market, 'last_updated': datetime.now().isoformat(), 'source': 'broker_service.quotes'})
         except Exception as e:
             app.logger.error(f"Error fetching market overview: {e}")
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
+            return jsonify({'success': False, 'error': str(e), 'data': {}, 'source': 'exception'}), 500
 
     @app.route('/api/dashboard/portfolio-holdings', methods=['GET'])
     @login_required

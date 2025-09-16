@@ -541,7 +541,32 @@
             console.debug('MarketOverview API result:', result);
             
             if (result.success && result.data) {
-                updateMarketOverviewUI(result.data);
+                // Normalize to expected index-name keyed object
+                let normalized = result.data;
+                // If result.data is an array of items with name/symbol, convert to object keyed by readable names
+                if (Array.isArray(result.data)) {
+                    normalized = {};
+                    result.data.forEach(item => {
+                        const name = item.name || item.index_name || item.symbol_name || item.symbol;
+                        if (name) normalized[name] = item;
+                    });
+                }
+                // If result.data is a dict keyed by fyers symbols, remap to friendly names
+                if (!normalized['NIFTY 50'] && typeof normalized === 'object') {
+                    const map = {
+                        'NSE:NIFTY50-INDEX': 'NIFTY 50',
+                        'NSE:NIFTYBANK-INDEX': 'BANK NIFTY',
+                        'NSE:NIFTYMIDCAP150-INDEX': 'NIFTY MIDCAP 150',
+                        'NSE:NIFTYSMALLCAP250-INDEX': 'NIFTY SMALLCAP 250'
+                    };
+                    const remapped = {};
+                    Object.entries(normalized).forEach(([k, v]) => {
+                        const friendly = map[k];
+                        if (friendly) remapped[friendly] = v;
+                    });
+                    if (Object.keys(remapped).length) normalized = remapped;
+                }
+                updateMarketOverviewUI(normalized);
             } else {
                 console.error('Failed to fetch market overview:', result.error);
                 showMarketOverviewError('Failed to load market data');
@@ -587,7 +612,15 @@
         const indices = ['NIFTY 50', 'BANK NIFTY', 'NIFTY MIDCAP 150', 'NIFTY SMALLCAP 250'];
         
         indices.forEach(indexName => {
-            const data = marketData[indexName];
+            // Normalize data shape for each index
+            let data = marketData[indexName];
+            if (!data && marketData && typeof marketData === 'object') {
+                // Some APIs may return an array
+                if (Array.isArray(marketData)) {
+                    const found = marketData.find(i => (i.name || i.index_name) === indexName);
+                    if (found) data = found;
+                }
+            }
             if (data) {
                 // Find the corresponding column in the market overview section
                 const indexElement = document.querySelector(`[data-index="${indexName}"]`);
@@ -595,24 +628,29 @@
                     // Update price
                     const priceElement = indexElement.querySelector('.market-price');
                     if (priceElement) {
-                        priceElement.innerHTML = data.current_price.toLocaleString('en-IN');
+                        const priceVal = data.current_price ?? data.price ?? data.lp ?? 0;
+                        priceElement.innerHTML = Number(priceVal).toLocaleString('en-IN');
                     }
                     
                     // Update change percentage and badge
                     const badgeElement = indexElement.querySelector('.market-badge');
                     if (badgeElement) {
-                        const changeText = data.is_positive ? 
-                            `<i class="bi bi-arrow-up"></i> +${data.change_percent}%` :
-                            `<i class="bi bi-arrow-down"></i> ${data.change_percent}%`;
+                        const cp = (data.change_percent ?? data.chp ?? 0);
+                        const positive = (data.is_positive !== undefined) ? data.is_positive : (cp >= 0);
+                        const changeText = positive ? 
+                            `<i class="bi bi-arrow-up"></i> +${Number(cp).toFixed(2)}%` :
+                            `<i class="bi bi-arrow-down"></i> ${Number(cp).toFixed(2)}%`;
                         
                         badgeElement.innerHTML = changeText;
-                        badgeElement.className = `badge market-badge ${data.is_positive ? 'bg-success' : 'bg-danger'}`;
+                        badgeElement.className = `badge market-badge ${positive ? 'bg-success' : 'bg-danger'}`;
                     }
                     
                     // Update index name color based on performance
                     const nameElement = indexElement.querySelector('.market-name');
                     if (nameElement) {
-                        nameElement.className = `market-name fw-bold mb-1 ${data.is_positive ? 'text-success' : 'text-danger'}`;
+                        const cp = (data.change_percent ?? data.chp ?? 0);
+                        const positive = (data.is_positive !== undefined) ? data.is_positive : (cp >= 0);
+                        nameElement.className = `market-name fw-bold mb-1 ${positive ? 'text-success' : 'text-danger'}`;
                     }
                 }
             } else {
