@@ -278,14 +278,18 @@ class MLAPIService:
                     models_data.append({
                         'id': model.id,
                         'symbol': model.symbol,
+                        'type': model.model_type,
                         'model_type': model.model_type,
+                        'accuracy': model.accuracy_score * 100 if model.accuracy_score else 0,
                         'accuracy_score': model.accuracy_score,
+                        'trained_date': model.created_at.isoformat() if model.created_at else None,
                         'created_at': model.created_at.isoformat() if model.created_at else None,
                         'last_prediction': model.last_prediction.isoformat() if model.last_prediction else None
                     })
 
                 return {
                     'success': True,
+                    'data': models_data,
                     'models': models_data,
                     'count': len(models_data)
                 }
@@ -295,6 +299,95 @@ class MLAPIService:
             return {
                 'success': False,
                 'error': f'Failed to get models: {str(e)}'
+            }
+
+    def get_ml_overview(self, user_id):
+        """
+        Get ML dashboard overview statistics.
+        Returns overview data or error.
+        """
+        try:
+            with self.db_manager.get_session() as session:
+                # Count trained models
+                trained_count = session.query(MLTrainedModel).filter(
+                    MLTrainedModel.user_id == user_id
+                ).count()
+
+                # Get training success rate
+                total_jobs = session.query(MLTrainingJob).filter(
+                    MLTrainingJob.user_id == user_id
+                ).count()
+
+                successful_jobs = session.query(MLTrainingJob).filter(
+                    and_(
+                        MLTrainingJob.user_id == user_id,
+                        MLTrainingJob.status == 'completed'
+                    )
+                ).count()
+
+                success_rate = (successful_jobs / total_jobs * 100) if total_jobs > 0 else 0
+
+                # Get last updated date
+                latest_model = session.query(MLTrainedModel).filter(
+                    MLTrainedModel.user_id == user_id
+                ).order_by(MLTrainedModel.created_at.desc()).first()
+
+                last_updated = latest_model.created_at.strftime('%Y-%m-%d') if latest_model else 'Never'
+
+                return {
+                    'success': True,
+                    'data': {
+                        'trained_stocks': trained_count,
+                        'success_rate': round(success_rate, 1),
+                        'last_updated': last_updated
+                    }
+                }
+
+        except Exception as e:
+            logger.error(f"Error getting ML overview: {e}")
+            return {
+                'success': False,
+                'error': f'Failed to get overview: {str(e)}'
+            }
+
+    def get_active_trainings(self, user_id):
+        """
+        Get active training jobs.
+        Returns active trainings list or error.
+        """
+        try:
+            with self.db_manager.get_session() as session:
+                active_jobs = session.query(MLTrainingJob).filter(
+                    and_(
+                        MLTrainingJob.user_id == user_id,
+                        MLTrainingJob.status.in_(['running', 'pending'])
+                    )
+                ).order_by(MLTrainingJob.created_at.desc()).all()
+
+                trainings_data = []
+                for job in active_jobs:
+                    trainings_data.append({
+                        'id': job.id,
+                        'symbol': job.symbol,
+                        'model_type': job.model_type,
+                        'status': job.status,
+                        'progress': job.progress,
+                        'created_at': job.created_at.isoformat() if job.created_at else None,
+                        'started_at': job.created_at.isoformat() if job.created_at else None,
+                        'error_message': job.error_message
+                    })
+
+                return {
+                    'success': True,
+                    'data': trainings_data,
+                    'count': len(trainings_data)
+                }
+
+        except Exception as e:
+            logger.error(f"Error getting active trainings: {e}")
+            return {
+                'success': False,
+                'error': f'Failed to get active trainings: {str(e)}'
             }
 
 

@@ -63,6 +63,9 @@ def train_new_model():
         result = ml_api_service.start_training_job(current_user.id, symbol, start_date, end_date)
 
         if result['success']:
+            # Add training_id for frontend compatibility
+            if 'job_id' in result:
+                result['training_id'] = result['job_id']
             return jsonify(result), 200
         else:
             return jsonify(result), 400
@@ -103,6 +106,47 @@ def get_trained_models():
 
     except Exception as e:
         logger.error(f"Models endpoint error: {e}")
+        return jsonify({'error': 'Internal server error', 'success': False}), 500
+
+
+@ml_bp.route('/overview', methods=['GET'])
+@login_required
+def get_ml_overview():
+    """Get ML dashboard overview data"""
+    try:
+        # Get overview data from ML API service
+        result = ml_api_service.get_ml_overview(current_user.id)
+
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'data': result['data']
+            }), 200
+        else:
+            return jsonify(result), 500
+
+    except Exception as e:
+        logger.error(f"ML overview endpoint error: {e}")
+        return jsonify({'error': 'Internal server error', 'success': False}), 500
+
+
+@ml_bp.route('/active-trainings', methods=['GET'])
+@login_required
+def get_active_trainings():
+    """Get active training jobs"""
+    try:
+        result = ml_api_service.get_active_trainings(current_user.id)
+
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'data': result['data']
+            }), 200
+        else:
+            return jsonify(result), 500
+
+    except Exception as e:
+        logger.error(f"Active trainings endpoint error: {e}")
         return jsonify({'error': 'Internal server error', 'success': False}), 500
 
 

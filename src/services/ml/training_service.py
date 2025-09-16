@@ -115,8 +115,6 @@ def train_and_tune_models(symbol: str, start_date: Optional[date] = None, end_da
                     job = session.query(MLTrainingJob).filter(MLTrainingJob.id == job_id).first()
                     if job:
                         job.progress = progress
-                        if message:
-                            job.progress_message = message
                         session.commit()
                         logger.info(f"Updated training progress to {progress}% for job {job_id}: {message}")
             except Exception as e:
