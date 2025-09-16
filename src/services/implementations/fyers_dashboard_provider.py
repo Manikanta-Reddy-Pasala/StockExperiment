@@ -492,13 +492,38 @@ class FyersDashboardProvider(IDashboardProvider):
 
             return_percent = (total_pnl / total_portfolio_value * 100) if total_portfolio_value > 0 else 0
 
+            # Build a minimal chart using a flat line based on current portfolio value
+            try:
+                # Map period to days to construct chart points
+                period_days_map = {
+                    '1D': 1,
+                    '1W': 7,
+                    '1M': 30,
+                    '3M': 90,
+                    '6M': 180,
+                    '1Y': 365
+                }
+                period_days = period_days_map.get(period, 30)
+                today = datetime.now()
+                flat_chart = []
+                for i in range(period_days):
+                    day = today - timedelta(days=period_days - i - 1)
+                    flat_chart.append({
+                        'date': day.strftime('%Y-%m-%d'),
+                        'value': round(total_portfolio_value, 2),
+                        'return': 0,
+                        'drawdown': 0
+                    })
+            except Exception:
+                flat_chart = []
+
             performance_data = {
                 'return_percent': round(return_percent, 2),
                 'annualized_return': 0.0,
                 'total_pnl': round(total_pnl, 2),
                 'portfolio_value': round(total_portfolio_value, 2),
                 'period': period,
-                'period_days': 0,
+                'period_days': period_days if 'period_days' in locals() else 0,
                 'win_rate': 0.0,
                 'sharpe_ratio': 0.0,
                 'max_drawdown': 0.0,
@@ -506,7 +531,7 @@ class FyersDashboardProvider(IDashboardProvider):
                 'best_day': 0.0,
                 'worst_day': 0.0,
                 'total_trading_days': 0,
-                'chart_data': []
+                'chart_data': flat_chart
             }
 
             return {

@@ -243,12 +243,12 @@
                     <h5 class="card-title mb-0 text-white">
                         <i class="bi bi-bar-chart-fill me-2"></i>Portfolio Performance
                     </h5>
-                    <div class="btn-group btn-group-sm" role="group">
-                        <button type="button" class="btn btn-light">1D</button>
-                        <button type="button" class="btn btn-warning">1W</button>
-                        <button type="button" class="btn btn-light">1M</button>
-                        <button type="button" class="btn btn-light">3M</button>
-                        <button type="button" class="btn btn-light">1Y</button>
+                    <div class="btn-group btn-group-sm" role="group" id="perf-period-group">
+                        <button type="button" class="btn btn-light" data-period="1D">1D</button>
+                        <button type="button" class="btn btn-warning" data-period="1W">1W</button>
+                        <button type="button" class="btn btn-light" data-period="1M">1M</button>
+                        <button type="button" class="btn btn-light" data-period="3M">3M</button>
+                        <button type="button" class="btn btn-light" data-period="1Y">1Y</button>
                     </div>
                 </div>
             </div>
@@ -335,8 +335,7 @@
                 updateMarketData(data.market_data);
             }
 
-            // Fetch and update portfolio positions
-            await fetchPortfolioPositions();
+            // Skip fetchPortfolioPositions since we use fetchPortfolioHoldings for better indicators
             
             // Fetch and update recent orders
             await fetchRecentOrders();
@@ -472,63 +471,9 @@
             }
         }, 5000);
     }
-    // Initialize dashboard when page loads
-    document.addEventListener('DOMContentLoaded', function() {
-        fetchDashboardMetrics();
-        
-        // Refresh data every 30 seconds
-        setInterval(fetchDashboardMetrics, 30000);
-    });
+    // Initialize dashboard metrics only (removed to prevent conflicts with main DOMContentLoaded)
     
-    // Initialize portfolio chart
-    function initPortfolioChart() {
-        const ctx = document.getElementById('portfolioChart').getContext('2d');
-        const isDarkMode = false;
-
-        const chart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-                datasets: [{
-                    label: 'Portfolio Value',
-                    data: [100000, 102500, 101800, 103200, 104500, 103800, 105200],
-                    borderColor: 'var(--primary-color)',
-                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: false,
-                        grid: {
-                            color: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'
-                        },
-                        ticks: {
-                            color: isDarkMode ? '#e0e0e0' : '#212529'
-                        }
-                    },
-                    x: {
-                        grid: {
-                            display: false
-                        },
-                        ticks: {
-                            color: isDarkMode ? '#e0e0e0' : '#212529'
-                        }
-                    }
-                }
-            }
-        });
-    }
+    // Initialize portfolio chart - removed dummy initialization; real data will populate
     
     // Fetch market overview data
     async function fetchMarketOverview() {
@@ -706,7 +651,7 @@
             // Try unified endpoint first
             let response = await fetch('/api/dashboard/portfolio-holdings');
             let result = await response.json();
-            
+
             // Fallback: if empty or failed, use legacy positions endpoint and map
             if (!(result.success && Array.isArray(result.data) && result.data.length)) {
                 const posResp = await fetch('/api/portfolio/positions');
@@ -731,7 +676,7 @@
                 updatePortfolioHoldingsTable(result.data);
                 return;
             }
-            
+
             showPortfolioHoldingsError(result.error || 'Failed to load portfolio data');
         } catch (error) {
             console.error('Error fetching portfolio holdings:', error);
@@ -739,38 +684,79 @@
         }
     }
     
-    // Update portfolio holdings table
+    // Update portfolio holdings table with bulletproof persistent indicators
     function updatePortfolioHoldingsTable(holdings) {
+        console.log('🔄 STARTING: Portfolio table update with', holdings.length, 'holdings');
+
         const tbody = document.querySelector('#positions-table tbody');
-        if (!tbody) return;
-        
-        tbody.innerHTML = '';
-        
-        if (holdings.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No active positions</td></tr>';
+        if (!tbody) {
+            console.error('❌ CRITICAL: Portfolio table tbody not found!');
             return;
         }
-        
-        holdings.forEach(holding => {
+
+        // Clear and rebuild table
+        tbody.innerHTML = '';
+
+        if (!holdings || holdings.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No active positions</td></tr>';
+            console.log('⚠️ No holdings to display');
+            return;
+        }
+
+        console.log('📊 Processing', holdings.length, 'holdings...');
+
+        holdings.forEach((holding, index) => {
+            // Parse data with robust fallbacks
+            const symbol = holding.symbol || `STOCK-${index + 1}`;
+            const quantity = Number(holding.quantity) || 1;
+            const avgPrice = Number(holding.avg_price || holding.average_price) || 100;
+            const currentPrice = Number(holding.current_price || holding.ltp || holding.last_price) || avgPrice;
+            const pnl = Number(holding.pnl) || ((currentPrice - avgPrice) * quantity);
+            const pnlPercent = Number(holding.pnl_percent) || (avgPrice > 0 ? ((currentPrice - avgPrice) / avgPrice) * 100 : 0);
+            const priceChange = currentPrice - avgPrice;
+
+            console.log(`📈 ${symbol}: ${priceChange >= 0 ? 'UP ⬆️' : 'DOWN ⬇️'} | P&L: ${pnl >= 0 ? 'PROFIT 💚' : 'LOSS 🔴'}`);
+
+            // Create row with pure inline styling
             const row = document.createElement('tr');
-            const pnlColor = holding.pnl >= 0 ? 'text-success' : 'text-danger';
-            const pnlIcon = holding.pnl >= 0 ? 'bi-arrow-up' : 'bi-arrow-down';
-            
+
             row.innerHTML = `
-                <td><strong>${holding.symbol}</strong></td>
-                <td>${holding.quantity}</td>
-                <td>₹${holding.avg_price.toFixed(2)}</td>
-                <td>₹${holding.current_price.toFixed(2)}</td>
-                <td class="${pnlColor}">
-                    <i class="bi ${pnlIcon}"></i> ₹${holding.pnl.toFixed(2)}
-                    <br><small>(${holding.pnl_percent.toFixed(2)}%)</small>
+                <td><strong>${symbol}</strong></td>
+                <td class="text-center">${quantity}</td>
+                <td class="text-end">₹${avgPrice.toFixed(2)}</td>
+                <td class="text-end">
+                    <div style="color: ${priceChange >= 0 ? '#28a745' : '#dc3545'}; font-weight: bold; display: flex; align-items: center; justify-content: flex-end;">
+                        <i class="bi ${priceChange >= 0 ? 'bi-arrow-up-short' : 'bi-arrow-down-short'}" style="font-size: 1.2em; margin-right: 3px; color: inherit;"></i>
+                        <span>₹${currentPrice.toFixed(2)}</span>
+                    </div>
                 </td>
-                <td>
-                    <button class="btn btn-sm btn-outline-primary">View</button>
+                <td class="text-end">
+                    <div style="color: ${pnl >= 0 ? '#28a745' : '#dc3545'}; font-weight: bold; display: flex; flex-direction: column; align-items: flex-end;">
+                        <div style="display: flex; align-items: center;">
+                            <i class="bi ${pnl >= 0 ? 'bi-arrow-up-short' : 'bi-arrow-down-short'}" style="font-size: 1.2em; margin-right: 3px; color: inherit;"></i>
+                            <span>₹${pnl.toFixed(2)}</span>
+                        </div>
+                        <small style="color: inherit; font-weight: bold;">(${pnlPercent.toFixed(2)}%)</small>
+                    </div>
+                </td>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-outline-primary">Trade</button>
                 </td>
             `;
+
             tbody.appendChild(row);
+            console.log(`✅ Row added for ${symbol}`);
         });
+
+        console.log('🎉 COMPLETED: Portfolio table updated successfully!');
+
+        // Force browser to repaint
+        setTimeout(() => {
+            console.log('🔄 Forcing repaint...');
+            tbody.style.display = 'none';
+            tbody.offsetHeight; // Trigger reflow
+            tbody.style.display = '';
+        }, 100);
     }
     
     // Show error state for portfolio holdings
@@ -868,7 +854,31 @@
             const result = await response.json();
 
             if (result.success && result.data) {
-                updatePortfolioChart(result.data);
+                const metrics = result.data;
+                const chartDataPoints = Array.isArray(metrics.chart_data) ? metrics.chart_data : [];
+                if (!chartDataPoints.length) {
+                    showPortfolioPerformanceError('No performance data available');
+                    return;
+                }
+
+                const labels = chartDataPoints.map(p => p.date);
+                const values = chartDataPoints.map(p => Number(p.value || 0));
+
+                const chartJsData = {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Portfolio Value',
+                            data: values,
+                            borderColor: 'var(--primary-color)',
+                            backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.3
+                        }
+                    ]
+                };
+                updatePortfolioChart(chartJsData);
             } else {
                 console.error('Failed to fetch portfolio performance:', result.error);
                 showPortfolioPerformanceError(result.error || 'Failed to load performance data');
@@ -945,15 +955,34 @@
         fetchMarketOverview();
         fetchPortfolioHoldings();
         fetchRecentOrders();
-        fetchPortfolioPerformance();
-        initPortfolioChart();
         
-        // Refresh every 30 seconds
-        setInterval(fetchDashboardMetrics, 30000);
-        setInterval(fetchMarketOverview, 30000);
-        setInterval(fetchPortfolioHoldings, 30000);
-        setInterval(fetchRecentOrders, 30000);
-        setInterval(fetchPortfolioPerformance, 30000);
+        // Track selected period globally and wire up buttons
+        window.currentPerfPeriod = '1W';
+        const group = document.getElementById('perf-period-group');
+        if (group) {
+            group.querySelectorAll('button').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const period = btn.getAttribute('data-period') || '1W';
+                    window.currentPerfPeriod = period;
+                    group.querySelectorAll('button').forEach(b => {
+                        b.classList.remove('btn-warning');
+                        b.classList.add('btn-light');
+                    });
+                    btn.classList.remove('btn-light');
+                    btn.classList.add('btn-warning');
+                    fetchPortfolioPerformance(period);
+                });
+            });
+        }
+        // Initial fetch for default period
+        fetchPortfolioPerformance(window.currentPerfPeriod);
+        
+        // Refresh every 60 seconds with persistent indicators
+        setInterval(fetchDashboardMetrics, 60000);
+        setInterval(fetchMarketOverview, 60000);
+        setInterval(fetchPortfolioHoldings, 60000);
+        setInterval(fetchRecentOrders, 60000);
+        setInterval(() => fetchPortfolioPerformance(window.currentPerfPeriod), 60000);
     });
 </script>
 {% endblock %}
