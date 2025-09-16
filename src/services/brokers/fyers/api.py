@@ -79,7 +79,7 @@ class FyersAPI:
                 elif endpoint == 'depth':
                     response = self.fyers_client.depth(**data)
                 elif endpoint == 'history':
-                    response = self.fyers_client.history(**data)
+                    response = self.fyers_client.history(data=data)
                 elif endpoint == 'search_scrips':
                     response = self.fyers_client.search_scrips(**data)
                 else:

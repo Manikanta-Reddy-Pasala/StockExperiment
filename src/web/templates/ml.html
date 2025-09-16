@@ -492,7 +492,6 @@ async function handleTrainingSubmit(event) {
 
     const formData = {
         symbol: document.getElementById('stock-symbol').value,
-        duration: document.getElementById('training-duration').value,
         model_type: 'ensemble', // Always use ensemble model
         use_technical_indicators: document.getElementById('use-technical-indicators').checked,
         start_date: document.getElementById('start-date').value,
@@ -514,7 +513,13 @@ async function handleTrainingSubmit(event) {
 
         if (result.success) {
             // Start polling for training progress
-            pollTrainingProgress(result.training_id);
+            if (result.training_id) {
+                pollTrainingProgress(result.training_id);
+            } else {
+                console.error('Training started but no training_id provided');
+                hideTrainingProgress();
+                alert('Training started but unable to track progress');
+            }
         } else {
             hideTrainingProgress();
             alert('Training failed: ' + (result.error || 'Unknown error'));
@@ -630,6 +635,14 @@ function hideTrainingProgress() {
 }
 
 function pollTrainingProgress(trainingId) {
+    // Validate trainingId
+    if (!trainingId || trainingId === 'undefined') {
+        console.error('Invalid training ID provided:', trainingId);
+        hideTrainingProgress();
+        alert('Unable to track training progress: Invalid training ID');
+        return;
+    }
+
     const progressBar = document.getElementById('progress-bar');
     const progressStatus = document.getElementById('progress-status');
     const progressPercent = document.getElementById('progress-percent');

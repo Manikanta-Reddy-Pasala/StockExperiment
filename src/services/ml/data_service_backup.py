@@ -26,78 +26,48 @@ def get_stock_data(
     Fetches stock data from Fyers API.
     If start_date and end_date are provided, they are used.
     Otherwise, the 'period' is used.
-    If the requested symbol fails, tries fallback symbols.
-    """
-    # First try the requested symbol
-    fyers_data = _try_fyers_data(symbol, start_date, end_date, period, interval, user_id)
-    if fyers_data is not None and len(fyers_data) > 0:
-        logger.info(f"Successfully fetched {len(fyers_data)} records from Fyers for {symbol}")
-        return fyers_data
-
-    # If the requested symbol fails, try fallback symbols
-    logger.warning(f"Requested symbol {symbol} failed, trying fallback symbols...")
-    fallback_symbols = [
-        "NSE:UTKARSHBNK-EQ",  # We know this works
-    ]
-
-    for fallback_symbol in fallback_symbols:
-        if fallback_symbol == symbol:
-            continue  # Don't retry the same symbol
-
-        logger.info(f"Trying fallback symbol: {fallback_symbol}")
-        fyers_data = _try_fyers_data(fallback_symbol, start_date, end_date, period, interval, user_id)
-        if fyers_data is not None and len(fyers_data) > 0:
-            logger.info(f"Successfully fetched {len(fyers_data)} records from Fyers using fallback symbol {fallback_symbol}")
-            return fyers_data
-
-    # If all symbols fail, raise an error
-    raise Exception(f"Failed to fetch data from Fyers API for {symbol} and all fallback symbols. Please check API connection.")
-
-def _try_fyers_data(symbol: str, start_date: Optional[date], end_date: Optional[date], period: str, interval: str, user_id: int):
-    """
-    Try to fetch data from Fyers API
     """
     try:
         # Get Fyers service
         fyers_service = get_fyers_service()
-
+        
         # Get user's Fyers configuration
         config = fyers_service.get_broker_config(user_id)
         if not config:
-            logger.warning(f"Fyers configuration not found for user {user_id}")
+            logger.error(f"Fyers configuration not found for user {user_id}")
             return None
         if not config.get('is_connected'):
-            logger.warning(f"Fyers not connected for user {user_id}. Connection status: {config.get('connection_status', 'unknown')}")
+            logger.error(f"Fyers not connected for user {user_id}. Connection status: {config.get('connection_status', 'unknown')}")
             return None
 
-        logger.info(f"Attempting Fyers data fetch for {symbol}")
-
+        logger.info(f"Using Fyers configuration for user {user_id}: client_id={config.get('client_id', 'NOT SET')[:8]}...")
+        
+        # Use Fyers service for historical data
+        fyers_service = get_fyers_service()
+        
         # Convert period to date range if needed
-        # Use a fixed reference date to ensure we're getting historical data
-        # Stock markets have data up to around 2024, so use that as end date
         if not start_date or not end_date:
-            reference_end_date = date(2024, 12, 31)  # Use end of 2024 as reference
             if period == "1y":
-                end_date = reference_end_date
+                end_date = date.today()
                 start_date = end_date - timedelta(days=365)
             elif period == "2y":
-                end_date = reference_end_date
+                end_date = date.today()
                 start_date = end_date - timedelta(days=730)
             elif period == "3y":
-                end_date = reference_end_date
+                end_date = date.today()
                 start_date = end_date - timedelta(days=1095)
             elif period == "5y":
-                end_date = reference_end_date
+                end_date = date.today()
                 start_date = end_date - timedelta(days=1825)
             else:
-                # Default to 1 year
-                end_date = reference_end_date
-                start_date = end_date - timedelta(days=365)
-
+                # Default to 3 years
+                end_date = date.today()
+                start_date = end_date - timedelta(days=1095)
+        
         # Convert dates to timestamp format for Fyers API
         range_from = int(datetime.combine(start_date, datetime.min.time()).timestamp())
         range_to = int(datetime.combine(end_date, datetime.max.time()).timestamp())
-
+        
         # Map interval to Fyers resolution
         resolution_map = {
             "1d": "D",
@@ -107,95 +77,40 @@ def _try_fyers_data(symbol: str, start_date: Optional[date], end_date: Optional[
             "30m": "30"
         }
         resolution = resolution_map.get(interval, "D")
-
-        # Get historical data from Fyers with chunking support
-        # Fyers API limitation: range_to cannot be 366 days greater than range_from for daily data
+        
+        # Get historical data from Fyers
         logger.info(f"Fetching historical data for {symbol} from {start_date} to {end_date} (timestamps: {range_from} - {range_to})")
         logger.info(f"Request parameters: symbol={symbol}, exchange=NSE, interval={resolution}")
 
-        # Calculate the date range in days
-        total_days = (end_date - start_date).days
-        max_days_per_request = 365  # Fyers limit
+        response = fyers_service.history(
+            user_id=user_id,
+            symbol=symbol,
+            exchange="NSE",  # Default exchange
+            interval=resolution,
+            start_date=str(range_from),
+            end_date=str(range_to)
+        )
 
-        all_candles = []
-
-        if total_days <= max_days_per_request:
-            # Single request
-            response = fyers_service.history(
-                user_id=user_id,
-                symbol=symbol,
-                exchange="NSE",
-                interval=resolution,
-                start_date=str(range_from),
-                end_date=str(range_to)
-            )
-
-            logger.info(f"Fyers API response status: {response.get('status', 'unknown')}")
-
-            if 'error' in response or response.get('status') != 'success':
-                logger.warning(f"Fyers API error for {symbol}: {response.get('message', 'Unknown error')}")
-                return None
-
-            if response.get('data', {}).get('candles'):
-                all_candles.extend(response['data']['candles'])
-        else:
-            # Multiple requests needed
-            logger.info(f"Data range ({total_days} days) exceeds Fyers limit. Using chunked requests.")
-
-            current_start = start_date
-            chunk_num = 1
-
-            while current_start < end_date:
-                current_end = min(current_start + timedelta(days=max_days_per_request), end_date)
-
-                chunk_range_from = int(datetime.combine(current_start, datetime.min.time()).timestamp())
-                chunk_range_to = int(datetime.combine(current_end, datetime.max.time()).timestamp())
-
-                logger.info(f"Chunk {chunk_num}: {current_start} to {current_end}")
-
-                response = fyers_service.history(
-                    user_id=user_id,
-                    symbol=symbol,
-                    exchange="NSE",
-                    interval=resolution,
-                    start_date=str(chunk_range_from),
-                    end_date=str(chunk_range_to)
-                )
-
-                if 'error' in response or response.get('status') != 'success':
-                    logger.warning(f"Fyers API error for chunk {chunk_num}: {response.get('message', 'Unknown error')}")
-                    current_start = current_end + timedelta(days=1)
-                    chunk_num += 1
-                    continue
-
-                if response.get('data', {}).get('candles'):
-                    all_candles.extend(response['data']['candles'])
-                    logger.info(f"Chunk {chunk_num}: Retrieved {len(response['data']['candles'])} candles")
-
-                current_start = current_end + timedelta(days=1)
-                chunk_num += 1
-
-        if not all_candles:
-            logger.warning(f"No candles data retrieved for {symbol}")
+        logger.info(f"Fyers API response status: {response.get('status', 'unknown')}")
+        logger.info(f"Fyers API response keys: {list(response.keys()) if isinstance(response, dict) else 'not a dict'}")
+        
+        if 'error' in response or response.get('status') != 'success':
+            logger.error(f"Error fetching data from Fyers: {response.get('message', 'Unknown error')}")
             return None
-
-        logger.info(f"Total candles retrieved: {len(all_candles)}")
-
-        # Convert all candles to DataFrame
-        combined_data = {'candles': all_candles}
-        df = _convert_fyers_to_dataframe(combined_data, symbol)
-
+        
+        # Convert Fyers response to pandas DataFrame
+        df = _convert_fyers_to_dataframe(response.get('data', {}), symbol)
+        
         if df.empty:
-            logger.warning(f"No data returned from Fyers for symbol {symbol}")
+            logger.warning(f"No data returned for symbol {symbol}")
             return None
-
-        logger.info(f"Successfully fetched {len(df)} records from Fyers for {symbol}")
+            
+        logger.info(f"Successfully fetched {len(df)} records for {symbol}")
         return df
-
+        
     except Exception as e:
-        logger.warning(f"Fyers API error for {symbol}: {str(e)}")
+        logger.error(f"Error fetching stock data for {symbol}: {str(e)}")
         return None
-
 
 def _convert_fyers_to_dataframe(response: dict, symbol: str) -> pd.DataFrame:
     """

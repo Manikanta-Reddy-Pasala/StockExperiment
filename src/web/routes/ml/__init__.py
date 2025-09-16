@@ -99,43 +99,58 @@ def run_training_job(job_id, symbol, model_type, start_date, end_date, use_techn
 
         # Run the actual training
         if ml_available:
-            result = train_and_tune_models(
-                symbol=symbol,
-                start_date=start_date,
-                end_date=end_date,
-                user_id=user_id
-            )
-
-            # Progress update: Training complete
-            job.progress = 90.0
-            session.commit()
-
-            # Create trained model record
-            if result.get('success', False):
-                trained_model = MLTrainedModel(
-                    training_job_id=job_id,
-                    user_id=user_id,
+            try:
+                result = train_and_tune_models(
                     symbol=symbol,
-                    model_type=model_type,
-                    model_file_path=result.get('model_path'),
-                    scaler_file_path=result.get('scaler_path'),
-                    accuracy=result.get('accuracy', 0),
-                    mse=result.get('mse'),
-                    mae=result.get('mae'),
-                    start_date=start_date,
-                    end_date=end_date
+                    start_date=start_date.date(),
+                    end_date=end_date.date(),
+                    user_id=user_id
                 )
-                session.add(trained_model)
 
-                # Update job status to completed
-                job.status = 'completed'
-                job.progress = 100.0
-                job.accuracy = result.get('accuracy', 0)
-                job.completed_at = datetime.now()
-                logger.info(f"Training job {job_id} completed successfully")
-            else:
+                # Progress update: Training complete
+                job.progress = 90.0
+                session.commit()
+
+                # Check if result indicates success
+                if result and isinstance(result, dict) and result.get('success', True):
+                    trained_model = MLTrainedModel(
+                        training_job_id=job_id,
+                        user_id=user_id,
+                        symbol=symbol,
+                        model_type=model_type,
+                        model_file_path=result.get('model_path'),
+                        scaler_file_path=result.get('scaler_path'),
+                        accuracy=result.get('accuracy', 0),
+                        start_date=start_date,
+                        end_date=end_date
+                    )
+                    session.add(trained_model)
+
+                    # Update job status to completed
+                    job.status = 'completed'
+                    job.progress = 100.0
+                    job.accuracy = result.get('accuracy', 0)
+                    job.completed_at = datetime.now()
+                    logger.info(f"Training job {job_id} completed successfully with accuracy {result.get('accuracy', 0)}")
+                else:
+                    job.status = 'failed'
+                    job.error_message = result.get('error', 'Training failed - no result returned')
+                    logger.error(f"Training job {job_id} failed: {job.error_message}")
+            except Exception as training_error:
                 job.status = 'failed'
-                job.error_message = result.get('error', 'Training failed')
+                error_msg = str(training_error)
+
+                # Provide more user-friendly error messages
+                if "Not enough data" in error_msg:
+                    if "NSE:" in symbol:
+                        job.error_message = f"Insufficient data for {symbol}. Please check if the symbol is correct and try with a different date range or a more liquid stock."
+                    else:
+                        job.error_message = f"Insufficient data for {symbol}. Please try with a longer date range (at least 6 months) or a different stock."
+                elif "Fyers not connected" in error_msg:
+                    job.error_message = "Fyers broker not connected. Please configure your Fyers credentials in the Brokers section first."
+                else:
+                    job.error_message = f"Training failed: {error_msg}"
+
                 logger.error(f"Training job {job_id} failed: {job.error_message}")
         else:
             # ML not available - simulate training for demo
@@ -475,29 +490,32 @@ if ml_available:
             data = request.get_json()
 
             # Validate input
-            required_fields = ['symbol', 'duration', 'model_type']
+            required_fields = ['symbol', 'model_type', 'start_date', 'end_date']
             for field in required_fields:
                 if not data.get(field):
                     return jsonify({'error': f'{field} is required'}), 400
 
             symbol = data['symbol'].upper()
-            duration = data['duration']
             model_type = data['model_type']
             use_technical_indicators = data.get('use_technical_indicators', True)
 
-            # Parse start and end dates from duration
+            # Parse start and end dates
             try:
-                start_date, end_date = parse_duration_to_dates(duration)
+                start_date = datetime.strptime(data['start_date'], '%Y-%m-%d')
+                end_date = datetime.strptime(data['end_date'], '%Y-%m-%d')
 
-                # If custom dates provided, use them instead
-                if data.get('start_date'):
-                    start_date = datetime.strptime(data['start_date'], '%Y-%m-%d')
-                if data.get('end_date'):
-                    end_date = datetime.strptime(data['end_date'], '%Y-%m-%d')
+                # Validate date range
+                if start_date >= end_date:
+                    return jsonify({'error': 'Start date must be before end date'}), 400
+
+                # Check if we have sufficient data range (at least 30 days)
+                date_diff = (end_date - start_date).days
+                if date_diff < 30:
+                    return jsonify({'error': 'Date range must be at least 30 days for meaningful training'}), 400
 
             except ValueError as e:
-                logger.error(f"Invalid duration format: {duration}")
-                return jsonify({'error': f'Invalid duration format: {str(e)}'}), 400
+                logger.error(f"Invalid date format: {str(e)}")
+                return jsonify({'error': f'Invalid date format. Please use YYYY-MM-DD format'}), 400
 
             logger.info(f"Starting ML training for {symbol} with {model_type} model by user {current_user.id}")
 
@@ -541,7 +559,6 @@ if ml_available:
                     'message': f'Training started for {symbol}',
                     'symbol': symbol,
                     'model_type': model_type,
-                    'duration': duration,
                     'start_date': start_date.isoformat(),
                     'end_date': end_date.isoformat()
                 })
