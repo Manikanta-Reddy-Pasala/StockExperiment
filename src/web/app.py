@@ -828,11 +828,12 @@ def create_app():
             app.logger.info(f"Fetching market overview for user {current_user.id}")
             
             # Use existing broker_service which already handles auth/config
+            # FYERS symbols as provided: NIFTY50, NIFTYBANK, NIFTYMIDCAP150, NIFTYSMLCAP250
             symbols_map = {
                 'NIFTY 50': 'NSE:NIFTY50-INDEX',
                 'BANK NIFTY': 'NSE:NIFTYBANK-INDEX',
                 'NIFTY MIDCAP 150': 'NSE:NIFTYMIDCAP150-INDEX',
-                'NIFTY SMALLCAP 250': 'NSE:NIFTYSMALLCAP250-INDEX'
+                'NIFTY SMALLCAP 250': 'NSE:NIFTYSMLCAP250-INDEX'
             }
             symbols = ','.join(symbols_map.values())
             quotes_data = broker_service.get_fyers_quotes(current_user.id, symbols)

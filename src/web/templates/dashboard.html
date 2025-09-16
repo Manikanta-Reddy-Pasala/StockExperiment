@@ -543,11 +543,37 @@
             if (result.success && result.data) {
                 // Normalize to expected index-name keyed object
                 let normalized = result.data;
+                // If backend forwarded raw FYERS shape inside data (has 'd'), convert it
+                if (normalized && Array.isArray(normalized.d)) {
+                    const arr = normalized.d;
+                    normalized = {};
+                    arr.forEach(item => {
+                        const v = item.v || {};
+                        if (v && (v.s === 'error' || v.errmsg)) return;
+                        const symbol = item.n || v.symbol;
+                        const map = {
+                            'NSE:NIFTY50-INDEX': 'NIFTY 50',
+                            'NSE:NIFTYBANK-INDEX': 'BANK NIFTY',
+                            'NSE:NIFTYMIDCAP150-INDEX': 'NIFTY MIDCAP 150',
+                            'NSE:NIFTYSMLCAP250-INDEX': 'NIFTY SMALLCAP 250'
+                        };
+                        const friendly = map[symbol];
+                        if (friendly) {
+                            normalized[friendly] = {
+                                current_price: v.lp,
+                                change_percent: v.chp,
+                                is_positive: (v.chp ?? 0) >= 0
+                            };
+                        }
+                    });
+                }
                 // If result.data is an array of items with name/symbol, convert to object keyed by readable names
                 if (Array.isArray(result.data)) {
                     normalized = {};
                     result.data.forEach(item => {
-                        const name = item.name || item.index_name || item.symbol_name || item.symbol;
+                        const v = item.v || item;
+                        if (v && (v.s === 'error' || v.errmsg)) return; // skip errored entries
+                        const name = item.name || item.index_name || item.symbol_name || item.symbol || item.n;
                         if (name) normalized[name] = item;
                     });
                 }
@@ -557,10 +583,12 @@
                         'NSE:NIFTY50-INDEX': 'NIFTY 50',
                         'NSE:NIFTYBANK-INDEX': 'BANK NIFTY',
                         'NSE:NIFTYMIDCAP150-INDEX': 'NIFTY MIDCAP 150',
-                        'NSE:NIFTYSMALLCAP250-INDEX': 'NIFTY SMALLCAP 250'
+                        'NSE:NIFTYSMLCAP250-INDEX': 'NIFTY SMALLCAP 250'
                     };
                     const remapped = {};
                     Object.entries(normalized).forEach(([k, v]) => {
+                        const vv = (v && v.v) ? v.v : v;
+                        if (vv && (vv.s === 'error' || vv.errmsg)) return; // skip errored entries
                         const friendly = map[k];
                         if (friendly) remapped[friendly] = v;
                     });

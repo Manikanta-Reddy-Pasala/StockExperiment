@@ -665,8 +665,9 @@ class FyersAPIConnector:
             # Use FYERS API client if available
             if self.fyers_client:
                 try:
-                    # Fix the quotes method call - use correct parameter name
-                    response = self.fyers_client.quotes(symbols)
+                    # Correct usage: pass an object with `symbols`
+                    payload = {"symbols": symbols}
+                    response = self.fyers_client.quotes(payload)
                     logger.info(f"FYERS quotes raw response: {response}")
                     logger.info("FYERS quotes fetched successfully using fyers-apiv3")
                     return response
