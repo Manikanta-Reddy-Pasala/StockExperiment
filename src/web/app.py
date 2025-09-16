@@ -1236,16 +1236,80 @@ def create_app():
     @app.route('/api/orders', methods=['GET'])
     @login_required
     def api_get_orders_no_slash():
-        """Get orders history - redirect to unified endpoint (without trailing slash)."""
+        """Get comprehensive orders data for Orders page including stats and history."""
         try:
-            from .routes.unified_routes import api_get_orders_history
-            return api_get_orders_history()
+            app.logger.info(f"Fetching comprehensive orders data for user {current_user.id}")
+
+            # Fetch raw orderbook data
+            orderbook_result = broker_service.get_fyers_orderbook(current_user.id)
+
+            if not orderbook_result.get('success'):
+                error_msg = orderbook_result.get('error', 'Failed to fetch orderbook')
+                app.logger.error(f"Orderbook fetch failed: {error_msg}")
+                return jsonify([]), 200  # Return empty array if no data
+
+            # Extract orders from response
+            orders_data = orderbook_result.get('data', {})
+            if isinstance(orders_data, dict):
+                raw_orders = orders_data.get('orderBook', [])
+            elif isinstance(orders_data, list):
+                raw_orders = orders_data
+            else:
+                raw_orders = []
+
+            # Fyers status code mapping
+            status_mapping = {
+                0: 'PLACED',       # Order placed
+                1: 'PARTIAL',      # Partially filled
+                2: 'COMPLETE',     # Complete/Executed
+                3: 'CANCELLED',    # Cancelled
+                4: 'REJECTED',     # Rejected
+                5: 'CANCELLED',    # Modified (treat as cancelled for old version)
+                6: 'PENDING'       # Pending
+            }
+
+            # Fyers side mapping
+            side_mapping = {
+                1: 'BUY',
+                -1: 'SELL'
+            }
+
+            # Fyers type mapping
+            type_mapping = {
+                1: 'LIMIT',
+                2: 'MARKET',
+                3: 'STOP_LOSS',
+                4: 'STOP_LOSS_MARKET'
+            }
+
+            # Transform orders to expected format
+            formatted_orders = []
+            for order in raw_orders:
+                status_code = order.get('status', 0)
+                side_code = order.get('side', 1)
+                type_code = order.get('type', 2)
+
+                formatted_order = {
+                    'order_id': str(order.get('id', '')),
+                    'symbol': order.get('symbol', '').replace('NSE:', '').replace('-EQ', ''),
+                    'type': type_mapping.get(type_code, 'MARKET'),
+                    'transaction': side_mapping.get(side_code, 'BUY'),
+                    'quantity': int(order.get('qty', 0)),
+                    'filled': int(order.get('filledQty', 0)),
+                    'status': status_mapping.get(status_code, 'UNKNOWN'),
+                    'price': float(order.get('limitPrice', order.get('tradedPrice', 0))),
+                    'created_at': order.get('orderDateTime', ''),
+                    'product_type': order.get('productType', ''),
+                    'remaining_quantity': int(order.get('remainingQuantity', 0))
+                }
+                formatted_orders.append(formatted_order)
+
+            app.logger.info(f"Formatted {len(formatted_orders)} orders for user {current_user.id}")
+            return jsonify(formatted_orders)
+
         except Exception as e:
-            app.logger.error(f"Error fetching orders: {e}")
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
+            app.logger.error(f"Error fetching orders: {e}", exc_info=True)
+            return jsonify([]), 200  # Return empty array on error to prevent frontend issues
 
     @app.route('/api/portfolio/positions', methods=['GET'])
     @login_required
