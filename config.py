@@ -16,12 +16,12 @@ LOGS_DIR = DATA_DIR / "logs"
 POSTGRES_URL = os.environ.get('POSTGRES_URL', 'postgresql://postgres:password@localhost/stockexperiment')
 DATABASE_URL = os.environ.get('DATABASE_URL', POSTGRES_URL)
 
-# Redis configuration
-REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
-REDIS_HOST = os.environ.get('REDIS_HOST', 'localhost')
-REDIS_PORT = int(os.environ.get('REDIS_PORT', '6379'))
-REDIS_DB = int(os.environ.get('REDIS_DB', '0'))
-REDIS_PASSWORD = os.environ.get('REDIS_PASSWORD', None)
+# Dragonfly configuration
+DRAGONFLY_URL = os.environ.get('DRAGONFLY_URL', 'redis://localhost:6379/0')
+DRAGONFLY_HOST = os.environ.get('DRAGONFLY_HOST', 'localhost')
+DRAGONFLY_PORT = int(os.environ.get('DRAGONFLY_PORT', '6379'))
+DRAGONFLY_DB = int(os.environ.get('DRAGONFLY_DB', '0'))
+DRAGONFLY_PASSWORD = os.environ.get('DRAGONFLY_PASSWORD', None)
 
 # Email configuration
 SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')

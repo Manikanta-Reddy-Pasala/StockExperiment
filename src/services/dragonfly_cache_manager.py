@@ -1,7 +1,7 @@
 """
-Redis Cache Manager for Stock Experiment Application
+Dragonfly Cache Manager for Stock Experiment Application
 
-Provides centralized caching functionality using Redis for improved performance
+Provides centralized caching functionality using Dragonfly for improved performance
 and reduced database load.
 """
 
@@ -14,21 +14,21 @@ import pickle
 
 logger = logging.getLogger(__name__)
 
-class RedisCacheManager:
+class DragonflyCacheManager:
     """
-    Centralized Redis cache management for the Stock Experiment application.
+    Centralized Dragonfly cache management for the Stock Experiment application.
     Handles caching of portfolio data, market data, and performance metrics.
     """
 
-    def __init__(self, redis_url: str = None, host: str = 'localhost',
+    def __init__(self, dragonfly_url: str = None, host: str = 'localhost',
                  port: int = 6379, db: int = 0, password: str = None):
-        """Initialize Redis cache manager"""
+        """Initialize Dragonfly cache manager"""
         self.redis_client = None
         self.is_available = False
 
         try:
-            if redis_url:
-                self.redis_client = redis.from_url(redis_url, decode_responses=False)
+            if dragonfly_url:
+                self.redis_client = redis.from_url(dragonfly_url, decode_responses=False)
             else:
                 self.redis_client = redis.Redis(
                     host=host,
@@ -41,10 +41,10 @@ class RedisCacheManager:
             # Test connection
             self.redis_client.ping()
             self.is_available = True
-            logger.info("Redis cache manager initialized successfully")
+            logger.info("Dragonfly cache manager initialized successfully")
 
         except Exception as e:
-            logger.warning(f"Redis not available, cache disabled: {e}")
+            logger.warning(f"Dragonfly not available, cache disabled: {e}")
             self.redis_client = None
             self.is_available = False
 
@@ -65,7 +65,7 @@ class RedisCacheManager:
                 return pickle.loads(data)
             return None
         except Exception as e:
-            logger.warning(f"Redis get error for key {key}: {e}")
+            logger.warning(f"Dragonfly get error for key {key}: {e}")
             return None
 
     def set(self, key: str, value: Any, ttl: int = 300) -> bool:
@@ -78,7 +78,7 @@ class RedisCacheManager:
             self.redis_client.setex(key, ttl, serialized_data)
             return True
         except Exception as e:
-            logger.warning(f"Redis set error for key {key}: {e}")
+            logger.warning(f"Dragonfly set error for key {key}: {e}")
             return False
 
     def delete(self, key: str) -> bool:
@@ -90,7 +90,7 @@ class RedisCacheManager:
             self.redis_client.delete(key)
             return True
         except Exception as e:
-            logger.warning(f"Redis delete error for key {key}: {e}")
+            logger.warning(f"Dragonfly delete error for key {key}: {e}")
             return False
 
     def exists(self, key: str) -> bool:
@@ -101,7 +101,7 @@ class RedisCacheManager:
         try:
             return bool(self.redis_client.exists(key))
         except Exception as e:
-            logger.warning(f"Redis exists error for key {key}: {e}")
+            logger.warning(f"Dragonfly exists error for key {key}: {e}")
             return False
 
     # Portfolio-specific cache methods
@@ -226,20 +226,20 @@ class RedisCacheManager:
 # Singleton instance
 _cache_manager = None
 
-def get_cache_manager() -> RedisCacheManager:
+def get_cache_manager() -> DragonflyCacheManager:
     """Get the singleton cache manager instance"""
     global _cache_manager
     if _cache_manager is None:
         try:
             import config
-            _cache_manager = RedisCacheManager(
-                redis_url=config.REDIS_URL,
-                host=config.REDIS_HOST,
-                port=config.REDIS_PORT,
-                db=config.REDIS_DB,
-                password=config.REDIS_PASSWORD
+            _cache_manager = DragonflyCacheManager(
+                dragonfly_url=config.DRAGONFLY_URL,
+                host=config.DRAGONFLY_HOST,
+                port=config.DRAGONFLY_PORT,
+                db=config.DRAGONFLY_DB,
+                password=config.DRAGONFLY_PASSWORD
             )
         except ImportError:
             # Fallback if config not available
-            _cache_manager = RedisCacheManager()
+            _cache_manager = DragonflyCacheManager()
     return _cache_manager

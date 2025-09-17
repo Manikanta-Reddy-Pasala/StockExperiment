@@ -111,11 +111,11 @@ class DailyPortfolioTracker:
     # SQLite fallback removed
 
     def init_cache(self):
-        """Initialize Redis cache manager"""
+        """Initialize Dragonfly cache manager"""
         try:
-            from .redis_cache_manager import get_cache_manager
+            from .dragonfly_cache_manager import get_cache_manager
             self.cache_manager = get_cache_manager()
-            logger.info("Redis cache manager initialized for portfolio tracker")
+            logger.info("Dragonfly cache manager initialized for portfolio tracker")
         except Exception as e:
             logger.warning(f"Cache manager initialization failed: {e}")
             self.cache_manager = None
