@@ -192,9 +192,6 @@
                                 <div class="card-body text-center">
                                     <h4 class="text-primary mb-1" id="predicted-price">₹0.00</h4>
                                     <small class="text-muted">Predicted Price</small>
-                                    <div class="mt-1">
-                                        <span class="badge bg-info" id="prediction-horizon">Next Day</span>
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -613,11 +610,6 @@ function displayPredictionResults(data) {
             currentPriceElement.textContent = `₹${currentPrice.toFixed(2)}`;
         }
         
-        // Display prediction horizon information (always 1 day)
-        const horizonElement = document.getElementById('prediction-horizon');
-        if (horizonElement) {
-            horizonElement.textContent = 'Next Day';
-        }
         
         // Update the price source label
         const currentPriceLabel = document.querySelector('#current-price').parentElement.querySelector('small');
