@@ -297,9 +297,7 @@ class UnifiedBrokerService:
             if current_broker == 'fyers':
                 from .brokers.fyers_service import FyersService
                 broker = FyersService()
-                # Convert list to comma-separated string for Fyers API
-                symbols_str = ','.join(symbols)
-                result = broker.get_quotes(user_id, symbols_str)
+                result = broker.quotes_multiple(user_id, symbols)
             elif current_broker == 'zerodha':
                 from .brokers.zerodha_service import ZerodhaService
                 broker = ZerodhaService()
@@ -320,6 +318,72 @@ class UnifiedBrokerService:
             return {
                 'success': False,
                 'error': f'Failed to get quotes: {str(e)}',
+                'data': {}
+            }
+    
+    def get_historical_data(self, user_id: int, symbol: str, resolution: str = "1D", period: str = "1d") -> Dict[str, Any]:
+        """Get historical data using user's selected broker."""
+        try:
+            # Get the user's current broker from broker configurations
+            from ..models.database import get_database_manager
+            from ..models.models import User, BrokerConfiguration
+            
+            db_manager = get_database_manager()
+            with db_manager.get_session() as session:
+                user = session.query(User).filter(User.id == user_id).first()
+                if not user:
+                    return self._no_provider_error('historical_data')
+                
+                # Get the active broker configuration for the user
+                broker_config = session.query(BrokerConfiguration).filter(
+                    BrokerConfiguration.user_id == user_id,
+                    BrokerConfiguration.is_active == True
+                ).first()
+                
+                current_broker = broker_config.broker_name if broker_config else 'fyers'
+            
+            # Calculate start and end dates based on period
+            from datetime import datetime, timedelta
+            end_date = datetime.now()
+            if period == "1d":
+                start_date = end_date - timedelta(days=1)
+            elif period == "1w":
+                start_date = end_date - timedelta(weeks=1)
+            elif period == "1m":
+                start_date = end_date - timedelta(days=30)
+            elif period == "1y":
+                start_date = end_date - timedelta(days=365)
+            else: # Default to 1 day
+                start_date = end_date - timedelta(days=1)
+            
+            start_date_str = start_date.strftime('%Y-%m-%d')
+            end_date_str = end_date.strftime('%Y-%m-%d')
+            
+            # Get historical data based on broker
+            if current_broker == 'fyers':
+                from .brokers.fyers_service import FyersService
+                broker = FyersService()
+                # Extract exchange from symbol (e.g., "NSE:NLCINDIA-EQ" -> "NSE")
+                exchange = symbol.split(':')[0] if ':' in symbol else 'NSE'
+                result = broker.history(user_id, symbol, exchange, resolution, start_date_str, end_date_str)
+            elif current_broker == 'zerodha':
+                from .brokers.zerodha_service import ZerodhaService
+                broker = ZerodhaService()
+                result = broker.history(user_id, symbol, resolution, start_date_str, end_date_str)
+            elif current_broker == 'simulator':
+                from .brokers.simulator_service import SimulatorService
+                broker = SimulatorService()
+                result = broker.history(user_id, symbol, resolution, start_date_str, end_date_str)
+            else:
+                return self._no_provider_error('historical_data')
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error getting historical data for user {user_id}, symbol {symbol}: {e}")
+            return {
+                'success': False,
+                'error': f'Failed to get historical data: {str(e)}',
                 'data': {}
             }
     

@@ -213,6 +213,9 @@
                                 <div class="card-body text-center">
                                     <h4 class="text-primary mb-1" id="predicted-price">₹0.00</h4>
                                     <small class="text-muted">Predicted Price</small>
+                                    <div class="mt-1">
+                                        <span class="badge bg-info" id="prediction-horizon">Next Day</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -616,11 +619,36 @@ function displayPredictionResults(data) {
             priceChangeElement.className = priceChange >= 0 ? 'text-success' : 'text-danger';
         }
 
-        // Use last_close_price as current price since current_price might not be available
-        const currentPrice = parseFloat(data.last_close_price);
+        // Use current price if available, otherwise fall back to last close price
+        let currentPrice, priceSource;
+        if (data.current_price && data.current_price > 0) {
+            currentPrice = parseFloat(data.current_price);
+            priceSource = 'Real-time';
+        } else {
+            currentPrice = parseFloat(data.last_close_price);
+            priceSource = 'Last Close';
+        }
+        
         const currentPriceElement = document.getElementById('current-price');
         if (currentPriceElement) {
             currentPriceElement.textContent = `₹${currentPrice.toFixed(2)}`;
+        }
+        
+        // Display prediction horizon information
+        const horizon = data.horizon || 1;
+        const horizonText = horizon === 1 ? 'Next Day' : 
+                           horizon <= 7 ? `${horizon} Days Ahead` : 
+                           `${horizon} Days Ahead`;
+        
+        const horizonElement = document.getElementById('prediction-horizon');
+        if (horizonElement) {
+            horizonElement.textContent = horizonText;
+        }
+        
+        // Update the price source label
+        const currentPriceLabel = document.querySelector('#current-price').parentElement.querySelector('small');
+        if (currentPriceLabel) {
+            currentPriceLabel.textContent = `Current Price (${priceSource})`;
         }
 
         // Calculate confidence based on prediction accuracy (simplified)

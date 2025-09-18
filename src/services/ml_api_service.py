@@ -23,13 +23,12 @@ class MLAPIService:
     def get_current_price(self, user_id, symbol):
         """
         Get current price for a symbol using the unified broker service.
-        Returns None if price cannot be fetched.
-        No hardcoded fallback values.
+        Falls back to historical data if real-time quotes fail.
         """
         try:
             logger.info(f"Fetching current price for {symbol} for user {user_id}")
 
-            # Use unified broker service to get current price
+            # Try to get real-time quotes first
             quotes_result = self.unified_broker_service.get_quotes(user_id, [symbol])
 
             if quotes_result and quotes_result.get('status') == 'success':
@@ -37,16 +36,60 @@ class MLAPIService:
                 if symbol in quotes_data:
                     current_price = float(quotes_data[symbol].get('ltp', 0))
                     if current_price > 0:
-                        logger.info(f"Successfully fetched current price for {symbol}: ₹{current_price}")
+                        logger.info(f"Successfully fetched real-time current price for {symbol}: ₹{current_price}")
                         return current_price
                     else:
                         logger.warning(f"Received invalid price for {symbol}: {current_price}")
-                        return None
                 else:
                     logger.warning(f"Symbol {symbol} not found in quotes data")
-                    return None
             else:
-                logger.warning(f"Failed to get quotes for {symbol}: {quotes_result}")
+                logger.warning(f"Failed to get real-time quotes for {symbol}: {quotes_result}")
+
+            # Fallback: Get the most recent price from historical data
+            logger.info(f"Falling back to historical data for current price of {symbol}")
+            try:
+                # Try to get historical data directly from the broker service
+                historical_result = self.unified_broker_service.get_historical_data(user_id, symbol, "1D", "1d")
+                logger.info(f"Historical data result: {historical_result}")
+                
+                if historical_result and historical_result.get('status') == 'success':
+                    data = historical_result.get('data', {})
+                    candles = data.get('candles', [])
+                    logger.info(f"Found {len(candles)} candles in historical data")
+                    
+                    if candles and len(candles) > 0:
+                        # Get the most recent close price from the last candle
+                        latest_candle = candles[-1]
+                        logger.info(f"Latest candle: {latest_candle}")
+                        
+                        latest_price = float(latest_candle.get('close', 0))
+                        if latest_price > 0:
+                            logger.info(f"Successfully fetched historical current price for {symbol}: ₹{latest_price}")
+                            return latest_price
+                        else:
+                            logger.warning(f"Invalid close price in historical data for {symbol}: {latest_price}")
+                    else:
+                        logger.warning(f"No candles data available for {symbol}")
+                else:
+                    logger.warning(f"Failed to get historical data for {symbol}: {historical_result}")
+                
+                # If historical data fails, try the ML data service as last resort
+                try:
+                    from .ml.data_service import get_stock_data
+                    df = get_stock_data(symbol, period="1d", user_id=user_id)
+                    if df is not None and len(df) > 0:
+                        # Get the most recent close price
+                        latest_price = float(df['close'].iloc[-1])
+                        logger.info(f"Successfully fetched ML data current price for {symbol}: ₹{latest_price}")
+                        return latest_price
+                    else:
+                        logger.warning(f"No ML data available for {symbol}")
+                        return None
+                except Exception as ml_error:
+                    logger.error(f"Error fetching ML data for {symbol}: {ml_error}")
+                    return None
+            except Exception as hist_error:
+                logger.error(f"Error fetching historical data for {symbol}: {hist_error}")
                 return None
 
         except Exception as e:
@@ -65,7 +108,7 @@ class MLAPIService:
             from .ml.prediction_service import get_prediction
 
             # Get ML prediction
-            prediction_result = get_prediction(symbol, user_id)
+            prediction_result = get_prediction(symbol, user_id, horizon)
 
             if not prediction_result:
                 return {
