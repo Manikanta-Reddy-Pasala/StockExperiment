@@ -65,7 +65,7 @@ class MLAPIService:
             from .ml.prediction_service import get_prediction
 
             # Get ML prediction
-            prediction_result = get_prediction(symbol, days_ahead=horizon)
+            prediction_result = get_prediction(symbol, user_id)
 
             if not prediction_result:
                 return {

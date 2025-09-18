@@ -227,6 +227,14 @@
                         <div class="col-lg-6 col-md-6">
                             <div class="card bg-light">
                                 <div class="card-body text-center">
+                                    <h4 class="text-success mb-1" id="current-price">₹0.00</h4>
+                                    <small class="text-muted">Current Price</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
                                     <h4 class="text-info mb-1" id="confidence-score">0%</h4>
                                     <small class="text-muted">Confidence</small>
                                 </div>
@@ -242,24 +250,6 @@
                         </div>
                     </div>
 
-                    <div class="mt-3">
-                        <h6>Model Breakdown</h6>
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>Model</th>
-                                        <th>Prediction</th>
-                                        <th>Weight</th>
-                                        <th>Confidence</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="model-breakdown">
-                                    <!-- Model breakdown will be populated -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -324,6 +314,15 @@ document.addEventListener('DOMContentLoaded', function() {
 async function loadMLDashboardData() {
     try {
         const response = await fetch('/api/v1/ml/overview');
+        
+        if (!response.ok) {
+            if (response.status === 401) {
+                window.location.href = '/login';
+                return;
+            }
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const result = await response.json();
 
         if (result.success) {
@@ -535,11 +534,15 @@ async function handleTrainingSubmit(event) {
 async function handlePrediction() {
     const symbol = document.getElementById('predict-symbol').value;
     const horizon = document.querySelector('input[name="horizon"]:checked').value;
+    const predictBtn = document.getElementById('predict-btn');
 
     if (!symbol) {
         alert('Please enter a stock symbol');
         return;
     }
+
+    // Show loading spinner
+    showPredictionLoading();
 
     try {
         const response = await fetch('/api/v1/ml/predict', {
@@ -553,10 +556,30 @@ async function handlePrediction() {
             })
         });
 
+        console.log('Response status:', response.status);
+        console.log('Response headers:', response.headers);
+        
+        if (!response.ok) {
+            if (response.status === 401) {
+                // User is not authenticated, redirect to login
+                alert('Your session has expired. Please log in again.');
+                window.location.href = '/login';
+                return;
+            }
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
         const result = await response.json();
+        console.log('Prediction API response:', result);
 
         if (result.success) {
-            displayPredictionResults(result.data);
+            // The backend returns prediction data under 'prediction' property
+            if (result.prediction) {
+                displayPredictionResults(result.prediction);
+            } else {
+                console.error('No prediction data in response:', result);
+                alert('Prediction failed: No prediction data received');
+            }
         } else {
             alert('Prediction failed: ' + (result.error || 'Model not found for this symbol'));
         }
@@ -568,34 +591,50 @@ async function handlePrediction() {
 
 // Display Prediction Results
 function displayPredictionResults(data) {
-    document.getElementById('prediction-results').style.display = 'block';
+    console.log('Displaying prediction results with data:', data);
+    
+    try {
+        // Show the prediction results section
+        const resultsSection = document.getElementById('prediction-results');
+        if (resultsSection) {
+            resultsSection.style.display = 'block';
+        }
 
-    // Update prediction values
-    document.getElementById('predicted-price').textContent = `₹${parseFloat(data.predicted_price).toFixed(2)}`;
+        // Update prediction values using correct property names from API
+        const predictedPriceElement = document.getElementById('predicted-price');
+        if (predictedPriceElement && data.final_predicted_price) {
+            predictedPriceElement.textContent = `₹${parseFloat(data.final_predicted_price).toFixed(2)}`;
+        }
 
-    const priceChange = parseFloat(data.price_change_percent);
-    const priceChangeElement = document.getElementById('price-change');
-    priceChangeElement.textContent = `${priceChange >= 0 ? '+' : ''}${priceChange.toFixed(2)}%`;
-    priceChangeElement.className = priceChange >= 0 ? 'text-success' : 'text-danger';
+        const priceChange = parseFloat(data.predicted_change_percent);
+        const priceChangeElement = document.getElementById('price-change');
+        if (priceChangeElement) {
+            priceChangeElement.textContent = `${priceChange >= 0 ? '+' : ''}${priceChange.toFixed(2)}%`;
+            priceChangeElement.className = priceChange >= 0 ? 'text-success' : 'text-danger';
+        }
 
-    document.getElementById('confidence-score').textContent = `${Math.round(data.confidence * 100)}%`;
+        // Use last_close_price as current price since current_price might not be available
+        const currentPrice = parseFloat(data.last_close_price);
+        const currentPriceElement = document.getElementById('current-price');
+        if (currentPriceElement) {
+            currentPriceElement.textContent = `₹${currentPrice.toFixed(2)}`;
+        }
 
-    const signalElement = document.getElementById('signal-strength');
-    signalElement.textContent = data.signal;
-    signalElement.className = getSignalColor(data.signal);
+        // Calculate confidence based on prediction accuracy (simplified)
+        const confidence = Math.max(0, Math.min(100, 100 - Math.abs(priceChange)));
+        const confidenceElement = document.getElementById('confidence-score');
+        if (confidenceElement) {
+            confidenceElement.textContent = `${Math.round(confidence)}%`;
+        }
 
-    // Update model breakdown
-    const tbody = document.getElementById('model-breakdown');
-    tbody.innerHTML = '';
-
-    if (data.model_breakdown) {
-        data.model_breakdown.forEach(model => {
-            const row = tbody.insertRow();
-            row.insertCell(0).textContent = model.name;
-            row.insertCell(1).textContent = `₹${parseFloat(model.prediction).toFixed(2)}`;
-            row.insertCell(2).textContent = `${Math.round(model.weight * 100)}%`;
-            row.insertCell(3).textContent = `${Math.round(model.confidence * 100)}%`;
-        });
+        const signalElement = document.getElementById('signal-strength');
+        if (signalElement && data.signal) {
+            signalElement.textContent = data.signal;
+            signalElement.className = getSignalColor(data.signal);
+        }
+    } catch (error) {
+        console.error('Error displaying prediction results:', error);
+        alert('Error displaying prediction results: ' + error.message);
     }
 }
 
@@ -656,6 +695,15 @@ function pollTrainingProgress(trainingId) {
 
         try {
             const response = await fetch(`/api/v1/ml/training_progress/${trainingId}`);
+            
+            if (!response.ok) {
+                if (response.status === 401) {
+                    window.location.href = '/login';
+                    return;
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             const result = await response.json();
 
             if (result.success && result.data) {

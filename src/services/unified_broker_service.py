@@ -271,6 +271,58 @@ class UnifiedBrokerService:
             return self._no_provider_error('reports')
         return provider.download_report(user_id, report_id)
     
+    # Market data methods
+    def get_quotes(self, user_id: int, symbols: List[str]) -> Dict[str, Any]:
+        """Get market quotes using user's selected broker."""
+        try:
+            # Get the user's current broker from broker configurations
+            from ..models.database import get_database_manager
+            from ..models.models import User, BrokerConfiguration
+            
+            db_manager = get_database_manager()
+            with db_manager.get_session() as session:
+                user = session.query(User).filter(User.id == user_id).first()
+                if not user:
+                    return self._no_provider_error('quotes')
+                
+                # Get the active broker configuration for the user
+                broker_config = session.query(BrokerConfiguration).filter(
+                    BrokerConfiguration.user_id == user_id,
+                    BrokerConfiguration.is_active == True
+                ).first()
+                
+                current_broker = broker_config.broker_name if broker_config else 'fyers'
+            
+            # Get quotes based on broker
+            if current_broker == 'fyers':
+                from .brokers.fyers_service import FyersService
+                broker = FyersService()
+                # Convert list to comma-separated string for Fyers API
+                symbols_str = ','.join(symbols)
+                result = broker.get_quotes(user_id, symbols_str)
+            elif current_broker == 'zerodha':
+                from .brokers.zerodha_service import ZerodhaService
+                broker = ZerodhaService()
+                symbols_str = ','.join(symbols)
+                result = broker.get_quotes(user_id, symbols_str)
+            elif current_broker == 'simulator':
+                from .brokers.simulator_service import SimulatorService
+                broker = SimulatorService()
+                symbols_str = ','.join(symbols)
+                result = broker.get_quotes(user_id, symbols_str)
+            else:
+                return self._no_provider_error('quotes')
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error getting quotes for user {user_id}: {e}")
+            return {
+                'success': False,
+                'error': f'Failed to get quotes: {str(e)}',
+                'data': {}
+            }
+    
     # Utility methods
     def get_available_brokers(self) -> Dict[str, Dict[str, bool]]:
         """Get list of available brokers and their supported features."""
