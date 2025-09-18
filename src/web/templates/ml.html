@@ -180,27 +180,6 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-12">
-                        <div class="mb-3">
-                            <label class="form-label">Prediction Horizon</label>
-                            <div class="btn-group w-100" role="group" id="prediction-horizon-group">
-                                <input type="radio" class="btn-check" name="horizon" id="horizon-1d" value="1" checked>
-                                <label class="btn btn-outline-info" for="horizon-1d">1 Day</label>
-
-                                <input type="radio" class="btn-check" name="horizon" id="horizon-3d" value="3">
-                                <label class="btn btn-outline-info" for="horizon-3d">3 Days</label>
-
-                                <input type="radio" class="btn-check" name="horizon" id="horizon-1w" value="7">
-                                <label class="btn btn-outline-info" for="horizon-1w">1 Week</label>
-
-                                <input type="radio" class="btn-check" name="horizon" id="horizon-2w" value="14">
-                                <label class="btn btn-outline-info" for="horizon-2w">2 Weeks</label>
-
-                                <input type="radio" class="btn-check" name="horizon" id="horizon-1m" value="30">
-                                <label class="btn btn-outline-info" for="horizon-1m">1 Month</label>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- Prediction Results -->
@@ -536,7 +515,7 @@ async function handleTrainingSubmit(event) {
 // Handle Stock Prediction
 async function handlePrediction() {
     const symbol = document.getElementById('predict-symbol').value;
-    const horizon = document.querySelector('input[name="horizon"]:checked').value;
+    const horizon = 1; // Default to 1 day prediction
     const predictBtn = document.getElementById('predict-btn');
 
     if (!symbol) {
@@ -634,15 +613,10 @@ function displayPredictionResults(data) {
             currentPriceElement.textContent = `₹${currentPrice.toFixed(2)}`;
         }
         
-        // Display prediction horizon information
-        const horizon = data.horizon || 1;
-        const horizonText = horizon === 1 ? 'Next Day' : 
-                           horizon <= 7 ? `${horizon} Days Ahead` : 
-                           `${horizon} Days Ahead`;
-        
+        // Display prediction horizon information (always 1 day)
         const horizonElement = document.getElementById('prediction-horizon');
         if (horizonElement) {
-            horizonElement.textContent = horizonText;
+            horizonElement.textContent = 'Next Day';
         }
         
         // Update the price source label

@@ -132,6 +132,20 @@ class MLAPIService:
 
             # Add current price to prediction result
             prediction_result['current_price'] = current_price
+            
+            # Recalculate percentage change using the real current price
+            final_predicted_price = prediction_result.get('final_predicted_price', 0)
+            if final_predicted_price > 0 and current_price > 0:
+                corrected_change_percent = ((final_predicted_price - current_price) / current_price) * 100
+                prediction_result['predicted_change_percent'] = corrected_change_percent
+                
+                # Update signal based on corrected percentage
+                if corrected_change_percent > 2:
+                    prediction_result['signal'] = "BUY"
+                elif corrected_change_percent < -2:
+                    prediction_result['signal'] = "SELL"
+                else:
+                    prediction_result['signal'] = "HOLD"
 
             return {
                 'success': True,
