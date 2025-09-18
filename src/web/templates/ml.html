@@ -586,6 +586,9 @@ async function handlePrediction() {
     } catch (error) {
         console.error('Prediction error:', error);
         alert('Prediction failed: Network error');
+    } finally {
+        // Hide loading spinner
+        hidePredictionLoading();
     }
 }
 
@@ -661,6 +664,39 @@ function getSignalColor(signal) {
 function formatDate(dateString) {
     const date = new Date(dateString);
     return date.toLocaleDateString();
+}
+
+// Prediction Loading Spinner Functions
+function showPredictionLoading() {
+    const predictBtn = document.getElementById('predict-btn');
+    const originalContent = predictBtn.innerHTML;
+    
+    // Store original content for restoration
+    predictBtn.setAttribute('data-original-content', originalContent);
+    
+    // Show spinner and disable button
+    predictBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Predicting...';
+    predictBtn.disabled = true;
+    
+    // Hide prediction results if they exist
+    const resultsSection = document.getElementById('prediction-results');
+    if (resultsSection) {
+        resultsSection.style.display = 'none';
+    }
+}
+
+function hidePredictionLoading() {
+    const predictBtn = document.getElementById('predict-btn');
+    const originalContent = predictBtn.getAttribute('data-original-content');
+    
+    // Restore original content and enable button
+    if (originalContent) {
+        predictBtn.innerHTML = originalContent;
+        predictBtn.removeAttribute('data-original-content');
+    } else {
+        predictBtn.innerHTML = '<i class="bi bi-magic"></i> Predict';
+    }
+    predictBtn.disabled = false;
 }
 
 function showTrainingProgress() {
