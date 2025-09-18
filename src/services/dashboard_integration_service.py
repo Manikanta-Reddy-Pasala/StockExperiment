@@ -40,25 +40,13 @@ class DashboardIntegrationService:
             # Import and initialize the appropriate broker service
             if current_broker == 'fyers':
                 from .brokers.fyers_service import FyersService
-                self.broker_instance = FyersService(
-                    client_id=broker_config.get('client_id'),
-                    access_token=broker_config.get('access_token'),
-                    api_secret=broker_config.get('api_secret')
-                )
+                self.broker_instance = FyersService()
             elif current_broker == 'zerodha':
                 from .brokers.zerodha_service import ZerodhaService
-                self.broker_instance = ZerodhaService(
-                    client_id=broker_config.get('client_id'),
-                    access_token=broker_config.get('access_token'),
-                    api_secret=broker_config.get('api_secret')
-                )
+                self.broker_instance = ZerodhaService()
             elif current_broker == 'simulator':
                 from .brokers.simulator_service import SimulatorService
-                self.broker_instance = SimulatorService(
-                    client_id=broker_config.get('client_id'),
-                    access_token=broker_config.get('access_token'),
-                    api_secret=broker_config.get('api_secret')
-                )
+                self.broker_instance = SimulatorService()
             else:
                 logger.error(f"Unknown broker: {current_broker}")
                 return None
@@ -82,10 +70,10 @@ class DashboardIntegrationService:
                 }
             
             # Fetch data from broker
-            funds_data = broker.funds()
-            holdings_data = broker.holdings()
-            positions_data = broker.positions()
-            orderbook_data = broker.orderbook()
+            funds_data = broker.funds(user_id)
+            holdings_data = broker.holdings(user_id)
+            positions_data = broker.positions(user_id)
+            orderbook_data = broker.orderbook(user_id)
             
             # Calculate metrics
             total_pnl = self._calculate_total_pnl(positions_data, holdings_data)
@@ -124,8 +112,8 @@ class DashboardIntegrationService:
                     'data': []
                 }
             
-            holdings_data = broker.holdings()
-            positions_data = broker.positions()
+            holdings_data = broker.holdings(user_id)
+            positions_data = broker.positions(user_id)
             
             # Process and combine holdings and positions
             processed_holdings = self._process_holdings_data(holdings_data, positions_data)
@@ -156,7 +144,7 @@ class DashboardIntegrationService:
                     'data': []
                 }
             
-            orderbook_data = broker.orderbook()
+            orderbook_data = broker.orderbook(user_id)
             processed_orders = self._process_orders_data(orderbook_data, status_filter='pending')
             
             return {
@@ -185,7 +173,7 @@ class DashboardIntegrationService:
                     'data': []
                 }
             
-            orderbook_data = broker.orderbook()
+            orderbook_data = broker.orderbook(user_id)
             processed_orders = self._process_orders_data(orderbook_data, limit=limit)
             
             return {
@@ -245,13 +233,17 @@ class DashboardIntegrationService:
                     pnl = position.get('pl', 0)
                     total_pnl += float(pnl) if pnl else 0
             
-            # Calculate P&L from holdings
+            # Calculate P&L from holdings (include all holdings, even with zero quantity)
             if holdings_data and holdings_data.get('success'):
-                holdings = holdings_data.get('data', {}).get('holdings', [])
+                holdings = holdings_data.get('data', [])
+                logger.info(f"Processing {len(holdings)} holdings for P&L calculation")
                 for holding in holdings:
                     pnl = holding.get('pnl', 0)
-                    total_pnl += float(pnl) if pnl else 0
+                    pnl_float = float(pnl) if pnl else 0
+                    logger.info(f"Holding {holding.get('symbol', '')}: P&L = {pnl} -> {pnl_float}")
+                    total_pnl += pnl_float
             
+            logger.info(f"Total P&L calculated: {total_pnl}")
             return round(total_pnl, 2)
             
         except Exception as e:
@@ -310,15 +302,16 @@ class DashboardIntegrationService:
         try:
             # Process holdings
             if holdings_data and holdings_data.get('success'):
-                holdings = holdings_data.get('data', {}).get('holdings', [])
+                holdings = holdings_data.get('data', [])
                 for holding in holdings:
+                    # Include all holdings for display, even with zero quantity
                     processed.append({
                         'symbol': holding.get('symbol', ''),
-                        'quantity': holding.get('qty', 0),
-                        'avg_price': holding.get('avgPrice', 0),
-                        'current_price': holding.get('ltp', 0),
-                        'pnl': holding.get('pnl', 0),
-                        'pnl_percent': holding.get('pnl_percent', 0),
+                        'quantity': float(holding.get('quantity', 0)),
+                        'avg_price': float(holding.get('average_price', 0)),
+                        'current_price': float(holding.get('last_price', 0)),
+                        'pnl': float(holding.get('pnl', 0)),
+                        'pnl_percent': 0,  # Calculate if needed
                         'type': 'holding'
                     })
             
