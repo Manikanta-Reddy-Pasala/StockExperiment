@@ -83,7 +83,10 @@ def get_training_progress(job_id):
         result = ml_api_service.get_training_progress(job_id)
 
         if result['success']:
-            return jsonify(result), 200
+            return jsonify({
+                'success': True,
+                'data': result
+            }), 200
         else:
             return jsonify(result), 404
 

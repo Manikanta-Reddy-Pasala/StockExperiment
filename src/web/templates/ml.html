@@ -668,10 +668,10 @@ function pollTrainingProgress(trainingId) {
 
                 // Update status message
                 if (data.status === 'running') {
-                    progressStatus.textContent = `Training ${data.symbol} with ${data.model_type}...`;
+                    progressStatus.textContent = `Training ${data.symbol}...`;
                     progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated bg-info';
                 } else if (data.status === 'completed') {
-                    progressStatus.textContent = `Training completed successfully! Accuracy: ${data.accuracy ? (data.accuracy * 100).toFixed(1) + '%' : 'N/A'}`;
+                    progressStatus.textContent = `Training completed successfully for ${data.symbol}!`;
                     progressBar.className = 'progress-bar bg-success';
 
                     // Stop polling
