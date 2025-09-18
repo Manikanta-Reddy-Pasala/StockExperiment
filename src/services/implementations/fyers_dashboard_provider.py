@@ -144,14 +144,14 @@ class FyersDashboardProvider(IDashboardProvider):
             if holdings_response.get('status') == 'success':
                 holdings = holdings_response.get('data', [])
                 # Calculate holdings metrics manually
-                total_holdings_pnl = sum(h.get('pnl', 0) for h in holdings)
+                total_holdings_pnl = sum(float(h.get('pnl', 0)) for h in holdings)
 
                 metrics.holdings_count = len(holdings)
 
                 # Calculate total holdings value
                 for holding in holdings:
                     market_val = holding.get('marketVal', 0)
-                    total_holdings_value += market_val
+                    total_holdings_value += float(market_val) if market_val else 0
 
             # Calculate summary metrics
             metrics.total_portfolio_value = total_positions_value + total_holdings_value
