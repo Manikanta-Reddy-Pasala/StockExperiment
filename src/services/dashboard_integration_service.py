@@ -227,23 +227,19 @@ class DashboardIntegrationService:
             total_pnl = 0.0
             
             # Calculate P&L from positions
-            if positions_data and positions_data.get('success'):
-                positions = positions_data.get('data', {}).get('overall', {}).get('net', [])
+            if positions_data and positions_data.get('status') == 'success':
+                positions = positions_data.get('data', [])
                 for position in positions:
                     pnl = position.get('pl', 0)
                     total_pnl += float(pnl) if pnl else 0
             
             # Calculate P&L from holdings (include all holdings, even with zero quantity)
-            if holdings_data and holdings_data.get('success'):
+            if holdings_data and holdings_data.get('status') == 'success':
                 holdings = holdings_data.get('data', [])
-                logger.info(f"Processing {len(holdings)} holdings for P&L calculation")
                 for holding in holdings:
                     pnl = holding.get('pnl', 0)
                     pnl_float = float(pnl) if pnl else 0
-                    logger.info(f"Holding {holding.get('symbol', '')}: P&L = {pnl} -> {pnl_float}")
                     total_pnl += pnl_float
-            
-            logger.info(f"Total P&L calculated: {total_pnl}")
             return round(total_pnl, 2)
             
         except Exception as e:
@@ -301,7 +297,7 @@ class DashboardIntegrationService:
         
         try:
             # Process holdings
-            if holdings_data and holdings_data.get('success'):
+            if holdings_data and holdings_data.get('status') == 'success':
                 holdings = holdings_data.get('data', [])
                 for holding in holdings:
                     # Include all holdings for display, even with zero quantity
@@ -316,8 +312,8 @@ class DashboardIntegrationService:
                     })
             
             # Process positions
-            if positions_data and positions_data.get('success'):
-                positions = positions_data.get('data', {}).get('overall', {}).get('net', [])
+            if positions_data and positions_data.get('status') == 'success':
+                positions = positions_data.get('data', [])
                 for position in positions:
                     if position.get('qty', 0) != 0:  # Only active positions
                         processed.append({

@@ -28,6 +28,12 @@ def get_stock_data(
     Otherwise, the 'period' is used.
     Only uses real data - no fallback to mock data.
     """
+    # Convert string dates to date objects if needed
+    if isinstance(start_date, str):
+        start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+    if isinstance(end_date, str):
+        end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+    
     # Try to fetch data for the requested symbol only
     fyers_data = _try_fyers_data(symbol, start_date, end_date, period, interval, user_id)
     if fyers_data is not None and len(fyers_data) > 0:
