@@ -28,11 +28,11 @@ services:
     depends_on:
       database:
         condition: service_healthy
-      redis:
+      dragonfly:
         condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://trader:trader_password@database:5432/trading_system
-      - REDIS_URL=redis://redis:6379/0
+      - DRAGONFLY_URL=redis://dragonfly:6379/0
       - FLASK_ENV=production
       - PYTHONPATH=/app
       - FYERS_CLIENT_ID=${FYERS_CLIENT_ID:-your_client_id}
@@ -46,17 +46,17 @@ services:
       - trading_network
     command: python run.py --multi-user
 
-  # Redis for caching and session management
-  redis:
-    image: redis:7-alpine
-    container_name: trading_system_redis
+  # Dragonfly for caching and session management
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly
+    container_name: trading_system_dragonfly
     ports:
       - "6379:6379"
     restart: unless-stopped
     networks:
       - trading_network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-h", "localhost", "-p", "6379", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5

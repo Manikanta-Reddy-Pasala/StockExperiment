@@ -1,5 +1,5 @@
 """
-Cache Service - Redis-based caching for tokens, API responses, and session data
+Cache Service - Dragonfly-based caching for tokens, API responses, and session data
 """
 import json
 import logging
@@ -11,32 +11,32 @@ import os
 logger = logging.getLogger(__name__)
 
 class CacheService:
-    """Redis-based cache service for the trading system."""
+    """Dragonfly-based cache service for the trading system."""
     
-    def __init__(self, redis_url: str = None):
+    def __init__(self, dragonfly_url: str = None):
         """
-        Initialize Redis cache service.
+        Initialize Dragonfly cache service.
         
         Args:
-            redis_url (str, optional): Redis connection URL
+            dragonfly_url (str, optional): Dragonfly connection URL
         """
-        self.redis_url = redis_url or os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+        self.dragonfly_url = dragonfly_url or os.environ.get('DRAGONFLY_URL', 'redis://localhost:6379/0')
         self.redis_client = None
         self._connect()
     
     def _connect(self):
-        """Connect to Redis server."""
+        """Connect to Dragonfly server."""
         try:
-            self.redis_client = redis.from_url(self.redis_url, decode_responses=True)
+            self.redis_client = redis.from_url(self.dragonfly_url, decode_responses=True)
             # Test connection
             self.redis_client.ping()
-            logger.info("Successfully connected to Redis")
+            logger.info("Successfully connected to Dragonfly")
         except Exception as e:
-            logger.warning(f"Failed to connect to Redis: {e}. Cache operations will be disabled.")
+            logger.warning(f"Failed to connect to Dragonfly: {e}. Cache operations will be disabled.")
             self.redis_client = None
     
     def is_available(self) -> bool:
-        """Check if Redis is available."""
+        """Check if Dragonfly is available."""
         return self.redis_client is not None
     
     def set(self, key: str, value: Any, expire_seconds: int = None) -> bool:
