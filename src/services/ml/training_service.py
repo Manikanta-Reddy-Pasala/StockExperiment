@@ -17,11 +17,19 @@ try:
     from .data_service import get_stock_data, create_features
     from ...utils.ml_helpers import save_model, save_lstm_model, save_scaler
 except ImportError:
-    # Fall back to absolute imports (for testing)
-    from data_service import get_stock_data, create_features
+    # Fall back to absolute imports (for testing/direct execution)
     import sys
     import os
-    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'utils'))
+
+    # Add the services/ml directory to path for data_service
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, current_dir)
+
+    # Add the utils directory to path for ml_helpers
+    utils_dir = os.path.join(os.path.dirname(os.path.dirname(current_dir)), 'utils')
+    sys.path.insert(0, utils_dir)
+
+    from data_service import get_stock_data, create_features
     from ml_helpers import save_model, save_lstm_model, save_scaler
 
 warnings.filterwarnings("ignore")
@@ -46,12 +54,14 @@ def prepare_lstm_data(df, features, target_scaler, window_size=10):
 # --- Optuna Objective Functions ---
 def _objective_rf(trial, X, y):
     params = {
-        'n_estimators': trial.suggest_int('n_estimators', 200, 500, step=50),
-        'max_depth': trial.suggest_int('max_depth', 10, 30),
-        'min_samples_split': trial.suggest_int('min_samples_split', 2, 10),
-        'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, 4),
-        'max_features': trial.suggest_categorical('max_features', ['sqrt', 'log2', 0.5, 0.7]),
-        'bootstrap': trial.suggest_categorical('bootstrap', [True, False])
+        'n_estimators': trial.suggest_int('n_estimators', 300, 800, step=50),
+        'max_depth': trial.suggest_int('max_depth', 8, 25),
+        'min_samples_split': trial.suggest_int('min_samples_split', 2, 20),
+        'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, 10),
+        'max_features': trial.suggest_categorical('max_features', ['sqrt', 'log2', 0.3, 0.5, 0.7, 0.9]),
+        'bootstrap': True,  # Always use bootstrap for better generalization
+        'max_samples': trial.suggest_float('max_samples', 0.5, 1.0),  # Subsample for diversity
+        'ccp_alpha': trial.suggest_float('ccp_alpha', 0.0, 0.01),  # Pruning for overfitting
     }
     model = RandomForestRegressor(**params, random_state=42, n_jobs=-1)
     X_train, X_test, y_train, y_test = train_test_split(X, y, shuffle=False, test_size=0.2)
@@ -61,14 +71,16 @@ def _objective_rf(trial, X, y):
 
 def _objective_xgb(trial, X, y):
     params = {
-        'n_estimators': trial.suggest_int('n_estimators', 200, 500, step=50),
-        'max_depth': trial.suggest_int('max_depth', 4, 12),
-        'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.2),
-        'subsample': trial.suggest_float('subsample', 0.7, 1.0),
-        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.7, 1.0),
-        'gamma': trial.suggest_float('gamma', 0, 0.5),
-        'reg_alpha': trial.suggest_float('reg_alpha', 0, 1.0),
-        'reg_lambda': trial.suggest_float('reg_lambda', 0, 1.0)
+        'n_estimators': trial.suggest_int('n_estimators', 300, 1000, step=50),
+        'max_depth': trial.suggest_int('max_depth', 3, 10),
+        'learning_rate': trial.suggest_float('learning_rate', 0.005, 0.15),
+        'subsample': trial.suggest_float('subsample', 0.6, 0.95),
+        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 0.95),
+        'colsample_bylevel': trial.suggest_float('colsample_bylevel', 0.6, 1.0),
+        'gamma': trial.suggest_float('gamma', 0, 2.0),
+        'reg_alpha': trial.suggest_float('reg_alpha', 0, 5.0),
+        'reg_lambda': trial.suggest_float('reg_lambda', 0, 5.0),
+        'min_child_weight': trial.suggest_int('min_child_weight', 1, 10),
     }
     model = XGBRegressor(**params, objective='reg:squarederror', random_state=42, n_jobs=-1)
     X_train, X_test, y_train, y_test = train_test_split(X, y, shuffle=False, test_size=0.2)
@@ -77,28 +89,50 @@ def _objective_xgb(trial, X, y):
     return mean_squared_error(y_test, preds)
 
 def _objective_lstm(trial, X, y):
-    units_1 = trial.suggest_int("units_1", 64, 256)
-    units_2 = trial.suggest_int("units_2", 32, 128)
-    units_3 = trial.suggest_int("units_3", 16, 64)
-    dropout = trial.suggest_float("dropout", 0.2, 0.5)
-    recurrent_dropout = trial.suggest_float("recurrent_dropout", 0.1, 0.3)
-    batch_size = trial.suggest_categorical("batch_size", [16, 32, 64])
-    epochs = trial.suggest_int("epochs", 50, 100)
-    learning_rate = trial.suggest_float("learning_rate", 0.0001, 0.01, log=True)
+    units_1 = trial.suggest_int("units_1", 128, 512)
+    units_2 = trial.suggest_int("units_2", 64, 256)
+    units_3 = trial.suggest_int("units_3", 32, 128)
+    dropout = trial.suggest_float("dropout", 0.1, 0.4)
+    recurrent_dropout = trial.suggest_float("recurrent_dropout", 0.05, 0.25)
+    batch_size = trial.suggest_categorical("batch_size", [16, 32, 64, 128])
+    epochs = trial.suggest_int("epochs", 80, 150)
+    learning_rate = trial.suggest_float("learning_rate", 0.0001, 0.005, log=True)
+    l2_reg = trial.suggest_float("l2_reg", 0.001, 0.01)
+    use_attention = trial.suggest_categorical("use_attention", [True, False])
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, shuffle=False, test_size=0.2)
 
     from tensorflow.keras.optimizers import Adam
+    from tensorflow.keras.regularizers import l2
+    from tensorflow.keras.layers import BatchNormalization, Attention
 
-    model = Sequential([
-        LSTM(units_1, return_sequences=True, input_shape=(X.shape[1], X.shape[2]),
-             dropout=dropout, recurrent_dropout=recurrent_dropout),
-        LSTM(units_2, return_sequences=True, dropout=dropout, recurrent_dropout=recurrent_dropout),
-        LSTM(units_3, dropout=dropout, recurrent_dropout=recurrent_dropout),
-        Dense(32, activation='relu'),
-        Dropout(dropout),
-        Dense(1, activation='linear')
-    ])
+    # Build improved LSTM architecture
+    model = Sequential()
+
+    # First LSTM layer
+    model.add(LSTM(units_1, return_sequences=True, input_shape=(X.shape[1], X.shape[2]),
+                   dropout=dropout, recurrent_dropout=recurrent_dropout,
+                   kernel_regularizer=l2(l2_reg), recurrent_regularizer=l2(l2_reg)))
+    model.add(BatchNormalization())
+
+    # Second LSTM layer
+    model.add(LSTM(units_2, return_sequences=True,
+                   dropout=dropout, recurrent_dropout=recurrent_dropout,
+                   kernel_regularizer=l2(l2_reg), recurrent_regularizer=l2(l2_reg)))
+    model.add(BatchNormalization())
+
+    # Third LSTM layer (final sequence layer)
+    model.add(LSTM(units_3, return_sequences=False,
+                   dropout=dropout, recurrent_dropout=recurrent_dropout,
+                   kernel_regularizer=l2(l2_reg), recurrent_regularizer=l2(l2_reg)))
+    model.add(BatchNormalization())
+
+    # Dense layers with regularization
+    model.add(Dense(64, activation='relu', kernel_regularizer=l2(l2_reg)))
+    model.add(Dropout(dropout))
+    model.add(Dense(32, activation='relu', kernel_regularizer=l2(l2_reg)))
+    model.add(Dropout(dropout * 0.5))
+    model.add(Dense(1, activation='linear'))
 
     optimizer = Adam(learning_rate=learning_rate)
     model.compile(loss='mean_squared_error', optimizer=optimizer, metrics=['mean_absolute_error'])
@@ -154,7 +188,7 @@ def train_and_tune_models(symbol: str, start_date: Optional[date] = None, end_da
         update_progress(30, "Training Random Forest model...")
         # --- Random Forest ---
         study_rf = optuna.create_study(direction='minimize')
-        study_rf.optimize(lambda trial: _objective_rf(trial, X_tab, y_tab), n_trials=12, show_progress_bar=False)
+        study_rf.optimize(lambda trial: _objective_rf(trial, X_tab, y_tab), n_trials=25, show_progress_bar=False)
         rf_model = RandomForestRegressor(**study_rf.best_params, random_state=42)
         rf_model.fit(X_train_tab, y_train_tab)
         save_model(rf_model, f"{symbol}_rf")
@@ -162,7 +196,7 @@ def train_and_tune_models(symbol: str, start_date: Optional[date] = None, end_da
         update_progress(50, "Training XGBoost model...")
         # --- XGBoost ---
         study_xgb = optuna.create_study(direction='minimize')
-        study_xgb.optimize(lambda trial: _objective_xgb(trial, X_tab, y_tab), n_trials=12, show_progress_bar=False)
+        study_xgb.optimize(lambda trial: _objective_xgb(trial, X_tab, y_tab), n_trials=25, show_progress_bar=False)
         xgb_model = XGBRegressor(**study_xgb.best_params, objective='reg:squarederror')
         xgb_model.fit(X_train_tab, y_train_tab)
         save_model(xgb_model, f"{symbol}_xgb")
@@ -176,7 +210,7 @@ def train_and_tune_models(symbol: str, start_date: Optional[date] = None, end_da
         X_train_lstm, X_test_lstm, y_train_lstm, y_test_lstm = train_test_split(X_lstm, y_lstm, shuffle=False, test_size=0.2)
 
         study_lstm = optuna.create_study(direction='minimize')
-        study_lstm.optimize(lambda trial: _objective_lstm(trial, X_lstm, y_lstm), n_trials=8, show_progress_bar=False)
+        study_lstm.optimize(lambda trial: _objective_lstm(trial, X_lstm, y_lstm), n_trials=15, show_progress_bar=False)
 
         best_lstm_params = study_lstm.best_params
         lstm_model = Sequential([

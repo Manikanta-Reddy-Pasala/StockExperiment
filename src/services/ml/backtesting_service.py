@@ -36,7 +36,15 @@ class BacktestingService:
             logger.info(f"Starting backtest for {symbol} over {test_period_days} days")
 
             # Import ml_helpers for loading models
-            from ...utils.ml_helpers import load_model, load_lstm_model, load_scaler
+            try:
+                from ...utils.ml_helpers import load_model, load_lstm_model, load_scaler
+            except ImportError:
+                # Fallback for direct execution
+                import sys
+                import os
+                utils_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'utils')
+                sys.path.insert(0, utils_dir)
+                from ml_helpers import load_model, load_lstm_model, load_scaler
 
             # Load the trained models using the helper functions
             symbol_clean = symbol.replace(':', '_')
@@ -71,11 +79,25 @@ class BacktestingService:
                 }
             
             # Get historical data for backtesting
-            from .data_service import get_stock_data
+            try:
+                from .data_service import get_stock_data
+            except ImportError:
+                # Fallback for direct execution
+                import sys
+                import os
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                sys.path.insert(0, current_dir)
+                from data_service import get_stock_data
 
-            # Get more historical data to ensure we have enough for testing
-            # Use a larger period to get sufficient data for backtesting
-            df = get_stock_data(symbol, period="6M", user_id=user_id)
+            # Get recent historical data for backtesting (should be AFTER training period)
+            # Use recent data to test on out-of-sample period
+            from datetime import datetime, timedelta
+
+            # Get data from last 3 months (most recent available)
+            end_date = datetime.now().date()
+            start_date = end_date - timedelta(days=90)  # 3 months back
+
+            df = get_stock_data(symbol, start_date=start_date, end_date=end_date, user_id=user_id)
             if df is None or len(df) < test_period_days + 20:
                 return {
                     'success': False,
@@ -83,7 +105,11 @@ class BacktestingService:
                 }
             
             # Prepare features
-            from .data_service import create_features
+            try:
+                from .data_service import create_features
+            except ImportError:
+                # Fallback for direct execution
+                from data_service import create_features
             df_featured, features = create_features(df)
             
             if len(df_featured) < test_period_days + 10:
@@ -189,20 +215,27 @@ class BacktestingService:
                     lstm_change = ((lstm_pred - current_price) / current_price) * 100
                     ensemble_change = ((ensemble_pred - current_price) / current_price) * 100
                     
-                    # Signal accuracy (direction prediction)
-                    def get_signal(change):
-                        if change > 2:
+                    # Adaptive signal generation based on volatility
+                    # Calculate recent volatility for dynamic thresholds
+                    recent_returns = current_data['Close'].pct_change().iloc[-10:].dropna()
+                    volatility = recent_returns.std() * 100  # Daily volatility as percentage
+
+                    # Dynamic threshold: use 1.5x daily volatility, with min 0.5% and max 3%
+                    threshold = max(0.5, min(3.0, volatility * 1.5))
+
+                    def get_signal(change, threshold):
+                        if change > threshold:
                             return "BUY"
-                        elif change < -2:
+                        elif change < -threshold:
                             return "SELL"
                         else:
                             return "HOLD"
                     
-                    actual_signal = get_signal(actual_change)
-                    rf_signal = get_signal(rf_change)
-                    xgb_signal = get_signal(xgb_change)
-                    lstm_signal = get_signal(lstm_change)
-                    ensemble_signal = get_signal(ensemble_change)
+                    actual_signal = get_signal(actual_change, threshold)
+                    rf_signal = get_signal(rf_change, threshold)
+                    xgb_signal = get_signal(xgb_change, threshold)
+                    lstm_signal = get_signal(lstm_change, threshold)
+                    ensemble_signal = get_signal(ensemble_change, threshold)
                     
                     results.append({
                         'date': df_featured.index[i].strftime('%Y-%m-%d'),

@@ -311,6 +311,31 @@ def create_features(df):
     df['Momentum'] = df['Close'] / df['Close'].shift(10) - 1
     df['ROC'] = df['Close'].pct_change(periods=10)
 
+    # Advanced price action features
+    df['High_Low_Ratio'] = df['High'] / df['Low']
+    df['Close_Open_Ratio'] = df['Close'] / df['Open']
+    df['Body_Size'] = abs(df['Close'] - df['Open']) / df['Open']  # Candle body size
+    df['Upper_Shadow'] = (df['High'] - df[['Open', 'Close']].max(axis=1)) / df['Open']
+    df['Lower_Shadow'] = (df[['Open', 'Close']].min(axis=1) - df['Low']) / df['Open']
+
+    # Volume-price relationship
+    df['Volume_Price_Trend'] = df['Volume'] * df['Return']  # Volume-weighted returns
+    df['Price_Volume_Ratio'] = df['Close'] * df['Volume']
+
+    # Short-term momentum features (better for next-day prediction)
+    df['Return_1d'] = df['Close'].pct_change(periods=1)
+    df['Return_3d'] = df['Close'].pct_change(periods=3)
+    df['Volatility_3d'] = df['Return_1d'].rolling(window=3).std()
+    df['Volatility_7d'] = df['Return_1d'].rolling(window=7).std()
+
+    # Trend strength indicators
+    df['MA5_Slope'] = df['MA5'].pct_change(periods=2)
+    df['MA20_Slope'] = df['MA20'].pct_change(periods=5)
+
+    # Support/Resistance levels
+    df['Distance_to_High_5d'] = (df['High'].rolling(5).max() - df['Close']) / df['Close']
+    df['Distance_to_Low_5d'] = (df['Close'] - df['Low'].rolling(5).min()) / df['Close']
+
     # --- Target Variable for Regression ---
     # The target is the next day's closing price.
     df['Target'] = df['Close'].shift(-1)
@@ -320,11 +345,26 @@ def create_features(df):
 
     # Use normalized features that don't depend on absolute price levels
     features = [
-        'Return', 'Return_2d', 'Return_5d',
+        # Basic price features
+        'Return', 'Return_1d', 'Return_2d', 'Return_3d', 'Return_5d',
+
+        # Moving average features
         'Price_MA5_Ratio', 'Price_MA10_Ratio', 'Price_MA20_Ratio', 'Price_MA50_Ratio',
-        'MA5_MA20_Ratio', 'MA10_MA50_Ratio',
-        'Volatility', 'Volume_Change', 'Volume_Ratio',
-        'Price_Position', 'RSI', 'BB_Position',
+        'MA5_MA20_Ratio', 'MA10_MA50_Ratio', 'MA5_Slope', 'MA20_Slope',
+
+        # Volatility features
+        'Volatility', 'Volatility_3d', 'Volatility_7d',
+
+        # Volume features
+        'Volume_Change', 'Volume_Ratio', 'Volume_Price_Trend',
+
+        # Price action features
+        'Price_Position', 'High_Low_Ratio', 'Close_Open_Ratio', 'Body_Size',
+        'Upper_Shadow', 'Lower_Shadow',
+        'Distance_to_High_5d', 'Distance_to_Low_5d',
+
+        # Technical indicators
+        'RSI', 'BB_Position',
         'MACD', 'MACD_Signal', 'MACD_Histogram',
         'Momentum', 'ROC'
     ]

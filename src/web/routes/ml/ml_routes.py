@@ -5,6 +5,7 @@ Routes handle HTTP logic only, business logic in services
 from flask import Blueprint, request, jsonify, render_template
 from flask_login import login_required, current_user
 import logging
+from datetime import datetime
 
 # Import the ML API service
 from ....services.ml_api_service import get_ml_api_service
@@ -326,6 +327,143 @@ def backtest_ml_model():
         return jsonify({
             'success': False,
             'error': f'Backtesting failed: {str(e)}'
+        }), 500
+
+@ml_bp.route('/suggested-stocks', methods=['GET'])
+@login_required
+def get_suggested_stocks():
+    """Get suggested stocks for swing trading with risk-based strategies."""
+    try:
+        # Get query parameters
+        strategy_type = request.args.get('strategy', 'default_risk')
+        limit = int(request.args.get('limit', 20))
+        
+        # Import the stock screening service
+        from ....services.stock_screening_service import get_stock_screening_service, StrategyType
+        
+        # Convert string to enum
+        if strategy_type == 'high_risk':
+            strategies = [StrategyType.HIGH_RISK]
+        else:
+            strategies = [StrategyType.DEFAULT_RISK]
+        
+        # Get stock screening service
+        screening_service = get_stock_screening_service()
+        
+        # Use a default user ID if current_user is not available (for testing)
+        user_id = current_user.id if current_user and hasattr(current_user, 'id') else 1
+        
+        # Screen stocks based on strategy
+        screened_stocks = screening_service.screen_stocks(strategies, user_id)
+        
+        # Convert to API response format
+        suggestions = []
+        for stock in screened_stocks:
+            suggestion = {
+                'symbol': stock.symbol,
+                'name': stock.name,
+                'current_price': stock.current_price,
+                'target_price': stock.target_price,
+                'stop_loss': stock.stop_loss,
+                'recommendation': stock.recommendation,
+                'strategy': stock.strategy,
+                'risk_level': stock.risk_level,
+                'holding_period': stock.holding_period,
+                'market_cap': stock.market_cap,
+                'pe_ratio': stock.pe_ratio,
+                'pb_ratio': stock.pb_ratio,
+                'roe': stock.roe,
+                'sales_growth': stock.sales_growth,
+                'rsi': stock.rsi,
+                'sma_20': stock.sma_20,
+                'volume': stock.volume,
+                'avg_volume_20d': stock.avg_volume_20d,
+                'expected_return': ((stock.target_price - stock.current_price) / stock.current_price * 100) if stock.target_price else 0,
+                'risk_reward_ratio': ((stock.target_price - stock.current_price) / (stock.current_price - stock.stop_loss)) if stock.target_price and stock.stop_loss else 0
+            }
+            suggestions.append(suggestion)
+        
+        return jsonify({
+            'success': True,
+            'data': suggestions,
+            'strategy_applied': strategy_type,
+            'total': len(suggestions),
+            'last_updated': datetime.now().isoformat()
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting suggested stocks: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@ml_bp.route('/suggested-stocks-test', methods=['GET'])
+def get_suggested_stocks_test():
+    """Test endpoint for suggested stocks without authentication."""
+    try:
+        # Get query parameters
+        strategy_type = request.args.get('strategy', 'default_risk')
+        limit = int(request.args.get('limit', 20))
+        
+        # Import the stock screening service
+        from ....services.stock_screening_service import get_stock_screening_service, StrategyType
+        
+        # Convert string to enum
+        if strategy_type == 'high_risk':
+            strategies = [StrategyType.HIGH_RISK]
+        else:
+            strategies = [StrategyType.DEFAULT_RISK]
+        
+        # Get stock screening service
+        screening_service = get_stock_screening_service()
+        
+        # Use a default user ID for testing
+        user_id = 1
+        
+        # Screen stocks based on strategy
+        screened_stocks = screening_service.screen_stocks(strategies, user_id)
+        
+        # Convert to API response format
+        suggestions = []
+        for stock in screened_stocks:
+            suggestion = {
+                'symbol': stock.symbol,
+                'name': stock.name,
+                'current_price': stock.current_price,
+                'target_price': stock.target_price,
+                'stop_loss': stock.stop_loss,
+                'recommendation': stock.recommendation,
+                'strategy': stock.strategy,
+                'risk_level': stock.risk_level,
+                'holding_period': stock.holding_period,
+                'market_cap': stock.market_cap,
+                'pe_ratio': stock.pe_ratio,
+                'pb_ratio': stock.pb_ratio,
+                'roe': stock.roe,
+                'sales_growth': stock.sales_growth,
+                'rsi': stock.rsi,
+                'sma_20': stock.sma_20,
+                'volume': stock.volume,
+                'avg_volume_20d': stock.avg_volume_20d,
+                'expected_return': ((stock.target_price - stock.current_price) / stock.current_price * 100) if stock.target_price else 0,
+                'risk_reward_ratio': ((stock.target_price - stock.current_price) / (stock.current_price - stock.stop_loss)) if stock.target_price and stock.stop_loss else 0
+            }
+            suggestions.append(suggestion)
+        
+        return jsonify({
+            'success': True,
+            'data': suggestions,
+            'strategy_applied': strategy_type,
+            'total': len(suggestions),
+            'last_updated': datetime.now().isoformat()
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting suggested stocks: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
         }), 500
 
 @ml_web_bp.route('/ml')
