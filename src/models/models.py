@@ -502,6 +502,7 @@ class MLTrainingJob(Base):
     progress = Column(Float, default=0.0)  # 0.0 to 100.0
     accuracy = Column(Float)  # Model accuracy after training
     error_message = Column(Text)
+    training_results = Column(Text)  # JSON string containing training results and backtesting data
     created_at = Column(DateTime, default=datetime.utcnow)
     started_at = Column(DateTime)
     completed_at = Column(DateTime)

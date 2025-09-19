@@ -240,9 +240,10 @@ class MLAPIService:
 
             # Start training in background thread
             def run_training():
+                training_results = None
                 try:
                     from .ml.training_service import train_and_tune_models
-                    result = train_and_tune_models(symbol, start_date, end_date, job_id)
+                    result = train_and_tune_models(symbol, start_dt.date(), end_dt.date(), job_id)
 
                     # Update job status
                     with self.db_manager.get_session() as session:
@@ -252,6 +253,30 @@ class MLAPIService:
                                 job.status = 'completed'
                                 job.progress = 100.0
                                 job.completed_at = datetime.utcnow()
+
+                                # Store training results including backtesting data
+                                import json
+                                import numpy as np
+
+                                # Convert numpy types to native Python types for JSON serialization
+                                def convert_numpy_types(obj):
+                                    if isinstance(obj, np.floating):
+                                        return float(obj)
+                                    elif isinstance(obj, np.integer):
+                                        return int(obj)
+                                    elif isinstance(obj, np.ndarray):
+                                        return obj.tolist()
+                                    elif isinstance(obj, dict):
+                                        return {key: convert_numpy_types(value) for key, value in obj.items()}
+                                    elif isinstance(obj, list):
+                                        return [convert_numpy_types(item) for item in obj]
+                                    return obj
+
+                                cleaned_result = convert_numpy_types(result) if result else None
+                                job.training_results = json.dumps(cleaned_result) if cleaned_result else None
+                                training_results = result
+
+                                logger.info(f"Training completed successfully for {symbol}, job {job_id}")
                             else:
                                 job.status = 'failed'
                                 job.error_message = 'Training failed'
@@ -299,7 +324,7 @@ class MLAPIService:
                         'error': 'Training job not found'
                     }
 
-                return {
+                response_data = {
                     'success': True,
                     'job_id': job_id,
                     'symbol': job.symbol,
@@ -309,6 +334,18 @@ class MLAPIService:
                     'completed_at': job.completed_at.isoformat() if job.completed_at else None,
                     'error_message': job.error_message
                 }
+
+                # Include training results if the job is completed and has results
+                if job.status == 'completed' and hasattr(job, 'training_results') and job.training_results:
+                    try:
+                        import json
+                        training_results = json.loads(job.training_results)
+                        response_data['training_results'] = training_results
+                        logger.info(f"Including training results for completed job {job_id}")
+                    except (json.JSONDecodeError, Exception) as e:
+                        logger.warning(f"Failed to parse training results for job {job_id}: {e}")
+
+                return response_data
 
         except Exception as e:
             logger.error(f"Error getting training progress for job {job_id}: {e}")

@@ -27,6 +27,8 @@ services:
       # Mount templates for live reloading
       - ./src/web/templates:/app/src/web/templates:ro
       - ./src/web/static:/app/src/web/static:ro
+      # Mount models directory for persistence
+      - ./api/v1/ml/trained:/app/api/v1/ml/trained
     restart: unless-stopped
     networks:
       - trading_network

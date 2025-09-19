@@ -3,6 +3,30 @@
 {% block title %}Machine Learning{% endblock %}
 
 {% block content %}
+<!-- Model Enhancement Banner -->
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm animate-fade-in-up">
+            <div class="d-flex align-items-center">
+                <div class="me-3">
+                    <i class="bi bi-rocket-takeoff" style="font-size: 2rem; color: #28a745;"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <h6 class="alert-heading mb-1">🚀 Enhanced ML Models Now Available!</h6>
+                    <p class="mb-2">
+                        Our ML prediction models have been significantly improved with:
+                        <strong>20+ normalized features</strong>, <strong>advanced hyperparameter tuning</strong>, and <strong>realistic price predictions</strong>.
+                    </p>
+                    <small class="text-muted">
+                        ✨ Better accuracy • 🎯 Realistic price ranges • 📊 Enhanced ensemble architecture
+                    </small>
+                </div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
+
 <!-- ML Dashboard Header -->
 <div class="row mb-4">
     <div class="col-12">
@@ -88,10 +112,14 @@
 
                     <div class="mb-3">
                         <div class="alert alert-info">
-                            <i class="bi bi-info-circle me-2"></i>
-                            <strong>Model:</strong> Advanced Ensemble (Random Forest + XGBoost + LSTM)
+                            <i class="bi bi-cpu-fill me-2"></i>
+                            <strong>Enhanced Ensemble Model:</strong> Random Forest + XGBoost + LSTM
                             <br>
-                            <small>Uses the best combination of models for optimal accuracy</small>
+                            <small class="text-muted">
+                                ✨ <strong>New Features:</strong> Normalized features, advanced hyperparameter tuning, improved LSTM architecture
+                                <br>
+                                🎯 <strong>Optimized for:</strong> Realistic price predictions with proper scale understanding
+                            </small>
                         </div>
                     </div>
 
@@ -99,7 +127,8 @@
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="use-technical-indicators" checked>
                             <label class="form-check-label" for="use-technical-indicators">
-                                Include Technical Indicators (RSI, MACD, Moving Averages)
+                                Include Enhanced Technical Indicators
+                                <small class="text-muted">(20+ normalized features: RSI, MACD, Moving Averages, Volume Patterns, Price Ratios)</small>
                             </label>
                         </div>
                     </div>
@@ -121,6 +150,63 @@
                     <div class="d-flex justify-content-between">
                         <small class="text-muted" id="progress-status">Starting training...</small>
                         <small class="text-muted" id="progress-percent">0%</small>
+                    </div>
+                </div>
+
+                <!-- Training Results & Backtesting -->
+                <div id="training-results" class="mt-4" style="display: none;">
+                    <div class="alert alert-success">
+                        <h6 class="alert-heading">
+                            <i class="bi bi-check-circle me-2"></i>Training Completed Successfully
+                        </h6>
+                        <p class="mb-2">
+                            <strong>Symbol:</strong> <span id="trained-symbol">-</span><br>
+                            <strong>Models:</strong> <span id="trained-models">-</span><br>
+                            <strong>Training Period:</strong> <span id="training-period">-</span>
+                        </p>
+
+                        <!-- Automatic Backtesting Results -->
+                        <div id="auto-backtest-results" style="display: none;">
+                            <hr class="my-3">
+                            <h6 class="mb-3">
+                                <i class="bi bi-graph-up me-2"></i>Automatic Backtesting Results
+                            </h6>
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <h5 class="mb-1" id="auto-trust-score">-</h5>
+                                        <small class="text-muted">Trust Score</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <h5 class="mb-1" id="auto-signal-accuracy">-</h5>
+                                        <small class="text-muted">Signal Accuracy</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <h5 class="mb-1" id="auto-best-model">-</h5>
+                                        <small class="text-muted">Best Model</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <h5 class="mb-1" id="auto-test-period">-</h5>
+                                        <small class="text-muted">Test Period</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <strong>Recommendation:</strong> <span id="auto-recommendation">-</span>
+                            </div>
+                        </div>
+
+                        <div class="mt-3">
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="hideTrainingResults()">
+                                <i class="bi bi-x"></i> Dismiss
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -229,6 +315,92 @@
                         </div>
                     </div>
 
+                    <!-- Individual Model Predictions -->
+                    <div class="row g-3 mt-2" id="individual-predictions" style="display: none;">
+                        <div class="col-12">
+                            <h6 class="text-muted mb-3">Individual Model Predictions</h6>
+                        </div>
+                        <div class="col-lg-4 col-md-4">
+                            <div class="card bg-light border-success">
+                                <div class="card-body text-center py-2">
+                                    <h6 class="text-success mb-1" id="rf-prediction">₹0.00</h6>
+                                    <small class="text-muted">Random Forest</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4 col-md-4">
+                            <div class="card bg-light border-warning">
+                                <div class="card-body text-center py-2">
+                                    <h6 class="text-warning mb-1" id="xgb-prediction">₹0.00</h6>
+                                    <small class="text-muted">XGBoost</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4 col-md-4">
+                            <div class="card bg-light border-info">
+                                <div class="card-body text-center py-2">
+                                    <h6 class="text-info mb-1" id="lstm-prediction">₹0.00</h6>
+                                    <small class="text-muted">LSTM</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Backtesting Section -->
+                <div class="mt-4">
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0">Model Trust Analysis</h6>
+                        <button class="btn btn-outline-warning btn-sm" id="backtest-btn">
+                            <i class="bi bi-shield-check"></i> Test Model
+                        </button>
+                    </div>
+                    
+                    <!-- Backtesting Results -->
+                    <div id="backtest-results" style="display: none;">
+                        <div class="alert alert-info">
+                            <h6 class="alert-heading">
+                                <i class="bi bi-graph-up me-2"></i>Model Performance Analysis
+                            </h6>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <div class="text-center">
+                                        <h4 class="mb-1" id="trust-score">0</h4>
+                                        <small class="text-muted">Trust Score</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center">
+                                        <h4 class="mb-1" id="signal-accuracy">0%</h4>
+                                        <small class="text-muted">Signal Accuracy</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center">
+                                        <h4 class="mb-1" id="price-accuracy">0%</h4>
+                                        <small class="text-muted">Price Accuracy</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Model Performance:</h6>
+                                    <ul class="list-unstyled">
+                                        <li><strong>Best Model:</strong> <span id="best-model">-</span></li>
+                                        <li><strong>Test Period:</strong> <span id="test-period">-</span></li>
+                                        <li><strong>Total Predictions:</strong> <span id="total-predictions">-</span></li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Recommendation:</h6>
+                                    <p id="recommendation" class="mb-0">-</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -284,6 +456,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Prediction button
     document.getElementById('predict-btn').addEventListener('click', handlePrediction);
+
+    // Backtest button
+    document.getElementById('backtest-btn').addEventListener('click', handleBacktest);
 
     // Symbol search
     document.getElementById('search-symbol-btn').addEventListener('click', searchSymbol);
@@ -629,6 +804,9 @@ function displayPredictionResults(data) {
             signalElement.textContent = data.signal;
             signalElement.className = getSignalColor(data.signal);
         }
+
+        // Display individual model predictions if available
+        displayIndividualPredictions(data);
     } catch (error) {
         console.error('Error displaying prediction results:', error);
         alert('Error displaying prediction results: ' + error.message);
@@ -755,6 +933,11 @@ function pollTrainingProgress(trainingId) {
                     // Stop polling
                     clearInterval(pollInterval);
 
+                    // Show training results if available
+                    if (data.training_results) {
+                        displayTrainingResults(data.training_results);
+                    }
+
                     // Hide progress after 3 seconds and refresh data
                     setTimeout(() => {
                         hideTrainingProgress();
@@ -846,6 +1029,140 @@ function deleteModel(modelId) {
         // Implement model deletion
         alert('Delete model ID: ' + modelId);
     }
+}
+
+// Handle Backtesting
+async function handleBacktest() {
+    const symbol = document.getElementById('predict-symbol').value;
+    const backtestBtn = document.getElementById('backtest-btn');
+
+    if (!symbol) {
+        alert('Please enter a stock symbol first');
+        return;
+    }
+
+    // Show loading state
+    showBacktestLoading();
+
+    try {
+        const response = await fetch('/api/v1/ml/backtest', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                symbol: symbol,
+                test_period_days: 30  // Test on last 30 days
+            })
+        });
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                alert('Your session has expired. Please log in again.');
+                window.location.href = '/login';
+                return;
+            }
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        if (result.success) {
+            displayBacktestResults(result);
+        } else {
+            alert('Backtesting failed: ' + result.error);
+        }
+
+    } catch (error) {
+        console.error('Backtesting error:', error);
+        alert('Backtesting failed: Network error');
+    } finally {
+        hideBacktestLoading();
+    }
+}
+
+function displayBacktestResults(result) {
+    console.log('Displaying backtest results:', result);
+    
+    const resultsSection = document.getElementById('backtest-results');
+    if (resultsSection) {
+        resultsSection.style.display = 'block';
+    }
+
+    const summary = result.summary;
+    const metrics = result.metrics;
+
+    // Update trust score with color coding
+    const trustScoreElement = document.getElementById('trust-score');
+    if (trustScoreElement) {
+        trustScoreElement.textContent = summary.trust_score;
+        trustScoreElement.className = `mb-1 text-${summary.trust_color}`;
+    }
+
+    // Update signal accuracy
+    const signalAccuracyElement = document.getElementById('signal-accuracy');
+    if (signalAccuracyElement) {
+        signalAccuracyElement.textContent = `${summary.ensemble_accuracy}%`;
+    }
+
+    // Update price accuracy (using MAPE - lower is better)
+    const priceAccuracyElement = document.getElementById('price-accuracy');
+    if (priceAccuracyElement) {
+        const priceAccuracy = Math.max(0, 100 - summary.ensemble_mape);
+        priceAccuracyElement.textContent = `${priceAccuracy.toFixed(1)}%`;
+    }
+
+    // Update model performance details
+    const bestModelElement = document.getElementById('best-model');
+    if (bestModelElement) {
+        bestModelElement.textContent = summary.best_model.replace('_model', '').toUpperCase();
+    }
+
+    const testPeriodElement = document.getElementById('test-period');
+    if (testPeriodElement) {
+        testPeriodElement.textContent = summary.test_period;
+    }
+
+    const totalPredictionsElement = document.getElementById('total-predictions');
+    if (totalPredictionsElement) {
+        totalPredictionsElement.textContent = metrics.total_predictions;
+    }
+
+    const recommendationElement = document.getElementById('recommendation');
+    if (recommendationElement) {
+        recommendationElement.textContent = summary.recommendation;
+    }
+}
+
+function showBacktestLoading() {
+    const backtestBtn = document.getElementById('backtest-btn');
+    const originalContent = backtestBtn.innerHTML;
+    
+    // Store original content for restoration
+    backtestBtn.setAttribute('data-original-content', originalContent);
+    
+    // Show spinner and disable button
+    backtestBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Testing...';
+    backtestBtn.disabled = true;
+    
+    // Hide previous results
+    const resultsSection = document.getElementById('backtest-results');
+    if (resultsSection) {
+        resultsSection.style.display = 'none';
+    }
+}
+
+function hideBacktestLoading() {
+    const backtestBtn = document.getElementById('backtest-btn');
+    const originalContent = backtestBtn.getAttribute('data-original-content');
+    
+    // Restore original content and enable button
+    if (originalContent) {
+        backtestBtn.innerHTML = originalContent;
+    } else {
+        backtestBtn.innerHTML = '<i class="bi bi-shield-check"></i> Test Model';
+    }
+    backtestBtn.disabled = false;
 }
 
 async function searchSymbol() {
@@ -989,6 +1306,138 @@ function showSymbolOptions(fyersData, symbolInput) {
 function showTrainedModelsError() {
     const tbody = document.querySelector('#trained-models-table tbody');
     tbody.innerHTML = '<tr><td colspan="5" class="text-center text-warning">Error loading models</td></tr>';
+}
+
+// Training Results Display Functions
+function displayTrainingResults(results) {
+    console.log('Displaying training results:', results);
+
+    const resultsSection = document.getElementById('training-results');
+    if (!resultsSection) return;
+
+    // Update basic training info
+    const trainedSymbolElement = document.getElementById('trained-symbol');
+    if (trainedSymbolElement) {
+        trainedSymbolElement.textContent = results.symbol || '-';
+    }
+
+    const trainedModelsElement = document.getElementById('trained-models');
+    if (trainedModelsElement && results.models_saved) {
+        trainedModelsElement.textContent = results.models_saved.join(', ');
+    }
+
+    const trainingPeriodElement = document.getElementById('training-period');
+    if (trainingPeriodElement && results.training_period) {
+        const period = results.training_period;
+        trainingPeriodElement.textContent = `${period.start_date} to ${period.end_date}`;
+    }
+
+    // Display backtesting results if available
+    if (results.backtesting && results.backtesting.success) {
+        displayAutoBacktestResults(results.backtesting);
+    }
+
+    // Show the results section
+    resultsSection.style.display = 'block';
+}
+
+function displayAutoBacktestResults(backtestData) {
+    console.log('Displaying auto backtest results:', backtestData);
+
+    const autoBacktestSection = document.getElementById('auto-backtest-results');
+    if (!autoBacktestSection) return;
+
+    const summary = backtestData.summary;
+    if (!summary) return;
+
+    // Update trust score with color coding
+    const autoTrustScoreElement = document.getElementById('auto-trust-score');
+    if (autoTrustScoreElement) {
+        autoTrustScoreElement.textContent = summary.trust_score || '-';
+        autoTrustScoreElement.className = `mb-1 text-${summary.trust_color || 'secondary'}`;
+    }
+
+    // Update signal accuracy
+    const autoSignalAccuracyElement = document.getElementById('auto-signal-accuracy');
+    if (autoSignalAccuracyElement) {
+        autoSignalAccuracyElement.textContent = `${summary.ensemble_accuracy || 0}%`;
+    }
+
+    // Update best model
+    const autoBestModelElement = document.getElementById('auto-best-model');
+    if (autoBestModelElement) {
+        const bestModel = summary.best_model ? summary.best_model.replace('_model', '').toUpperCase() : '-';
+        autoBestModelElement.textContent = bestModel;
+    }
+
+    // Update test period
+    const autoTestPeriodElement = document.getElementById('auto-test-period');
+    if (autoTestPeriodElement) {
+        autoTestPeriodElement.textContent = summary.test_period || '-';
+    }
+
+    // Update recommendation
+    const autoRecommendationElement = document.getElementById('auto-recommendation');
+    if (autoRecommendationElement) {
+        autoRecommendationElement.textContent = summary.recommendation || '-';
+    }
+
+    // Show the auto backtest results
+    autoBacktestSection.style.display = 'block';
+}
+
+function hideTrainingResults() {
+    const resultsSection = document.getElementById('training-results');
+    if (resultsSection) {
+        resultsSection.style.display = 'none';
+    }
+
+    // Also hide the auto backtest section
+    const autoBacktestSection = document.getElementById('auto-backtest-results');
+    if (autoBacktestSection) {
+        autoBacktestSection.style.display = 'none';
+    }
+}
+
+function displayIndividualPredictions(data) {
+    const individualSection = document.getElementById('individual-predictions');
+    if (!individualSection) return;
+
+    let hasIndividualPredictions = false;
+
+    // Update Random Forest prediction
+    if (data.rf_predicted_price) {
+        const rfElement = document.getElementById('rf-prediction');
+        if (rfElement) {
+            rfElement.textContent = `₹${parseFloat(data.rf_predicted_price).toFixed(2)}`;
+            hasIndividualPredictions = true;
+        }
+    }
+
+    // Update XGBoost prediction
+    if (data.xgb_predicted_price) {
+        const xgbElement = document.getElementById('xgb-prediction');
+        if (xgbElement) {
+            xgbElement.textContent = `₹${parseFloat(data.xgb_predicted_price).toFixed(2)}`;
+            hasIndividualPredictions = true;
+        }
+    }
+
+    // Update LSTM prediction
+    if (data.lstm_predicted_price) {
+        const lstmElement = document.getElementById('lstm-prediction');
+        if (lstmElement) {
+            lstmElement.textContent = `₹${parseFloat(data.lstm_predicted_price).toFixed(2)}`;
+            hasIndividualPredictions = true;
+        }
+    }
+
+    // Show/hide the individual predictions section
+    if (hasIndividualPredictions) {
+        individualSection.style.display = 'block';
+    } else {
+        individualSection.style.display = 'none';
+    }
 }
 </script>
 {% endblock %}

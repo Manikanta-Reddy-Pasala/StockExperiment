@@ -46,12 +46,14 @@ def prepare_lstm_data(df, features, target_scaler, window_size=10):
 # --- Optuna Objective Functions ---
 def _objective_rf(trial, X, y):
     params = {
-        'n_estimators': trial.suggest_int('n_estimators', 100, 300, step=50),
-        'max_depth': trial.suggest_int('max_depth', 5, 20),
+        'n_estimators': trial.suggest_int('n_estimators', 200, 500, step=50),
+        'max_depth': trial.suggest_int('max_depth', 10, 30),
         'min_samples_split': trial.suggest_int('min_samples_split', 2, 10),
-        'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, 5)
+        'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, 4),
+        'max_features': trial.suggest_categorical('max_features', ['sqrt', 'log2', 0.5, 0.7]),
+        'bootstrap': trial.suggest_categorical('bootstrap', [True, False])
     }
-    model = RandomForestRegressor(**params, random_state=42)
+    model = RandomForestRegressor(**params, random_state=42, n_jobs=-1)
     X_train, X_test, y_train, y_test = train_test_split(X, y, shuffle=False, test_size=0.2)
     model.fit(X_train, y_train)
     preds = model.predict(X_test)
@@ -59,38 +61,54 @@ def _objective_rf(trial, X, y):
 
 def _objective_xgb(trial, X, y):
     params = {
-        'n_estimators': trial.suggest_int('n_estimators', 100, 300, step=50),
-        'max_depth': trial.suggest_int('max_depth', 3, 10),
-        'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),
-        'subsample': trial.suggest_float('subsample', 0.6, 1.0),
-        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0)
+        'n_estimators': trial.suggest_int('n_estimators', 200, 500, step=50),
+        'max_depth': trial.suggest_int('max_depth', 4, 12),
+        'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.2),
+        'subsample': trial.suggest_float('subsample', 0.7, 1.0),
+        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.7, 1.0),
+        'gamma': trial.suggest_float('gamma', 0, 0.5),
+        'reg_alpha': trial.suggest_float('reg_alpha', 0, 1.0),
+        'reg_lambda': trial.suggest_float('reg_lambda', 0, 1.0)
     }
-    model = XGBRegressor(**params, objective='reg:squarederror')
+    model = XGBRegressor(**params, objective='reg:squarederror', random_state=42, n_jobs=-1)
     X_train, X_test, y_train, y_test = train_test_split(X, y, shuffle=False, test_size=0.2)
     model.fit(X_train, y_train)
     preds = model.predict(X_test)
     return mean_squared_error(y_test, preds)
 
 def _objective_lstm(trial, X, y):
-    units_1 = trial.suggest_int("units_1", 32, 128)
-    units_2 = trial.suggest_int("units_2", 16, 64)
-    dropout = trial.suggest_float("dropout", 0.1, 0.5)
-    batch_size = trial.suggest_categorical("batch_size", [8, 16, 32])
-    epochs = trial.suggest_int("epochs", 15, 40)
+    units_1 = trial.suggest_int("units_1", 64, 256)
+    units_2 = trial.suggest_int("units_2", 32, 128)
+    units_3 = trial.suggest_int("units_3", 16, 64)
+    dropout = trial.suggest_float("dropout", 0.2, 0.5)
+    recurrent_dropout = trial.suggest_float("recurrent_dropout", 0.1, 0.3)
+    batch_size = trial.suggest_categorical("batch_size", [16, 32, 64])
+    epochs = trial.suggest_int("epochs", 50, 100)
+    learning_rate = trial.suggest_float("learning_rate", 0.0001, 0.01, log=True)
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, shuffle=False, test_size=0.2)
 
+    from tensorflow.keras.optimizers import Adam
+
     model = Sequential([
-        LSTM(units_1, return_sequences=True, input_shape=(X.shape[1], X.shape[2])),
+        LSTM(units_1, return_sequences=True, input_shape=(X.shape[1], X.shape[2]),
+             dropout=dropout, recurrent_dropout=recurrent_dropout),
+        LSTM(units_2, return_sequences=True, dropout=dropout, recurrent_dropout=recurrent_dropout),
+        LSTM(units_3, dropout=dropout, recurrent_dropout=recurrent_dropout),
+        Dense(32, activation='relu'),
         Dropout(dropout),
-        LSTM(units_2),
-        Dropout(dropout),
-        Dense(1, activation='linear') # Output layer for regression
+        Dense(1, activation='linear')
     ])
-    model.compile(loss='mean_squared_error', optimizer='adam', metrics=['mean_absolute_error'])
+
+    optimizer = Adam(learning_rate=learning_rate)
+    model.compile(loss='mean_squared_error', optimizer=optimizer, metrics=['mean_absolute_error'])
+
+    callbacks = [
+        EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True),
+    ]
+
     model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size,
-              validation_data=(X_test, y_test), verbose=0,
-              callbacks=[EarlyStopping(monitor='val_loss', patience=5)])
+              validation_data=(X_test, y_test), verbose=0, callbacks=callbacks)
 
     preds = model.predict(X_test)
     return mean_squared_error(y_test, preds)
@@ -181,7 +199,25 @@ def train_and_tune_models(symbol: str, start_date: Optional[date] = None, end_da
         save_scaler(feature_scaler, f"{symbol}_lstm_feature")
         save_scaler(target_scaler, f"{symbol}_lstm_target")
 
-        update_progress(100, "Training completed successfully")
+        # Run automatic backtesting after training
+        update_progress(95, "Running backtesting...")
+        backtest_results = None
+        try:
+            from .backtesting_service import backtest_model
+
+            # Run backtesting on 30-day period
+            backtest_results = backtest_model(symbol=symbol, user_id=1, test_period_days=30)
+            logger.info(f"Backtesting completed for {symbol}")
+
+        except Exception as e:
+            logger.warning(f"Backtesting failed for {symbol}: {e}")
+            backtest_results = {
+                'success': False,
+                'error': f'Backtesting failed: {str(e)}',
+                'symbol': symbol
+            }
+
+        update_progress(100, "Training and backtesting completed!")
 
         # Save model metadata to database
         if job_id:
@@ -218,7 +254,20 @@ def train_and_tune_models(symbol: str, start_date: Optional[date] = None, end_da
             except Exception as e:
                 logger.error(f"Failed to create model record: {e}")
 
-        return {"message": f"Successfully trained and saved models for {symbol}"}
+        # Return comprehensive results including backtesting
+        result = {
+            "message": f"Successfully trained and saved models for {symbol}",
+            "symbol": symbol,
+            "training_period": {
+                "start_date": start_date.isoformat() if hasattr(start_date, 'isoformat') else str(start_date) if start_date else None,
+                "end_date": end_date.isoformat() if hasattr(end_date, 'isoformat') else str(end_date) if end_date else None
+            },
+            "models_saved": ["Random Forest", "XGBoost", "LSTM", "Feature Scaler", "Target Scaler"],
+            "backtesting": backtest_results,
+            "success": True
+        }
+
+        return result
 
     except Exception as e:
         logger.error(f"Training failed for {symbol}: {e}")

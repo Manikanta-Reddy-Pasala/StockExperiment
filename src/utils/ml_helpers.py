@@ -4,8 +4,8 @@ import tensorflow as tf
 
 def get_model_dir():
     """Get the models directory path."""
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    model_dir = os.path.join(base_dir, "models", "ml")
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    model_dir = os.path.join(base_dir, "api", "v1", "ml", "trained")
     os.makedirs(model_dir, exist_ok=True)
     return model_dir
 

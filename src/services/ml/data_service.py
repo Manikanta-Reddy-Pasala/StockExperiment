@@ -63,10 +63,9 @@ def _try_fyers_data(symbol: str, start_date: Optional[date], end_date: Optional[
         logger.info(f"Attempting Fyers data fetch for {symbol}")
 
         # Convert period to date range if needed
-        # Use a fixed reference date to ensure we're getting historical data
-        # Stock markets have data up to around 2024, so use that as end date
+        # Use current date as reference for getting most recent data
         if not start_date or not end_date:
-            reference_end_date = date(2024, 12, 31)  # Use end of 2024 as reference
+            reference_end_date = datetime.now().date()  # Use current date as reference
             if period == "1y":
                 end_date = reference_end_date
                 start_date = end_date - timedelta(days=365)
@@ -76,13 +75,16 @@ def _try_fyers_data(symbol: str, start_date: Optional[date], end_date: Optional[
             elif period == "3y":
                 end_date = reference_end_date
                 start_date = end_date - timedelta(days=1095)
+            elif period == "4y":
+                end_date = reference_end_date
+                start_date = end_date - timedelta(days=1460)
             elif period == "5y":
                 end_date = reference_end_date
                 start_date = end_date - timedelta(days=1825)
             else:
-                # Default to 1 year
+                # Default to 4 years for better training
                 end_date = reference_end_date
-                start_date = end_date - timedelta(days=365)
+                start_date = end_date - timedelta(days=1460)
 
         # Convert dates to timestamp format for Fyers API
         range_from = int(datetime.combine(start_date, datetime.min.time()).timestamp())
@@ -247,23 +249,67 @@ def _convert_fyers_to_dataframe(response: dict, symbol: str) -> pd.DataFrame:
 
 
 def create_features(df):
-    """Engineers features for the stock data."""
+    """Engineers features for the stock data with improved feature engineering."""
+    # Price-based features (normalized)
     df['Return'] = df['Close'].pct_change()
+    df['Return_2d'] = df['Close'].pct_change(periods=2)
+    df['Return_5d'] = df['Close'].pct_change(periods=5)
+
+    # Moving averages (as ratios to current price for scale normalization)
     df['MA5'] = df['Close'].rolling(window=5).mean()
     df['MA10'] = df['Close'].rolling(window=10).mean()
     df['MA20'] = df['Close'].rolling(window=20).mean()
-    df['STD5'] = df['Close'].rolling(window=5).std()
-    df['Volume_Change'] = df['Volume'].pct_change()
+    df['MA50'] = df['Close'].rolling(window=50).mean()
 
+    # Price relative to moving averages (normalized features)
+    df['Price_MA5_Ratio'] = df['Close'] / df['MA5']
+    df['Price_MA10_Ratio'] = df['Close'] / df['MA10']
+    df['Price_MA20_Ratio'] = df['Close'] / df['MA20']
+    df['Price_MA50_Ratio'] = df['Close'] / df['MA50']
+
+    # Moving average crossovers (trend indicators)
+    df['MA5_MA20_Ratio'] = df['MA5'] / df['MA20']
+    df['MA10_MA50_Ratio'] = df['MA10'] / df['MA50']
+
+    # Volatility features
+    df['STD5'] = df['Close'].rolling(window=5).std()
+    df['STD20'] = df['Close'].rolling(window=20).std()
+    df['Volatility'] = df['STD20'] / df['MA20']  # Normalized volatility
+
+    # Volume features
+    df['Volume_Change'] = df['Volume'].pct_change()
+    df['Volume_MA5'] = df['Volume'].rolling(window=5).mean()
+    df['Volume_Ratio'] = df['Volume'] / df['Volume_MA5']
+
+    # Price position within recent range
+    df['High_20'] = df['High'].rolling(window=20).max()
+    df['Low_20'] = df['Low'].rolling(window=20).min()
+    df['Price_Position'] = (df['Close'] - df['Low_20']) / (df['High_20'] - df['Low_20'])
+
+    # RSI
     delta = df['Close'].diff()
     gain = delta.where(delta > 0, 0)
     loss = -delta.where(delta < 0, 0)
-
     avg_gain = gain.rolling(window=14).mean()
     avg_loss = loss.rolling(window=14).mean()
-
     rs = avg_gain / avg_loss
     df['RSI'] = 100 - (100 / (1 + rs))
+
+    # Bollinger Bands
+    df['BB_Upper'] = df['MA20'] + (df['STD20'] * 2)
+    df['BB_Lower'] = df['MA20'] - (df['STD20'] * 2)
+    df['BB_Position'] = (df['Close'] - df['BB_Lower']) / (df['BB_Upper'] - df['BB_Lower'])
+
+    # MACD
+    df['EMA12'] = df['Close'].ewm(span=12).mean()
+    df['EMA26'] = df['Close'].ewm(span=26).mean()
+    df['MACD'] = df['EMA12'] - df['EMA26']
+    df['MACD_Signal'] = df['MACD'].ewm(span=9).mean()
+    df['MACD_Histogram'] = df['MACD'] - df['MACD_Signal']
+
+    # Momentum indicators
+    df['Momentum'] = df['Close'] / df['Close'].shift(10) - 1
+    df['ROC'] = df['Close'].pct_change(periods=10)
 
     # --- Target Variable for Regression ---
     # The target is the next day's closing price.
@@ -272,5 +318,14 @@ def create_features(df):
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
     df.dropna(inplace=True)
 
-    features = ['Return', 'MA5', 'MA10', 'MA20', 'STD5', 'Volume_Change', 'RSI']
+    # Use normalized features that don't depend on absolute price levels
+    features = [
+        'Return', 'Return_2d', 'Return_5d',
+        'Price_MA5_Ratio', 'Price_MA10_Ratio', 'Price_MA20_Ratio', 'Price_MA50_Ratio',
+        'MA5_MA20_Ratio', 'MA10_MA50_Ratio',
+        'Volatility', 'Volume_Change', 'Volume_Ratio',
+        'Price_Position', 'RSI', 'BB_Position',
+        'MACD', 'MACD_Signal', 'MACD_Histogram',
+        'Momentum', 'ROC'
+    ]
     return df, features
