@@ -30,8 +30,12 @@ class RequestLoggerMiddleware:
         g.start_time = time.time()
         g.request_id = str(int(time.time() * 1000))[-8:]  # Simple request ID
         
-        # Skip logging for static files
+        # Skip logging for static files and health endpoints
         if request.endpoint and 'static' in request.endpoint:
+            return
+        
+        # Skip logging for health and status endpoints
+        if request.path and ('/health' in request.path or '/status' in request.path):
             return
         
         request_data = {
@@ -87,8 +91,12 @@ class RequestLoggerMiddleware:
     
     def after_request(self, response):
         """Log response details."""
-        # Skip logging for static files
+        # Skip logging for static files and health endpoints
         if request.endpoint and 'static' in request.endpoint:
+            return response
+        
+        # Skip logging for health and status endpoints
+        if request.path and ('/health' in request.path or '/status' in request.path):
             return response
         
         duration = (time.time() - g.start_time) * 1000  # Convert to milliseconds
