@@ -72,12 +72,10 @@ class BacktestingService:
             
             # Get historical data for backtesting
             from .data_service import get_stock_data
-            
-            # Get more data than needed to ensure we have enough for testing
-            end_date = datetime.now().date()
-            start_date = end_date - timedelta(days=test_period_days + 60)  # Extra buffer
-            
-            df = get_stock_data(symbol, start_date, end_date, user_id=user_id)
+
+            # Get more historical data to ensure we have enough for testing
+            # Use a larger period to get sufficient data for backtesting
+            df = get_stock_data(symbol, period="6M", user_id=user_id)
             if df is None or len(df) < test_period_days + 20:
                 return {
                     'success': False,
@@ -145,11 +143,10 @@ class BacktestingService:
                 
                 # Prepare features for prediction
                 X = current_data[features].iloc[-1:].values
-                X_scaled = feature_scaler.transform(X)
 
-                # Make predictions for tabular models
-                rf_pred = rf_model.predict(X_scaled)[0]
-                xgb_pred = xgb_model.predict(X_scaled)[0]
+                # Make predictions for tabular models (use raw features)
+                rf_pred = rf_model.predict(X)[0]
+                xgb_pred = xgb_model.predict(X)[0]
 
                 # For LSTM, we need sequence data
                 # Get the last 10 data points for LSTM prediction
