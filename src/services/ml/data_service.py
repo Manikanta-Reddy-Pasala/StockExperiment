@@ -82,9 +82,9 @@ def _try_fyers_data(symbol: str, start_date: Optional[date], end_date: Optional[
                 end_date = reference_end_date
                 start_date = end_date - timedelta(days=1825)
             else:
-                # Default to 4 years for better training
+                # Default to 5 years for better training with 70 features
                 end_date = reference_end_date
-                start_date = end_date - timedelta(days=1460)
+                start_date = end_date - timedelta(days=1825)
 
         # Convert dates to timestamp format for Fyers API
         range_from = int(datetime.combine(start_date, datetime.min.time()).timestamp())
@@ -234,6 +234,9 @@ def _convert_fyers_to_dataframe(response: dict, symbol: str) -> pd.DataFrame:
         df.set_index('Date', inplace=True)
         df.sort_index(inplace=True)
 
+        # Remove duplicate dates (keep the last occurrence)
+        df = df[~df.index.duplicated(keep='last')]
+
         # Ensure all required columns exist
         required_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
         for col in required_columns:
@@ -250,6 +253,10 @@ def _convert_fyers_to_dataframe(response: dict, symbol: str) -> pd.DataFrame:
 
 def create_features(df):
     """Engineers features for the stock data with improved feature engineering."""
+    # Data sufficiency check for rolling window features
+    if len(df) < 60:
+        raise ValueError(f"Insufficient data for feature engineering: {len(df)} records. Need at least 60 for rolling windows.")
+
     # Price-based features (normalized)
     df['Return'] = df['Close'].pct_change()
     df['Return_2d'] = df['Close'].pct_change(periods=2)

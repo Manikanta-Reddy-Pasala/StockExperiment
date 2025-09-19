@@ -178,13 +178,55 @@ def train_and_tune_models(symbol: str, start_date: Optional[date] = None, end_da
     try:
         update_progress(10, "Fetching stock data...")
         df = get_stock_data(symbol=symbol, start_date=start_date, end_date=end_date, user_id=1)
-        if df is None or len(df) < 150:
-            raise ValueError(f"Not enough data for {symbol} in the given date range to train models.")
 
-        update_progress(20, "Creating features...")
+        # Enhanced data validation for 70 features
+        min_required_data = 300  # Increased from 150 for better feature stability
+        if df is None or len(df) < min_required_data:
+            raise ValueError(f"Insufficient data for {symbol}: got {len(df) if df is not None else 0} records, need at least {min_required_data} for robust training with 70 features.")
+
+        logger.info(f"Fetched {len(df)} records for {symbol} from {df.index.min()} to {df.index.max()}")
+
+        update_progress(15, "Validating data quality...")
+        # Data quality checks
+        missing_ohlcv = df[['Open', 'High', 'Low', 'Close', 'Volume']].isnull().sum().sum()
+        if missing_ohlcv > 0:
+            logger.warning(f"Found {missing_ohlcv} missing OHLCV values, forward-filling...")
+            df = df.fillna(method='ffill').fillna(method='bfill')
+
+        # Check for sufficient data variety
+        price_range = df['Close'].max() - df['Close'].min()
+        if price_range < df['Close'].mean() * 0.1:  # Less than 10% price variation
+            logger.warning(f"Low price volatility detected for {symbol}: {price_range:.2f} range")
+
+        volume_zeros = (df['Volume'] == 0).sum()
+        if volume_zeros > len(df) * 0.1:  # More than 10% zero volume days
+            logger.warning(f"High zero-volume days for {symbol}: {volume_zeros}/{len(df)} days")
+
+        update_progress(20, "Creating enhanced features...")
         df, features = create_features(df)
+
+        # Validate feature creation
+        feature_data_available = len(df)
+        logger.info(f"Created {len(features)} features with {feature_data_available} valid data points")
+
+        if feature_data_available < min_required_data * 0.7:  # Lost too much data during feature creation
+            raise ValueError(f"Feature engineering reduced data to {feature_data_available} points (from {len(df)}). Need at least {int(min_required_data * 0.7)} for stable training.")
+
         X_tab = df[features]
         y_tab = df['Target']
+
+        # Check for feature quality
+        null_features = X_tab.isnull().sum()
+        problematic_features = null_features[null_features > len(X_tab) * 0.05].index.tolist()
+        if problematic_features:
+            logger.warning(f"Features with >5% missing data: {problematic_features}")
+
+        # Check feature variance
+        low_variance_features = X_tab.var()[X_tab.var() < 1e-8].index.tolist()
+        if low_variance_features:
+            logger.warning(f"Low variance features detected: {low_variance_features[:5]}...")
+
+        update_progress(25, f"Data validation complete: {feature_data_available} samples, {len(features)} features")
 
         X_train_tab, X_test_tab, y_train_tab, y_test_tab = train_test_split(X_tab, y_tab, shuffle=False, test_size=0.2)
 
