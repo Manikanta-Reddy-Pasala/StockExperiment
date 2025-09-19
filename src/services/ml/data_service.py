@@ -394,8 +394,62 @@ def create_features(df):
     df['OBV_MA'] = df['OBV'].rolling(10).mean()
     df['OBV_Ratio'] = df['OBV'] / df['OBV_MA']
 
+    # Advanced Market Microstructure Features
+    # Intraday price efficiency measures
+    df['Intraday_Efficiency'] = (df['Close'] - df['Open']) / (df['High'] - df['Low'])
+    df['Price_Range_Efficiency'] = abs(df['Close'] - df['Open']) / (df['High'] - df['Low'])
+
+    # Volume-weighted metrics
+    df['VWAP_approx'] = ((df['High'] + df['Low'] + df['Close']) / 3 * df['Volume']).rolling(20).sum() / df['Volume'].rolling(20).sum()
+    df['Price_VWAP_Ratio'] = df['Close'] / df['VWAP_approx']
+
+    # Market regime detection features
+    df['Volatility_Regime'] = (df['Return'].rolling(20).std() > df['Return'].rolling(60).std()).astype(int)
+    df['Trend_Regime'] = (df['MA5'] > df['MA20']).astype(int)
+    df['Volume_Regime'] = (df['Volume'] > df['Volume'].rolling(20).mean()).astype(int)
+
+    # Advanced momentum features
+    df['Momentum_Acceleration'] = df['Momentum'].diff()
+    df['RSI_Momentum'] = df['RSI'].diff()
+    df['Volume_Momentum'] = df['Volume'].pct_change().rolling(5).mean()
+
+    # Liquidity and market stress indicators
+    df['Bid_Ask_Spread_Proxy'] = (df['High'] - df['Low']) / df['Close']  # Proxy for bid-ask spread
+    df['Market_Stress'] = df['Volume'] * df['Volatility']  # High volume + high volatility = stress
+    df['Liquidity_Index'] = df['Volume'] / (df['High'] - df['Low'])  # Volume per price range
+
+    # Pattern recognition features
+    df['Doji_Pattern'] = (abs(df['Close'] - df['Open']) / (df['High'] - df['Low']) < 0.1).astype(int)
+    df['Hammer_Pattern'] = ((df['Low'] < df[['Open', 'Close']].min(axis=1)) &
+                           (df['High'] - df[['Open', 'Close']].max(axis=1) < df[['Open', 'Close']].min(axis=1) - df['Low'])).astype(int)
+
+    # Multi-timeframe features (using different rolling windows)
+    df['Short_Long_MA_Diff'] = (df['MA5'] - df['MA50']) / df['MA50']
+    df['Price_Momentum_Divergence'] = np.sign(df['Return_5d']) != np.sign(df['Volume_Change'].rolling(5).mean())
+
+    # Advanced volatility features
+    df['Volatility_Skew'] = df['Return'].rolling(20).skew()
+    df['Volatility_Kurtosis'] = df['Return'].rolling(20).apply(lambda x: x.kurtosis())
+    df['Realized_Volatility'] = df['Return'].rolling(20).std() * np.sqrt(252)
+
+    # Time-based features (to capture calendar effects)
+    if hasattr(df.index, 'dayofweek'):
+        df['Day_of_Week'] = df.index.dayofweek / 6.0  # Normalize 0-1
+        df['Month_of_Year'] = df.index.month / 12.0   # Normalize 0-1
+    else:
+        df['Day_of_Week'] = 0.5  # Default neutral value
+        df['Month_of_Year'] = 0.5  # Default neutral value
+
+    # Risk-adjusted returns
+    df['Sharpe_Ratio_Short'] = df['Return'].rolling(20).mean() / (df['Return'].rolling(20).std() + 1e-8)
+    df['Sortino_Ratio_Short'] = df['Return'].rolling(20).mean() / (df['Return'][df['Return'] < 0].rolling(20).std().fillna(df['Return'].rolling(20).std()) + 1e-8)
+
+    # Mean reversion indicators
+    df['Mean_Reversion_5d'] = (df['Close'] - df['Close'].rolling(5).mean()) / df['Close'].rolling(5).std()
+    df['Mean_Reversion_20d'] = (df['Close'] - df['Close'].rolling(20).mean()) / df['Close'].rolling(20).std()
+
     # Drop intermediate calculation columns
-    df.drop(['TR1', 'TR2', 'TR3', 'True_Range', 'Fib_38_2', 'Fib_61_8', 'SAR_approx', 'OBV_MA'], axis=1, inplace=True, errors='ignore')
+    df.drop(['TR1', 'TR2', 'TR3', 'True_Range', 'Fib_38_2', 'Fib_61_8', 'SAR_approx', 'OBV_MA', 'VWAP_approx'], axis=1, inplace=True, errors='ignore')
 
     # --- Target Variable for Regression ---
     # The target is the next day's closing price.
@@ -431,6 +485,36 @@ def create_features(df):
         'Momentum', 'ROC',
 
         # Fibonacci and trend analysis
-        'Price_to_Fib_38_2', 'Price_to_Fib_61_8', 'Price_SAR_Ratio'
+        'Price_to_Fib_38_2', 'Price_to_Fib_61_8', 'Price_SAR_Ratio',
+
+        # Advanced Market Microstructure Features
+        'Intraday_Efficiency', 'Price_Range_Efficiency', 'Price_VWAP_Ratio',
+
+        # Market regime detection
+        'Volatility_Regime', 'Trend_Regime', 'Volume_Regime',
+
+        # Advanced momentum and acceleration
+        'Momentum_Acceleration', 'RSI_Momentum', 'Volume_Momentum',
+
+        # Liquidity and market stress
+        'Bid_Ask_Spread_Proxy', 'Market_Stress', 'Liquidity_Index',
+
+        # Pattern recognition
+        'Doji_Pattern', 'Hammer_Pattern',
+
+        # Multi-timeframe analysis
+        'Short_Long_MA_Diff', 'Price_Momentum_Divergence',
+
+        # Advanced volatility measures
+        'Volatility_Skew', 'Volatility_Kurtosis', 'Realized_Volatility',
+
+        # Time-based features
+        'Day_of_Week', 'Month_of_Year',
+
+        # Risk-adjusted metrics
+        'Sharpe_Ratio_Short', 'Sortino_Ratio_Short',
+
+        # Mean reversion indicators
+        'Mean_Reversion_5d', 'Mean_Reversion_20d'
     ]
     return df, features

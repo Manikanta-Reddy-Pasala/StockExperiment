@@ -230,8 +230,36 @@ def train_and_tune_models(symbol: str, start_date: Optional[date] = None, end_da
                        validation_data=(X_test_lstm, y_test_lstm), verbose=0,
                        callbacks=[EarlyStopping(monitor='val_loss', patience=5)])
 
+        update_progress(85, "Training ensemble meta-learner...")
+
+        # Create ensemble predictions for meta-learning
+        rf_pred_train = rf_model.predict(X_train_tab)
+        xgb_pred_train = xgb_model.predict(X_train_tab)
+        lstm_pred_train = lstm_model.predict(X_train_lstm).flatten()
+
+        # Align LSTM predictions with tabular data
+        lstm_train_aligned = lstm_pred_train[:len(rf_pred_train)]
+
+        # Create meta-features
+        meta_features_train = np.column_stack([
+            rf_pred_train,
+            xgb_pred_train,
+            lstm_train_aligned,
+            # Add confidence features
+            np.abs(rf_pred_train - xgb_pred_train),  # Disagreement between models
+            (rf_pred_train + xgb_pred_train) / 2,    # Average prediction
+            X_train_tab['Volatility'].values,         # Volatility context
+            X_train_tab['Volume_Regime'].values       # Volume regime context
+        ])
+
+        # Train meta-learner (lightweight model for ensemble combination)
+        from sklearn.linear_model import Ridge
+        meta_learner = Ridge(alpha=1.0)
+        meta_learner.fit(meta_features_train, y_train_tab)
+
         update_progress(90, "Saving models...")
         save_lstm_model(lstm_model, f"{symbol}_lstm")
+        save_model(meta_learner, f"{symbol}_meta")
         # Save both scalers: one for features, one for the target
         save_scaler(feature_scaler, f"{symbol}_lstm_feature")
         save_scaler(target_scaler, f"{symbol}_lstm_target")
@@ -299,7 +327,7 @@ def train_and_tune_models(symbol: str, start_date: Optional[date] = None, end_da
                 "start_date": start_date.isoformat() if hasattr(start_date, 'isoformat') else str(start_date) if start_date else None,
                 "end_date": end_date.isoformat() if hasattr(end_date, 'isoformat') else str(end_date) if end_date else None
             },
-            "models_saved": ["Random Forest", "XGBoost", "LSTM", "Feature Scaler", "Target Scaler"],
+            "models_saved": ["Random Forest", "XGBoost", "LSTM", "Meta-Learner", "Feature Scaler", "Target Scaler"],
             "backtesting": backtest_results,
             "success": True
         }
