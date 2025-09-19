@@ -137,8 +137,11 @@ def _objective_lstm(trial, X, y):
     optimizer = Adam(learning_rate=learning_rate)
     model.compile(loss='mean_squared_error', optimizer=optimizer, metrics=['mean_absolute_error'])
 
+    from tensorflow.keras.callbacks import ReduceLROnPlateau
+
     callbacks = [
-        EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True),
+        EarlyStopping(monitor='val_loss', patience=15, restore_best_weights=True, min_delta=1e-6),
+        ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=8, min_lr=1e-7, verbose=0)
     ]
 
     model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size,
@@ -188,7 +191,7 @@ def train_and_tune_models(symbol: str, start_date: Optional[date] = None, end_da
         update_progress(30, "Training Random Forest model...")
         # --- Random Forest ---
         study_rf = optuna.create_study(direction='minimize')
-        study_rf.optimize(lambda trial: _objective_rf(trial, X_tab, y_tab), n_trials=25, show_progress_bar=False)
+        study_rf.optimize(lambda trial: _objective_rf(trial, X_tab, y_tab), n_trials=50, show_progress_bar=False)
         rf_model = RandomForestRegressor(**study_rf.best_params, random_state=42)
         rf_model.fit(X_train_tab, y_train_tab)
         save_model(rf_model, f"{symbol}_rf")
@@ -196,7 +199,7 @@ def train_and_tune_models(symbol: str, start_date: Optional[date] = None, end_da
         update_progress(50, "Training XGBoost model...")
         # --- XGBoost ---
         study_xgb = optuna.create_study(direction='minimize')
-        study_xgb.optimize(lambda trial: _objective_xgb(trial, X_tab, y_tab), n_trials=25, show_progress_bar=False)
+        study_xgb.optimize(lambda trial: _objective_xgb(trial, X_tab, y_tab), n_trials=50, show_progress_bar=False)
         xgb_model = XGBRegressor(**study_xgb.best_params, objective='reg:squarederror')
         xgb_model.fit(X_train_tab, y_train_tab)
         save_model(xgb_model, f"{symbol}_xgb")
@@ -210,7 +213,7 @@ def train_and_tune_models(symbol: str, start_date: Optional[date] = None, end_da
         X_train_lstm, X_test_lstm, y_train_lstm, y_test_lstm = train_test_split(X_lstm, y_lstm, shuffle=False, test_size=0.2)
 
         study_lstm = optuna.create_study(direction='minimize')
-        study_lstm.optimize(lambda trial: _objective_lstm(trial, X_lstm, y_lstm), n_trials=15, show_progress_bar=False)
+        study_lstm.optimize(lambda trial: _objective_lstm(trial, X_lstm, y_lstm), n_trials=30, show_progress_bar=False)
 
         best_lstm_params = study_lstm.best_params
         lstm_model = Sequential([

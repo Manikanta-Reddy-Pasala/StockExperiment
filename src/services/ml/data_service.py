@@ -336,6 +336,67 @@ def create_features(df):
     df['Distance_to_High_5d'] = (df['High'].rolling(5).max() - df['Close']) / df['Close']
     df['Distance_to_Low_5d'] = (df['Close'] - df['Low'].rolling(5).min()) / df['Close']
 
+    # Advanced momentum and trend features
+    df['Williams_R'] = (df['High'].rolling(14).max() - df['Close']) / (df['High'].rolling(14).max() - df['Low'].rolling(14).min()) * -100
+
+    # Stochastic Oscillator
+    lowest_low = df['Low'].rolling(14).min()
+    highest_high = df['High'].rolling(14).max()
+    df['Stoch_K'] = ((df['Close'] - lowest_low) / (highest_high - lowest_low)) * 100
+    df['Stoch_D'] = df['Stoch_K'].rolling(3).mean()
+
+    # Average True Range (volatility)
+    df['TR1'] = df['High'] - df['Low']
+    df['TR2'] = abs(df['High'] - df['Close'].shift(1))
+    df['TR3'] = abs(df['Low'] - df['Close'].shift(1))
+    df['True_Range'] = df[['TR1', 'TR2', 'TR3']].max(axis=1)
+    df['ATR'] = df['True_Range'].rolling(14).mean()
+    df['ATR_Ratio'] = df['ATR'] / df['Close']
+
+    # Price strength relative to volume
+    df['Price_Volume_Strength'] = df['Return'] * np.log1p(df['Volume'])
+
+    # Commodity Channel Index
+    tp = (df['High'] + df['Low'] + df['Close']) / 3  # Typical Price
+    df['CCI'] = (tp - tp.rolling(20).mean()) / (0.015 * tp.rolling(20).std())
+
+    # Money Flow Index
+    raw_money_flow = tp * df['Volume']
+    positive_flow = pd.Series(0.0, index=df.index)
+    negative_flow = pd.Series(0.0, index=df.index)
+
+    positive_mask = tp > tp.shift(1)
+    negative_mask = tp < tp.shift(1)
+
+    positive_flow[positive_mask] = raw_money_flow[positive_mask]
+    negative_flow[negative_mask] = raw_money_flow[negative_mask]
+
+    positive_flow_14 = positive_flow.rolling(14).sum()
+    negative_flow_14 = negative_flow.rolling(14).sum()
+
+    df['MFI'] = 100 - (100 / (1 + (positive_flow_14 / negative_flow_14)))
+
+    # Fibonacci retracement levels (approximate)
+    period_high = df['High'].rolling(21).max()
+    period_low = df['Low'].rolling(21).min()
+    fib_range = period_high - period_low
+    df['Fib_38_2'] = period_high - (0.382 * fib_range)
+    df['Fib_61_8'] = period_high - (0.618 * fib_range)
+    df['Price_to_Fib_38_2'] = (df['Close'] - df['Fib_38_2']) / df['Close']
+    df['Price_to_Fib_61_8'] = (df['Close'] - df['Fib_61_8']) / df['Close']
+
+    # Parabolic SAR approximation
+    df['SAR_approx'] = df['Close'].rolling(10).mean() * 0.98  # Simplified version
+    df['Price_SAR_Ratio'] = df['Close'] / df['SAR_approx']
+
+    # On Balance Volume
+    df['OBV'] = (np.sign(df['Close'].diff()) * df['Volume']).fillna(0).cumsum()
+    df['OBV_MA'] = df['OBV'].rolling(10).mean()
+    df['OBV_Ratio'] = df['OBV'] / df['OBV_MA']
+
+    # Drop intermediate calculation columns
+    df.drop(['TR1', 'TR2', 'TR3', 'True_Range', 'Fib_38_2', 'Fib_61_8', 'SAR_approx', 'OBV_MA'], axis=1, inplace=True, errors='ignore')
+
     # --- Target Variable for Regression ---
     # The target is the next day's closing price.
     df['Target'] = df['Close'].shift(-1)
@@ -353,19 +414,23 @@ def create_features(df):
         'MA5_MA20_Ratio', 'MA10_MA50_Ratio', 'MA5_Slope', 'MA20_Slope',
 
         # Volatility features
-        'Volatility', 'Volatility_3d', 'Volatility_7d',
+        'Volatility', 'Volatility_3d', 'Volatility_7d', 'ATR_Ratio',
 
         # Volume features
-        'Volume_Change', 'Volume_Ratio', 'Volume_Price_Trend',
+        'Volume_Change', 'Volume_Ratio', 'Volume_Price_Trend', 'Price_Volume_Strength', 'OBV_Ratio',
 
         # Price action features
         'Price_Position', 'High_Low_Ratio', 'Close_Open_Ratio', 'Body_Size',
         'Upper_Shadow', 'Lower_Shadow',
         'Distance_to_High_5d', 'Distance_to_Low_5d',
 
-        # Technical indicators
-        'RSI', 'BB_Position',
+        # Advanced technical indicators
+        'RSI', 'BB_Position', 'Williams_R', 'Stoch_K', 'Stoch_D',
         'MACD', 'MACD_Signal', 'MACD_Histogram',
-        'Momentum', 'ROC'
+        'CCI', 'MFI',
+        'Momentum', 'ROC',
+
+        # Fibonacci and trend analysis
+        'Price_to_Fib_38_2', 'Price_to_Fib_61_8', 'Price_SAR_Ratio'
     ]
     return df, features

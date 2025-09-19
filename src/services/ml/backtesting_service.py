@@ -188,8 +188,20 @@ class BacktestingService:
                     # If not enough data for LSTM, use average of other predictions
                     lstm_pred = (rf_pred + xgb_pred) / 2
                 
-                # Ensemble prediction (weighted average)
-                ensemble_pred = (rf_pred * 0.4 + xgb_pred * 0.4 + lstm_pred * 0.2)
+                # Adaptive ensemble prediction based on recent performance
+                # Calculate confidence scores based on recent volatility and trend
+                recent_volatility = current_data['Close'].pct_change().iloc[-5:].std()
+                trend_strength = abs(current_data['Close'].iloc[-1] / current_data['Close'].iloc[-5] - 1)
+
+                # Adaptive weights based on market conditions
+                if recent_volatility < 0.02:  # Low volatility - favor tree models
+                    rf_weight, xgb_weight, lstm_weight = 0.45, 0.45, 0.1
+                elif trend_strength > 0.05:  # Strong trend - favor LSTM
+                    rf_weight, xgb_weight, lstm_weight = 0.25, 0.25, 0.5
+                else:  # Normal conditions - balanced approach
+                    rf_weight, xgb_weight, lstm_weight = 0.35, 0.35, 0.3
+
+                ensemble_pred = (rf_pred * rf_weight + xgb_pred * xgb_weight + lstm_pred * lstm_weight)
                 
                 # Get actual next day price
                 if i + 1 < len(df_featured):
