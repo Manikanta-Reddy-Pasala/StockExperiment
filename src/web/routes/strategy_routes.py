@@ -40,34 +40,6 @@ def api_initialize_stock_universe():
         }), 500
 
 
-@strategy_bp.route('/update-stock-prices', methods=['POST'])
-@login_required
-def api_update_stock_prices():
-    """Update current prices for all stocks."""
-    try:
-        from ...services.stock_data_service import get_stock_data_service
-        
-        data = request.get_json() or {}
-        symbols = data.get('symbols')  # Optional: specific symbols to update
-        
-        current_app.logger.info(f"Updating stock prices for user {current_user.id}")
-        
-        stock_data_service = get_stock_data_service()
-        results = stock_data_service.update_stock_prices(symbols, current_user.id)
-        
-        return jsonify({
-            'success': True,
-            'message': 'Stock prices updated successfully',
-            'results': results
-        })
-        
-    except Exception as e:
-        current_app.logger.error(f"Error updating stock prices: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
 
 @strategy_bp.route('/create-portfolio', methods=['POST'])
 @login_required

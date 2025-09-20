@@ -109,12 +109,6 @@ class StockDataService:
         # TODO: Fetch stock from database or broker API
         return None
     
-    def update_stock_prices(self, symbols: List[str] = None, user_id: int = 1) -> Dict[str, int]:
-        """Update stock prices."""
-        logger.info("Updating stock prices...")
-        # TODO: Update prices from broker API
-        return {"updated": 0, "errors": 0}
-    
     def get_stock_details(self, symbol: str) -> Optional[StockInfo]:
         """Get detailed information for a specific stock."""
         # TODO: Fetch stock details from database or broker API

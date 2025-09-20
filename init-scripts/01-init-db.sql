@@ -233,22 +233,6 @@ CREATE TABLE IF NOT EXISTS stocks (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS stock_prices (
-    id SERIAL PRIMARY KEY,
-    stock_id INTEGER REFERENCES stocks(id),
-    open_price DECIMAL(10,2),
-    high_price DECIMAL(10,2),
-    low_price DECIMAL(10,2),
-    close_price DECIMAL(10,2),
-    price DECIMAL(10,2) NOT NULL,
-    volume BIGINT,
-    timestamp TIMESTAMP NOT NULL,
-    date VARCHAR(10),
-    data_source VARCHAR(20) DEFAULT 'fyers',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(stock_id, timestamp)
-);
-
 CREATE TABLE IF NOT EXISTS strategy_types (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) UNIQUE NOT NULL,
@@ -542,7 +526,6 @@ CREATE TABLE IF NOT EXISTS ml_trained_models (
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_stocks_symbol ON stocks(symbol);
 CREATE INDEX IF NOT EXISTS idx_stocks_market_cap_category ON stocks(market_cap_category);
-CREATE INDEX IF NOT EXISTS idx_stock_prices_stock_date ON stock_prices(stock_id, date);
 CREATE INDEX IF NOT EXISTS idx_strategy_stock_selections_strategy ON strategy_stock_selections(strategy_type_id);
 CREATE INDEX IF NOT EXISTS idx_ml_predictions_stock_date ON ml_predictions(stock_id, prediction_date);
 CREATE INDEX IF NOT EXISTS idx_portfolio_strategies_user ON portfolio_strategies(user_id);
@@ -562,4 +545,3 @@ CREATE INDEX IF NOT EXISTS idx_symbol_master_active ON symbol_master(is_active, 
 CREATE INDEX IF NOT EXISTS idx_market_data_snapshots_date ON market_data_snapshots(snapshot_date);
 CREATE INDEX IF NOT EXISTS idx_stocks_active ON stocks(is_active, is_tradeable);
 CREATE INDEX IF NOT EXISTS idx_stocks_market_cap ON stocks(market_cap);
-CREATE INDEX IF NOT EXISTS idx_stock_prices_timestamp ON stock_prices(stock_id, timestamp);

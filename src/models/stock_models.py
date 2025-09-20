@@ -52,44 +52,11 @@ class Stock(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
-    prices = relationship("StockPrice", back_populates="stock", cascade="all, delete-orphan")
     strategy_selections = relationship("StrategyStockSelection", back_populates="stock")
     ml_predictions = relationship("MLPrediction", back_populates="stock")
     
     def __repr__(self):
         return f'<Stock {self.symbol}: {self.name}>'
-
-
-class StockPrice(Base):
-    """Historical price data for stocks."""
-    __tablename__ = 'stock_prices'
-    
-    id = Column(Integer, primary_key=True)
-    stock_id = Column(Integer, ForeignKey('stocks.id'), nullable=False, index=True)
-    
-    # Price data
-    open_price = Column(Float)
-    high_price = Column(Float)
-    low_price = Column(Float)
-    close_price = Column(Float)
-    price = Column(Float, nullable=False)  # Current/closing price
-    volume = Column(Integer)
-    
-    # Timestamp
-    timestamp = Column(DateTime, nullable=False, index=True)
-    date = Column(String(10), index=True)  # YYYY-MM-DD format for daily aggregation
-    
-    # Metadata
-    data_source = Column(String(20), default='fyers')  # fyers, yahoo, etc.
-    created_at = Column(DateTime, default=datetime.utcnow)
-    
-    # Relationships
-    stock = relationship("Stock", back_populates="prices")
-    
-    # Unique constraint to prevent duplicate price records
-    __table_args__ = (
-        UniqueConstraint('stock_id', 'timestamp', name='_stock_timestamp_uc'),
-    )
 
 
 class StrategyType(Base):

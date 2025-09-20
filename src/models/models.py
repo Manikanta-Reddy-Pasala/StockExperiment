@@ -9,7 +9,7 @@ from flask_login import UserMixin
 
 # Import enhanced stock models and use their Base
 from .stock_models import (
-    Stock, StockPrice, StrategyType, StrategyStockSelection, MLPrediction,
+    Stock, StrategyType, StrategyStockSelection, MLPrediction,
     PortfolioStrategy, PortfolioPosition, MarketDataSnapshot, MarketCapCategory,
     SymbolMaster, Base
 )
