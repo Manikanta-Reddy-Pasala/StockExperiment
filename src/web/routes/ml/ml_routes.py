@@ -11,6 +11,9 @@ from datetime import datetime
 from ....services.ml_api_service import get_ml_api_service
 from ....services.ml.backtesting_service import backtest_model
 
+# Import screening routes
+from .screening_routes import screening_bp
+
 # Create blueprints
 ml_bp = Blueprint('ml', __name__, url_prefix='/api/v1/ml')  # API routes
 ml_web_bp = Blueprint('ml_web', __name__)  # Web routes

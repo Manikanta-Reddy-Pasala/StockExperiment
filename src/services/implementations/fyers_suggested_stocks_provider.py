@@ -27,14 +27,25 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
             if not strategies:
                 strategies = [StrategyType.DEFAULT_RISK, StrategyType.HIGH_RISK]
             
-            # Get popular stocks as suggestions (since get_watchlist_suggestions doesn't exist)
-            popular_symbols = [
-                'NSE:RELIANCE-EQ', 'NSE:TCS-EQ', 'NSE:HDFCBANK-EQ', 'NSE:INFY-EQ',
-                'NSE:HINDUNILVR-EQ', 'NSE:ITC-EQ', 'NSE:KOTAKBANK-EQ', 'NSE:LT-EQ',
-                'NSE:SBIN-EQ', 'NSE:BHARTIARTL-EQ', 'NSE:ASIANPAINT-EQ', 'NSE:MARUTI-EQ',
-                'NSE:AXISBANK-EQ', 'NSE:NESTLEIND-EQ', 'NSE:ULTRACEMCO-EQ', 'NSE:TITAN-EQ',
-                'NSE:SUNPHARMA-EQ', 'NSE:TECHM-EQ', 'NSE:WIPRO-EQ', 'NSE:ONGC-EQ'
-            ]
+            # Use dynamic stock discovery instead of hardcoded stocks
+            try:
+                from ...ml.stock_discovery_service import get_stock_discovery_service
+                discovery_service = get_stock_discovery_service()
+                discovered_stocks = discovery_service.get_top_liquid_stocks(user_id, count=50)
+                popular_symbols = [stock.symbol for stock in discovered_stocks]
+                logger.info(f"Discovered {len(popular_symbols)} stocks dynamically from broker API")
+            except Exception as e:
+                logger.warning(f"Failed to discover stocks dynamically: {e}")
+                # Fallback to generic sector-based search if discovery fails
+                popular_symbols = []
+                for sector in ['BANK', 'IT', 'PHARMA', 'AUTO', 'FMCG', 'METAL']:
+                    try:
+                        result = self.fyers_service.search(user_id, sector, 'NSE')
+                        if result.get('status') == 'success':
+                            symbols = [s.get('symbol') for s in result.get('data', [])[:5]]
+                            popular_symbols.extend([s for s in symbols if s and '-EQ' in s])
+                    except Exception:
+                        continue
             
             # Get quotes for popular stocks
             quotes_response = self.fyers_service.quotes_multiple(user_id, popular_symbols)

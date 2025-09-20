@@ -1062,6 +1062,15 @@ def create_app():
         app.logger.warning(f"ML prediction routes not available: {e}")
         app.logger.warning("ML functionality will be disabled")
 
+    # Register ML screening blueprints
+    try:
+        from .routes.ml.screening_routes import screening_bp
+        app.register_blueprint(screening_bp)
+        app.logger.info("ML screening routes registered successfully")
+    except ImportError as e:
+        app.logger.warning(f"ML screening routes not available: {e}")
+        app.logger.warning("ML screening functionality will be disabled")
+
     # Register strategy blueprints
     try:
         from .routes.strategy_routes import strategy_bp

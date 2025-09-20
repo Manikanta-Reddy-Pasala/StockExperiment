@@ -21,8 +21,8 @@ class SimulatorSuggestedStocksProvider(ISuggestedStocksProvider):
         
         suggested_stocks = []
         sample_stocks = [
-            'NSE:BAJFINANCE-EQ', 'NSE:ASIANPAINT-EQ', 'NSE:MARUTI-EQ', 'NSE:WIPRO-EQ',
-            'NSE:LT-EQ', 'NSE:KOTAKBANK-EQ', 'NSE:SUNPHARMA-EQ', 'NSE:HINDUNILVR-EQ'
+            'NSE:FINANCE001-EQ', 'NSE:CONSUMER001-EQ', 'NSE:AUTO001-EQ', 'NSE:TECH002-EQ',
+            'NSE:INFRA002-EQ', 'NSE:BANK002-EQ', 'NSE:PHARMA001-EQ', 'NSE:FMCG001-EQ'
         ]
         
         for i, symbol in enumerate(sample_stocks[:limit]):

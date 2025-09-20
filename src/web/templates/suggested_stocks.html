@@ -8,7 +8,8 @@
     <div class="card-header bg-gradient-primary text-white">
         <div class="d-flex justify-content-between align-items-center">
             <h5 class="card-title mb-0 text-white">
-                <i class="bi bi-lightbulb me-2"></i>Suggested Stocks
+                <i class="bi bi-robot me-2"></i>ML-Suggested Stocks
+                <small class="opacity-75">Powered by AI</small>
             </h5>
             <div class="d-flex gap-2 align-items-center">
                 <select class="form-select form-select-sm" id="time-filter" style="min-width: 120px;">
@@ -87,85 +88,84 @@
         return selectedRadio ? selectedRadio.value : 'default_risk';
     }
 
-    // Fetch suggested stocks from API using new risk-based approach
+    // Fetch ML-suggested stocks using new intelligent screening API
     async function fetchSuggestedStocks() {
         try {
             // Show loading spinner
             showLoadingSpinner();
-            
+
             const riskStrategy = getSelectedRiskStrategy();
-            const timeFilter = document.getElementById('time-filter').value;
-            
-            // Use the new strategy API
-            const response = await fetch('/api/strategy/generate-recommendations', {
+
+            // Use the production ML screening API (fully dynamic)
+            const response = await fetch('/api/v1/screening/screen', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 credentials: 'same-origin',
                 body: JSON.stringify({
-                    strategy_type: riskStrategy,
-                    capital: 100000, // Default 1 lakh
-                    time_filter: timeFilter
+                    risk_profile: riskStrategy,
+                    auto_train: true
                 })
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             const data = await response.json();
-            
+
             if (data.success) {
-                suggestedStocks = data.recommendations || [];
+                // Extract stocks from portfolio structure
+                const portfolio = data.portfolio;
+                suggestedStocks = [
+                    ...portfolio.stocks.large_cap.map(s => ({ ...s, category: 'Large Cap' })),
+                    ...portfolio.stocks.mid_cap.map(s => ({ ...s, category: 'Mid Cap' })),
+                    ...portfolio.stocks.small_cap.map(s => ({ ...s, category: 'Small Cap' }))
+                ];
+
+                // Sort by ML score
+                suggestedStocks.sort((a, b) => b.overall_score - a.overall_score);
+
                 populateTable();
-                showNotification(`Loaded ${suggestedStocks.length} ${riskStrategy.replace('_', ' ')} recommendations`, 'success');
+                showNotification(`Loaded ${suggestedStocks.length} ML-analyzed ${riskStrategy.replace('_', ' ')} stocks`, 'success');
             } else {
-                throw new Error(data.error || 'Failed to fetch stock recommendations');
+                throw new Error(data.error || 'Failed to fetch ML stock recommendations');
             }
         } catch (error) {
-            console.error('Error fetching suggested stocks:', error);
-            showNotification(`Error loading stocks: ${error.message}`, 'error');
+            console.error('Error fetching ML suggested stocks:', error);
+            showNotification(`Error loading ML stocks: ${error.message}`, 'error');
         } finally {
             // Hide loading spinner
             hideLoadingSpinner();
         }
     }
 
-    // Refresh suggested stocks
+    // Refresh ML-suggested stocks by discovering new stocks
     async function refreshSuggestedStocks() {
         try {
             // Show loading spinner
             showLoadingSpinner();
-            
-            const selectedStrategies = getSelectedStrategies();
-            
-            const response = await fetch('/api/suggested-stocks/refresh', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'same-origin',
-                body: JSON.stringify({
-                    strategies: selectedStrategies
-                })
-            });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+
+            // First, discover fresh stocks from broker
+            const discoverResponse = await fetch('/api/v1/screening/discover?refresh=true');
+
+            if (!discoverResponse.ok) {
+                throw new Error(`Discovery failed: ${discoverResponse.status}`);
             }
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                suggestedStocks = data.data;
-                populateTable();
-                showNotification(`Refreshed ${data.total} suggested stocks at ${data.refreshed_at}`, 'success');
+
+            const discoverData = await discoverResponse.json();
+
+            if (discoverData.success) {
+                showNotification(`Discovered ${discoverData.summary.total_stocks} fresh stocks from broker`, 'info');
+
+                // Now fetch ML suggestions with the refreshed data
+                await fetchSuggestedStocks();
             } else {
-                throw new Error(data.error || 'Failed to refresh suggested stocks');
+                throw new Error(discoverData.error || 'Failed to discover stocks');
             }
         } catch (error) {
-            console.error('Error refreshing suggested stocks:', error);
+            console.error('Error refreshing ML stocks:', error);
             showNotification(`Error refreshing stocks: ${error.message}`, 'error');
         } finally {
             // Hide loading spinner
@@ -187,56 +187,69 @@
             return;
         }
         
-        suggestedStocks.forEach(recommendation => {
+        suggestedStocks.forEach(stock => {
             const row = table.insertRow();
-            
-            // Extract data from recommendation (it's already a flat dictionary)
-            const stock = recommendation;
-            const mlPrediction = recommendation.ml_prediction || {};
-            
-            // Populate row with new structure
-            row.insertCell(0).textContent = stock.symbol || 'N/A';
+
+            // Symbol with ML Suggested tag
+            const symbolCell = row.insertCell(0);
+            symbolCell.innerHTML = `
+                <div>
+                    <strong>${stock.symbol || 'N/A'}</strong>
+                    <br>
+                    <span class="badge bg-success bg-gradient" style="font-size: 0.7em;">
+                        <i class="bi bi-robot me-1"></i>ML
+                    </span>
+                </div>
+            `;
+
             row.insertCell(1).textContent = stock.name || 'N/A';
-            
+
             // Market Cap
             const marketCapCell = row.insertCell(2);
-            const marketCap = stock.market_cap || 0;
-            if (marketCap > 20000) {
-                marketCapCell.innerHTML = '<span class="badge bg-success">Large Cap</span>';
-            } else if (marketCap > 5000) {
-                marketCapCell.innerHTML = '<span class="badge bg-warning">Mid Cap</span>';
-            } else {
-                marketCapCell.innerHTML = '<span class="badge bg-danger">Small Cap</span>';
-            }
-            
+            const category = stock.category || 'Unknown';
+            const categoryColor = category === 'Large Cap' ? 'success' :
+                                 category === 'Mid Cap' ? 'warning' : 'danger';
+            marketCapCell.innerHTML = `<span class="badge bg-${categoryColor}">${category}</span>`;
+
             row.insertCell(3).textContent = '₹' + (stock.current_price || 0).toFixed(2);
             row.insertCell(4).textContent = '₹' + (stock.target_price || 0).toFixed(2);
-            
+
             // Expected Return
             const returnCell = row.insertCell(5);
-            const expectedReturn = stock.expected_return || 0;
+            const expectedReturn = (stock.expected_return || 0) * 100; // Convert to percentage
             returnCell.textContent = expectedReturn.toFixed(1) + '%';
-            returnCell.className = expectedReturn > 0 ? 'text-success' : 'text-danger';
-            
-            // ML Confidence
+            returnCell.className = expectedReturn > 0 ? 'text-success fw-bold' : 'text-danger fw-bold';
+
+            // ML Confidence (Overall Score)
             const confidenceCell = row.insertCell(6);
-            const confidence = mlPrediction.confidence || 0;
-            confidenceCell.textContent = (confidence * 100).toFixed(1) + '%';
-            confidenceCell.className = confidence > 0.7 ? 'text-success' : confidence > 0.5 ? 'text-warning' : 'text-danger';
-            
-            row.insertCell(7).textContent = stock.recommended_quantity || 0;
-            row.insertCell(8).textContent = '₹' + (stock.investment_amount || 0).toFixed(2);
-            
+            const confidence = (stock.overall_score || 0) * 100;
+            confidenceCell.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <div class="progress flex-grow-1 me-2" style="height: 6px; width: 60px;">
+                        <div class="progress-bar bg-${confidence >= 70 ? 'success' : confidence >= 50 ? 'warning' : 'danger'}"
+                             style="width: ${confidence}%"></div>
+                    </div>
+                    <small>${confidence.toFixed(0)}%</small>
+                </div>
+            `;
+
+            // Recommended Quantity (calculate based on investment)
+            const currentPrice = stock.current_price || 1;
+            const recommendedQty = Math.floor(10000 / currentPrice); // ₹10k worth
+            row.insertCell(7).textContent = recommendedQty;
+
+            // Investment Amount
+            const investmentAmount = recommendedQty * currentPrice;
+            row.insertCell(8).textContent = '₹' + investmentAmount.toFixed(2);
+
             // Risk Level
             const riskCell = row.insertCell(9);
             const riskScore = stock.risk_score || 0;
-            if (riskScore < 0.3) {
-                riskCell.innerHTML = '<span class="badge bg-success">Low</span>';
-            } else if (riskScore < 0.7) {
-                riskCell.innerHTML = '<span class="badge bg-warning">Medium</span>';
-            } else {
-                riskCell.innerHTML = '<span class="badge bg-danger">High</span>';
-            }
+            const riskProfile = document.querySelector('input[name="strategy"]:checked').value;
+            const riskColor = riskProfile === 'high_risk' ? 'danger' : 'primary';
+            const riskText = riskProfile === 'high_risk' ? 'High Risk' : 'Balanced';
+
+            riskCell.innerHTML = `<span class="badge bg-${riskColor}">${riskText}</span>`;
         });
     }
 
@@ -271,17 +284,22 @@
     function showLoadingSpinner() {
         const table = document.getElementById('suggested-stocks-table').getElementsByTagName('tbody')[0];
         table.innerHTML = '';
-        
+
         const row = table.insertRow();
         const cell = row.insertCell();
-        cell.colSpan = 9;
-        cell.className = 'text-center py-4';
+        cell.colSpan = 10;
+        cell.className = 'text-center py-5';
         cell.innerHTML = `
-            <div class="d-flex justify-content-center align-items-center">
-                <div class="spinner-border text-primary me-3" role="status">
+            <div class="d-flex flex-column justify-content-center align-items-center">
+                <div class="spinner-border text-primary mb-3" role="status">
                     <span class="visually-hidden">Loading...</span>
                 </div>
-                <span class="text-muted">Loading suggested stocks...</span>
+                <h6 class="text-primary mb-2">
+                    <i class="bi bi-cpu-fill me-2"></i>ML Analysis in Progress
+                </h6>
+                <p class="text-muted mb-0">
+                    Analyzing stocks with 70 advanced features • Auto-training models • Risk filtering
+                </p>
             </div>
         `;
     }
