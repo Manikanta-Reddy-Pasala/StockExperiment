@@ -126,8 +126,7 @@ class StockSyncService:
                         'symbol': sm.symbol,
                         'fytoken': sm.fytoken,
                         'name': sm.name,
-                        'exchange': sm.exchange,
-                        'id': sm.id
+                        'exchange': sm.exchange
                     })
 
                 # Process each stock individually

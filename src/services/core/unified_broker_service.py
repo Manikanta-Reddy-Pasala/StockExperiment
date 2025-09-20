@@ -337,7 +337,14 @@ class UnifiedBrokerService:
                 return self._no_provider_error('quotes')
 
             # If primary broker failed, return error (no fallback)
-            if primary_broker_failed or (result and not result.get('success')):
+            # Check for both 'success' and 'status' fields to handle different broker response formats
+            broker_failed = primary_broker_failed or (
+                result and 
+                not result.get('success', False) and 
+                not result.get('status') == 'success'
+            )
+            
+            if broker_failed:
                 logger.warning(f"Primary broker failed and no fallback available")
                 return {
                     'success': False,

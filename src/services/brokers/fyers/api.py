@@ -615,28 +615,34 @@ class FyersAPI:
                 formatted_symbol = symbol
             
             # Use official library to get quotes
-            result = self.fyers_client.quotes(data=formatted_symbol)
+            result = self.fyers_client.quotes(data={"symbols": formatted_symbol})
             
             if result.get('s') == 'ok':
-                quotes_data = result.get('d', {})
+                quotes_data = result.get('d', [])
                 
-                if formatted_symbol in quotes_data:
-                    quote = quotes_data[formatted_symbol]['v']
+                # Find the symbol in the response array
+                quote_data = None
+                for item in quotes_data:
+                    if item.get('n') == formatted_symbol and item.get('s') == 'ok':
+                        quote_data = item.get('v')
+                        break
+                
+                if quote_data:
                     
                     formatted_quote = {
                         'symbol': symbol,
                         'exchange': exchange or self._extract_exchange(formatted_symbol),
-                        'ltp': str(quote.get('lp', 0)),
-                        'open': str(quote.get('open_price', 0)),
-                        'high': str(quote.get('h', 0)),
-                        'low': str(quote.get('l', 0)),
-                        'prev_close': str(quote.get('prev_close_price', 0)),
-                        'change': str(quote.get('ch', 0)),
-                        'change_percent': str(quote.get('chp', 0)),
-                        'volume': str(quote.get('volume', 0)),
-                        'bid': str(quote.get('bid', 0)),
-                        'ask': str(quote.get('ask', 0)),
-                        'timestamp': str(quote.get('timestamp', ''))
+                        'ltp': str(quote_data.get('lp', 0)),
+                        'open': str(quote_data.get('open_price', 0)),
+                        'high': str(quote_data.get('high_price', 0)),
+                        'low': str(quote_data.get('low_price', 0)),
+                        'prev_close': str(quote_data.get('prev_close_price', 0)),
+                        'change': str(quote_data.get('ch', 0)),
+                        'change_percent': str(quote_data.get('chp', 0)),
+                        'volume': str(quote_data.get('volume', 0)),
+                        'bid': str(quote_data.get('bid', 0)),
+                        'ask': str(quote_data.get('ask', 0)),
+                        'timestamp': str(quote_data.get('tt', ''))
                     }
                     
                     return {
@@ -677,33 +683,34 @@ class FyersAPI:
                 else:
                     formatted_symbols.append(symbol)
             
-            # Join symbols with comma for FYERS API
-            symbols_string = ",".join(formatted_symbols)
-            
             # Use official library to get quotes
-            result = self.fyers_client.quotes(data=symbols_string)
+            result = self.fyers_client.quotes(data={"symbols": ",".join(formatted_symbols)})
             
             if result.get('s') == 'ok':
-                quotes_data = result.get('d', {})
+                quotes_data = result.get('d', [])
                 formatted_quotes = {}
                 
-                for symbol in symbols:
-                    if symbol in quotes_data and quotes_data[symbol].get('v'):
-                        quote = quotes_data[symbol]['v']
-                        formatted_quotes[symbol] = {
-                            'symbol': symbol,
-                            'ltp': str(quote.get('lp', 0)),
-                            'open': str(quote.get('open_price', 0)),
-                            'high': str(quote.get('h', 0)),
-                            'low': str(quote.get('l', 0)),
-                            'prev_close': str(quote.get('prev_close_price', 0)),
-                            'change': str(quote.get('ch', 0)),
-                            'change_percent': str(quote.get('chp', 0)),
-                            'volume': str(quote.get('volume', 0)),
-                            'bid': str(quote.get('bid', 0)),
-                            'ask': str(quote.get('ask', 0)),
-                            'timestamp': str(quote.get('timestamp', ''))
-                        }
+                # Process each item in the response array
+                for item in quotes_data:
+                    if item.get('s') == 'ok':
+                        symbol_name = item.get('n')
+                        quote_data = item.get('v')
+                        
+                        if symbol_name and quote_data:
+                            formatted_quotes[symbol_name] = {
+                                'symbol': symbol_name,
+                                'ltp': str(quote_data.get('lp', 0)),
+                                'open': str(quote_data.get('open_price', 0)),
+                                'high': str(quote_data.get('high_price', 0)),
+                                'low': str(quote_data.get('low_price', 0)),
+                                'prev_close': str(quote_data.get('prev_close_price', 0)),
+                                'change': str(quote_data.get('ch', 0)),
+                                'change_percent': str(quote_data.get('chp', 0)),
+                                'volume': str(quote_data.get('volume', 0)),
+                                'bid': str(quote_data.get('bid', 0)),
+                                'ask': str(quote_data.get('ask', 0)),
+                                'timestamp': str(quote_data.get('tt', ''))
+                            }
                 
                 return {
                     'status': 'success',
