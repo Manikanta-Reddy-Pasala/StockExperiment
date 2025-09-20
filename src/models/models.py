@@ -7,12 +7,11 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 from flask_login import UserMixin
 
-Base = declarative_base()
-
-# Import enhanced stock models
+# Import enhanced stock models and use their Base
 from .stock_models import (
     Stock, StockPrice, StrategyType, StrategyStockSelection, MLPrediction,
-    PortfolioStrategy, PortfolioPosition, MarketDataSnapshot, MarketCapCategory
+    PortfolioStrategy, PortfolioPosition, MarketDataSnapshot, MarketCapCategory,
+    SymbolMaster, Base
 )
 
 

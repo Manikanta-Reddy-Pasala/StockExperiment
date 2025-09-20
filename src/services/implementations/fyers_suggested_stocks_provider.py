@@ -38,11 +38,11 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
 
             all_symbols = set()
             discovered_stocks = []
+            api_failed = False
 
             for term in search_terms:
                 try:
                     search_result = self.fyers_service.search(user_id, term, exchange)
-
 
                     if search_result.get('status') == 'success':
                         symbols = search_result.get('data', [])
@@ -65,6 +65,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
                                 })
                     else:
                         logger.warning(f"Search failed for term '{term}': {search_result.get('message')}")
+                        api_failed = True
 
                     # Rate limiting
                     import time
@@ -72,24 +73,24 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
 
                 except Exception as e:
                     logger.warning(f"Search failed for term '{term}': {e}")
+                    api_failed = True
                     continue
 
             logger.info(f"Discovered {len(all_symbols)} potential stocks")
+
+
+            categorized = {
+                'large_cap': [],
+                'mid_cap': [],
+                'small_cap': []
+            }
 
             # Get quotes for discovered stocks and categorize
             if all_symbols:
                 quotes_result = self.fyers_service.quotes_multiple(user_id, list(all_symbols)[:50])  # Limit for API
 
-
                 if quotes_result.get('status') == 'success':
                     quotes_data = quotes_result.get('data', {})
-
-                    # Categorize stocks by market cap
-                    categorized = {
-                        'large_cap': [],
-                        'mid_cap': [],
-                        'small_cap': []
-                    }
 
                     for stock in discovered_stocks:
                         symbol = stock['symbol']
@@ -224,16 +225,13 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
             
             # Get quotes for popular stocks
             quotes_response = self.fyers_service.quotes_multiple(user_id, popular_symbols)
-            
+
             if quotes_response.get('status') != 'success':
                 return {
                     'success': False,
                     'error': quotes_response.get('message', 'Failed to fetch stock suggestions'),
                     'data': [],
                     'total': 0,
-                    'search': search,
-                    'sort_by': sort_by,
-                    'sort_order': sort_order,
                     'strategies_applied': [s.value for s in strategies],
                     'last_updated': datetime.now().isoformat()
                 }
@@ -301,7 +299,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
         """Search for stocks by name or symbol with advanced filtering."""
         try:
             # Use FYERS search API
-            search_response = self.fyers_service.search_symbols(user_id, query, limit)
+            search_response = self.fyers_service.search(user_id, query)
             
             if not search_response.get('success'):
                 return {
@@ -1103,3 +1101,4 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
 
         # Default sector if no keywords match
         return 'Diversified'
+

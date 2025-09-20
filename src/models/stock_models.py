@@ -8,8 +8,8 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
 
-# Import the existing base from models.py
-from .models import Base
+# Create separate base to avoid circular imports
+Base = declarative_base()
 
 
 class MarketCapCategory(enum.Enum):
@@ -322,6 +322,48 @@ class PortfolioPosition(Base):
     # Relationships
     portfolio_strategy = relationship("PortfolioStrategy", back_populates="positions")
     stock = relationship("Stock")
+
+
+class SymbolMaster(Base):
+    """Raw symbol master data from broker APIs."""
+    __tablename__ = 'symbol_master'
+
+    id = Column(Integer, primary_key=True)
+
+    # Symbol identification
+    symbol = Column(String(50), nullable=False, index=True)  # NSE:SYMBOL-EQ
+    fytoken = Column(String(50), unique=True, nullable=False, index=True)  # Fyers unique token
+    name = Column(String(200), nullable=False)
+    exchange = Column(String(20), nullable=False, index=True)  # NSE, BSE
+    segment = Column(String(20), nullable=False)  # CM (Capital Market)
+    instrument_type = Column(String(20), nullable=False)  # EQ (Equity)
+
+    # Trading parameters
+    lot_size = Column(Integer, default=1)
+    tick_size = Column(Float, default=0.05)
+    isin = Column(String(20))  # ISIN code
+
+    # Data source and versioning
+    data_source = Column(String(20), default='fyers')
+    source_updated = Column(String(20))  # Last updated timestamp from source
+    download_date = Column(DateTime, default=datetime.utcnow)
+
+    # Status flags
+    is_active = Column(Boolean, default=True, index=True)
+    is_equity = Column(Boolean, default=True, index=True)  # Only equity symbols
+
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Unique constraint to prevent duplicates
+    __table_args__ = (
+        UniqueConstraint('symbol', 'exchange', name='_symbol_exchange_uc'),
+        UniqueConstraint('fytoken', name='_fytoken_uc'),
+    )
+
+    def __repr__(self):
+        return f'<SymbolMaster {self.symbol}: {self.name}>'
 
 
 class MarketDataSnapshot(Base):

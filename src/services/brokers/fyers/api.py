@@ -81,7 +81,8 @@ class FyersAPI:
                 elif endpoint == 'history':
                     response = self.fyers_client.history(data=data)
                 elif endpoint == 'search_scrips':
-                    response = self.fyers_client.search_scrips(**data)
+                    # This endpoint is deprecated - use the search() method instead
+                    return {'status': 'error', 'message': 'Use search() method instead of search_scrips endpoint', 'error_code': 'DEPRECATED_ENDPOINT'}
                 else:
                     return {'status': 'error', 'message': f'POST endpoint {endpoint} not implemented'}
                 
@@ -886,39 +887,47 @@ class FyersAPI:
     # Search and Symbol Information
     def search(self, symbol: str, exchange: str = "") -> Dict[str, Any]:
         """
-        Search for symbols with standard format.
+        Search for symbols using Fyers Symbol Service.
         """
         try:
-            search_data = {
-                "symbol": symbol,
-                "exchange": exchange.upper() if exchange else "ALL"
-            }
-            
-            result = self._make_request('POST', 'search_scrips', data=search_data)
-            
-            if result['status'] == 'success':
-                search_results = result.get('data', {}).get('d', [])
+            # Import here to avoid circular imports
+            from ...fyers_symbol_service import get_fyers_symbol_service
+
+            # Get symbol service
+            symbol_service = get_fyers_symbol_service()
+
+            # Use NSE by default if no exchange specified
+            search_exchange = exchange.upper() if exchange else "NSE"
+
+            # Search symbols using the symbol service
+            search_results = symbol_service.search_symbols(symbol, search_exchange, limit=50)
+
+            if search_results:
                 formatted_results = []
-                
+
                 for item in search_results:
                     formatted_result = {
                         'symbol': item.get('symbol', ''),
                         'name': item.get('name', ''),
-                        'exchange': item.get('exch', ''),
+                        'exchange': item.get('exchange', ''),
                         'segment': item.get('segment', ''),
                         'instrument_type': item.get('instrument_type', ''),
-                        'lot_size': str(item.get('lot_size', 1)),
-                        'tick_size': str(item.get('tick_size', 0.01))
+                        'lot': item.get('lot', 1),
+                        'tick': item.get('tick', 0.05),
+                        'fytoken': item.get('fytoken', '')
                     }
                     formatted_results.append(formatted_result)
-                
+
                 return {
                     'status': 'success',
                     'data': formatted_results
                 }
             else:
-                return result
-                
+                return {
+                    'status': 'success',
+                    'data': []
+                }
+
         except Exception as e:
             logger.error(f"Search error: {str(e)}")
             return {

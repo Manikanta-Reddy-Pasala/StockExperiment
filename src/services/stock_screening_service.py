@@ -69,51 +69,64 @@ class StockScreeningService:
         # TODO: Load stock universe from database or broker API
         # For now, return empty list - stocks should be fetched from connected broker
         return []
-    
-    def _initialize_fyers_connector(self, user_id: int = 1):
-        """Initialize FYERS connector for API calls."""
-        try:
-            if self.broker_service:
-                config = self.broker_service.get_broker_config('fyers', user_id)
-                logger.info(f"FYERS config for user {user_id}: {config}")
-                
-                # Check if we have the required credentials (don't require is_connected to be True)
-                if config and config.get('client_id') and config.get('access_token'):
-                    logger.info("FYERS credentials found, initializing connector")
-                    from .brokers.fyers_service import FyersAPIConnector
-                    self.fyers_connector = FyersAPIConnector(
-                        client_id=config.get('client_id'),
-                        access_token=config.get('access_token')
-                    )
-                    logger.info("FYERS connector initialized successfully")
-                    return True
-                else:
-                    logger.warning(f"FYERS credentials missing: client_id={bool(config.get('client_id'))}, access_token={bool(config.get('access_token'))}")
-        except Exception as e:
-            logger.error(f"Error initializing FYERS connector: {e}")
-        return False
 
-    def _get_technical_indicators(self, symbol: str) -> Optional[Dict[str, float]]:
+    def _get_symbols_for_screening(self, user_id: int) -> List[str]:
+        """Get symbols for screening using stock discovery service."""
+        try:
+            # Import here to avoid circular imports
+            from .ml.stock_discovery_service import get_stock_discovery_service
+
+            # Get stock discovery service
+            discovery_service = get_stock_discovery_service()
+
+            # Get top liquid stocks for screening
+            discovered_stocks = discovery_service.get_top_liquid_stocks(user_id, count=100)
+
+            # Extract symbols
+            symbols = [stock.symbol for stock in discovered_stocks if stock.is_tradeable]
+
+            logger.info(f"Found {len(symbols)} symbols from stock discovery service")
+            return symbols
+
+        except Exception as e:
+            logger.error(f"Error getting symbols from discovery service: {e}")
+            # Fallback to empty list
+            return []
+    
+    def _initialize_broker_service(self, user_id: int = 1):
+        """Initialize unified broker service for API calls."""
+        try:
+            # Import here to avoid circular imports
+            from .unified_broker_service import get_unified_broker_service
+
+            self.unified_broker_service = get_unified_broker_service()
+            logger.info("Unified broker service initialized successfully")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error initializing unified broker service: {e}")
+            return False
+
+    def _get_technical_indicators(self, symbol: str, user_id: int = 1) -> Optional[Dict[str, float]]:
         """Calculate technical indicators for a stock."""
         try:
-            if not self.fyers_connector:
+            if not hasattr(self, 'unified_broker_service') or not self.unified_broker_service:
                 return None
 
             # Fetch last 30 days of historical data for calculations
             range_to = datetime.now()
             range_from = range_to - timedelta(days=45) # Fetch more to ensure we get 30 trading days
 
-            history_data = self.fyers_connector.history(
-                symbol=symbol,
-                resolution="D",
-                range_from=range_from.strftime('%Y-%m-%d'),
-                range_to=range_to.strftime('%Y-%m-%d')
+            history_result = self.unified_broker_service.get_historical_data(
+                user_id, symbol, resolution="D",
+                range_from=range_from.strftime('%Y-%m-%d')
             )
 
-            if not history_data or not history_data.get('candles'):
+            if not history_result.get('success') or not history_result.get('data', {}).get('candles'):
                 logger.warning(f"Could not fetch historical data for {symbol}")
                 return None
 
+            history_data = history_result.get('data', {})
             df = pd.DataFrame(history_data['candles'], columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
             if len(df) < 21: # Need at least 21 days for 20-day avg and 14-day ATR
                 logger.warning(f"Not enough historical data for {symbol} ({len(df)} days)")
@@ -145,22 +158,29 @@ class StockScreeningService:
         """Screen stocks based on criteria and strategies."""
         if strategy_types is None:
             strategy_types = [StrategyType.DEFAULT_RISK, StrategyType.HIGH_RISK]
-        
-        if not self._initialize_fyers_connector(user_id):
-            logger.warning("FYERS connector not available, cannot screen stocks without broker connection")
+
+        if not self._initialize_broker_service(user_id):
+            logger.warning("Unified broker service not available, cannot screen stocks without broker connection")
             return []
-        
+
+        # Get symbols from stock discovery service
+        symbols_to_screen = self._get_symbols_for_screening(user_id)
+        if not symbols_to_screen:
+            logger.warning("No symbols found for screening")
+            return []
+
+        logger.info(f"Screening {len(symbols_to_screen)} symbols")
         screened_stocks = []
-        
-        for symbol in self.nse_symbols:
+
+        for symbol in symbols_to_screen:
             try:
                 # Get quote data
-                quote_data = self._get_stock_data(symbol)
+                quote_data = self._get_stock_data(symbol, user_id)
                 if not quote_data:
                     continue
 
                 # Get technical indicators
-                tech_indicators = self._get_technical_indicators(symbol)
+                tech_indicators = self._get_technical_indicators(symbol, user_id)
                 if not tech_indicators:
                     continue
                 
@@ -185,24 +205,26 @@ class StockScreeningService:
         screened_stocks.sort(key=lambda x: self._get_recommendation_score(x), reverse=True)
         return screened_stocks[:20]
 
-    def _get_stock_data(self, symbol: str) -> Optional[StockData]:
-        """Get stock data from FYERS API."""
+    def _get_stock_data(self, symbol: str, user_id: int = 1) -> Optional[StockData]:
+        """Get stock data from unified broker service."""
         try:
-            if not self.fyers_connector:
-                return None
-            
-            quotes_data = self.fyers_connector.quotes(symbol)
-            
-            if not quotes_data or 'd' not in quotes_data or not quotes_data['d']:
-                logger.warning(f"No quotes data for {symbol}")
-                return None
-            
-            quote = quotes_data['d'][0] if isinstance(quotes_data['d'], list) else quotes_data['d'].get(symbol, {})
-            if not quote or 'v' not in quote:
+            if not hasattr(self, 'unified_broker_service') or not self.unified_broker_service:
                 return None
 
-            current_price = float(quote.get('v', {}).get('lp', 0))
-            volume = int(quote.get('v', {}).get('volume', 0))
+            quotes_result = self.unified_broker_service.get_quotes(user_id, [symbol])
+
+            if not quotes_result.get('success') or not quotes_result.get('data'):
+                logger.warning(f"No quotes data for {symbol}")
+                return None
+
+            quotes_data = quotes_result.get('data', {})
+            if symbol not in quotes_data:
+                logger.warning(f"Symbol {symbol} not found in quotes response")
+                return None
+
+            quote = quotes_data[symbol]
+            current_price = float(quote.get('lp', quote.get('ltp', 0)))
+            volume = int(quote.get('volume', quote.get('vol', 0)))
 
             return StockData(
                 symbol=symbol,
