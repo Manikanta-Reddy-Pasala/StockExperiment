@@ -136,7 +136,7 @@ def screen_stocks():
         data = request.get_json()
         risk_profile_str = data.get('risk_profile', 'default')
         user_id = data.get('user_id', 1)
-        auto_train = data.get('auto_train', True)
+        auto_train = data.get('auto_train', False)
 
         logger.info(f"API: Screening stocks for {risk_profile_str} risk profile")
 
@@ -261,7 +261,7 @@ def analyze_single_stock():
         data = request.get_json()
         symbol = data.get('symbol')
         user_id = data.get('user_id', 1)
-        auto_train = data.get('auto_train', True)
+        auto_train = data.get('auto_train', False)
 
         if not symbol:
             return jsonify({

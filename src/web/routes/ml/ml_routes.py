@@ -340,66 +340,191 @@ def get_suggested_stocks():
         # Get query parameters
         strategy_type = request.args.get('strategy', 'default_risk')
         limit = int(request.args.get('limit', 20))
-        
-        # Import the stock screening service
-        from ....services.stock_screening_service import get_stock_screening_service, StrategyType
-        
-        # Convert string to enum
-        if strategy_type == 'high_risk':
-            strategies = [StrategyType.HIGH_RISK]
-        else:
-            strategies = [StrategyType.DEFAULT_RISK]
-        
-        # Get stock screening service
-        screening_service = get_stock_screening_service()
-        
+        use_ml = request.args.get('use_ml', 'false').lower() == 'true'
+
         # Use a default user ID if current_user is not available (for testing)
         user_id = current_user.id if current_user and hasattr(current_user, 'id') else 1
-        
-        # Screen stocks based on strategy
-        screened_stocks = screening_service.screen_stocks(strategies, user_id)
-        
-        # Convert to API response format
-        suggestions = []
-        for stock in screened_stocks:
-            suggestion = {
-                'symbol': stock.symbol,
-                'name': stock.name,
-                'current_price': stock.current_price,
-                'target_price': stock.target_price,
-                'stop_loss': stock.stop_loss,
-                'recommendation': stock.recommendation,
-                'strategy': stock.strategy,
-                'risk_level': stock.risk_level,
-                'holding_period': stock.holding_period,
-                'market_cap': stock.market_cap,
-                'pe_ratio': stock.pe_ratio,
-                'pb_ratio': stock.pb_ratio,
-                'roe': stock.roe,
-                'sales_growth': stock.sales_growth,
-                'rsi': stock.rsi,
-                'sma_20': stock.sma_20,
-                'volume': stock.volume,
-                'avg_volume_20d': stock.avg_volume_20d,
-                'expected_return': ((stock.target_price - stock.current_price) / stock.current_price * 100) if stock.target_price else 0,
-                'risk_reward_ratio': ((stock.target_price - stock.current_price) / (stock.current_price - stock.stop_loss)) if stock.target_price and stock.stop_loss else 0
-            }
-            suggestions.append(suggestion)
-        
+
+        if use_ml:
+            # Try ML-based suggestions first
+            try:
+                suggestions = _get_ml_based_suggestions(strategy_type, limit, user_id)
+                return jsonify({
+                    'success': True,
+                    'data': suggestions,
+                    'strategy_applied': strategy_type,
+                    'total': len(suggestions),
+                    'method': 'ml_predictions',
+                    'last_updated': datetime.now().isoformat()
+                }), 200
+            except Exception as ml_error:
+                logger.warning(f"ML predictions failed, falling back to basic screening: {ml_error}")
+                # Fall through to basic screening
+
+        # Basic screening without ML (current working approach)
+        suggestions = _get_basic_screening_suggestions(strategy_type, limit, user_id)
+
         return jsonify({
             'success': True,
             'data': suggestions,
             'strategy_applied': strategy_type,
             'total': len(suggestions),
+            'method': 'basic_screening',
             'last_updated': datetime.now().isoformat()
         }), 200
-        
+
     except Exception as e:
         logger.error(f"Error getting suggested stocks: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
         }), 500
+
+def _get_basic_screening_suggestions(strategy_type: str, limit: int, user_id: int):
+    """Get stock suggestions using basic screening without ML predictions."""
+    try:
+        # Use new basic stock screening service
+        from ....services.basic_stock_screening_service import get_basic_stock_screening_service
+
+        screening_service = get_basic_stock_screening_service()
+        screening_result = screening_service.get_top_stocks(
+            risk_level=strategy_type,
+            limit=limit,
+            user_id=user_id
+        )
+
+        if not screening_result.get('success'):
+            logger.warning(f"Basic screening failed: {screening_result.get('error', 'Unknown error')}")
+            return []
+
+        # Extract stocks from all categories
+        portfolio = screening_result.get('portfolio', {})
+        all_stocks = []
+        for category in ['large_cap', 'mid_cap', 'small_cap']:
+            all_stocks.extend(portfolio.get(category, []))
+
+        suggestions = []
+        for stock_data in all_stocks:
+            # Create enhanced targets based on basic score
+            current_price = stock_data.get('current_price', 0)
+            basic_score = stock_data.get('basic_score', 0.5)
+
+            # Dynamic targets based on scoring
+            upside_percent = 0.10 + (basic_score * 0.15)  # 10-25% upside based on score
+            downside_percent = 0.05 + ((1 - basic_score) * 0.05)  # 5-10% downside
+
+            target_price = current_price * (1 + upside_percent) if current_price else None
+            stop_loss = current_price * (1 - downside_percent) if current_price else None
+
+            # Determine holding period based on market cap and score
+            market_cap_cat = stock_data.get('market_cap_category', 'mid_cap')
+            if market_cap_cat == 'large_cap':
+                holding_period = '4-8 weeks'
+                risk_level = 'Low'
+            elif market_cap_cat == 'mid_cap':
+                holding_period = '3-6 weeks'
+                risk_level = 'Medium'
+            else:  # small_cap
+                holding_period = '2-4 weeks'
+                risk_level = 'High'
+
+            suggestion = {
+                'symbol': stock_data.get('symbol'),
+                'name': stock_data.get('name'),
+                'current_price': current_price,
+                'target_price': round(target_price, 2) if target_price else None,
+                'stop_loss': round(stop_loss, 2) if stop_loss else None,
+                'recommendation': stock_data.get('recommendation', 'BUY'),
+                'strategy': strategy_type,
+                'risk_level': risk_level,
+                'holding_period': holding_period,
+                'market_cap': stock_data.get('market_cap_crores', 0) * 10000000,
+                'market_cap_category': market_cap_cat,
+                'sector': stock_data.get('sector', 'Others'),
+                'pe_ratio': None,  # Basic screening doesn't have fundamental data
+                'pb_ratio': None,
+                'roe': None,
+                'sales_growth': None,
+                'rsi': None,
+                'sma_20': None,
+                'volume': stock_data.get('volume', 0),
+                'liquidity_score': stock_data.get('liquidity_score', 0),
+                'avg_volume_20d': None,
+                'expected_return': ((target_price - current_price) / current_price * 100) if target_price and current_price else 0,
+                'risk_reward_ratio': ((target_price - current_price) / (current_price - stop_loss)) if target_price and stop_loss and current_price > stop_loss else 0,
+                'reason': f'High liquidity {market_cap_cat} stock with basic score {basic_score:.2f}',
+                'basic_score': basic_score
+            }
+            suggestions.append(suggestion)
+
+        return suggestions
+
+    except Exception as e:
+        logger.error(f"Error in basic screening: {e}")
+        return []
+
+
+def _get_ml_based_suggestions(strategy_type: str, limit: int, user_id: int):
+    """Get stock suggestions using ML predictions (requires trained models)."""
+    # Import ML prediction service
+    from ....services.ml.prediction_service import get_prediction_service
+    from ....services.ml.stock_discovery_service import get_stock_discovery_service
+
+    # Get stocks for prediction
+    discovery_service = get_stock_discovery_service()
+    discovered_stocks = discovery_service.get_top_liquid_stocks(user_id, count=50)
+
+    prediction_service = get_prediction_service()
+    suggestions = []
+
+    for stock_info in discovered_stocks:
+        try:
+            # Get ML prediction for this stock
+            prediction_result = prediction_service.predict(
+                symbol=stock_info.symbol,
+                user_id=user_id,
+                horizon_days=30
+            )
+
+            if prediction_result.get('success') and prediction_result.get('data'):
+                pred_data = prediction_result['data']
+
+                # Only suggest stocks with positive ML predictions
+                if pred_data.get('signal') == 'BUY' and pred_data.get('expected_return', 0) > 5:
+                    suggestion = {
+                        'symbol': stock_info.symbol,
+                        'name': stock_info.name,
+                        'current_price': stock_info.current_price,
+                        'target_price': pred_data.get('target_price'),
+                        'stop_loss': pred_data.get('stop_loss'),
+                        'recommendation': pred_data.get('signal'),
+                        'strategy': strategy_type,
+                        'risk_level': 'ML-Based',
+                        'holding_period': '4-6 weeks',
+                        'market_cap': stock_info.market_cap_crores * 10000000,  # Convert to actual value
+                        'pe_ratio': None,  # Would need fundamental data
+                        'pb_ratio': None,
+                        'roe': None,
+                        'sales_growth': None,
+                        'rsi': pred_data.get('rsi'),
+                        'sma_20': pred_data.get('sma_20'),
+                        'volume': stock_info.volume,
+                        'avg_volume_20d': None,
+                        'expected_return': pred_data.get('expected_return'),
+                        'risk_reward_ratio': pred_data.get('risk_reward_ratio'),
+                        'ml_confidence': pred_data.get('confidence'),
+                        'reason': f"ML prediction with {pred_data.get('confidence', 0):.1%} confidence"
+                    }
+                    suggestions.append(suggestion)
+
+        except Exception as e:
+            logger.warning(f"ML prediction failed for {stock_info.symbol}: {e}")
+            continue
+
+    # Sort by ML confidence and expected return
+    suggestions.sort(key=lambda x: (x.get('ml_confidence', 0) * x.get('expected_return', 0)), reverse=True)
+    return suggestions[:limit]
+
 
 @ml_bp.route('/suggested-stocks-test', methods=['GET'])
 def get_suggested_stocks_test():
@@ -408,60 +533,39 @@ def get_suggested_stocks_test():
         # Get query parameters
         strategy_type = request.args.get('strategy', 'default_risk')
         limit = int(request.args.get('limit', 20))
-        
-        # Import the stock screening service
-        from ....services.stock_screening_service import get_stock_screening_service, StrategyType
-        
-        # Convert string to enum
-        if strategy_type == 'high_risk':
-            strategies = [StrategyType.HIGH_RISK]
-        else:
-            strategies = [StrategyType.DEFAULT_RISK]
-        
-        # Get stock screening service
-        screening_service = get_stock_screening_service()
-        
+        use_ml = request.args.get('use_ml', 'false').lower() == 'true'
+
         # Use a default user ID for testing
         user_id = 1
-        
-        # Screen stocks based on strategy
-        screened_stocks = screening_service.screen_stocks(strategies, user_id)
-        
-        # Convert to API response format
-        suggestions = []
-        for stock in screened_stocks:
-            suggestion = {
-                'symbol': stock.symbol,
-                'name': stock.name,
-                'current_price': stock.current_price,
-                'target_price': stock.target_price,
-                'stop_loss': stock.stop_loss,
-                'recommendation': stock.recommendation,
-                'strategy': stock.strategy,
-                'risk_level': stock.risk_level,
-                'holding_period': stock.holding_period,
-                'market_cap': stock.market_cap,
-                'pe_ratio': stock.pe_ratio,
-                'pb_ratio': stock.pb_ratio,
-                'roe': stock.roe,
-                'sales_growth': stock.sales_growth,
-                'rsi': stock.rsi,
-                'sma_20': stock.sma_20,
-                'volume': stock.volume,
-                'avg_volume_20d': stock.avg_volume_20d,
-                'expected_return': ((stock.target_price - stock.current_price) / stock.current_price * 100) if stock.target_price else 0,
-                'risk_reward_ratio': ((stock.target_price - stock.current_price) / (stock.current_price - stock.stop_loss)) if stock.target_price and stock.stop_loss else 0
-            }
-            suggestions.append(suggestion)
-        
+
+        if use_ml:
+            # Try ML-based suggestions first
+            try:
+                suggestions = _get_ml_based_suggestions(strategy_type, limit, user_id)
+                return jsonify({
+                    'success': True,
+                    'data': suggestions,
+                    'strategy_applied': strategy_type,
+                    'total': len(suggestions),
+                    'method': 'ml_predictions',
+                    'last_updated': datetime.now().isoformat()
+                }), 200
+            except Exception as ml_error:
+                logger.warning(f"ML predictions failed, falling back to basic screening: {ml_error}")
+                # Fall through to basic screening
+
+        # Basic screening without ML (current working approach)
+        suggestions = _get_basic_screening_suggestions(strategy_type, limit, user_id)
+
         return jsonify({
             'success': True,
             'data': suggestions,
             'strategy_applied': strategy_type,
             'total': len(suggestions),
+            'method': 'basic_screening',
             'last_updated': datetime.now().isoformat()
         }), 200
-        
+
     except Exception as e:
         logger.error(f"Error getting suggested stocks: {e}")
         return jsonify({

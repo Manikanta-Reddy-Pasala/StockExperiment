@@ -1570,7 +1570,7 @@ async function loadMLRecommendations() {
             },
             body: JSON.stringify({
                 risk_profile: riskProfile,
-                auto_train: true
+                auto_train: false
             })
         });
 
@@ -1852,7 +1852,7 @@ async function analyzeStock(symbol) {
             },
             body: JSON.stringify({
                 symbol: symbol,
-                auto_train: true
+                auto_train: false
             })
         });
 

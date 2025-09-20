@@ -6,6 +6,7 @@ API endpoints and response formats.
 """
 
 import logging
+import time
 from typing import Dict, Optional, Any
 from datetime import datetime
 
@@ -369,27 +370,146 @@ class FyersService:
         except Exception as e:
             APILogger.log_error("FyersService", "quotes", e, request_data, user_id)
             raise
-    
+
+    def _is_valid_fyers_symbol(self, symbol: str) -> bool:
+        """Validate if symbol is in correct Fyers format."""
+        if not symbol or not isinstance(symbol, str):
+            return False
+
+        # Fyers symbols should be in format: EXCHANGE:SYMBOL-SEGMENT
+        # Examples: NSE:INFY-EQ, BSE:SENSEX-INDEX, MCX:GOLD24FEB-COM
+        if ':' not in symbol or '-' not in symbol:
+            return False
+
+        parts = symbol.split(':')
+        if len(parts) != 2:
+            return False
+
+        exchange, symbol_part = parts
+        if exchange not in ['NSE', 'BSE', 'MCX', 'NCDEX']:
+            return False
+
+        if '-' not in symbol_part:
+            return False
+
+        # Basic length validation
+        if len(symbol) < 6 or len(symbol) > 30:
+            return False
+
+        # Additional Fyers-specific validation
+        # Reject symbols with problematic characters that cause API issues
+        symbol_name, segment = symbol_part.rsplit('-', 1)
+
+        # Skip symbols with special characters that Fyers API rejects
+        if any(char in symbol_name for char in ['&', '+', '(', ')', '[', ']', '*']):
+            logger.debug(f"Rejecting symbol with special characters: {symbol}")
+            return False
+
+        # Only allow standard segments
+        if segment not in ['EQ', 'INDEX', 'FUT', 'OPT', 'COM']:
+            return False
+
+        return True
+
     def quotes_multiple(self, user_id: int, symbols: list):
         """Get quotes for multiple symbols using standardized format."""
-        print(f"DEBUG: FyersService.quotes_multiple called for user {user_id} with symbols: {symbols}")
-        request_data = {'symbols': symbols}
-        
+        logger.debug(f"FyersService.quotes_multiple called for user {user_id} with {len(symbols)} symbols")
+
+        # Validate and filter symbols for Fyers API format
+        valid_symbols = []
+        for symbol in symbols:
+            if self._is_valid_fyers_symbol(symbol):
+                valid_symbols.append(symbol)
+            else:
+                logger.debug(f"Invalid symbol format for Fyers API: {symbol}")
+
+        if not valid_symbols:
+            logger.warning(f"No valid symbols found in batch of {len(symbols)}")
+            return {
+                'status': 'error',
+                'message': 'No valid symbols found',
+                'data': {}
+            }
+
+        # Limit batch size to avoid API limits (Fyers typically allows 50-100 symbols per request)
+        max_batch_size = 50
+        if len(valid_symbols) > max_batch_size:
+            valid_symbols = valid_symbols[:max_batch_size]
+            logger.debug(f"Limiting batch to {max_batch_size} symbols")
+
+        request_data = {'symbols': valid_symbols}
         APILogger.log_request("FyersService", "quotes_multiple", request_data, user_id)
         try:
-            print("DEBUG: Getting API instance")
             api = self._get_api_instance(user_id)
-            print(f"DEBUG: API instance: {api}")
-            print("DEBUG: Calling api.quotes_multiple")
-            result = api.quotes_multiple(symbols)
-            print(f"DEBUG: api.quotes_multiple result: {result}")
-            APILogger.log_response("FyersService", "quotes_multiple", result, user_id)
-            return result
+            result = api.quotes_multiple(valid_symbols)
+
+            # Enhanced error reporting
+            if result.get('status') == 'success':
+                logger.debug(f"Quotes successful for {len(valid_symbols)} symbols")
+                APILogger.log_response("FyersService", "quotes_multiple", result, user_id)
+                return result
+            else:
+                error_msg = result.get('message', 'Unknown error')
+                error_code = result.get('error_code', 'UNKNOWN')
+
+                # Try fallback to individual quotes if batch fails
+                if 'invalid input' in error_msg.lower():
+                    logger.info(f"Batch quotes failed, trying individual quotes for {len(valid_symbols)} symbols")
+                    return self._try_individual_quotes(user_id, valid_symbols)
+                elif 'authentication' in error_msg.lower() or 'token' in error_msg.lower():
+                    logger.error(f"Authentication failed - check Fyers API credentials and access token")
+                elif 'limit' in error_msg.lower():
+                    logger.warning(f"API limit reached - reducing batch size next time")
+                else:
+                    logger.warning(f"Quotes failed for batch: {error_msg} (Code: {error_code})")
+
+                APILogger.log_response("FyersService", "quotes_multiple", result, user_id)
+                return result
+
         except Exception as e:
-            print(f"DEBUG: Exception in quotes_multiple: {e}")
+            logger.warning(f"Exception in quotes_multiple: {e}")
             APILogger.log_error("FyersService", "quotes_multiple", e, request_data, user_id)
             raise
-    
+
+    def _try_individual_quotes(self, user_id: int, symbols: list) -> dict:
+        """Fallback method to get individual quotes when batch fails."""
+        successful_quotes = {}
+        failed_count = 0
+
+        # Limit to first 10 symbols to avoid too many individual API calls
+        limited_symbols = symbols[:10]
+        logger.info(f"Trying individual quotes for {len(limited_symbols)} symbols (limited from {len(symbols)})")
+
+        for symbol in limited_symbols:
+            try:
+                # Use the single quote method
+                result = self.quotes(user_id, symbol)
+                if result.get('status') == 'success' and result.get('data'):
+                    successful_quotes[symbol] = result['data']
+                else:
+                    failed_count += 1
+                    logger.debug(f"Individual quote failed for {symbol}")
+            except Exception as e:
+                failed_count += 1
+                logger.debug(f"Exception getting individual quote for {symbol}: {e}")
+
+            # Small delay to respect rate limits
+            time.sleep(0.05)
+
+        if successful_quotes:
+            logger.info(f"Individual quotes successful: {len(successful_quotes)}, failed: {failed_count}")
+            return {
+                'status': 'success',
+                'data': successful_quotes
+            }
+        else:
+            logger.warning(f"All individual quotes failed for {len(limited_symbols)} symbols")
+            return {
+                'status': 'error',
+                'message': 'All individual quotes failed',
+                'error_code': 'INDIVIDUAL_QUOTES_FAILED'
+            }
+
     def generate_portfolio_summary_report(self, user_id: int):
         """Generate comprehensive portfolio summary report."""
         APILogger.log_request("FyersService", "generate_portfolio_summary_report", {}, user_id)
