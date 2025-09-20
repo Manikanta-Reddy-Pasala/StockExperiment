@@ -55,7 +55,7 @@ class MarketDataService:
                 if config and client_id and access_token:
                     print("DEBUG: All credentials found, initializing connector")
                     logger.info("FYERS credentials found, initializing connector")
-                    from ..broker_service import FyersAPIConnector
+                    from src.integrations.broker_service import FyersAPIConnector
                     self.fyers_connector = FyersAPIConnector(
                         client_id=client_id,
                         access_token=access_token

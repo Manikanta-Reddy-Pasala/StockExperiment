@@ -8,8 +8,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 try:
-    from ...services.brokers.fyers_service import get_fyers_service
-    from ...models.database import get_database_manager
+    from src.services.brokers.fyers_service import get_fyers_service
+    from src.models.database import get_database_manager
 except ImportError:
     from services.brokers.fyers_service import get_fyers_service
     from models.database import get_database_manager

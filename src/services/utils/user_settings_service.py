@@ -4,8 +4,8 @@ Handles user-specific settings storage and retrieval
 """
 import json
 from typing import Dict, Any, Optional
-from ..models.database import DatabaseManager
-from ..models.models import Configuration
+from src.models.database import DatabaseManager
+from src.models.models import Configuration
 from sqlalchemy.orm import sessionmaker
 
 

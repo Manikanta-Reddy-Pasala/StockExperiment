@@ -15,10 +15,10 @@ try:
     )
     from ...services.ml.stock_discovery_service import get_stock_discovery_service
 except ImportError:
-    from services.ml.intelligent_screening_service import (
+    from src.services.ml.intelligent_screening_service import (
         get_intelligent_screening_service, RiskProfile
     )
-    from services.ml.stock_discovery_service import get_stock_discovery_service
+    from src.services.ml.stock_discovery_service import get_stock_discovery_service
 
 logger = logging.getLogger(__name__)
 

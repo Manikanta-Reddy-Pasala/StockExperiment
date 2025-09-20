@@ -12,8 +12,8 @@ from typing import Dict, Optional, Any
 logger = logging.getLogger(__name__)
 
 try:
-    from ...models.database import get_database_manager
-    from ...models.models import BrokerConfiguration, Order, Trade
+    from src.models.database import get_database_manager
+    from src.models.models import BrokerConfiguration, Order, Trade
 except ImportError:
     from models.database import get_database_manager
     from models.models import BrokerConfiguration, Order, Trade

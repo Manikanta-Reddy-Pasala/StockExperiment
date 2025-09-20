@@ -5,7 +5,7 @@ Now uses the new DashboardIntegrationService for broker-agnostic integration.
 from datetime import datetime
 from .broker_service import get_broker_service
 from .dashboard_integration_service import get_dashboard_integration_service
-from .user_strategy_settings_service import get_user_strategy_settings_service
+from ..utils.user_strategy_settings_service import get_user_strategy_settings_service
 
 class DashboardService:
     def __init__(self, broker_service):

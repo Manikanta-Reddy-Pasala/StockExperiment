@@ -14,9 +14,9 @@ from enum import Enum
 logger = logging.getLogger(__name__)
 
 try:
-    from .ml.stock_discovery_service import get_stock_discovery_service, StockInfo, MarketCap
+    from ..ml.stock_discovery_service import get_stock_discovery_service, StockInfo, MarketCap
 except ImportError:
-    from services.ml.stock_discovery_service import get_stock_discovery_service, StockInfo, MarketCap
+    from src.services.ml.stock_discovery_service import get_stock_discovery_service, StockInfo, MarketCap
 
 
 class RiskLevel(Enum):

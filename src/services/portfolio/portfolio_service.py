@@ -3,7 +3,7 @@ Service for portfolio-related logic.
 """
 import logging
 from datetime import datetime
-from .broker_service import get_broker_service
+from ..core.broker_service import get_broker_service
 
 logger = logging.getLogger(__name__)
 

@@ -8,7 +8,7 @@ import logging
 from datetime import datetime
 
 # Import the ML API service
-from ....services.ml_api_service import get_ml_api_service
+from ....services.ml.ml_api_service import get_ml_api_service
 from ....services.ml.backtesting_service import backtest_model
 
 # Import screening routes

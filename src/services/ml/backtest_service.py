@@ -3,7 +3,7 @@ import os
 try:
     # Try relative imports first (for normal usage)
     from .data_service import get_stock_data, create_features
-    from ...utils.ml_helpers import load_model, load_lstm_model, load_scaler, get_model_dir
+    from src.utils.ml_helpers import load_model, load_lstm_model, load_scaler, get_model_dir
 except ImportError:
     # Fall back to absolute imports (for testing)
     from data_service import get_stock_data, create_features

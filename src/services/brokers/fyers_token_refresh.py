@@ -37,8 +37,8 @@ class FyersTokenRefreshService:
         # The actual token refresh requires user interaction through OAuth flow
         try:
             from ..token_manager_service import get_token_manager
-            from ...models.database import get_database_manager
-            from ...models.models import BrokerConfiguration
+            from src.models.database import get_database_manager
+            from src.models.models import BrokerConfiguration
             
             db_manager = get_database_manager()
             

@@ -11,9 +11,9 @@ from typing import Dict, Optional, Any
 from datetime import datetime
 
 try:
-    from ...models.database import get_database_manager
-    from ...models.models import BrokerConfiguration
-    from ...utils.api_logger import APILogger
+    from src.models.database import get_database_manager
+    from src.models.models import BrokerConfiguration
+    from src.utils.api_logger import APILogger
     from .fyers import create_fyers_api, create_fyers_auth
 except ImportError:
     from models.database import get_database_manager

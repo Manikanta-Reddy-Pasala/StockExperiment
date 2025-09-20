@@ -2,8 +2,8 @@ import numpy as np
 try:
     # Try relative imports first (for normal usage)
     from .data_service import get_stock_data, create_features
-    from ...utils.ml_helpers import load_model, load_lstm_model, load_scaler
-    from ...utils.api_logger import APILogger, log_api_call
+    from src.utils.ml_helpers import load_model, load_lstm_model, load_scaler
+    from src.utils.api_logger import APILogger, log_api_call
 except ImportError:
     # Fall back to absolute imports (for testing)
     from data_service import get_stock_data, create_features

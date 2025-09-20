@@ -2,8 +2,8 @@
 Service for user management and authentication.
 """
 from datetime import datetime
-from ..models.database import get_database_manager
-from ..models.models import User
+from src.models.database import get_database_manager
+from src.models.models import User
 
 class UserService:
     def __init__(self, db_manager, bcrypt):

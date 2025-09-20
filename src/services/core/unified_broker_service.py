@@ -8,7 +8,7 @@ using the Strategy pattern and broker-specific implementations.
 import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime
-from .interfaces import (
+from ..interfaces import (
     IDashboardProvider, ISuggestedStocksProvider, IOrdersProvider,
     IPortfolioProvider, IReportsProvider, BrokerFeatureFactory,
     get_broker_feature_factory
@@ -290,8 +290,8 @@ class UnifiedBrokerService:
         """Get market quotes using user's selected broker."""
         try:
             # Get the user's current broker from broker configurations
-            from ..models.database import get_database_manager
-            from ..models.models import User, BrokerConfiguration
+            from src.models.database import get_database_manager
+            from src.models.models import User, BrokerConfiguration
             
             db_manager = get_database_manager()
             with db_manager.get_session() as session:
@@ -339,8 +339,8 @@ class UnifiedBrokerService:
         """Get historical data using user's selected broker."""
         try:
             # Get the user's current broker from broker configurations
-            from ..models.database import get_database_manager
-            from ..models.models import User, BrokerConfiguration
+            from src.models.database import get_database_manager
+            from src.models.models import User, BrokerConfiguration
             
             db_manager = get_database_manager()
             with db_manager.get_session() as session:

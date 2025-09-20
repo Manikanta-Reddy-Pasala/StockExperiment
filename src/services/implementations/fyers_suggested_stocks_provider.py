@@ -205,7 +205,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
             
             # Use dynamic stock discovery instead of hardcoded stocks
             try:
-                from ...ml.stock_discovery_service import get_stock_discovery_service
+                from src.services.ml.stock_discovery_service import get_stock_discovery_service
                 discovery_service = get_stock_discovery_service()
                 discovered_stocks = discovery_service.get_top_liquid_stocks(user_id, count=50)
                 popular_symbols = [stock.symbol for stock in discovered_stocks]

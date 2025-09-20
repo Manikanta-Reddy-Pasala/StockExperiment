@@ -23,8 +23,8 @@ try:
     from .data_service import get_stock_data, create_features
     from .prediction_service import get_prediction
     from .training_service import train_and_tune_models
-    from ...utils.ml_helpers import load_model, load_lstm_model, load_scaler
-    from ...services.brokers.fyers_service import get_fyers_service
+    from src.utils.ml_helpers import load_model, load_lstm_model, load_scaler
+    from src.services.brokers.fyers_service import get_fyers_service
 except ImportError:
     from stock_discovery_service import get_stock_discovery_service, StockInfo, MarketCap
     from data_service import get_stock_data, create_features

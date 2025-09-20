@@ -191,8 +191,8 @@ class SchedulerService:
         
         def cleanup_data():
             try:
-                from ..models.database import get_database_manager
-                from ..models.models import Order, Trade
+                from src.models.database import get_database_manager
+                from src.models.models import Order, Trade
                 from datetime import datetime, timedelta
                 
                 db_manager = get_database_manager()

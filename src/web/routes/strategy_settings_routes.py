@@ -9,7 +9,7 @@ from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
 from datetime import datetime
 
-from ...services.user_strategy_settings_service import get_user_strategy_settings_service
+from ...services.utils.user_strategy_settings_service import get_user_strategy_settings_service
 from ...utils.api_logger import APILogger, log_flask_route
 
 logger = logging.getLogger(__name__)

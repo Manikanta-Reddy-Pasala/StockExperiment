@@ -891,7 +891,7 @@ class FyersAPI:
         """
         try:
             # Import here to avoid circular imports
-            from ...fyers_symbol_service import get_fyers_symbol_service
+            from src.services.brokers.fyers_symbol_service import get_fyers_symbol_service
 
             # Get symbol service
             symbol_service = get_fyers_symbol_service()

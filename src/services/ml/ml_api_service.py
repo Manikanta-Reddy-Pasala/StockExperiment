@@ -7,9 +7,9 @@ from datetime import datetime, timedelta
 import threading
 from sqlalchemy import func, and_
 
-from ..models.database import get_database_manager
-from ..models.models import MLTrainingJob, MLTrainedModel
-from .unified_broker_service import get_unified_broker_service
+from src.models.database import get_database_manager
+from src.models.models import MLTrainingJob, MLTrainedModel
+from ..core.unified_broker_service import get_unified_broker_service
 
 logger = logging.getLogger(__name__)
 

@@ -11,8 +11,8 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass
 from enum import Enum
 
-from ..integrations.broker_service import get_broker_service
-from ..services.ml.prediction_service import get_prediction
+from src.integrations.broker_service import get_broker_service
+from src.services.ml.prediction_service import get_prediction
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +119,7 @@ class PortfolioStrategyEngine:
                 # Check if we have the required credentials (don't require is_connected to be True)
                 if config and config.get('client_id') and config.get('access_token'):
                     logger.info("FYERS credentials found, initializing connector")
-                    from ..broker_service import FyersAPIConnector
+                    from src.integrations.broker_service import FyersAPIConnector
                     self.fyers_connector = FyersAPIConnector(
                         client_id=config.get('client_id'),
                         access_token=config.get('access_token')
@@ -509,7 +509,7 @@ class PortfolioStrategyEngine:
             {"symbol": "NSE:HIGHVOLATILE-EQ", "name": "High Volatile Stock", "current_price": 750.25, "market_cap": 18000, "avg_volume_20d": 900000, "atr_percent": 12.5}  # ATR > 10%
         ]
         
-        return mock_stocks_data("")
+        return mock_stocks
     
     def _get_mock_technical_data(self, symbol: str) -> Dict:
         """Generate mock technical data for testing."""
@@ -731,251 +731,49 @@ class PortfolioStrategyEngine:
         
         return summary
 
+    def _passes_filtering_criteria(self, stock_data: Dict) -> bool:
+        """Check if stock passes filtering criteria."""
+        try:
+            price = stock_data.get('current_price', 0)
+            volume = stock_data.get('avg_volume_20d', 0)
+            atr_percent = stock_data.get('atr_percent', 0)
 
-def get_portfolio_strategy_engine(user_id: int = 1) -> PortfolioStrategyEngine:
-    """Get portfolio strategy engine instance."""
-    return PortfolioStrategyEngine(user_id)
-_data("")
-    
-    def _get_mock_technical_data(self, symbol: str) -> Dict:
-        """Generate mock technical data for testing."""
-        import random
-        
-        current_price = random.uniform(100, 3000)
-        ema_20 = current_price * random.uniform(0.95, 1.02)
-        ema_50 = current_price * random.uniform(0.90, 1.01)
-        rsi = random.uniform(45, 75)
-        high_20d = current_price * random.uniform(0.95, 1.05)
-        volume = random.randint(100000, 5000000)
-        avg_volume = volume * random.uniform(0.7, 1.2)
-        
-        return {
-            "current_price": current_price,
-            "ema_20": ema_20,
-            "ema_50": ema_50,
-            "rsi": rsi,
-            "high_20d": high_20d,
-            "current_volume": volume,
-            "avg_volume_20d": avg_volume,
-            "price_above_20ema": current_price > ema_20,
-            "price_above_50ema": current_price > ema_50,
-            "breakout_20d": current_price > high_20d,
-            "volume_confirmation": volume >= (avg_volume * 1.5),
-            "rsi_valid": 50 <= rsi <= 70
-        }
-    
-    def _generate_entry_signal(self, technical_data: Dict) -> EntrySignal:
-        """Generate entry signal based on technical criteria."""
-        return EntrySignal(
-            price_above_20ema=technical_data.get("price_above_20ema", False),
-            price_above_50ema=technical_data.get("price_above_50ema", False),
-            breakout_20d_high=technical_data.get("breakout_20d", False),
-            volume_confirmation=technical_data.get("volume_confirmation", False),
-            rsi_valid=technical_data.get("rsi_valid", False)
-        )
-    
-    def _get_ml_prediction_safe(self, symbol: str) -> Dict:
-        """Get ML prediction using existing ML API flow."""
-        try:
-            # Use existing ML prediction service
-            prediction = get_prediction(symbol, self.user_id)
-            return prediction
-            
-        except Exception as e:
-            logger.warning(f"Error getting ML prediction for {symbol}: {e}")
-            # Return mock ML prediction
-            import random
-            predicted_change = random.uniform(2, 15)
-            
-            return {
-                "symbol": symbol,
-                "rf_predicted_price": 0,
-                "xgb_predicted_price": 0,
-                "lstm_predicted_price": 0,
-                "final_predicted_price": 0,
-                "predicted_change_percent": predicted_change,
-                "signal": "BUY" if predicted_change > 5 else "HOLD",
-                "confidence": random.uniform(0.6, 0.9),
-                "ml_api_status": "active"
-            }
-    
-    def _validate_combined_signals(self, entry_signal: EntrySignal, ml_prediction: Dict) -> bool:
-        """Validate combined technical and ML signals for entry."""
-        try:
-            # Technical signal validation
-            technical_score = sum([
-                entry_signal.price_above_20ema,
-                entry_signal.price_above_50ema,
-                entry_signal.breakout_20d_high,
-                entry_signal.volume_confirmation,
-                entry_signal.rsi_valid
-            ])
-            
-            # Require at least 3 out of 5 technical conditions
-            technical_valid = technical_score >= 3
-            
-            # ML signal validation
-            ml_signal = ml_prediction.get("signal", "HOLD")
-            ml_confidence = ml_prediction.get("confidence", 0)
-            ml_return = ml_prediction.get("predicted_change_percent", 0)
-            
-            # ML conditions: BUY signal, confidence > 60%, predicted return > 3%
-            ml_valid = (ml_signal == "BUY" and 
-                       ml_confidence > 0.6 and 
-                       ml_return > 3.0)
-            
-            # Both technical and ML must be valid
-            return technical_valid and ml_valid
-            
-        except Exception as e:
-            logger.warning(f"Error validating combined signals: {e}")
+            return (price >= self.filter_criteria.min_price and
+                   volume >= self.filter_criteria.min_avg_volume_20d and
+                   atr_percent <= self.filter_criteria.max_atr_percent)
+        except Exception:
             return False
-    
-    def _calculate_signal_strength(self, entry_signal: EntrySignal, ml_prediction: Dict) -> float:
-        """Calculate overall signal strength (0-100)."""
-        try:
-            # Technical strength (0-50 points)
-            technical_conditions = [
-                entry_signal.price_above_20ema,
-                entry_signal.price_above_50ema,
-                entry_signal.breakout_20d_high,
-                entry_signal.volume_confirmation,
-                entry_signal.rsi_valid
-            ]
-            technical_strength = sum(technical_conditions) * 10  # Max 50 points
-            
-            # ML strength (0-50 points)
-            ml_confidence = ml_prediction.get("confidence", 0)
-            ml_return = ml_prediction.get("predicted_change_percent", 0)
-            
-            ml_strength = (ml_confidence * 30) + min(ml_return / 20 * 20, 20)  # Max 50 points
-            
-            total_strength = technical_strength + ml_strength
-            return min(total_strength, 100)
-            
-        except Exception as e:
-            logger.warning(f"Error calculating signal strength: {e}")
-            return 50.0
-    
-    def _get_current_price(self, symbol: str) -> float:
-        """Get current price for position monitoring."""
+
+    def _categorize_by_market_cap(self, stocks: List[Dict]) -> Dict[str, List[Dict]]:
+        """Categorize stocks by market cap."""
+        categorized = {"large_cap": [], "mid_cap": [], "small_cap": []}
+
+        for stock in stocks:
+            market_cap = stock.get('market_cap', 0)
+            if market_cap > self.LARGE_CAP_MIN:
+                stock['market_cap'] = 'large_cap'
+                categorized['large_cap'].append(stock)
+            elif market_cap >= self.MID_CAP_MIN:
+                stock['market_cap'] = 'mid_cap'
+                categorized['mid_cap'].append(stock)
+            else:
+                stock['market_cap'] = 'small_cap'
+                categorized['small_cap'].append(stock)
+
+        return categorized
+
+    def _get_technical_indicators(self, symbol: str) -> Dict:
+        """Get technical indicators for a symbol."""
         try:
             if self.fyers_connector:
-                quotes = self.fyers_connector.quotes(symbol)
-                if quotes and 'd' in quotes and symbol in quotes['d']:
-                    return float(quotes['d'][symbol]['v']['lp'])
-            
-            # Fallback to mock price
-            import random
-            return random.uniform(100, 3000)
-            
+                # In real implementation, fetch actual data
+                # For now, using mock data
+                return self._get_mock_technical_data(symbol)
+            else:
+                return self._get_mock_technical_data(symbol)
         except Exception as e:
-            logger.warning(f"Error getting current price for {symbol}: {e}")
-            return 0.0
-    
-    def _check_exit_conditions(self, position: Position) -> Optional[Dict]:
-        """Check exit conditions for a position."""
-        try:
-            current_return = (position.current_price - position.entry_price) / position.entry_price
-            days_held = (datetime.now() - position.entry_date).days
-            
-            exit_action = None
-            
-            # Profit Target 1: +5% (sell 50%)
-            if (current_return >= position.exit_rules.profit_target_1 and 
-                position.status == PositionStatus.ENTERED):
-                
-                exit_action = {
-                    "action": "partial_exit",
-                    "reason": "profit_target_1",
-                    "exit_percentage": 0.5,
-                    "exit_price": position.current_price,
-                    "profit": current_return * 100
-                }
-                position.status = PositionStatus.PARTIAL_EXIT
-                position.remaining_quantity = position.quantity // 2
-            
-            # Profit Target 2: +10% (sell remaining) or Time Stop
-            elif ((current_return >= position.exit_rules.profit_target_2 or 
-                   days_held >= position.exit_rules.max_holding_days) and
-                  position.remaining_quantity > 0):
-                
-                reason = "profit_target_2" if current_return >= position.exit_rules.profit_target_2 else "time_stop"
-                exit_action = {
-                    "action": "full_exit",
-                    "reason": reason,
-                    "exit_percentage": 1.0 if position.status == PositionStatus.ENTERED else 0.5,
-                    "exit_price": position.current_price,
-                    "profit": current_return * 100,
-                    "days_held": days_held
-                }
-                position.status = PositionStatus.FULL_EXIT if reason == "profit_target_2" else PositionStatus.TIME_STOP
-                position.remaining_quantity = 0
-            
-            # Stop Loss: -3% (exit all)
-            elif current_return <= -position.exit_rules.stop_loss_percent:
-                exit_action = {
-                    "action": "stop_loss",
-                    "reason": "stop_loss",
-                    "exit_percentage": 1.0,
-                    "exit_price": position.current_price,
-                    "loss": current_return * 100
-                }
-                position.status = PositionStatus.STOP_LOSS
-                position.remaining_quantity = 0
-            
-            return exit_action
-            
-        except Exception as e:
-            logger.warning(f"Error checking exit conditions for {position.symbol}: {e}")
-            return None
-    
-    def _get_allocation_summary(self, allocated_stocks: List[Dict]) -> Dict:
-        """Get allocation summary for Step 2."""
-        summary = {"large_cap": 0, "mid_cap": 0, "small_cap": 0}
-        
-        for stock in allocated_stocks:
-            market_cap = stock.get('market_cap', 'unknown')
-            if market_cap in summary:
-                summary[market_cap] += 1
-        
-        return summary
-    
-    def _get_signals_summary(self, entry_candidates: List[Dict]) -> Dict:
-        """Get signals summary for Step 3."""
-        if not entry_candidates:
-            return {"strong_signals": 0, "medium_signals": 0, "weak_signals": 0}
-        
-        strong = len([c for c in entry_candidates if c.get('signal_strength', 0) > 80])
-        medium = len([c for c in entry_candidates if 60 <= c.get('signal_strength', 0) <= 80])
-        weak = len([c for c in entry_candidates if c.get('signal_strength', 0) < 60])
-        
-        return {
-            "strong_signals": strong,
-            "medium_signals": medium,
-            "weak_signals": weak
-        }
-    
-    def _get_positions_summary(self) -> List[Dict]:
-        """Get summary of active positions."""
-        summary = []
-        
-        for symbol, position in self.active_positions.items():
-            summary.append({
-                "symbol": symbol,
-                "entry_date": position.entry_date.isoformat(),
-                "entry_price": position.entry_price,
-                "current_price": position.current_price,
-                "quantity": position.quantity,
-                "remaining_quantity": position.remaining_quantity,
-                "unrealized_pnl": f"{position.unrealized_pnl*100:.2f}%",
-                "status": position.status.value,
-                "days_held": (datetime.now() - position.entry_date).days,
-                "market_cap": position.market_cap.value,
-                "risk_bucket": position.risk_bucket.value
-            })
-        
-        return summary
+            logger.warning(f"Error getting technical indicators for {symbol}: {e}")
+            return self._get_mock_technical_data(symbol)
 
 
 def get_portfolio_strategy_engine(user_id: int = 1) -> PortfolioStrategyEngine:

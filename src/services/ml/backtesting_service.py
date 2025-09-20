@@ -37,7 +37,7 @@ class BacktestingService:
 
             # Import ml_helpers for loading models
             try:
-                from ...utils.ml_helpers import load_model, load_lstm_model, load_scaler
+                from src.utils.ml_helpers import load_model, load_lstm_model, load_scaler
             except ImportError:
                 # Fallback for direct execution
                 import sys

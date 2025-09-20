@@ -15,7 +15,7 @@ from datetime import date
 try:
     # Try relative imports first (for normal usage)
     from .data_service import get_stock_data, create_features
-    from ...utils.ml_helpers import save_model, save_lstm_model, save_scaler
+    from src.utils.ml_helpers import save_model, save_lstm_model, save_scaler
 except ImportError:
     # Fall back to absolute imports (for testing/direct execution)
     import sys
@@ -161,8 +161,8 @@ def train_and_tune_models(symbol: str, start_date: Optional[date] = None, end_da
         if job_id:
             try:
                 # Import here to avoid circular imports
-                from ...models.database import get_database_manager
-                from ...models.models import MLTrainingJob
+                from src.models.database import get_database_manager
+                from src.models.models import MLTrainingJob
                 from datetime import datetime
 
                 db_manager = get_database_manager()
@@ -329,8 +329,8 @@ def train_and_tune_models(symbol: str, start_date: Optional[date] = None, end_da
         # Save model metadata to database
         if job_id:
             try:
-                from ...models.database import get_database_manager
-                from ...models.models import MLTrainedModel, MLTrainingJob
+                from src.models.database import get_database_manager
+                from src.models.models import MLTrainedModel, MLTrainingJob
                 from datetime import datetime
                 import json
 

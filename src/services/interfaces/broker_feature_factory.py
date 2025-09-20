@@ -7,9 +7,12 @@ feature implementations based on user settings.
 
 from typing import Dict, Type, Optional
 try:
-    from ..user_settings_service import get_user_settings_service
+    from ..utils.user_settings_service import get_user_settings_service
 except ImportError:
-    from src.services.user_settings_service import get_user_settings_service
+    try:
+        from src.services.utils.user_settings_service import get_user_settings_service
+    except ImportError:
+        from src.services.user_settings_service import get_user_settings_service
 from .dashboard_interface import IDashboardProvider
 from .suggested_stocks_interface import ISuggestedStocksProvider
 from .orders_interface import IOrdersProvider

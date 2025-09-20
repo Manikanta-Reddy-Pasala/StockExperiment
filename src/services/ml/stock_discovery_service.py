@@ -18,14 +18,14 @@ from enum import Enum
 logger = logging.getLogger(__name__)
 
 try:
-    from ..unified_broker_service import get_unified_broker_service
-    from ...models.database import get_database_manager
+    from ..core.unified_broker_service import get_unified_broker_service
+    from src.models.database import get_database_manager
 except ImportError:
     try:
-        from services.unified_broker_service import get_unified_broker_service
-        from models.database import get_database_manager
+        from src.services.core.unified_broker_service import get_unified_broker_service
+        from src.models.database import get_database_manager
     except ImportError:
-        from src.services.unified_broker_service import get_unified_broker_service
+        from src.services.core.unified_broker_service import get_unified_broker_service
         from src.models.database import get_database_manager
 
 

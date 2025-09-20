@@ -13,11 +13,11 @@ try:
     from ..models.models import Log, Order, Trade, Position, User, Strategy, SuggestedStock, Configuration, BrokerConfiguration
     from ..integrations.db_charts import DatabaseCharts
     from ..integrations.multi_user_trading_engine import get_trading_engine
-    from ..services.user_service import get_user_service
-    from ..services.broker_service import get_broker_service
-    from ..services.dashboard_service import get_dashboard_service
-    from ..services.portfolio_service import get_portfolio_service
-    from ..services.stock_screening_service import get_stock_screening_service, StrategyType
+    from ..services.core.user_service import get_user_service
+    from ..services.core.broker_service import get_broker_service
+    from ..services.core.dashboard_service import get_dashboard_service
+    from ..services.portfolio.portfolio_service import get_portfolio_service
+    from ..services.market.stock_screening_service import get_stock_screening_service, StrategyType
     from ..utils.api_logger import APILogger, log_flask_route
 except ImportError:
     # Fall back to absolute imports (for testing)
@@ -25,11 +25,11 @@ except ImportError:
     from models.models import Log, Order, Trade, Position, User, Strategy, SuggestedStock, Configuration, BrokerConfiguration
     from integrations.db_charts import DatabaseCharts
     from integrations.multi_user_trading_engine import get_trading_engine
-    from services.user_service import get_user_service
-    from services.broker_service import get_broker_service
-    from services.dashboard_service import get_dashboard_service
-    from services.portfolio_service import get_portfolio_service
-    from services.stock_screening_service import get_stock_screening_service, StrategyType
+    from services.core.user_service import get_user_service
+    from services.core.broker_service import get_broker_service
+    from services.core.dashboard_service import get_dashboard_service
+    from services.portfolio.portfolio_service import get_portfolio_service
+    from services.market.stock_screening_service import get_stock_screening_service, StrategyType
     from utils.api_logger import APILogger, log_flask_route
 from datetime import datetime
 import secrets
@@ -93,9 +93,9 @@ def create_app():
     stock_screening_service = get_stock_screening_service(broker_service)
     
     # Initialize new services
-    from ..services.cache_service import get_cache_service
-    from ..services.token_manager_service import get_token_manager
-    from ..services.scheduler_service import get_scheduler
+    from ..services.utils.cache_service import get_cache_service
+    from ..services.utils.token_manager_service import get_token_manager
+    from ..services.utils.scheduler_service import get_scheduler
     
     cache_service = get_cache_service()
     token_manager = get_token_manager()

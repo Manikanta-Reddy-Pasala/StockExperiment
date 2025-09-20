@@ -16,8 +16,8 @@ from sqlalchemy.exc import IntegrityError
 logger = logging.getLogger(__name__)
 
 try:
-    from ..models.stock_models import SymbolMaster, Stock, MarketCapCategory
-    from ..models.database import get_database_manager
+    from src.models.stock_models import SymbolMaster, Stock, MarketCapCategory
+    from src.models.database import get_database_manager
     from .fyers_symbol_service import get_fyers_symbol_service
 except ImportError:
     from models.stock_models import SymbolMaster, Stock, MarketCapCategory
