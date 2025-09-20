@@ -97,12 +97,89 @@ class StockMasterService:
 
     def _get_all_available_symbols(self, user_id: int, exchange: str) -> List[str]:
         """
-        Get all available symbols from the broker API.
-        Use the broker's symbol search with comprehensive search terms.
+        Get all available symbols from comprehensive CSV data.
+        Uses Fyers symbol service to get complete symbol list instead of limited search.
         """
         all_symbols = set()
 
         try:
+            logger.info(f"Getting comprehensive symbol list for {exchange} using CSV data")
+
+            # Use Fyers symbol service to get all equity symbols from CSV
+            from ..data.fyers_symbol_service import get_fyers_symbol_service
+            fyers_service = get_fyers_symbol_service()
+
+            # Get all equity symbols (this uses the comprehensive CSV data)
+            equity_symbols = fyers_service.get_equity_symbols(exchange)
+
+            logger.info(f"Retrieved {len(equity_symbols)} equity symbols from CSV data")
+
+            # Extract symbol names and store in symbol_master table
+            with self.db_manager.get_session() as session:
+                from ...models.stock_models import SymbolMaster
+
+                symbols_added = 0
+                for symbol_data in equity_symbols:
+                    symbol = symbol_data.get('symbol', '')
+                    if symbol and '-EQ' in symbol:  # Only equity symbols
+                        all_symbols.add(symbol)
+
+                        # Store in symbol_master table for future reference
+                        try:
+                            existing_symbol = session.query(SymbolMaster).filter(
+                                SymbolMaster.symbol == symbol,
+                                SymbolMaster.exchange == exchange
+                            ).first()
+
+                            if not existing_symbol:
+                                symbol_master = SymbolMaster(
+                                    symbol=symbol,
+                                    fytoken=symbol_data.get('fytoken', ''),
+                                    name=symbol_data.get('name', ''),
+                                    exchange=exchange,
+                                    segment=symbol_data.get('segment', 'CM'),
+                                    instrument_type=symbol_data.get('instrument_type', 'EQ'),
+                                    lot_size=symbol_data.get('lot', 1),
+                                    tick_size=symbol_data.get('tick', 0.05),
+                                    isin=symbol_data.get('isin', ''),
+                                    data_source='fyers',
+                                    is_active=True,
+                                    is_equity=True
+                                )
+                                session.add(symbol_master)
+                                symbols_added += 1
+
+                        except Exception as e:
+                            logger.warning(f"Error storing symbol {symbol} in symbol_master: {e}")
+                            continue
+
+                # Commit all symbol_master entries
+                session.commit()
+                logger.info(f"Stored {symbols_added} new symbols in symbol_master table")
+
+            # Fall back to search method if CSV method fails
+            if not all_symbols:
+                logger.warning("CSV method failed, falling back to search-based discovery")
+                return self._get_symbols_search_fallback(user_id, exchange)
+
+            result = sorted(list(all_symbols))
+            logger.info(f"Found {len(result)} unique symbols from {exchange} CSV data")
+            return result
+
+        except Exception as e:
+            logger.error(f"Error getting comprehensive symbols from CSV: {e}")
+            # Fall back to search method
+            return self._get_symbols_search_fallback(user_id, exchange)
+
+    def _get_symbols_search_fallback(self, user_id: int, exchange: str) -> List[str]:
+        """
+        Fallback method: Get symbols using search-based discovery.
+        """
+        all_symbols = set()
+
+        try:
+            logger.info(f"Using search-based fallback for {exchange}")
+
             # Get the broker feature factory for symbol search
             try:
                 from ..interfaces.broker_feature_factory import get_broker_feature_factory
@@ -116,20 +193,8 @@ class StockMasterService:
                 logger.error("No broker provider available for symbol search")
                 return []
 
-            # Use alphabet-based search to get comprehensive coverage
-            # This is more thorough than keyword-based search
-            search_patterns = [
-                # Alphabet prefixes - covers most stock symbols
-                *[chr(i) for i in range(ord('A'), ord('Z') + 1)],  # A-Z
-                # Common numeric prefixes for some stocks
-                "1", "2", "3", "5", "7", "9",
-                # Common stock name patterns
-                "INDIA", "BHARAT", "HINDUSTAN", "TATA", "RELIANCE", "ADANI",
-                "BAJAJ", "MAHINDRA", "GODREJ", "BIRLA", "JINDAL", "ESSAR",
-                # Major sectors to ensure coverage
-                "BANK", "PHARMA", "AUTO", "IT", "TECH", "FINANCE", "INFRA",
-                "STEEL", "CEMENT", "TEXTILE", "CHEMICAL", "POWER", "OIL"
-            ]
+            # Use alphabet-based search as fallback
+            search_patterns = [chr(i) for i in range(ord('A'), ord('Z') + 1)]  # A-Z
 
             for pattern in search_patterns:
                 try:
@@ -146,9 +211,7 @@ class StockMasterService:
                             # Filter for equity stocks only
                             if (symbol.startswith(f"{exchange}:") and
                                 '-EQ' in symbol and
-                                len(name) > 2 and
-                                'ETF' not in name.upper() and  # Exclude ETFs for now
-                                'INDEX' not in name.upper()):
+                                len(name) > 2):
                                 all_symbols.add(symbol)
 
                     # Rate limiting
@@ -158,11 +221,11 @@ class StockMasterService:
                     logger.warning(f"Search failed for pattern '{pattern}': {e}")
                     continue
 
-            logger.info(f"Comprehensive symbol search found {len(all_symbols)} unique symbols")
+            logger.info(f"Search fallback found {len(all_symbols)} unique symbols")
             return list(all_symbols)
 
         except Exception as e:
-            logger.error(f"Error getting all available symbols: {e}")
+            logger.error(f"Error in search fallback: {e}")
             return []
 
     def _get_batch_quotes(self, symbols: List[str], user_id: int) -> Dict[str, Dict]:

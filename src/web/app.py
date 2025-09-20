@@ -113,7 +113,32 @@ def create_app():
     
     # Schedule default tasks
     scheduler.schedule_data_cleanup(interval_hours=24)
-    
+
+    # Initialize startup service and run application initialization
+    try:
+        from ..services.startup import get_startup_service
+        from ..services.ml.stock_master_service import get_stock_master_service
+        stock_master_service = get_stock_master_service()
+        startup_service = get_startup_service(db_manager, broker_service, stock_master_service)
+
+        # Run startup initialization in background thread to avoid blocking app startup
+        import threading
+        def run_startup_initialization():
+            try:
+                app.logger.info("🔄 Running startup initialization...")
+                results = startup_service.initialize_application()
+                app.logger.info(f"✅ Startup initialization completed: {results.get('stock_data_loaded', False)} stock data, {results.get('market_snapshots', False)} snapshots")
+            except Exception as e:
+                app.logger.error(f"❌ Startup initialization failed: {e}")
+
+        # Start initialization in background thread
+        startup_thread = threading.Thread(target=run_startup_initialization, daemon=True)
+        startup_thread.start()
+        app.logger.info("🚀 Startup initialization launched in background")
+
+    except Exception as e:
+        app.logger.warning(f"Could not initialize startup service: {e}")
+
     # Initialize charting
     charts = DatabaseCharts(db_manager)
     
