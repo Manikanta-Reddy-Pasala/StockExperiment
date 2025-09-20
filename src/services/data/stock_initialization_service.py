@@ -41,12 +41,16 @@ class StockInitializationService:
         self.rate_limit_delay = 0.2  # 200ms between API calls
         self.batch_size = 10  # Process in small batches
 
-    def initialize_complete_stock_system(self, user_id: int = 1) -> Dict:
+    def initialize_complete_stock_system(self, user_id: int = 1, aggressive_mode: bool = False) -> Dict:
         """
         Complete initialization flow:
         1. Load symbol master from Fyers API
         2. Verify symbols with quotes and update verification flags
         3. Create/update stocks table with current prices
+
+        Args:
+            user_id: User ID for API calls
+            aggressive_mode: If True, processes ALL symbols (may take long time)
         """
         logger.info("🚀 Starting complete stock system initialization")
 
@@ -59,13 +63,51 @@ class StockInitializationService:
 
             # Step 2: Verify symbols and update verification flags
             logger.info("🔍 Step 2: Verifying symbols with quotes")
-            verification_result = self._verify_symbols_with_quotes(user_id)
+            # Get count of unverified symbols to process all of them
+            with self.db_manager.get_session() as session:
+                from sqlalchemy import and_, or_
+                from datetime import timedelta
+                cutoff_date = datetime.utcnow() - timedelta(days=7)
+                unverified_count = session.query(SymbolMaster).filter(
+                    and_(
+                        SymbolMaster.is_active == True,
+                        SymbolMaster.is_equity == True,
+                        or_(
+                            SymbolMaster.is_fyers_verified.is_(None),
+                            SymbolMaster.is_fyers_verified == False,
+                            SymbolMaster.verification_date < cutoff_date
+                        )
+                    )
+                ).count()
+                logger.info(f"🔍 Found {unverified_count} symbols needing verification")
+
+            # Choose verification strategy based on mode
+            if aggressive_mode:
+                verification_limit = unverified_count  # Process all
+                logger.info(f"🔍 Aggressive mode: Verifying ALL {verification_limit} symbols")
+            else:
+                verification_limit = min(unverified_count, 500)  # Max 500 per run
+                logger.info(f"🔍 Batch mode: Verifying {verification_limit} symbols (out of {unverified_count} total)")
+
+            verification_result = self._verify_symbols_with_quotes(user_id, limit=verification_limit)
             if not verification_result['success']:
                 return verification_result
 
             # Step 3: Create/update stocks with current prices
             logger.info("📈 Step 3: Creating/updating stocks with current prices")
-            stocks_result = self._create_update_stocks_from_verified_symbols(user_id)
+            # Get count of verified symbols to process all of them
+            with self.db_manager.get_session() as session:
+                verified_count = session.query(SymbolMaster).filter(
+                    and_(
+                        SymbolMaster.is_active == True,
+                        SymbolMaster.is_equity == True,
+                        SymbolMaster.is_fyers_verified == True
+                    )
+                ).count()
+                logger.info(f"📈 Found {verified_count} verified symbols to create stocks for")
+
+            # Process all verified symbols for stock creation (since they're already verified)
+            stocks_result = self._create_update_stocks_from_verified_symbols(user_id, limit=verified_count)
 
             # Step 4: Get final statistics
             stats = self._get_initialization_statistics()

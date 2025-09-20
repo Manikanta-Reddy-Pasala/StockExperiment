@@ -210,6 +210,8 @@ CREATE TABLE IF NOT EXISTS broker_configurations (
 );
 
 -- Stock Strategy Tables
+-- Note: Stocks table contains only verified stocks with live API data
+-- Verification is handled in symbol_master table before stock creation
 CREATE TABLE IF NOT EXISTS stocks (
     id SERIAL PRIMARY KEY,
     symbol VARCHAR(50) UNIQUE NOT NULL,
@@ -228,13 +230,8 @@ CREATE TABLE IF NOT EXISTS stocks (
     beta DECIMAL(8,4),
     is_active BOOLEAN DEFAULT TRUE,
     is_tradeable BOOLEAN DEFAULT TRUE,
-    -- Verification columns for Fyers API compatibility
-    is_fyers_verified BOOLEAN DEFAULT FALSE,
-    verification_date TIMESTAMP,
-    verification_error TEXT,
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS strategy_types (
@@ -363,6 +360,8 @@ CREATE TABLE IF NOT EXISTS portfolio_positions (
 );
 
 -- Symbol Master table for raw broker data (fytoken as primary key)
+-- This table stores all symbols from Fyers API and handles verification
+-- Only verified symbols (is_fyers_verified = true) are promoted to stocks table
 CREATE TABLE IF NOT EXISTS symbol_master (
     fytoken VARCHAR(50) PRIMARY KEY NOT NULL,  -- Fyers unique token as primary key
     symbol VARCHAR(50) NOT NULL,
@@ -378,7 +377,7 @@ CREATE TABLE IF NOT EXISTS symbol_master (
     download_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_active BOOLEAN DEFAULT TRUE,
     is_equity BOOLEAN DEFAULT TRUE,
-    -- Verification columns for Fyers API compatibility
+    -- Verification columns - validates symbols work with Fyers API quotes
     is_fyers_verified BOOLEAN DEFAULT FALSE,
     verification_date TIMESTAMP,
     verification_error TEXT,
@@ -549,7 +548,6 @@ CREATE INDEX IF NOT EXISTS idx_symbol_master_symbol ON symbol_master(symbol);
 CREATE INDEX IF NOT EXISTS idx_symbol_master_exchange ON symbol_master(exchange);
 CREATE INDEX IF NOT EXISTS idx_symbol_master_active ON symbol_master(is_active, is_equity);
 CREATE INDEX IF NOT EXISTS idx_symbol_master_verified ON symbol_master(is_fyers_verified);
-CREATE INDEX IF NOT EXISTS idx_stocks_verified ON stocks(is_fyers_verified);
 CREATE INDEX IF NOT EXISTS idx_market_data_snapshots_date ON market_data_snapshots(snapshot_date);
 CREATE INDEX IF NOT EXISTS idx_stocks_active ON stocks(is_active, is_tradeable);
 CREATE INDEX IF NOT EXISTS idx_stocks_market_cap ON stocks(market_cap);
