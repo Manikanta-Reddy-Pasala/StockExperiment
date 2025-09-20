@@ -270,16 +270,22 @@ class StockMasterService:
             return []
 
     def _get_batch_quotes(self, symbols: List[str], user_id: int) -> Dict[str, Dict]:
-        """Get quotes for a batch of symbols."""
+        """Get quotes for a batch of symbols using unified broker service."""
         try:
+            # Use the unified broker service which delegates to user's selected broker
             quotes_result = self.unified_broker_service.get_quotes(user_id, symbols)
+
             if quotes_result.get('success'):
-                return quotes_result.get('data', {})
+                # Return the data from unified broker service
+                quotes_data = quotes_result.get('data', {})
+                logger.info(f"Successfully fetched quotes for {len(quotes_data)} symbols via unified broker service")
+                return quotes_data
             else:
-                logger.warning(f"Batch quotes failed: {quotes_result.get('error', 'Unknown error')}")
+                logger.warning(f"Unified broker service quotes failed: {quotes_result.get('error', 'Unknown error')}")
                 return {}
+
         except Exception as e:
-            logger.warning(f"Exception getting batch quotes: {e}")
+            logger.warning(f"Exception getting batch quotes via unified broker service: {e}")
             return {}
 
     def _update_stocks_batch(self, session, symbols: List[str], quotes: Dict[str, Dict],
@@ -318,18 +324,30 @@ class StockMasterService:
         return {'processed': processed, 'updated': updated, 'new': new}
 
     def _update_existing_stock(self, stock: Stock, quote_data: Dict) -> int:
-        """Update an existing stock record."""
+        """Update an existing stock record with validated price data."""
         try:
             # Extract price and volume data
             current_price = float(quote_data.get('lp', quote_data.get('ltp', quote_data.get('last_price', 0))))
             volume = int(quote_data.get('volume', quote_data.get('vol', 0)))
 
-            if current_price <= 0:
+            # Validate price data comprehensively
+            validation_result = self._validate_price_data(stock.symbol, current_price, volume, quote_data)
+
+            if not validation_result['valid']:
+                logger.error(f"Invalid price data for {stock.symbol}: {validation_result['warnings']}")
                 return 0
 
-            # Update current market data
-            stock.current_price = current_price
-            stock.volume = volume
+            # Use validated values
+            validated_price = validation_result['price']
+            validated_volume = validation_result['volume']
+
+            # Log any warnings for monitoring
+            if validation_result['warnings']:
+                logger.info(f"Price validation warnings for {stock.symbol}: {'; '.join(validation_result['warnings'])}")
+
+            # Update current market data with validated values
+            stock.current_price = validated_price
+            stock.volume = validated_volume
             stock.last_updated = datetime.utcnow()
             stock.is_active = True
 
@@ -337,11 +355,11 @@ class StockMasterService:
             if stock.market_cap:
                 # Update market cap based on current price (simplified)
                 # In production, you'd get shares outstanding from fundamental data APIs
-                stock.market_cap = self._estimate_market_cap(current_price, volume)
+                stock.market_cap = self._estimate_market_cap(validated_price, validated_volume)
                 stock.market_cap_category = self._determine_market_cap_category(stock.market_cap)
 
-            # Calculate liquidity and tradeability
-            stock.is_tradeable = self._calculate_tradeability(current_price, volume, quote_data)
+            # Calculate liquidity and tradeability with validated data
+            stock.is_tradeable = self._calculate_tradeability(validated_price, validated_volume, quote_data)
 
             return 1
 
@@ -441,32 +459,44 @@ class StockMasterService:
             current_price = float(quote_data.get('lp', quote_data.get('ltp', quote_data.get('last_price', 0))))
             volume = int(quote_data.get('volume', quote_data.get('vol', 0)))
 
-            if current_price <= 0 or volume <= 0:
+            # Validate price data comprehensively
+            validation_result = self._validate_price_data(cleaned_symbol, current_price, volume, quote_data)
+
+            if not validation_result['valid']:
+                logger.error(f"Invalid price data for new stock {cleaned_symbol}: {validation_result['warnings']}")
                 return None
+
+            # Use validated values
+            validated_price = validation_result['price']
+            validated_volume = validation_result['volume']
+
+            # Log any warnings for monitoring
+            if validation_result['warnings']:
+                logger.info(f"Price validation warnings for new stock {cleaned_symbol}: {'; '.join(validation_result['warnings'])}")
 
             # Extract name from symbol
             name = cleaned_symbol.replace(f"{exchange}:", "").replace("-EQ", "")
             if 'symbol_name' in quote_data:
                 name = quote_data['symbol_name']
 
-            # Calculate market cap and determine category
-            market_cap = self._estimate_market_cap(current_price, volume)
+            # Calculate market cap and determine category using validated data
+            market_cap = self._estimate_market_cap(validated_price, validated_volume)
             market_cap_category = self._determine_market_cap_category(market_cap)
 
             # Determine sector
             sector = self._determine_sector(name)
 
-            # Calculate tradeability
-            is_tradeable = self._calculate_tradeability(current_price, volume, quote_data)
+            # Calculate tradeability using validated data
+            is_tradeable = self._calculate_tradeability(validated_price, validated_volume, quote_data)
 
-            # Create new stock with cleaned symbol
+            # Create new stock with cleaned symbol and validated data
             new_stock = Stock(
                 symbol=cleaned_symbol,
                 name=name,
                 exchange=exchange,
                 sector=sector,
-                current_price=current_price,
-                volume=volume,
+                current_price=validated_price,
+                volume=validated_volume,
                 market_cap=market_cap,
                 market_cap_category=market_cap_category,
                 is_active=True,
@@ -662,6 +692,74 @@ class StockMasterService:
             return 'Trading'
         else:
             return 'Others'
+
+    def _validate_price_data(self, symbol: str, price: float, volume: int, quote_data: Dict) -> Dict:
+        """
+        Comprehensive price data validation to ensure data quality.
+
+        Returns:
+            Dict with 'valid': bool, 'price': float, 'volume': int, 'warnings': List[str]
+        """
+        warnings = []
+        validated_price = price
+        validated_volume = volume
+
+        # 1. Basic validation - price must be positive
+        if price <= 0:
+            return {
+                'valid': False,
+                'price': 0,
+                'volume': 0,
+                'warnings': [f"Invalid price: {price} for {symbol}"]
+            }
+
+        # 2. Price range validation (Indian stock market context)
+        if price < 1.0:
+            warnings.append(f"Very low price: ₹{price:.2f} for {symbol} - may be penny stock")
+        elif price > 100000:  # ₹1 lakh per share is extremely high
+            warnings.append(f"Extremely high price: ₹{price:.2f} for {symbol} - possible data error")
+
+        # 3. Volume validation
+        if volume <= 0:
+            warnings.append(f"Zero or negative volume: {volume} for {symbol}")
+            validated_volume = 0
+        elif volume > 100000000:  # 10 crore shares in a day is unusually high
+            warnings.append(f"Extremely high volume: {volume:,} for {symbol}")
+
+        # 4. Price precision validation (Indian stocks typically trade in multiples of 0.05)
+        price_precision = round(price % 0.05, 3)
+        if price_precision not in [0.0, 0.05] and price > 10:
+            warnings.append(f"Unusual price precision: ₹{price:.2f} for {symbol}")
+
+        # 5. Cross-field validation
+        market_value = price * volume
+        if market_value > 500000000000:  # ₹50,000 crore daily turnover is extremely high
+            warnings.append(f"Extremely high market value: ₹{market_value:,.0f} for {symbol}")
+
+        # 6. Quote data consistency check
+        alternative_prices = []
+        for field in ['ltp', 'last_price', 'close', 'prev_close']:
+            if field in quote_data and quote_data[field] > 0:
+                alternative_prices.append(float(quote_data[field]))
+
+        if alternative_prices:
+            avg_alt_price = sum(alternative_prices) / len(alternative_prices)
+            price_deviation = abs(price - avg_alt_price) / avg_alt_price * 100
+            if price_deviation > 10:  # More than 10% deviation
+                warnings.append(f"Price inconsistency: ₹{price:.2f} vs avg ₹{avg_alt_price:.2f} ({price_deviation:.1f}% diff) for {symbol}")
+
+        # Log validation results
+        if warnings:
+            logger.warning(f"Price validation warnings for {symbol}: {'; '.join(warnings)}")
+        else:
+            logger.debug(f"Price validation passed for {symbol}: ₹{price:.2f}")
+
+        return {
+            'valid': True,  # We allow with warnings, but flag issues
+            'price': validated_price,
+            'volume': validated_volume,
+            'warnings': warnings
+        }
 
     def _calculate_tradeability(self, price: float, volume: int, quote_data: Dict) -> bool:
         """Calculate if a stock is tradeable based on basic criteria."""
