@@ -134,7 +134,7 @@
                                     <i class="bi bi-info-circle me-2"></i>
                                     <strong>Zerodha Integration Coming Soon!</strong> 
                                     We're working on integrating Zerodha Kite Connect API. 
-                                    For now, please use FYERS or Simulator mode.
+                                    For now, please use FYERS mode.
                                 </div>
                                 
                                 <!-- Zerodha Configuration Form (Disabled) -->
@@ -318,7 +318,7 @@
             document.getElementById('zerodha-status').textContent = 'Not Implemented';
             document.getElementById('zerodha-status').className = 'badge bg-secondary';
             
-            showNotification('Zerodha integration is not yet implemented. Please use FYERS or Simulator.', 'info');
+            showNotification('Zerodha integration is not yet implemented. Please use FYERS.', 'info');
             
         } catch (error) {
             status.textContent = 'Connection Failed';
@@ -330,12 +330,12 @@
     
     // Zerodha login
     document.getElementById('zerodha-login').addEventListener('click', async function() {
-        showNotification('Zerodha login will be available soon. Please use FYERS or Simulator for now.', 'info');
+        showNotification('Zerodha login will be available soon. Please use FYERS for now.', 'info');
     });
     
     // Save Zerodha configuration (disabled for now)
     document.getElementById('save-zerodha-config').addEventListener('click', async function() {
-        showNotification('Zerodha configuration is not yet available. Please use FYERS or Simulator.', 'info');
+        showNotification('Zerodha configuration is not yet available. Please use FYERS.', 'info');
     });
 
     document.addEventListener('DOMContentLoaded', function() {

@@ -161,9 +161,8 @@ class StockDiscoveryService:
             if not quote_data:
                 return None
 
-            # Extract basic info from quote format (supports both Fyers and Simulator)
+            # Extract basic info from quote format (Fyers API)
             # Fyers API returns: lp, ltp, volume, vol
-            # Simulator returns: last_price, volume
             current_price = float(quote_data.get('lp', quote_data.get('ltp', quote_data.get('last_price', 0))))
             volume = float(quote_data.get('volume', quote_data.get('vol', 0)))
 
@@ -256,7 +255,7 @@ class StockDiscoveryService:
             volume_score = min(volume / 1000000, 1.0)  # Normalize to 1M shares
 
             # Spread component (30%) - estimate from high-low
-            # Handle both Fyers format (direct high/low) and Simulator format (ohlc.high/ohlc.low)
+            # Handle Fyers format (direct high/low or ohlc.high/ohlc.low)
             ohlc_data = quote_data.get('ohlc', {})
             high = float(quote_data.get('high', ohlc_data.get('high', price)))
             low = float(quote_data.get('low', ohlc_data.get('low', price)))

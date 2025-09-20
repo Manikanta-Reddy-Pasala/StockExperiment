@@ -2,7 +2,7 @@
 Broker Implementations Package
 
 This package contains the concrete implementations of the broker interfaces
-for different brokers like FYERS, Zerodha, and Simulator.
+for different brokers like FYERS and Zerodha.
 """
 
 # FYERS implementations (conditional import)
@@ -27,22 +27,8 @@ try:
 except ImportError:
     ZERODHA_AVAILABLE = False
 
-# Simulator implementations (always available)
-from .simulator_dashboard_provider import SimulatorDashboardProvider
-from .simulator_suggested_stocks_provider import SimulatorSuggestedStocksProvider
-from .simulator_orders_provider import SimulatorOrdersProvider
-from .simulator_portfolio_provider import SimulatorPortfolioProvider
-from .simulator_reports_provider import SimulatorReportsProvider
-
 # Build __all__ list conditionally
-__all__ = [
-    # Simulator (always available)
-    'SimulatorDashboardProvider',
-    'SimulatorSuggestedStocksProvider',
-    'SimulatorOrdersProvider',
-    'SimulatorPortfolioProvider',
-    'SimulatorReportsProvider'
-]
+__all__ = []
 
 # Add FYERS if available
 if FYERS_AVAILABLE:

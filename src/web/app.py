@@ -1071,10 +1071,9 @@ def create_app():
         app.logger.warning(f"Unified routes not available: {e}")
 
     # Register broker-specific blueprints
-    from .routes.brokers import fyers_bp, zerodha_bp, simulator_bp
+    from .routes.brokers import fyers_bp, zerodha_bp
     app.register_blueprint(fyers_bp)
     app.register_blueprint(zerodha_bp)
-    app.register_blueprint(simulator_bp)
 
 
     # Register ML prediction blueprints
@@ -1126,11 +1125,6 @@ def create_app():
         """Zerodha broker page."""
         return render_template('brokers/zerodha.html')
 
-    @app.route('/brokers/simulator')
-    @login_required
-    def brokers_simulator():
-        """Simulator broker page."""
-        return render_template('brokers/simulator.html')
 
 
     # Add missing API endpoints that frontend expects

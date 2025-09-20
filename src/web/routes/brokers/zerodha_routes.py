@@ -62,7 +62,7 @@ def api_test_zerodha_connection():
         # For now, return a placeholder response since Zerodha integration is not ready
         return jsonify({
             'success': False, 
-            'message': 'Zerodha integration is coming soon. Please use FYERS or Simulator for now.',
+            'message': 'Zerodha integration is coming soon. Please use FYERS for now.',
             'status_code': 501
         })
         
@@ -78,7 +78,7 @@ def api_save_zerodha_config():
         # For now, return a placeholder response since Zerodha integration is not ready
         return jsonify({
             'success': False, 
-            'error': 'Zerodha integration is coming soon. Please use FYERS or Simulator for now.'
+            'error': 'Zerodha integration is coming soon. Please use FYERS for now.'
         })
         
     except Exception as e:
@@ -93,7 +93,7 @@ def api_zerodha_login():
         # For now, return a placeholder response since Zerodha integration is not ready
         return jsonify({
             'success': False, 
-            'error': 'Zerodha integration is coming soon. Please use FYERS or Simulator for now.'
+            'error': 'Zerodha integration is coming soon. Please use FYERS for now.'
         })
         
     except Exception as e:
@@ -108,7 +108,7 @@ def api_get_zerodha_funds():
         # For now, return a placeholder response since Zerodha integration is not ready
         return jsonify({
             'success': False, 
-            'error': 'Zerodha integration is coming soon. Please use FYERS or Simulator for now.'
+            'error': 'Zerodha integration is coming soon. Please use FYERS for now.'
         })
         
     except Exception as e:
@@ -123,7 +123,7 @@ def api_get_zerodha_holdings():
         # For now, return a placeholder response since Zerodha integration is not ready
         return jsonify({
             'success': False, 
-            'error': 'Zerodha integration is coming soon. Please use FYERS or Simulator for now.'
+            'error': 'Zerodha integration is coming soon. Please use FYERS for now.'
         })
         
     except Exception as e:
@@ -138,7 +138,7 @@ def api_get_zerodha_positions():
         # For now, return a placeholder response since Zerodha integration is not ready
         return jsonify({
             'success': False, 
-            'error': 'Zerodha integration is coming soon. Please use FYERS or Simulator for now.'
+            'error': 'Zerodha integration is coming soon. Please use FYERS for now.'
         })
         
     except Exception as e:
@@ -153,7 +153,7 @@ def api_get_zerodha_orders():
         # For now, return a placeholder response since Zerodha integration is not ready
         return jsonify({
             'success': False, 
-            'error': 'Zerodha integration is coming soon. Please use FYERS or Simulator for now.'
+            'error': 'Zerodha integration is coming soon. Please use FYERS for now.'
         })
         
     except Exception as e:
@@ -168,7 +168,7 @@ def api_get_zerodha_trades():
         # For now, return a placeholder response since Zerodha integration is not ready
         return jsonify({
             'success': False, 
-            'error': 'Zerodha integration is coming soon. Please use FYERS or Simulator for now.'
+            'error': 'Zerodha integration is coming soon. Please use FYERS for now.'
         })
         
     except Exception as e:
@@ -183,7 +183,7 @@ def api_get_zerodha_quotes():
         # For now, return a placeholder response since Zerodha integration is not ready
         return jsonify({
             'success': False, 
-            'error': 'Zerodha integration is coming soon. Please use FYERS or Simulator for now.'
+            'error': 'Zerodha integration is coming soon. Please use FYERS for now.'
         })
         
     except Exception as e:
@@ -198,7 +198,7 @@ def api_get_zerodha_profile():
         # For now, return a placeholder response since Zerodha integration is not ready
         return jsonify({
             'success': False, 
-            'error': 'Zerodha integration is coming soon. Please use FYERS or Simulator for now.'
+            'error': 'Zerodha integration is coming soon. Please use FYERS for now.'
         })
         
     except Exception as e:

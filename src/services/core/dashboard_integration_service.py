@@ -44,9 +44,6 @@ class DashboardIntegrationService:
             elif current_broker == 'zerodha':
                 from .brokers.zerodha_service import ZerodhaService
                 self.broker_instance = ZerodhaService()
-            elif current_broker == 'simulator':
-                from .brokers.simulator_service import SimulatorService
-                self.broker_instance = SimulatorService()
             else:
                 logger.error(f"Unknown broker: {current_broker}")
                 return None

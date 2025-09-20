@@ -323,43 +323,28 @@ class UnifiedBrokerService:
                          'authentication' in result.get('error', '').lower() or
                          'token' in result.get('error', '').lower())):
                         primary_broker_failed = True
-                        logger.warning(f"Fyers quotes failed with auth/credential error, falling back to simulator")
+                        logger.warning(f"Fyers quotes failed with auth/credential error")
                 except Exception as e:
                     primary_broker_failed = True
-                    logger.warning(f"Fyers service failed with exception: {e}, falling back to simulator")
+                    logger.warning(f"Fyers service failed with exception: {e}")
 
             elif current_broker == 'zerodha':
                 from ..brokers.zerodha_service import ZerodhaService
                 broker = ZerodhaService()
                 symbols_str = ','.join(symbols)
                 result = broker.get_quotes(user_id, symbols_str)
-            elif current_broker == 'simulator':
-                from ..brokers.simulator_service import SimulatorService
-                broker = SimulatorService()
-                symbols_str = ','.join(symbols)
-                result = broker.get_quotes(user_id, symbols_str)
             else:
                 return self._no_provider_error('quotes')
 
-            # If primary broker failed (especially Fyers auth issues), fall back to simulator
+            # If primary broker failed, return error (no fallback)
             if primary_broker_failed or (result and not result.get('success')):
-                logger.info(f"Primary broker failed, using simulator fallback for quotes")
-                try:
-                    from ..brokers.simulator_service import SimulatorService
-                    simulator = SimulatorService()
-                    symbols_str = ','.join(symbols)
-                    simulator_result = simulator.get_quotes(user_id, symbols_str)
-
-                    # Transform simulator result to match expected format
-                    if simulator_result and 'data' in simulator_result:
-                        return {
-                            'success': True,
-                            'data': simulator_result['data'],
-                            'fallback_used': 'simulator',
-                            'primary_broker': current_broker
-                        }
-                except Exception as sim_error:
-                    logger.error(f"Simulator fallback also failed: {sim_error}")
+                logger.warning(f"Primary broker failed and no fallback available")
+                return {
+                    'success': False,
+                    'error': 'Primary broker failed and no fallback available',
+                    'data': {},
+                    'primary_broker': current_broker
+                }
 
             return result if result else self._no_provider_error('quotes')
 
@@ -419,10 +404,6 @@ class UnifiedBrokerService:
             elif current_broker == 'zerodha':
                 from ..brokers.zerodha_service import ZerodhaService
                 broker = ZerodhaService()
-                result = broker.history(user_id, symbol, resolution, start_date_str, end_date_str)
-            elif current_broker == 'simulator':
-                from ..brokers.simulator_service import SimulatorService
-                broker = SimulatorService()
                 result = broker.history(user_id, symbol, resolution, start_date_str, end_date_str)
             else:
                 return self._no_provider_error('historical_data')

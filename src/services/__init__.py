@@ -4,7 +4,7 @@ Services package - Business logic layer
 This package contains all business logic services organized into logical modules:
 
 - core/       : Core business services (users, orders, strategies, brokers)
-- brokers/    : Broker integration services (Fyers, Zerodha, Simulator)
+- brokers/    : Broker integration services (Fyers, Zerodha)
 - ml/         : Machine learning and AI services
 - data/       : Data management and synchronization services
 - portfolio/  : Portfolio management and tracking services

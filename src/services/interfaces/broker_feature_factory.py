@@ -73,21 +73,6 @@ class BrokerFeatureFactory:
         except ImportError:
             pass  # Zerodha providers not available
         
-        # Import and register Simulator providers
-        try:
-            from ..implementations.simulator_dashboard_provider import SimulatorDashboardProvider
-            from ..implementations.simulator_suggested_stocks_provider import SimulatorSuggestedStocksProvider
-            from ..implementations.simulator_orders_provider import SimulatorOrdersProvider
-            from ..implementations.simulator_portfolio_provider import SimulatorPortfolioProvider
-            from ..implementations.simulator_reports_provider import SimulatorReportsProvider
-            
-            self.register_dashboard_provider('simulator', SimulatorDashboardProvider)
-            self.register_suggested_stocks_provider('simulator', SimulatorSuggestedStocksProvider)
-            self.register_orders_provider('simulator', SimulatorOrdersProvider)
-            self.register_portfolio_provider('simulator', SimulatorPortfolioProvider)
-            self.register_reports_provider('simulator', SimulatorReportsProvider)
-        except ImportError:
-            pass  # Simulator providers not available
     
     # Registration methods
     def register_dashboard_provider(self, broker: str, provider_class: Type[IDashboardProvider]):
