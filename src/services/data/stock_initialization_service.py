@@ -64,22 +64,21 @@ class StockInitializationService:
             # Step 2: Verify symbols and update verification flags
             logger.info("🔍 Step 2: Verifying symbols with quotes")
             # Get count of unverified symbols to process all of them
+            # Only count symbols that have never been verified
             with self.db_manager.get_session() as session:
                 from sqlalchemy import and_, or_
-                from datetime import timedelta
-                cutoff_date = datetime.utcnow() - timedelta(days=7)
                 unverified_count = session.query(SymbolMaster).filter(
                     and_(
                         SymbolMaster.is_active == True,
                         SymbolMaster.is_equity == True,
                         or_(
                             SymbolMaster.is_fyers_verified.is_(None),
-                            SymbolMaster.is_fyers_verified == False,
-                            SymbolMaster.verification_date < cutoff_date
+                            SymbolMaster.is_fyers_verified == False
                         )
+                        # Never re-verify already verified symbols
                     )
                 ).count()
-                logger.info(f"🔍 Found {unverified_count} symbols needing verification")
+                logger.info(f"🔍 Found {unverified_count} symbols needing verification (never re-verify)")
 
             # Choose verification strategy based on mode
             if aggressive_mode:
@@ -133,8 +132,27 @@ class StockInitializationService:
             }
 
     def _load_symbol_master_from_fyers(self) -> Dict:
-        """Load comprehensive symbol master data from Fyers API."""
+        """Load comprehensive symbol master data from Fyers API (once per day)."""
         try:
+            # Check if we already downloaded symbols today
+            today = datetime.utcnow().date()
+            with self.db_manager.get_session() as session:
+                latest_download = session.query(SymbolMaster.download_date).filter(
+                    SymbolMaster.download_date >= today
+                ).first()
+
+                if latest_download:
+                    symbol_count = session.query(SymbolMaster).count()
+                    logger.info(f"📊 Symbol master already downloaded today: {symbol_count:,} symbols")
+                    return {
+                        'success': True,
+                        'total_symbols': symbol_count,
+                        'new_symbols': 0,
+                        'updated_symbols': 0,
+                        'source': 'cached_today',
+                        'cached': True
+                    }
+
             logger.info("🔄 Loading symbol master data from Fyers CSV APIs")
 
             # Use fyers symbol service to get comprehensive data
@@ -231,17 +249,17 @@ class StockInitializationService:
             logger.info("🔍 Starting symbol verification with quotes")
 
             # First, get the symbols to verify using a separate query
+            # Only verify symbols that are NOT already verified (never re-verify)
             with self.db_manager.get_session() as session:
-                cutoff_date = datetime.utcnow() - timedelta(days=7)
                 unverified_symbols = session.query(SymbolMaster.fytoken, SymbolMaster.symbol).filter(
                     and_(
                         SymbolMaster.is_active == True,
                         SymbolMaster.is_equity == True,
                         or_(
                             SymbolMaster.is_fyers_verified.is_(None),
-                            SymbolMaster.is_fyers_verified == False,
-                            SymbolMaster.verification_date < cutoff_date
+                            SymbolMaster.is_fyers_verified == False
                         )
+                        # Removed time-based re-verification - once verified, always verified
                     )
                 ).limit(limit).all()
 
@@ -329,23 +347,44 @@ class StockInitializationService:
 
     def _create_update_stocks_from_verified_symbols(self, user_id: int, limit: int = 50) -> Dict:
         """
-        Create/update stocks table from verified symbols with current prices.
+        Create/update stocks table from verified symbols with current prices (once per day).
         Only processes symbols that have is_fyers_verified = True.
         """
         try:
             logger.info("📈 Creating/updating stocks from verified symbols")
 
-            # First, get the verified symbols data
+            # Check which symbols need price updates (once per day)
+            today = datetime.utcnow().date()
             with self.db_manager.get_session() as session:
-                verified_symbols = session.query(
+                # Get verified symbols that either:
+                # 1. Don't exist in stocks table yet, OR
+                # 2. Haven't been updated today
+                symbols_needing_update = session.query(
                     SymbolMaster.fytoken, SymbolMaster.symbol, SymbolMaster.name, SymbolMaster.exchange
-                ).filter(
+                ).outerjoin(Stock, SymbolMaster.symbol == Stock.symbol).filter(
                     and_(
                         SymbolMaster.is_active == True,
                         SymbolMaster.is_equity == True,
-                        SymbolMaster.is_fyers_verified == True
+                        SymbolMaster.is_fyers_verified == True,
+                        or_(
+                            Stock.id.is_(None),  # No stock record exists
+                            Stock.last_updated < today  # Not updated today
+                        )
                     )
                 ).limit(limit).all()
+
+                if not symbols_needing_update:
+                    existing_count = session.query(Stock).count()
+                    logger.info(f"📈 All stocks already updated today: {existing_count:,} records")
+                    return {
+                        'success': True,
+                        'total_processed': 0,
+                        'created': 0,
+                        'updated': 0,
+                        'errors': 0,
+                        'cached': True,
+                        'message': 'All stock prices already updated today'
+                    }
 
                 # Convert to list of dictionaries
                 symbols_to_process = [
@@ -355,7 +394,7 @@ class StockInitializationService:
                         'name': row.name,
                         'exchange': row.exchange
                     }
-                    for row in verified_symbols
+                    for row in symbols_needing_update
                 ]
 
             logger.info(f"📈 Found {len(symbols_to_process)} verified symbols to process")
