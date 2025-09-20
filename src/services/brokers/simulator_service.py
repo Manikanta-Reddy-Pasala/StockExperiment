@@ -290,24 +290,39 @@ class SimulatorService:
     def get_quotes(self, user_id: int, symbols: str):
         """Get simulated market quotes for symbols."""
         logger.info(f"Fetching simulator quotes for symbols: {symbols}")
-        
+
         # Generate simulated quotes data
         symbol_list = symbols.split(',')
         quotes = {
             'data': {}
         }
-        
+
         for symbol in symbol_list:
             symbol = symbol.strip()
-            base_price = random.uniform(100, 5000)
-            change = random.uniform(-50, 50)
-            
+
+            # Create more realistic price distribution similar to Indian stock market
+            # Most stocks trade between ₹10-2000, with few high-priced ones
+            price_category = random.random()
+
+            if price_category < 0.15:  # 15% Large cap stocks (₹500-3000)
+                base_price = random.uniform(500, 3000)
+                volume_range = (50000, 500000)
+            elif price_category < 0.45:  # 30% Mid cap stocks (₹100-800)
+                base_price = random.uniform(100, 800)
+                volume_range = (20000, 200000)
+            else:  # 55% Small cap stocks (₹10-300)
+                base_price = random.uniform(10, 300)
+                volume_range = (5000, 100000)
+
+            change = random.uniform(-base_price * 0.05, base_price * 0.05)  # ±5% daily change
+            volume = random.randint(volume_range[0], volume_range[1])
+
             quotes['data'][symbol] = {
                 'instrument_token': random.randint(100000, 999999),
                 'last_price': base_price,
                 'last_quantity': random.randint(1, 1000),
                 'average_price': base_price + random.uniform(-10, 10),
-                'volume': random.randint(1000, 100000),
+                'volume': volume,
                 'buy_quantity': random.randint(100, 5000),
                 'sell_quantity': random.randint(100, 5000),
                 'ohlc': {
@@ -323,7 +338,7 @@ class SimulatorService:
                 'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'last_trade_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
-        
+
         return quotes
 
     def get_profile(self, user_id: int):

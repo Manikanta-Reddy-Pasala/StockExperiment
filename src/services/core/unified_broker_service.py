@@ -292,41 +292,77 @@ class UnifiedBrokerService:
             # Get the user's current broker from broker configurations
             from src.models.database import get_database_manager
             from src.models.models import User, BrokerConfiguration
-            
+
             db_manager = get_database_manager()
             with db_manager.get_session() as session:
                 user = session.query(User).filter(User.id == user_id).first()
                 if not user:
                     return self._no_provider_error('quotes')
-                
+
                 # Get the active broker configuration for the user
                 broker_config = session.query(BrokerConfiguration).filter(
                     BrokerConfiguration.user_id == user_id,
                     BrokerConfiguration.is_active == True
                 ).first()
-                
+
                 current_broker = broker_config.broker_name if broker_config else 'fyers'
-            
+
+            # Try primary broker first
+            result = None
+            primary_broker_failed = False
+
             # Get quotes based on broker
             if current_broker == 'fyers':
-                from .brokers.fyers_service import FyersService
-                broker = FyersService()
-                result = broker.quotes_multiple(user_id, symbols)
+                try:
+                    from ..brokers.fyers_service import FyersService
+                    broker = FyersService()
+                    result = broker.quotes_multiple(user_id, symbols)
+                    # Check if result indicates authentication/credential failure
+                    if (not result.get('success') and
+                        ('invalid input' in result.get('error', '').lower() or
+                         'authentication' in result.get('error', '').lower() or
+                         'token' in result.get('error', '').lower())):
+                        primary_broker_failed = True
+                        logger.warning(f"Fyers quotes failed with auth/credential error, falling back to simulator")
+                except Exception as e:
+                    primary_broker_failed = True
+                    logger.warning(f"Fyers service failed with exception: {e}, falling back to simulator")
+
             elif current_broker == 'zerodha':
-                from .brokers.zerodha_service import ZerodhaService
+                from ..brokers.zerodha_service import ZerodhaService
                 broker = ZerodhaService()
                 symbols_str = ','.join(symbols)
                 result = broker.get_quotes(user_id, symbols_str)
             elif current_broker == 'simulator':
-                from .brokers.simulator_service import SimulatorService
+                from ..brokers.simulator_service import SimulatorService
                 broker = SimulatorService()
                 symbols_str = ','.join(symbols)
                 result = broker.get_quotes(user_id, symbols_str)
             else:
                 return self._no_provider_error('quotes')
-            
-            return result
-            
+
+            # If primary broker failed (especially Fyers auth issues), fall back to simulator
+            if primary_broker_failed or (result and not result.get('success')):
+                logger.info(f"Primary broker failed, using simulator fallback for quotes")
+                try:
+                    from ..brokers.simulator_service import SimulatorService
+                    simulator = SimulatorService()
+                    symbols_str = ','.join(symbols)
+                    simulator_result = simulator.get_quotes(user_id, symbols_str)
+
+                    # Transform simulator result to match expected format
+                    if simulator_result and 'data' in simulator_result:
+                        return {
+                            'success': True,
+                            'data': simulator_result['data'],
+                            'fallback_used': 'simulator',
+                            'primary_broker': current_broker
+                        }
+                except Exception as sim_error:
+                    logger.error(f"Simulator fallback also failed: {sim_error}")
+
+            return result if result else self._no_provider_error('quotes')
+
         except Exception as e:
             logger.error(f"Error getting quotes for user {user_id}: {e}")
             return {
@@ -375,17 +411,17 @@ class UnifiedBrokerService:
             
             # Get historical data based on broker
             if current_broker == 'fyers':
-                from .brokers.fyers_service import FyersService
+                from ..brokers.fyers_service import FyersService
                 broker = FyersService()
                 # Extract exchange from symbol (e.g., "NSE:NLCINDIA-EQ" -> "NSE")
                 exchange = symbol.split(':')[0] if ':' in symbol else 'NSE'
                 result = broker.history(user_id, symbol, exchange, resolution, start_date_str, end_date_str)
             elif current_broker == 'zerodha':
-                from .brokers.zerodha_service import ZerodhaService
+                from ..brokers.zerodha_service import ZerodhaService
                 broker = ZerodhaService()
                 result = broker.history(user_id, symbol, resolution, start_date_str, end_date_str)
             elif current_broker == 'simulator':
-                from .brokers.simulator_service import SimulatorService
+                from ..brokers.simulator_service import SimulatorService
                 broker = SimulatorService()
                 result = broker.history(user_id, symbol, resolution, start_date_str, end_date_str)
             else:

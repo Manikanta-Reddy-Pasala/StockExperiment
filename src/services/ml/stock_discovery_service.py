@@ -9,6 +9,7 @@ No hardcoded stock symbols - everything fetched from broker API.
 import logging
 import pandas as pd
 import numpy as np
+import random
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 import time
@@ -221,9 +222,10 @@ class StockDiscoveryService:
             if not quote_data:
                 return None
 
-            # Extract basic info from Fyers quote format
-            # Fyers API returns data in different fields
-            current_price = float(quote_data.get('lp', quote_data.get('ltp', 0)))  # lp = last price
+            # Extract basic info from quote format (supports both Fyers and Simulator)
+            # Fyers API returns: lp, ltp, volume, vol
+            # Simulator returns: last_price, volume
+            current_price = float(quote_data.get('lp', quote_data.get('ltp', quote_data.get('last_price', 0))))
             volume = float(quote_data.get('volume', quote_data.get('vol', 0)))
 
             # Extract name from symbol or use symbol itself
@@ -278,23 +280,35 @@ class StockDiscoveryService:
             return None
 
     def _estimate_shares_outstanding(self, symbol: str, price: float, volume: float) -> float:
-        """Estimate shares outstanding (simplified approach)."""
-        # This is a rough estimation - in production use fundamental data APIs
+        """Estimate shares outstanding using realistic market cap assumptions."""
+        # Create realistic market cap distribution for Indian stocks
 
-        # Use volume and price patterns to estimate
-        base_shares = volume * 100  # Rough multiplier
+        # Use volume as an indicator of company size (higher volume = larger company typically)
+        volume_factor = volume / 100000  # Normalize to 100k base
 
-        # Adjust based on price level (higher price usually means fewer shares)
-        if price > 1000:
-            multiplier = 50000000    # Large cap with high price
-        elif price > 500:
-            multiplier = 100000000   # Large/mid cap
-        elif price > 100:
-            multiplier = 200000000   # Mid cap
-        else:
-            multiplier = 500000000   # Small cap or low price
+        # Price-based estimation with realistic ranges
+        if price > 1500:  # High price stocks
+            # Usually large cap companies with fewer shares outstanding
+            base_shares = random.uniform(50000000, 300000000)  # 5-30 crores shares
+        elif price > 500:  # Mid-high price stocks
+            # Mix of large and mid cap
+            base_shares = random.uniform(100000000, 800000000)  # 10-80 crores shares
+        elif price > 100:  # Medium price stocks
+            # Mostly mid cap companies
+            base_shares = random.uniform(200000000, 1500000000)  # 20-150 crores shares
+        else:  # Low price stocks
+            # Small cap and penny stocks with many shares
+            base_shares = random.uniform(500000000, 5000000000)  # 50-500 crores shares
 
-        return min(base_shares * 1000, multiplier)
+        # Adjust based on volume (higher volume typically indicates larger companies)
+        if volume > 200000:  # High volume
+            base_shares *= random.uniform(0.8, 1.2)  # Large companies
+        elif volume > 50000:  # Medium volume
+            base_shares *= random.uniform(0.9, 1.3)  # Mid companies
+        else:  # Low volume
+            base_shares *= random.uniform(1.0, 2.0)  # Smaller companies
+
+        return int(base_shares)
 
     def _calculate_liquidity_score(self, price: float, volume: float, quote_data: Dict) -> float:
         """Calculate liquidity score (0-1) based on volume and spread."""
@@ -303,8 +317,10 @@ class StockDiscoveryService:
             volume_score = min(volume / 1000000, 1.0)  # Normalize to 1M shares
 
             # Spread component (30%) - estimate from high-low
-            high = float(quote_data.get('high', price))
-            low = float(quote_data.get('low', price))
+            # Handle both Fyers format (direct high/low) and Simulator format (ohlc.high/ohlc.low)
+            ohlc_data = quote_data.get('ohlc', {})
+            high = float(quote_data.get('high', ohlc_data.get('high', price)))
+            low = float(quote_data.get('low', ohlc_data.get('low', price)))
             if high > low and price > 0:
                 spread_pct = (high - low) / price
                 spread_score = max(0, 1 - (spread_pct * 10))  # Lower spread = higher score

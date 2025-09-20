@@ -41,7 +41,7 @@ class BasicStockScreeningService:
             },
             RiskLevel.MEDIUM: {
                 "price_range": (50, 3000),
-                "min_liquidity": 0.4,
+                "min_liquidity": 0.3,
                 "market_caps": [MarketCap.LARGE_CAP, MarketCap.MID_CAP, MarketCap.SMALL_CAP],
                 "allocation": {"large_cap": 50, "mid_cap": 35, "small_cap": 15}
             },
