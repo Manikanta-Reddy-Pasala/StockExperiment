@@ -236,15 +236,17 @@ CREATE TABLE IF NOT EXISTS stocks (
 CREATE TABLE IF NOT EXISTS stock_prices (
     id SERIAL PRIMARY KEY,
     stock_id INTEGER REFERENCES stocks(id),
-    date DATE NOT NULL,
     open_price DECIMAL(10,2),
     high_price DECIMAL(10,2),
     low_price DECIMAL(10,2),
     close_price DECIMAL(10,2),
+    price DECIMAL(10,2) NOT NULL,
     volume BIGINT,
-    adjusted_close DECIMAL(10,2),
+    timestamp TIMESTAMP NOT NULL,
+    date VARCHAR(10),
+    data_source VARCHAR(20) DEFAULT 'fyers',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(stock_id, date)
+    UNIQUE(stock_id, timestamp)
 );
 
 CREATE TABLE IF NOT EXISTS strategy_types (
@@ -266,32 +268,56 @@ CREATE TABLE IF NOT EXISTS strategy_types (
 
 CREATE TABLE IF NOT EXISTS strategy_stock_selections (
     id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) NOT NULL,
     strategy_type_id INTEGER REFERENCES strategy_types(id),
     stock_id INTEGER REFERENCES stocks(id),
-    selection_date DATE NOT NULL,
-    selection_price DECIMAL(10,2),
+    selection_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    selection_price DECIMAL(10,2) NOT NULL,
+    selection_score DECIMAL(10,4),
+    recommended_quantity INTEGER,
+    recommended_allocation DECIMAL(10,4),
+    position_size_rationale TEXT,
+    target_price DECIMAL(10,2),
+    stop_loss DECIMAL(10,2),
+    expected_return DECIMAL(10,4),
+    risk_score DECIMAL(10,4),
+    status VARCHAR(20) DEFAULT 'selected',
+    execution_date TIMESTAMP,
+    exit_date TIMESTAMP,
+    current_price DECIMAL(10,2),
+    unrealized_pnl DECIMAL(15,2),
+    realized_pnl DECIMAL(15,2),
     selection_reason TEXT,
-    ml_confidence DECIMAL(5,4),
-    expected_return DECIMAL(8,4),
-    risk_score DECIMAL(5,4),
-    is_active BOOLEAN DEFAULT TRUE,
+    algorithm_version VARCHAR(20),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(strategy_type_id, stock_id, selection_date)
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS ml_predictions (
     id SERIAL PRIMARY KEY,
     stock_id INTEGER REFERENCES stocks(id),
-    prediction_date DATE NOT NULL,
+    user_id INTEGER REFERENCES users(id),
+    prediction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    prediction_horizon_days INTEGER DEFAULT 30,
+    current_price DECIMAL(10,2) NOT NULL,
     rf_predicted_price DECIMAL(10,2),
     xgb_predicted_price DECIMAL(10,2),
     lstm_predicted_price DECIMAL(10,2),
-    final_predicted_price DECIMAL(10,2),
-    predicted_change_percent DECIMAL(8,4),
-    confidence DECIMAL(5,4),
+    ensemble_predicted_price DECIMAL(10,2),
+    prediction_confidence DECIMAL(10,4),
+    model_accuracy DECIMAL(10,4),
+    prediction_std DECIMAL(10,4),
     signal VARCHAR(10),
-    prediction_horizon_days INTEGER,
-    model_version VARCHAR(20),
+    signal_strength DECIMAL(10,4),
+    expected_return DECIMAL(10,4),
+    risk_reward_ratio DECIMAL(10,4),
+    model_version VARCHAR(50),
+    features_used TEXT,
+    training_data_period VARCHAR(20),
+    actual_price DECIMAL(10,2),
+    prediction_error DECIMAL(10,4),
+    is_validated BOOLEAN DEFAULT FALSE,
+    validation_date TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(stock_id, prediction_date, prediction_horizon_days)
 );
@@ -326,15 +352,68 @@ CREATE TABLE IF NOT EXISTS portfolio_positions (
     id SERIAL PRIMARY KEY,
     portfolio_strategy_id INTEGER REFERENCES portfolio_strategies(id),
     stock_id INTEGER REFERENCES stocks(id),
+    entry_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    entry_price DECIMAL(10,2) NOT NULL,
     quantity INTEGER NOT NULL,
-    average_price DECIMAL(10,2) NOT NULL,
+    investment_amount DECIMAL(15,2) NOT NULL,
     current_price DECIMAL(10,2),
-    market_value DECIMAL(15,2),
+    current_value DECIMAL(15,2),
     unrealized_pnl DECIMAL(15,2),
+    unrealized_pnl_percentage DECIMAL(10,4),
+    target_price DECIMAL(10,2),
+    stop_loss DECIMAL(10,2),
+    position_allocation DECIMAL(10,4),
+    exit_date TIMESTAMP,
+    exit_price DECIMAL(10,2),
     realized_pnl DECIMAL(15,2),
-    entry_date DATE NOT NULL,
+    realized_pnl_percentage DECIMAL(10,4),
+    status VARCHAR(20) DEFAULT 'active',
+    entry_reason TEXT,
+    exit_reason TEXT,
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Symbol Master table for raw broker data
+CREATE TABLE IF NOT EXISTS symbol_master (
+    id SERIAL PRIMARY KEY,
+    symbol VARCHAR(50) NOT NULL,
+    fytoken VARCHAR(50) UNIQUE NOT NULL,
+    name VARCHAR(200) NOT NULL,
+    exchange VARCHAR(20) NOT NULL,
+    segment VARCHAR(20) NOT NULL,
+    instrument_type VARCHAR(20) NOT NULL,
+    lot_size INTEGER DEFAULT 1,
+    tick_size DECIMAL(10,4) DEFAULT 0.05,
+    isin VARCHAR(20),
+    data_source VARCHAR(20) DEFAULT 'fyers',
+    source_updated VARCHAR(20),
+    download_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE,
+    is_equity BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(symbol, exchange),
+    UNIQUE(fytoken)
+);
+
+-- Market Data Snapshots table
+CREATE TABLE IF NOT EXISTS market_data_snapshots (
+    id SERIAL PRIMARY KEY,
+    snapshot_date VARCHAR(10) NOT NULL,
+    nifty_50 DECIMAL(10,2),
+    sensex DECIMAL(10,2),
+    nifty_midcap DECIMAL(10,2),
+    nifty_smallcap DECIMAL(10,2),
+    total_stocks_tracked INTEGER,
+    large_cap_avg_change DECIMAL(10,4),
+    mid_cap_avg_change DECIMAL(10,4),
+    small_cap_avg_change DECIMAL(10,4),
+    total_volume BIGINT,
+    advance_decline_ratio DECIMAL(10,4),
+    data_source VARCHAR(20) DEFAULT 'fyers',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(snapshot_date)
 );
 
 -- Insert default strategy types
@@ -476,3 +555,11 @@ CREATE INDEX IF NOT EXISTS idx_ml_training_jobs_user_status ON ml_training_jobs(
 CREATE INDEX IF NOT EXISTS idx_ml_training_jobs_symbol ON ml_training_jobs(symbol);
 CREATE INDEX IF NOT EXISTS idx_ml_trained_models_user_symbol ON ml_trained_models(user_id, symbol);
 CREATE INDEX IF NOT EXISTS idx_ml_trained_models_active ON ml_trained_models(user_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_symbol_master_symbol ON symbol_master(symbol);
+CREATE INDEX IF NOT EXISTS idx_symbol_master_fytoken ON symbol_master(fytoken);
+CREATE INDEX IF NOT EXISTS idx_symbol_master_exchange ON symbol_master(exchange);
+CREATE INDEX IF NOT EXISTS idx_symbol_master_active ON symbol_master(is_active, is_equity);
+CREATE INDEX IF NOT EXISTS idx_market_data_snapshots_date ON market_data_snapshots(snapshot_date);
+CREATE INDEX IF NOT EXISTS idx_stocks_active ON stocks(is_active, is_tradeable);
+CREATE INDEX IF NOT EXISTS idx_stocks_market_cap ON stocks(market_cap);
+CREATE INDEX IF NOT EXISTS idx_stock_prices_timestamp ON stock_prices(stock_id, timestamp);

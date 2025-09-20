@@ -22,40 +22,32 @@ class MarketCapCategory(enum.Enum):
 class Stock(Base):
     """Master stock information with categorization."""
     __tablename__ = 'stocks'
-    
+
     id = Column(Integer, primary_key=True)
     symbol = Column(String(50), unique=True, nullable=False, index=True)
     name = Column(String(200), nullable=False)
     exchange = Column(String(20), nullable=False, default='NSE')
     sector = Column(String(100))
-    industry = Column(String(100))
-    
+
     # Market capitalization data
     market_cap = Column(Float)  # in crores
-    market_cap_category = Column(Enum(MarketCapCategory), nullable=False, index=True)
-    
+    market_cap_category = Column(String(20), index=True)  # Use String instead of Enum for compatibility
+
     # Current market data
     current_price = Column(Float)
     volume = Column(Integer)
-    avg_volume_30d = Column(Integer)  # 30-day average volume
-    
-    # Fundamental ratios
+
+    # Fundamental ratios (basic set that matches actual table)
     pe_ratio = Column(Float)
     pb_ratio = Column(Float)
     roe = Column(Float)  # Return on Equity
     debt_to_equity = Column(Float)
     dividend_yield = Column(Float)
     beta = Column(Float)
-    
-    # Additional metrics
-    price_52w_high = Column(Float)
-    price_52w_low = Column(Float)
-    market_cap_rank = Column(Integer)  # Rank by market cap
-    
+
     # Status and metadata
     is_active = Column(Boolean, default=True, index=True)
     is_tradeable = Column(Boolean, default=True)
-    listing_date = Column(DateTime)
     last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow)
     

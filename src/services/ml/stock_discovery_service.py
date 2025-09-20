@@ -63,112 +63,49 @@ class StockDiscoveryService:
     def discover_tradeable_stocks(self, user_id: int = 1,
                                 exchange: str = "NSE") -> List[StockInfo]:
         """
-        Discover all tradeable stocks from the broker API.
-        Returns categorized stocks by market cap.
+        Discover tradeable stocks using the database-driven approach.
+        This replaces the keyword search strategy with comprehensive database queries.
         """
         try:
-            logger.info(f"Discovering tradeable stocks from {exchange} via broker API")
+            logger.info(f"Discovering tradeable stocks from database for {exchange}")
 
-            # Check cache first
+            # Check if stock master data needs refresh
+            from .stock_master_service import get_stock_master_service
+            stock_master = get_stock_master_service()
+
+            # Refresh stock master data if needed (daily refresh)
+            if stock_master.is_refresh_needed():
+                logger.info("Stock master data is stale, initiating refresh...")
+                refresh_result = stock_master.refresh_all_stocks(user_id, exchange)
+                if refresh_result.get('success'):
+                    logger.info(f"Stock master refresh completed: {refresh_result}")
+                else:
+                    logger.warning(f"Stock master refresh failed: {refresh_result.get('error')}")
+
+            # Check cache first for converted StockInfo objects
             if self._is_cache_valid():
-                logger.info("Using cached stock data")
+                logger.info("Using cached StockInfo data")
                 return self._stock_cache.get('stocks', [])
 
-            # Get popular/liquid stocks using search functionality
+            # Get all tradeable stocks from database
+            db_stocks = stock_master.get_stocks_for_screening(limit=1000)  # Get top 1000 by market cap and volume
+
+            if not db_stocks:
+                logger.warning("No stocks found in database")
+                return []
+
+            logger.info(f"Retrieved {len(db_stocks)} stocks from database")
+
+            # Convert database Stock objects to StockInfo objects for compatibility
             discovered_stocks = []
-
-            # Search for major indices and generic sector terms only (no company names)
-            search_terms = [
-                # Major indices components
-                "NIFTY", "SENSEX", "BANKNIFTY", "NIFTYNXT50", "FINNIFTY",
-                # Generic sector keywords only
-                "BANK", "IT", "PHARMA", "AUTO", "FMCG", "METAL", "INFRA", "ENERGY",
-                "FINANCE", "TECH", "HEALTHCARE", "CONSUMER", "COMMODITY",
-                # Generic size/volume based searches
-                "LTD", "LIMITED", "CORP", "INC", "INDUSTRIES"
-            ]
-
-            all_symbols = set()
-
-            for term in search_terms:
+            for db_stock in db_stocks:
                 try:
-                    # Get the fyers provider directly for more reliable search
-                    try:
-                        from ..interfaces.broker_feature_factory import get_broker_feature_factory
-                    except ImportError:
-                        from src.services.interfaces.broker_feature_factory import get_broker_feature_factory
-                    factory = get_broker_feature_factory()
-                    provider = factory.get_suggested_stocks_provider(user_id)
-
-                    if provider:
-                        # Call the search method directly with proper signature
-                        search_result = provider.fyers_service.search(user_id, term, exchange)
-
-                        if search_result.get('status') == 'success':
-                            symbols = search_result.get('data', [])
-                            logger.info(f"Search term '{term}' returned {len(symbols)} results")
-
-                            for symbol_info in symbols:
-                                symbol = symbol_info.get('symbol', '')
-                                name = symbol_info.get('name', symbol_info.get('symbol_name', ''))
-
-                                # Filter for equity stocks only
-                                if ('-EQ' in symbol and
-                                    symbol.startswith(f"{exchange}:") and
-                                    len(name) > 2):
-                                    all_symbols.add(symbol)
-                        else:
-                            logger.warning(f"Search failed for term '{term}': {search_result.get('message', 'Unknown error')}")
-                    else:
-                        logger.warning(f"No broker provider available for search")
-
-                    # Rate limiting
-                    time.sleep(0.1)
-
-                except Exception as e:
-                    logger.warning(f"Search failed for term '{term}': {e}")
-                    continue
-
-            logger.info(f"Discovered {len(all_symbols)} potential stocks")
-
-            # Try to get real-time quotes first, fall back if not available
-            logger.info(f"Processing {len(all_symbols)} symbols with real-time quotes")
-
-            # Convert to list and process in batches for quote retrieval
-            symbols_list = list(all_symbols)
-
-            # Try to get real-time quotes in batches
-            batch_size = 20
-            quotes_data = {}
-
-            for i in range(0, len(symbols_list), batch_size):
-                batch_symbols = symbols_list[i:i + batch_size]
-                try:
-                    batch_quotes = self._get_batch_quotes(batch_symbols, user_id)
-                    quotes_data.update(batch_quotes)
-                    time.sleep(0.5)  # Rate limiting between batches
-                except Exception as e:
-                    logger.warning(f"Failed to get quotes for batch {i//batch_size + 1}: {e}")
-                    continue
-
-            logger.info(f"Retrieved quotes for {len(quotes_data)} out of {len(symbols_list)} symbols")
-
-            # Process symbols with available quotes
-            for symbol in symbols_list:
-                try:
-                    quote_data = quotes_data.get(symbol)
-                    if quote_data:
-                        # Use real quote data
-                        stock_info = self._analyze_stock_info(symbol, quote_data, user_id)
-                    else:
-                        # Skip symbols without quotes - no fallback to static data
-                        logger.debug(f"No quote data available for {symbol}, skipping")
-                        continue
-
+                    # Convert database Stock to StockInfo
+                    stock_info = self._convert_db_stock_to_stock_info(db_stock)
                     if stock_info and stock_info.is_tradeable:
                         discovered_stocks.append(stock_info)
                 except Exception as e:
-                    logger.debug(f"Failed to analyze {symbol}: {e}")
+                    logger.debug(f"Failed to convert stock {db_stock.symbol}: {e}")
                     continue
 
             # Sort by market cap and liquidity
@@ -181,14 +118,16 @@ class StockDiscoveryService:
             }
             self._cache_timestamp = time.time()
 
-            logger.info(f"Discovered {len(discovered_stocks)} tradeable stocks")
+            logger.info(f"Discovered {len(discovered_stocks)} tradeable stocks from database")
             self._log_discovery_summary(discovered_stocks)
 
             return discovered_stocks
 
         except Exception as e:
-            logger.error(f"Error discovering stocks: {e}")
-            return []
+            logger.error(f"Error discovering stocks from database: {e}")
+            # Fallback to legacy search approach if database fails
+            logger.info("Falling back to legacy search approach")
+            return self._discover_stocks_legacy_search(user_id, exchange)
 
     def _get_batch_quotes(self, symbols: List[str], user_id: int) -> Dict[str, Dict]:
         """Get quotes for a batch of symbols."""
@@ -443,6 +382,158 @@ class StockDiscoveryService:
             category_stocks = [s for s in stocks if s.market_cap_category == category][:5]
             if category_stocks:
                 logger.info(f"  Top {category.value}: {[s.symbol for s in category_stocks]}")
+
+    def _convert_db_stock_to_stock_info(self, db_stock) -> Optional[StockInfo]:
+        """Convert database Stock object to StockInfo object."""
+        try:
+            # Calculate liquidity score (simplified for database stocks)
+            liquidity_score = self._calculate_liquidity_score_from_volume(
+                db_stock.current_price, db_stock.volume or 0
+            )
+
+            # Convert string market cap category back to enum
+            market_cap_category = MarketCap.LARGE_CAP
+            if db_stock.market_cap_category == "mid_cap":
+                market_cap_category = MarketCap.MID_CAP
+            elif db_stock.market_cap_category == "small_cap":
+                market_cap_category = MarketCap.SMALL_CAP
+
+            return StockInfo(
+                symbol=db_stock.symbol,
+                name=db_stock.name,
+                exchange=db_stock.exchange,
+                market_cap_category=market_cap_category,
+                current_price=db_stock.current_price or 0.0,
+                market_cap_crores=db_stock.market_cap or 0.0,
+                volume=db_stock.volume or 0,
+                liquidity_score=liquidity_score,
+                is_tradeable=db_stock.is_tradeable,
+                sector=db_stock.sector or 'Others'
+            )
+        except Exception as e:
+            logger.warning(f"Error converting db stock {db_stock.symbol}: {e}")
+            return None
+
+    def _calculate_liquidity_score_from_volume(self, price: float, volume: int) -> float:
+        """Calculate liquidity score from volume data."""
+        try:
+            # Volume component (80% weight for database stocks)
+            volume_score = min(volume / 1000000, 1.0)  # Normalize to 1M shares
+
+            # Price stability component (20% weight)
+            price_score = 0.8 if 100 <= price <= 1000 else 0.6
+
+            return (volume_score * 0.8) + (price_score * 0.2)
+        except Exception:
+            return 0.5
+
+    def _discover_stocks_legacy_search(self, user_id: int, exchange: str) -> List[StockInfo]:
+        """
+        Legacy stock discovery using keyword search.
+        Used as fallback when database approach fails.
+        """
+        try:
+            logger.info("Using legacy keyword search approach")
+
+            # Get popular/liquid stocks using search functionality
+            discovered_stocks = []
+
+            # Search for major indices and generic sector terms only (no company names)
+            search_terms = [
+                # Major indices components
+                "NIFTY", "SENSEX", "BANKNIFTY", "NIFTYNXT50", "FINNIFTY",
+                # Generic sector keywords only
+                "BANK", "IT", "PHARMA", "AUTO", "FMCG", "METAL", "INFRA", "ENERGY",
+                "FINANCE", "TECH", "HEALTHCARE", "CONSUMER", "COMMODITY",
+                # Generic size/volume based searches
+                "LTD", "LIMITED", "CORP", "INC", "INDUSTRIES"
+            ]
+
+            all_symbols = set()
+
+            for term in search_terms:
+                try:
+                    # Get the fyers provider directly for more reliable search
+                    try:
+                        from ..interfaces.broker_feature_factory import get_broker_feature_factory
+                    except ImportError:
+                        from src.services.interfaces.broker_feature_factory import get_broker_feature_factory
+                    factory = get_broker_feature_factory()
+                    provider = factory.get_suggested_stocks_provider(user_id)
+
+                    if provider:
+                        # Call the search method directly with proper signature
+                        search_result = provider.fyers_service.search(user_id, term, exchange)
+
+                        if search_result.get('status') == 'success':
+                            symbols = search_result.get('data', [])
+                            logger.debug(f"Search term '{term}' returned {len(symbols)} results")
+
+                            for symbol_info in symbols:
+                                symbol = symbol_info.get('symbol', '')
+                                name = symbol_info.get('name', symbol_info.get('symbol_name', ''))
+
+                                # Filter for equity stocks only
+                                if ('-EQ' in symbol and
+                                    symbol.startswith(f"{exchange}:") and
+                                    len(name) > 2):
+                                    all_symbols.add(symbol)
+
+                    # Rate limiting
+                    time.sleep(0.1)
+
+                except Exception as e:
+                    logger.warning(f"Search failed for term '{term}': {e}")
+                    continue
+
+            logger.info(f"Legacy search discovered {len(all_symbols)} potential stocks")
+
+            # Convert to list and process in batches for quote retrieval
+            symbols_list = list(all_symbols)
+
+            # Try to get real-time quotes in batches
+            batch_size = 20
+            quotes_data = {}
+
+            for i in range(0, len(symbols_list), batch_size):
+                batch_symbols = symbols_list[i:i + batch_size]
+                try:
+                    batch_quotes = self._get_batch_quotes(batch_symbols, user_id)
+                    quotes_data.update(batch_quotes)
+                    time.sleep(0.5)  # Rate limiting between batches
+                except Exception as e:
+                    logger.warning(f"Failed to get quotes for batch {i//batch_size + 1}: {e}")
+                    continue
+
+            logger.info(f"Retrieved quotes for {len(quotes_data)} out of {len(symbols_list)} symbols")
+
+            # Process symbols with available quotes
+            for symbol in symbols_list:
+                try:
+                    quote_data = quotes_data.get(symbol)
+                    if quote_data:
+                        # Use real quote data
+                        stock_info = self._analyze_stock_info(symbol, quote_data, user_id)
+                    else:
+                        # Skip symbols without quotes
+                        logger.debug(f"No quote data available for {symbol}, skipping")
+                        continue
+
+                    if stock_info and stock_info.is_tradeable:
+                        discovered_stocks.append(stock_info)
+                except Exception as e:
+                    logger.debug(f"Failed to analyze {symbol}: {e}")
+                    continue
+
+            # Sort by market cap and liquidity
+            discovered_stocks.sort(key=lambda x: (x.market_cap_crores, x.liquidity_score), reverse=True)
+
+            logger.info(f"Legacy search discovered {len(discovered_stocks)} tradeable stocks")
+            return discovered_stocks
+
+        except Exception as e:
+            logger.error(f"Error in legacy stock discovery: {e}")
+            return []
 
     def refresh_cache(self, user_id: int = 1):
         """Force refresh of stock cache."""
