@@ -7,7 +7,7 @@ import requests
 import json
 import logging
 from datetime import datetime
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -266,6 +266,7 @@ class BrokerService:
                 'updated_at': config.updated_at
             }
     
+
     def get_broker_stats(self, broker_name: str, user_id: Optional[int] = None) -> Dict[str, Any]:
         """Get broker statistics from database."""
         with self.db_manager.get_session() as session:

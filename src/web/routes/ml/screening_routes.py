@@ -81,6 +81,10 @@ def discover_stocks():
         else:
             stocks = discovery_service.discover_tradeable_stocks(user_id)
 
+        # Log discovery statistics to broker response file
+        total_discovered = len(stocks)
+        logger.info(f"Broker API discovered {total_discovered} stocks from real Fyers API")
+
         # Categorize stocks
         categorized = {
             'large_cap': [],
@@ -93,14 +97,23 @@ def discover_stocks():
                 category = stock.market_cap_category.value
                 categorized[category].append(serialize_stock_info(stock))
 
-        # Summary statistics
+        # Summary statistics with filtering counts
+        tradeable_count = len([s for s in stocks if s.is_tradeable])
+        filtered_count = len(categorized['large_cap']) + len(categorized['mid_cap']) + len(categorized['small_cap'])
+
         summary = {
             'total_stocks': len(stocks),
+            'tradeable_stocks': tradeable_count,
+            'filtered_stocks': filtered_count,
             'large_cap_count': len(categorized['large_cap']),
             'mid_cap_count': len(categorized['mid_cap']),
             'small_cap_count': len(categorized['small_cap']),
-            'discovery_time': datetime.now().isoformat()
+            'discovery_time': datetime.now().isoformat(),
+            'data_source': 'Real Fyers Broker API'
         }
+
+        # Log filtering statistics
+        logger.info(f"Filtering Stats: Discovered {len(stocks)} → Tradeable {tradeable_count} → Categorized {filtered_count}")
 
         return jsonify({
             'success': True,
@@ -133,14 +146,37 @@ def screen_stocks():
         else:
             risk_profile = RiskProfile.DEFAULT
 
+        # First get stocks from discovery service for statistics
+        discovery_service = get_stock_discovery_service()
+        discovered_stocks = discovery_service.discover_tradeable_stocks(user_id)
+
+        # Count initial filtering
+        total_discovered = len(discovered_stocks)
+        tradeable_stocks = [s for s in discovered_stocks if s.is_tradeable]
+        tradeable_count = len(tradeable_stocks)
+
+        logger.info(f"ML Screening: Discovered {total_discovered} stocks from broker → {tradeable_count} tradeable")
+
+        # Apply ML screening
         screening_service = get_intelligent_screening_service()
         portfolio = screening_service.screen_stocks_by_risk_profile(
             risk_profile, user_id, auto_train
         )
 
-        # Serialize portfolio recommendation
+        # Count ML filtered stocks
+        ml_filtered_count = portfolio.total_stocks
+        logger.info(f"ML Screening: Tradeable {tradeable_count} → ML analyzed {ml_filtered_count} stocks")
+
+        # Serialize portfolio recommendation with filtering statistics
         result = {
             'risk_profile': portfolio.risk_profile.value,
+            'filtering_statistics': {
+                'total_discovered': total_discovered,
+                'tradeable_stocks': tradeable_count,
+                'ml_analyzed': ml_filtered_count,
+                'data_source': 'Real Fyers Broker API',
+                'filtering_stages': f"Discovered {total_discovered} → Tradeable {tradeable_count} → ML analyzed {ml_filtered_count}"
+            },
             'portfolio_metrics': {
                 'total_stocks': portfolio.total_stocks,
                 'expected_return': round(portfolio.expected_return * 100, 2),  # As percentage

@@ -18,10 +18,10 @@ from enum import Enum
 logger = logging.getLogger(__name__)
 
 try:
-    from ...services.brokers.fyers_service import get_fyers_service
+    from ...services.unified_broker_service import get_unified_broker_service
     from ...models.database import get_database_manager
 except ImportError:
-    from services.brokers.fyers_service import get_fyers_service
+    from services.unified_broker_service import get_unified_broker_service
     from models.database import get_database_manager
 
 
@@ -49,7 +49,7 @@ class StockDiscoveryService:
     """Dynamic stock discovery service using broker API."""
 
     def __init__(self):
-        self.fyers_service = get_fyers_service()
+        self.unified_broker_service = get_unified_broker_service()
         self.db_manager = get_database_manager()
         self.cache_duration = 3600  # 1 hour cache
         self._stock_cache = {}
@@ -87,16 +87,23 @@ class StockDiscoveryService:
 
             for term in search_terms:
                 try:
-                    search_result = self.fyers_service.search(user_id, term, exchange)
-                    if search_result.get('status') == 'success':
+                    search_result = self.unified_broker_service.search_stocks(user_id, term, exchange)
+
+                    if search_result.get('success'):
                         symbols = search_result.get('data', [])
+                        logger.info(f"Search term '{term}' returned {len(symbols)} results")
+
                         for symbol_info in symbols:
                             symbol = symbol_info.get('symbol', '')
+                            name = symbol_info.get('name', symbol_info.get('symbol_name', ''))
+
                             # Filter for equity stocks only
                             if ('-EQ' in symbol and
                                 symbol.startswith(f"{exchange}:") and
-                                len(symbol_info.get('name', '')) > 2):
+                                len(name) > 2):
                                 all_symbols.add(symbol)
+                    else:
+                        logger.warning(f"Search failed for term '{term}': {search_result.get('error')}")
 
                     # Rate limiting
                     time.sleep(0.1)
@@ -153,25 +160,15 @@ class StockDiscoveryService:
     def _get_batch_quotes(self, symbols: List[str], user_id: int) -> Dict[str, Dict]:
         """Get quotes for a batch of symbols."""
         try:
-            # Try multiple quotes first
-            quotes_result = self.fyers_service.quotes_multiple(user_id, symbols)
-            if quotes_result.get('status') == 'success':
+            # Use unified broker service for quotes
+            quotes_result = self.unified_broker_service.get_quotes(user_id, symbols)
+
+
+            if quotes_result.get('success'):
                 return quotes_result.get('data', {})
 
-            # Fallback to individual quotes
-            batch_quotes = {}
-            for symbol in symbols:
-                try:
-                    clean_symbol = symbol.replace("NSE:", "").replace("-EQ", "")
-                    quote_result = self.fyers_service.quotes(user_id, clean_symbol, "NSE")
-                    if quote_result.get('status') == 'success':
-                        batch_quotes[symbol] = quote_result.get('data', {})
-                    time.sleep(0.05)  # Rate limiting
-                except Exception as e:
-                    logger.warning(f"Failed to get quote for {symbol}: {e}")
-                    continue
-
-            return batch_quotes
+            # Return empty dict if failed
+            return {}
 
         except Exception as e:
             logger.error(f"Error getting batch quotes: {e}")
@@ -184,10 +181,15 @@ class StockDiscoveryService:
             if not quote_data:
                 return None
 
-            # Extract basic info
-            current_price = float(quote_data.get('ltp', 0))
-            volume = float(quote_data.get('volume', 0))
+            # Extract basic info from Fyers quote format
+            # Fyers API returns data in different fields
+            current_price = float(quote_data.get('lp', quote_data.get('ltp', 0)))  # lp = last price
+            volume = float(quote_data.get('volume', quote_data.get('vol', 0)))
+
+            # Extract name from symbol or use symbol itself
             name = symbol.replace("NSE:", "").replace("-EQ", "")
+            if 'symbol_name' in quote_data:
+                name = quote_data['symbol_name']
 
             # Skip if price too low or no volume
             if current_price < 1 or volume < 1000:
@@ -390,6 +392,7 @@ class StockDiscoveryService:
         logger.info("Force refreshing stock discovery cache")
         self._cache_timestamp = 0
         return self.discover_tradeable_stocks(user_id)
+
 
 
 # Global service instance

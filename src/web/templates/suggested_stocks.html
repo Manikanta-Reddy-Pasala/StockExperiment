@@ -128,7 +128,15 @@
                 suggestedStocks.sort((a, b) => b.overall_score - a.overall_score);
 
                 populateTable();
-                showNotification(`Loaded ${suggestedStocks.length} ML-analyzed ${riskStrategy.replace('_', ' ')} stocks`, 'success');
+
+                // Show detailed filtering statistics
+                const filterStats = data.portfolio.filtering_statistics;
+                if (filterStats) {
+                    const message = `${filterStats.filtering_stages} • ML Selected ${suggestedStocks.length} stocks`;
+                    showNotification(message, 'success');
+                } else {
+                    showNotification(`Loaded ${suggestedStocks.length} ML-analyzed ${riskStrategy.replace('_', ' ')} stocks`, 'success');
+                }
             } else {
                 throw new Error(data.error || 'Failed to fetch ML stock recommendations');
             }
@@ -298,7 +306,7 @@
                     <i class="bi bi-cpu-fill me-2"></i>ML Analysis in Progress
                 </h6>
                 <p class="text-muted mb-0">
-                    Analyzing stocks with 70 advanced features • Auto-training models • Risk filtering
+                    Fetching real stocks from Fyers broker • 70 ML features • Auto-training models • Risk filtering
                 </p>
             </div>
         `;

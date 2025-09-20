@@ -26,7 +26,45 @@ class ISuggestedStocksProvider(ABC):
     """
 
     @abstractmethod
-    def get_suggested_stocks(self, user_id: int, strategies: List[StrategyType] = None, 
+    def discover_tradeable_stocks(self, user_id: int, exchange: str = "NSE") -> Dict[str, Any]:
+        """
+        Discover all tradeable stocks from the broker API.
+
+        Args:
+            user_id: The user ID for broker-specific authentication
+            exchange: The exchange to search (e.g., NSE, BSE)
+
+        Returns:
+            Dict containing:
+            - success: bool
+            - data: List of discovered stocks with categorization
+            - total_discovered: int
+            - filtering_statistics: Dict with counts by category
+            - last_updated: timestamp
+        """
+        pass
+
+    @abstractmethod
+    def search_stocks(self, user_id: int, search_term: str, exchange: str = "NSE") -> Dict[str, Any]:
+        """
+        Search for stocks using a search term.
+
+        Args:
+            user_id: The user ID for broker-specific authentication
+            search_term: Term to search for (e.g., "BANK", "IT", "RELIANCE")
+            exchange: The exchange to search
+
+        Returns:
+            Dict containing:
+            - success: bool
+            - data: List of matching stocks
+            - search_term: The term that was searched
+            - total_results: int
+        """
+        pass
+
+    @abstractmethod
+    def get_suggested_stocks(self, user_id: int, strategies: List[StrategyType] = None,
                            limit: int = 50) -> Dict[str, Any]:
         """
         Get suggested stocks based on screening strategies.

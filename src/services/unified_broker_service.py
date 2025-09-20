@@ -84,7 +84,21 @@ class UnifiedBrokerService:
         return provider.get_watchlist_quotes(user_id, symbols)
     
     # Suggested Stocks methods
-    def get_suggested_stocks(self, user_id: int, strategies: List[Any] = None, 
+    def discover_tradeable_stocks(self, user_id: int, exchange: str = "NSE") -> Dict[str, Any]:
+        """Discover tradeable stocks using user's selected broker."""
+        provider = self.factory.get_suggested_stocks_provider(user_id)
+        if not provider:
+            return self._no_provider_error('suggested_stocks')
+        return provider.discover_tradeable_stocks(user_id, exchange)
+
+    def search_stocks(self, user_id: int, search_term: str, exchange: str = "NSE") -> Dict[str, Any]:
+        """Search stocks using user's selected broker."""
+        provider = self.factory.get_suggested_stocks_provider(user_id)
+        if not provider:
+            return self._no_provider_error('suggested_stocks')
+        return provider.search_stocks(user_id, search_term, exchange)
+
+    def get_suggested_stocks(self, user_id: int, strategies: List[Any] = None,
                            limit: int = 50) -> Dict[str, Any]:
         """Get suggested stocks using user's selected broker."""
         provider = self.factory.get_suggested_stocks_provider(user_id)

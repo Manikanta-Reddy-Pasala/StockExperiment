@@ -5,6 +5,7 @@ Implements comprehensive stock screening with search and sort capabilities.
 """
 
 import logging
+import json
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from ..interfaces.suggested_stocks_interface import ISuggestedStocksProvider, StrategyType, SuggestedStock
@@ -15,9 +16,183 @@ logger = logging.getLogger(__name__)
 
 class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
     """Enhanced FYERS implementation with full search and sort functionality."""
-    
+
     def __init__(self):
         self.fyers_service = get_fyers_service()
+
+    def discover_tradeable_stocks(self, user_id: int, exchange: str = "NSE") -> Dict[str, Any]:
+        """Discover all tradeable stocks from the Fyers broker API."""
+        try:
+            logger.info(f"Discovering tradeable stocks from {exchange} via Fyers broker API")
+
+            # Search for stocks using generic sector terms
+            search_terms = [
+                # Major indices components
+                "NIFTY", "SENSEX", "BANKNIFTY", "NIFTYNXT50", "FINNIFTY",
+                # Generic sector keywords only
+                "BANK", "IT", "PHARMA", "AUTO", "FMCG", "METAL", "INFRA", "ENERGY",
+                "FINANCE", "TECH", "HEALTHCARE", "CONSUMER", "COMMODITY",
+                # Generic size/volume based searches
+                "LTD", "LIMITED", "CORP", "INC", "INDUSTRIES"
+            ]
+
+            all_symbols = set()
+            discovered_stocks = []
+
+            for term in search_terms:
+                try:
+                    search_result = self.fyers_service.search(user_id, term, exchange)
+
+
+                    if search_result.get('status') == 'success':
+                        symbols = search_result.get('data', [])
+                        logger.info(f"Search term '{term}' returned {len(symbols)} results")
+
+                        for symbol_info in symbols:
+                            symbol = symbol_info.get('symbol', '')
+                            name = symbol_info.get('symbol_name', '')
+
+                            # Filter for equity stocks only
+                            if ('-EQ' in symbol and
+                                symbol.startswith(f"{exchange}:") and
+                                len(name) > 2):
+                                all_symbols.add(symbol)
+                                discovered_stocks.append({
+                                    'symbol': symbol,
+                                    'name': name,
+                                    'exchange': exchange,
+                                    'search_term': term
+                                })
+                    else:
+                        logger.warning(f"Search failed for term '{term}': {search_result.get('message')}")
+
+                    # Rate limiting
+                    import time
+                    time.sleep(0.1)
+
+                except Exception as e:
+                    logger.warning(f"Search failed for term '{term}': {e}")
+                    continue
+
+            logger.info(f"Discovered {len(all_symbols)} potential stocks")
+
+            # Get quotes for discovered stocks and categorize
+            if all_symbols:
+                quotes_result = self.fyers_service.quotes_multiple(user_id, list(all_symbols)[:50])  # Limit for API
+
+
+                if quotes_result.get('status') == 'success':
+                    quotes_data = quotes_result.get('data', {})
+
+                    # Categorize stocks by market cap
+                    categorized = {
+                        'large_cap': [],
+                        'mid_cap': [],
+                        'small_cap': []
+                    }
+
+                    for stock in discovered_stocks:
+                        symbol = stock['symbol']
+                        if symbol in quotes_data:
+                            quote = quotes_data[symbol]
+                            price = float(quote.get('lp', quote.get('ltp', 0)))
+
+                            if price > 0:
+                                # Estimate market cap category based on price (simplified)
+                                if price > 1500:
+                                    category = 'large_cap'
+                                elif price > 500:
+                                    category = 'mid_cap'
+                                else:
+                                    category = 'small_cap'
+
+                                stock_info = {
+                                    'symbol': symbol,
+                                    'name': stock['name'],
+                                    'exchange': stock['exchange'],
+                                    'current_price': price,
+                                    'volume': float(quote.get('volume', quote.get('vol', 0))),
+                                    'market_cap_category': category,
+                                    'is_tradeable': True,
+                                    'sector': self._determine_sector(stock['name'])
+                                }
+                                categorized[category].append(stock_info)
+
+            # Summary statistics
+            summary = {
+                'total_discovered': len(all_symbols),
+                'tradeable_stocks': len(discovered_stocks),
+                'filtered_stocks': sum(len(stocks) for stocks in categorized.values()),
+                'large_cap_count': len(categorized['large_cap']),
+                'mid_cap_count': len(categorized['mid_cap']),
+                'small_cap_count': len(categorized['small_cap']),
+                'discovery_time': datetime.now().isoformat(),
+                'data_source': 'Real Fyers Broker API'
+            }
+
+            return {
+                'success': True,
+                'data': categorized,
+                'summary': summary,
+                'filtering_statistics': summary,
+                'last_updated': datetime.now().isoformat()
+            }
+
+        except Exception as e:
+            logger.error(f"Error discovering stocks: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'data': {'large_cap': [], 'mid_cap': [], 'small_cap': []},
+                'summary': {'total_discovered': 0},
+                'last_updated': datetime.now().isoformat()
+            }
+
+    def search_stocks(self, user_id: int, search_term: str, exchange: str = "NSE") -> Dict[str, Any]:
+        """Search for stocks using a search term via Fyers broker API."""
+        try:
+            search_result = self.fyers_service.search(user_id, search_term, exchange)
+
+
+            if search_result.get('status') == 'success':
+                stocks = search_result.get('data', [])
+
+                # Filter for equity stocks
+                filtered_stocks = []
+                for stock in stocks:
+                    symbol = stock.get('symbol', '')
+                    if '-EQ' in symbol and symbol.startswith(f"{exchange}:"):
+                        filtered_stocks.append({
+                            'symbol': symbol,
+                            'name': stock.get('symbol_name', ''),
+                            'exchange': exchange,
+                            'search_term': search_term
+                        })
+
+                return {
+                    'success': True,
+                    'data': filtered_stocks,
+                    'search_term': search_term,
+                    'total_results': len(filtered_stocks)
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': search_result.get('message', 'Search failed'),
+                    'data': [],
+                    'search_term': search_term,
+                    'total_results': 0
+                }
+
+        except Exception as e:
+            logger.error(f"Error searching stocks: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'data': [],
+                'search_term': search_term,
+                'total_results': 0
+            }
     
     def get_suggested_stocks(self, user_id: int, strategies: List[StrategyType] = None, 
                            limit: int = 50, search: str = None, sort_by: str = None,
@@ -868,3 +1043,63 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
         variance = sum((r - avg_return) ** 2 for r in returns) / len(returns)
         volatility = variance ** 0.5
         return round(volatility, 2)
+
+
+    def _determine_sector(self, company_name: str) -> str:
+        """Determine sector from company name using keywords."""
+        name = company_name.upper()
+
+        # Banking and Financial Services
+        if any(keyword in name for keyword in ['BANK', 'FINANCIAL', 'FINANCE', 'CREDIT', 'LOAN', 'INSURANCE', 'MUTUAL', 'FUND']):
+            return 'Banking & Financial Services'
+
+        # Information Technology
+        if any(keyword in name for keyword in ['TECH', 'SOFTWARE', 'SYSTEMS', 'INFOTECH', 'TECHNOLOGIES', 'COMPUTER', 'DATA', 'DIGITAL']):
+            return 'Information Technology'
+
+        # Pharmaceuticals and Healthcare
+        if any(keyword in name for keyword in ['PHARMA', 'DRUG', 'MEDICINE', 'HEALTHCARE', 'HOSPITAL', 'MEDICAL', 'BIO', 'HEALTH']):
+            return 'Pharmaceuticals & Healthcare'
+
+        # Automotive
+        if any(keyword in name for keyword in ['AUTO', 'MOTOR', 'VEHICLE', 'CAR', 'TRUCK', 'BIKE', 'TYRE', 'TIRE']):
+            return 'Automotive'
+
+        # Fast Moving Consumer Goods
+        if any(keyword in name for keyword in ['CONSUMER', 'FOOD', 'BEVERAGE', 'PERSONAL', 'CARE', 'HOUSEHOLD', 'FMCG']):
+            return 'FMCG'
+
+        # Metals and Mining
+        if any(keyword in name for keyword in ['STEEL', 'IRON', 'METAL', 'MINING', 'ALUMINIUM', 'COPPER', 'ZINC', 'COAL']):
+            return 'Metals & Mining'
+
+        # Infrastructure and Construction
+        if any(keyword in name for keyword in ['CONSTRUCTION', 'INFRASTRUCTURE', 'ENGINEERING', 'BUILDING', 'CEMENT', 'REAL', 'ESTATE']):
+            return 'Infrastructure & Construction'
+
+        # Energy and Power
+        if any(keyword in name for keyword in ['POWER', 'ENERGY', 'ELECTRICITY', 'SOLAR', 'WIND', 'COAL', 'OIL', 'GAS', 'PETROLEUM']):
+            return 'Energy & Power'
+
+        # Telecommunications
+        if any(keyword in name for keyword in ['TELECOM', 'COMMUNICATION', 'NETWORK', 'WIRELESS', 'BROADBAND', 'MOBILE']):
+            return 'Telecommunications'
+
+        # Textiles
+        if any(keyword in name for keyword in ['TEXTILE', 'COTTON', 'FABRIC', 'GARMENT', 'APPAREL', 'CLOTH']):
+            return 'Textiles'
+
+        # Media and Entertainment
+        if any(keyword in name for keyword in ['MEDIA', 'ENTERTAINMENT', 'TELEVISION', 'BROADCASTING', 'FILM', 'NEWS']):
+            return 'Media & Entertainment'
+
+        # Chemicals
+        if any(keyword in name for keyword in ['CHEMICAL', 'FERTILIZER', 'PESTICIDE', 'PLASTIC', 'POLYMER']):
+            return 'Chemicals'
+
+        # Agriculture
+        if any(keyword in name for keyword in ['AGRO', 'AGRICULTURE', 'FARM', 'SEED', 'CROP', 'DAIRY']):
+            return 'Agriculture'
+
+        # Default sector if no keywords match
+        return 'Diversified'
