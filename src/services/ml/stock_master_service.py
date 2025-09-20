@@ -128,26 +128,63 @@ class StockMasterService:
 
                         # Store in symbol_master table for future reference
                         try:
-                            existing_symbol = session.query(SymbolMaster).filter(
-                                SymbolMaster.symbol == cleaned_symbol,
-                                SymbolMaster.exchange == exchange
+                            # Smart refresh logic: fytoken is primary key, so direct lookup
+                            fytoken = symbol_data.get('fytoken', '')
+                            if not fytoken:
+                                logger.warning(f"No fytoken for symbol {cleaned_symbol}, skipping")
+                                continue
+
+                            # Check if this fytoken already exists (primary key lookup)
+                            existing_record = session.query(SymbolMaster).filter(
+                                SymbolMaster.fytoken == fytoken
                             ).first()
 
-                            if not existing_symbol:
-                                symbol_master = SymbolMaster(
-                                    symbol=cleaned_symbol,
-                                    fytoken=symbol_data.get('fytoken', ''),
-                                    name=symbol_data.get('name', ''),
-                                    exchange=exchange,
-                                    segment=symbol_data.get('segment', 'CM'),
-                                    instrument_type=symbol_data.get('instrument_type', 'EQ'),
-                                    lot_size=symbol_data.get('lot', 1),
-                                    tick_size=symbol_data.get('tick', 0.05),
-                                    isin=symbol_data.get('isin', ''),
-                                    data_source='fyers',
-                                    is_active=True,
-                                    is_equity=True
-                                )
+                            if existing_record:
+                                # Update existing record with latest data while preserving verification
+                                logger.info(f"Updating existing record for fytoken {fytoken}: {existing_record.symbol} -> {cleaned_symbol}")
+
+                                # Update basic symbol data
+                                existing_record.symbol = cleaned_symbol
+                                existing_record.name = symbol_data.get('name', existing_record.name)
+                                existing_record.exchange = exchange
+                                existing_record.segment = symbol_data.get('segment', existing_record.segment)
+                                existing_record.instrument_type = symbol_data.get('instrument_type', existing_record.instrument_type)
+                                existing_record.lot_size = symbol_data.get('lot', existing_record.lot_size)
+                                existing_record.tick_size = symbol_data.get('tick', existing_record.tick_size)
+                                existing_record.isin = symbol_data.get('isin', existing_record.isin)
+                                existing_record.updated_at = datetime.utcnow()
+
+                                # Verification data is automatically preserved (not overwritten)
+                                logger.info(f"Preserved verification status: {getattr(existing_record, 'is_fyers_verified', False)}")
+
+                            else:
+                                # Create new record
+                                # Create symbol with preserved verification data if applicable
+                                symbol_master_data = {
+                                    'symbol': cleaned_symbol,
+                                    'fytoken': symbol_data.get('fytoken', ''),
+                                    'name': symbol_data.get('name', ''),
+                                    'exchange': exchange,
+                                    'segment': symbol_data.get('segment', 'CM'),
+                                    'instrument_type': symbol_data.get('instrument_type', 'EQ'),
+                                    'lot_size': symbol_data.get('lot', 1),
+                                    'tick_size': symbol_data.get('tick', 0.05),
+                                    'isin': symbol_data.get('isin', ''),
+                                    'data_source': 'fyers',
+                                    'is_active': True,
+                                    'is_equity': True
+                                }
+
+                                # Preserve verification data if applicable
+                                if should_preserve_verification and existing_verification_data:
+                                    symbol_master_data.update({
+                                        'is_fyers_verified': existing_verification_data['is_fyers_verified'],
+                                        'verification_date': existing_verification_data['verification_date'],
+                                        'verification_error': existing_verification_data['verification_error'],
+                                        'last_quote_check': existing_verification_data['last_quote_check']
+                                    })
+
+                                symbol_master = SymbolMaster(**symbol_master_data)
                                 session.add(symbol_master)
                                 symbols_added += 1
 

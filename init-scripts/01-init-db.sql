@@ -228,6 +228,10 @@ CREATE TABLE IF NOT EXISTS stocks (
     beta DECIMAL(8,4),
     is_active BOOLEAN DEFAULT TRUE,
     is_tradeable BOOLEAN DEFAULT TRUE,
+    -- Verification columns for Fyers API compatibility
+    is_fyers_verified BOOLEAN DEFAULT FALSE,
+    verification_date TIMESTAMP,
+    verification_error TEXT,
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -358,11 +362,10 @@ CREATE TABLE IF NOT EXISTS portfolio_positions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Symbol Master table for raw broker data
+-- Symbol Master table for raw broker data (fytoken as primary key)
 CREATE TABLE IF NOT EXISTS symbol_master (
-    id SERIAL PRIMARY KEY,
+    fytoken VARCHAR(50) PRIMARY KEY NOT NULL,  -- Fyers unique token as primary key
     symbol VARCHAR(50) NOT NULL,
-    fytoken VARCHAR(50) UNIQUE NOT NULL,
     name VARCHAR(200) NOT NULL,
     exchange VARCHAR(20) NOT NULL,
     segment VARCHAR(20) NOT NULL,
@@ -375,10 +378,14 @@ CREATE TABLE IF NOT EXISTS symbol_master (
     download_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_active BOOLEAN DEFAULT TRUE,
     is_equity BOOLEAN DEFAULT TRUE,
+    -- Verification columns for Fyers API compatibility
+    is_fyers_verified BOOLEAN DEFAULT FALSE,
+    verification_date TIMESTAMP,
+    verification_error TEXT,
+    last_quote_check TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(symbol, exchange),
-    UNIQUE(fytoken)
+    UNIQUE(symbol, exchange)
 );
 
 -- Market Data Snapshots table
@@ -539,9 +546,10 @@ CREATE INDEX IF NOT EXISTS idx_ml_training_jobs_symbol ON ml_training_jobs(symbo
 CREATE INDEX IF NOT EXISTS idx_ml_trained_models_user_symbol ON ml_trained_models(user_id, symbol);
 CREATE INDEX IF NOT EXISTS idx_ml_trained_models_active ON ml_trained_models(user_id, is_active);
 CREATE INDEX IF NOT EXISTS idx_symbol_master_symbol ON symbol_master(symbol);
-CREATE INDEX IF NOT EXISTS idx_symbol_master_fytoken ON symbol_master(fytoken);
 CREATE INDEX IF NOT EXISTS idx_symbol_master_exchange ON symbol_master(exchange);
 CREATE INDEX IF NOT EXISTS idx_symbol_master_active ON symbol_master(is_active, is_equity);
+CREATE INDEX IF NOT EXISTS idx_symbol_master_verified ON symbol_master(is_fyers_verified);
+CREATE INDEX IF NOT EXISTS idx_stocks_verified ON stocks(is_fyers_verified);
 CREATE INDEX IF NOT EXISTS idx_market_data_snapshots_date ON market_data_snapshots(snapshot_date);
 CREATE INDEX IF NOT EXISTS idx_stocks_active ON stocks(is_active, is_tradeable);
 CREATE INDEX IF NOT EXISTS idx_stocks_market_cap ON stocks(market_cap);

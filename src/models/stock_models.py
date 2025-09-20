@@ -287,11 +287,9 @@ class SymbolMaster(Base):
     """Raw symbol master data from broker APIs."""
     __tablename__ = 'symbol_master'
 
-    id = Column(Integer, primary_key=True)
-
-    # Symbol identification
+    # Symbol identification - fytoken is the primary key (TRUE UNIQUE IDENTIFIER)
+    fytoken = Column(String(50), primary_key=True, nullable=False)  # Fyers unique token (PRIMARY KEY)
     symbol = Column(String(50), nullable=False, index=True)  # NSE:SYMBOL-EQ
-    fytoken = Column(String(50), unique=True, nullable=False, index=True)  # Fyers unique token
     name = Column(String(200), nullable=False)
     exchange = Column(String(20), nullable=False, index=True)  # NSE, BSE
     segment = Column(String(20), nullable=False)  # CM (Capital Market)
@@ -311,14 +309,19 @@ class SymbolMaster(Base):
     is_active = Column(Boolean, default=True, index=True)
     is_equity = Column(Boolean, default=True, index=True)  # Only equity symbols
 
+    # Verification status for Fyers API compatibility
+    is_fyers_verified = Column(Boolean, default=False, index=True)
+    verification_date = Column(DateTime)
+    verification_error = Column(Text)
+    last_quote_check = Column(DateTime)
+
     # Metadata
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Unique constraint to prevent duplicates
+    # Unique constraint to prevent duplicate symbol-exchange combinations
     __table_args__ = (
         UniqueConstraint('symbol', 'exchange', name='_symbol_exchange_uc'),
-        UniqueConstraint('fytoken', name='_fytoken_uc'),
     )
 
     def __repr__(self):
