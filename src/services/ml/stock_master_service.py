@@ -120,20 +120,22 @@ class StockMasterService:
 
                 symbols_added = 0
                 for symbol_data in equity_symbols:
-                    symbol = symbol_data.get('symbol', '')
-                    if symbol and '-EQ' in symbol:  # Only equity symbols
-                        all_symbols.add(symbol)
+                    original_symbol = symbol_data.get('symbol', '')
+                    if original_symbol and '-EQ' in original_symbol:  # Only equity symbols
+                        # Clean the symbol before storing
+                        cleaned_symbol = self._clean_symbol(original_symbol)
+                        all_symbols.add(cleaned_symbol)
 
                         # Store in symbol_master table for future reference
                         try:
                             existing_symbol = session.query(SymbolMaster).filter(
-                                SymbolMaster.symbol == symbol,
+                                SymbolMaster.symbol == cleaned_symbol,
                                 SymbolMaster.exchange == exchange
                             ).first()
 
                             if not existing_symbol:
                                 symbol_master = SymbolMaster(
-                                    symbol=symbol,
+                                    symbol=cleaned_symbol,
                                     fytoken=symbol_data.get('fytoken', ''),
                                     name=symbol_data.get('name', ''),
                                     exchange=exchange,
@@ -150,7 +152,7 @@ class StockMasterService:
                                 symbols_added += 1
 
                         except Exception as e:
-                            logger.warning(f"Error storing symbol {symbol} in symbol_master: {e}")
+                            logger.warning(f"Error storing symbol {cleaned_symbol} in symbol_master: {e}")
                             continue
 
                 # Commit all symbol_master entries
@@ -205,14 +207,16 @@ class StockMasterService:
                         logger.debug(f"Search pattern '{pattern}' returned {len(symbols)} results")
 
                         for symbol_info in symbols:
-                            symbol = symbol_info.get('symbol', '')
+                            original_symbol = symbol_info.get('symbol', '')
                             name = symbol_info.get('name', symbol_info.get('symbol_name', ''))
 
                             # Filter for equity stocks only
-                            if (symbol.startswith(f"{exchange}:") and
-                                '-EQ' in symbol and
+                            if (original_symbol.startswith(f"{exchange}:") and
+                                '-EQ' in original_symbol and
                                 len(name) > 2):
-                                all_symbols.add(symbol)
+                                # Clean the symbol before adding to collection
+                                cleaned_symbol = self._clean_symbol(original_symbol)
+                                all_symbols.add(cleaned_symbol)
 
                     # Rate limiting
                     time.sleep(0.2)
@@ -308,9 +312,94 @@ class StockMasterService:
             logger.warning(f"Error updating stock {stock.symbol}: {e}")
             return 0
 
+    def _clean_symbol(self, symbol: str) -> str:
+        """
+        Clean symbol to ensure Fyers API compatibility.
+        Removes problematic characters that cause 'invalid input' errors.
+        """
+        if not symbol:
+            return symbol
+
+        # Handle common problematic patterns
+        cleaned_symbol = symbol
+
+        # Replace ampersands with appropriate text
+        ampersand_mappings = {
+            'ARE&M': 'AREAM',
+            'GMRP&UI': 'GMRPUI',
+            'GVT&D': 'GVTD',
+            'J&KBANK': 'JKBANK',
+            'M&M': 'MM',
+            'M&MFIN': 'MMFIN',
+            'S&SPOWER': 'SSPOWER',
+            'SURANAT&P': 'SURANATPHARMA'
+        }
+
+        # Extract the base symbol for checking
+        if ':' in cleaned_symbol and '-EQ' in cleaned_symbol:
+            prefix = cleaned_symbol.split(':')[0] + ':'
+            suffix = '-EQ'
+            base_symbol = cleaned_symbol.replace(prefix, '').replace(suffix, '')
+
+            # Apply ampersand mappings
+            if base_symbol in ampersand_mappings:
+                cleaned_symbol = f"{prefix}{ampersand_mappings[base_symbol]}{suffix}"
+            else:
+                # General ampersand cleaning (remove & entirely)
+                if '&' in base_symbol:
+                    # Replace & with empty string, but handle common cases
+                    base_symbol = base_symbol.replace('&', '')
+                    cleaned_symbol = f"{prefix}{base_symbol}{suffix}"
+
+        # Handle double hyphens in company names
+        double_hyphen_mappings = {
+            'BAJAJ-AUTO': 'BAJAJAUTO',
+            'HCL-INSYS': 'HCLINSYS',
+            'NAM-INDIA': 'NAMINDIA',
+            'UMIYA-MRO': 'UMIYAMRO'
+        }
+
+        if ':' in cleaned_symbol and '-EQ' in cleaned_symbol:
+            prefix = cleaned_symbol.split(':')[0] + ':'
+            suffix = '-EQ'
+            base_symbol = cleaned_symbol.replace(prefix, '').replace(suffix, '')
+
+            # Apply double hyphen mappings
+            if base_symbol in double_hyphen_mappings:
+                cleaned_symbol = f"{prefix}{double_hyphen_mappings[base_symbol]}{suffix}"
+            else:
+                # General double hyphen cleaning - only keep the first part before first hyphen
+                # unless it's the standard -EQ suffix
+                if base_symbol.count('-') > 0:
+                    # Keep only alphanumeric characters for the base part
+                    # This removes extra hyphens while preserving the main symbol
+                    base_parts = base_symbol.split('-')
+                    if len(base_parts) > 1:
+                        # Take the first part and any numeric parts, remove extra text parts
+                        clean_base = base_parts[0]
+                        for part in base_parts[1:]:
+                            if part.isdigit() or len(part) <= 2:  # Keep short suffixes and numbers
+                                clean_base += part
+                        cleaned_symbol = f"{prefix}{clean_base}{suffix}"
+
+        # Remove any other special characters that might cause issues
+        special_chars = ['[', ']', '(', ')', '/', '\\', '+', '=', '|', '<', '>', '?', '*']
+        for char in special_chars:
+            if char in cleaned_symbol:
+                cleaned_symbol = cleaned_symbol.replace(char, '')
+
+        # Log if symbol was changed
+        if cleaned_symbol != symbol:
+            logger.info(f"Cleaned symbol: {symbol} → {cleaned_symbol}")
+
+        return cleaned_symbol
+
     def _create_new_stock(self, symbol: str, quote_data: Dict, exchange: str) -> Optional[Stock]:
         """Create a new stock record."""
         try:
+            # Clean the symbol first to prevent API compatibility issues
+            cleaned_symbol = self._clean_symbol(symbol)
+
             # Extract basic data
             current_price = float(quote_data.get('lp', quote_data.get('ltp', quote_data.get('last_price', 0))))
             volume = int(quote_data.get('volume', quote_data.get('vol', 0)))
@@ -319,7 +408,7 @@ class StockMasterService:
                 return None
 
             # Extract name from symbol
-            name = symbol.replace(f"{exchange}:", "").replace("-EQ", "")
+            name = cleaned_symbol.replace(f"{exchange}:", "").replace("-EQ", "")
             if 'symbol_name' in quote_data:
                 name = quote_data['symbol_name']
 
@@ -333,9 +422,9 @@ class StockMasterService:
             # Calculate tradeability
             is_tradeable = self._calculate_tradeability(current_price, volume, quote_data)
 
-            # Create new stock
+            # Create new stock with cleaned symbol
             new_stock = Stock(
-                symbol=symbol,
+                symbol=cleaned_symbol,
                 name=name,
                 exchange=exchange,
                 sector=sector,
