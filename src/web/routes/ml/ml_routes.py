@@ -384,7 +384,7 @@ def _get_basic_screening_suggestions(strategy_type: str, limit: int, user_id: in
     """Get stock suggestions using basic screening without ML predictions."""
     try:
         # Use new basic stock screening service
-        from ....services.basic_stock_screening_service import get_basic_stock_screening_service
+        from ....services.market.basic_stock_screening_service import get_basic_stock_screening_service
 
         screening_service = get_basic_stock_screening_service()
         screening_result = screening_service.get_top_stocks(

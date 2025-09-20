@@ -94,6 +94,10 @@ class OrderSyncService:
             # Determine what needs to be synced
             new_orders = []
             updated_orders = []
+            stale_orders = []
+
+            # Get order IDs from Fyers response
+            fyers_order_ids = {order.get('order_id') for order in fyers_orders if order.get('order_id')}
 
             for fyers_order in fyers_orders:
                 order_id = fyers_order.get('order_id')
@@ -109,10 +113,21 @@ class OrderSyncService:
                     # New order
                     new_orders.append(fyers_order)
 
-            # Update database
-            if new_orders or updated_orders:
-                self._update_database(user_id, new_orders, updated_orders)
-                logger.info(f"Synced {len(new_orders)} new orders and {len(updated_orders)} updated orders for user {user_id}")
+            # Find orders that exist in DB but not in Fyers response (stale orders)
+            for db_order in db_orders:
+                db_order_id = db_order.get('order_id')
+                if db_order_id and db_order_id not in fyers_order_ids:
+                    # Order exists in DB but not in broker - mark as stale/removed
+                    stale_order = db_order.copy()
+                    stale_order['status'] = 'CANCELLED'  # Mark as cancelled since it's no longer on broker
+                    stale_order['updated_at'] = datetime.utcnow().isoformat()
+                    stale_orders.append(stale_order)
+                    logger.info(f"Found stale order {db_order_id} - marking as cancelled")
+
+            # Update database with all changes including stale orders
+            if new_orders or updated_orders or stale_orders:
+                self._update_database(user_id, new_orders, updated_orders, stale_orders)
+                logger.info(f"Synced {len(new_orders)} new orders, {len(updated_orders)} updated orders, and {len(stale_orders)} stale orders for user {user_id}")
 
             # Update sync timestamp
             self._update_last_sync(user_id)
@@ -222,8 +237,8 @@ class OrderSyncService:
 
         return False
 
-    def _update_database(self, user_id: int, new_orders: List[Dict], updated_orders: List[Dict]):
-        """Update database with new and updated orders."""
+    def _update_database(self, user_id: int, new_orders: List[Dict], updated_orders: List[Dict], stale_orders: List[Dict] = None):
+        """Update database with new, updated, and stale orders."""
         try:
             with self.db_manager.get_session() as session:
                 # Insert new orders
@@ -241,6 +256,22 @@ class OrderSyncService:
 
                     if db_order:
                         self._update_db_order(db_order, order_data)
+
+                # Handle stale orders (orders that exist in DB but not on broker)
+                if stale_orders:
+                    for stale_order_data in stale_orders:
+                        order_id = stale_order_data['order_id']
+                        db_order = session.query(Order).filter(
+                            Order.order_id == order_id,
+                            Order.user_id == user_id
+                        ).first()
+
+                        if db_order:
+                            # Mark as cancelled since it no longer exists on broker
+                            db_order.order_status = 'CANCELLED'
+                            db_order.status_message = 'Order not found on broker - marked as cancelled'
+                            db_order.updated_at = datetime.utcnow()
+                            logger.info(f"Updated stale order {order_id} status to CANCELLED")
 
                 session.commit()
 

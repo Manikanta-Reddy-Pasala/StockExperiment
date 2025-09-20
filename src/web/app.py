@@ -1322,6 +1322,42 @@ def create_app():
                 'worst_performers': []
             }), 500
 
+    @app.route('/api/orders/sync-broker', methods=['POST'])
+    def api_sync_orders_from_broker():
+        """Force sync orders from broker API for debugging."""
+        try:
+            user_id = getattr(current_user, 'id', None) if current_user and current_user.is_authenticated else 1
+
+            app.logger.info(f"Manual broker sync requested for user {user_id}")
+
+            from src.services.data.order_sync_service import get_order_sync_service
+            order_sync_service = get_order_sync_service()
+
+            # Force refresh from broker
+            orders = order_sync_service.get_user_orders(user_id, force_refresh=True)
+
+            # Also test broker API directly
+            from src.services.core.broker_service import get_broker_service
+            broker_service = get_broker_service()
+
+            broker_orders = broker_service.get_fyers_orderbook(user_id)
+            broker_trades = broker_service.get_fyers_tradebook(user_id)
+
+            return jsonify({
+                'success': True,
+                'synced_orders_count': len(orders),
+                'broker_orders_response': broker_orders,
+                'broker_trades_response': broker_trades,
+                'orders_sample': orders[:2] if orders else []
+            })
+
+        except Exception as e:
+            app.logger.error(f"Error during broker sync: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
     @app.route('/api/alerts', methods=['GET'])
     @login_required
     def api_get_alerts():
