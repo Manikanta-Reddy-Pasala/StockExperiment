@@ -388,29 +388,152 @@ class StockMasterService:
             return "small_cap"
 
     def _determine_sector(self, name: str) -> str:
-        """Determine sector from stock name using keywords."""
+        """Determine sector from stock name using comprehensive keyword mapping."""
         name_upper = name.upper()
 
-        if any(term in name_upper for term in ['BANK', 'FINANCE', 'FINANCIAL', 'LENDING', 'CREDIT']):
+        # Banking & Financial Services - Comprehensive list
+        banking_keywords = [
+            'BANK', 'FINANCE', 'FINANCIAL', 'LENDING', 'CREDIT', 'CAPITAL', 'SECURITIES',
+            'MUTUAL', 'ASSET', 'HOUSING', 'HFC', 'NBFC', 'LEASING', 'INVESTMENTS',
+            'EQUITY', 'WEALTH', 'INSURANCE', 'LIFE', 'GENERAL', 'BROKING', 'TRADING',
+            'FUNDS', 'INVEST', 'LOANS', 'MORTGAG', 'MICROFINANCE', 'MFIN'
+        ]
+
+        # Technology & IT - Extended with more patterns
+        technology_keywords = [
+            'IT', 'TECH', 'SOFTWARE', 'SYSTEM', 'COMPUTER', 'DIGITAL', 'INFO', 'DATA',
+            'CYBER', 'SOLUTIONS', 'SERVICES', 'AUTOMATION', 'ANALYTICS', 'AI', 'CLOUD',
+            'MICRO', 'ELECTRONICS', 'SEMICONDUCTOR', 'CHIPS', 'COMMUNICATIONS', 'COMM',
+            'SILICON', 'PROCESSORS', 'MEMORY', 'DEVICES', 'INFOTECH', 'DATACOM',
+            'NETWORKS', 'TELESERVICES', 'ONLINE', 'WEB', 'INTERNET', 'APPS'
+        ]
+
+        # Pharmaceutical & Healthcare - More medical terms
+        pharma_keywords = [
+            'PHARMA', 'DRUG', 'MEDICINE', 'HEALTHCARE', 'BIO', 'LABORATORY', 'LABS',
+            'MEDICAL', 'HEALTH', 'DIAGNOSTICS', 'THERAPEU', 'VACCINES', 'HOSPITAL',
+            'CLINIC', 'SURGICAL', 'DIAGNOSTIC', 'LIFE', 'SCIENCES', 'BIOTECH',
+            'WELLNESS', 'MEDICARE', 'MEDIC', 'APOLLO', 'CARE', 'CURE'
+        ]
+
+        # Automobile & Transportation - More auto terms
+        auto_keywords = [
+            'AUTO', 'MOTOR', 'VEHICLE', 'TRANSPORT', 'LOGISTICS', 'CARGO', 'SHIPPING',
+            'FREIGHT', 'DELIVERY', 'MOBILITY', 'TYRE', 'TYRES', 'WHEELS', 'PARTS',
+            'COMPONENT', 'BEARINGS', 'FORGING', 'CASTINGS', 'ENGINES', 'GEARS',
+            'AUTOMOBILES', 'CARS', 'BIKES', 'SCOOTER', 'BAJAJ', 'MARUTI'
+        ]
+
+        # FMCG & Consumer Goods - More consumer terms
+        fmcg_keywords = [
+            'FMCG', 'CONSUMER', 'FOOD', 'BEVERAGE', 'RETAIL', 'PRODUCTS', 'GOODS',
+            'BRANDS', 'PERSONAL', 'CARE', 'COSMETIC', 'BEAUTY', 'HYGIENE', 'SOAP',
+            'DETERGENT', 'TOBACCO', 'CIGARETTE', 'DAIRY', 'MILK', 'NUTRITION',
+            'CONFECTION', 'BISCUIT', 'SNACKS', 'EDIBLE', 'OIL', 'SUGAR', 'TEA', 'COFFEE',
+            'FOODS', 'DRINKS', 'FROZEN', 'SPICES', 'FLOUR', 'RICE', 'WHEAT'
+        ]
+
+        # Metals & Mining - More metal terms
+        metals_keywords = [
+            'METAL', 'STEEL', 'IRON', 'COAL', 'MINING', 'ALUMINIUM', 'ALUMINUM',
+            'COPPER', 'ZINC', 'LEAD', 'NICKEL', 'TIN', 'ALLOY', 'FOUNDRY',
+            'SMELTING', 'ORE', 'MINERAL', 'METALLURGY', 'ROLLING', 'WIRE', 'TUBES',
+            'PIPE', 'PIPES', 'RODS', 'BARS', 'SHEETS', 'COILS', 'STRIPS'
+        ]
+
+        # Energy & Power - More energy terms
+        energy_keywords = [
+            'ENERGY', 'POWER', 'OIL', 'GAS', 'PETROLEUM', 'SOLAR', 'ELECTRIC', 'ELECTRICITY',
+            'RENEWABLE', 'WIND', 'HYDRO', 'THERMAL', 'NUCLEAR', 'FUEL', 'COAL',
+            'REFINERY', 'PIPELINE', 'DISTRIBUTION', 'TRANSMISSION', 'GRID', 'UTILITIES'
+        ]
+
+        # Infrastructure & Construction - More construction terms
+        infra_keywords = [
+            'INFRA', 'CEMENT', 'CONSTRUCTION', 'BUILDING', 'ENGINEERING', 'CONCRETE',
+            'ROADS', 'BRIDGE', 'INFRASTRUCTURE', 'CONTRACTORS', 'PROJECTS', 'REAL',
+            'ESTATE', 'PROPERTY', 'DEVELOPMENT', 'HOUSING', 'RESIDENTIAL', 'COMMERCIAL',
+            'BUILDERS', 'CONSTRUCT', 'HOMES', 'FLATS', 'TOWERS', 'TOWNSHIP'
+        ]
+
+        # Telecommunications - More telecom terms
+        telecom_keywords = [
+            'TELECOM', 'COMMUNICATION', 'WIRELESS', 'NETWORK', 'TELEPHONE', 'MOBILE',
+            'BROADBAND', 'INTERNET', 'SATELLITE', 'CABLE', 'FIBER', 'OPTIC', 'BHARTI'
+        ]
+
+        # Textiles & Apparel - More textile terms
+        textile_keywords = [
+            'TEXTILE', 'COTTON', 'FABRIC', 'GARMENT', 'APPAREL', 'CLOTH', 'YARN',
+            'SPINNING', 'WEAVING', 'FASHION', 'CLOTHING', 'SYNTHETIC', 'FIBER',
+            'DENIM', 'SILK', 'WOOL', 'POLYESTER', 'KNITTING', 'MILLS', 'FABRICS'
+        ]
+
+        # Chemical & Petrochemicals - More chemical terms
+        chemical_keywords = [
+            'CHEMICAL', 'CHEMICALS', 'PETRO', 'POLYMER', 'PLASTIC', 'RESIN', 'DYES',
+            'PIGMENT', 'SPECIALTY', 'INDUSTRIAL', 'AGRO', 'FERTILIZER', 'PESTICIDE',
+            'CROP', 'PROTECTION', 'PAINT', 'COATING', 'ADHESIVE', 'RUBBER'
+        ]
+
+        # Media & Entertainment - More media terms
+        media_keywords = [
+            'MEDIA', 'ENTERTAINMENT', 'TELEVISION', 'TV', 'BROADCASTING', 'NEWS',
+            'FILM', 'MOVIE', 'PRODUCTION', 'ADVERTISING', 'MARKETING', 'PUBLISHING',
+            'PRINT', 'CONTENT', 'STUDIOS', 'RADIO', 'CHANNEL'
+        ]
+
+        # Agriculture & Allied - More agri terms
+        agri_keywords = [
+            'AGRI', 'AGRICULTURE', 'FARMING', 'CROPS', 'SEEDS', 'IRRIGATION',
+            'TRACTORS', 'EQUIPMENT', 'MACHINERY', 'FERTILIZERS', 'ORGANIC',
+            'PLANTATION', 'HORTICULTURE', 'AQUACULTURE', 'FISHERIES', 'SUGAR'
+        ]
+
+        # Manufacturing & Industrial - New category for better classification
+        manufacturing_keywords = [
+            'MANUFACTUR', 'INDUSTRIAL', 'INDUSTRIES', 'IND', 'MACHINERY', 'EQUIPMENT',
+            'TOOLS', 'INSTRUMENTS', 'PRECISION', 'ENGINEERING', 'GEAR', 'VALVES',
+            'PUMPS', 'COMPRESSOR', 'TURBINE', 'BOILER', 'CRANE', 'MACHINE'
+        ]
+
+        # Trading & Commerce - New category
+        trading_keywords = [
+            'TRADING', 'TRADERS', 'COMMERCE', 'EXPORTS', 'IMPORTS', 'GLOBAL',
+            'INTERNATIONAL', 'OVERSEAS', 'FOREIGN', 'WORLDWIDE', 'UNIVERSAL'
+        ]
+
+        # Check each sector in priority order (most specific first)
+        if any(term in name_upper for term in banking_keywords):
             return 'Banking'
-        elif any(term in name_upper for term in ['IT', 'TECH', 'SOFTWARE', 'SYSTEM', 'COMPUTER', 'DIGITAL']):
+        elif any(term in name_upper for term in technology_keywords):
             return 'Technology'
-        elif any(term in name_upper for term in ['PHARMA', 'DRUG', 'MEDICINE', 'HEALTHCARE', 'BIO', 'LABORATORY']):
+        elif any(term in name_upper for term in pharma_keywords):
             return 'Pharmaceutical'
-        elif any(term in name_upper for term in ['AUTO', 'MOTOR', 'VEHICLE', 'TRANSPORT', 'LOGISTICS']):
+        elif any(term in name_upper for term in auto_keywords):
             return 'Automobile'
-        elif any(term in name_upper for term in ['FMCG', 'CONSUMER', 'FOOD', 'BEVERAGE', 'RETAIL']):
+        elif any(term in name_upper for term in fmcg_keywords):
             return 'FMCG'
-        elif any(term in name_upper for term in ['METAL', 'STEEL', 'IRON', 'COAL', 'MINING', 'ALUMINIUM']):
+        elif any(term in name_upper for term in metals_keywords):
             return 'Metals'
-        elif any(term in name_upper for term in ['ENERGY', 'POWER', 'OIL', 'GAS', 'PETROLEUM', 'SOLAR', 'ELECTRIC']):
+        elif any(term in name_upper for term in energy_keywords):
             return 'Energy'
-        elif any(term in name_upper for term in ['INFRA', 'CEMENT', 'CONSTRUCTION', 'BUILDING', 'ENGINEERING']):
+        elif any(term in name_upper for term in infra_keywords):
             return 'Infrastructure'
-        elif any(term in name_upper for term in ['TELECOM', 'COMMUNICATION', 'WIRELESS', 'NETWORK']):
+        elif any(term in name_upper for term in telecom_keywords):
             return 'Telecommunications'
-        elif any(term in name_upper for term in ['TEXTILE', 'COTTON', 'FABRIC', 'GARMENT', 'APPAREL']):
+        elif any(term in name_upper for term in textile_keywords):
             return 'Textiles'
+        elif any(term in name_upper for term in chemical_keywords):
+            return 'Chemicals'
+        elif any(term in name_upper for term in media_keywords):
+            return 'Media'
+        elif any(term in name_upper for term in agri_keywords):
+            return 'Agriculture'
+        elif any(term in name_upper for term in manufacturing_keywords):
+            return 'Manufacturing'
+        elif any(term in name_upper for term in trading_keywords):
+            return 'Trading'
         else:
             return 'Others'
 
