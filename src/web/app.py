@@ -114,30 +114,40 @@ def create_app():
     # Schedule default tasks
     scheduler.schedule_data_cleanup(interval_hours=24)
 
-    # Initialize startup service and run application initialization
+    # Initialize stock initialization service with complete flow
     try:
-        from ..services.startup import get_startup_service
-        from ..services.ml.stock_master_service import get_stock_master_service
-        stock_master_service = get_stock_master_service()
-        startup_service = get_startup_service(db_manager, broker_service, stock_master_service)
+        from ..services.data.stock_initialization_service import get_stock_initialization_service
+        stock_init_service = get_stock_initialization_service()
 
-        # Run startup initialization in background thread to avoid blocking app startup
+        # Run complete stock initialization in background thread
         import threading
-        def run_startup_initialization():
+        def run_complete_stock_initialization():
             try:
-                app.logger.info("🔄 Running startup initialization...")
-                results = startup_service.initialize_application()
-                app.logger.info(f"✅ Startup initialization completed: {results.get('stock_data_loaded', False)} stock data, {results.get('market_snapshots', False)} snapshots")
+                app.logger.info("🚀 Running complete stock system initialization...")
+                app.logger.info("📊 This includes: Symbol Master → Verification → Stock Creation")
+
+                results = stock_init_service.initialize_complete_stock_system()
+
+                if results.get('success'):
+                    app.logger.info("✅ Stock system initialization completed successfully!")
+                    app.logger.info(f"📊 Symbol Master: {results.get('symbol_master', {}).get('total_symbols', 0)} symbols")
+                    app.logger.info(f"🔍 Verification: {results.get('verification', {}).get('verified', 0)} verified")
+                    app.logger.info(f"📈 Stocks: {results.get('stocks', {}).get('created', 0)} created, {results.get('stocks', {}).get('updated', 0)} updated")
+                else:
+                    app.logger.error(f"❌ Stock system initialization failed: {results.get('error', 'Unknown error')}")
+
             except Exception as e:
-                app.logger.error(f"❌ Startup initialization failed: {e}")
+                app.logger.error(f"❌ Stock system initialization failed: {e}")
+                import traceback
+                app.logger.error(f"Stack trace: {traceback.format_exc()}")
 
         # Start initialization in background thread
-        startup_thread = threading.Thread(target=run_startup_initialization, daemon=True)
+        startup_thread = threading.Thread(target=run_complete_stock_initialization, daemon=True)
         startup_thread.start()
-        app.logger.info("🚀 Startup initialization launched in background")
+        app.logger.info("🚀 Complete stock system initialization launched in background")
 
     except Exception as e:
-        app.logger.warning(f"Could not initialize startup service: {e}")
+        app.logger.warning(f"Could not initialize stock system: {e}")
 
     # Initialize charting
     charts = DatabaseCharts(db_manager)

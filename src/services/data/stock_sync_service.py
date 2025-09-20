@@ -141,8 +141,10 @@ class StockSyncService:
 
                 for i, symbol_info in enumerate(symbol_data):
                     try:
+                        logger.info(f"🔄 Processing stock {i+1}/{len(symbol_data)}: {symbol_info['symbol']}")
                         # Process individual stock
                         stock_result = self._process_individual_stock_with_data(session, symbol_info, user_id)
+                        logger.info(f"📊 Stock {symbol_info['symbol']} result: {stock_result}")
 
                         # Update counters
                         results['processed'] += 1
@@ -192,7 +194,8 @@ class StockSyncService:
             # Get real-time quote for this specific stock
             quote_result = self._get_individual_stock_quote(symbol, user_id)
 
-            if not quote_result['success']:
+            # Check for both 'success' and 'status' fields to handle different broker response formats
+            if not quote_result.get('success', False) and not quote_result.get('status') == 'success':
                 logger.debug(f"❌ No quote data for {symbol}: {quote_result.get('error')}")
                 return {'action': 'skipped', 'reason': 'no_quote_data'}
 
@@ -200,18 +203,23 @@ class StockSyncService:
 
             # Find existing stock by symbol (primary lookup)
             existing_stock = session.query(Stock).filter_by(symbol=symbol).first()
+            logger.info(f"🔍 Checking for existing stock {symbol}: {'Found' if existing_stock else 'Not found'}")
 
             if existing_stock:
                 # Update existing stock with real-time data
+                logger.info(f"📝 Updating existing stock {symbol}")
                 update_result = self._update_stock_with_realtime_data_from_info(existing_stock, quote_data, symbol_info)
                 return {'action': 'updated', 'stock_id': existing_stock.id, 'details': update_result}
             else:
                 # Create new stock with real-time data
+                logger.info(f"🆕 Creating new stock {symbol}")
                 new_stock = self._create_stock_with_realtime_data_from_info(symbol_info, quote_data)
                 if new_stock:
                     session.add(new_stock)
+                    logger.info(f"✅ Successfully created new stock {symbol}")
                     return {'action': 'created', 'stock_id': 'new', 'symbol': symbol}
                 else:
+                    logger.warning(f"❌ Failed to create new stock {symbol}")
                     return {'action': 'skipped', 'reason': 'creation_failed'}
 
         except Exception as e:
@@ -227,7 +235,8 @@ class StockSyncService:
             # Get real-time quote for this specific stock
             quote_result = self._get_individual_stock_quote(symbol, user_id)
 
-            if not quote_result['success']:
+            # Check for both 'success' and 'status' fields to handle different broker response formats
+            if not quote_result.get('success', False) and not quote_result.get('status') == 'success':
                 logger.debug(f"❌ No quote data for {symbol}: {quote_result.get('error')}")
                 return {'action': 'skipped', 'reason': 'no_quote_data'}
 
@@ -395,6 +404,7 @@ class StockSyncService:
         try:
             # Validate quote data first
             validation = self._validate_quote_data(symbol_info['symbol'], quote_data)
+            logger.info(f"🔍 Validation for {symbol_info['symbol']}: {validation}")
             if not validation['valid']:
                 logger.warning(f"⚠️  Invalid quote data for new stock {symbol_info['symbol']}: {validation['errors']}")
                 return None
