@@ -1116,7 +1116,7 @@ def create_app():
             # Get user_id - default to 1 for testing (same pattern as orders API)
             user_id = getattr(current_user, 'id', None) if current_user and current_user.is_authenticated else 1
 
-            from src.services.portfolio_sync_service import get_portfolio_sync_service
+            from src.services.data.portfolio_sync_service import get_portfolio_sync_service
             portfolio_sync_service = get_portfolio_sync_service()
 
             force_refresh = request.args.get('force_refresh', 'false').lower() == 'true'
@@ -1187,7 +1187,7 @@ def create_app():
             app.logger.info(f"Fetching orders data for user {user_id} with caching")
 
             # Use order sync service for efficient data retrieval
-            from src.services.order_sync_service import get_order_sync_service
+            from src.services.data.order_sync_service import get_order_sync_service
             order_sync_service = get_order_sync_service()
 
             # Check if force refresh is requested
@@ -1240,7 +1240,7 @@ def create_app():
 
             app.logger.info(f"Fetching reports data for user {user_id}")
 
-            from src.services.reports_sync_service import get_reports_sync_service
+            from src.services.data.reports_sync_service import get_reports_sync_service
             reports_sync_service = get_reports_sync_service()
 
             force_refresh = request.args.get('force_refresh', 'false').lower() == 'true'
@@ -1261,7 +1261,7 @@ def create_app():
         try:
             user_id = getattr(current_user, 'id', None) if current_user and current_user.is_authenticated else 1
 
-            from src.services.reports_sync_service import get_reports_sync_service
+            from src.services.data.reports_sync_service import get_reports_sync_service
             reports_sync_service = get_reports_sync_service()
 
             force_refresh = request.args.get('force_refresh', 'false').lower() == 'true'
@@ -1284,7 +1284,7 @@ def create_app():
         try:
             user_id = getattr(current_user, 'id', None) if current_user and current_user.is_authenticated else 1
 
-            from src.services.reports_sync_service import get_reports_sync_service
+            from src.services.data.reports_sync_service import get_reports_sync_service
             reports_sync_service = get_reports_sync_service()
 
             force_refresh = request.args.get('force_refresh', 'false').lower() == 'true'
@@ -1304,7 +1304,7 @@ def create_app():
         try:
             user_id = getattr(current_user, 'id', None) if current_user and current_user.is_authenticated else 1
 
-            from src.services.reports_sync_service import get_reports_sync_service
+            from src.services.data.reports_sync_service import get_reports_sync_service
             reports_sync_service = get_reports_sync_service()
 
             force_refresh = request.args.get('force_refresh', 'false').lower() == 'true'
@@ -1320,6 +1320,37 @@ def create_app():
             return jsonify({
                 'top_performers': [],
                 'worst_performers': []
+            }), 500
+
+    @app.route('/api/alerts', methods=['GET'])
+    @login_required
+    def api_get_alerts():
+        """Get user alerts data."""
+        try:
+            # Return a simple alerts structure for now
+            alerts = [
+                {
+                    'id': 1,
+                    'type': 'info',
+                    'title': 'Market Update',
+                    'message': 'Markets are performing well today',
+                    'timestamp': datetime.now().isoformat(),
+                    'read': False
+                }
+            ]
+            return jsonify({
+                'success': True,
+                'alerts': alerts,
+                'total': len(alerts)
+            })
+
+        except Exception as e:
+            app.logger.error(f"Error fetching alerts: {e}")
+            return jsonify({
+                'success': False,
+                'alerts': [],
+                'total': 0,
+                'error': str(e)
             }), 500
 
 

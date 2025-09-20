@@ -15,7 +15,7 @@ import threading
 from src.models.database import get_database_manager
 from src.models.models import Position, Holding
 from src.services.utils.cache_service import get_cache_service
-from src.services.broker_service import get_broker_service
+from src.services.core.broker_service import get_broker_service
 
 logger = logging.getLogger(__name__)
 
