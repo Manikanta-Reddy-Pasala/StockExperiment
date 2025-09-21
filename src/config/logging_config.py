@@ -69,8 +69,8 @@ def setup_logging():
                 'level': 'INFO',
                 'propagate': False
             },
-            'api_calls': {  # API calls logger
-                'handlers': ['console', 'api_file'],
+            'api_calls': {  # API calls logger - CONSOLE DISABLED
+                'handlers': ['api_file'],  # Only log to file, not console
                 'level': 'INFO',
                 'propagate': False
             },

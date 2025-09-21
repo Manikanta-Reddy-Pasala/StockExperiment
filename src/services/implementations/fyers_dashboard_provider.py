@@ -22,7 +22,7 @@ class FyersDashboardProvider(IDashboardProvider):
     
     def get_market_overview(self, user_id: int) -> Dict[str, Any]:
         """Get market overview data using real Fyers API data only."""
-        print(f"DEBUG: FyersDashboardProvider.get_market_overview called for user {user_id}")
+        # Debug print removed for clean console output
         try:
             # Get real positions data to show as market overview
             positions_response = self.fyers_service.positions(user_id)
@@ -233,7 +233,7 @@ class FyersDashboardProvider(IDashboardProvider):
             # Add recent orders
             if orderbook_response.get('status') == 'success':
                 orders = orderbook_response.get('data', [])[:limit//2]
-                print(f"DEBUG: Orders: {orders}")
+# Debug print removed for clean console output
                 for order in orders:
                     activities.append({
                         'type': 'order',

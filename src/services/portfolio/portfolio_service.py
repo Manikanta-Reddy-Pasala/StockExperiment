@@ -13,10 +13,10 @@ class PortfolioService:
 
     def get_portfolio_holdings(self, user_id: int):
         """Get portfolio holdings using FYERS API."""
-        print(f"DEBUG: get_portfolio_holdings called for user {user_id}")
+        # Debug print removed for clean console
         try:
             holdings_data = self.broker_service.get_fyers_holdings(user_id)
-            print(f"DEBUG: holdings_data response: {holdings_data}")
+        # Debug print removed for clean console
 
             # Check if the response is successful (FYERS format: 's': 'ok')
             if holdings_data.get('s') == 'ok':
@@ -41,13 +41,13 @@ class PortfolioService:
                 }
             else:
                 error_msg = holdings_data.get('message', 'Unknown error')
-                print(f"DEBUG: Error in holdings_data: {error_msg}")
+        # Debug print removed for clean console
                 return {
                     'success': False,
                     'error': f'Failed to fetch holdings data from FYERS: {error_msg}'
                 }
         except Exception as e:
-            print(f"DEBUG: Exception in get_portfolio_holdings: {str(e)}")
+        # Debug print removed for clean console
             return {
                 'success': False,
                 'error': f'Failed to fetch holdings data from FYERS: {str(e)}'
@@ -55,17 +55,17 @@ class PortfolioService:
 
     def get_portfolio_positions(self, user_id: int):
         """Get portfolio positions using FYERS API."""
-        print(f"DEBUG: get_portfolio_positions called for user {user_id}")
+        # Debug print removed for clean console
         try:
-            print("DEBUG: Calling broker_service.get_fyers_positions")
+        # Debug print removed for clean console
             positions_data = self.broker_service.get_fyers_positions(user_id)
-            print(f"DEBUG: positions_data response: {positions_data}")
+        # Debug print removed for clean console
             logger.info(f"Portfolio positions response: {positions_data}")
 
             # Check if the response is successful (FYERS format: 's': 'ok')
             if positions_data.get('s') == 'ok':
                 positions = positions_data.get('netPositions', [])
-                print(f"DEBUG: Processing {len(positions)} positions")
+        # Debug print removed for clean console
 
                 processed_positions = []
                 for position in positions:
@@ -81,7 +81,7 @@ class PortfolioService:
                     product = position.get('product', position.get('productType', ''))
 
                     # Debug each mapped position clearly for docker logs
-                    print(f"DEBUG: Mapped position -> symbol={position.get('symbol','')}, qty={quantity}, avg={avg_price}, ltp={ltp_val}, pnl={pnl_val}, side={side}, product={product}")
+        # Debug print removed for clean console
 
                     processed_positions.append({
                         'symbol': position.get('symbol', ''),
@@ -101,14 +101,14 @@ class PortfolioService:
                 }
             else:
                 error_msg = positions_data.get('message', 'Unknown error')
-                print(f"DEBUG: Error in positions_data: {error_msg}")
+        # Debug print removed for clean console
                 logger.error(f"Failed to fetch positions data: {error_msg}")
                 return {
                     'success': False,
                     'error': f'Failed to fetch positions data from FYERS: {error_msg}'
                 }
         except Exception as e:
-            print(f"DEBUG: Exception in get_portfolio_positions: {str(e)}")
+        # Debug print removed for clean console
             logger.error(f"Exception in get_portfolio_positions: {str(e)}")
             return {
                 'success': False,
