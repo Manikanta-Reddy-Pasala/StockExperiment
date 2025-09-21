@@ -279,15 +279,23 @@ class BusinessLogicScreener:
         """Apply final portfolio optimization."""
         print(f"   📊 BUSINESS FILTER 5: Portfolio optimization...")
 
-        # Sort by multiple criteria for best selection
+        # Sort by multiple criteria for best selection - ONLY use actual database data
+        # Filter out stocks with missing critical data first
+        valid_stocks = []
+        for stock in stocks:
+            if (stock.volume is not None and stock.volume > 0):
+                valid_stocks.append(stock)
+            else:
+                print(f"         ❌ EXCLUDED: {stock.symbol} - Missing critical volume data")
+
         optimized_stocks = sorted(
-            stocks,
+            valid_stocks,
             key=lambda s: (
-                -(s.market_cap or 0),           # Prefer larger market cap
-                -(s.volume or 0),               # Prefer higher volume
-                -(s.roe or 0),                  # Prefer higher ROE
-                abs((s.pe_ratio or 25) - 15),   # Prefer P/E around 15
-                s.atr_percentage or 999         # Prefer lower ATR%
+                -(s.market_cap) if s.market_cap else float('-inf'),     # Prefer larger market cap (only if available)
+                -(s.volume),                                           # Volume is required - already filtered
+                -(s.roe) if s.roe else float('-inf'),                  # Prefer higher ROE (only if available)
+                abs(s.pe_ratio - 15) if s.pe_ratio else float('inf'), # Prefer P/E around 15 (only if available)
+                s.atr_percentage if s.atr_percentage else float('inf') # Prefer lower ATR% (only if available)
             )
         )
 
@@ -303,28 +311,71 @@ class BusinessLogicScreener:
             criteria = self.strategy_criteria.get(strategy, {})
 
             if strategy == StrategyType.DEFAULT_RISK:
-                # Handle NULL values gracefully (data may not be available yet)
+                # NO MOCK DATA - Only use actual database values, skip if data missing
                 market_cap_ok = (stock.market_cap is None or stock.market_cap >= criteria.get('min_market_cap', 0))
-                atr_ok = (stock.atr_percentage or 0) <= criteria.get('max_atr_percentage', 999)
-                beta_ok = (stock.beta or 1.0) <= criteria.get('max_beta', 999)
+
+                # ATR check - skip stock if no real data
+                if stock.atr_percentage is not None:
+                    atr_ok = stock.atr_percentage <= criteria.get('max_atr_percentage', 999)
+                else:
+                    atr_ok = True  # Allow if no ATR data available
+
+                # Beta check - skip stock if no real data
+                if stock.beta is not None:
+                    beta_ok = stock.beta <= criteria.get('max_beta', 999)
+                else:
+                    beta_ok = True  # Allow if no beta data available
+
                 pe_ok = (stock.pe_ratio is None or stock.pe_ratio <= criteria.get('max_pe_ratio', 999))
-                debt_ok = (stock.debt_to_equity or 0) <= criteria.get('max_debt_equity', 999)
+
+                # Debt check - skip stock if no real data
+                if stock.debt_to_equity is not None:
+                    debt_ok = stock.debt_to_equity <= criteria.get('max_debt_equity', 999)
+                else:
+                    debt_ok = True  # Allow if no debt data available
 
                 return market_cap_ok and atr_ok and beta_ok and pe_ok and debt_ok
 
             elif strategy == StrategyType.HIGH_RISK:
-                # Handle NULL values gracefully (data may not be available yet)
+                # NO MOCK DATA - Only use actual database values
                 market_cap_ok = (stock.market_cap is None or stock.market_cap >= criteria.get('min_market_cap', 0))
-                atr_ok = (stock.atr_percentage or 0) <= criteria.get('max_atr_percentage', 999)
-                beta_ok = (stock.beta or 1.0) <= criteria.get('max_beta', 999)
-                volume_ok = (stock.volume or 0) >= criteria.get('min_volume', 0)
+
+                # ATR check - skip stock if no real data
+                if stock.atr_percentage is not None:
+                    atr_ok = stock.atr_percentage <= criteria.get('max_atr_percentage', 999)
+                else:
+                    atr_ok = True  # Allow if no ATR data available
+
+                # Beta check - skip stock if no real data
+                if stock.beta is not None:
+                    beta_ok = stock.beta <= criteria.get('max_beta', 999)
+                else:
+                    beta_ok = True  # Allow if no beta data available
+
+                # Volume check - REQUIRE actual volume data
+                if stock.volume is not None:
+                    volume_ok = stock.volume >= criteria.get('min_volume', 0)
+                else:
+                    return False  # Reject if no volume data for high risk strategy
+
                 return market_cap_ok and atr_ok and beta_ok and volume_ok
 
             else:  # MEDIUM_RISK or default
-                # Handle NULL values gracefully (data may not be available yet)
+                # NO MOCK DATA - Only use actual database values
                 market_cap_ok = (stock.market_cap is None or stock.market_cap >= criteria.get('min_market_cap', 0))
-                atr_ok = (stock.atr_percentage or 0) <= criteria.get('max_atr_percentage', 999)
-                beta_ok = (stock.beta or 1.0) <= criteria.get('max_beta', 999)
+
+                # ATR check - skip stock if no real data
+                if stock.atr_percentage is not None:
+                    atr_ok = stock.atr_percentage <= criteria.get('max_atr_percentage', 999)
+                else:
+                    atr_ok = True  # Allow if no ATR data available
+
+                # Beta check - skip stock if no real data
+                if stock.beta is not None:
+                    beta_ok = stock.beta <= criteria.get('max_beta', 999)
+                else:
+                    beta_ok = True  # Allow if no beta data available
+
                 return market_cap_ok and atr_ok and beta_ok
 
         except Exception as e:
@@ -393,7 +444,7 @@ class BusinessLogicScreener:
         # Sector distribution
         sector_distribution = {}
         strategy_distribution = {}
-        market_cap_distribution = {'large_cap': 0, 'mid_cap': 0, 'small_cap': 0}
+        market_cap_distribution = {'large_cap': 0, 'mid_cap': 0, 'small_cap': 0, 'unknown': 0}
 
         for stock in self.results['final_stocks']:
             # Sector analysis
@@ -406,14 +457,17 @@ class BusinessLogicScreener:
                 strategy = strategy.value
             strategy_distribution[strategy] = strategy_distribution.get(strategy, 0) + 1
 
-            # Market cap analysis
-            market_cap = stock.market_cap or 0
-            if market_cap >= 20000:  # ₹20,000cr+
-                market_cap_distribution['large_cap'] += 1
-            elif market_cap >= 5000:  # ₹5,000cr - ₹20,000cr
-                market_cap_distribution['mid_cap'] += 1
+            # Market cap analysis - NO MOCK DATA
+            if stock.market_cap is not None:
+                market_cap = stock.market_cap
+                if market_cap >= 20000:  # ₹20,000cr+
+                    market_cap_distribution['large_cap'] += 1
+                elif market_cap >= 5000:  # ₹5,000cr - ₹20,000cr
+                    market_cap_distribution['mid_cap'] += 1
+                else:  # < ₹5,000cr
+                    market_cap_distribution['small_cap'] += 1
             else:
-                market_cap_distribution['small_cap'] += 1
+                market_cap_distribution['unknown'] += 1
 
         return {
             'total_stocks': len(self.results['final_stocks']),

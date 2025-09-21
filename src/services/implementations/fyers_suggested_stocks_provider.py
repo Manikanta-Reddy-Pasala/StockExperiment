@@ -1136,8 +1136,8 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
                 volatility_service = get_volatility_calculator_service()
                 screening_coordinator = ScreeningCoordinator(self.fyers_service, volatility_service)
 
-                # Use default strategy for screening since strategies parameter is not available in this scope
-                screening_strategies = [ScreeningStrategyType.DEFAULT_RISK]
+                # Get user's strategy from settings table instead of using default
+                screening_strategies = self._get_user_screening_strategies(user_id)
 
                 # Execute the complete screening pipeline
                 pipeline_result = screening_coordinator.execute_screening_pipeline(
@@ -1362,4 +1362,46 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
 
         # Default sector if no keywords match
         return 'Diversified'
+
+    def _get_user_screening_strategies(self, user_id: int) -> List:
+        """
+        Get user's screening strategies from settings table.
+
+        Args:
+            user_id: User ID to get settings for
+
+        Returns:
+            List of ScreeningStrategyType enums based on user settings
+        """
+        try:
+            # Import settings service
+            from ..utils.user_settings_service import get_user_settings_service
+            from ..stock_screening.business_logic_screener import StrategyType as ScreeningStrategyType
+
+            user_settings_service = get_user_settings_service()
+            user_settings = user_settings_service.get_user_settings(user_id)
+
+            # Get strategy from settings, default to DEFAULT_RISK if not found
+            strategy_setting = user_settings.get('screening_strategy', 'default_risk')
+
+            # Map string strategy to enum
+            strategy_mapping = {
+                'default_risk': ScreeningStrategyType.DEFAULT_RISK,
+                'high_risk': ScreeningStrategyType.HIGH_RISK,
+                'medium_risk': ScreeningStrategyType.MEDIUM_RISK
+            }
+
+            # Get the strategy enum, fallback to DEFAULT_RISK
+            strategy = strategy_mapping.get(strategy_setting.lower(), ScreeningStrategyType.DEFAULT_RISK)
+
+            print(f"   🎯 Using strategy from user settings: {strategy.value}")
+            return [strategy]
+
+        except Exception as e:
+            logger.warning(f"Could not get user screening strategy from settings: {e}")
+            print(f"   ⚠️  Could not load user strategy from settings, using default: default_risk")
+
+            # Fallback to default strategy
+            from ..stock_screening.business_logic_screener import StrategyType as ScreeningStrategyType
+            return [ScreeningStrategyType.DEFAULT_RISK]
 
