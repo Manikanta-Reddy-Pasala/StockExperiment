@@ -438,10 +438,33 @@ class StockInitializationService:
         - Batch processes with quotes (50 symbols per call)
         - Creates stocks with live prices
         - Completes in ~25 seconds vs 20+ minutes
+
+        Only runs once per day to avoid unnecessary updates.
         """
         start_time = time.time()
 
         try:
+            # Check if stocks were already synced today
+            today = datetime.utcnow().date()
+            with self.db_manager.get_session() as session:
+                latest_stock_update = session.query(Stock.last_updated).filter(
+                    Stock.last_updated >= today
+                ).first()
+
+                if latest_stock_update:
+                    stock_count = session.query(Stock).count()
+                    logger.info(f"📊 Stocks already synced today: {stock_count:,} stocks")
+                    logger.info("⚡ Skipping stock sync - prices are up to date for today")
+                    return {
+                        'success': True,
+                        'total_symbols': stock_count,
+                        'stocks_created': 0,
+                        'duration_seconds': time.time() - start_time,
+                        'source': 'cached_today',
+                        'cached': True,
+                        'message': f'Stocks already synced today ({stock_count:,} stocks)'
+                    }
+
             logger.info("🚀 Starting fast stock synchronization")
 
             # Step 1: Load symbol master (fast)
@@ -637,42 +660,66 @@ class StockInitializationService:
             return 'small_cap'
 
     def _bulk_create_stocks(self, stock_data: List[Dict]) -> int:
-        """Bulk create stock records efficiently."""
+        """Bulk create/update stock records efficiently using upsert logic."""
         if not stock_data:
             return 0
 
         try:
             with self.db_manager.get_session() as session:
-                # Remove existing stocks first
-                session.query(Stock).delete()
+                created_count = 0
+                updated_count = 0
 
-                # Create new stock objects with validation
-                stock_objects = []
-                for data in stock_data:
-                    try:
-                        # Create stock with BigInteger support for volume
-                        stock = Stock(
-                            symbol=data['symbol'],
-                            name=data['name'],
-                            exchange=data['exchange'],
-                            current_price=data['current_price'],
-                            volume=data['volume'],  # BigInteger can handle large values
-                            market_cap_category=data['market_cap_category'],
-                            sector=data['sector'],
-                            is_active=data['is_active'],
-                            is_tradeable=data['is_tradeable'],
-                            last_updated=data['last_updated']
-                        )
-                        stock_objects.append(stock)
-                    except Exception as e:
-                        logger.warning(f"Skipping stock {data.get('symbol', 'unknown')} due to data error: {e}")
-                        continue
+                # Process in batches for better performance
+                batch_size = 100
+                for i in range(0, len(stock_data), batch_size):
+                    batch = stock_data[i:i + batch_size]
 
-                # Bulk insert
-                session.bulk_save_objects(stock_objects)
-                session.commit()
+                    for data in batch:
+                        try:
+                            symbol = data['symbol']
 
-                return len(stock_objects)
+                            # Check if stock exists
+                            existing_stock = session.query(Stock).filter(
+                                Stock.symbol == symbol
+                            ).first()
+
+                            if existing_stock:
+                                # Update existing stock with fresh data
+                                existing_stock.name = data['name']
+                                existing_stock.current_price = data['current_price']
+                                existing_stock.volume = data['volume']
+                                existing_stock.market_cap_category = data['market_cap_category']
+                                existing_stock.sector = data['sector']
+                                existing_stock.is_active = data['is_active']
+                                existing_stock.is_tradeable = data['is_tradeable']
+                                existing_stock.last_updated = data['last_updated']
+                                updated_count += 1
+                            else:
+                                # Create new stock
+                                stock = Stock(
+                                    symbol=data['symbol'],
+                                    name=data['name'],
+                                    exchange=data['exchange'],
+                                    current_price=data['current_price'],
+                                    volume=data['volume'],
+                                    market_cap_category=data['market_cap_category'],
+                                    sector=data['sector'],
+                                    is_active=data['is_active'],
+                                    is_tradeable=data['is_tradeable'],
+                                    last_updated=data['last_updated']
+                                )
+                                session.add(stock)
+                                created_count += 1
+
+                        except Exception as e:
+                            logger.warning(f"Skipping stock {data.get('symbol', 'unknown')} due to data error: {e}")
+                            continue
+
+                    # Commit batch
+                    session.commit()
+
+                logger.info(f"📊 Stock upsert completed: {created_count} created, {updated_count} updated")
+                return created_count + updated_count
 
         except Exception as e:
             logger.error(f"Bulk create stocks failed: {e}")

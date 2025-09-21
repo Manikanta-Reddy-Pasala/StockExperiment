@@ -48,15 +48,16 @@ def create_app():
     # Generate a secret key for sessions
     app.secret_key = secrets.token_hex(16)
     
-    # Add comprehensive request/response logging middleware
-    try:
-        from ..utils.request_logger_middleware import RequestLoggerMiddleware
-        RequestLoggerMiddleware(app)
-        print("🔍 Request logging middleware enabled - All API calls will be logged to console")
-    except ImportError:
-        from utils.request_logger_middleware import RequestLoggerMiddleware
-        RequestLoggerMiddleware(app)
-        print("🔍 Request logging middleware enabled - All API calls will be logged to console")
+    # Add comprehensive request/response logging middleware - DISABLED
+    # try:
+    #     from ..utils.request_logger_middleware import RequestLoggerMiddleware
+    #     RequestLoggerMiddleware(app)
+    #     print("🔍 Request logging middleware enabled - All API calls will be logged to console")
+    # except ImportError:
+    #     from utils.request_logger_middleware import RequestLoggerMiddleware
+    #     RequestLoggerMiddleware(app)
+    #     print("🔍 Request logging middleware enabled - All API calls will be logged to console")
+    print("🔇 Request logging middleware disabled - Console will be clean")
     
     
     # Initialize Flask-Login
