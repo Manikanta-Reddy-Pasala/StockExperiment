@@ -157,15 +157,28 @@ class VolatilityCalculationService:
                 period='1y'  # Request 1 year of historical data (lowercase)
             )
 
-            if not historical_data or 'candles' not in historical_data:
+            if not historical_data:
+                return None
+
+            # Handle nested data structure from unified broker service
+            if 'data' in historical_data and 'candles' in historical_data['data']:
+                candles = historical_data['data']['candles']
+            elif 'candles' in historical_data:
+                candles = historical_data['candles']
+            else:
                 return None
 
             # Convert to DataFrame
-            candles = historical_data['candles']
             if not candles:
                 return None
 
             df = pd.DataFrame(candles, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+
+            # Convert string values to numeric types
+            numeric_columns = ['open', 'high', 'low', 'close', 'volume']
+            for col in numeric_columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+
             df['date'] = pd.to_datetime(df['timestamp'], unit='s')
             df = df.sort_values('date')
 
@@ -184,7 +197,9 @@ class VolatilityCalculationService:
             'beta': None,
             'historical_volatility_1y': None,
             'bid_ask_spread': None,
-            'avg_daily_volume_20d': None
+            'avg_daily_volume_20d': None,
+            'avg_daily_turnover': None,
+            'trades_per_day': None
         }
 
         try:
@@ -198,6 +213,17 @@ class VolatilityCalculationService:
             # Calculate average volume (20-day)
             if len(stock_data) >= 20:
                 metrics['avg_daily_volume_20d'] = stock_data['volume'].tail(20).mean()
+
+            # Calculate average daily turnover (volume * price)
+            if len(stock_data) >= 20:
+                turnover = stock_data['volume'] * stock_data['close']
+                metrics['avg_daily_turnover'] = turnover.tail(20).mean() / 10000000  # Convert to crores
+
+            # Estimate trades per day (simplified based on volume)
+            if len(stock_data) >= 20:
+                avg_volume = stock_data['volume'].tail(20).mean()
+                # Rough estimate: assume average trade size is 100 shares
+                metrics['trades_per_day'] = int(avg_volume / 100) if avg_volume > 0 else None
 
             # Calculate Beta (if NIFTY data is available)
             if nifty_data is not None and len(nifty_data) > 50:
@@ -284,15 +310,20 @@ class VolatilityCalculationService:
 
     def _calculate_historical_volatility(self, df: pd.DataFrame, period: int = 252) -> Optional[float]:
         """Calculate annualized historical volatility."""
-        if len(df) < period:
+        if len(df) < 30:  # Need at least 30 data points for basic calculation
             return None
 
         try:
             # Calculate daily returns
             returns = df['close'].pct_change().dropna()
 
-            if len(returns) < 50:  # Need at least 50 data points
+            if len(returns) < 30:  # Need at least 30 data points for volatility
                 return None
+
+            # Use available data up to the period limit
+            actual_period = min(len(returns), period)
+            if actual_period > 30:
+                returns = returns.tail(actual_period)
 
             # Calculate volatility (annualized)
             volatility = returns.std() * np.sqrt(252) * 100  # Convert to percentage
@@ -330,6 +361,11 @@ class VolatilityCalculationService:
             stock.historical_volatility_1y = metrics.get('historical_volatility_1y')
             stock.bid_ask_spread = metrics.get('bid_ask_spread')
             stock.avg_daily_volume_20d = metrics.get('avg_daily_volume_20d')
+            stock.avg_daily_turnover = metrics.get('avg_daily_turnover')
+            stock.trades_per_day = metrics.get('trades_per_day')
+
+            # Update the updated_at timestamp for volatility tracking
+            stock.updated_at = datetime.now()
 
         except Exception as e:
             logger.error(f"Error updating stock volatility: {e}")
