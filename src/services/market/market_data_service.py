@@ -63,12 +63,13 @@ class MarketDataService:
                     logger.info("FYERS connector initialized successfully")
                     return True
                 else:
-        # Debug print removed for clean console
+                    # Debug print removed for clean console
                     logger.warning(f"FYERS credentials missing: config={bool(config)}, client_id={bool(client_id)}, access_token={bool(access_token)}")
             else:
-        # Debug print removed for clean console
+                # Debug print removed for clean console
+                pass
         except Exception as e:
-        # Debug print removed for clean console
+            # Debug print removed for clean console
             logger.error(f"Error initializing FYERS connector: {e}")
         # Debug print removed for clean console
         return False

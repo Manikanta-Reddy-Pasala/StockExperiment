@@ -89,8 +89,23 @@ def setup_logging():
                 'level': 'DEBUG',
                 'propagate': False
             },
-            'src.services.brokers': {  # Broker services
-                'handlers': ['console', 'file'],
+            'src.services.brokers': {  # Broker services - CONSOLE WARNING ONLY
+                'handlers': ['file'],  # Only log to file, not console
+                'level': 'DEBUG',
+                'propagate': False
+            },
+            'src.services.brokers.fyers.api': {  # Fyers API - CONSOLE DISABLED
+                'handlers': ['file'],  # Only log to file, not console
+                'level': 'DEBUG',
+                'propagate': False
+            },
+            'src.services.core.broker_service': {  # Core broker service - CONSOLE DISABLED
+                'handlers': ['file'],  # Only log to file, not console
+                'level': 'DEBUG',
+                'propagate': False
+            },
+            'src.services.portfolio.portfolio_service': {  # Portfolio service - CONSOLE DISABLED
+                'handlers': ['file'],  # Only log to file, not console
                 'level': 'DEBUG',
                 'propagate': False
             },
