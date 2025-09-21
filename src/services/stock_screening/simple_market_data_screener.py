@@ -7,6 +7,7 @@ without complex volatility calculations.
 
 import logging
 import time
+import os
 from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -22,14 +23,14 @@ class SimpleMarketDataScreener:
     def __init__(self, fyers_service):
         self.fyers_service = fyers_service
 
-        # Configuration for basic screening
+        # Configuration for basic screening - loaded from environment variables
         self.config = {
             # Basic quotes screening criteria
-            'min_price_threshold': 50.0,                # ₹50 minimum (lowered for more results)
-            'min_daily_volume': 50000,                  # 50k shares minimum (lowered)
-            'max_daily_change_percent': 25.0,           # Skip extreme movers (raised)
-            'batch_size': 50,                           # Quotes API batch size
-            'quotes_rate_limit_delay': 0.2,             # 200ms delay between batches
+            'min_price_threshold': float(os.getenv('SCREENING_MIN_PRICE_THRESHOLD', '50.0')),
+            'min_daily_volume': int(os.getenv('SCREENING_MIN_DAILY_VOLUME', '50000')),
+            'max_daily_change_percent': float(os.getenv('SCREENING_MAX_DAILY_CHANGE_PERCENT', '25.0')),
+            'batch_size': int(os.getenv('SCREENING_BATCH_SIZE', '50')),
+            'quotes_rate_limit_delay': float(os.getenv('SCREENING_QUOTES_RATE_LIMIT_DELAY', '0.2')),
         }
 
     def screen_stocks(self, user_id: int, tradeable_stocks: List) -> List:
@@ -262,14 +263,14 @@ class SimpleMarketDataScreener:
         Returns:
             List of stocks that passed volatility screening
         """
-        # Volatility screening criteria
+        # Volatility screening criteria - loaded from environment variables
         volatility_config = {
-            'max_atr_percentage': 5.0,         # Max 5% ATR for moderate volatility
-            'min_avg_volume_20d': 100000,      # Minimum 20-day average volume
-            'max_bid_ask_spread': 2.0,         # Max 2% bid-ask spread
-            'min_historical_volatility': 10.0, # Min 10% historical volatility (active stock)
-            'max_historical_volatility': 40.0, # Max 40% historical volatility (not too risky)
-            'max_beta': 1.2                    # Max Beta 1.2 for smoother, more predictable swings
+            'max_atr_percentage': float(os.getenv('SCREENING_MAX_ATR_PERCENTAGE', '5.0')),
+            'min_avg_volume_20d': int(os.getenv('SCREENING_MIN_AVG_VOLUME_20D', '100000')),
+            'max_bid_ask_spread': float(os.getenv('SCREENING_MAX_BID_ASK_SPREAD', '2.0')),
+            'min_historical_volatility': float(os.getenv('SCREENING_MIN_HISTORICAL_VOLATILITY', '10.0')),
+            'max_historical_volatility': float(os.getenv('SCREENING_MAX_HISTORICAL_VOLATILITY', '40.0')),
+            'max_beta': float(os.getenv('SCREENING_MAX_BETA', '1.2'))
         }
 
         print(f"   📊 Processing {len(quotes_candidates)} stocks for volatility analysis")

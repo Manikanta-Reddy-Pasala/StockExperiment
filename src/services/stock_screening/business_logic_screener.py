@@ -10,6 +10,7 @@ Handles comprehensive business logic screening for swing trading:
 """
 
 import logging
+import os
 from typing import List, Dict, Any, Optional
 from enum import Enum
 
@@ -36,16 +37,16 @@ class BusinessLogicScreener:
     """
 
     def __init__(self):
-        # Business filter criteria
+        # Business filter criteria - loaded from environment variables
         self.config = {
-            'max_sector_allocation': 30.0,      # Max 30% in any sector
-            'min_market_cap_crores': 500,       # Minimum ₹500cr market cap
-            'max_pe_ratio': 50.0,               # P/E ratio filter
-            'min_roe': 5.0,                     # Minimum ROE %
-            'max_debt_equity': 2.0,             # Maximum debt-to-equity
-            'min_dividend_yield': 0.0,          # Minimum dividend yield
-            'max_position_size': 5.0,           # Max 5% position size
-            'max_final_stocks': 50              # Final portfolio limit
+            'max_sector_allocation': float(os.getenv('SCREENING_MAX_SECTOR_ALLOCATION', '30.0')),
+            'min_market_cap_crores': int(os.getenv('SCREENING_MIN_MARKET_CAP_CRORES', '500')),
+            'max_pe_ratio': float(os.getenv('SCREENING_MAX_PE_RATIO', '50.0')),
+            'min_roe': float(os.getenv('SCREENING_MIN_ROE', '5.0')),
+            'max_debt_equity': float(os.getenv('SCREENING_MAX_DEBT_EQUITY', '2.0')),
+            'min_dividend_yield': float(os.getenv('SCREENING_MIN_DIVIDEND_YIELD', '0.0')),
+            'max_position_size': float(os.getenv('SCREENING_MAX_POSITION_SIZE', '5.0')),
+            'max_final_stocks': int(os.getenv('SCREENING_MAX_FINAL_STOCKS', '50'))
         }
 
         # Strategy-specific criteria
