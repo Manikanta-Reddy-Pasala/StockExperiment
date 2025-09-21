@@ -80,43 +80,48 @@ class SimpleMarketDataScreener:
         print(f"   📊 Performing basic database-only screening...")
 
         valid_stocks = []
-        for stock in tradeable_stocks[:50]:  # Limit to first 50 for testing
+        for stock in tradeable_stocks:  # Process all tradeable stocks
             try:
-                # Basic checks using existing database data
+                # Only use actual database data - no defaults or assumptions
                 current_price = getattr(stock, 'current_price', None)
                 current_volume = getattr(stock, 'volume', None)
 
+                # Skip stocks that don't have required data
                 if current_price is None:
-                    current_price = 100.0  # Default assumption
-                else:
-                    current_price = float(current_price)
+                    self.quotes_results['api_failures'] += 1
+                    if self.quotes_results['api_failures'] <= 3:
+                        print(f"         ❌ MISSING PRICE: {stock.symbol} - No current_price data")
+                    continue
 
                 if current_volume is None:
-                    current_volume = 100000  # Default assumption
-                else:
-                    current_volume = int(current_volume)
+                    self.quotes_results['api_failures'] += 1
+                    if self.quotes_results['api_failures'] <= 3:
+                        print(f"         ❌ MISSING VOLUME: {stock.symbol} - No volume data")
+                    continue
 
-                # Apply basic filters
+                # Convert to proper types
+                current_price = float(current_price)
+                current_volume = int(current_volume)
+
+                # Apply basic filters using only actual data
                 if current_price >= self.config['min_price_threshold']:
                     if current_volume >= self.config['min_daily_volume']:
                         valid_stocks.append(stock)
                         self.quotes_results['symbol_validated'] += 1
                         print(f"         ✅ PASSED: {stock.symbol} - {stock.name} (₹{current_price:.2f}, Vol: {current_volume:,})")
-
-                        if len(valid_stocks) >= 20:  # Limit for testing
-                            break
                     else:
                         self.quotes_results['low_volume_filtered'] += 1
-                        if self.quotes_results['low_volume_filtered'] <= 3:
+                        if self.quotes_results['low_volume_filtered'] <= 5:
                             print(f"         💧 LOW VOLUME: {stock.symbol} - Vol: {current_volume:,} (< {self.config['min_daily_volume']:,})")
                 else:
                     self.quotes_results['penny_stocks_filtered'] += 1
-                    if self.quotes_results['penny_stocks_filtered'] <= 3:
+                    if self.quotes_results['penny_stocks_filtered'] <= 5:
                         print(f"         🪙 PENNY STOCK: {stock.symbol} - ₹{current_price:.2f} (< ₹{self.config['min_price_threshold']})")
 
             except Exception as e:
                 self.quotes_results['api_failures'] += 1
-                print(f"         ❌ ERROR processing {getattr(stock, 'symbol', 'Unknown')}: {e}")
+                if self.quotes_results['api_failures'] <= 5:
+                    print(f"         ❌ ERROR processing {getattr(stock, 'symbol', 'Unknown')}: {e}")
                 continue
 
         self.quotes_results['quotes_candidates'] = valid_stocks

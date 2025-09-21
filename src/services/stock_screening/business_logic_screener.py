@@ -160,7 +160,7 @@ class BusinessLogicScreener:
         for stock in stocks:
             market_cap_crores = stock.market_cap
 
-            # For initial testing, allow stocks with NULL market cap
+            # Allow stocks with NULL market cap (data not available yet)
             if market_cap_crores is not None and market_cap_crores < self.config['min_market_cap_crores']:
                 self.results['market_cap_filtered'] += 1
                 if self.results['market_cap_filtered'] <= 5:  # Show first 5
@@ -169,7 +169,9 @@ class BusinessLogicScreener:
                 # Include stocks with NULL market cap or above threshold
                 market_cap_stocks.append(stock)
                 if market_cap_crores is None:
-                    print(f"         ✅ PASSED (NULL market cap): {stock.symbol}")
+                    print(f"         ✅ PASSED (market cap data not available): {stock.symbol}")
+                else:
+                    print(f"         ✅ PASSED: {stock.symbol} - ₹{market_cap_crores:.0f}cr")
 
         print(f"      ✅ Market cap filter result: {len(market_cap_stocks)} stocks passed")
         return market_cap_stocks
@@ -266,35 +268,29 @@ class BusinessLogicScreener:
             criteria = self.strategy_criteria.get(strategy, {})
 
             if strategy == StrategyType.DEFAULT_RISK:
-                # For initial testing, allow NULL market cap
+                # Handle NULL values gracefully (data may not be available yet)
                 market_cap_ok = (stock.market_cap is None or stock.market_cap >= criteria.get('min_market_cap', 0))
                 atr_ok = (stock.atr_percentage or 0) <= criteria.get('max_atr_percentage', 999)
                 beta_ok = (stock.beta or 1.0) <= criteria.get('max_beta', 999)
-                # Allow NULL P/E ratios for initial testing
                 pe_ok = (stock.pe_ratio is None or stock.pe_ratio <= criteria.get('max_pe_ratio', 999))
                 debt_ok = (stock.debt_to_equity or 0) <= criteria.get('max_debt_equity', 999)
 
-                result = market_cap_ok and atr_ok and beta_ok and pe_ok and debt_ok
-
-                if not result:
-                    print(f"         📊 DEBUG {stock.symbol}: market_cap_ok={market_cap_ok}, atr_ok={atr_ok}, beta_ok={beta_ok}, pe_ok={pe_ok}, debt_ok={debt_ok}")
-
-                return result
+                return market_cap_ok and atr_ok and beta_ok and pe_ok and debt_ok
 
             elif strategy == StrategyType.HIGH_RISK:
-                return (
-                    (stock.market_cap or 0) >= criteria.get('min_market_cap', 0) and
-                    (stock.atr_percentage or 0) <= criteria.get('max_atr_percentage', 999) and
-                    (stock.beta or 1.0) <= criteria.get('max_beta', 999) and
-                    (stock.volume or 0) >= criteria.get('min_volume', 0)
-                )
+                # Handle NULL values gracefully (data may not be available yet)
+                market_cap_ok = (stock.market_cap is None or stock.market_cap >= criteria.get('min_market_cap', 0))
+                atr_ok = (stock.atr_percentage or 0) <= criteria.get('max_atr_percentage', 999)
+                beta_ok = (stock.beta or 1.0) <= criteria.get('max_beta', 999)
+                volume_ok = (stock.volume or 0) >= criteria.get('min_volume', 0)
+                return market_cap_ok and atr_ok and beta_ok and volume_ok
 
             else:  # MEDIUM_RISK or default
-                return (
-                    (stock.market_cap or 0) >= criteria.get('min_market_cap', 0) and
-                    (stock.atr_percentage or 0) <= criteria.get('max_atr_percentage', 999) and
-                    (stock.beta or 1.0) <= criteria.get('max_beta', 999)
-                )
+                # Handle NULL values gracefully (data may not be available yet)
+                market_cap_ok = (stock.market_cap is None or stock.market_cap >= criteria.get('min_market_cap', 0))
+                atr_ok = (stock.atr_percentage or 0) <= criteria.get('max_atr_percentage', 999)
+                beta_ok = (stock.beta or 1.0) <= criteria.get('max_beta', 999)
+                return market_cap_ok and atr_ok and beta_ok
 
         except Exception as e:
             logger.warning(f"Error checking strategy criteria for {stock.symbol}: {e}")

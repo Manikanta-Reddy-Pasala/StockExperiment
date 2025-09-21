@@ -1136,20 +1136,8 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
                 volatility_service = get_volatility_calculator_service()
                 screening_coordinator = ScreeningCoordinator(self.fyers_service, volatility_service)
 
-                # Map strategy enum to screening StrategyType
-                screening_strategies = []
-                for strategy in strategies:
-                    if hasattr(strategy, 'value'):
-                        strategy_value = strategy.value
-                    else:
-                        strategy_value = str(strategy)
-
-                    if strategy_value == 'default_risk':
-                        screening_strategies.append(ScreeningStrategyType.DEFAULT_RISK)
-                    elif strategy_value == 'high_risk':
-                        screening_strategies.append(ScreeningStrategyType.HIGH_RISK)
-                    else:
-                        screening_strategies.append(ScreeningStrategyType.DEFAULT_RISK)  # Default fallback
+                # Use default strategy for screening since strategies parameter is not available in this scope
+                screening_strategies = [ScreeningStrategyType.DEFAULT_RISK]
 
                 # Execute the complete screening pipeline
                 pipeline_result = screening_coordinator.execute_screening_pipeline(

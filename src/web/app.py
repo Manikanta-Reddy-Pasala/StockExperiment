@@ -1004,7 +1004,7 @@ def create_app():
     def api_get_settings():
         """Get user settings."""
         try:
-            from ..services.user_settings_service import get_user_settings_service
+            from ..services.utils.user_settings_service import get_user_settings_service
             user_settings_service = get_user_settings_service()
             settings = user_settings_service.get_user_settings(current_user.id)
             return jsonify({'success': True, 'settings': settings})
@@ -1018,7 +1018,7 @@ def create_app():
         """Save user settings."""
         try:
             data = request.get_json()
-            from ..services.user_settings_service import get_user_settings_service
+            from ..services.utils.user_settings_service import get_user_settings_service
             user_settings_service = get_user_settings_service()
             
             # Save settings to database
@@ -1036,7 +1036,7 @@ def create_app():
     def api_get_current_broker():
         """Get the currently selected broker."""
         try:
-            from ..services.user_settings_service import get_user_settings_service
+            from ..services.utils.user_settings_service import get_user_settings_service
             user_settings_service = get_user_settings_service()
             broker_provider = user_settings_service.get_broker_provider(current_user.id)
             return jsonify({'success': True, 'broker': broker_provider})
@@ -1051,7 +1051,7 @@ def create_app():
         try:
             data = request.get_json()
             broker = data.get('broker', 'fyers')
-            from ..services.user_settings_service import get_user_settings_service
+            from ..services.utils.user_settings_service import get_user_settings_service
             user_settings_service = get_user_settings_service()
             
             # Save broker provider to user settings
