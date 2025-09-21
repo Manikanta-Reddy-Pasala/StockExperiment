@@ -12,7 +12,7 @@ from enum import Enum
 
 
 class StrategyType(Enum):
-    """Risk-based strategy types."""
+    """Risk-based strategy types for swing trading business domain."""
     DEFAULT_RISK = "default_risk"
     HIGH_RISK = "high_risk"
 

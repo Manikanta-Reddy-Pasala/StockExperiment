@@ -195,83 +195,67 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
                 'total_results': 0
             }
     
-    def get_suggested_stocks(self, user_id: int, strategies: List[StrategyType] = None, 
+    def get_suggested_stocks(self, user_id: int, strategies: List[StrategyType] = None,
                            limit: int = 50, search: str = None, sort_by: str = None,
                            sort_order: str = 'desc', sector: str = None) -> Dict[str, Any]:
-        """Get suggested stocks with comprehensive search and sort functionality."""
+        """Get suggested stocks with comprehensive filtering pipeline and logging."""
         try:
             if not strategies:
                 strategies = [StrategyType.DEFAULT_RISK, StrategyType.HIGH_RISK]
-            
-            # Use dynamic stock discovery instead of hardcoded stocks
-            try:
-                from src.services.ml.stock_discovery_service import get_stock_discovery_service
-                discovery_service = get_stock_discovery_service()
-                discovered_stocks = discovery_service.get_top_liquid_stocks(user_id, count=50)
-                popular_symbols = [stock.symbol for stock in discovered_stocks]
-                logger.info(f"Discovered {len(popular_symbols)} stocks dynamically from broker API")
-            except Exception as e:
-                logger.warning(f"Failed to discover stocks dynamically: {e}")
-                # Fallback to generic sector-based search if discovery fails
-                popular_symbols = []
-                for sector in ['BANK', 'IT', 'PHARMA', 'AUTO', 'FMCG', 'METAL']:
-                    try:
-                        result = self.fyers_service.search(user_id, sector, 'NSE')
-                        if result.get('status') == 'success':
-                            symbols = [s.get('symbol') for s in result.get('data', [])[:5]]
-                            popular_symbols.extend([s for s in symbols if s and '-EQ' in s])
-                    except Exception:
-                        continue
-            
-            # Get quotes for popular stocks
-            quotes_response = self.fyers_service.quotes_multiple(user_id, popular_symbols)
 
-            if quotes_response.get('status') != 'success':
+            print(f"🎯 STAGE 0: Starting stock filtering pipeline for strategies: {[s.value for s in strategies]}")
+
+            # Use database-driven filtering pipeline
+            filtered_stocks = self._get_filtered_stocks_from_database(user_id)
+
+            if not filtered_stocks:
+                print("❌ STAGE 1 FAILED: No stocks passed the filtering pipeline")
                 return {
                     'success': False,
-                    'error': quotes_response.get('message', 'Failed to fetch stock suggestions'),
+                    'error': 'No tradeable stocks found after filtering',
                     'data': [],
                     'total': 0,
                     'strategies_applied': [s.value for s in strategies],
                     'last_updated': datetime.now().isoformat()
                 }
-            
-            quotes_data = quotes_response.get('data', {})
-            
-            # Convert quotes to suggested stocks format
-            suggestions = []
-            for symbol, quote_data in quotes_data.items():
-                suggestions.append({
-                    'symbol': symbol,
-                    'symbol_name': symbol.replace('NSE:', '').replace('-EQ', ''),
-                    'price': float(quote_data.get('ltp', 0)),
-                    'change': float(quote_data.get('change', 0)),
-                    'change_percent': float(quote_data.get('change_percent', 0)),
-                    'volume': int(quote_data.get('volume', 0)),
-                    'high': float(quote_data.get('high', 0)),
-                    'low': float(quote_data.get('low', 0)),
-                    'open': float(quote_data.get('open', 0)),
-                    'prev_close': float(quote_data.get('prev_close', 0))
-                })
-            
-            # Apply strategy-based filtering and scoring
+
+            # STAGE 2: Apply swing trading business logic
+            print(f"🎯 STAGE 2: Applying swing trading business logic...")
+            print(f"   📊 Processing {len(filtered_stocks)} stocks with {len(strategies)} strategies")
+
             suggested_stocks = []
-            for suggestion in suggestions:
+            strategy_counts = {s.value: 0 for s in strategies}
+
+            for i, stock_data in enumerate(filtered_stocks):
+                if i < 5:  # Show first 5 for debugging
+                    print(f"   📈 Analyzing: {stock_data['symbol']} - ₹{stock_data['current_price']:.2f}")
+
                 for strategy in strategies:
-                    stock = self._create_suggested_stock_from_suggestion(suggestion, strategy)
+                    stock = self._create_suggested_stock_from_database(stock_data, strategy)
                     if self._meets_strategy_criteria(stock, strategy):
                         suggested_stocks.append(stock.to_dict())
+                        strategy_counts[strategy.value] += 1
+
+                        # Show first few results for debugging
+                        if len(suggested_stocks) <= 5:
+                            profit_pct = ((stock.target_price/stock.current_price - 1) * 100)
+                            print(f"      ✅ {strategy.value}: ₹{stock.current_price:.2f} → ₹{stock.target_price:.2f} (+{profit_pct:.1f}%)")
                         break  # Only add once per stock
-            
+
+            print(f"   📋 STAGE 2 RESULTS:")
+            for strategy, count in strategy_counts.items():
+                print(f"      🎯 {strategy}: {count} stocks")
+            print(f"   ✅ STAGE 2 COMPLETE: Generated {len(suggested_stocks)} total suggestions")
+
             # Apply additional sorting if specified
             if sort_by and sort_by != 'volume':
                 reverse = sort_order.lower() == 'desc'
                 if sort_by in ['symbol', 'name', 'strategy', 'recommendation', 'sector']:
                     suggested_stocks.sort(key=lambda x: x.get(sort_by, '').lower(), reverse=reverse)
-                elif sort_by in ['current_price', 'target_price', 'stop_loss', 'market_cap', 
+                elif sort_by in ['current_price', 'target_price', 'stop_loss', 'market_cap',
                                'pe_ratio', 'pb_ratio', 'roe', 'sales_growth']:
                     suggested_stocks.sort(key=lambda x: float(x.get(sort_by, 0) or 0), reverse=reverse)
-            
+
             return {
                 'success': True,
                 'data': suggested_stocks[:limit],
@@ -283,7 +267,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
                 'strategies_applied': [s.value for s in strategies],
                 'last_updated': datetime.now().isoformat()
             }
-            
+
         except Exception as e:
             logger.error(f"Error getting suggested stocks for user {user_id}: {str(e)}")
             return {
@@ -695,9 +679,9 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
             }
     
     # Helper Methods
-    def _create_suggested_stock_from_suggestion(self, suggestion: Dict[str, Any], 
+    def _create_suggested_stock_from_suggestion(self, suggestion: Dict[str, Any],
                                               strategy: StrategyType) -> SuggestedStock:
-        """Create SuggestedStock object from market suggestion."""
+        """Create SuggestedStock object from market suggestion with enhanced swing trading logic."""
         stock = SuggestedStock(
             symbol=suggestion['symbol'],
             name=suggestion['symbol_name'],
@@ -705,26 +689,55 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
             current_price=suggestion['price'],
             recommendation='BUY'  # Will be refined based on analysis
         )
-        
-        # Set risk-based strategy targets
+
+        # Swing Trading Business Domain - Both strategies use 2-week timeframe with 3% stop loss
         if strategy == StrategyType.DEFAULT_RISK:
-            stock.target_price = suggestion['price'] * 1.12  # 12% upside (conservative)
-            stock.stop_loss = suggestion['price'] * 0.92     # 8% stop loss
-            stock.reason = "Balanced risk profile with stable fundamentals"
+            # Default Risk Swing Trading: Conservative 5-7% profit targets
+            swing_score = self._calculate_swing_trading_score(suggestion)
+
+            if swing_score >= 7:  # High potential for default risk
+                stock.target_price = suggestion['price'] * 1.07  # 7% target
+                stock.reason = "Conservative swing trading with strong fundamentals (2-week hold)"
+            elif swing_score >= 5:  # Medium potential
+                stock.target_price = suggestion['price'] * 1.06  # 6% target
+                stock.reason = "Moderate swing trading opportunity with decent setup (2-week hold)"
+            else:  # Conservative approach
+                stock.target_price = suggestion['price'] * 1.05  # 5% target
+                stock.reason = "Low-risk swing trading for stable returns (2-week hold)"
+
+            stock.stop_loss = suggestion['price'] * 0.97     # 3% stop loss for swing trading
+
         elif strategy == StrategyType.HIGH_RISK:
-            stock.target_price = suggestion['price'] * 1.25  # 25% upside (aggressive)
-            stock.stop_loss = suggestion['price'] * 0.85     # 15% stop loss
-            stock.reason = "High growth potential with higher risk-reward"
-        
+            # High Risk Swing Trading: Aggressive 8-10% profit targets
+            swing_score = self._calculate_swing_trading_score(suggestion)
+
+            if swing_score >= 7:  # High potential for aggressive approach
+                stock.target_price = suggestion['price'] * 1.10  # 10% target
+                stock.reason = "Aggressive swing trading with high momentum (2-week hold)"
+            elif swing_score >= 5:  # Medium potential
+                stock.target_price = suggestion['price'] * 1.09  # 9% target
+                stock.reason = "High-risk swing trading with good potential (2-week hold)"
+            else:  # Conservative high risk
+                stock.target_price = suggestion['price'] * 1.08  # 8% target
+                stock.reason = "Moderate high-risk swing trading (2-week hold)"
+
+            stock.stop_loss = suggestion['price'] * 0.97     # 3% stop loss for swing trading
+
         return stock
     
     def _meets_strategy_criteria(self, stock: SuggestedStock, strategy: StrategyType) -> bool:
-        """Check if stock meets risk-based strategy criteria."""
-        # Risk-based criteria
+        """Check if stock meets swing trading strategy criteria."""
+        # Both strategies use swing trading criteria with different risk levels
         if strategy == StrategyType.DEFAULT_RISK:
-            return stock.current_price > 100  # Stable, established stocks
+            # Conservative swing trading criteria - stable, established stocks
+            # Price range suitable for conservative swing trading
+            return 100 <= stock.current_price <= 3000  # Stable stocks for conservative approach
+
         elif strategy == StrategyType.HIGH_RISK:
-            return stock.current_price < 2000  # Smaller, growth-oriented stocks
+            # High risk swing trading criteria - smaller cap, higher volatility potential
+            # Broader price range for aggressive swing trading
+            return 50 <= stock.current_price <= 2000  # Growth-oriented stocks for aggressive approach
+
         return True
     
     def _applies_search_filters(self, result: Dict[str, Any], filters: Dict[str, Any]) -> bool:
@@ -1036,12 +1049,226 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
         """Calculate volatility of returns."""
         if not returns or len(returns) < 2:
             return 0
-        
+
         avg_return = sum(returns) / len(returns)
         variance = sum((r - avg_return) ** 2 for r in returns) / len(returns)
         volatility = variance ** 0.5
         return round(volatility, 2)
 
+    def _calculate_swing_trading_score(self, suggestion: Dict[str, Any]) -> int:
+        """Calculate swing trading score for 2-week timeframe with 5-10% profit targets."""
+        score = 0
+
+        price = suggestion.get('price', 0)
+        volume = suggestion.get('volume', 0)
+        change_percent = suggestion.get('change_percent', 0)
+
+        # Price range suitability (1-2 points)
+        if 100 <= price <= 1000:  # Sweet spot for swing trading
+            score += 2
+        elif 50 <= price <= 2000:  # Acceptable range
+            score += 1
+
+        # Volume activity (1-2 points)
+        if volume > 1000000:  # High liquidity
+            score += 2
+        elif volume > 100000:  # Moderate liquidity
+            score += 1
+
+        # Recent momentum (1-2 points)
+        if 0.5 <= abs(change_percent) <= 3.0:  # Optimal momentum range
+            score += 2
+        elif abs(change_percent) <= 5.0:  # Acceptable momentum
+            score += 1
+
+        # Volatility assessment (1-2 points)
+        # Higher volatility can provide better swing opportunities
+        if 2.0 <= abs(change_percent) <= 4.0:  # Good volatility for swings
+            score += 2
+        elif 1.0 <= abs(change_percent) <= 6.0:  # Moderate volatility
+            score += 1
+
+        # Sector stability bonus (0-1 point)
+        symbol = suggestion.get('symbol', '')
+        if any(sector in symbol.upper() for sector in ['BANK', 'IT', 'PHARMA', 'FMCG']):
+            score += 1  # Stable sectors are better for predictable swings
+
+        return min(score, 10)  # Cap at 10 points
+
+
+    def _get_filtered_stocks_from_database(self, user_id: int) -> List[Dict[str, Any]]:
+        """
+        Comprehensive stock filtering pipeline from database with detailed logging.
+
+        Filtering steps:
+        1. Get all stocks from database
+        2. Filter out non-tradeable stocks
+        3. Filter out penny stocks (high risk)
+        4. Apply volume and liquidity filters
+        5. Log all filtering steps for verification
+        """
+        try:
+            from src.models.stock_models import Stock
+            from src.models.database import get_database_manager
+
+            db_manager = get_database_manager()
+
+            with db_manager.get_session() as session:
+                # STAGE 1: Get all stocks and filter penny stocks
+                print(f"📊 STAGE 1: Starting database filtering...")
+                all_stocks = session.query(Stock).all()
+                total_stocks = len(all_stocks)
+                print(f"   📊 Retrieved {total_stocks} total stocks from database")
+
+                # Filter tradeable stocks
+                tradeable_stocks = [stock for stock in all_stocks if stock.is_tradeable and stock.is_active]
+                non_tradeable_count = total_stocks - len(tradeable_stocks)
+                print(f"   🚫 Filtered out {non_tradeable_count} non-tradeable stocks")
+                print(f"   ✅ {len(tradeable_stocks)} tradeable stocks remaining")
+
+                # Filter out penny stocks (< ₹50 - very high risk)
+                penny_stock_threshold = 50.0
+                penny_stocks = []
+                quality_stocks = []
+
+                for stock in tradeable_stocks:
+                    if stock.current_price and stock.current_price < penny_stock_threshold:
+                        penny_stocks.append(stock)
+                        print(f"   🪙 PENNY STOCK SKIPPED: {stock.symbol} - ₹{stock.current_price:.2f}")
+                    else:
+                        quality_stocks.append(stock)
+
+                print(f"   🪙 STAGE 1 RESULT: Filtered out {len(penny_stocks)} penny stocks (< ₹{penny_stock_threshold})")
+                print(f"   ✅ STAGE 1 FINAL: {len(quality_stocks)} quality stocks for next stage")
+
+                # Additional filters for liquidity
+                min_volume = 50000  # Minimum daily volume for liquidity
+                min_price = 20.0    # Minimum price for stability
+                max_price = 10000.0 # Maximum price to avoid extreme high-priced stocks
+
+                filtered_stocks = []
+                low_volume_stocks = []
+                extreme_price_stocks = []
+
+                for stock in quality_stocks:
+                    # Check volume
+                    if stock.volume and stock.volume < min_volume:
+                        low_volume_stocks.append(stock)
+                        continue
+
+                    # Check price range
+                    if stock.current_price:
+                        if stock.current_price < min_price:
+                            extreme_price_stocks.append(stock)
+                            continue
+                        elif stock.current_price > max_price:
+                            extreme_price_stocks.append(stock)
+                            continue
+
+                    filtered_stocks.append(stock)
+
+                print(f"   📉 Additional filter: Removed {len(low_volume_stocks)} low volume stocks")
+                print(f"   💰 Additional filter: Removed {len(extreme_price_stocks)} extreme price stocks")
+                print(f"   ✅ STAGE 1 COMPLETE: {len(filtered_stocks)} stocks ready for swing trading analysis")
+
+                # Convert to dictionary format with comprehensive data
+                result_stocks = []
+                for stock in filtered_stocks:
+                    stock_data = {
+                        'symbol': stock.symbol,
+                        'name': stock.name,
+                        'current_price': stock.current_price or 0.0,
+                        'volume': stock.volume or 0,
+                        'sector': stock.sector or 'Unknown',
+                        'market_cap': stock.market_cap or 0.0,
+                        'market_cap_category': stock.market_cap_category or 'mid_cap',
+                        'pe_ratio': stock.pe_ratio or 0.0,
+                        'pb_ratio': stock.pb_ratio or 0.0,
+                        'roe': stock.roe or 0.0,
+                        'debt_to_equity': stock.debt_to_equity or 0.0,
+                        'dividend_yield': stock.dividend_yield or 0.0,
+                        'beta': stock.beta or 1.0,
+                        'last_updated': stock.last_updated.isoformat() if stock.last_updated else None
+                    }
+                    result_stocks.append(stock_data)
+
+                print(f"   📋 STAGE 1 SUMMARY:")
+                print(f"      📊 Total stocks in database: {total_stocks}")
+                print(f"      🚫 Non-tradeable filtered: {non_tradeable_count}")
+                print(f"      🪙 Penny stocks filtered: {len(penny_stocks)}")
+                print(f"      📉 Low volume filtered: {len(low_volume_stocks)}")
+                print(f"      💰 Extreme price filtered: {len(extreme_price_stocks)}")
+                print(f"      ✅ Ready for Stage 2: {len(result_stocks)} stocks")
+
+                return result_stocks
+
+        except Exception as e:
+            logger.error(f"Error in database filtering pipeline: {e}")
+            return []
+
+    def _create_suggested_stock_from_database(self, stock_data: Dict[str, Any],
+                                            strategy: StrategyType) -> SuggestedStock:
+        """Create SuggestedStock object from database stock data."""
+        stock = SuggestedStock(
+            symbol=stock_data['symbol'],
+            name=stock_data['name'],
+            strategy=strategy,
+            current_price=stock_data['current_price'],
+            recommendation='BUY'
+        )
+
+        # Set additional data from database
+        stock.market_cap = stock_data.get('market_cap')
+        stock.pe_ratio = stock_data.get('pe_ratio')
+        stock.pb_ratio = stock_data.get('pb_ratio')
+        stock.roe = stock_data.get('roe')
+
+        # Calculate change_percent for scoring (simplified - could use historical data)
+        change_percent = 0.0  # Default for database stocks without real-time change
+
+        # Create suggestion format for scoring
+        suggestion = {
+            'symbol': stock_data['symbol'],
+            'symbol_name': stock_data['name'],
+            'price': stock_data['current_price'],
+            'volume': stock_data['volume'],
+            'change_percent': change_percent
+        }
+
+        # Swing Trading Business Domain - Both strategies use 2-week timeframe with 3% stop loss
+        if strategy == StrategyType.DEFAULT_RISK:
+            # Default Risk Swing Trading: Conservative 5-7% profit targets
+            swing_score = self._calculate_swing_trading_score(suggestion)
+
+            if swing_score >= 7:  # High potential for default risk
+                stock.target_price = stock_data['current_price'] * 1.07  # 7% target
+                stock.reason = "Conservative swing trading with strong fundamentals (2-week hold)"
+            elif swing_score >= 5:  # Medium potential
+                stock.target_price = stock_data['current_price'] * 1.06  # 6% target
+                stock.reason = "Moderate swing trading opportunity with decent setup (2-week hold)"
+            else:  # Conservative approach
+                stock.target_price = stock_data['current_price'] * 1.05  # 5% target
+                stock.reason = "Low-risk swing trading for stable returns (2-week hold)"
+
+            stock.stop_loss = stock_data['current_price'] * 0.97     # 3% stop loss for swing trading
+
+        elif strategy == StrategyType.HIGH_RISK:
+            # High Risk Swing Trading: Aggressive 8-10% profit targets
+            swing_score = self._calculate_swing_trading_score(suggestion)
+
+            if swing_score >= 7:  # High potential for aggressive approach
+                stock.target_price = stock_data['current_price'] * 1.10  # 10% target
+                stock.reason = "Aggressive swing trading with high momentum (2-week hold)"
+            elif swing_score >= 5:  # Medium potential
+                stock.target_price = stock_data['current_price'] * 1.09  # 9% target
+                stock.reason = "High-risk swing trading with good potential (2-week hold)"
+            else:  # Conservative high risk
+                stock.target_price = stock_data['current_price'] * 1.08  # 8% target
+                stock.reason = "Moderate high-risk swing trading (2-week hold)"
+
+            stock.stop_loss = stock_data['current_price'] * 0.97     # 3% stop loss for swing trading
+
+        return stock
 
     def _determine_sector(self, company_name: str) -> str:
         """Determine sector from company name using keywords."""
