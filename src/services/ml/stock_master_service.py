@@ -7,6 +7,7 @@ comprehensive stock information for efficient filtering and screening.
 """
 
 import logging
+import os
 import time
 from typing import List, Dict, Optional, Set
 from datetime import datetime, timedelta
@@ -907,40 +908,30 @@ class StockMasterService:
             from ..data.volatility_calculation_service import get_volatility_calculation_service
             volatility_service = get_volatility_calculation_service()
 
-            # Get all tradeable stocks for volatility calculation
-            with self.db_manager.get_session() as session:
-                tradeable_stocks = session.query(Stock).filter(
-                    and_(
-                        Stock.is_tradeable == True,
-                        Stock.is_active == True,
-                        Stock.exchange == exchange
-                    )
-                ).all()
+            # Check volatility data freshness and identify stocks needing updates
+            stocks_needing_update = self._identify_stocks_needing_volatility_update(exchange)
 
-                stock_symbols = [stock.symbol for stock in tradeable_stocks]
-                logger.info(f"Found {len(stock_symbols)} tradeable stocks for volatility calculation")
+            if not stocks_needing_update:
+                logger.info("All stocks have fresh volatility data, skipping update")
+                return {
+                    'updated': 0,
+                    'failed': 0,
+                    'processed': 0,
+                    'skipped': 'All volatility data is fresh'
+                }
 
-            if not stock_symbols:
-                logger.warning("No tradeable stocks found for volatility calculation")
-                return {'updated': 0, 'failed': 0, 'error': 'No tradeable stocks found'}
+            logger.info(f"Found {len(stocks_needing_update)} stocks needing volatility updates")
 
             # Limit to reasonable batch size for daily updates
-            # For production, we might want to update top 500-1000 most liquid stocks daily
-            max_stocks = 500
-            if len(stock_symbols) > max_stocks:
-                logger.info(f"Limiting volatility calculation to top {max_stocks} stocks by volume")
-
-                # Get top stocks by volume
-                with self.db_manager.get_session() as session:
-                    top_stocks = session.query(Stock).filter(
-                        and_(
-                            Stock.is_tradeable == True,
-                            Stock.is_active == True,
-                            Stock.exchange == exchange
-                        )
-                    ).order_by(Stock.volume.desc()).limit(max_stocks).all()
-
-                    stock_symbols = [stock.symbol for stock in top_stocks]
+            max_stocks = int(os.getenv('VOLATILITY_MAX_STOCKS', '1000'))
+            if len(stocks_needing_update) > max_stocks:
+                logger.info(f"Limiting volatility calculation to top {max_stocks} stocks by priority")
+                # Prioritize by: 1) Missing data, 2) High volume, 3) Most outdated
+                stock_symbols = self._prioritize_volatility_updates(
+                    stocks_needing_update, max_stocks
+                )
+            else:
+                stock_symbols = stocks_needing_update
 
             # Calculate volatility for the selected stocks
             volatility_result = volatility_service.calculate_volatility_for_stocks(
@@ -961,6 +952,132 @@ class StockMasterService:
         except Exception as e:
             logger.error(f"Error updating volatility data: {e}")
             return {'updated': 0, 'failed': 0, 'error': str(e)}
+
+    def _identify_stocks_needing_volatility_update(self, exchange: str) -> List[str]:
+        """
+        Identify stocks that need volatility data updates based on updated_at timestamp.
+        Returns list of stock symbols needing updates.
+        """
+        try:
+            with self.db_manager.get_session() as session:
+                # Get volatility update threshold from environment (default: 24 hours)
+                hours_threshold = int(os.getenv('VOLATILITY_UPDATE_HOURS', '24'))
+                threshold_time = datetime.utcnow() - timedelta(hours=hours_threshold)
+
+                # Find stocks needing volatility updates
+                stocks_needing_update = session.query(Stock).filter(
+                    and_(
+                        Stock.is_tradeable == True,
+                        Stock.is_active == True,
+                        Stock.exchange == exchange,
+                        or_(
+                            # No volatility data at all
+                            Stock.atr_14.is_(None),
+                            Stock.atr_percentage.is_(None),
+                            Stock.historical_volatility_1y.is_(None),
+                            Stock.avg_daily_turnover.is_(None),
+                            Stock.trades_per_day.is_(None),
+                            # Outdated volatility data
+                            Stock.volatility_last_updated.is_(None),
+                            Stock.volatility_last_updated < threshold_time
+                        )
+                    )
+                ).all()
+
+                symbols = [stock.symbol for stock in stocks_needing_update]
+
+                # Log summary
+                missing_data_count = session.query(Stock).filter(
+                    and_(
+                        Stock.is_tradeable == True,
+                        Stock.is_active == True,
+                        Stock.exchange == exchange,
+                        Stock.atr_14.is_(None)
+                    )
+                ).count()
+
+                outdated_count = len(symbols) - missing_data_count
+
+                logger.info(f"Volatility update analysis: {len(symbols)} stocks need updates")
+                logger.info(f"  • {missing_data_count} stocks missing volatility data")
+                logger.info(f"  • {outdated_count} stocks with outdated volatility data (>{hours_threshold}h)")
+
+                return symbols
+
+        except Exception as e:
+            logger.error(f"Error identifying stocks needing volatility updates: {e}")
+            # Fallback: return all tradeable stocks
+            with self.db_manager.get_session() as session:
+                fallback_stocks = session.query(Stock).filter(
+                    and_(
+                        Stock.is_tradeable == True,
+                        Stock.is_active == True,
+                        Stock.exchange == exchange
+                    )
+                ).all()
+                return [stock.symbol for stock in fallback_stocks]
+
+    def _prioritize_volatility_updates(self, stock_symbols: List[str], max_stocks: int) -> List[str]:
+        """
+        Prioritize stocks for volatility updates based on:
+        1. Missing volatility data (highest priority)
+        2. High trading volume (liquidity priority)
+        3. Most outdated data (staleness priority)
+        """
+        try:
+            with self.db_manager.get_session() as session:
+                # Get stock details for prioritization
+                stocks = session.query(Stock).filter(
+                    and_(
+                        Stock.symbol.in_(stock_symbols),
+                        Stock.is_tradeable == True,
+                        Stock.is_active == True
+                    )
+                ).all()
+
+                # Create priority scoring
+                prioritized_stocks = []
+                for stock in stocks:
+                    priority_score = 0
+
+                    # Priority 1: Missing volatility data (highest priority)
+                    if (stock.atr_14 is None or
+                        stock.atr_percentage is None or
+                        stock.historical_volatility_1y is None or
+                        stock.avg_daily_turnover is None or
+                        stock.trades_per_day is None):
+                        priority_score += 1000
+
+                    # Priority 2: High volume (liquidity importance)
+                    if stock.volume:
+                        # Normalize volume score (log scale)
+                        import math
+                        volume_score = min(500, math.log10(stock.volume + 1) * 50)
+                        priority_score += volume_score
+
+                    # Priority 3: Outdated data (staleness penalty)
+                    if stock.volatility_last_updated:
+                        hours_old = (datetime.utcnow() - stock.volatility_last_updated).total_seconds() / 3600
+                        staleness_score = min(100, hours_old / 24 * 10)  # Max 100 points for 10+ days old
+                        priority_score += staleness_score
+
+                    prioritized_stocks.append((stock.symbol, priority_score))
+
+                # Sort by priority score (descending) and take top max_stocks
+                prioritized_stocks.sort(key=lambda x: x[1], reverse=True)
+                result = [symbol for symbol, score in prioritized_stocks[:max_stocks]]
+
+                logger.info(f"Prioritized {len(result)} stocks for volatility update")
+                logger.info(f"  • Top priority stock: {prioritized_stocks[0][0]} (score: {prioritized_stocks[0][1]:.1f})")
+                if len(prioritized_stocks) > 1:
+                    logger.info(f"  • Lowest priority: {prioritized_stocks[-1][0]} (score: {prioritized_stocks[-1][1]:.1f})")
+
+                return result
+
+        except Exception as e:
+            logger.error(f"Error prioritizing volatility updates: {e}")
+            # Fallback: return first max_stocks
+            return stock_symbols[:max_stocks]
 
     def refresh_volatility_only(self, user_id: int = 1, exchange: str = "NSE", max_stocks: int = 100) -> Dict:
         """

@@ -234,7 +234,9 @@ CREATE TABLE IF NOT EXISTS stocks (
     historical_volatility_1y DOUBLE PRECISION,  -- Annualized historical volatility
     bid_ask_spread DOUBLE PRECISION,  -- Estimated bid-ask spread
     avg_daily_volume_20d DOUBLE PRECISION,  -- 20-day average daily volume
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- For tracking volatility updates
+    avg_daily_turnover DOUBLE PRECISION,  -- Average daily turnover in crores
+    trades_per_day INTEGER,  -- Average trades per day
+    volatility_last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- For tracking volatility updates
     is_active BOOLEAN DEFAULT TRUE,
     is_tradeable BOOLEAN DEFAULT TRUE,
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -576,4 +578,4 @@ CREATE INDEX IF NOT EXISTS idx_stocks_atr_percentage ON stocks(atr_percentage);
 CREATE INDEX IF NOT EXISTS idx_stocks_beta ON stocks(beta);
 CREATE INDEX IF NOT EXISTS idx_stocks_historical_volatility ON stocks(historical_volatility_1y);
 CREATE INDEX IF NOT EXISTS idx_stocks_avg_volume_20d ON stocks(avg_daily_volume_20d);
-CREATE INDEX IF NOT EXISTS idx_stocks_updated_at ON stocks(updated_at);
+CREATE INDEX IF NOT EXISTS idx_stocks_volatility_last_updated ON stocks(volatility_last_updated);

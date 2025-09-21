@@ -364,8 +364,8 @@ class VolatilityCalculationService:
             stock.avg_daily_turnover = metrics.get('avg_daily_turnover')
             stock.trades_per_day = metrics.get('trades_per_day')
 
-            # Update the updated_at timestamp for volatility tracking
-            stock.updated_at = datetime.now()
+            # Update the volatility_last_updated timestamp for volatility tracking
+            stock.volatility_last_updated = datetime.now()
 
         except Exception as e:
             logger.error(f"Error updating stock volatility: {e}")

@@ -57,8 +57,8 @@ class Stock(Base):
     # Status and metadata
     is_active = Column(Boolean, default=True, index=True)
     is_tradeable = Column(Boolean, default=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)  # For volatility update tracking
-    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    volatility_last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)  # For volatility update tracking
+    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)  # For stock data update tracking
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
