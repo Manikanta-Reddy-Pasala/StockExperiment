@@ -130,9 +130,10 @@ def create_app():
 
                 if results.get('success'):
                     app.logger.info("✅ Stock system initialization completed successfully!")
-                    app.logger.info(f"📊 Symbol Master: {results.get('symbol_master', {}).get('total_symbols', 0)} symbols")
-                    app.logger.info(f"🔍 Verification: {results.get('verification', {}).get('verified', 0)} verified")
-                    app.logger.info(f"📈 Stocks: {results.get('stocks', {}).get('created', 0)} created, {results.get('stocks', {}).get('updated', 0)} updated")
+                    app.logger.info(f"📊 Symbols Processed: {results.get('symbols_processed', 0)} symbols")
+                    app.logger.info(f"🔍 Verification: {results.get('symbols_processed', 0)} processed")
+                    app.logger.info(f"📈 Stocks: {results.get('stocks_created', 0)} created")
+                    app.logger.info(f"⚡ Performance: {results.get('duration_seconds', 0):.1f}s ({results.get('success_rate', 0):.1f}% success)")
                 else:
                     app.logger.error(f"❌ Stock system initialization failed: {results.get('error', 'Unknown error')}")
 
