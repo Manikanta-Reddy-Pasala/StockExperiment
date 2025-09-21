@@ -135,7 +135,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
                 'success': True,
                 'data': categorized,
                 'summary': summary,
-                'filtering_statistics': summary,
+                'screening_statistics': summary,
                 'last_updated': datetime.now().isoformat()
             }
 
@@ -198,21 +198,21 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
     def get_suggested_stocks(self, user_id: int, strategies: List[StrategyType] = None,
                            limit: int = 50, search: str = None, sort_by: str = None,
                            sort_order: str = 'desc', sector: str = None) -> Dict[str, Any]:
-        """Get suggested stocks with comprehensive filtering pipeline and logging."""
+        """Get suggested stocks with comprehensive screening pipeline and logging."""
         try:
             if not strategies:
                 strategies = [StrategyType.DEFAULT_RISK, StrategyType.HIGH_RISK]
 
-            print(f"🎯 STAGE 0: Starting stock filtering pipeline for strategies: {[s.value for s in strategies]}")
+            print(f"🎯 STAGE 0: Starting stock screening pipeline for strategies: {[s.value for s in strategies]}")
 
-            # Use database-driven filtering pipeline
+            # Use database-driven screening pipeline
             filtered_stocks = self._get_filtered_stocks_from_database(user_id)
 
             if not filtered_stocks:
-                print("❌ STAGE 1 FAILED: No stocks passed the filtering pipeline")
+                print("❌ STAGE 1 FAILED: No stocks passed the screening pipeline")
                 return {
                     'success': False,
-                    'error': 'No tradeable stocks found after filtering',
+                    'error': 'No tradeable stocks found after screening',
                     'data': [],
                     'total': 0,
                     'strategies_applied': [s.value for s in strategies],
@@ -280,7 +280,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
     
     def search_stocks(self, user_id: int, query: str, limit: int = 50,
                      filters: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Search for stocks by name or symbol with advanced filtering."""
+        """Search for stocks by name or symbol with advanced screening."""
         try:
             # Use FYERS search API
             search_response = self.fyers_service.search(user_id, query)
@@ -1098,14 +1098,13 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
 
     def _get_filtered_stocks_from_database(self, user_id: int) -> List[Dict[str, Any]]:
         """
-        Comprehensive stock filtering pipeline from database with detailed logging.
+        Comprehensive stock screening pipeline from database with detailed logging.
 
-        Filtering steps:
+        Screening steps:
         1. Get all stocks from database
-        2. Filter out non-tradeable stocks
-        3. Filter out penny stocks (high risk)
-        4. Apply volume and liquidity filters
-        5. Log all filtering steps for verification
+        2. Apply Market Data Screening (Real-time quotes and historical volatility analysis)
+        3. Apply Business Logic Screening (Fundamental analysis and portfolio optimization)
+        4. Log all screening steps for verification
         """
         try:
             from src.models.stock_models import Stock
@@ -1115,7 +1114,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
 
             with db_manager.get_session() as session:
                 # STAGE 1: Get all stocks and filter penny stocks
-                print(f"📊 STAGE 1: Starting database filtering...")
+                print(f"📊 STAGE 1: Starting database screening...")
                 all_stocks = session.query(Stock).all()
                 total_stocks = len(all_stocks)
                 print(f"   📊 Retrieved {total_stocks} total stocks from database")
@@ -1126,133 +1125,53 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
                 print(f"   🚫 Filtered out {non_tradeable_count} non-tradeable stocks")
                 print(f"   ✅ {len(tradeable_stocks)} tradeable stocks remaining")
 
-                # STAGE 1: Apply comprehensive volatility and liquidity filters
-                print(f"   🎯 STAGE 1: Applying comprehensive volatility and liquidity filters...")
+                # 🚀 EXECUTE MODULAR FILTERING PIPELINE
+                print(f"🚀 Executing modular screening pipeline using specialized helper classes...")
 
-                # Filter criteria based on user requirements
-                min_price_threshold = 100.0  # ₹100 is a good start in India
-                max_atr_percentage = 5.0     # Exclude if ATR% > 5%
-                max_beta = 1.2               # Exclude if Beta > 1.2
-                max_historical_volatility = 60.0  # Exclude if > 60% annual volatility
-                min_daily_volume = 100000    # At least 100k shares per day
-                min_daily_turnover = 1.0     # At least ₹1cr daily turnover
-                min_trades_per_day = 50      # At least 50 trades per day
-                max_bid_ask_spread = 2.0     # Bid-ask spread < 2%
+                # Import and initialize the screening coordinator
+                from ..stock_screening import ScreeningCoordinator
+                from ..stock_screening.business_logic_screener import StrategyType as ScreeningStrategyType
+                from ..data.volatility_calculator_service import get_volatility_calculator_service
 
-                # Categorize filtering results
-                penny_stocks = []
-                high_volatility_stocks = []
-                low_liquidity_stocks = []
-                quality_stocks = []
+                volatility_service = get_volatility_calculator_service()
+                screening_coordinator = ScreeningCoordinator(self.fyers_service, volatility_service)
 
-                # Track filter application statistics
-                filter_stats = {
-                    'total_processed': 0,
-                    'atr_filters_applied': 0,
-                    'beta_filters_applied': 0,
-                    'hist_vol_filters_applied': 0,
-                    'turnover_filters_applied': 0,
-                    'trades_filters_applied': 0,
-                    'spread_filters_applied': 0
-                }
+                # Map strategy enum to screening StrategyType
+                screening_strategies = []
+                for strategy in strategies:
+                    if hasattr(strategy, 'value'):
+                        strategy_value = strategy.value
+                    else:
+                        strategy_value = str(strategy)
 
-                for stock in tradeable_stocks:
-                    # Skip if no price data
-                    if not stock.current_price or stock.current_price <= 0:
-                        continue
+                    if strategy_value == 'default_risk':
+                        screening_strategies.append(ScreeningStrategyType.DEFAULT_RISK)
+                    elif strategy_value == 'high_risk':
+                        screening_strategies.append(ScreeningStrategyType.HIGH_RISK)
+                    else:
+                        screening_strategies.append(ScreeningStrategyType.DEFAULT_RISK)  # Default fallback
 
-                    filter_stats['total_processed'] += 1
+                # Execute the complete screening pipeline
+                pipeline_result = screening_coordinator.execute_screening_pipeline(
+                    user_id=user_id,
+                    tradeable_stocks=tradeable_stocks,
+                    strategies=screening_strategies
+                )
 
-                    # Calculate missing metrics before filtering
-                    missing_metrics = self._calculate_missing_volatility_metrics(stock)
+                if not pipeline_result['success']:
+                    logger.error(f"Filtering pipeline failed: {pipeline_result.get('error')}")
+                    return []
 
-                    # Filter 1: Price threshold (₹100 minimum)
-                    if stock.current_price < min_price_threshold:
-                        penny_stocks.append(stock)
-                        if len(penny_stocks) <= 5:  # Show first 5 examples
-                            print(f"   🪙 PENNY STOCK: {stock.symbol} - ₹{stock.current_price:.2f} (< ₹{min_price_threshold})")
-                        continue
+                stage2_final_stocks = pipeline_result['data']
 
-                    # Filter 2: ATR Percentage (only if actual data available)
-                    atr_pct = stock.atr_percentage or missing_metrics.get('atr_percentage')
-                    if atr_pct:
-                        filter_stats['atr_filters_applied'] += 1
-                        if atr_pct > max_atr_percentage:
-                            high_volatility_stocks.append(stock)
-                            if len(high_volatility_stocks) <= 3:  # Show first 3 examples
-                                print(f"   📈 HIGH ATR: {stock.symbol} - ATR {atr_pct:.1f}% (> {max_atr_percentage}%)")
-                            continue
-
-                    # Filter 3: Beta (only if actual data available)
-                    if stock.beta:
-                        filter_stats['beta_filters_applied'] += 1
-                        if stock.beta > max_beta:
-                            high_volatility_stocks.append(stock)
-                            if len(high_volatility_stocks) <= 3:  # Show first 3 examples
-                                print(f"   📊 HIGH BETA: {stock.symbol} - Beta {stock.beta:.2f} (> {max_beta})")
-                            continue
-
-                    # Filter 4: Historical Volatility (only if actual data available)
-                    if stock.historical_volatility_1y:
-                        filter_stats['hist_vol_filters_applied'] += 1
-                        if stock.historical_volatility_1y > max_historical_volatility:
-                            high_volatility_stocks.append(stock)
-                            if len(high_volatility_stocks) <= 3:  # Show first 3 examples
-                                print(f"   📉 HIGH VOLATILITY: {stock.symbol} - {stock.historical_volatility_1y:.1f}% (> {max_historical_volatility}%)")
-                            continue
-
-                    # Filter 5: Volume liquidity (use current volume if 20-day average not available)
-                    daily_volume = stock.avg_daily_volume_20d or stock.volume or 0
-                    if daily_volume < min_daily_volume:
-                        low_liquidity_stocks.append(stock)
-                        if len(low_liquidity_stocks) <= 3:  # Show first 3 examples
-                            print(f"   💧 LOW VOLUME: {stock.symbol} - {daily_volume:,} shares (< {min_daily_volume:,})")
-                        continue
-
-                    # Filter 6: Daily turnover (only if we can calculate from actual data)
-                    daily_turnover = stock.avg_daily_turnover or missing_metrics.get('avg_daily_turnover')
-                    if daily_turnover:
-                        filter_stats['turnover_filters_applied'] += 1
-                        if daily_turnover < min_daily_turnover:
-                            low_liquidity_stocks.append(stock)
-                            if len(low_liquidity_stocks) <= 3:  # Show first 3 examples
-                                print(f"   💰 LOW TURNOVER: {stock.symbol} - ₹{daily_turnover:.1f}cr (< ₹{min_daily_turnover}cr)")
-                            continue
-
-                    # Filter 7: Trading frequency
-                    if stock.trades_per_day:
-                        filter_stats['trades_filters_applied'] += 1
-                        if stock.trades_per_day < min_trades_per_day:
-                            low_liquidity_stocks.append(stock)
-                            if len(low_liquidity_stocks) <= 3:  # Show first 3 examples
-                                print(f"   🔄 LOW TRADES: {stock.symbol} - {stock.trades_per_day} trades/day (< {min_trades_per_day})")
-                            continue
-
-                    # Filter 8: Bid-ask spread (liquidity indicator)
-                    if stock.bid_ask_spread:
-                        filter_stats['spread_filters_applied'] += 1
-                        if stock.bid_ask_spread > max_bid_ask_spread:
-                            low_liquidity_stocks.append(stock)
-                            if len(low_liquidity_stocks) <= 3:  # Show first 3 examples
-                                print(f"   📏 WIDE SPREAD: {stock.symbol} - {stock.bid_ask_spread:.2f}% spread (> {max_bid_ask_spread}%)")
-                            continue
-
-                    # Stock passed all Stage 1 filters
-                    quality_stocks.append(stock)
-
-                print(f"   📊 STAGE 1 FILTERING RESULTS:")
-                print(f"      🪙 Penny stocks (< ₹{min_price_threshold}): {len(penny_stocks)}")
-                print(f"      📈 High volatility (ATR/Beta/Hist Vol): {len(high_volatility_stocks)}")
-                print(f"      💧 Low liquidity (Volume/Turnover/Trades): {len(low_liquidity_stocks)}")
-                print(f"      ✅ Quality stocks for Stage 2: {len(quality_stocks)}")
-
-                # Use quality_stocks as the final filtered list
-                filtered_stocks = quality_stocks
-                print(f"   ✅ STAGE 1 COMPLETE: {len(filtered_stocks)} stocks ready for swing trading analysis")
+                # Log pipeline performance metrics
+                performance_metrics = screening_coordinator.get_pipeline_performance_metrics()
+                logger.info(f"Pipeline execution time: {performance_metrics['execution_stats']['total_execution_time']:.2f}s")
+                logger.info(f"Final portfolio size: {len(stage2_final_stocks)} stocks")
 
                 # Convert to dictionary format with comprehensive data
                 result_stocks = []
-                for stock in filtered_stocks:
+                for stock in stage2_final_stocks:
                     stock_data = {
                         'symbol': stock.symbol,
                         'name': stock.name,
@@ -1279,42 +1198,15 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
                     }
                     result_stocks.append(stock_data)
 
-                print(f"   📋 STAGE 1 COMPREHENSIVE SUMMARY:")
-                print(f"      📊 Total stocks in database: {total_stocks}")
-                print(f"      🚫 Non-tradeable filtered: {non_tradeable_count}")
-                print(f"      🪙 Penny stocks filtered (< ₹{min_price_threshold}): {len(penny_stocks)}")
-                print(f"      📈 High volatility filtered (ATR/Beta/Hist Vol): {len(high_volatility_stocks)}")
-                print(f"      💧 Low liquidity filtered (Volume/Turnover/Trades/Spread): {len(low_liquidity_stocks)}")
-                print(f"      ✅ Quality stocks ready for Stage 2: {len(result_stocks)} stocks")
-                print(f"")
-                print(f"   🎯 STAGE 1 FILTER CRITERIA APPLIED:")
-                print(f"      💰 Min Price: ₹{min_price_threshold} (applied to all {filter_stats['total_processed']} stocks)")
-                print(f"      📊 Max ATR%: {max_atr_percentage}% (applied to {filter_stats['atr_filters_applied']} stocks with ATR data)")
-                print(f"      📈 Max Beta: {max_beta} (applied to {filter_stats['beta_filters_applied']} stocks with Beta data)")
-                print(f"      📉 Max Historical Volatility: {max_historical_volatility}% (applied to {filter_stats['hist_vol_filters_applied']} stocks with hist vol data)")
-                print(f"      💧 Min Daily Volume: {min_daily_volume:,} shares (applied to all stocks)")
-                print(f"      💰 Min Daily Turnover: ₹{min_daily_turnover}cr (applied to {filter_stats['turnover_filters_applied']} stocks with turnover data)")
-                print(f"      🔄 Min Trades/Day: {min_trades_per_day} (applied to {filter_stats['trades_filters_applied']} stocks with trades data)")
-                print(f"      📏 Max Bid-Ask Spread: {max_bid_ask_spread}% (applied to {filter_stats['spread_filters_applied']} stocks with spread data)")
-                print(f"")
-                print(f"   ⚠️  FILTERS SKIPPED DUE TO MISSING DATA:")
-                missing_atr = filter_stats['total_processed'] - filter_stats['atr_filters_applied']
-                missing_beta = filter_stats['total_processed'] - filter_stats['beta_filters_applied']
-                missing_hist_vol = filter_stats['total_processed'] - filter_stats['hist_vol_filters_applied']
-                missing_turnover = filter_stats['total_processed'] - filter_stats['turnover_filters_applied']
-                missing_trades = filter_stats['total_processed'] - filter_stats['trades_filters_applied']
-                missing_spread = filter_stats['total_processed'] - filter_stats['spread_filters_applied']
-                print(f"      📊 ATR filters skipped: {missing_atr} stocks (no ATR data)")
-                print(f"      📈 Beta filters skipped: {missing_beta} stocks (no Beta data)")
-                print(f"      📉 Hist Vol filters skipped: {missing_hist_vol} stocks (no historical volatility data)")
-                print(f"      💰 Turnover filters skipped: {missing_turnover} stocks (no turnover data)")
-                print(f"      🔄 Trades filters skipped: {missing_trades} stocks (no trades data)")
-                print(f"      📏 Spread filters skipped: {missing_spread} stocks (no spread data)")
+                print(f"🎯 FINAL FILTERING PIPELINE COMPLETE:")
+                print(f"   📊 Total stocks in database: {total_stocks}")
+                print(f"   🚫 Non-tradeable filtered: {non_tradeable_count}")
+                print(f"   ✅ Final portfolio ready: {len(result_stocks)} stocks")
 
                 return result_stocks
 
         except Exception as e:
-            logger.error(f"Error in database filtering pipeline: {e}")
+            logger.error(f"Error in database screening pipeline: {e}")
             return []
 
     def _create_suggested_stock_from_database(self, stock_data: Dict[str, Any],
@@ -1381,6 +1273,32 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
 
         return stock
 
+    def _calculate_real_volatility_metrics(self, user_id: int, stock) -> Dict[str, float]:
+        """Calculate real volatility metrics using FYERS v3 API - NO ESTIMATIONS."""
+        try:
+            # Import the volatility calculator service
+            from ..data.volatility_calculator_service import get_volatility_calculator_service
+
+            volatility_service = get_volatility_calculator_service()
+
+            # Get real metrics from FYERS v3 Historical and Quotes APIs
+            real_metrics = volatility_service.calculate_stock_volatility_metrics(
+                user_id=user_id,
+                symbol=stock.symbol,
+                days_lookback=252  # 1 year of data
+            )
+
+            if real_metrics:
+                logger.info(f"✅ Real volatility metrics calculated for {stock.symbol}: {list(real_metrics.keys())}")
+                return real_metrics
+            else:
+                logger.warning(f"❌ Could not calculate real volatility metrics for {stock.symbol}")
+                return {}
+
+        except Exception as e:
+            logger.error(f"Error calculating real volatility metrics for {stock.symbol}: {e}")
+            return {}
+
     def _calculate_missing_volatility_metrics(self, stock) -> Dict[str, float]:
         """Calculate only computable metrics from existing data - NO ESTIMATIONS."""
         metrics = {}
@@ -1396,6 +1314,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
 
         # NO ESTIMATIONS for Beta or Historical Volatility - only use actual data
         return metrics
+
 
     def _determine_sector(self, company_name: str) -> str:
         """Determine sector from company name using keywords."""
