@@ -381,82 +381,36 @@ def get_suggested_stocks():
         }), 500
 
 def _get_basic_screening_suggestions(strategy_type: str, limit: int, user_id: int):
-    """Get stock suggestions using basic screening without ML predictions."""
+    """Get stock suggestions using swing trading filtering and business logic."""
     try:
-        # Use new basic stock screening service
-        from ....services.market.basic_stock_screening_service import get_basic_stock_screening_service
+        # Use Fyers suggested stocks provider with proper filtering pipeline
+        from ....services.implementations.fyers_suggested_stocks_provider import FyersSuggestedStocksProvider
+        from ....services.interfaces.suggested_stocks_interface import StrategyType
 
-        screening_service = get_basic_stock_screening_service()
-        screening_result = screening_service.get_top_stocks(
-            risk_level=strategy_type,
-            limit=limit,
-            user_id=user_id
+        # Map strategy type to enum
+        strategy_map = {
+            'default_risk': StrategyType.DEFAULT_RISK,
+            'high_risk': StrategyType.HIGH_RISK,
+            'medium_risk': StrategyType.DEFAULT_RISK  # Map medium_risk to default_risk
+        }
+
+        strategy_enum = strategy_map.get(strategy_type, StrategyType.DEFAULT_RISK)
+
+        provider = FyersSuggestedStocksProvider()
+        screening_result = provider.get_suggested_stocks(
+            user_id=user_id,
+            strategies=[strategy_enum],
+            limit=limit
         )
 
         if not screening_result.get('success'):
-            logger.warning(f"Basic screening failed: {screening_result.get('error', 'Unknown error')}")
+            logger.warning(f"Swing trading screening failed: {screening_result.get('error', 'Unknown error')}")
             return []
 
-        # Extract stocks from all categories
-        portfolio = screening_result.get('portfolio', {})
-        all_stocks = []
-        for category in ['large_cap', 'mid_cap', 'small_cap']:
-            all_stocks.extend(portfolio.get(category, []))
+        # Return the properly filtered suggestions (already processed by FyersSuggestedStocksProvider)
+        suggestions = screening_result.get('data', [])
 
-        suggestions = []
-        for stock_data in all_stocks:
-            # Create enhanced targets based on basic score
-            current_price = stock_data.get('current_price', 0)
-            basic_score = stock_data.get('basic_score', 0.5)
-
-            # Dynamic targets based on scoring
-            upside_percent = 0.10 + (basic_score * 0.15)  # 10-25% upside based on score
-            downside_percent = 0.05 + ((1 - basic_score) * 0.05)  # 5-10% downside
-
-            target_price = current_price * (1 + upside_percent) if current_price else None
-            stop_loss = current_price * (1 - downside_percent) if current_price else None
-
-            # Determine holding period based on market cap and score
-            market_cap_cat = stock_data.get('market_cap_category', 'mid_cap')
-            if market_cap_cat == 'large_cap':
-                holding_period = '4-8 weeks'
-                risk_level = 'Low'
-            elif market_cap_cat == 'mid_cap':
-                holding_period = '3-6 weeks'
-                risk_level = 'Medium'
-            else:  # small_cap
-                holding_period = '2-4 weeks'
-                risk_level = 'High'
-
-            suggestion = {
-                'symbol': stock_data.get('symbol'),
-                'name': stock_data.get('name'),
-                'current_price': current_price,
-                'target_price': round(target_price, 2) if target_price else None,
-                'stop_loss': round(stop_loss, 2) if stop_loss else None,
-                'recommendation': stock_data.get('recommendation', 'BUY'),
-                'strategy': strategy_type,
-                'risk_level': risk_level,
-                'holding_period': holding_period,
-                'market_cap': stock_data.get('market_cap_crores', 0) * 10000000,
-                'market_cap_category': market_cap_cat,
-                'sector': stock_data.get('sector', 'Others'),
-                'pe_ratio': None,  # Basic screening doesn't have fundamental data
-                'pb_ratio': None,
-                'roe': None,
-                'sales_growth': None,
-                'rsi': None,
-                'sma_20': None,
-                'volume': stock_data.get('volume', 0),
-                'liquidity_score': stock_data.get('liquidity_score', 0),
-                'avg_volume_20d': None,
-                'expected_return': ((target_price - current_price) / current_price * 100) if target_price and current_price else 0,
-                'risk_reward_ratio': ((target_price - current_price) / (current_price - stop_loss)) if target_price and stop_loss and current_price > stop_loss else 0,
-                'reason': f'High liquidity {market_cap_cat} stock with basic score {basic_score:.2f}',
-                'basic_score': basic_score
-            }
-            suggestions.append(suggestion)
-
+        logger.info(f"✅ Swing trading screening returned {len(suggestions)} suggestions")
         return suggestions
 
     except Exception as e:
