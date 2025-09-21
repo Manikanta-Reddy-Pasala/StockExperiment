@@ -43,10 +43,27 @@ class SimpleMarketDataScreener:
         Returns:
             List of stocks that passed basic screening
         """
-        logger.info(f"📊 Starting Simple Market Data Screening for {len(tradeable_stocks)} stocks")
+        print(f"📊 STAGE 1: MARKET DATA SCREENING")
+        print(f"=" * 60)
+        print(f"   📊 Input: {len(tradeable_stocks)} tradeable stocks")
+        print()
 
-        # Basic quotes screening only (skip volatility for now)
+        # STAGE 1 STEP 1: Basic quotes screening
+        print(f"📋 STAGE 1 STEP 1: Basic Database Screening")
+        print(f"-" * 40)
         quotes_candidates = self.basic_quotes_screening(user_id, tradeable_stocks)
+        print()
+
+        # STAGE 1 STEP 2: Would be volatility screening (skipped for simplified version)
+        print(f"📈 STAGE 1 STEP 2: Historical Volatility Analysis")
+        print(f"-" * 40)
+        print(f"   ⏭️  SKIPPED: Using simplified screening without volatility calculations")
+        print(f"   ✅ Forwarding {len(quotes_candidates)} candidates to Stage 2")
+        print()
+
+        print(f"✅ STAGE 1 COMPLETE: {len(quotes_candidates)} candidates passed Market Data Screening")
+        print(f"=" * 60)
+        print()
 
         logger.info(f"✅ Simple Market Data Screening complete: {len(quotes_candidates)} candidates")
         return quotes_candidates
@@ -62,8 +79,6 @@ class SimpleMarketDataScreener:
         Returns:
             List of stocks that passed basic quotes screening
         """
-        logger.info(f"📋 Starting Basic Quotes Screening for {len(tradeable_stocks)} stocks")
-
         # Results tracking for quotes screening
         self.quotes_results = {
             'total_input': len(tradeable_stocks),
@@ -75,9 +90,9 @@ class SimpleMarketDataScreener:
             'quotes_candidates': []
         }
 
-        # For initial testing, let's just return the first 20 valid stocks without API calls
-        # to avoid rate limiting issues
-        print(f"   📊 Performing basic database-only screening...")
+        print(f"   📊 Processing {len(tradeable_stocks)} stocks with database-only screening")
+        print(f"   🎯 Criteria: Price ≥ ₹{self.config['min_price_threshold']}, Volume ≥ {self.config['min_daily_volume']:,}")
+        print(f"   📈 Analyzing stocks...")
 
         valid_stocks = []
         for stock in tradeable_stocks:  # Process all tradeable stocks

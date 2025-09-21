@@ -117,31 +117,15 @@ class ScreeningCoordinator:
 
     def _execute_market_data_screening(self, user_id: int, tradeable_stocks: List) -> List:
         """Execute market data screening."""
-        print(f"📊 MARKET DATA SCREENING: Real-time quotes and historical volatility analysis")
-        print(f"=" * 80)
-
         candidates = self.market_data_screener.screen_stocks(user_id, tradeable_stocks)
-
-        print(f"✅ MARKET DATA SCREENING COMPLETE: {len(candidates)} candidates for business logic screening")
-        print(f"=" * 80)
-        print()
-
         return candidates
 
     def _execute_business_logic_screening(self, market_data_candidates: List, strategies: Optional[List[StrategyType]]) -> List:
         """Execute business logic screening."""
-        print(f"🎯 BUSINESS LOGIC SCREENING: Fundamental analysis and portfolio optimization")
-        print(f"=" * 80)
-
         if not strategies:
             strategies = [StrategyType.DEFAULT_RISK]
 
         final_stocks = self.business_logic_screener.screen_stocks(market_data_candidates, strategies)
-
-        print(f"✅ BUSINESS LOGIC SCREENING COMPLETE: {len(final_stocks)} stocks ready for swing trading")
-        print(f"=" * 80)
-        print()
-
         return final_stocks
 
     def _print_pipeline_header(self, total_stocks: int):

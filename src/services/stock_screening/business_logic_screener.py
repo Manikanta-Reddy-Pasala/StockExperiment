@@ -81,7 +81,11 @@ class BusinessLogicScreener:
         Returns:
             List of stocks optimized for swing trading portfolio
         """
-        logger.info(f"🎯 Starting Business Logic Screening for {len(market_data_candidates)} candidates")
+        print(f"🎯 STAGE 2: BUSINESS LOGIC SCREENING")
+        print(f"=" * 60)
+        print(f"   📊 Input: {len(market_data_candidates)} candidates from Stage 1")
+        print(f"   🎯 Strategies: {[s.value for s in strategies] if strategies else ['default_risk']}")
+        print()
 
         if not strategies:
             strategies = [StrategyType.DEFAULT_RISK]
@@ -98,12 +102,40 @@ class BusinessLogicScreener:
             'final_stocks': []
         }
 
-        # Apply business logic screening filters in sequence
+        # STAGE 2 STEP 1: Sector allocation filter
+        print(f"📊 STAGE 2 STEP 1: Sector Allocation Filter")
+        print(f"-" * 40)
         sector_filtered = self._apply_sector_allocation_filter(market_data_candidates)
+        print(f"   ✅ {len(sector_filtered)} stocks passed sector allocation filter")
+        print()
+
+        # STAGE 2 STEP 2: Market cap filter
+        print(f"💰 STAGE 2 STEP 2: Market Cap Filter")
+        print(f"-" * 40)
         market_cap_filtered = self._apply_market_cap_filter(sector_filtered)
+        print(f"   ✅ {len(market_cap_filtered)} stocks passed market cap filter")
+        print()
+
+        # STAGE 2 STEP 3: Fundamental filters
+        print(f"📈 STAGE 2 STEP 3: Fundamental Analysis Filter")
+        print(f"-" * 40)
         fundamental_filtered = self._apply_fundamental_filters(market_cap_filtered)
+        print(f"   ✅ {len(fundamental_filtered)} stocks passed fundamental filters")
+        print()
+
+        # STAGE 2 STEP 4: Strategy-specific filters
+        print(f"🎯 STAGE 2 STEP 4: Strategy-Specific Filter")
+        print(f"-" * 40)
         strategy_filtered = self._apply_strategy_filters(fundamental_filtered, strategies)
+        print(f"   ✅ {len(strategy_filtered)} stocks passed strategy filters")
+        print()
+
+        # STAGE 2 STEP 5: Portfolio optimization
+        print(f"⚖️ STAGE 2 STEP 5: Portfolio Optimization")
+        print(f"-" * 40)
         final_optimized = self._apply_portfolio_optimization(strategy_filtered)
+        print(f"   ✅ {len(final_optimized)} stocks in final optimized portfolio")
+        print()
 
         self.results['final_stocks'] = final_optimized
 
@@ -111,12 +143,15 @@ class BusinessLogicScreener:
         self._log_business_logic_results()
         self._log_portfolio_composition(final_optimized)
 
+        print(f"✅ STAGE 2 COMPLETE: {len(final_optimized)} stocks ready for swing trading")
+        print(f"=" * 60)
+        print()
+
         logger.info(f"✅ Business Logic Screening complete: {len(final_optimized)} stocks ready for swing trading")
         return final_optimized
 
     def _apply_sector_allocation_filter(self, stocks: List) -> List:
         """Apply sector allocation limits to prevent over-concentration."""
-        print(f"   📊 BUSINESS FILTER 1: Sector allocation analysis...")
 
         # Analyze sector distribution
         sector_counts = {}
