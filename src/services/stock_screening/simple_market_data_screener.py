@@ -269,7 +269,7 @@ class SimpleMarketDataScreener:
             'min_avg_volume_20d': int(os.getenv('SCREENING_MIN_AVG_VOLUME_20D', '100000')),
             'max_bid_ask_spread': float(os.getenv('SCREENING_MAX_BID_ASK_SPREAD', '2.0')),
             'min_historical_volatility': float(os.getenv('SCREENING_MIN_HISTORICAL_VOLATILITY', '10.0')),
-            'max_historical_volatility': float(os.getenv('SCREENING_MAX_HISTORICAL_VOLATILITY', '40.0')),
+            'max_historical_volatility': float(os.getenv('SCREENING_MAX_HISTORICAL_VOLATILITY', '60.0')),
             'max_beta': float(os.getenv('SCREENING_MAX_BETA', '1.2'))
         }
 
