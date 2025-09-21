@@ -646,22 +646,27 @@ class StockInitializationService:
                 # Remove existing stocks first
                 session.query(Stock).delete()
 
-                # Create new stock objects
+                # Create new stock objects with validation
                 stock_objects = []
                 for data in stock_data:
-                    stock = Stock(
-                        symbol=data['symbol'],
-                        name=data['name'],
-                        exchange=data['exchange'],
-                        current_price=data['current_price'],
-                        volume=data['volume'],
-                        market_cap_category=data['market_cap_category'],
-                        sector=data['sector'],
-                        is_active=data['is_active'],
-                        is_tradeable=data['is_tradeable'],
-                        last_updated=data['last_updated']
-                    )
-                    stock_objects.append(stock)
+                    try:
+                        # Create stock with BigInteger support for volume
+                        stock = Stock(
+                            symbol=data['symbol'],
+                            name=data['name'],
+                            exchange=data['exchange'],
+                            current_price=data['current_price'],
+                            volume=data['volume'],  # BigInteger can handle large values
+                            market_cap_category=data['market_cap_category'],
+                            sector=data['sector'],
+                            is_active=data['is_active'],
+                            is_tradeable=data['is_tradeable'],
+                            last_updated=data['last_updated']
+                        )
+                        stock_objects.append(stock)
+                    except Exception as e:
+                        logger.warning(f"Skipping stock {data.get('symbol', 'unknown')} due to data error: {e}")
+                        continue
 
                 # Bulk insert
                 session.bulk_save_objects(stock_objects)

@@ -2,7 +2,7 @@
 Enhanced Data Models for Stock Management
 Adds comprehensive stock data storage and categorization
 """
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text, ForeignKey, UniqueConstraint, Enum
+from sqlalchemy import Column, Integer, BigInteger, String, Float, DateTime, Boolean, Text, ForeignKey, UniqueConstraint, Enum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -35,7 +35,7 @@ class Stock(Base):
 
     # Current market data
     current_price = Column(Float)
-    volume = Column(Integer)
+    volume = Column(BigInteger)  # Use BigInteger to handle large volume values
 
     # Fundamental ratios (basic set that matches actual table)
     pe_ratio = Column(Float)
