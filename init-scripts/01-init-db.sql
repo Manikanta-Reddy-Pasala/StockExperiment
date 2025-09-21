@@ -216,23 +216,28 @@ CREATE TABLE IF NOT EXISTS stocks (
     id SERIAL PRIMARY KEY,
     symbol VARCHAR(50) UNIQUE NOT NULL,
     name VARCHAR(200) NOT NULL,
-    exchange VARCHAR(20) NOT NULL,
+    exchange VARCHAR(20) NOT NULL DEFAULT 'NSE',
     sector VARCHAR(100),
-    market_cap DECIMAL(15,2),
+    market_cap DOUBLE PRECISION,  -- in crores, matches SQLAlchemy Float
     market_cap_category VARCHAR(20),
-    current_price DECIMAL(10,2),
-    volume BIGINT,
-    pe_ratio DECIMAL(8,2),
-    pb_ratio DECIMAL(8,2),
-    roe DECIMAL(8,4),
-    debt_to_equity DECIMAL(8,4),
-    dividend_yield DECIMAL(8,4),
-    beta DECIMAL(8,4),
+    current_price DOUBLE PRECISION,  -- matches SQLAlchemy Float
+    volume BIGINT,  -- Handle high volume stocks like IDEA (2.6B+ volume)
+    pe_ratio DOUBLE PRECISION,  -- matches SQLAlchemy Float
+    pb_ratio DOUBLE PRECISION,  -- matches SQLAlchemy Float
+    roe DOUBLE PRECISION,  -- matches SQLAlchemy Float
+    debt_to_equity DOUBLE PRECISION,  -- matches SQLAlchemy Float
+    dividend_yield DOUBLE PRECISION,  -- matches SQLAlchemy Float
+    beta DOUBLE PRECISION,  -- matches SQLAlchemy Float
     is_active BOOLEAN DEFAULT TRUE,
     is_tradeable BOOLEAN DEFAULT TRUE,
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Indexes for stocks table (matches SQLAlchemy model)
+CREATE INDEX IF NOT EXISTS ix_stocks_symbol ON stocks(symbol);
+CREATE INDEX IF NOT EXISTS ix_stocks_market_cap_category ON stocks(market_cap_category);
+CREATE INDEX IF NOT EXISTS ix_stocks_is_active ON stocks(is_active);
 
 CREATE TABLE IF NOT EXISTS strategy_types (
     id SERIAL PRIMARY KEY,
@@ -370,7 +375,7 @@ CREATE TABLE IF NOT EXISTS symbol_master (
     segment VARCHAR(20) NOT NULL,
     instrument_type VARCHAR(20) NOT NULL,
     lot_size INTEGER DEFAULT 1,
-    tick_size DECIMAL(10,4) DEFAULT 0.05,
+    tick_size DOUBLE PRECISION DEFAULT 0.05,  -- matches SQLAlchemy Float
     isin VARCHAR(20),
     data_source VARCHAR(20) DEFAULT 'fyers',
     source_updated VARCHAR(20),
@@ -384,8 +389,16 @@ CREATE TABLE IF NOT EXISTS symbol_master (
     last_quote_check TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(symbol, exchange)
+    -- Unique constraint to prevent duplicate symbol-exchange combinations
+    CONSTRAINT _symbol_exchange_uc UNIQUE(symbol, exchange)
 );
+
+-- Indexes for symbol_master table (matches SQLAlchemy model)
+CREATE INDEX IF NOT EXISTS ix_symbol_master_symbol ON symbol_master(symbol);
+CREATE INDEX IF NOT EXISTS ix_symbol_master_exchange ON symbol_master(exchange);
+CREATE INDEX IF NOT EXISTS ix_symbol_master_is_active ON symbol_master(is_active);
+CREATE INDEX IF NOT EXISTS ix_symbol_master_is_equity ON symbol_master(is_equity);
+CREATE INDEX IF NOT EXISTS ix_symbol_master_is_fyers_verified ON symbol_master(is_fyers_verified);
 
 -- Market Data Snapshots table
 CREATE TABLE IF NOT EXISTS market_data_snapshots (
