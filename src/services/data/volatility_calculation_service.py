@@ -149,12 +149,12 @@ class VolatilityCalculationService:
 
             # Use unified broker service to get historical data
             # This will route to the appropriate broker (FYERS) based on user config
+            # API only accepts period parameter, so request 1 year of data
             historical_data = self.unified_broker_service.get_historical_data(
                 user_id=user_id,
                 symbol=symbol,
-                start_date=start_date.strftime('%Y-%m-%d'),
-                end_date=end_date.strftime('%Y-%m-%d'),
-                resolution='D'
+                resolution='1D',
+                period='1y'  # Request 1 year of historical data (lowercase)
             )
 
             if not historical_data or 'candles' not in historical_data:
