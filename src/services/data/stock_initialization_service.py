@@ -24,11 +24,15 @@ try:
     from ...models.database import get_database_manager
     from ...models.stock_models import Stock, SymbolMaster
     from ..data.fyers_symbol_service import get_fyers_symbol_service
+    from ..data.volatility_calculation_service import get_volatility_calculation_service
+    from ..ml.stock_master_service import get_stock_master_service
 except ImportError:
     from src.services.core.unified_broker_service import get_unified_broker_service
     from src.models.database import get_database_manager
     from src.models.stock_models import Stock, SymbolMaster
     from src.services.data.fyers_symbol_service import get_fyers_symbol_service
+    from src.services.data.volatility_calculation_service import get_volatility_calculation_service
+    from src.services.ml.stock_master_service import get_stock_master_service
 
 
 class StockInitializationService:
@@ -38,6 +42,8 @@ class StockInitializationService:
         self.unified_broker_service = get_unified_broker_service()
         self.db_manager = get_database_manager()
         self.fyers_service = get_fyers_symbol_service()
+        self.volatility_service = get_volatility_calculation_service()
+        self.stock_master_service = get_stock_master_service()
         self.rate_limit_delay = 0.1  # 100ms between API calls (fast mode)
         self.batch_size = 50  # Process in medium batches for better success rate
 
@@ -455,6 +461,10 @@ class StockInitializationService:
                     stock_count = session.query(Stock).count()
                     logger.info(f"📊 Stocks already synced today: {stock_count:,} stocks")
                     logger.info("⚡ Skipping stock sync - prices are up to date for today")
+
+                    # Even if stocks are synced, check if volatility needs updating
+                    volatility_result = self._auto_trigger_volatility_calculation(user_id)
+
                     return {
                         'success': True,
                         'total_symbols': stock_count,
@@ -462,7 +472,8 @@ class StockInitializationService:
                         'duration_seconds': time.time() - start_time,
                         'source': 'cached_today',
                         'cached': True,
-                        'message': f'Stocks already synced today ({stock_count:,} stocks)'
+                        'message': f'Stocks already synced today ({stock_count:,} stocks)',
+                        'volatility_calculation': volatility_result
                     }
 
             logger.info("🚀 Starting fast stock synchronization")
@@ -627,6 +638,9 @@ class StockInitializationService:
                     session.commit()
                     logger.info(f"✅ Updated verification status for {len(verified_symbols)} symbols")
 
+            # Step 5: Auto-trigger volatility calculation after stock sync
+            volatility_result = self._auto_trigger_volatility_calculation(user_id)
+
             duration = time.time() - start_time
 
             logger.info(f"🎉 Fast sync completed in {duration:.1f} seconds")
@@ -638,7 +652,8 @@ class StockInitializationService:
                 'symbols_processed': len(symbols),
                 'stocks_created': stocks_created,
                 'success_rate': stocks_created / len(symbols) * 100 if symbols else 0,
-                'speed_symbols_per_second': len(symbols) / duration if duration > 0 else 0
+                'speed_symbols_per_second': len(symbols) / duration if duration > 0 else 0,
+                'volatility_calculation': volatility_result
             }
 
         except Exception as e:
@@ -648,6 +663,67 @@ class StockInitializationService:
                 'success': False,
                 'error': str(e),
                 'duration_seconds': duration
+            }
+
+    def _auto_trigger_volatility_calculation(self, user_id: int) -> Dict:
+        """
+        Auto-trigger volatility calculation after stock data is populated.
+
+        This method:
+        1. Checks which stocks need volatility data updates based on dates
+        2. Prioritizes stocks intelligently
+        3. Triggers volatility calculation using real broker historical data
+        4. Runs automatically after each stock sync
+        """
+        try:
+            logger.info("🔄 Auto-triggering volatility calculation after stock sync")
+
+            # Use stock master service to identify stocks needing volatility updates
+            stock_symbols_needing_update = self.stock_master_service._identify_stocks_needing_volatility_update("NSE")
+
+            if not stock_symbols_needing_update:
+                logger.info("✅ All stocks have up-to-date volatility data")
+                return {
+                    'triggered': False,
+                    'reason': 'All volatility data is up to date',
+                    'stocks_checked': 0,
+                    'stocks_updated': 0
+                }
+
+            # For auto-trigger, use all symbols that need updates (no prioritization to keep it simple)
+            stock_symbols = stock_symbols_needing_update
+
+            logger.info(f"📊 Found {len(stock_symbols)} stocks needing volatility updates")
+            logger.info(f"🎯 Prioritized top stocks for volatility calculation")
+
+            # Trigger volatility calculation using real broker historical data
+            volatility_result = self.volatility_service.calculate_volatility_for_stocks(
+                user_id=user_id,
+                stock_symbols=stock_symbols
+            )
+
+            if volatility_result.get('updated', 0) > 0:
+                logger.info(f"✅ Successfully updated volatility for {volatility_result['updated']} stocks")
+            else:
+                logger.warning("⚠️ No stocks were updated with volatility data")
+
+            return {
+                'triggered': True,
+                'stocks_checked': len(stock_symbols_needing_update),
+                'stocks_prioritized': len(stock_symbols),
+                'stocks_updated': volatility_result.get('updated', 0),
+                'stocks_failed': volatility_result.get('failed', 0),
+                'duration_seconds': volatility_result.get('duration', 0),
+                'errors': volatility_result.get('errors', [])
+            }
+
+        except Exception as e:
+            logger.error(f"❌ Error in auto-trigger volatility calculation: {e}")
+            return {
+                'triggered': False,
+                'error': str(e),
+                'stocks_checked': 0,
+                'stocks_updated': 0
             }
 
     def _get_market_cap_category(self, price: float) -> str:
