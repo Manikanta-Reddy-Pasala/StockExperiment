@@ -94,6 +94,15 @@ class SimpleMarketDataScreener:
         print(f"   📈 Analyzing stocks...")
 
         valid_stocks = []
+
+        # Track detailed filtering stats with stock examples
+        self.quotes_results['detailed_examples'] = {
+            'passed_stocks': [],
+            'penny_stocks': [],
+            'low_volume_stocks': [],
+            'missing_data_stocks': []
+        }
+
         for stock in tradeable_stocks:  # Process all tradeable stocks
             try:
                 # Only use actual database data - no defaults or assumptions
@@ -103,14 +112,24 @@ class SimpleMarketDataScreener:
                 # Skip stocks that don't have required data
                 if current_price is None:
                     self.quotes_results['api_failures'] += 1
-                    if self.quotes_results['api_failures'] <= 3:
-                        print(f"         ❌ MISSING PRICE: {stock.symbol} - No current_price data")
+                    self.quotes_results['detailed_examples']['missing_data_stocks'].append({
+                        'symbol': stock.symbol,
+                        'reason': 'Missing current_price',
+                        'price': None,
+                        'volume': current_volume
+                    })
+                    print(f"         ❌ MISSING PRICE: {stock.symbol} - No current_price data")
                     continue
 
                 if current_volume is None:
                     self.quotes_results['api_failures'] += 1
-                    if self.quotes_results['api_failures'] <= 3:
-                        print(f"         ❌ MISSING VOLUME: {stock.symbol} - No volume data")
+                    self.quotes_results['detailed_examples']['missing_data_stocks'].append({
+                        'symbol': stock.symbol,
+                        'reason': 'Missing volume',
+                        'price': current_price,
+                        'volume': None
+                    })
+                    print(f"         ❌ MISSING VOLUME: {stock.symbol} - No volume data")
                     continue
 
                 # Convert to proper types
@@ -122,20 +141,41 @@ class SimpleMarketDataScreener:
                     if current_volume >= self.config['min_daily_volume']:
                         valid_stocks.append(stock)
                         self.quotes_results['symbol_validated'] += 1
+                        self.quotes_results['detailed_examples']['passed_stocks'].append({
+                            'symbol': stock.symbol,
+                            'name': getattr(stock, 'name', 'Unknown'),
+                            'price': current_price,
+                            'volume': current_volume
+                        })
                         print(f"         ✅ PASSED: {stock.symbol} - {stock.name} (₹{current_price:.2f}, Vol: {current_volume:,})")
                     else:
                         self.quotes_results['low_volume_filtered'] += 1
-                        if self.quotes_results['low_volume_filtered'] <= 5:
-                            print(f"         💧 LOW VOLUME: {stock.symbol} - Vol: {current_volume:,} (< {self.config['min_daily_volume']:,})")
+                        self.quotes_results['detailed_examples']['low_volume_stocks'].append({
+                            'symbol': stock.symbol,
+                            'price': current_price,
+                            'volume': current_volume,
+                            'threshold': self.config['min_daily_volume']
+                        })
+                        print(f"         💧 LOW VOLUME: {stock.symbol} - Vol: {current_volume:,} (< {self.config['min_daily_volume']:,}), Price: ₹{current_price:.2f}")
                 else:
                     self.quotes_results['penny_stocks_filtered'] += 1
-                    if self.quotes_results['penny_stocks_filtered'] <= 5:
-                        print(f"         🪙 PENNY STOCK: {stock.symbol} - ₹{current_price:.2f} (< ₹{self.config['min_price_threshold']})")
+                    self.quotes_results['detailed_examples']['penny_stocks'].append({
+                        'symbol': stock.symbol,
+                        'price': current_price,
+                        'volume': current_volume,
+                        'threshold': self.config['min_price_threshold']
+                    })
+                    print(f"         🪙 PENNY STOCK: {stock.symbol} - ₹{current_price:.2f} (< ₹{self.config['min_price_threshold']}), Vol: {current_volume:,}")
 
             except Exception as e:
                 self.quotes_results['api_failures'] += 1
-                if self.quotes_results['api_failures'] <= 5:
-                    print(f"         ❌ ERROR processing {getattr(stock, 'symbol', 'Unknown')}: {e}")
+                self.quotes_results['detailed_examples']['missing_data_stocks'].append({
+                    'symbol': getattr(stock, 'symbol', 'Unknown'),
+                    'reason': f'Processing error: {e}',
+                    'price': None,
+                    'volume': None
+                })
+                print(f"         ❌ ERROR processing {getattr(stock, 'symbol', 'Unknown')}: {e}")
                 continue
 
         self.quotes_results['quotes_candidates'] = valid_stocks
@@ -147,7 +187,7 @@ class SimpleMarketDataScreener:
         return valid_stocks
 
     def _log_quotes_results(self):
-        """Log comprehensive quotes screening results."""
+        """Log comprehensive quotes screening results with detailed examples."""
         print(f"   📊 BASIC QUOTES SCREENING RESULTS:")
         print(f"      📈 Total stocks processed: {self.quotes_results['total_input']}")
         print(f"      ✅ Symbols validated: {self.quotes_results['symbol_validated']}")
@@ -155,6 +195,44 @@ class SimpleMarketDataScreener:
         print(f"      💧 Low volume filtered (< {self.config['min_daily_volume']:,}): {self.quotes_results['low_volume_filtered']}")
         print(f"      ❌ Processing failures: {self.quotes_results['api_failures']}")
         print(f"      ✅ Basic candidates: {len(self.quotes_results['quotes_candidates'])}")
+        print()
+
+        # Show detailed examples with actual values
+        examples = self.quotes_results.get('detailed_examples', {})
+
+        if examples.get('passed_stocks'):
+            print(f"   📋 PASSED STOCKS (Sample with Values):")
+            for i, stock in enumerate(examples['passed_stocks'][:3]):  # Show first 3
+                print(f"      ✅ {stock['symbol']}: ₹{stock['price']:.2f}, Vol: {stock['volume']:,}")
+            if len(examples['passed_stocks']) > 3:
+                print(f"      ... and {len(examples['passed_stocks']) - 3} more passed stocks")
+            print()
+
+        if examples.get('penny_stocks'):
+            print(f"   🪙 PENNY STOCKS FILTERED (Sample with Values):")
+            for i, stock in enumerate(examples['penny_stocks'][:3]):  # Show first 3
+                print(f"      🪙 {stock['symbol']}: ₹{stock['price']:.2f} (< ₹{stock['threshold']:.1f}), Vol: {stock['volume']:,}")
+            if len(examples['penny_stocks']) > 3:
+                print(f"      ... and {len(examples['penny_stocks']) - 3} more penny stocks")
+            print()
+
+        if examples.get('low_volume_stocks'):
+            print(f"   💧 LOW VOLUME STOCKS FILTERED (Sample with Values):")
+            for i, stock in enumerate(examples['low_volume_stocks'][:3]):  # Show first 3
+                print(f"      💧 {stock['symbol']}: Vol: {stock['volume']:,} (< {stock['threshold']:,}), ₹{stock['price']:.2f}")
+            if len(examples['low_volume_stocks']) > 3:
+                print(f"      ... and {len(examples['low_volume_stocks']) - 3} more low volume stocks")
+            print()
+
+        if examples.get('missing_data_stocks'):
+            print(f"   ❌ MISSING DATA STOCKS (Sample with Reasons):")
+            for i, stock in enumerate(examples['missing_data_stocks'][:3]):  # Show first 3
+                price_str = f"₹{stock['price']:.2f}" if stock['price'] is not None else "N/A"
+                vol_str = f"{stock['volume']:,}" if stock['volume'] is not None else "N/A"
+                print(f"      ❌ {stock['symbol']}: {stock['reason']} (Price: {price_str}, Vol: {vol_str})")
+            if len(examples['missing_data_stocks']) > 3:
+                print(f"      ... and {len(examples['missing_data_stocks']) - 3} more missing data stocks")
+            print()
 
     def get_screening_stats(self) -> Dict[str, Any]:
         """Get detailed screening statistics."""
@@ -207,7 +285,15 @@ class SimpleMarketDataScreener:
             'extreme_volatility_filtered': 0,
             'high_beta_filtered': 0,
             'missing_data_filtered': 0,
-            'volatility_candidates': []
+            'volatility_candidates': [],
+            'detailed_examples': {
+                'passed_stocks': [],
+                'high_atr_stocks': [],
+                'low_volume_stocks': [],
+                'high_beta_stocks': [],
+                'extreme_volatility_stocks': [],
+                'missing_data_stocks': []
+            }
         }
 
         valid_stocks = []
@@ -226,12 +312,27 @@ class SimpleMarketDataScreener:
                     if avg_volume_20d and avg_volume_20d >= volatility_config['min_avg_volume_20d']:
                         # Allow stocks with good volume even without ATR data
                         valid_stocks.append(stock)
-                        print(f"         ✅ PASSED: {stock.symbol} - Good volume, ATR data pending")
+                        self.volatility_results['detailed_examples']['passed_stocks'].append({
+                            'symbol': stock.symbol,
+                            'atr_percentage': None,
+                            'avg_volume_20d': avg_volume_20d,
+                            'beta': beta,
+                            'reason': 'Good volume, ATR data pending'
+                        })
+                        print(f"         ✅ PASSED: {stock.symbol} - Good volume (Vol: {avg_volume_20d:,.0f}), ATR data pending")
                         continue
                     else:
                         self.volatility_results['missing_data_filtered'] += 1
-                        if self.volatility_results['missing_data_filtered'] <= 3:
-                            print(f"         ❌ MISSING DATA: {stock.symbol} - No ATR percentage or volume")
+                        self.volatility_results['detailed_examples']['missing_data_stocks'].append({
+                            'symbol': stock.symbol,
+                            'reason': 'No ATR percentage or sufficient volume',
+                            'atr_percentage': None,
+                            'avg_volume_20d': avg_volume_20d,
+                            'beta': beta,
+                            'volume_threshold': volatility_config['min_avg_volume_20d']
+                        })
+                        vol_str = f"Vol: {avg_volume_20d:,.0f}" if avg_volume_20d else "Vol: N/A"
+                        print(f"         ❌ MISSING DATA: {stock.symbol} - No ATR percentage, insufficient volume ({vol_str} < {volatility_config['min_avg_volume_20d']:,})")
                         continue
 
                 # Convert to proper types - NO MOCK DATA
@@ -254,27 +355,68 @@ class SimpleMarketDataScreener:
 
                         if beta_ok and spread_ok and volatility_ok:
                             valid_stocks.append(stock)
-                            beta_str = f", Beta: {beta:.2f}" if beta is not None else ""
-                            print(f"         ✅ PASSED: {stock.symbol} - ATR: {atr_percentage:.2f}%, Vol: {avg_volume_20d:,.0f}{beta_str}")
+                            self.volatility_results['detailed_examples']['passed_stocks'].append({
+                                'symbol': stock.symbol,
+                                'atr_percentage': atr_percentage,
+                                'avg_volume_20d': avg_volume_20d,
+                                'beta': beta,
+                                'bid_ask_spread': bid_ask_spread,
+                                'hist_volatility': hist_volatility,
+                                'reason': 'Passed all volatility criteria'
+                            })
+                            beta_str = f", Beta: {beta:.2f}" if beta is not None else ", Beta: N/A"
+                            spread_str = f", Spread: {bid_ask_spread:.2f}%" if bid_ask_spread is not None else ""
+                            print(f"         ✅ PASSED: {stock.symbol} - ATR: {atr_percentage:.2f}%, Vol: {avg_volume_20d:,.0f}{beta_str}{spread_str}")
                         else:
                             if not beta_ok:
                                 self.volatility_results['high_beta_filtered'] += 1
-                                if self.volatility_results['high_beta_filtered'] <= 3:
-                                    print(f"         📈 HIGH BETA: {stock.symbol} - Beta: {beta:.2f} (> {volatility_config['max_beta']})")
+                                self.volatility_results['detailed_examples']['high_beta_stocks'].append({
+                                    'symbol': stock.symbol,
+                                    'atr_percentage': atr_percentage,
+                                    'avg_volume_20d': avg_volume_20d,
+                                    'beta': beta,
+                                    'beta_threshold': volatility_config['max_beta'],
+                                    'reason': f'High Beta: {beta:.2f} > {volatility_config["max_beta"]}'
+                                })
+                                print(f"         📈 HIGH BETA: {stock.symbol} - Beta: {beta:.2f} (> {volatility_config['max_beta']}), ATR: {atr_percentage:.2f}%, Vol: {avg_volume_20d:,.0f}")
                             else:
                                 self.volatility_results['extreme_volatility_filtered'] += 1
-                                if self.volatility_results['extreme_volatility_filtered'] <= 3:
-                                    spread_str = f", Spread: {bid_ask_spread:.2f}%" if bid_ask_spread else ""
-                                    hv_str = f", HV: {hist_volatility:.1f}%" if hist_volatility else ""
-                                    print(f"         📊 VOLATILITY: {stock.symbol}{spread_str}{hv_str}")
+                                self.volatility_results['detailed_examples']['extreme_volatility_stocks'].append({
+                                    'symbol': stock.symbol,
+                                    'atr_percentage': atr_percentage,
+                                    'avg_volume_20d': avg_volume_20d,
+                                    'beta': beta,
+                                    'bid_ask_spread': bid_ask_spread,
+                                    'hist_volatility': hist_volatility,
+                                    'reason': 'Failed spread or historical volatility filters'
+                                })
+                                spread_str = f", Spread: {bid_ask_spread:.2f}%" if bid_ask_spread else ""
+                                hv_str = f", HV: {hist_volatility:.1f}%" if hist_volatility else ""
+                                print(f"         📊 VOLATILITY: {stock.symbol} - ATR: {atr_percentage:.2f}%, Vol: {avg_volume_20d:,.0f}{spread_str}{hv_str}")
                     else:
                         self.volatility_results['low_volume_filtered'] += 1
-                        if self.volatility_results['low_volume_filtered'] <= 3:
-                            print(f"         💧 LOW VOLUME: {stock.symbol} - Avg Vol: {avg_volume_20d:,.0f}")
+                        self.volatility_results['detailed_examples']['low_volume_stocks'].append({
+                            'symbol': stock.symbol,
+                            'atr_percentage': atr_percentage,
+                            'avg_volume_20d': avg_volume_20d,
+                            'volume_threshold': volatility_config['min_avg_volume_20d'],
+                            'beta': beta,
+                            'reason': f'Low volume: {avg_volume_20d:,.0f} < {volatility_config["min_avg_volume_20d"]:,}'
+                        })
+                        vol_str = f"{avg_volume_20d:,.0f}" if avg_volume_20d is not None else "N/A"
+                        print(f"         💧 LOW VOLUME: {stock.symbol} - ATR: {atr_percentage:.2f}%, Vol: {vol_str} (< {volatility_config['min_avg_volume_20d']:,})")
                 else:
                     self.volatility_results['high_atr_filtered'] += 1
-                    if self.volatility_results['high_atr_filtered'] <= 3:
-                        print(f"         📈 HIGH ATR: {stock.symbol} - ATR: {atr_percentage:.2f}%")
+                    self.volatility_results['detailed_examples']['high_atr_stocks'].append({
+                        'symbol': stock.symbol,
+                        'atr_percentage': atr_percentage,
+                        'atr_threshold': volatility_config['max_atr_percentage'],
+                        'avg_volume_20d': avg_volume_20d,
+                        'beta': beta,
+                        'reason': f'High ATR: {atr_percentage:.2f}% > {volatility_config["max_atr_percentage"]}%'
+                    })
+                    vol_str = f", Vol: {avg_volume_20d:,.0f}" if avg_volume_20d is not None else ""
+                    print(f"         📈 HIGH ATR: {stock.symbol} - ATR: {atr_percentage:.2f}% (> {volatility_config['max_atr_percentage']}%){vol_str}")
 
             except Exception as e:
                 self.volatility_results['missing_data_filtered'] += 1
@@ -291,7 +433,7 @@ class SimpleMarketDataScreener:
         return valid_stocks
 
     def _log_volatility_results(self):
-        """Log comprehensive volatility screening results."""
+        """Log comprehensive volatility screening results with detailed examples."""
         print(f"   📊 VOLATILITY SCREENING RESULTS:")
         print(f"      📈 Total stocks processed: {self.volatility_results['total_input']}")
         print(f"      ✅ Passed volatility filters: {len(self.volatility_results['volatility_candidates'])}")
@@ -300,3 +442,64 @@ class SimpleMarketDataScreener:
         print(f"      📈 High Beta filtered (> 1.2): {self.volatility_results['high_beta_filtered']}")
         print(f"      📊 Extreme volatility filtered: {self.volatility_results['extreme_volatility_filtered']}")
         print(f"      ❌ Missing data filtered: {self.volatility_results['missing_data_filtered']}")
+        print()
+
+        # Show detailed examples with actual values for each filter category
+        examples = self.volatility_results.get('detailed_examples', {})
+
+        if examples.get('passed_stocks'):
+            print(f"   📋 PASSED STOCKS (Sample with Values):")
+            for i, stock in enumerate(examples['passed_stocks'][:3]):  # Show first 3
+                atr_str = f"ATR: {stock['atr_percentage']:.2f}%" if stock['atr_percentage'] is not None else "ATR: Pending"
+                beta_str = f", Beta: {stock['beta']:.2f}" if stock['beta'] is not None else ", Beta: N/A"
+                spread_str = f", Spread: {stock['bid_ask_spread']:.2f}%" if stock.get('bid_ask_spread') is not None else ""
+                print(f"      ✅ {stock['symbol']}: {atr_str}, Vol: {stock['avg_volume_20d']:,.0f}{beta_str}{spread_str}")
+            if len(examples['passed_stocks']) > 3:
+                print(f"      ... and {len(examples['passed_stocks']) - 3} more passed stocks")
+            print()
+
+        if examples.get('high_atr_stocks'):
+            print(f"   📈 HIGH ATR STOCKS FILTERED (Sample with Values):")
+            for i, stock in enumerate(examples['high_atr_stocks'][:3]):  # Show first 3
+                vol_str = f", Vol: {stock['avg_volume_20d']:,.0f}" if stock['avg_volume_20d'] is not None else ""
+                print(f"      📈 {stock['symbol']}: ATR: {stock['atr_percentage']:.2f}% (> {stock['atr_threshold']:.1f}%){vol_str}")
+            if len(examples['high_atr_stocks']) > 3:
+                print(f"      ... and {len(examples['high_atr_stocks']) - 3} more high ATR stocks")
+            print()
+
+        if examples.get('high_beta_stocks'):
+            print(f"   📈 HIGH BETA STOCKS FILTERED (Sample with Values):")
+            for i, stock in enumerate(examples['high_beta_stocks'][:3]):  # Show first 3
+                print(f"      📈 {stock['symbol']}: Beta: {stock['beta']:.2f} (> {stock['beta_threshold']:.1f}), ATR: {stock['atr_percentage']:.2f}%, Vol: {stock['avg_volume_20d']:,.0f}")
+            if len(examples['high_beta_stocks']) > 3:
+                print(f"      ... and {len(examples['high_beta_stocks']) - 3} more high Beta stocks")
+            print()
+
+        if examples.get('low_volume_stocks'):
+            print(f"   💧 LOW VOLUME STOCKS FILTERED (Sample with Values):")
+            for i, stock in enumerate(examples['low_volume_stocks'][:3]):  # Show first 3
+                vol_str = f"{stock['avg_volume_20d']:,.0f}" if stock['avg_volume_20d'] is not None else "N/A"
+                print(f"      💧 {stock['symbol']}: Vol: {vol_str} (< {stock['volume_threshold']:,}), ATR: {stock['atr_percentage']:.2f}%")
+            if len(examples['low_volume_stocks']) > 3:
+                print(f"      ... and {len(examples['low_volume_stocks']) - 3} more low volume stocks")
+            print()
+
+        if examples.get('extreme_volatility_stocks'):
+            print(f"   📊 EXTREME VOLATILITY STOCKS FILTERED (Sample with Values):")
+            for i, stock in enumerate(examples['extreme_volatility_stocks'][:3]):  # Show first 3
+                spread_str = f", Spread: {stock['bid_ask_spread']:.2f}%" if stock['bid_ask_spread'] is not None else ""
+                hv_str = f", HV: {stock['hist_volatility']:.1f}%" if stock['hist_volatility'] is not None else ""
+                print(f"      📊 {stock['symbol']}: ATR: {stock['atr_percentage']:.2f}%, Vol: {stock['avg_volume_20d']:,.0f}{spread_str}{hv_str}")
+            if len(examples['extreme_volatility_stocks']) > 3:
+                print(f"      ... and {len(examples['extreme_volatility_stocks']) - 3} more extreme volatility stocks")
+            print()
+
+        if examples.get('missing_data_stocks'):
+            print(f"   ❌ MISSING DATA STOCKS (Sample with Reasons):")
+            for i, stock in enumerate(examples['missing_data_stocks'][:3]):  # Show first 3
+                vol_str = f"Vol: {stock['avg_volume_20d']:,.0f}" if stock['avg_volume_20d'] is not None else "Vol: N/A"
+                beta_str = f", Beta: {stock['beta']:.2f}" if stock['beta'] is not None else ", Beta: N/A"
+                print(f"      ❌ {stock['symbol']}: {stock['reason']} ({vol_str}{beta_str})")
+            if len(examples['missing_data_stocks']) > 3:
+                print(f"      ... and {len(examples['missing_data_stocks']) - 3} more missing data stocks")
+            print()
