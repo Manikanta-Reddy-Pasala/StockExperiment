@@ -41,95 +41,6 @@ class StockInitializationService:
         self.rate_limit_delay = 0.1  # 100ms between API calls (fast mode)
         self.batch_size = 50  # Process in medium batches for better success rate
 
-    def initialize_complete_stock_system(self, user_id: int = 1, aggressive_mode: bool = False) -> Dict:
-        """
-        Complete initialization flow:
-        1. Load symbol master from Fyers API
-        2. Verify symbols with quotes and update verification flags
-        3. Create/update stocks table with current prices
-
-        Args:
-            user_id: User ID for API calls
-            aggressive_mode: If True, processes ALL symbols (may take long time)
-        """
-        logger.info("🚀 Starting complete stock system initialization")
-
-        try:
-            # Step 1: Load symbol master data from Fyers
-            logger.info("📊 Step 1: Loading symbol master data from Fyers API")
-            symbol_result = self._load_symbol_master_from_fyers()
-            if not symbol_result['success']:
-                return symbol_result
-
-            # Step 2: Verify symbols and update verification flags
-            logger.info("🔍 Step 2: Verifying symbols with quotes")
-            # Get count of unverified symbols to process all of them
-            # Only count symbols that have never been verified
-            with self.db_manager.get_session() as session:
-                from sqlalchemy import and_, or_
-                unverified_count = session.query(SymbolMaster).filter(
-                    and_(
-                        SymbolMaster.is_active == True,
-                        SymbolMaster.is_equity == True,
-                        or_(
-                            SymbolMaster.is_fyers_verified.is_(None),
-                            SymbolMaster.is_fyers_verified == False
-                        )
-                        # Never re-verify already verified symbols
-                    )
-                ).count()
-                logger.info(f"🔍 Found {unverified_count} symbols needing verification (never re-verify)")
-
-            # Choose verification strategy based on mode
-            if aggressive_mode:
-                verification_limit = unverified_count  # Process all
-                logger.info(f"🔍 Aggressive mode: Verifying ALL {verification_limit} symbols")
-            else:
-                verification_limit = min(unverified_count, 500)  # Max 500 per run
-                logger.info(f"🔍 Batch mode: Verifying {verification_limit} symbols (out of {unverified_count} total)")
-
-            verification_result = self._verify_symbols_with_quotes(user_id, limit=verification_limit)
-            if not verification_result['success']:
-                return verification_result
-
-            # Step 3: Create/update stocks with current prices
-            logger.info("📈 Step 3: Creating/updating stocks with current prices")
-            # Get count of verified symbols to process all of them
-            with self.db_manager.get_session() as session:
-                verified_count = session.query(SymbolMaster).filter(
-                    and_(
-                        SymbolMaster.is_active == True,
-                        SymbolMaster.is_equity == True,
-                        SymbolMaster.is_fyers_verified == True
-                    )
-                ).count()
-                logger.info(f"📈 Found {verified_count} verified symbols to create stocks for")
-
-            # Process all verified symbols for stock creation (since they're already verified)
-            stocks_result = self._create_update_stocks_from_verified_symbols(user_id, limit=verified_count)
-
-            # Step 4: Get final statistics
-            stats = self._get_initialization_statistics()
-
-            result = {
-                'success': True,
-                'symbol_master': symbol_result,
-                'verification': verification_result,
-                'stocks': stocks_result,
-                'statistics': stats,
-                'completed_at': datetime.utcnow().isoformat()
-            }
-
-            logger.info(f"✅ Complete stock system initialization finished: {result}")
-            return result
-
-        except Exception as e:
-            logger.error(f"❌ Stock system initialization failed: {e}")
-            return {
-                'success': False,
-                'error': str(e),
-                'stage': 'complete_initialization'
-            }
 
     def _load_symbol_master_from_fyers(self) -> Dict:
         """Load comprehensive symbol master data from Fyers API (once per day)."""
@@ -240,236 +151,6 @@ class StockInitializationService:
                 'error': str(e)
             }
 
-    def _verify_symbols_with_quotes(self, user_id: int, limit: int = 100) -> Dict:
-        """
-        Verify symbols by getting quotes and update is_fyers_verified flag.
-        This step ensures only valid symbols with working quotes are marked as verified.
-        """
-        try:
-            logger.info("🔍 Starting symbol verification with quotes")
-
-            # First, get the symbols to verify using a separate query
-            # Only verify symbols that are NOT already verified (never re-verify)
-            with self.db_manager.get_session() as session:
-                unverified_symbols = session.query(SymbolMaster.fytoken, SymbolMaster.symbol).filter(
-                    and_(
-                        SymbolMaster.is_active == True,
-                        SymbolMaster.is_equity == True,
-                        or_(
-                            SymbolMaster.is_fyers_verified.is_(None),
-                            SymbolMaster.is_fyers_verified == False
-                        )
-                        # Removed time-based re-verification - once verified, always verified
-                    )
-                ).limit(limit).all()
-
-                # Convert to list of tuples
-                symbols_to_verify = [(row.fytoken, row.symbol) for row in unverified_symbols]
-
-            logger.info(f"🔍 Found {len(symbols_to_verify)} symbols to verify")
-
-            verified_count = 0
-            failed_count = 0
-
-            # Now process each symbol with its own session
-            for i, (fytoken, symbol) in enumerate(symbols_to_verify):
-                try:
-                    logger.info(f"🔍 Verifying {i+1}/{len(symbols_to_verify)}: {symbol}")
-
-                    # Get quote for this symbol
-                    quote_result = self._get_individual_quote(symbol, user_id)
-
-                    # Update in a fresh session
-                    with self.db_manager.get_session() as update_session:
-                        symbol_record = update_session.query(SymbolMaster).filter(
-                            SymbolMaster.fytoken == fytoken
-                        ).first()
-
-                        if symbol_record:
-                            if quote_result['success']:
-                                # Verification successful
-                                symbol_record.is_fyers_verified = True
-                                symbol_record.verification_date = datetime.utcnow()
-                                symbol_record.verification_error = None
-                                symbol_record.last_quote_check = datetime.utcnow()
-                                verified_count += 1
-                                logger.info(f"✅ Verified: {symbol}")
-                            else:
-                                # Verification failed
-                                symbol_record.is_fyers_verified = False
-                                symbol_record.verification_date = datetime.utcnow()
-                                symbol_record.verification_error = quote_result.get('error', 'Unknown error')
-                                symbol_record.last_quote_check = datetime.utcnow()
-                                failed_count += 1
-                                logger.warning(f"❌ Failed: {symbol} - {quote_result.get('error')}")
-
-                            update_session.commit()
-
-                    # Rate limiting
-                    time.sleep(self.rate_limit_delay)
-
-                    # Progress logging every 10 records
-                    if (i + 1) % 10 == 0:
-                        logger.info(f"📊 Progress: {i+1}/{len(symbols_to_verify)} verified")
-
-                except Exception as e:
-                    logger.warning(f"Error verifying {symbol}: {e}")
-                    # Try to mark as failed
-                    try:
-                        with self.db_manager.get_session() as error_session:
-                            symbol_record = error_session.query(SymbolMaster).filter(
-                                SymbolMaster.fytoken == fytoken
-                            ).first()
-                            if symbol_record:
-                                symbol_record.is_fyers_verified = False
-                                symbol_record.verification_error = str(e)
-                                symbol_record.verification_date = datetime.utcnow()
-                                error_session.commit()
-                    except:
-                        pass  # If error update fails, continue
-                    failed_count += 1
-                    continue
-
-            return {
-                'success': True,
-                'total_checked': len(symbols_to_verify),
-                'verified': verified_count,
-                'failed': failed_count,
-                'verification_rate': verified_count / len(symbols_to_verify) if symbols_to_verify else 0
-            }
-
-        except Exception as e:
-            logger.error(f"Error in symbol verification: {e}")
-            return {
-                'success': False,
-                'error': str(e)
-            }
-
-    def _create_update_stocks_from_verified_symbols(self, user_id: int, limit: int = 50) -> Dict:
-        """
-        Create/update stocks table from verified symbols with current prices (once per day).
-        Only processes symbols that have is_fyers_verified = True.
-        """
-        try:
-            logger.info("📈 Creating/updating stocks from verified symbols")
-
-            # Check which symbols need price updates (once per day)
-            today = datetime.utcnow().date()
-            with self.db_manager.get_session() as session:
-                # Get verified symbols that either:
-                # 1. Don't exist in stocks table yet, OR
-                # 2. Haven't been updated today
-                symbols_needing_update = session.query(
-                    SymbolMaster.fytoken, SymbolMaster.symbol, SymbolMaster.name, SymbolMaster.exchange
-                ).outerjoin(Stock, SymbolMaster.symbol == Stock.symbol).filter(
-                    and_(
-                        SymbolMaster.is_active == True,
-                        SymbolMaster.is_equity == True,
-                        SymbolMaster.is_fyers_verified == True,
-                        or_(
-                            Stock.id.is_(None),  # No stock record exists
-                            Stock.last_updated < today  # Not updated today
-                        )
-                    )
-                ).limit(limit).all()
-
-                if not symbols_needing_update:
-                    existing_count = session.query(Stock).count()
-                    logger.info(f"📈 All stocks already updated today: {existing_count:,} records")
-                    return {
-                        'success': True,
-                        'total_processed': 0,
-                        'created': 0,
-                        'updated': 0,
-                        'errors': 0,
-                        'cached': True,
-                        'message': 'All stock prices already updated today'
-                    }
-
-                # Convert to list of dictionaries
-                symbols_to_process = [
-                    {
-                        'fytoken': row.fytoken,
-                        'symbol': row.symbol,
-                        'name': row.name,
-                        'exchange': row.exchange
-                    }
-                    for row in symbols_needing_update
-                ]
-
-            logger.info(f"📈 Found {len(symbols_to_process)} verified symbols to process")
-
-            created_count = 0
-            updated_count = 0
-            error_count = 0
-
-            for i, symbol_info in enumerate(symbols_to_process):
-                try:
-                    logger.info(f"📈 Processing {i+1}/{len(symbols_to_process)}: {symbol_info['symbol']}")
-
-                    # Get current quote with price data
-                    quote_result = self._get_individual_quote(symbol_info['symbol'], user_id)
-
-                    if not quote_result['success']:
-                        logger.warning(f"❌ No quote data for {symbol_info['symbol']}")
-                        error_count += 1
-                        continue
-
-                    quote_data = quote_result['data']
-
-                    # Validate and extract price data
-                    price_data = self._extract_validate_price_data(quote_data, symbol_info['symbol'])
-                    if not price_data['valid']:
-                        logger.warning(f"❌ Invalid price data for {symbol_info['symbol']}")
-                        error_count += 1
-                        continue
-
-                    # Process in a separate session
-                    with self.db_manager.get_session() as stock_session:
-                        # Check if stock already exists
-                        existing_stock = stock_session.query(Stock).filter_by(symbol=symbol_info['symbol']).first()
-
-                        if existing_stock:
-                            # Update existing stock
-                            self._update_stock_with_price_data_from_dict(existing_stock, price_data, symbol_info)
-                            updated_count += 1
-                            logger.info(f"📝 Updated: {symbol_info['symbol']}")
-                        else:
-                            # Create new stock
-                            new_stock = self._create_stock_with_price_data_from_dict(price_data, symbol_info)
-                            if new_stock:
-                                stock_session.add(new_stock)
-                                created_count += 1
-                                logger.info(f"🆕 Created: {symbol_info['symbol']}")
-
-                        stock_session.commit()
-
-                    # Rate limiting
-                    time.sleep(self.rate_limit_delay)
-
-                    # Progress logging every 10 records
-                    if (i + 1) % 10 == 0:
-                        logger.info(f"📊 Progress: {i+1}/{len(symbols_to_process)} processed")
-
-                except Exception as e:
-                    logger.warning(f"Error processing stock {symbol_info['symbol']}: {e}")
-                    error_count += 1
-                    continue
-
-            return {
-                'success': True,
-                'total_processed': len(symbols_to_process),
-                'created': created_count,
-                'updated': updated_count,
-                'errors': error_count
-            }
-
-        except Exception as e:
-            logger.error(f"Error creating/updating stocks: {e}")
-            return {
-                'success': False,
-                'error': str(e)
-            }
 
     def _get_individual_quote(self, symbol: str, user_id: int) -> Dict:
         """Get quote for individual symbol with error handling."""
@@ -771,7 +452,7 @@ class StockInitializationService:
 
             # Step 2: Get symbols for processing
             with self.db_manager.get_session() as session:
-                symbols = session.query(SymbolMaster).filter(
+                symbol_records = session.query(SymbolMaster).filter(
                     and_(
                         SymbolMaster.is_active == True,
                         SymbolMaster.is_equity == True,
@@ -779,10 +460,22 @@ class StockInitializationService:
                     )
                 ).all()
 
+                # Convert to dictionaries to avoid session issues
+                symbols = [
+                    {
+                        'fytoken': record.fytoken,
+                        'symbol': record.symbol,
+                        'name': record.name,
+                        'exchange': record.exchange
+                    }
+                    for record in symbol_records
+                ]
+
             logger.info(f"📊 Processing {len(symbols)} symbols in fast mode")
 
             # Step 3: Fast batch processing with quotes
             verified_stocks = []
+            verified_symbols = []  # Track symbols that were successfully verified
             total_batches = (len(symbols) + self.batch_size - 1) // self.batch_size
 
             for i in range(0, len(symbols), self.batch_size):
@@ -794,7 +487,7 @@ class StockInitializationService:
                 # Retry logic for 100% success rate
                 retry_count = 0
                 max_retries = 3
-                batch_symbols = [symbol.symbol for symbol in batch]
+                batch_symbols = [symbol['symbol'] for symbol in batch]
 
                 while retry_count <= max_retries:
                     try:
@@ -806,7 +499,7 @@ class StockInitializationService:
                             # Process each symbol in batch
                             batch_processed = 0
                             for symbol_obj in batch:
-                                symbol = symbol_obj.symbol
+                                symbol = symbol_obj['symbol']
                                 quote = quotes_data.get(symbol)
 
                                 if quote and quote.get('ltp'):
@@ -815,18 +508,16 @@ class StockInitializationService:
                                         volume = int(quote.get('volume', 0)) if quote.get('volume') else 0
 
                                         if price > 0:
-                                            # Mark symbol as verified
-                                            symbol_obj.is_fyers_verified = True
-                                            symbol_obj.verification_date = datetime.utcnow()
-                                            symbol_obj.last_quote_check = datetime.utcnow()
+                                            # Mark symbol as verified (will update DB later)
+                                            # Note: Update database separately to avoid session issues
 
                                             # Create stock record
                                             market_cap_category = self._get_market_cap_category(price)
 
                                             verified_stocks.append({
                                                 'symbol': symbol,
-                                                'name': symbol_obj.name,
-                                                'exchange': symbol_obj.exchange,
+                                                'name': symbol_obj['name'],
+                                                'exchange': symbol_obj['exchange'],
                                                 'current_price': price,
                                                 'volume': volume,
                                                 'market_cap_category': market_cap_category,
@@ -835,21 +526,20 @@ class StockInitializationService:
                                                 'is_tradeable': True,
                                                 'last_updated': datetime.utcnow()
                                             })
+                                            verified_symbols.append(symbol_obj['fytoken'])  # Track for DB update
                                             batch_processed += 1
 
                                     except (ValueError, TypeError):
                                         continue
                                 else:
                                     # Create stock without live price for 100% success
-                                    symbol_obj.is_fyers_verified = False
-                                    symbol_obj.verification_date = datetime.utcnow()
-                                    symbol_obj.last_quote_check = datetime.utcnow()
+                                    # Note: Update database separately to avoid session issues
 
                                     # Still create stock record with default price
                                     verified_stocks.append({
                                         'symbol': symbol,
-                                        'name': symbol_obj.name,
-                                        'exchange': symbol_obj.exchange,
+                                        'name': symbol_obj['name'],
+                                        'exchange': symbol_obj['exchange'],
                                         'current_price': 100.0,  # Default price
                                         'volume': 0,
                                         'market_cap_category': 'mid_cap',
@@ -879,9 +569,9 @@ class StockInitializationService:
                             # Still create stocks with default values for 100% success
                             for symbol_obj in batch:
                                 verified_stocks.append({
-                                    'symbol': symbol_obj.symbol,
-                                    'name': symbol_obj.name,
-                                    'exchange': symbol_obj.exchange,
+                                    'symbol': symbol_obj['symbol'],
+                                    'name': symbol_obj['name'],
+                                    'exchange': symbol_obj['exchange'],
                                     'current_price': 100.0,
                                     'volume': 0,
                                     'market_cap_category': 'mid_cap',
@@ -899,9 +589,20 @@ class StockInitializationService:
             logger.info(f"💾 Creating {len(verified_stocks)} stock records")
             stocks_created = self._bulk_create_stocks(verified_stocks)
 
-            # Commit symbol verification updates
-            with self.db_manager.get_session() as session:
-                session.commit()
+            # Update symbol verification status in database
+            if verified_symbols:
+                with self.db_manager.get_session() as session:
+                    # Bulk update verified symbols
+                    session.query(SymbolMaster).filter(
+                        SymbolMaster.fytoken.in_(verified_symbols)
+                    ).update({
+                        'is_fyers_verified': True,
+                        'verification_date': datetime.utcnow(),
+                        'last_quote_check': datetime.utcnow(),
+                        'verification_error': None
+                    }, synchronize_session=False)
+                    session.commit()
+                    logger.info(f"✅ Updated verification status for {len(verified_symbols)} symbols")
 
             duration = time.time() - start_time
 

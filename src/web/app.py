@@ -126,7 +126,7 @@ def create_app():
                 app.logger.info("🚀 Running complete stock system initialization...")
                 app.logger.info("📊 This includes: Symbol Master → Verification → Stock Creation")
 
-                results = stock_init_service.initialize_complete_stock_system()
+                results = stock_init_service.fast_sync_stocks()
 
                 if results.get('success'):
                     app.logger.info("✅ Stock system initialization completed successfully!")
