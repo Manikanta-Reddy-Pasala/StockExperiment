@@ -307,34 +307,20 @@ class SimpleMarketDataScreener:
                 hist_volatility = getattr(stock, 'historical_volatility_1y', None)
                 beta = getattr(stock, 'beta', None)
 
-                # Handle stocks with missing ATR data - use alternative metrics or skip if critical data missing
+                # Handle stocks with missing ATR data - require real volatility data for proper screening
                 if atr_percentage is None:
-                    # If no ATR data, check if we have good volume data to proceed
-                    if avg_volume_20d and avg_volume_20d >= volatility_config['min_avg_volume_20d']:
-                        # Allow stocks with good volume even without ATR data
-                        valid_stocks.append(stock)
-                        self.volatility_results['detailed_examples']['passed_stocks'].append({
-                            'symbol': stock.symbol,
-                            'atr_percentage': None,
-                            'avg_volume_20d': avg_volume_20d,
-                            'beta': beta,
-                            'reason': 'Good volume, ATR data pending'
-                        })
-                        print(f"         ✅ PASSED: {stock.symbol} - Good volume (Vol: {avg_volume_20d:,.0f}), ATR data pending")
-                        continue
-                    else:
-                        self.volatility_results['missing_data_filtered'] += 1
-                        self.volatility_results['detailed_examples']['missing_data_stocks'].append({
-                            'symbol': stock.symbol,
-                            'reason': 'No ATR percentage or sufficient volume',
-                            'atr_percentage': None,
-                            'avg_volume_20d': avg_volume_20d,
-                            'beta': beta,
-                            'volume_threshold': volatility_config['min_avg_volume_20d']
-                        })
-                        vol_str = f"Vol: {avg_volume_20d:,.0f}" if avg_volume_20d else "Vol: N/A"
-                        print(f"         ❌ MISSING DATA: {stock.symbol} - No ATR percentage, insufficient volume ({vol_str} < {volatility_config['min_avg_volume_20d']:,})")
-                        continue
+                    self.volatility_results['missing_data_filtered'] += 1
+                    self.volatility_results['detailed_examples']['missing_data_stocks'].append({
+                        'symbol': stock.symbol,
+                        'reason': 'No ATR data available - volatility screening requires historical price data',
+                        'atr_percentage': None,
+                        'avg_volume_20d': avg_volume_20d,
+                        'beta': beta,
+                        'solution': 'Run populate_volatility_data.py with FYERS API to calculate real ATR'
+                    })
+                    vol_str = f"Vol: {avg_volume_20d:,.0f}" if avg_volume_20d else "Vol: N/A"
+                    print(f"         ❌ NO ATR DATA: {stock.symbol} - Volatility screening requires real ATR calculation ({vol_str})")
+                    continue
 
                 # Convert to proper types - NO MOCK DATA
                 atr_percentage = float(atr_percentage)
@@ -504,3 +490,14 @@ class SimpleMarketDataScreener:
             if len(examples['missing_data_stocks']) > 3:
                 print(f"      ... and {len(examples['missing_data_stocks']) - 3} more missing data stocks")
             print()
+
+            # Add solution guidance if there are missing data stocks
+            if self.volatility_results['missing_data_filtered'] > 0:
+                print(f"   🔧 VOLATILITY DATA SOLUTION:")
+                print(f"      ⚠️  {self.volatility_results['missing_data_filtered']} stocks filtered due to missing ATR/Beta data")
+                print(f"      💡 To enable proper volatility screening:")
+                print(f"         1. Configure FYERS API credentials in .env file")
+                print(f"         2. Run: python3 populate_volatility_data.py")
+                print(f"         3. This will calculate real ATR, Beta from historical prices")
+                print(f"         4. Re-run screening to get accurate volatility filtering")
+                print()

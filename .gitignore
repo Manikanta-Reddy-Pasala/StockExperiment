@@ -5,7 +5,6 @@ __pycache__/
 *.log
 logs/
 *.db
-.env
 :memory:*
 
 # Cookie files and debug files

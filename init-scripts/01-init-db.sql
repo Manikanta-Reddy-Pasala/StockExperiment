@@ -228,6 +228,13 @@ CREATE TABLE IF NOT EXISTS stocks (
     debt_to_equity DOUBLE PRECISION,  -- matches SQLAlchemy Float
     dividend_yield DOUBLE PRECISION,  -- matches SQLAlchemy Float
     beta DOUBLE PRECISION,  -- matches SQLAlchemy Float
+    -- Volatility and risk metrics
+    atr_14 DOUBLE PRECISION,  -- Average True Range (14-day period)
+    atr_percentage DOUBLE PRECISION,  -- ATR as percentage of current price
+    historical_volatility_1y DOUBLE PRECISION,  -- Annualized historical volatility
+    bid_ask_spread DOUBLE PRECISION,  -- Estimated bid-ask spread
+    avg_daily_volume_20d DOUBLE PRECISION,  -- 20-day average daily volume
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- For tracking volatility updates
     is_active BOOLEAN DEFAULT TRUE,
     is_tradeable BOOLEAN DEFAULT TRUE,
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -564,3 +571,9 @@ CREATE INDEX IF NOT EXISTS idx_symbol_master_verified ON symbol_master(is_fyers_
 CREATE INDEX IF NOT EXISTS idx_market_data_snapshots_date ON market_data_snapshots(snapshot_date);
 CREATE INDEX IF NOT EXISTS idx_stocks_active ON stocks(is_active, is_tradeable);
 CREATE INDEX IF NOT EXISTS idx_stocks_market_cap ON stocks(market_cap);
+-- Volatility indexes for screening performance
+CREATE INDEX IF NOT EXISTS idx_stocks_atr_percentage ON stocks(atr_percentage);
+CREATE INDEX IF NOT EXISTS idx_stocks_beta ON stocks(beta);
+CREATE INDEX IF NOT EXISTS idx_stocks_historical_volatility ON stocks(historical_volatility_1y);
+CREATE INDEX IF NOT EXISTS idx_stocks_avg_volume_20d ON stocks(avg_daily_volume_20d);
+CREATE INDEX IF NOT EXISTS idx_stocks_updated_at ON stocks(updated_at);

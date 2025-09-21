@@ -77,6 +77,9 @@ class StockMasterService:
                 # Commit all changes
                 session.commit()
 
+            # After basic refresh, update volatility data for tradeable stocks
+            volatility_result = self._update_volatility_data(user_id, exchange)
+
             result = {
                 'success': True,
                 'exchange': exchange,
@@ -85,6 +88,8 @@ class StockMasterService:
                 'new_stocks': new_count,
                 'updated_stocks': updated_count,
                 'marked_inactive': inactive_count,
+                'volatility_updated': volatility_result.get('updated', 0),
+                'volatility_failed': volatility_result.get('failed', 0),
                 'refresh_timestamp': datetime.utcnow().isoformat()
             }
 
@@ -889,6 +894,81 @@ class StockMasterService:
         except Exception as e:
             logger.error(f"Error checking refresh status: {e}")
             return True
+
+    def _update_volatility_data(self, user_id: int, exchange: str) -> Dict:
+        """
+        Update volatility data for all tradeable stocks as part of daily sync.
+        This runs after the basic stock data refresh.
+        """
+        logger.info(f"Starting volatility data update for {exchange} stocks")
+
+        try:
+            # Import volatility service
+            from ..data.volatility_calculation_service import get_volatility_calculation_service
+            volatility_service = get_volatility_calculation_service()
+
+            # Get all tradeable stocks for volatility calculation
+            with self.db_manager.get_session() as session:
+                tradeable_stocks = session.query(Stock).filter(
+                    and_(
+                        Stock.is_tradeable == True,
+                        Stock.is_active == True,
+                        Stock.exchange == exchange
+                    )
+                ).all()
+
+                stock_symbols = [stock.symbol for stock in tradeable_stocks]
+                logger.info(f"Found {len(stock_symbols)} tradeable stocks for volatility calculation")
+
+            if not stock_symbols:
+                logger.warning("No tradeable stocks found for volatility calculation")
+                return {'updated': 0, 'failed': 0, 'error': 'No tradeable stocks found'}
+
+            # Limit to reasonable batch size for daily updates
+            # For production, we might want to update top 500-1000 most liquid stocks daily
+            max_stocks = 500
+            if len(stock_symbols) > max_stocks:
+                logger.info(f"Limiting volatility calculation to top {max_stocks} stocks by volume")
+
+                # Get top stocks by volume
+                with self.db_manager.get_session() as session:
+                    top_stocks = session.query(Stock).filter(
+                        and_(
+                            Stock.is_tradeable == True,
+                            Stock.is_active == True,
+                            Stock.exchange == exchange
+                        )
+                    ).order_by(Stock.volume.desc()).limit(max_stocks).all()
+
+                    stock_symbols = [stock.symbol for stock in top_stocks]
+
+            # Calculate volatility for the selected stocks
+            volatility_result = volatility_service.calculate_volatility_for_stocks(
+                user_id=user_id,
+                stock_symbols=stock_symbols
+            )
+
+            logger.info(f"Volatility calculation completed: {volatility_result['updated']}/{volatility_result['processed']} stocks updated")
+
+            return {
+                'updated': volatility_result['updated'],
+                'failed': volatility_result['failed'],
+                'processed': volatility_result['processed'],
+                'duration': volatility_result.get('duration', 0),
+                'errors': volatility_result.get('errors', [])[:5]  # First 5 errors only
+            }
+
+        except Exception as e:
+            logger.error(f"Error updating volatility data: {e}")
+            return {'updated': 0, 'failed': 0, 'error': str(e)}
+
+    def refresh_volatility_only(self, user_id: int = 1, exchange: str = "NSE", max_stocks: int = 100) -> Dict:
+        """
+        Standalone method to refresh only volatility data.
+        Useful for testing or manual volatility updates.
+        """
+        logger.info(f"Starting standalone volatility refresh for {exchange}")
+        return self._update_volatility_data(user_id, exchange)
 
 
 # Global service instance

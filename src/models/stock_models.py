@@ -49,7 +49,7 @@ class Stock(Base):
     atr_14 = Column(Float)  # Average True Range (14 days)
     atr_percentage = Column(Float)  # ATR as percentage of price
     historical_volatility_1y = Column(Float)  # 1-year historical volatility
-    avg_daily_volume_20d = Column(BigInteger)  # 20-day average volume
+    avg_daily_volume_20d = Column(Float)  # 20-day average volume (matches schema)
     avg_daily_turnover = Column(Float)  # Average daily turnover in crores
     bid_ask_spread = Column(Float)  # Bid-ask spread percentage
     trades_per_day = Column(Integer)  # Average trades per day
@@ -57,6 +57,7 @@ class Stock(Base):
     # Status and metadata
     is_active = Column(Boolean, default=True, index=True)
     is_tradeable = Column(Boolean, default=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)  # For volatility update tracking
     last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow)
     
