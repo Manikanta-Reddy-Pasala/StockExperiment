@@ -401,7 +401,8 @@ class FyersService:
         symbol_name, segment = symbol_part.rsplit('-', 1)
 
         # Skip symbols with special characters that Fyers API rejects
-        if any(char in symbol_name for char in ['&', '+', '(', ')', '[', ']', '*']):
+        # Note: & is allowed as it's used in legitimate company symbols (M&M, J&K Bank, etc.)
+        if any(char in symbol_name for char in ['+', '(', ')', '[', ']', '*']):
             logger.debug(f"Rejecting symbol with special characters: {symbol}")
             return False
 

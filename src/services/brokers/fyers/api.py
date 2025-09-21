@@ -676,13 +676,13 @@ class FyersAPI:
         """
         try:
             # Format symbols for Fyers API
+            import urllib.parse
             formatted_symbols = []
             for symbol in symbols:
-                if ":" not in symbol:
-                    formatted_symbols.append(symbol)
-                else:
-                    formatted_symbols.append(symbol)
-            
+                # URL encode symbols to handle special characters like &
+                encoded_symbol = urllib.parse.quote(symbol, safe=':,-')
+                formatted_symbols.append(encoded_symbol)
+
             # Use official library to get quotes
             result = self.fyers_client.quotes(data={"symbols": ",".join(formatted_symbols)})
             
