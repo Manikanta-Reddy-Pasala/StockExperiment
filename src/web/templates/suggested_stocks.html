@@ -8,8 +8,8 @@
     <div class="card-header bg-gradient-success text-white">
         <div class="d-flex justify-content-between align-items-center">
             <h5 class="card-title mb-0 text-white">
-                <i class="bi bi-funnel me-2"></i>Basic Stock Filtering
-                <small class="opacity-75">Top 20 Stocks by Risk Criteria</small>
+                <i class="bi bi-funnel me-2"></i>Swing Trading Suggestions
+                <small class="opacity-75">2-Week Timeframe with Profit Targets & Stop Loss</small>
             </h5>
             <div class="d-flex gap-2 align-items-center">
                 <select class="form-select form-select-sm" id="time-filter" style="min-width: 120px;">
@@ -25,19 +25,10 @@
                     <ul class="dropdown-menu" aria-labelledby="strategy-filter">
                         <li>
                             <div class="form-check ms-2">
-                                <input class="form-check-input strategy-radio" type="radio" name="strategy" value="low_risk" id="strategy-low">
-                                <label class="form-check-label" for="strategy-low">
-                                    <i class="bi bi-shield-check text-success me-2"></i>Low Risk
-                                    <small class="text-muted d-block">Conservative portfolio with large cap stocks</small>
-                                </label>
-                            </div>
-                        </li>
-                        <li>
-                            <div class="form-check ms-2">
-                                <input class="form-check-input strategy-radio" type="radio" name="strategy" value="medium_risk" id="strategy-medium" checked>
-                                <label class="form-check-label" for="strategy-medium">
-                                    <i class="bi bi-graph-up text-primary me-2"></i>Medium Risk
-                                    <small class="text-muted d-block">Balanced portfolio with large & mid cap stocks</small>
+                                <input class="form-check-input strategy-radio" type="radio" name="strategy" value="default_risk" id="strategy-default" checked>
+                                <label class="form-check-label" for="strategy-default">
+                                    <i class="bi bi-shield-check text-success me-2"></i>Default Risk
+                                    <small class="text-muted d-block">Conservative swing trading: 5-7% targets, 3% stop loss</small>
                                 </label>
                             </div>
                         </li>
@@ -46,7 +37,7 @@
                                 <input class="form-check-input strategy-radio" type="radio" name="strategy" value="high_risk" id="strategy-high">
                                 <label class="form-check-label" for="strategy-high">
                                     <i class="bi bi-lightning-charge text-warning me-2"></i>High Risk
-                                    <small class="text-muted d-block">Aggressive portfolio with small & mid cap stocks</small>
+                                    <small class="text-muted d-block">Aggressive swing trading: 8-10% targets, 3% stop loss</small>
                                 </label>
                             </div>
                         </li>
@@ -136,7 +127,7 @@
     // Get selected risk strategy
     function getSelectedRiskStrategy() {
         const selectedRadio = document.querySelector('input[name="strategy"]:checked');
-        return selectedRadio ? selectedRadio.value : 'medium_risk';
+        return selectedRadio ? selectedRadio.value : 'default_risk';
     }
 
     // Fetch basic filtered stocks (always loads first)
@@ -146,8 +137,8 @@
 
             const riskStrategy = getSelectedRiskStrategy();
 
-            // Use the new suggested stocks API with basic screening
-            const response = await fetch(`/api/v1/ml/suggested-stocks?strategy=${riskStrategy}&limit=20&use_ml=false`, {
+            // Use the proper suggested stocks API endpoint
+            const response = await fetch(`/api/suggested-stocks/?strategy=${riskStrategy}&limit=20`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -184,8 +175,8 @@
 
             const riskStrategy = getSelectedRiskStrategy();
 
-            // Use the ML screening API for BUY signals only
-            const response = await fetch(`/api/v1/ml/suggested-stocks?strategy=${riskStrategy}&limit=20&use_ml=true`, {
+            // Use suggested stocks API - ML analysis can be added as future enhancement
+            const response = await fetch(`/api/suggested-stocks/?strategy=${riskStrategy}&limit=20`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',

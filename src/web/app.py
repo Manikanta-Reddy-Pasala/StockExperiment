@@ -1116,6 +1116,15 @@ def create_app():
         app.logger.warning(f"Strategy settings routes not available: {e}")
         app.logger.warning("Strategy functionality will be disabled")
 
+    # Register suggested stocks blueprints
+    try:
+        from .routes.suggested_stocks_routes import suggested_stocks_bp
+        app.register_blueprint(suggested_stocks_bp)
+        app.logger.info("Suggested stocks routes registered successfully")
+    except ImportError as e:
+        app.logger.warning(f"Suggested stocks routes not available: {e}")
+        app.logger.warning("Suggested stocks functionality will be disabled")
+
     # Individual broker page routes
     @app.route('/brokers/fyers')
     @login_required

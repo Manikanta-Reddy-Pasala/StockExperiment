@@ -1126,49 +1126,128 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
                 print(f"   🚫 Filtered out {non_tradeable_count} non-tradeable stocks")
                 print(f"   ✅ {len(tradeable_stocks)} tradeable stocks remaining")
 
-                # Filter out penny stocks (< ₹50 - very high risk)
-                penny_stock_threshold = 50.0
+                # STAGE 1: Apply comprehensive volatility and liquidity filters
+                print(f"   🎯 STAGE 1: Applying comprehensive volatility and liquidity filters...")
+
+                # Filter criteria based on user requirements
+                min_price_threshold = 100.0  # ₹100 is a good start in India
+                max_atr_percentage = 5.0     # Exclude if ATR% > 5%
+                max_beta = 1.2               # Exclude if Beta > 1.2
+                max_historical_volatility = 60.0  # Exclude if > 60% annual volatility
+                min_daily_volume = 100000    # At least 100k shares per day
+                min_daily_turnover = 1.0     # At least ₹1cr daily turnover
+                min_trades_per_day = 50      # At least 50 trades per day
+                max_bid_ask_spread = 2.0     # Bid-ask spread < 2%
+
+                # Categorize filtering results
                 penny_stocks = []
+                high_volatility_stocks = []
+                low_liquidity_stocks = []
                 quality_stocks = []
 
+                # Track filter application statistics
+                filter_stats = {
+                    'total_processed': 0,
+                    'atr_filters_applied': 0,
+                    'beta_filters_applied': 0,
+                    'hist_vol_filters_applied': 0,
+                    'turnover_filters_applied': 0,
+                    'trades_filters_applied': 0,
+                    'spread_filters_applied': 0
+                }
+
                 for stock in tradeable_stocks:
-                    if stock.current_price and stock.current_price < penny_stock_threshold:
-                        penny_stocks.append(stock)
-                        print(f"   🪙 PENNY STOCK SKIPPED: {stock.symbol} - ₹{stock.current_price:.2f}")
-                    else:
-                        quality_stocks.append(stock)
-
-                print(f"   🪙 STAGE 1 RESULT: Filtered out {len(penny_stocks)} penny stocks (< ₹{penny_stock_threshold})")
-                print(f"   ✅ STAGE 1 FINAL: {len(quality_stocks)} quality stocks for next stage")
-
-                # Additional filters for liquidity
-                min_volume = 50000  # Minimum daily volume for liquidity
-                min_price = 20.0    # Minimum price for stability
-                max_price = 10000.0 # Maximum price to avoid extreme high-priced stocks
-
-                filtered_stocks = []
-                low_volume_stocks = []
-                extreme_price_stocks = []
-
-                for stock in quality_stocks:
-                    # Check volume
-                    if stock.volume and stock.volume < min_volume:
-                        low_volume_stocks.append(stock)
+                    # Skip if no price data
+                    if not stock.current_price or stock.current_price <= 0:
                         continue
 
-                    # Check price range
-                    if stock.current_price:
-                        if stock.current_price < min_price:
-                            extreme_price_stocks.append(stock)
-                            continue
-                        elif stock.current_price > max_price:
-                            extreme_price_stocks.append(stock)
+                    filter_stats['total_processed'] += 1
+
+                    # Calculate missing metrics before filtering
+                    missing_metrics = self._calculate_missing_volatility_metrics(stock)
+
+                    # Filter 1: Price threshold (₹100 minimum)
+                    if stock.current_price < min_price_threshold:
+                        penny_stocks.append(stock)
+                        if len(penny_stocks) <= 5:  # Show first 5 examples
+                            print(f"   🪙 PENNY STOCK: {stock.symbol} - ₹{stock.current_price:.2f} (< ₹{min_price_threshold})")
+                        continue
+
+                    # Filter 2: ATR Percentage (only if actual data available)
+                    atr_pct = stock.atr_percentage or missing_metrics.get('atr_percentage')
+                    if atr_pct:
+                        filter_stats['atr_filters_applied'] += 1
+                        if atr_pct > max_atr_percentage:
+                            high_volatility_stocks.append(stock)
+                            if len(high_volatility_stocks) <= 3:  # Show first 3 examples
+                                print(f"   📈 HIGH ATR: {stock.symbol} - ATR {atr_pct:.1f}% (> {max_atr_percentage}%)")
                             continue
 
-                    filtered_stocks.append(stock)
+                    # Filter 3: Beta (only if actual data available)
+                    if stock.beta:
+                        filter_stats['beta_filters_applied'] += 1
+                        if stock.beta > max_beta:
+                            high_volatility_stocks.append(stock)
+                            if len(high_volatility_stocks) <= 3:  # Show first 3 examples
+                                print(f"   📊 HIGH BETA: {stock.symbol} - Beta {stock.beta:.2f} (> {max_beta})")
+                            continue
 
-                print(f"   📉 Additional filter: Removed {len(low_volume_stocks)} low volume stocks")
-                print(f"   💰 Additional filter: Removed {len(extreme_price_stocks)} extreme price stocks")
+                    # Filter 4: Historical Volatility (only if actual data available)
+                    if stock.historical_volatility_1y:
+                        filter_stats['hist_vol_filters_applied'] += 1
+                        if stock.historical_volatility_1y > max_historical_volatility:
+                            high_volatility_stocks.append(stock)
+                            if len(high_volatility_stocks) <= 3:  # Show first 3 examples
+                                print(f"   📉 HIGH VOLATILITY: {stock.symbol} - {stock.historical_volatility_1y:.1f}% (> {max_historical_volatility}%)")
+                            continue
+
+                    # Filter 5: Volume liquidity (use current volume if 20-day average not available)
+                    daily_volume = stock.avg_daily_volume_20d or stock.volume or 0
+                    if daily_volume < min_daily_volume:
+                        low_liquidity_stocks.append(stock)
+                        if len(low_liquidity_stocks) <= 3:  # Show first 3 examples
+                            print(f"   💧 LOW VOLUME: {stock.symbol} - {daily_volume:,} shares (< {min_daily_volume:,})")
+                        continue
+
+                    # Filter 6: Daily turnover (only if we can calculate from actual data)
+                    daily_turnover = stock.avg_daily_turnover or missing_metrics.get('avg_daily_turnover')
+                    if daily_turnover:
+                        filter_stats['turnover_filters_applied'] += 1
+                        if daily_turnover < min_daily_turnover:
+                            low_liquidity_stocks.append(stock)
+                            if len(low_liquidity_stocks) <= 3:  # Show first 3 examples
+                                print(f"   💰 LOW TURNOVER: {stock.symbol} - ₹{daily_turnover:.1f}cr (< ₹{min_daily_turnover}cr)")
+                            continue
+
+                    # Filter 7: Trading frequency
+                    if stock.trades_per_day:
+                        filter_stats['trades_filters_applied'] += 1
+                        if stock.trades_per_day < min_trades_per_day:
+                            low_liquidity_stocks.append(stock)
+                            if len(low_liquidity_stocks) <= 3:  # Show first 3 examples
+                                print(f"   🔄 LOW TRADES: {stock.symbol} - {stock.trades_per_day} trades/day (< {min_trades_per_day})")
+                            continue
+
+                    # Filter 8: Bid-ask spread (liquidity indicator)
+                    if stock.bid_ask_spread:
+                        filter_stats['spread_filters_applied'] += 1
+                        if stock.bid_ask_spread > max_bid_ask_spread:
+                            low_liquidity_stocks.append(stock)
+                            if len(low_liquidity_stocks) <= 3:  # Show first 3 examples
+                                print(f"   📏 WIDE SPREAD: {stock.symbol} - {stock.bid_ask_spread:.2f}% spread (> {max_bid_ask_spread}%)")
+                            continue
+
+                    # Stock passed all Stage 1 filters
+                    quality_stocks.append(stock)
+
+                print(f"   📊 STAGE 1 FILTERING RESULTS:")
+                print(f"      🪙 Penny stocks (< ₹{min_price_threshold}): {len(penny_stocks)}")
+                print(f"      📈 High volatility (ATR/Beta/Hist Vol): {len(high_volatility_stocks)}")
+                print(f"      💧 Low liquidity (Volume/Turnover/Trades): {len(low_liquidity_stocks)}")
+                print(f"      ✅ Quality stocks for Stage 2: {len(quality_stocks)}")
+
+                # Use quality_stocks as the final filtered list
+                filtered_stocks = quality_stocks
                 print(f"   ✅ STAGE 1 COMPLETE: {len(filtered_stocks)} stocks ready for swing trading analysis")
 
                 # Convert to dictionary format with comprehensive data
@@ -1188,17 +1267,49 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
                         'debt_to_equity': stock.debt_to_equity or 0.0,
                         'dividend_yield': stock.dividend_yield or 0.0,
                         'beta': stock.beta or 1.0,
+                        # Volatility and risk metrics for analysis
+                        'atr_14': stock.atr_14 or 0.0,
+                        'atr_percentage': stock.atr_percentage or 0.0,
+                        'historical_volatility_1y': stock.historical_volatility_1y or 0.0,
+                        'avg_daily_volume_20d': stock.avg_daily_volume_20d or 0,
+                        'avg_daily_turnover': stock.avg_daily_turnover or 0.0,
+                        'bid_ask_spread': stock.bid_ask_spread or 0.0,
+                        'trades_per_day': stock.trades_per_day or 0,
                         'last_updated': stock.last_updated.isoformat() if stock.last_updated else None
                     }
                     result_stocks.append(stock_data)
 
-                print(f"   📋 STAGE 1 SUMMARY:")
+                print(f"   📋 STAGE 1 COMPREHENSIVE SUMMARY:")
                 print(f"      📊 Total stocks in database: {total_stocks}")
                 print(f"      🚫 Non-tradeable filtered: {non_tradeable_count}")
-                print(f"      🪙 Penny stocks filtered: {len(penny_stocks)}")
-                print(f"      📉 Low volume filtered: {len(low_volume_stocks)}")
-                print(f"      💰 Extreme price filtered: {len(extreme_price_stocks)}")
-                print(f"      ✅ Ready for Stage 2: {len(result_stocks)} stocks")
+                print(f"      🪙 Penny stocks filtered (< ₹{min_price_threshold}): {len(penny_stocks)}")
+                print(f"      📈 High volatility filtered (ATR/Beta/Hist Vol): {len(high_volatility_stocks)}")
+                print(f"      💧 Low liquidity filtered (Volume/Turnover/Trades/Spread): {len(low_liquidity_stocks)}")
+                print(f"      ✅ Quality stocks ready for Stage 2: {len(result_stocks)} stocks")
+                print(f"")
+                print(f"   🎯 STAGE 1 FILTER CRITERIA APPLIED:")
+                print(f"      💰 Min Price: ₹{min_price_threshold} (applied to all {filter_stats['total_processed']} stocks)")
+                print(f"      📊 Max ATR%: {max_atr_percentage}% (applied to {filter_stats['atr_filters_applied']} stocks with ATR data)")
+                print(f"      📈 Max Beta: {max_beta} (applied to {filter_stats['beta_filters_applied']} stocks with Beta data)")
+                print(f"      📉 Max Historical Volatility: {max_historical_volatility}% (applied to {filter_stats['hist_vol_filters_applied']} stocks with hist vol data)")
+                print(f"      💧 Min Daily Volume: {min_daily_volume:,} shares (applied to all stocks)")
+                print(f"      💰 Min Daily Turnover: ₹{min_daily_turnover}cr (applied to {filter_stats['turnover_filters_applied']} stocks with turnover data)")
+                print(f"      🔄 Min Trades/Day: {min_trades_per_day} (applied to {filter_stats['trades_filters_applied']} stocks with trades data)")
+                print(f"      📏 Max Bid-Ask Spread: {max_bid_ask_spread}% (applied to {filter_stats['spread_filters_applied']} stocks with spread data)")
+                print(f"")
+                print(f"   ⚠️  FILTERS SKIPPED DUE TO MISSING DATA:")
+                missing_atr = filter_stats['total_processed'] - filter_stats['atr_filters_applied']
+                missing_beta = filter_stats['total_processed'] - filter_stats['beta_filters_applied']
+                missing_hist_vol = filter_stats['total_processed'] - filter_stats['hist_vol_filters_applied']
+                missing_turnover = filter_stats['total_processed'] - filter_stats['turnover_filters_applied']
+                missing_trades = filter_stats['total_processed'] - filter_stats['trades_filters_applied']
+                missing_spread = filter_stats['total_processed'] - filter_stats['spread_filters_applied']
+                print(f"      📊 ATR filters skipped: {missing_atr} stocks (no ATR data)")
+                print(f"      📈 Beta filters skipped: {missing_beta} stocks (no Beta data)")
+                print(f"      📉 Hist Vol filters skipped: {missing_hist_vol} stocks (no historical volatility data)")
+                print(f"      💰 Turnover filters skipped: {missing_turnover} stocks (no turnover data)")
+                print(f"      🔄 Trades filters skipped: {missing_trades} stocks (no trades data)")
+                print(f"      📏 Spread filters skipped: {missing_spread} stocks (no spread data)")
 
                 return result_stocks
 
@@ -1269,6 +1380,22 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
             stock.stop_loss = stock_data['current_price'] * 0.97     # 3% stop loss for swing trading
 
         return stock
+
+    def _calculate_missing_volatility_metrics(self, stock) -> Dict[str, float]:
+        """Calculate only computable metrics from existing data - NO ESTIMATIONS."""
+        metrics = {}
+
+        # Calculate ATR percentage if we have actual ATR data
+        if not stock.atr_percentage and stock.atr_14 and stock.current_price:
+            metrics['atr_percentage'] = (stock.atr_14 / stock.current_price) * 100
+
+        # Calculate daily turnover from actual volume data
+        if not stock.avg_daily_turnover and stock.current_price and stock.volume:
+            # Convert to crores: (price * volume) / 10,000,000
+            metrics['avg_daily_turnover'] = (stock.current_price * stock.volume) / 10000000
+
+        # NO ESTIMATIONS for Beta or Historical Volatility - only use actual data
+        return metrics
 
     def _determine_sector(self, company_name: str) -> str:
         """Determine sector from company name using keywords."""
