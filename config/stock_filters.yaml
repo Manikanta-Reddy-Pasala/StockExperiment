@@ -269,12 +269,12 @@ stage_2_filters:
     risk_score: 0.20
     momentum_score: 0.25
     volume_score: 0.05
-
+    
   filtering_thresholds:
-    minimum_total_score: 40
-    minimum_technical_score: 20
-    minimum_fundamental_score: 10
-    minimum_risk_score: 30
+    minimum_total_score: 0.5
+    minimum_technical_score: 0.25
+    minimum_fundamental_score: 0.20
+    minimum_risk_score: 0.35
     require_all_categories: false
 
 # -------------------------

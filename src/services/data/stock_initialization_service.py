@@ -25,6 +25,7 @@ try:
     from ...models.stock_models import Stock, SymbolMaster
     from ..data.fyers_symbol_service import get_fyers_symbol_service
     from ..data.volatility_calculation_service import get_volatility_calculation_service
+    from ..data.fundamental_data_service import get_fundamental_data_service
     from ..ml.stock_master_service import get_stock_master_service
 except ImportError:
     from src.services.core.unified_broker_service import get_unified_broker_service
@@ -32,6 +33,7 @@ except ImportError:
     from src.models.stock_models import Stock, SymbolMaster
     from src.services.data.fyers_symbol_service import get_fyers_symbol_service
     from src.services.data.volatility_calculation_service import get_volatility_calculation_service
+    from src.services.data.fundamental_data_service import get_fundamental_data_service
     from src.services.ml.stock_master_service import get_stock_master_service
 
 
@@ -43,6 +45,7 @@ class StockInitializationService:
         self.db_manager = get_database_manager()
         self.fyers_service = get_fyers_symbol_service()
         self.volatility_service = get_volatility_calculation_service()
+        self.fundamental_service = get_fundamental_data_service()
         self.stock_master_service = get_stock_master_service()
         self.rate_limit_delay = 0.1  # 100ms between API calls (fast mode)
         self.batch_size = 50  # Process in medium batches for better success rate
@@ -641,6 +644,10 @@ class StockInitializationService:
             # Step 5: Auto-trigger volatility calculation after stock sync
             volatility_result = self._auto_trigger_volatility_calculation(user_id)
 
+            # Step 6: Update fundamental data for stocks
+            logger.info("📊 Updating fundamental data for stocks...")
+            fundamental_result = self._update_fundamental_data(user_id)
+
             duration = time.time() - start_time
 
             logger.info(f"🎉 Fast sync completed in {duration:.1f} seconds")
@@ -653,7 +660,8 @@ class StockInitializationService:
                 'stocks_created': stocks_created,
                 'success_rate': stocks_created / len(symbols) * 100 if symbols else 0,
                 'speed_symbols_per_second': len(symbols) / duration if duration > 0 else 0,
-                'volatility_calculation': volatility_result
+                'volatility_calculation': volatility_result,
+                'fundamental_data_update': fundamental_result
             }
 
         except Exception as e:
@@ -835,6 +843,27 @@ class StockInitializationService:
         except Exception as e:
             logger.error(f"Error getting statistics: {e}")
             return {}
+
+    def _update_fundamental_data(self, user_id: int) -> Dict[str, Any]:
+        """Update fundamental data for all stocks."""
+        try:
+            logger.info("📊 Starting fundamental data update...")
+            result = self.fundamental_service.update_fundamental_data_for_all_stocks(user_id)
+            
+            if result.get('success'):
+                logger.info(f"✅ Fundamental data update completed: {result.get('updated_count', 0)} stocks updated")
+            else:
+                logger.warning(f"⚠️ Fundamental data update failed: {result.get('error', 'Unknown error')}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error updating fundamental data: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'updated_count': 0
+            }
 
 
 # Global service instance
