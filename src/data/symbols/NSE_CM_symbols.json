@@ -4273,18 +4273,6 @@
       "last_updated": ""
     },
     {
-      "fytoken": "101000000013421",
-      "symbol": "NSE:EMKAY-EQ",
-      "name": "EMKAY GLOBAL FIN SERV LTD",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE296H01011",
-      "last_updated": ""
-    },
-    {
       "fytoken": "101000000013423",
       "symbol": "NSE:ELIN-EQ",
       "name": "ELIN ELECTRONICS LIMITED",
@@ -7522,18 +7510,6 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE688E01024",
-      "last_updated": ""
-    },
-    {
-      "fytoken": "101000000015295",
-      "symbol": "NSE:VIRINCHI-EQ",
-      "name": "VIRINCHI LIMITED",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE539B01017",
       "last_updated": ""
     },
     {
@@ -11893,18 +11869,6 @@
       "last_updated": ""
     },
     {
-      "fytoken": "101000000020071",
-      "symbol": "NSE:INTENTECH-EQ",
-      "name": "INTENSE TECHNOLOGIES LTD",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE781A01025",
-      "last_updated": ""
-    },
-    {
       "fytoken": "101000000020072",
       "symbol": "NSE:INFRABEES-EQ",
       "name": "NIP IND ETF INFRA BEES",
@@ -12238,18 +12202,6 @@
       "lot": 1,
       "tick": 0.05,
       "isin": "INE740D01017",
-      "last_updated": ""
-    },
-    {
-      "fytoken": "101000000020321",
-      "symbol": "NSE:SHANKARA-EQ",
-      "name": "SHANKARA BLDG PRODUCT LTD",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.05,
-      "isin": "INE274V01019",
       "last_updated": ""
     },
     {
@@ -13402,18 +13354,6 @@
       "lot": 1,
       "tick": 0.05,
       "isin": "INE866R01028",
-      "last_updated": ""
-    },
-    {
-      "fytoken": "101000000021733",
-      "symbol": "NSE:RHFL-EQ",
-      "name": "RELIANCE HOME FINANCE LTD",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE217K01011",
       "last_updated": ""
     },
     {
@@ -14830,18 +14770,6 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INF251K01TL6",
-      "last_updated": ""
-    },
-    {
-      "fytoken": "10100000002412",
-      "symbol": "NSE:PEL-EQ",
-      "name": "PIRAMAL ENTERPRISES LTD",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.1,
-      "isin": "INE140A01024",
       "last_updated": ""
     },
     {
@@ -17077,18 +17005,6 @@
       "last_updated": ""
     },
     {
-      "fytoken": "101000000027571",
-      "symbol": "NSE:ODIGMA-EQ",
-      "name": "ODIGMA CONSULTANCY SOL L",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE054301028",
-      "last_updated": ""
-    },
-    {
       "fytoken": "1010000000277",
       "symbol": "NSE:GICRE-EQ",
       "name": "GENERAL INS CORP OF INDIA",
@@ -18117,7 +18033,7 @@
       "instrument_type": "EQ",
       "lot": 1,
       "tick": 0.1,
-      "isin": "INE418L01021",
+      "isin": "INE418L01047",
       "last_updated": ""
     },
     {
@@ -24213,7 +24129,7 @@
       "instrument_type": "EQ",
       "lot": 1,
       "tick": 0.05,
-      "isin": "INE219Y01018",
+      "isin": "INE219Y01026",
       "last_updated": ""
     },
     {
@@ -24673,6 +24589,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "1010000000758909",
+      "symbol": "NSE:AMANTA-EQ",
+      "name": "AMANTA HEALTHCARE LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE084K01015",
+      "last_updated": ""
+    },
+    {
       "fytoken": "1010000000758941",
       "symbol": "NSE:CPEDU-EQ",
       "name": "CAREER POINT EDUTECH LTD",
@@ -24721,18 +24649,6 @@
       "last_updated": ""
     },
     {
-      "fytoken": "1010000000758968",
-      "symbol": "NSE:AHCL-EQ",
-      "name": "ANLON HEALTHCARE LIMITED",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE0Y8W01017",
-      "last_updated": ""
-    },
-    {
       "fytoken": "1010000000758973",
       "symbol": "NSE:VIKRAN-EQ",
       "name": "VIKRAN ENGINEERING LTD",
@@ -24769,6 +24685,54 @@
       "last_updated": ""
     },
     {
+      "fytoken": "1010000000759041",
+      "symbol": "NSE:IVALUE-EQ",
+      "name": "IVALUE INFOSOLUTIONS LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.05,
+      "isin": "INE056801025",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "1010000000759048",
+      "symbol": "NSE:GKENERGY-EQ",
+      "name": "GK ENERGY LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE1AG301022",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "1010000000759057",
+      "symbol": "NSE:SAATVIKGL-EQ",
+      "name": "SAATVIK GREEN ENERGY LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.05,
+      "isin": "INE13B501022",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "1010000000759062",
+      "symbol": "NSE:RHETAN-EQ",
+      "name": "RHETAN TMT LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE0KKN01029",
+      "last_updated": ""
+    },
+    {
       "fytoken": "1010000000759084",
       "symbol": "NSE:URBANCO-EQ",
       "name": "URBAN COMPANY LIMITED",
@@ -24802,6 +24766,18 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE00RL01028",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "1010000000759130",
+      "symbol": "NSE:ABCOTS-EQ",
+      "name": "A B COTSPIN INDIA LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.05,
+      "isin": "INE08PH01015",
       "last_updated": ""
     },
     {
@@ -24898,6 +24874,18 @@
       "lot": 1,
       "tick": 0.05,
       "isin": "INE06XZ01023",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "1010000000759797",
+      "symbol": "NSE:EUROPRATIK-EQ",
+      "name": "EURO PRATIK SALES LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE198501012",
       "last_updated": ""
     },
     {
@@ -26977,6 +26965,6 @@
       "last_updated": ""
     }
   ],
-  "timestamp": "2025-09-21T11:17:45.185594",
+  "timestamp": "2025-09-26T22:46:14.417084",
   "exchange_type": "NSE_CM"
 }

@@ -501,7 +501,6 @@ class MLTrainingJob(Base):
     progress = Column(Float, default=0.0)  # 0.0 to 100.0
     accuracy = Column(Float)  # Model accuracy after training
     error_message = Column(Text)
-    training_results = Column(Text)  # JSON string containing training results and backtesting data
     created_at = Column(DateTime, default=datetime.utcnow)
     started_at = Column(DateTime)
     completed_at = Column(DateTime)
@@ -519,16 +518,17 @@ class MLTrainedModel(Base):
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     symbol = Column(String(50), nullable=False)
     model_type = Column(String(50), nullable=False)
-    model_file_path = Column(String(500))  # Path to saved model file
-    scaler_file_path = Column(String(500))  # Path to saved scaler file
-    feature_names = Column(Text)  # JSON array of feature names
+    model_file_path = Column(Text)  # Path to saved model file
+    scaler_file_path = Column(Text)  # Path to saved scaler file
+    feature_columns = Column(Text)  # JSON array of feature columns (matches DB)
+    target_column = Column(String(50))  # Target column name
+    model_version = Column(String(50))  # Model version
     accuracy = Column(Float)
-    mse = Column(Float)  # Mean squared error
-    mae = Column(Float)  # Mean absolute error
-    start_date = Column(DateTime, nullable=False)
-    end_date = Column(DateTime, nullable=False)
+    training_start_date = Column(DateTime, nullable=False)  # Matches DB
+    training_end_date = Column(DateTime, nullable=False)    # Matches DB
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     training_job = relationship("MLTrainingJob")

@@ -87,26 +87,39 @@ class StockDiscoveryService:
                 logger.info("Using cached StockInfo data")
                 return self._stock_cache.get('stocks', [])
 
-            # Get all tradeable stocks from database
-            db_stocks = stock_master.get_stocks_for_screening(limit=1000)  # Get top 1000 by market cap and volume
+            # Get all tradeable stocks from database with proper session handling
+            try:
+                db_stocks = stock_master.get_stocks_for_screening(limit=1000)  # Get top 1000 by market cap and volume
 
-            if not db_stocks:
-                logger.warning("No stocks found in database")
+                if not db_stocks:
+                    logger.warning("No stocks found in database")
+                    return []
+
+                logger.info(f"Retrieved {len(db_stocks)} stocks from database")
+
+                # Convert database Stock objects to StockInfo objects for compatibility
+                # Use a fresh session to avoid session binding issues
+                discovered_stocks = []
+
+                with self.db_manager.get_session() as session:
+                    for db_stock in db_stocks:
+                        try:
+                            # Refresh the object in current session to avoid binding issues
+                            refreshed_stock = session.merge(db_stock)
+                            session.expunge(refreshed_stock)  # Remove from session to avoid conflicts
+
+                            # Convert database Stock to StockInfo
+                            stock_info = self._convert_db_stock_to_stock_info(refreshed_stock)
+                            if stock_info and stock_info.is_tradeable:
+                                discovered_stocks.append(stock_info)
+                        except Exception as e:
+                            logger.debug(f"Failed to convert stock {getattr(db_stock, 'symbol', 'unknown')}: {e}")
+                            continue
+
+            except Exception as e:
+                logger.error(f"Database session error: {e}")
+                # If database fails, return empty list instead of legacy fallback
                 return []
-
-            logger.info(f"Retrieved {len(db_stocks)} stocks from database")
-
-            # Convert database Stock objects to StockInfo objects for compatibility
-            discovered_stocks = []
-            for db_stock in db_stocks:
-                try:
-                    # Convert database Stock to StockInfo
-                    stock_info = self._convert_db_stock_to_stock_info(db_stock)
-                    if stock_info and stock_info.is_tradeable:
-                        discovered_stocks.append(stock_info)
-                except Exception as e:
-                    logger.debug(f"Failed to convert stock {db_stock.symbol}: {e}")
-                    continue
 
             # Sort by market cap and liquidity
             discovered_stocks.sort(key=lambda x: (x.market_cap_crores, x.liquidity_score), reverse=True)
@@ -125,9 +138,8 @@ class StockDiscoveryService:
 
         except Exception as e:
             logger.error(f"Error discovering stocks from database: {e}")
-            # Fallback to legacy search approach if database fails
-            logger.info("Falling back to legacy search approach")
-            return self._discover_stocks_legacy_search(user_id, exchange)
+            # Return empty list - no fallbacks
+            return []
 
     def _get_batch_quotes(self, symbols: List[str], user_id: int) -> Dict[str, Dict]:
         """Get quotes for a batch of symbols."""
