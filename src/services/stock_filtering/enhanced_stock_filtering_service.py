@@ -368,7 +368,8 @@ class EnhancedStockFilteringService:
             atr_pct = getattr(stock, 'atr_percentage', None)
             if atr_pct is not None and atr_pct > 0:
                 # Score inversely to ATR% - lower ATR% gets higher score
-                atr_score = max(0, min(1, (5 - atr_pct) / 5))  # 0-5% ATR range
+                # More selective: only 0-3% ATR gets high score
+                atr_score = max(0, min(1, (3 - atr_pct) / 3))  # 0-3% ATR range
                 score += atr_score * 0.3
                 factors += 0.3
             
@@ -376,7 +377,8 @@ class EnhancedStockFilteringService:
             hist_vol = getattr(stock, 'historical_volatility_1y', None)
             if hist_vol is not None and hist_vol > 0:
                 # Score inversely to volatility - lower volatility gets higher score
-                vol_score = max(0, min(1, (0.5 - hist_vol) / 0.5))  # 0-50% volatility range
+                # More selective: only 0-30% volatility gets high score
+                vol_score = max(0, min(1, (0.3 - hist_vol) / 0.3))  # 0-30% volatility range
                 score += vol_score * 0.3
                 factors += 0.3
             
@@ -400,11 +402,11 @@ class EnhancedStockFilteringService:
             if factors > 0:
                 return score / factors
             else:
-                return 0.5  # Default neutral score if no data available
+                return 0.2  # Low score if no data available (penalize missing data)
                 
         except Exception as e:
             logger.warning(f"Error calculating technical score: {e}")
-            return 0.5
+            return 0.2
     
     def _calculate_fundamental_score(self, stock_score: StockScore) -> float:
         """Calculate fundamental analysis score (0-1) based on real data."""
@@ -463,11 +465,11 @@ class EnhancedStockFilteringService:
             if factors > 0:
                 return score / factors
             else:
-                return 0.5  # Default neutral score if no data available
+                return 0.1  # Very low score if no fundamental data available
                 
         except Exception as e:
             logger.warning(f"Error calculating fundamental score: {e}")
-            return 0.5
+            return 0.1
     
     def _calculate_risk_score(self, stock_score: StockScore) -> float:
         """Calculate risk assessment score (0-1) based on real data."""
@@ -519,11 +521,11 @@ class EnhancedStockFilteringService:
             if factors > 0:
                 return score / factors
             else:
-                return 0.5  # Default neutral score if no data available
+                return 0.2  # Low score if no data available (penalize missing data)
                 
         except Exception as e:
             logger.warning(f"Error calculating risk score: {e}")
-            return 0.5
+            return 0.2
     
     def _calculate_momentum_score(self, stock_score: StockScore) -> float:
         """Calculate momentum score (0-1) based on real data."""
@@ -564,11 +566,11 @@ class EnhancedStockFilteringService:
             if factors > 0:
                 return score / factors
             else:
-                return 0.5  # Default neutral score if no data available
+                return 0.2  # Low score if no data available (penalize missing data)
                 
         except Exception as e:
             logger.warning(f"Error calculating momentum score: {e}")
-            return 0.5
+            return 0.2
     
     def _calculate_volume_score(self, stock_score: StockScore) -> float:
         """Calculate volume analysis score (0-1) based on real data."""
@@ -609,11 +611,11 @@ class EnhancedStockFilteringService:
             if factors > 0:
                 return score / factors
             else:
-                return 0.5  # Default neutral score if no data available
+                return 0.2  # Low score if no data available (penalize missing data)
                 
         except Exception as e:
             logger.warning(f"Error calculating volume score: {e}")
-            return 0.5
+            return 0.2
     
     def _apply_sector_concentration_limit(self, stocks: List[StockScore]) -> List[StockScore]:
         """Apply sector concentration limit."""
