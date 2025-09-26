@@ -4,23 +4,17 @@ High-performance automated trading system with live market data integration.
 
 ## Quick Start
 
-### Initialize Stock Data
-```bash
-python3 sync_stocks.py
-```
-This will recreate the database tables and sync all stock data with live prices (~20 seconds).
-
-### Run Trading Strategies
-```bash
-python3 portfolio_strategy_runner.py
-```
-Execute enhanced portfolio strategies with live market data.
-
 ### Start Web Application
 ```bash
 python3 run.py
 ```
 Launch the web interface for portfolio management and trading.
+
+### Development Mode
+```bash
+./run.sh dev
+```
+Start in development mode with auto-reloading for faster development.
 
 ## Key Features
 
@@ -41,9 +35,8 @@ Launch the web interface for portfolio management and trading.
 └── integrations/      # External API integrations
 
 /config.py             # Configuration settings
-/sync_stocks.py        # Stock data synchronization
-/portfolio_strategy_runner.py # Strategy execution
 /run.py                # Main application entry point
+/app.py                # Alternative entry point
 ```
 
 ## Performance

@@ -16,16 +16,8 @@ try:
 except ImportError:
     FYERS_AVAILABLE = False
 
-# Zerodha implementations (conditional import)
-try:
-    from .zerodha_dashboard_provider import ZerodhaDashboardProvider
-    from .zerodha_suggested_stocks_provider import ZerodhaSuggestedStocksProvider
-    from .zerodha_orders_provider import ZerodhaOrdersProvider
-    from .zerodha_portfolio_provider import ZerodhaPortfolioProvider
-    from .zerodha_reports_provider import ZerodhaReportsProvider
-    ZERODHA_AVAILABLE = True
-except ImportError:
-    ZERODHA_AVAILABLE = False
+# Zerodha implementations (removed - not implemented)
+ZERODHA_AVAILABLE = False
 
 # Build __all__ list conditionally
 __all__ = []
@@ -40,12 +32,4 @@ if FYERS_AVAILABLE:
         'FyersReportsProvider'
     ])
 
-# Add Zerodha if available
-if ZERODHA_AVAILABLE:
-    __all__.extend([
-        'ZerodhaDashboardProvider',
-        'ZerodhaSuggestedStocksProvider',
-        'ZerodhaOrdersProvider',
-        'ZerodhaPortfolioProvider',
-        'ZerodhaReportsProvider'
-    ])
+# Zerodha implementations removed - not available
