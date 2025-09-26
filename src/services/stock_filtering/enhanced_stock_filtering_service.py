@@ -262,11 +262,22 @@ class EnhancedStockFilteringService:
                     volume_score * weights.volume_score
                 ) * 100  # Convert to 0-100 scale
                 
+                # Convert individual scores to 0-100 scale for comparison
+                technical_score = technical_score * 100
+                fundamental_score = fundamental_score * 100
+                risk_score = risk_score * 100
+                momentum_score = momentum_score * 100
+                volume_score = volume_score * 100
+                
                 stock_score.total_score = total_score
                 
                 # Apply filtering thresholds
                 thresholds = self.config.filtering_thresholds
                 reject_reasons = []
+                
+                # Debug logging for first few stocks
+                if len(passed_stocks) < 3:
+                    logger.info(f"Stock {stock_score.symbol} scores: total={total_score:.1f}, technical={technical_score:.1f}, fundamental={fundamental_score:.1f}, risk={risk_score:.1f}")
                 
                 if total_score < thresholds.minimum_total_score:
                     reject_reasons.append(f"Total score {total_score:.1f} below minimum {thresholds.minimum_total_score}")

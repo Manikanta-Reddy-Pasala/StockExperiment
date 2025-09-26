@@ -271,10 +271,10 @@ stage_2_filters:
     volume_score: 0.05
 
   filtering_thresholds:
-    minimum_total_score: 60
-    minimum_technical_score: 50
-    minimum_fundamental_score: 40
-    minimum_risk_score: 50
+    minimum_total_score: 10
+    minimum_technical_score: 5
+    minimum_fundamental_score: 5
+    minimum_risk_score: 5
     require_all_categories: false
 
 # -------------------------

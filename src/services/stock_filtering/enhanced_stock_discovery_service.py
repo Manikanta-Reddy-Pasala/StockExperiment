@@ -123,19 +123,25 @@ class EnhancedStockDiscoveryService:
         """Get stocks from database."""
         try:
             from src.models.database import get_database_manager
-            from src.models.stock_models import Stock
+            from sqlalchemy import text
             
             db_manager = get_database_manager()
             
             with db_manager.get_session() as session:
-                query = session.query(Stock)
-                
-                # Apply limit if specified
+                # Use raw SQL to avoid relationship issues
+                sql = "SELECT * FROM stocks"
                 if limit and limit > 0:
-                    query = query.limit(limit)
+                    sql += f" LIMIT {limit}"
                 
-                stocks = query.all()
-                session.expunge_all()
+                result = session.execute(text(sql))
+                stocks = []
+                
+                for row in result:
+                    # Convert row to a simple object
+                    stock = type('Stock', (), {})()
+                    for key, value in row._mapping.items():
+                        setattr(stock, key, value)
+                    stocks.append(stock)
                 
                 logger.info(f"Retrieved {len(stocks)} stocks from database")
                 return stocks

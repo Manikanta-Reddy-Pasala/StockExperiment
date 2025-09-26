@@ -142,7 +142,7 @@ class StrategyStockSelection(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    user = relationship("User")
+    user = relationship("User", foreign_keys=[user_id])
     strategy_type = relationship("StrategyType", back_populates="stock_selections")
     stock = relationship("Stock", back_populates="strategy_selections")
 
@@ -193,7 +193,7 @@ class MLPrediction(Base):
     
     # Relationships
     stock = relationship("Stock", back_populates="ml_predictions")
-    user = relationship("User")
+    user = relationship("User", foreign_keys=[user_id])
     
     # Index for efficient querying
     __table_args__ = (
@@ -244,7 +244,7 @@ class PortfolioStrategy(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    user = relationship("User")
+    user = relationship("User", foreign_keys=[user_id])
     positions = relationship("PortfolioPosition", back_populates="portfolio_strategy")
 
 
