@@ -306,6 +306,42 @@ def train_and_tune_models(symbol: str, start_date: Optional[date] = None, end_da
         save_scaler(feature_scaler, f"{symbol}_lstm_feature")
         save_scaler(target_scaler, f"{symbol}_lstm_target")
 
+        # Calculate real metrics on test data
+        from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+
+        # Get test predictions from all models
+        rf_pred_test = rf_model.predict(X_test_tab)
+        xgb_pred_test = xgb_model.predict(X_test_tab)
+        lstm_pred_test = lstm_model.predict(X_test_lstm).flatten()
+
+        # Align LSTM predictions with test data
+        lstm_test_aligned = lstm_pred_test[:len(rf_pred_test)]
+
+        # Create meta-features for test data
+        meta_features_test = np.column_stack([
+            rf_pred_test,
+            xgb_pred_test,
+            lstm_test_aligned,
+            np.abs(rf_pred_test - xgb_pred_test),
+            (rf_pred_test + xgb_pred_test) / 2,
+            X_test_tab['Volatility'].values,
+            X_test_tab['Volume_Regime'].values
+        ])
+
+        # Get ensemble predictions
+        ensemble_pred_test = meta_learner.predict(meta_features_test)
+
+        # Calculate metrics for ensemble model
+        ensemble_mse = mean_squared_error(y_test_tab, ensemble_pred_test)
+        ensemble_mae = mean_absolute_error(y_test_tab, ensemble_pred_test)
+        ensemble_r2 = r2_score(y_test_tab, ensemble_pred_test)
+
+        # Convert R2 to accuracy-like metric (0-1 range, where 1 is perfect)
+        # R2 can be negative for bad models, so we clip it
+        ensemble_accuracy = max(0, ensemble_r2)
+
+        logger.info(f"Ensemble Model Metrics - MSE: {ensemble_mse:.6f}, MAE: {ensemble_mae:.6f}, R2: {ensemble_r2:.4f}")
+
         # Run automatic backtesting after training
         update_progress(95, "Running backtesting...")
         backtest_results = None
@@ -345,11 +381,11 @@ def train_and_tune_models(symbol: str, start_date: Optional[date] = None, end_da
                             user_id=training_job.user_id,
                             symbol=symbol,
                             model_type='ensemble',
-                            model_file_path=f"models/{symbol}_ensemble.pkl",  # Placeholder path
+                            model_file_path=f"models/{symbol}_ensemble.pkl",  # Path to ensemble components
                             feature_names=json.dumps(features),
-                            accuracy=0.85,  # Placeholder accuracy - should be calculated from actual model performance
-                            mse=0.02,       # Placeholder MSE
-                            mae=0.01,       # Placeholder MAE
+                            accuracy=float(ensemble_accuracy),  # Real R2 score (clipped to 0-1)
+                            mse=float(ensemble_mse),            # Real Mean Squared Error
+                            mae=float(ensemble_mae),            # Real Mean Absolute Error
                             start_date=training_job.start_date,
                             end_date=training_job.end_date,
                             is_active=True,

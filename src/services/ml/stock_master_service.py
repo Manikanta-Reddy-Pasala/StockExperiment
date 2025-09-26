@@ -19,10 +19,12 @@ try:
     from ..core.unified_broker_service import get_unified_broker_service
     from src.models.database import get_database_manager
     from src.models.stock_models import Stock, MarketCapCategory
+    from .config_loader import get_stock_filter_config
 except ImportError:
     from src.services.core.unified_broker_service import get_unified_broker_service
     from src.models.database import get_database_manager
     from src.models.stock_models import Stock, MarketCapCategory
+    from src.services.ml.config_loader import get_stock_filter_config
 
 
 class StockMasterService:
@@ -31,6 +33,7 @@ class StockMasterService:
     def __init__(self):
         self.unified_broker_service = get_unified_broker_service()
         self.db_manager = get_database_manager()
+        self.config = get_stock_filter_config()
         self.refresh_interval_hours = 24  # Refresh daily
 
     def refresh_all_stocks(self, user_id: int = 1, exchange: str = "NSE") -> Dict:
@@ -262,7 +265,7 @@ class StockMasterService:
                                 all_symbols.add(cleaned_symbol)
 
                     # Rate limiting
-                    time.sleep(0.2)
+                    time.sleep(0.2)  # Rate limiting for API calls
 
                 except Exception as e:
                     logger.warning(f"Search failed for pattern '{pattern}': {e}")
@@ -541,10 +544,13 @@ class StockMasterService:
         return market_cap_crores
 
     def _determine_market_cap_category(self, market_cap_crores: float) -> str:
-        """Determine market cap category."""
-        if market_cap_crores > 20000:
+        """Determine market cap category using configuration."""
+        large_cap_min = self.config.market_cap_categories.get('large_cap', {}).minimum or 20000
+        mid_cap_min = self.config.market_cap_categories.get('mid_cap', {}).minimum or 5000
+
+        if market_cap_crores > large_cap_min:
             return "large_cap"
-        elif market_cap_crores > 5000:
+        elif market_cap_crores > mid_cap_min:
             return "mid_cap"
         else:
             return "small_cap"
@@ -768,12 +774,12 @@ class StockMasterService:
         }
 
     def _calculate_tradeability(self, price: float, volume: int, quote_data: Dict) -> bool:
-        """Calculate if a stock is tradeable based on basic criteria."""
-        # Basic tradeability criteria
+        """Calculate if a stock is tradeable based on configuration criteria."""
+        # Use configuration for tradeability criteria
         return (
-            price >= 5 and      # Minimum price
-            volume >= 10000 and # Minimum volume
-            price <= 10000      # Maximum price (avoid extreme prices)
+            price >= self.config.tradeability.minimum_price and
+            price <= self.config.tradeability.maximum_price and
+            volume >= self.config.tradeability.minimum_volume
         )
 
     def _mark_inactive_stocks(self, session, active_symbols: List[str], exchange: str) -> int:

@@ -16,6 +16,8 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 
+from .config_loader import get_stock_filter_config, StockFilterConfig
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -56,7 +58,11 @@ class StockDiscoveryService:
     def __init__(self):
         self.unified_broker_service = get_unified_broker_service()
         self.db_manager = get_database_manager()
-        self.cache_duration = 3600  # 1 hour cache
+
+        # Load configuration
+        self.config = get_stock_filter_config()
+        self.cache_duration = self.config.cache_duration
+
         self._stock_cache = {}
         self._cache_timestamp = 0
 
@@ -87,9 +93,15 @@ class StockDiscoveryService:
                 logger.info("Using cached StockInfo data")
                 return self._stock_cache.get('stocks', [])
 
-            # Get all tradeable stocks from database with proper session handling
+            # Get all tradeable stocks from database with filtering criteria
             try:
-                db_stocks = stock_master.get_stocks_for_screening(limit=1000)  # Get top 1000 by market cap and volume
+                # Apply stage 1 filtering criteria to database query
+                db_stocks = stock_master.get_stocks_for_screening(
+                    min_price=self.config.tradeability.minimum_price,
+                    max_price=self.config.tradeability.maximum_price,
+                    min_volume=self.config.tradeability.minimum_volume,
+                    limit=self.config.screening_limit
+                )
 
                 if not db_stocks:
                     logger.warning("No stocks found in database")
@@ -118,7 +130,7 @@ class StockDiscoveryService:
 
             except Exception as e:
                 logger.error(f"Database session error: {e}")
-                # If database fails, return empty list instead of legacy fallback
+                # If database fails, return empty list - no fallback
                 return []
 
             # Sort by market cap and liquidity
@@ -138,7 +150,7 @@ class StockDiscoveryService:
 
         except Exception as e:
             logger.error(f"Error discovering stocks from database: {e}")
-            # Return empty list - no fallbacks
+            # Return empty list - pure criteria-based filtering only
             return []
 
     def _get_batch_quotes(self, symbols: List[str], user_id: int) -> Dict[str, Dict]:
@@ -183,18 +195,23 @@ class StockDiscoveryService:
             if 'symbol_name' in quote_data:
                 name = quote_data['symbol_name']
 
-            # Skip if price too low or no volume
-            if current_price < 1 or volume < 1000:
+            # Skip if price too low or no volume (using config)
+            price_threshold = self.config.tradeability.minimum_price / 5  # Lower threshold for analysis
+            volume_threshold = self.config.tradeability.minimum_volume / 10  # Lower threshold for analysis
+            if current_price < price_threshold or volume < volume_threshold:
                 return None
 
             # Estimate market cap (this is simplified - in production you'd use fundamental data)
             estimated_shares = self._estimate_shares_outstanding(symbol, current_price, volume)
             market_cap_crores = (current_price * estimated_shares) / 10000000  # Convert to crores
 
-            # Categorize by market cap
-            if market_cap_crores > 20000:
+            # Categorize by market cap using configuration
+            large_cap_min = self.config.market_cap_categories.get('large_cap', {}).minimum or 20000
+            mid_cap_min = self.config.market_cap_categories.get('mid_cap', {}).minimum or 5000
+
+            if market_cap_crores > large_cap_min:
                 market_cap_category = MarketCap.LARGE_CAP
-            elif market_cap_crores > 5000:
+            elif market_cap_crores > mid_cap_min:
                 market_cap_category = MarketCap.MID_CAP
             else:
                 market_cap_category = MarketCap.SMALL_CAP
@@ -202,11 +219,12 @@ class StockDiscoveryService:
             # Calculate liquidity score
             liquidity_score = self._calculate_liquidity_score(current_price, volume, quote_data)
 
-            # Determine if tradeable (basic criteria)
+            # Determine if tradeable using configuration
             is_tradeable = (
-                current_price >= 5 and  # Minimum price
-                volume >= 10000 and     # Minimum volume
-                liquidity_score >= 0.3  # Minimum liquidity
+                current_price >= self.config.tradeability.minimum_price and
+                current_price <= self.config.tradeability.maximum_price and
+                volume >= self.config.tradeability.minimum_volume and
+                liquidity_score >= self.config.tradeability.minimum_liquidity_score
             )
 
             # Determine sector (simplified)
@@ -231,94 +249,93 @@ class StockDiscoveryService:
 
     def _estimate_shares_outstanding(self, symbol: str, price: float, volume: float) -> float:
         """Estimate shares outstanding using realistic market cap assumptions."""
-        # Create realistic market cap distribution for Indian stocks
+        # Create realistic market cap distribution using configuration
+        shares_config = self.config.shares_estimation
 
-        # Use volume as an indicator of company size (higher volume = larger company typically)
+        # Use volume as an indicator of company size
         volume_factor = volume / 100000  # Normalize to 100k base
 
-        # Price-based estimation with realistic ranges
-        if price > 1500:  # High price stocks
-            # Usually large cap companies with fewer shares outstanding
-            base_shares = random.uniform(50000000, 300000000)  # 5-30 crores shares
-        elif price > 500:  # Mid-high price stocks
-            # Mix of large and mid cap
-            base_shares = random.uniform(100000000, 800000000)  # 10-80 crores shares
-        elif price > 100:  # Medium price stocks
-            # Mostly mid cap companies
-            base_shares = random.uniform(200000000, 1500000000)  # 20-150 crores shares
-        else:  # Low price stocks
-            # Small cap and penny stocks with many shares
-            base_shares = random.uniform(500000000, 5000000000)  # 50-500 crores shares
+        # Price-based estimation with configured ranges
+        if price > shares_config.high_price_threshold:
+            # High price stocks - usually large cap companies
+            base_shares = random.uniform(
+                shares_config.high_price_shares_min,
+                shares_config.high_price_shares_max
+            )
+        elif price > shares_config.mid_high_price_threshold:
+            # Mid-high price stocks
+            base_shares = random.uniform(
+                shares_config.mid_high_shares_min,
+                shares_config.mid_high_shares_max
+            )
+        elif price > shares_config.medium_price_threshold:
+            # Medium price stocks
+            base_shares = random.uniform(
+                shares_config.medium_shares_min,
+                shares_config.medium_shares_max
+            )
+        else:
+            # Low price stocks
+            base_shares = random.uniform(
+                shares_config.low_shares_min,
+                shares_config.low_shares_max
+            )
 
-        # Adjust based on volume (higher volume typically indicates larger companies)
-        if volume > 200000:  # High volume
-            base_shares *= random.uniform(0.8, 1.2)  # Large companies
-        elif volume > 50000:  # Medium volume
-            base_shares *= random.uniform(0.9, 1.3)  # Mid companies
-        else:  # Low volume
-            base_shares *= random.uniform(1.0, 2.0)  # Smaller companies
+        # Adjust based on volume using configuration
+        if volume > shares_config.high_volume_threshold:
+            base_shares *= random.uniform(
+                shares_config.high_volume_mult_min,
+                shares_config.high_volume_mult_max
+            )
+        elif volume > shares_config.medium_volume_threshold:
+            base_shares *= random.uniform(
+                shares_config.medium_volume_mult_min,
+                shares_config.medium_volume_mult_max
+            )
+        else:
+            base_shares *= random.uniform(
+                shares_config.low_volume_mult_min,
+                shares_config.low_volume_mult_max
+            )
 
         return int(base_shares)
 
     def _calculate_liquidity_score(self, price: float, volume: float, quote_data: Dict) -> float:
         """Calculate liquidity score (0-1) based on volume and spread."""
         try:
-            # Volume component (70%)
-            volume_score = min(volume / 1000000, 1.0)  # Normalize to 1M shares
+            liq_config = self.config.liquidity_scoring
 
-            # Spread component (30%) - estimate from high-low
+            # Volume component
+            volume_score = min(volume / liq_config.volume_normalization, 1.0)
+
+            # Spread component - estimate from high-low
             # Handle Fyers format (direct high/low or ohlc.high/ohlc.low)
             ohlc_data = quote_data.get('ohlc', {})
             high = float(quote_data.get('high', ohlc_data.get('high', price)))
             low = float(quote_data.get('low', ohlc_data.get('low', price)))
             if high > low and price > 0:
                 spread_pct = (high - low) / price
-                spread_score = max(0, 1 - (spread_pct * 10))  # Lower spread = higher score
+                spread_score = max(0, 1 - (spread_pct * liq_config.spread_multiplier))
             else:
                 spread_score = 0.5
 
-            return (volume_score * 0.7) + (spread_score * 0.3)
+            return (volume_score * liq_config.volume_weight) + \
+                   (spread_score * liq_config.spread_weight)
 
         except Exception:
             return 0.5
 
 
     def _determine_sector(self, name: str) -> str:
-        """Determine sector from stock name using only generic keywords (no company names)."""
+        """Determine sector from stock name using configured keywords."""
         name_upper = name.upper()
 
-        # Banking & Financial Services
-        if any(term in name_upper for term in ['BANK', 'FINANCE', 'FINANCIAL', 'LENDING', 'CREDIT']):
-            return 'Banking'
-        # Technology & Software
-        elif any(term in name_upper for term in ['IT', 'TECH', 'SOFTWARE', 'SYSTEM', 'COMPUTER', 'DIGITAL']):
-            return 'Technology'
-        # Pharmaceutical & Healthcare
-        elif any(term in name_upper for term in ['PHARMA', 'DRUG', 'MEDICINE', 'HEALTHCARE', 'BIO', 'LABORATORY']):
-            return 'Pharmaceutical'
-        # Automobile & Transportation
-        elif any(term in name_upper for term in ['AUTO', 'MOTOR', 'VEHICLE', 'TRANSPORT', 'LOGISTICS']):
-            return 'Automobile'
-        # Consumer Goods
-        elif any(term in name_upper for term in ['FMCG', 'CONSUMER', 'FOOD', 'BEVERAGE', 'RETAIL']):
-            return 'FMCG'
-        # Metals & Mining
-        elif any(term in name_upper for term in ['METAL', 'STEEL', 'IRON', 'COAL', 'MINING', 'ALUMINIUM']):
-            return 'Metals'
-        # Energy & Power
-        elif any(term in name_upper for term in ['ENERGY', 'POWER', 'OIL', 'GAS', 'PETROLEUM', 'SOLAR', 'ELECTRIC']):
-            return 'Energy'
-        # Infrastructure & Construction
-        elif any(term in name_upper for term in ['INFRA', 'CEMENT', 'CONSTRUCTION', 'BUILDING', 'ENGINEERING']):
-            return 'Infrastructure'
-        # Telecommunications
-        elif any(term in name_upper for term in ['TELECOM', 'COMMUNICATION', 'WIRELESS', 'NETWORK']):
-            return 'Telecommunications'
-        # Textiles
-        elif any(term in name_upper for term in ['TEXTILE', 'COTTON', 'FABRIC', 'GARMENT', 'APPAREL']):
-            return 'Textiles'
-        else:
-            return 'Others'
+        # Use sector keywords from configuration
+        for sector, keywords in self.config.sector_keywords.items():
+            if any(term in name_upper for term in keywords):
+                return sector
+
+        return 'Others'
 
     def get_stocks_by_category(self, user_id: int = 1) -> Dict[MarketCap, List[StockInfo]]:
         """Get stocks categorized by market cap."""
@@ -377,6 +394,9 @@ class StockDiscoveryService:
 
     def _log_discovery_summary(self, stocks: List[StockInfo]):
         """Log summary of discovered stocks."""
+        if not self.config.enable_discovery_summary:
+            return
+
         total = len(stocks)
         large_cap = len([s for s in stocks if s.market_cap_category == MarketCap.LARGE_CAP])
         mid_cap = len([s for s in stocks if s.market_cap_category == MarketCap.MID_CAP])
@@ -389,8 +409,9 @@ class StockDiscoveryService:
         logger.info(f"  Small Cap: {small_cap}")
 
         # Log top stocks by category
+        top_n = self.config.top_stocks_per_category
         for category in [MarketCap.LARGE_CAP, MarketCap.MID_CAP, MarketCap.SMALL_CAP]:
-            category_stocks = [s for s in stocks if s.market_cap_category == category][:5]
+            category_stocks = [s for s in stocks if s.market_cap_category == category][:top_n]
             if category_stocks:
                 logger.info(f"  Top {category.value}: {[s.symbol for s in category_stocks]}")
 
@@ -428,123 +449,21 @@ class StockDiscoveryService:
     def _calculate_liquidity_score_from_volume(self, price: float, volume: int) -> float:
         """Calculate liquidity score from volume data."""
         try:
-            # Volume component (80% weight for database stocks)
-            volume_score = min(volume / 1000000, 1.0)  # Normalize to 1M shares
+            liq_config = self.config.liquidity_scoring
 
-            # Price stability component (20% weight)
-            price_score = 0.8 if 100 <= price <= 1000 else 0.6
+            # Volume component
+            volume_score = min(volume / liq_config.volume_normalization, 1.0)
 
-            return (volume_score * 0.8) + (price_score * 0.2)
+            # Price stability component
+            if liq_config.stable_price_min <= price <= liq_config.stable_price_max:
+                price_score = liq_config.stable_price_score
+            else:
+                price_score = liq_config.unstable_price_score
+
+            return (volume_score * liq_config.db_volume_weight) + \
+                   (price_score * liq_config.db_price_stability_weight)
         except Exception:
             return 0.5
-
-    def _discover_stocks_legacy_search(self, user_id: int, exchange: str) -> List[StockInfo]:
-        """
-        Legacy stock discovery using keyword search.
-        Used as fallback when database approach fails.
-        """
-        try:
-            logger.info("Using legacy keyword search approach")
-
-            # Get popular/liquid stocks using search functionality
-            discovered_stocks = []
-
-            # Search for major indices and generic sector terms only (no company names)
-            search_terms = [
-                # Major indices components
-                "NIFTY", "SENSEX", "BANKNIFTY", "NIFTYNXT50", "FINNIFTY",
-                # Generic sector keywords only
-                "BANK", "IT", "PHARMA", "AUTO", "FMCG", "METAL", "INFRA", "ENERGY",
-                "FINANCE", "TECH", "HEALTHCARE", "CONSUMER", "COMMODITY",
-                # Generic size/volume based searches
-                "LTD", "LIMITED", "CORP", "INC", "INDUSTRIES"
-            ]
-
-            all_symbols = set()
-
-            for term in search_terms:
-                try:
-                    # Get the fyers provider directly for more reliable search
-                    try:
-                        from ..interfaces.broker_feature_factory import get_broker_feature_factory
-                    except ImportError:
-                        from src.services.interfaces.broker_feature_factory import get_broker_feature_factory
-                    factory = get_broker_feature_factory()
-                    provider = factory.get_suggested_stocks_provider(user_id)
-
-                    if provider:
-                        # Call the search method directly with proper signature
-                        search_result = provider.fyers_service.search(user_id, term, exchange)
-
-                        if search_result.get('status') == 'success':
-                            symbols = search_result.get('data', [])
-                            logger.debug(f"Search term '{term}' returned {len(symbols)} results")
-
-                            for symbol_info in symbols:
-                                symbol = symbol_info.get('symbol', '')
-                                name = symbol_info.get('name', symbol_info.get('symbol_name', ''))
-
-                                # Filter for equity stocks only
-                                if ('-EQ' in symbol and
-                                    symbol.startswith(f"{exchange}:") and
-                                    len(name) > 2):
-                                    all_symbols.add(symbol)
-
-                    # Rate limiting
-                    time.sleep(0.1)
-
-                except Exception as e:
-                    logger.warning(f"Search failed for term '{term}': {e}")
-                    continue
-
-            logger.info(f"Legacy search discovered {len(all_symbols)} potential stocks")
-
-            # Convert to list and process in batches for quote retrieval
-            symbols_list = list(all_symbols)
-
-            # Try to get real-time quotes in batches
-            batch_size = 20
-            quotes_data = {}
-
-            for i in range(0, len(symbols_list), batch_size):
-                batch_symbols = symbols_list[i:i + batch_size]
-                try:
-                    batch_quotes = self._get_batch_quotes(batch_symbols, user_id)
-                    quotes_data.update(batch_quotes)
-                    time.sleep(0.5)  # Rate limiting between batches
-                except Exception as e:
-                    logger.warning(f"Failed to get quotes for batch {i//batch_size + 1}: {e}")
-                    continue
-
-            logger.info(f"Retrieved quotes for {len(quotes_data)} out of {len(symbols_list)} symbols")
-
-            # Process symbols with available quotes
-            for symbol in symbols_list:
-                try:
-                    quote_data = quotes_data.get(symbol)
-                    if quote_data:
-                        # Use real quote data
-                        stock_info = self._analyze_stock_info(symbol, quote_data, user_id)
-                    else:
-                        # Skip symbols without quotes
-                        logger.debug(f"No quote data available for {symbol}, skipping")
-                        continue
-
-                    if stock_info and stock_info.is_tradeable:
-                        discovered_stocks.append(stock_info)
-                except Exception as e:
-                    logger.debug(f"Failed to analyze {symbol}: {e}")
-                    continue
-
-            # Sort by market cap and liquidity
-            discovered_stocks.sort(key=lambda x: (x.market_cap_crores, x.liquidity_score), reverse=True)
-
-            logger.info(f"Legacy search discovered {len(discovered_stocks)} tradeable stocks")
-            return discovered_stocks
-
-        except Exception as e:
-            logger.error(f"Error in legacy stock discovery: {e}")
-            return []
 
     def refresh_cache(self, user_id: int = 1):
         """Force refresh of stock cache."""
