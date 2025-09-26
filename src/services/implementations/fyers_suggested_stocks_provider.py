@@ -197,16 +197,38 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
     
     def get_suggested_stocks(self, user_id: int, strategies: List[StrategyType] = None,
                            limit: int = 50, search: str = None, sort_by: str = None,
-                           sort_order: str = 'desc', sector: str = None) -> Dict[str, Any]:
-        """Get suggested stocks with comprehensive screening pipeline and logging."""
+                           sort_order: str = 'desc', sector: str = None, config=None) -> Dict[str, Any]:
+        """Get suggested stocks with comprehensive screening pipeline and logging.
+
+        Args:
+            user_id: User ID for the request
+            strategies: List of strategies to apply
+            limit: Maximum number of stocks to return
+            search: Search query string
+            sort_by: Field to sort results by
+            sort_order: Sort order ('asc' or 'desc')
+            sector: Filter by specific sector
+            config: Optional StockScreeningConfig for customizing the screening pipeline
+                   If None, uses default configuration
+
+        Returns:
+            Dictionary with screening results
+        """
         try:
             if not strategies:
                 strategies = [StrategyType.DEFAULT_RISK, StrategyType.HIGH_RISK]
 
+            # If sector is specified and no config provided, create one with sector filter
+            if sector and not config:
+                from ..stock_filtering.screening_config import ConfigurationBuilder, FilterStrategy
+                config = (ConfigurationBuilder()
+                         .with_sectors([sector])
+                         .build())
+
             print(f"🎯 STAGE 0: Starting stock screening pipeline for strategies: {[s.value for s in strategies]}")
 
-            # Use database-driven screening pipeline
-            filtered_stocks = self._get_filtered_stocks_from_database(user_id)
+            # Use database-driven screening pipeline with configuration
+            filtered_stocks = self._get_filtered_stocks_from_database(user_id, config)
 
             if not filtered_stocks:
                 print("❌ STAGE 1 FAILED: No stocks passed the screening pipeline")
@@ -1096,50 +1118,148 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
         return min(score, 10)  # Cap at 10 points
 
 
-    def _get_filtered_stocks_from_database(self, user_id: int) -> List[Dict[str, Any]]:
+    def _get_filtered_stocks_from_database(self, user_id: int, config=None) -> List[Dict[str, Any]]:
         """
-        Comprehensive stock screening pipeline from database with detailed logging.
+        Enhanced stock screening pipeline with configurable parameters.
 
-        Screening steps:
-        1. Get all stocks from database
-        2. Apply Market Data Screening (Real-time quotes and historical volatility analysis)
-        3. Apply Business Logic Screening (Fundamental analysis and portfolio optimization)
-        4. Log all screening steps for verification
+        This refactored method uses dedicated services for:
+        1. Database queries (StockDataRepository) - Configurable via DatabaseQueryConfig
+        2. Filtering logic (StockFilteringService) - Configurable via FilteringConfig
+        3. Data transformation (StockDataTransformer)
+        4. Screening coordination (ScreeningCoordinator)
+        5. Comprehensive error handling (ErrorHandler)
+
+        Args:
+            user_id: ID of the user making the request
+            config: Optional StockScreeningConfig for customizing the pipeline
+                   If None, uses default configuration (current behavior)
+
+        Returns:
+            List of filtered stock dictionaries
         """
+        # Initialize error handler
+        from ..stock_filtering import (
+            ErrorHandler, DatabaseError, FilteringError, ScreeningError,
+            ErrorSeverity
+        )
+        error_handler = ErrorHandler()
+
         try:
-            from src.models.stock_models import Stock
+            # Use default configuration if none provided
+            if config is None:
+                from ..stock_filtering.screening_config import get_default_config
+                config = get_default_config()
+
+            # Validate configuration
+            if not config.validate():
+                logger.warning("Invalid configuration provided, using default")
+                from ..stock_filtering.screening_config import get_default_config
+                config = get_default_config()
+
+            # Initialize services
             from src.models.database import get_database_manager
+            from ..stock_filtering import (
+                StockDataRepository,
+                StockFilteringService,
+                StockDataTransformer
+            )
+            from ..stock_screening import ScreeningCoordinator
+            from ..data.volatility_calculator_service import get_volatility_calculator_service
 
             db_manager = get_database_manager()
+            repository = StockDataRepository(db_manager)
+            filtering_service = StockFilteringService()
+            transformer = StockDataTransformer()
 
-            with db_manager.get_session() as session:
-                # STAGE 1: Get all stocks and filter penny stocks
-                print(f"📊 STAGE 1: Starting database screening...")
-                all_stocks = session.query(Stock).all()
+            # STAGE 1: Database Query (configurable)
+            logger.info(f"Starting enhanced stock screening pipeline with profile: {config.profile.value}")
+            print(f"📊 STAGE 1: Fetching stocks from database [Strategy: {config.query_config.strategy.value}]...")
+
+            try:
+                # Use configuration-based query
+                all_stocks = repository.get_stocks_with_config(config.query_config)
                 total_stocks = len(all_stocks)
-                print(f"   📊 Retrieved {total_stocks} total stocks from database")
+                print(f"   📊 Retrieved {total_stocks} stocks from database")
 
-                # Filter tradeable stocks
-                tradeable_stocks = [stock for stock in all_stocks if stock.is_tradeable and stock.is_active]
-                non_tradeable_count = total_stocks - len(tradeable_stocks)
-                print(f"   🚫 Filtered out {non_tradeable_count} non-tradeable stocks")
-                print(f"   ✅ {len(tradeable_stocks)} tradeable stocks remaining")
+                # Log query configuration details if verbose
+                if config.enable_logging:
+                    logger.debug(f"Query config: {config.query_config.to_dict()}")
 
-                # 🚀 EXECUTE MODULAR FILTERING PIPELINE
-                print(f"🚀 Executing modular screening pipeline using specialized helper classes...")
+                if not all_stocks:
+                    logger.warning("No stocks found in database with given configuration")
+                    return []
 
-                # Import and initialize the screening coordinator
-                from ..stock_screening import ScreeningCoordinator
-                from ..stock_screening.business_logic_screener import StrategyType as ScreeningStrategyType
-                from ..data.volatility_calculator_service import get_volatility_calculator_service
+            except Exception as e:
+                db_error = DatabaseError(f"Failed to fetch stocks from database: {e}")
+                error_details = error_handler.handle_error(db_error, {
+                    'stage': 'database_query',
+                    'config': config.query_config.to_dict() if config else None
+                })
+                logger.error(f"Database query failed: {error_details}")
 
+                # Use fallback if enabled
+                if config.fallback_on_error:
+                    logger.info("Attempting fallback to all stocks")
+                    all_stocks = repository.get_all_stocks()
+                    if not all_stocks:
+                        return []
+                else:
+                    return []
+
+            # STAGE 2: Apply Filtering (configurable)
+            filter_strategies = [s.value for s in config.filtering_config.strategies]
+            print(f"📊 STAGE 2: Applying filtering criteria [Strategies: {filter_strategies}]...")
+
+            try:
+                # Use configuration-based filtering
+                tradeable_stocks = filtering_service.apply_filters_with_config(
+                    all_stocks,
+                    config.filtering_config
+                )
+                print(f"   ✅ {len(tradeable_stocks)} stocks after filtering")
+
+                # Log filtering configuration details if verbose
+                if config.enable_logging:
+                    logger.debug(f"Filtering config: {config.filtering_config.to_dict()}")
+
+                # Get filter statistics if enabled
+                if config.enable_statistics:
+                    stats = filtering_service.get_filter_statistics()
+                    logger.info(f"Filter statistics: {stats}")
+
+                if not tradeable_stocks:
+                    logger.warning("No stocks found after filtering with given configuration")
+                    return []
+
+            except Exception as e:
+                filter_error = FilteringError(f"Failed to filter stocks: {e}")
+                error_details = error_handler.handle_error(filter_error, {
+                    'stage': 'filtering',
+                    'config': config.filtering_config.to_dict() if config else None
+                })
+                logger.error(f"Filtering failed: {error_details}")
+
+                # Use fallback if enabled
+                if config.fallback_on_error:
+                    logger.info("Attempting fallback to basic tradeable filter")
+                    tradeable_stocks = filtering_service.filter_tradeable_stocks(all_stocks)
+                    if not tradeable_stocks:
+                        tradeable_stocks = all_stocks
+                else:
+                    return []
+
+            # STAGE 3: Execute Advanced Screening Pipeline
+            print(f"🚀 STAGE 3: Executing advanced screening pipeline...")
+
+            try:
+                # Initialize screening coordinator with required services
                 volatility_service = get_volatility_calculator_service()
                 screening_coordinator = ScreeningCoordinator(self.fyers_service, volatility_service)
 
-                # Get user's strategy from settings table instead of using default
+                # Get user's screening strategies
                 screening_strategies = self._get_user_screening_strategies(user_id)
 
-                # Execute the complete screening pipeline
+                # Execute the screening pipeline
                 pipeline_result = screening_coordinator.execute_screening_pipeline(
                     user_id=user_id,
                     tradeable_stocks=tradeable_stocks,
@@ -1147,55 +1267,130 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
                 )
 
                 if not pipeline_result['success']:
-                    logger.error(f"Filtering pipeline failed: {pipeline_result.get('error')}")
-                    return []
+                    screening_error = ScreeningError(f"Pipeline failed: {pipeline_result.get('error')}")
+                    error_details = error_handler.handle_error(screening_error, {'stage': 'screening'})
+                    logger.error(f"Screening failed: {error_details}")
+                    # Attempt recovery with simpler screening
+                    screened_stocks = tradeable_stocks[:50]  # Take top 50 as fallback
+                else:
+                    screened_stocks = pipeline_result['data']
 
-                stage2_final_stocks = pipeline_result['data']
+            except Exception as e:
+                screening_error = ScreeningError(f"Screening pipeline error: {e}")
+                error_details = error_handler.handle_error(screening_error, {'stage': 'screening'})
+                logger.error(f"Screening exception: {error_details}")
+                # Fallback to first 50 tradeable stocks
+                screened_stocks = tradeable_stocks[:50]
 
-                # Log pipeline performance metrics
-                performance_metrics = screening_coordinator.get_pipeline_performance_metrics()
-                logger.info(f"Pipeline execution time: {performance_metrics['execution_stats']['total_execution_time']:.2f}s")
-                logger.info(f"Final portfolio size: {len(stage2_final_stocks)} stocks")
+            # STAGE 4: Transform Data (separated concern)
+            print(f"📊 STAGE 4: Transforming stock data...")
 
-                # Convert to dictionary format with comprehensive data
-                result_stocks = []
-                for stock in stage2_final_stocks:
-                    stock_data = {
-                        'symbol': stock.symbol,
-                        'name': stock.name,
-                        'current_price': stock.current_price or 0.0,
-                        'volume': stock.volume or 0,
-                        'sector': stock.sector or 'Unknown',
-                        'market_cap': stock.market_cap or 0.0,
-                        'market_cap_category': stock.market_cap_category or 'mid_cap',
-                        'pe_ratio': stock.pe_ratio or 0.0,
-                        'pb_ratio': stock.pb_ratio or 0.0,
-                        'roe': stock.roe or 0.0,
-                        'debt_to_equity': stock.debt_to_equity or 0.0,
-                        'dividend_yield': stock.dividend_yield or 0.0,
-                        'beta': stock.beta or 1.0,
-                        # Volatility and risk metrics for analysis
-                        'atr_14': stock.atr_14 or 0.0,
-                        'atr_percentage': stock.atr_percentage or 0.0,
-                        'historical_volatility_1y': stock.historical_volatility_1y or 0.0,
-                        'avg_daily_volume_20d': stock.avg_daily_volume_20d or 0,
-                        'avg_daily_turnover': stock.avg_daily_turnover or 0.0,
-                        'bid_ask_spread': stock.bid_ask_spread or 0.0,
-                        'trades_per_day': stock.trades_per_day or 0,
-                        'last_updated': stock.last_updated.isoformat() if stock.last_updated else None
-                    }
-                    result_stocks.append(stock_data)
+            try:
+                # Transform stocks to dictionary format
+                transformed_stocks = transformer.transform_stocks_batch(
+                    screened_stocks,
+                    include_volatility=True,
+                    include_fundamentals=True
+                )
 
-                print(f"🎯 FINAL FILTERING PIPELINE COMPLETE:")
-                print(f"   📊 Total stocks in database: {total_stocks}")
-                print(f"   🚫 Non-tradeable filtered: {non_tradeable_count}")
-                print(f"   ✅ Final portfolio ready: {len(result_stocks)} stocks")
+                # Validate transformed data
+                validated_stocks = []
+                for stock_data in transformed_stocks:
+                    validated_data = transformer.validate_stock_data(stock_data)
+                    validated_stocks.append(validated_data)
 
-                return result_stocks
+                transformed_stocks = validated_stocks
+
+            except Exception as e:
+                from ..stock_filtering import TransformationError
+                trans_error = TransformationError(f"Data transformation failed: {e}")
+                error_details = error_handler.handle_error(trans_error, {'stage': 'transformation'})
+                logger.error(f"Transformation failed: {error_details}")
+                # Attempt basic transformation as fallback
+                transformed_stocks = []
+                for stock in screened_stocks[:50]:  # Limit to 50 for safety
+                    try:
+                        basic_data = transformer.transform_stock_to_dict(stock, False, False)
+                        transformed_stocks.append(basic_data)
+                    except:
+                        continue
+
+            # Log comprehensive statistics
+            self._log_pipeline_statistics(
+                total_stocks=total_stocks,
+                tradeable_stocks=len(tradeable_stocks),
+                final_stocks=len(transformed_stocks),
+                filter_stats=filtering_service.get_filter_statistics(),
+                transformation_stats=transformer.get_transformation_stats(),
+                pipeline_metrics=screening_coordinator.get_pipeline_performance_metrics() if 'screening_coordinator' in locals() else {}
+            )
+
+            # Log error statistics if any errors occurred
+            error_stats = error_handler.get_error_statistics()
+            if error_stats['total_errors'] > 0:
+                logger.warning(f"Pipeline completed with {error_stats['total_errors']} errors")
+                logger.debug(f"Error statistics: {error_stats}")
+
+            print(f"🎯 ENHANCED PIPELINE COMPLETE:")
+            print(f"   📊 Total stocks processed: {total_stocks}")
+            print(f"   ✅ Final portfolio size: {len(transformed_stocks)} stocks")
+            if error_stats['total_errors'] > 0:
+                print(f"   ⚠️  Pipeline had {error_stats['total_errors']} recoverable errors")
+
+            return transformed_stocks
 
         except Exception as e:
-            logger.error(f"Error in database screening pipeline: {e}")
+            # Handle unexpected errors
+            from ..stock_filtering import StockFilteringError
+            unexpected_error = StockFilteringError(
+                f"Unexpected error in screening pipeline: {e}",
+                severity=ErrorSeverity.CRITICAL
+            )
+            error_details = error_handler.handle_error(unexpected_error, {'stage': 'pipeline'})
+            logger.critical(f"Critical pipeline failure: {error_details}", exc_info=True)
+
+            # Return empty list on critical failure
             return []
+
+    def _log_pipeline_statistics(self, total_stocks: int, tradeable_stocks: int,
+                                final_stocks: int, filter_stats: Dict[str, Any],
+                                transformation_stats: Dict[str, Any],
+                                pipeline_metrics: Dict[str, Any]):
+        """
+        Log comprehensive statistics about the screening pipeline execution.
+
+        Args:
+            total_stocks: Total number of stocks in database
+            tradeable_stocks: Number of tradeable stocks
+            final_stocks: Final number of stocks after screening
+            filter_stats: Statistics from filtering service
+            transformation_stats: Statistics from transformation service
+            pipeline_metrics: Metrics from screening coordinator
+        """
+        try:
+            stats_summary = {
+                'pipeline_summary': {
+                    'total_stocks': total_stocks,
+                    'tradeable_stocks': tradeable_stocks,
+                    'final_stocks': final_stocks,
+                    'reduction_rate': 1 - (final_stocks / total_stocks) if total_stocks > 0 else 0
+                },
+                'filter_performance': filter_stats,
+                'transformation_performance': transformation_stats,
+                'screening_performance': pipeline_metrics.get('execution_stats', {})
+            }
+
+            logger.info(f"Pipeline execution statistics: {stats_summary}")
+
+            # Log performance metrics
+            total_time = (
+                filter_stats.get('total_execution_time', 0) +
+                pipeline_metrics.get('execution_stats', {}).get('total_execution_time', 0)
+            )
+            logger.info(f"Total pipeline execution time: {total_time:.2f}s")
+
+        except Exception as e:
+            logger.error(f"Error logging pipeline statistics: {e}")
 
     def _create_suggested_stock_from_database(self, stock_data: Dict[str, Any],
                                             strategy: StrategyType) -> SuggestedStock:
