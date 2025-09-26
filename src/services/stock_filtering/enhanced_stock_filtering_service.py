@@ -151,6 +151,7 @@ class EnhancedStockFilteringService:
         for stock in stocks:
             try:
                 score = StockScore(symbol=getattr(stock, 'symbol', 'UNKNOWN'))
+                score.stock_object = stock  # Add stock object for scoring calculations
                 reject_reasons = []
                 
                 # Price range filter
@@ -353,39 +354,266 @@ class EnhancedStockFilteringService:
         return selected_stocks, rejected_stocks
     
     def _calculate_technical_score(self, stock_score: StockScore) -> float:
-        """Calculate technical analysis score (0-1)."""
-        # This is a simplified implementation
-        # In a real implementation, you would calculate RSI, MACD, Bollinger Bands, etc.
-        # For now, return a placeholder score
-        return 0.7  # Placeholder
+        """Calculate technical analysis score (0-1) based on real data."""
+        try:
+            # Get the stock object from the score
+            stock = getattr(stock_score, 'stock_object', None)
+            if not stock:
+                return 0.0
+            
+            score = 0.0
+            factors = 0
+            
+            # ATR-based volatility score (lower ATR% is better for stability)
+            atr_pct = getattr(stock, 'atr_percentage', None)
+            if atr_pct is not None and atr_pct > 0:
+                # Score inversely to ATR% - lower ATR% gets higher score
+                atr_score = max(0, min(1, (5 - atr_pct) / 5))  # 0-5% ATR range
+                score += atr_score * 0.3
+                factors += 0.3
+            
+            # Historical volatility score (lower volatility is better)
+            hist_vol = getattr(stock, 'historical_volatility_1y', None)
+            if hist_vol is not None and hist_vol > 0:
+                # Score inversely to volatility - lower volatility gets higher score
+                vol_score = max(0, min(1, (0.5 - hist_vol) / 0.5))  # 0-50% volatility range
+                score += vol_score * 0.3
+                factors += 0.3
+            
+            # Volume consistency score (higher average volume is better)
+            avg_volume = getattr(stock, 'avg_daily_volume_20d', None)
+            if avg_volume is not None and avg_volume > 0:
+                # Score based on volume - higher volume gets higher score
+                vol_score = min(1, avg_volume / 1000000)  # Normalize to 1M volume
+                score += vol_score * 0.2
+                factors += 0.2
+            
+            # Bid-ask spread score (lower spread is better)
+            spread = getattr(stock, 'bid_ask_spread', None)
+            if spread is not None and spread > 0:
+                # Score inversely to spread - lower spread gets higher score
+                spread_score = max(0, min(1, (0.1 - spread) / 0.1))  # 0-10% spread range
+                score += spread_score * 0.2
+                factors += 0.2
+            
+            # Normalize by factors used
+            if factors > 0:
+                return score / factors
+            else:
+                return 0.5  # Default neutral score if no data available
+                
+        except Exception as e:
+            logger.warning(f"Error calculating technical score: {e}")
+            return 0.5
     
     def _calculate_fundamental_score(self, stock_score: StockScore) -> float:
-        """Calculate fundamental analysis score (0-1)."""
-        # This is a simplified implementation
-        # In a real implementation, you would analyze P/E, P/B, ROE, etc.
-        # For now, return a placeholder score
-        return 0.6  # Placeholder
+        """Calculate fundamental analysis score (0-1) based on real data."""
+        try:
+            # Get the stock object from the score
+            stock = getattr(stock_score, 'stock_object', None)
+            if not stock:
+                return 0.0
+            
+            score = 0.0
+            factors = 0
+            
+            # P/E ratio score (moderate P/E is better)
+            pe_ratio = getattr(stock, 'pe_ratio', None)
+            if pe_ratio is not None and pe_ratio > 0:
+                # Score based on P/E - 10-25 range gets highest score
+                if 10 <= pe_ratio <= 25:
+                    pe_score = 1.0
+                elif pe_ratio < 10:
+                    pe_score = pe_ratio / 10  # Lower P/E gets lower score
+                else:
+                    pe_score = max(0, (50 - pe_ratio) / 25)  # Higher P/E gets lower score
+                score += pe_score * 0.3
+                factors += 0.3
+            
+            # P/B ratio score (moderate P/B is better)
+            pb_ratio = getattr(stock, 'pb_ratio', None)
+            if pb_ratio is not None and pb_ratio > 0:
+                # Score based on P/B - 1-3 range gets highest score
+                if 1 <= pb_ratio <= 3:
+                    pb_score = 1.0
+                elif pb_ratio < 1:
+                    pb_score = pb_ratio  # Lower P/B gets lower score
+                else:
+                    pb_score = max(0, (6 - pb_ratio) / 3)  # Higher P/B gets lower score
+                score += pb_score * 0.3
+                factors += 0.3
+            
+            # ROE score (higher ROE is better)
+            roe = getattr(stock, 'roe', None)
+            if roe is not None:
+                # Score based on ROE - 15%+ gets highest score
+                roe_score = min(1, roe / 20)  # Normalize to 20% ROE
+                score += roe_score * 0.2
+                factors += 0.2
+            
+            # Debt-to-equity score (lower D/E is better)
+            debt_equity = getattr(stock, 'debt_to_equity', None)
+            if debt_equity is not None and debt_equity >= 0:
+                # Score inversely to D/E - lower D/E gets higher score
+                de_score = max(0, min(1, (2 - debt_equity) / 2))  # 0-2 D/E range
+                score += de_score * 0.2
+                factors += 0.2
+            
+            # Normalize by factors used
+            if factors > 0:
+                return score / factors
+            else:
+                return 0.5  # Default neutral score if no data available
+                
+        except Exception as e:
+            logger.warning(f"Error calculating fundamental score: {e}")
+            return 0.5
     
     def _calculate_risk_score(self, stock_score: StockScore) -> float:
-        """Calculate risk assessment score (0-1)."""
-        # This is a simplified implementation
-        # In a real implementation, you would analyze beta, volatility, Sharpe ratio, etc.
-        # For now, return a placeholder score
-        return 0.8  # Placeholder
+        """Calculate risk assessment score (0-1) based on real data."""
+        try:
+            # Get the stock object from the score
+            stock = getattr(stock_score, 'stock_object', None)
+            if not stock:
+                return 0.0
+            
+            score = 0.0
+            factors = 0
+            
+            # Beta score (moderate beta is better)
+            beta = getattr(stock, 'beta', None)
+            if beta is not None:
+                # Score based on beta - 0.8-1.2 range gets highest score
+                if 0.8 <= beta <= 1.2:
+                    beta_score = 1.0
+                elif beta < 0.8:
+                    beta_score = beta / 0.8  # Lower beta gets lower score
+                else:
+                    beta_score = max(0, (2 - beta) / 0.8)  # Higher beta gets lower score
+                score += beta_score * 0.4
+                factors += 0.4
+            
+            # Historical volatility score (lower volatility is better)
+            hist_vol = getattr(stock, 'historical_volatility_1y', None)
+            if hist_vol is not None and hist_vol > 0:
+                # Score inversely to volatility - lower volatility gets higher score
+                vol_score = max(0, min(1, (0.3 - hist_vol) / 0.3))  # 0-30% volatility range
+                score += vol_score * 0.3
+                factors += 0.3
+            
+            # Market cap category score (larger cap is better for risk)
+            market_cap_cat = getattr(stock, 'market_cap_category', None)
+            if market_cap_cat:
+                if market_cap_cat == 'large_cap':
+                    cap_score = 1.0
+                elif market_cap_cat == 'mid_cap':
+                    cap_score = 0.7
+                elif market_cap_cat == 'small_cap':
+                    cap_score = 0.4
+                else:
+                    cap_score = 0.5
+                score += cap_score * 0.3
+                factors += 0.3
+            
+            # Normalize by factors used
+            if factors > 0:
+                return score / factors
+            else:
+                return 0.5  # Default neutral score if no data available
+                
+        except Exception as e:
+            logger.warning(f"Error calculating risk score: {e}")
+            return 0.5
     
     def _calculate_momentum_score(self, stock_score: StockScore) -> float:
-        """Calculate momentum score (0-1)."""
-        # This is a simplified implementation
-        # In a real implementation, you would analyze price momentum, ROC, relative strength, etc.
-        # For now, return a placeholder score
-        return 0.75  # Placeholder
+        """Calculate momentum score (0-1) based on real data."""
+        try:
+            # Get the stock object from the score
+            stock = getattr(stock_score, 'stock_object', None)
+            if not stock:
+                return 0.0
+            
+            score = 0.0
+            factors = 0
+            
+            # Volume momentum score (higher recent volume is better)
+            current_volume = getattr(stock, 'volume', 0) or 0
+            avg_volume = getattr(stock, 'avg_daily_volume_20d', None)
+            if current_volume > 0 and avg_volume and avg_volume > 0:
+                # Score based on volume ratio - higher ratio gets higher score
+                volume_ratio = current_volume / avg_volume
+                momentum_score = min(1, volume_ratio / 2)  # Normalize to 2x average
+                score += momentum_score * 0.5
+                factors += 0.5
+            
+            # Price momentum (using current price vs market cap as proxy)
+            current_price = getattr(stock, 'current_price', 0) or 0
+            market_cap = getattr(stock, 'market_cap', None)
+            if current_price > 0 and market_cap and market_cap > 0:
+                # Score based on price stability - moderate price gets higher score
+                if 50 <= current_price <= 500:
+                    price_score = 1.0
+                elif current_price < 50:
+                    price_score = current_price / 50
+                else:
+                    price_score = max(0, (1000 - current_price) / 500)
+                score += price_score * 0.5
+                factors += 0.5
+            
+            # Normalize by factors used
+            if factors > 0:
+                return score / factors
+            else:
+                return 0.5  # Default neutral score if no data available
+                
+        except Exception as e:
+            logger.warning(f"Error calculating momentum score: {e}")
+            return 0.5
     
     def _calculate_volume_score(self, stock_score: StockScore) -> float:
-        """Calculate volume analysis score (0-1)."""
-        # This is a simplified implementation
-        # In a real implementation, you would analyze volume surge, OBV, MFI, etc.
-        # For now, return a placeholder score
-        return 0.65  # Placeholder
+        """Calculate volume analysis score (0-1) based on real data."""
+        try:
+            # Get the stock object from the score
+            stock = getattr(stock_score, 'stock_object', None)
+            if not stock:
+                return 0.0
+            
+            score = 0.0
+            factors = 0
+            
+            # Average volume score (higher volume is better)
+            avg_volume = getattr(stock, 'avg_daily_volume_20d', None)
+            if avg_volume and avg_volume > 0:
+                # Score based on volume - higher volume gets higher score
+                vol_score = min(1, avg_volume / 500000)  # Normalize to 500K volume
+                score += vol_score * 0.4
+                factors += 0.4
+            
+            # Average turnover score (higher turnover is better)
+            avg_turnover = getattr(stock, 'avg_daily_turnover', None)
+            if avg_turnover and avg_turnover > 0:
+                # Score based on turnover - higher turnover gets higher score
+                turnover_score = min(1, avg_turnover / 100)  # Normalize to 100 crores
+                score += turnover_score * 0.3
+                factors += 0.3
+            
+            # Trades per day score (higher trades is better)
+            trades_per_day = getattr(stock, 'trades_per_day', None)
+            if trades_per_day and trades_per_day > 0:
+                # Score based on trades - higher trades gets higher score
+                trades_score = min(1, trades_per_day / 10000)  # Normalize to 10K trades
+                score += trades_score * 0.3
+                factors += 0.3
+            
+            # Normalize by factors used
+            if factors > 0:
+                return score / factors
+            else:
+                return 0.5  # Default neutral score if no data available
+                
+        except Exception as e:
+            logger.warning(f"Error calculating volume score: {e}")
+            return 0.5
     
     def _apply_sector_concentration_limit(self, stocks: List[StockScore]) -> List[StockScore]:
         """Apply sector concentration limit."""
