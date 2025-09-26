@@ -2,7 +2,6 @@
 Data Models for the Automated Trading System
 """
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text, ForeignKey, UniqueConstraint
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from flask_login import UserMixin

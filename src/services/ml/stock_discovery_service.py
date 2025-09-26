@@ -8,14 +8,13 @@ No hardcoded stock symbols - everything fetched from broker API.
 
 import logging
 import pandas as pd
-import numpy as np
-from typing import Dict, List, Optional, Tuple
-from datetime import datetime, timedelta
+from typing import Dict, List, Optional
+from datetime import datetime
 import time
 from dataclasses import dataclass
 from enum import Enum
 
-from .config_loader import get_stock_filter_config, get_stage1_config, StockFilterConfig
+from .config_loader import get_stock_filter_config, get_stage1_config
 
 logger = logging.getLogger(__name__)
 
