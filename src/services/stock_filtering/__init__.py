@@ -5,8 +5,6 @@ This module provides essential and enhanced services for stock filtering and dat
 It includes core functionality and comprehensive filtering with Stage 1 and Stage 2 analysis.
 """
 
-from .stock_filtering_service import StockFilteringService
-from .stock_data_repository import StockDataRepository
 from .stock_data_transformer import StockDataTransformer
 from .error_handler import (
     ErrorHandler,
@@ -39,9 +37,7 @@ from .enhanced_stock_discovery_service import (
 )
 
 __all__ = [
-    # Original services
-    'StockFilteringService',
-    'StockDataRepository',
+    # Core services
     'StockDataTransformer',
     'ErrorHandler',
     'StockFilteringError',
