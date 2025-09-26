@@ -31,10 +31,7 @@ from .portfolio import (
     get_portfolio_service
 )
 
-from .market import (
-    get_basic_stock_screening_service,
-    get_market_data_service
-)
+# Market services removed - not used
 
 from .utils import (
     get_cache_service
@@ -57,9 +54,7 @@ __all__ = [
     # Portfolio services
     'get_portfolio_service',
 
-    # Market services
-    'get_basic_stock_screening_service',
-    'get_market_data_service',
+    # Market services removed - not used
 
     # Utility services
     'get_cache_service',
