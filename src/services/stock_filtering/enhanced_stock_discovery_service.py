@@ -155,6 +155,9 @@ class EnhancedStockDiscoveryService:
         result = []
         
         for score in stock_scores:
+            # Get the full stock object if available
+            stock_obj = getattr(score, 'stock_object', None)
+            
             stock_data = {
                 'symbol': score.symbol,
                 'scores': {
@@ -169,6 +172,30 @@ class EnhancedStockDiscoveryService:
                 'reject_reasons': score.reject_reasons,
                 'discovery_timestamp': datetime.now().isoformat()
             }
+            
+            # Add full stock data if available
+            if stock_obj:
+                stock_data.update({
+                    'name': getattr(stock_obj, 'name', 'Unknown'),
+                    'current_price': getattr(stock_obj, 'current_price', 0.0),
+                    'market_cap': getattr(stock_obj, 'market_cap', 0.0),
+                    'pe_ratio': getattr(stock_obj, 'pe_ratio'),
+                    'pb_ratio': getattr(stock_obj, 'pb_ratio'),
+                    'debt_to_equity': getattr(stock_obj, 'debt_to_equity'),
+                    'roe': getattr(stock_obj, 'roe'),
+                    'volume': getattr(stock_obj, 'volume', 0),
+                    'avg_volume_20d': getattr(stock_obj, 'avg_daily_volume_20d', 0.0),
+                    'atr_14': getattr(stock_obj, 'atr_14', 0.0),
+                    'atr_percentage': getattr(stock_obj, 'atr_percentage'),
+                    'beta': getattr(stock_obj, 'beta'),
+                    'historical_volatility_1y': getattr(stock_obj, 'historical_volatility_1y'),
+                    'market_cap_category': getattr(stock_obj, 'market_cap_category'),
+                    'sector': getattr(stock_obj, 'sector'),
+                    'exchange': getattr(stock_obj, 'exchange'),
+                    'is_active': getattr(stock_obj, 'is_active', True),
+                    'is_tradeable': getattr(stock_obj, 'is_tradeable', True)
+                })
+            
             result.append(stock_data)
         
         return result

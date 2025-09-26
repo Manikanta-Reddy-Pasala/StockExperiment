@@ -421,7 +421,7 @@
         const urlParams = new URLSearchParams(window.location.search);
         const strategyParam = urlParams.get('strategy');
 
-        if (strategyParam && ['low_risk', 'medium_risk', 'high_risk'].includes(strategyParam)) {
+        if (strategyParam && ['default_risk', 'high_risk'].includes(strategyParam)) {
             // Set the radio button based on URL parameter
             const radioButton = document.getElementById(`strategy-${strategyParam.replace('_', '-')}`);
             if (radioButton) {

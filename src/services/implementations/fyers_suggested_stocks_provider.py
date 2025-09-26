@@ -746,19 +746,59 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
         return stock
     
     def _meets_strategy_criteria(self, stock: SuggestedStock, strategy: StrategyType) -> bool:
-        """Check if stock meets swing trading strategy criteria."""
-        # Both strategies use swing trading criteria with different risk levels
-        if strategy == StrategyType.DEFAULT_RISK:
-            # Conservative swing trading criteria - stable, established stocks
-            # Price range suitable for conservative swing trading
-            return 100 <= stock.current_price <= 3000  # Stable stocks for conservative approach
-
-        elif strategy == StrategyType.HIGH_RISK:
-            # High risk swing trading criteria - smaller cap, higher volatility potential
-            # Broader price range for aggressive swing trading
-            return 50 <= stock.current_price <= 2000  # Growth-oriented stocks for aggressive approach
-
-        return True
+        """Check if stock meets swing trading strategy criteria based on risk level."""
+        try:
+            # Get the stock's enhanced filtering scores if available
+            stock_data = getattr(stock, '_source_data', {})
+            scores = stock_data.get('scores', {})
+            
+            if not scores:
+                # Fallback to basic criteria if no enhanced scores available
+                if strategy == StrategyType.DEFAULT_RISK:
+                    return 100 <= stock.current_price <= 3000
+                elif strategy == StrategyType.HIGH_RISK:
+                    return 50 <= stock.current_price <= 2000
+                return True
+            
+            # Use enhanced filtering scores for risk-based filtering
+            total_score = scores.get('total', 0)
+            technical_score = scores.get('technical', 0)
+            fundamental_score = scores.get('fundamental', 0)
+            risk_score = scores.get('risk', 0)
+            momentum_score = scores.get('momentum', 0)
+            
+            if strategy == StrategyType.DEFAULT_RISK:
+                # Conservative swing trading - focus on stability and fundamentals
+                # Higher requirements for total score, technical score, and risk management
+                return (
+                    total_score >= 55 and  # Higher total score requirement (0-100 scale)
+                    technical_score >= 0.25 and  # Strong technical setup (0-1 scale)
+                    fundamental_score >= 0.08 and  # Good fundamentals (0-1 scale)
+                    risk_score >= 0.6 and  # Lower risk profile (0-1 scale)
+                    momentum_score >= 0.85  # Strong momentum (0-1 scale)
+                )
+                
+            elif strategy == StrategyType.HIGH_RISK:
+                # High risk swing trading - focus on momentum and growth potential
+                # Lower requirements but higher momentum and technical scores
+                return (
+                    total_score >= 45 and  # Lower total score requirement (0-100 scale)
+                    technical_score >= 0.15 and  # Basic technical setup (0-1 scale)
+                    fundamental_score >= 0.05 and  # Basic fundamentals OK (0-1 scale)
+                    risk_score >= 0.4 and  # Can handle higher risk (0-1 scale)
+                    momentum_score >= 0.95  # Very high momentum requirement (0-1 scale)
+                )
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error checking strategy criteria for {stock.symbol}: {e}")
+            # Fallback to basic price-based filtering
+            if strategy == StrategyType.DEFAULT_RISK:
+                return 100 <= stock.current_price <= 3000
+            elif strategy == StrategyType.HIGH_RISK:
+                return 50 <= stock.current_price <= 2000
+            return True
     
     def _applies_search_filters(self, result: Dict[str, Any], filters: Dict[str, Any]) -> bool:
         """Apply search filters to stock results."""
@@ -1333,6 +1373,9 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
         stock.pe_ratio = stock_data.get('pe_ratio')
         stock.pb_ratio = stock_data.get('pb_ratio')
         stock.roe = stock_data.get('roe')
+        
+        # Store enhanced filtering scores for risk-based filtering
+        stock._source_data = stock_data
 
         # Calculate change_percent for scoring (simplified - could use historical data)
         change_percent = 0.0  # Default for database stocks without real-time change
