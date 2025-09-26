@@ -1201,6 +1201,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
             
             # The enhanced discovery system already provides fully screened stocks
             screened_stocks = tradeable_stocks
+            
             # STAGE 4: Convert enhanced results to suggested stocks format
             print(f"📊 STAGE 4: Converting enhanced results to suggested stocks format...")
 
