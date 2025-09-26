@@ -122,10 +122,23 @@ class EnhancedStockDiscoveryService:
     def _get_stocks_from_database(self, limit: Optional[int] = None) -> List[Any]:
         """Get stocks from database."""
         try:
-            # This is a simplified implementation
-            # In a real implementation, you would query the database
-            # For now, return empty list as placeholder
-            return []
+            from src.models.database import get_database_manager
+            from src.models.stock_models import Stock
+            
+            db_manager = get_database_manager()
+            
+            with db_manager.get_session() as session:
+                query = session.query(Stock)
+                
+                # Apply limit if specified
+                if limit and limit > 0:
+                    query = query.limit(limit)
+                
+                stocks = query.all()
+                session.expunge_all()
+                
+                logger.info(f"Retrieved {len(stocks)} stocks from database")
+                return stocks
             
         except Exception as e:
             logger.error(f"Error getting stocks from database: {e}")

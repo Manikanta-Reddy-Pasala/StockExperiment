@@ -154,8 +154,10 @@ class EnhancedStockFilteringService:
                 reject_reasons = []
                 
                 # Price range filter
-                current_price = getattr(stock, 'current_price', 0)
-                if current_price < stage1_config.minimum_price:
+                current_price = getattr(stock, 'current_price', 0) or 0
+                if current_price <= 0:
+                    reject_reasons.append(f"Invalid price {current_price}")
+                elif current_price < stage1_config.minimum_price:
                     reject_reasons.append(f"Price {current_price} below minimum {stage1_config.minimum_price}")
                 elif current_price > stage1_config.maximum_price:
                     reject_reasons.append(f"Price {current_price} above maximum {stage1_config.maximum_price}")
@@ -163,7 +165,7 @@ class EnhancedStockFilteringService:
                     score.filters_passed.append("price_range")
                 
                 # Volume and turnover filter
-                volume = getattr(stock, 'volume', 0)
+                volume = getattr(stock, 'volume', 0) or 0
                 daily_turnover = current_price * volume if current_price and volume else 0
                 
                 if daily_turnover < stage1_config.minimum_daily_turnover_inr:
@@ -174,8 +176,12 @@ class EnhancedStockFilteringService:
                 else:
                     score.filters_passed.append("turnover")
                 
-                # Liquidity score filter
-                liquidity_score = getattr(stock, 'liquidity_score', 0)
+                # Liquidity score filter (use volume as proxy if liquidity_score not available)
+                liquidity_score = getattr(stock, 'liquidity_score', None)
+                if liquidity_score is None:
+                    # Use volume as proxy for liquidity
+                    liquidity_score = min(1.0, volume / 1000000) if volume > 0 else 0
+                
                 if liquidity_score < stage1_config.minimum_liquidity_score:
                     reject_reasons.append(f"Liquidity score {liquidity_score} below minimum {stage1_config.minimum_liquidity_score}")
                 else:
@@ -193,8 +199,11 @@ class EnhancedStockFilteringService:
                     score.filters_passed.append("trading_status")
                 
                 # ATR volatility filter
-                atr_percentage = getattr(stock, 'atr_percentage', 0)
-                if atr_percentage < stage1_config.min_atr_pct_of_price:
+                atr_percentage = getattr(stock, 'atr_percentage', None)
+                if atr_percentage is None:
+                    # Skip ATR filter if not available
+                    score.filters_passed.append("atr_volatility_skip")
+                elif atr_percentage < stage1_config.min_atr_pct_of_price:
                     reject_reasons.append(f"ATR {atr_percentage}% below minimum {stage1_config.min_atr_pct_of_price}%")
                 elif atr_percentage > stage1_config.max_atr_pct_of_price:
                     reject_reasons.append(f"ATR {atr_percentage}% above maximum {stage1_config.max_atr_pct_of_price}%")
