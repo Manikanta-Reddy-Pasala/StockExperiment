@@ -69,122 +69,6 @@ class LiquidityRequirementsConfig:
 
 
 @dataclass
-class TechnicalIndicatorConfig:
-    """Base configuration for technical indicators."""
-    enabled: bool = True
-
-
-@dataclass
-class RSIConfig(TechnicalIndicatorConfig):
-    """RSI indicator configuration."""
-    oversold_threshold: int = 30
-    overbought_threshold: int = 70
-    neutral_range_min: int = 40
-    neutral_range_max: int = 60
-    period: int = 14
-
-
-@dataclass
-class MACDConfig(TechnicalIndicatorConfig):
-    """MACD indicator configuration."""
-    fast_period: int = 12
-    slow_period: int = 26
-    signal_period: int = 9
-    histogram_threshold: float = 0.01
-
-
-@dataclass
-class TechnicalIndicatorsConfig:
-    """Configuration for all technical indicators."""
-    rsi: Optional[Dict] = None
-    macd: Optional[Dict] = None
-    bollinger_bands: Optional[Dict] = None
-    moving_averages: Optional[Dict] = None
-    stochastic: Optional[Dict] = None
-    williams_r: Optional[Dict] = None
-    atr: Optional[Dict] = None
-
-
-@dataclass
-class VolumeAnalysisConfig:
-    """Configuration for volume analysis."""
-    volume_surge: Optional[Dict] = None
-    obv: Optional[Dict] = None
-    vpt: Optional[Dict] = None
-    mfi: Optional[Dict] = None
-
-
-@dataclass
-class FundamentalRatiosConfig:
-    """Configuration for fundamental ratios."""
-    pe_ratio: Optional[Dict] = None
-    pb_ratio: Optional[Dict] = None
-    peg_ratio: Optional[Dict] = None
-    roe: Optional[Dict] = None
-    roa: Optional[Dict] = None
-    profit_margin: Optional[Dict] = None
-    debt_to_equity: Optional[Dict] = None
-    current_ratio: Optional[Dict] = None
-    quick_ratio: Optional[Dict] = None
-    revenue_growth: Optional[Dict] = None
-    earnings_growth: Optional[Dict] = None
-
-
-@dataclass
-class RiskMetricsConfig:
-    """Configuration for risk metrics."""
-    beta: Optional[Dict] = None
-    volatility: Optional[Dict] = None
-    sharpe_ratio: Optional[Dict] = None
-    max_drawdown: Optional[Dict] = None
-    var: Optional[Dict] = None
-
-
-@dataclass
-class MomentumConfig:
-    """Configuration for momentum indicators."""
-    price_momentum: Optional[Dict] = None
-    roc: Optional[Dict] = None
-    relative_strength: Optional[Dict] = None
-
-
-@dataclass
-class TrendAnalysisConfig:
-    """Configuration for trend analysis."""
-    trend_direction: Optional[Dict] = None
-    support_resistance: Optional[Dict] = None
-    chart_patterns: Optional[Dict] = None
-    adx: Optional[Dict] = None
-
-
-@dataclass
-class MarketFactorsConfig:
-    """Configuration for market factors."""
-    sector_performance: Optional[Dict] = None
-    market_regime: Optional[Dict] = None
-    seasonality: Optional[Dict] = None
-
-
-@dataclass
-class ScoringWeightsConfig:
-    """Configuration for scoring weights."""
-    technical_score: float = 0.30
-    fundamental_score: float = 0.25
-    risk_score: float = 0.20
-    momentum_score: float = 0.15
-    volume_score: float = 0.10
-
-
-@dataclass
-class FilteringThresholdsConfig:
-    """Configuration for filtering thresholds."""
-    minimum_total_score: int = 60
-    minimum_technical_score: int = 50
-    minimum_fundamental_score: int = 40
-    require_all_categories: bool = False
-
-
-@dataclass
 class Stage1FiltersConfig:
     """Configuration for Stage 1 filters."""
     tradeability: TradeabilityConfig = field(default_factory=TradeabilityConfig)
@@ -193,50 +77,6 @@ class Stage1FiltersConfig:
     trading_status: TradingStatusConfig = field(default_factory=TradingStatusConfig)
     liquidity: LiquidityRequirementsConfig = field(default_factory=LiquidityRequirementsConfig)
 
-
-@dataclass
-class Stage2FiltersConfig:
-    """Configuration for Stage 2 filters."""
-    technical_indicators: TechnicalIndicatorsConfig = field(default_factory=TechnicalIndicatorsConfig)
-    volume_analysis: VolumeAnalysisConfig = field(default_factory=VolumeAnalysisConfig)
-    fundamental_ratios: FundamentalRatiosConfig = field(default_factory=FundamentalRatiosConfig)
-    risk_metrics: RiskMetricsConfig = field(default_factory=RiskMetricsConfig)
-    momentum: MomentumConfig = field(default_factory=MomentumConfig)
-    trend_analysis: TrendAnalysisConfig = field(default_factory=TrendAnalysisConfig)
-    market_factors: MarketFactorsConfig = field(default_factory=MarketFactorsConfig)
-    scoring_weights: ScoringWeightsConfig = field(default_factory=ScoringWeightsConfig)
-    filtering_thresholds: FilteringThresholdsConfig = field(default_factory=FilteringThresholdsConfig)
-
-
-@dataclass
-class SharesEstimationConfig:
-    """Configuration for shares outstanding estimation."""
-    high_price_threshold: float = 1500
-    high_price_shares_min: int = 50000000
-    high_price_shares_max: int = 300000000
-
-    mid_high_price_threshold: float = 500
-    mid_high_shares_min: int = 100000000
-    mid_high_shares_max: int = 800000000
-
-    medium_price_threshold: float = 100
-    medium_shares_min: int = 200000000
-    medium_shares_max: int = 1500000000
-
-    low_shares_min: int = 500000000
-    low_shares_max: int = 5000000000
-
-    # Volume adjustments
-    high_volume_threshold: int = 200000
-    high_volume_mult_min: float = 0.8
-    high_volume_mult_max: float = 1.2
-
-    medium_volume_threshold: int = 50000
-    medium_volume_mult_min: float = 0.9
-    medium_volume_mult_max: float = 1.3
-
-    low_volume_mult_min: float = 1.0
-    low_volume_mult_max: float = 2.0
 
 
 @dataclass
@@ -248,13 +88,11 @@ class StockFilterConfig:
     trading_status: TradingStatusConfig = field(default_factory=TradingStatusConfig)
     liquidity_requirements: LiquidityRequirementsConfig = field(default_factory=LiquidityRequirementsConfig)
 
-    # Stage 1 and Stage 2 comprehensive filters
+    # Stage 1 comprehensive filters
     stage_1_filters: Optional[Stage1FiltersConfig] = None
-    stage_2_filters: Optional[Stage2FiltersConfig] = None
 
     # Supporting configurations
     liquidity_scoring: LiquidityScoringConfig = field(default_factory=LiquidityScoringConfig)
-    shares_estimation: SharesEstimationConfig = field(default_factory=SharesEstimationConfig)
 
     # API and cache settings
     cache_duration: int = 3600
@@ -281,25 +119,6 @@ class StockFilterConfig:
             liquidity=self.liquidity_requirements
         )
 
-    def get_stage2_config(self) -> Optional[Stage2FiltersConfig]:
-        """Get Stage 2 configuration if available."""
-        return self.stage_2_filters
-
-    def is_stage2_enabled(self) -> bool:
-        """Check if Stage 2 filtering is configured and enabled."""
-        return self.stage_2_filters is not None
-
-    def get_technical_indicator(self, indicator_name: str) -> Optional[Dict]:
-        """Get specific technical indicator configuration."""
-        if not self.stage_2_filters or not self.stage_2_filters.technical_indicators:
-            return None
-        return getattr(self.stage_2_filters.technical_indicators, indicator_name, None)
-
-    def get_scoring_weights(self) -> ScoringWeightsConfig:
-        """Get scoring weights with defaults."""
-        if self.stage_2_filters and self.stage_2_filters.scoring_weights:
-            return self.stage_2_filters.scoring_weights
-        return ScoringWeightsConfig()
 
 
 class ConfigLoader:
@@ -408,108 +227,6 @@ class ConfigLoader:
             if 'price_volume_thresholds' in stage1:
                 config.stage_1_filters.price_volume_thresholds = stage1['price_volume_thresholds']
 
-        # Parse Stage 2 filters
-        if 'stage_2_filters' in data:
-            stage2 = data['stage_2_filters']
-            config.stage_2_filters = Stage2FiltersConfig()
-
-            # Technical indicators
-            if 'technical_indicators' in stage2:
-                config.stage_2_filters.technical_indicators = TechnicalIndicatorsConfig(
-                    rsi=stage2['technical_indicators'].get('rsi'),
-                    macd=stage2['technical_indicators'].get('macd'),
-                    bollinger_bands=stage2['technical_indicators'].get('bollinger_bands'),
-                    moving_averages=stage2['technical_indicators'].get('moving_averages'),
-                    stochastic=stage2['technical_indicators'].get('stochastic'),
-                    williams_r=stage2['technical_indicators'].get('williams_r'),
-                    atr=stage2['technical_indicators'].get('atr')
-                )
-
-            # Volume analysis
-            if 'volume_analysis' in stage2:
-                config.stage_2_filters.volume_analysis = VolumeAnalysisConfig(
-                    volume_surge=stage2['volume_analysis'].get('volume_surge'),
-                    obv=stage2['volume_analysis'].get('obv'),
-                    vpt=stage2['volume_analysis'].get('vpt'),
-                    mfi=stage2['volume_analysis'].get('mfi')
-                )
-
-            # Fundamental ratios
-            if 'fundamental_ratios' in stage2:
-                fr = stage2['fundamental_ratios']
-                config.stage_2_filters.fundamental_ratios = FundamentalRatiosConfig(
-                    pe_ratio=fr.get('pe_ratio'),
-                    pb_ratio=fr.get('pb_ratio'),
-                    peg_ratio=fr.get('peg_ratio'),
-                    roe=fr.get('roe'),
-                    roa=fr.get('roa'),
-                    profit_margin=fr.get('profit_margin'),
-                    debt_to_equity=fr.get('debt_to_equity'),
-                    current_ratio=fr.get('current_ratio'),
-                    quick_ratio=fr.get('quick_ratio'),
-                    revenue_growth=fr.get('revenue_growth'),
-                    earnings_growth=fr.get('earnings_growth')
-                )
-
-            # Risk metrics
-            if 'risk_metrics' in stage2:
-                rm = stage2['risk_metrics']
-                config.stage_2_filters.risk_metrics = RiskMetricsConfig(
-                    beta=rm.get('beta'),
-                    volatility=rm.get('volatility'),
-                    sharpe_ratio=rm.get('sharpe_ratio'),
-                    max_drawdown=rm.get('max_drawdown'),
-                    var=rm.get('var')
-                )
-
-            # Momentum
-            if 'momentum' in stage2:
-                config.stage_2_filters.momentum = MomentumConfig(
-                    price_momentum=stage2['momentum'].get('price_momentum'),
-                    roc=stage2['momentum'].get('roc'),
-                    relative_strength=stage2['momentum'].get('relative_strength')
-                )
-
-            # Trend analysis
-            if 'trend_analysis' in stage2:
-                ta = stage2['trend_analysis']
-                config.stage_2_filters.trend_analysis = TrendAnalysisConfig(
-                    trend_direction=ta.get('trend_direction'),
-                    support_resistance=ta.get('support_resistance'),
-                    chart_patterns=ta.get('chart_patterns'),
-                    adx=ta.get('adx')
-                )
-
-            # Market factors
-            if 'market_factors' in stage2:
-                mf = stage2['market_factors']
-                config.stage_2_filters.market_factors = MarketFactorsConfig(
-                    sector_performance=mf.get('sector_performance'),
-                    market_regime=mf.get('market_regime'),
-                    seasonality=mf.get('seasonality')
-                )
-
-            # Scoring weights
-            if 'scoring_weights' in stage2:
-                sw = stage2['scoring_weights']
-                config.stage_2_filters.scoring_weights = ScoringWeightsConfig(
-                    technical_score=sw.get('technical_score', 0.30),
-                    fundamental_score=sw.get('fundamental_score', 0.25),
-                    risk_score=sw.get('risk_score', 0.20),
-                    momentum_score=sw.get('momentum_score', 0.15),
-                    volume_score=sw.get('volume_score', 0.10)
-                )
-
-            # Filtering thresholds
-            if 'filtering_thresholds' in stage2:
-                ft = stage2['filtering_thresholds']
-                config.stage_2_filters.filtering_thresholds = FilteringThresholdsConfig(
-                    minimum_total_score=ft.get('minimum_total_score', 60),
-                    minimum_technical_score=ft.get('minimum_technical_score', 50),
-                    minimum_fundamental_score=ft.get('minimum_fundamental_score', 40),
-                    require_all_categories=ft.get('require_all_categories', False)
-                )
-
         # Liquidity scoring
         if 'liquidity_scoring' in data:
             liq = data['liquidity_scoring']
@@ -528,37 +245,6 @@ class ConfigLoader:
                 stable_price_max=stable_range.get('maximum', 1000),
                 stable_price_score=db_scoring.get('stable_price_score', 0.8),
                 unstable_price_score=db_scoring.get('unstable_price_score', 0.6)
-            )
-
-        # Shares estimation
-        if 'shares_estimation' in data:
-            shares = data['shares_estimation']
-            high = shares.get('high_price_stocks', {})
-            mid_high = shares.get('mid_high_price_stocks', {})
-            medium = shares.get('medium_price_stocks', {})
-            low = shares.get('low_price_stocks', {})
-            vol_adj = shares.get('volume_adjustments', {})
-
-            config.shares_estimation = SharesEstimationConfig(
-                high_price_threshold=high.get('price_threshold', 1500),
-                high_price_shares_min=high.get('shares_range_min', 50000000),
-                high_price_shares_max=high.get('shares_range_max', 300000000),
-                mid_high_price_threshold=mid_high.get('price_threshold', 500),
-                mid_high_shares_min=mid_high.get('shares_range_min', 100000000),
-                mid_high_shares_max=mid_high.get('shares_range_max', 800000000),
-                medium_price_threshold=medium.get('price_threshold', 100),
-                medium_shares_min=medium.get('shares_range_min', 200000000),
-                medium_shares_max=medium.get('shares_range_max', 1500000000),
-                low_shares_min=low.get('shares_range_min', 500000000),
-                low_shares_max=low.get('shares_range_max', 5000000000),
-                high_volume_threshold=vol_adj.get('high_volume_threshold', 200000),
-                high_volume_mult_min=vol_adj.get('high_volume_multiplier_min', 0.8),
-                high_volume_mult_max=vol_adj.get('high_volume_multiplier_max', 1.2),
-                medium_volume_threshold=vol_adj.get('medium_volume_threshold', 50000),
-                medium_volume_mult_min=vol_adj.get('medium_volume_multiplier_min', 0.9),
-                medium_volume_mult_max=vol_adj.get('medium_volume_multiplier_max', 1.3),
-                low_volume_mult_min=vol_adj.get('low_volume_multiplier_min', 1.0),
-                low_volume_mult_max=vol_adj.get('low_volume_multiplier_max', 2.0)
             )
 
         # Database and cache settings
@@ -616,10 +302,6 @@ def get_stage1_config() -> Stage1FiltersConfig:
     return config.get_stage1_config()
 
 
-def get_stage2_config() -> Optional[Stage2FiltersConfig]:
-    """Get Stage 2 filter configuration."""
-    config = get_stock_filter_config()
-    return config.get_stage2_config()
 
 
 def reload_config():
