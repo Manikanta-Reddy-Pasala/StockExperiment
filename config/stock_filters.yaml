@@ -2,6 +2,7 @@
 # This file contains all configurable parameters for stock filtering and discovery
 
 # Stage 1: Basic Stock Filtering Criteria
+# These filters are applied first to reduce the universe of stocks to a manageable set
 stage_1_filters:
   # Basic tradeability criteria
   tradeability:
@@ -9,6 +10,8 @@ stage_1_filters:
     maximum_price: 10000.0        # Maximum stock price in INR (avoid extreme prices)
     minimum_volume: 10000         # Minimum daily volume
     minimum_liquidity_score: 0.3  # Minimum liquidity score (0-1)
+    minimum_avg_volume: 50000     # Minimum average volume over period
+    minimum_trades_per_day: 100   # Minimum number of trades per day
 
   # Market capitalization categories (in crores)
   market_cap_categories:
@@ -28,6 +31,278 @@ stage_1_filters:
     analysis:
       minimum_price: 1.0          # Skip stocks below this price in analysis
       minimum_volume: 1000        # Skip stocks below this volume in analysis
+
+  # Trading status filters
+  trading_status:
+    exclude_suspended: true       # Exclude suspended stocks
+    exclude_delisted: true       # Exclude delisted stocks
+    exclude_stage_listed: true   # Exclude stage listed stocks
+    min_listing_days: 365        # Minimum days since listing
+
+  # Basic liquidity requirements
+  liquidity:
+    minimum_bid_ask_spread: 0.01  # Maximum spread percentage (1%)
+    maximum_bid_ask_spread: 5.0   # Maximum spread percentage (5%)
+    minimum_market_depth: 1000    # Minimum shares in order book
+
+# Stage 2: Advanced Analysis Filters
+# These filters are applied after Stage 1 for deeper technical and fundamental analysis
+stage_2_filters:
+  # Technical indicators
+  technical_indicators:
+    # RSI (Relative Strength Index)
+    rsi:
+      enabled: true
+      oversold_threshold: 30      # Buy signal when RSI < 30
+      overbought_threshold: 70    # Sell signal when RSI > 70
+      neutral_range_min: 40       # Neutral zone lower bound
+      neutral_range_max: 60       # Neutral zone upper bound
+      period: 14                  # RSI calculation period
+
+    # MACD (Moving Average Convergence Divergence)
+    macd:
+      enabled: true
+      fast_period: 12            # Fast EMA period
+      slow_period: 26            # Slow EMA period
+      signal_period: 9           # Signal line EMA period
+      histogram_threshold: 0.01   # Minimum histogram value for signals
+
+    # Bollinger Bands
+    bollinger_bands:
+      enabled: true
+      period: 20                 # Moving average period
+      std_dev: 2                 # Standard deviation multiplier
+      squeeze_threshold: 0.05    # Minimum band width for squeeze detection
+
+    # Moving Averages
+    moving_averages:
+      enabled: true
+      sma_periods: [5, 10, 20, 50, 100, 200]  # Simple MA periods
+      ema_periods: [12, 26, 50]               # Exponential MA periods
+      price_above_ma200: false    # Require price above 200-day MA
+      golden_cross_days: 5        # Days since golden cross for signal
+      death_cross_days: 5         # Days since death cross for signal
+
+    # Stochastic Oscillator
+    stochastic:
+      enabled: true
+      k_period: 14               # %K period
+      d_period: 3                # %D period (smoothing)
+      oversold_threshold: 20     # Oversold level
+      overbought_threshold: 80   # Overbought level
+
+    # Williams %R
+    williams_r:
+      enabled: true
+      period: 14                 # Look-back period
+      oversold_threshold: -80    # Oversold level
+      overbought_threshold: -20  # Overbought level
+
+    # ATR (Average True Range)
+    atr:
+      enabled: true
+      period: 14                 # ATR calculation period
+      volatility_threshold_low: 0.01   # Low volatility threshold
+      volatility_threshold_high: 0.05  # High volatility threshold
+
+  # Volume analysis
+  volume_analysis:
+    # Volume patterns
+    volume_surge:
+      enabled: true
+      surge_multiplier: 2.0      # Volume surge threshold (2x average)
+      lookback_period: 20        # Days to calculate average volume
+
+    # On-Balance Volume (OBV)
+    obv:
+      enabled: true
+      trend_period: 10           # Period for OBV trend calculation
+      divergence_detection: true # Detect price-OBV divergences
+
+    # Volume Price Trend (VPT)
+    vpt:
+      enabled: true
+      signal_period: 10          # VPT signal line period
+
+    # Money Flow Index (MFI)
+    mfi:
+      enabled: true
+      period: 14                 # MFI calculation period
+      oversold_threshold: 20     # Oversold level
+      overbought_threshold: 80   # Overbought level
+
+  # Fundamental ratios
+  fundamental_ratios:
+    # Valuation ratios
+    pe_ratio:
+      enabled: true
+      minimum: 0                 # Exclude negative P/E
+      maximum: 50                # Maximum acceptable P/E
+      sector_relative: true      # Compare to sector average
+
+    pb_ratio:
+      enabled: true
+      minimum: 0.5              # Minimum P/B ratio
+      maximum: 5                # Maximum P/B ratio
+
+    peg_ratio:
+      enabled: true
+      maximum: 2.0              # Maximum PEG ratio
+
+    # Profitability ratios
+    roe:
+      enabled: true
+      minimum: 10               # Minimum ROE percentage
+
+    roa:
+      enabled: true
+      minimum: 5                # Minimum ROA percentage
+
+    profit_margin:
+      enabled: true
+      minimum: 5                # Minimum profit margin percentage
+
+    # Financial health
+    debt_to_equity:
+      enabled: true
+      maximum: 2.0              # Maximum D/E ratio
+
+    current_ratio:
+      enabled: true
+      minimum: 1.0              # Minimum current ratio
+
+    quick_ratio:
+      enabled: true
+      minimum: 0.8              # Minimum quick ratio
+
+    # Growth metrics
+    revenue_growth:
+      enabled: true
+      minimum: 5                # Minimum YoY revenue growth %
+      period: "yearly"          # yearly, quarterly
+
+    earnings_growth:
+      enabled: true
+      minimum: 5                # Minimum YoY earnings growth %
+      period: "yearly"
+
+  # Risk metrics
+  risk_metrics:
+    # Beta
+    beta:
+      enabled: true
+      minimum: 0.5              # Minimum beta (low volatility)
+      maximum: 2.0              # Maximum beta (high volatility)
+      market_index: "NIFTY50"   # Reference market index
+
+    # Volatility
+    volatility:
+      enabled: true
+      period: 20                # Days for volatility calculation
+      maximum_daily: 5.0        # Maximum daily volatility %
+      maximum_annual: 50.0      # Maximum annualized volatility %
+
+    # Sharpe Ratio
+    sharpe_ratio:
+      enabled: true
+      minimum: 0.5              # Minimum acceptable Sharpe ratio
+      risk_free_rate: 6.5       # Risk-free rate % (Indian T-bills)
+
+    # Maximum Drawdown
+    max_drawdown:
+      enabled: true
+      period: 252               # Trading days (1 year)
+      maximum: 30.0             # Maximum acceptable drawdown %
+
+    # Value at Risk (VaR)
+    var:
+      enabled: true
+      confidence_level: 95      # Confidence level %
+      period: 20                # Days for VaR calculation
+      maximum: 5.0              # Maximum VaR %
+
+  # Momentum indicators
+  momentum:
+    # Price momentum
+    price_momentum:
+      enabled: true
+      periods: [1, 5, 10, 20, 60]  # Momentum calculation periods
+      minimum_1d: -5.0          # Minimum 1-day momentum %
+      maximum_1d: 10.0          # Maximum 1-day momentum %
+
+    # Rate of Change (ROC)
+    roc:
+      enabled: true
+      period: 10                # ROC calculation period
+      minimum: -20.0            # Minimum ROC %
+      maximum: 30.0             # Maximum ROC %
+
+    # Relative strength
+    relative_strength:
+      enabled: true
+      comparison_index: "NIFTY50"  # Compare against this index
+      period: 20                    # RS calculation period
+      minimum: 0.8              # Minimum relative strength
+
+  # Trend analysis
+  trend_analysis:
+    # Trend direction
+    trend_direction:
+      enabled: true
+      method: "moving_average"   # moving_average, linear_regression
+      period: 20                 # Trend calculation period
+      required_direction: null   # up, down, or null for any
+
+    # Support/Resistance
+    support_resistance:
+      enabled: true
+      lookback_period: 50       # Days to identify levels
+      proximity_threshold: 2.0   # % distance to consider near S/R
+
+    # Chart patterns
+    chart_patterns:
+      enabled: false             # Pattern recognition (resource intensive)
+      patterns: ["head_shoulders", "triangle", "flag", "wedge"]
+
+    # Trend strength
+    adx:
+      enabled: true
+      period: 14                # ADX calculation period
+      strong_trend_threshold: 25  # ADX > 25 indicates strong trend
+      weak_trend_threshold: 20    # ADX < 20 indicates weak trend
+
+  # Sentiment and market factors
+  market_factors:
+    # Sector performance
+    sector_performance:
+      enabled: true
+      relative_strength_min: 0.9  # Minimum sector RS vs market
+
+    # Market regime
+    market_regime:
+      enabled: true
+      bull_market_filter: false   # Only trade in bull markets
+      volatility_regime: "all"    # low, medium, high, all
+
+    # Seasonality
+    seasonality:
+      enabled: false
+      favorable_months: [1, 2, 10, 11, 12]  # Favorable trading months
+
+  # Score weights for ranking (sum should be 1.0)
+  scoring_weights:
+    technical_score: 0.30       # Weight for technical indicators
+    fundamental_score: 0.25     # Weight for fundamentals
+    risk_score: 0.20           # Weight for risk metrics
+    momentum_score: 0.15        # Weight for momentum
+    volume_score: 0.10         # Weight for volume analysis
+
+  # Filtering thresholds
+  filtering_thresholds:
+    minimum_total_score: 60     # Minimum score (0-100) to pass Stage 2
+    minimum_technical_score: 50 # Minimum technical score
+    minimum_fundamental_score: 40 # Minimum fundamental score
+    require_all_categories: false # Require passing all category minimums
 
 # Liquidity Score Calculation Parameters
 liquidity_scoring:

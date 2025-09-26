@@ -22,6 +22,8 @@ class TradeabilityConfig:
     maximum_price: float = 10000.0
     minimum_volume: int = 10000
     minimum_liquidity_score: float = 0.3
+    minimum_avg_volume: int = 50000
+    minimum_trades_per_day: int = 100
 
 
 @dataclass
@@ -47,6 +49,163 @@ class LiquidityScoringConfig:
     stable_price_max: float = 1000
     stable_price_score: float = 0.8
     unstable_price_score: float = 0.6
+
+
+@dataclass
+class TradingStatusConfig:
+    """Configuration for trading status filters."""
+    exclude_suspended: bool = True
+    exclude_delisted: bool = True
+    exclude_stage_listed: bool = True
+    min_listing_days: int = 365
+
+
+@dataclass
+class LiquidityRequirementsConfig:
+    """Configuration for basic liquidity requirements."""
+    minimum_bid_ask_spread: float = 0.01
+    maximum_bid_ask_spread: float = 5.0
+    minimum_market_depth: int = 1000
+
+
+@dataclass
+class TechnicalIndicatorConfig:
+    """Base configuration for technical indicators."""
+    enabled: bool = True
+
+
+@dataclass
+class RSIConfig(TechnicalIndicatorConfig):
+    """RSI indicator configuration."""
+    oversold_threshold: int = 30
+    overbought_threshold: int = 70
+    neutral_range_min: int = 40
+    neutral_range_max: int = 60
+    period: int = 14
+
+
+@dataclass
+class MACDConfig(TechnicalIndicatorConfig):
+    """MACD indicator configuration."""
+    fast_period: int = 12
+    slow_period: int = 26
+    signal_period: int = 9
+    histogram_threshold: float = 0.01
+
+
+@dataclass
+class TechnicalIndicatorsConfig:
+    """Configuration for all technical indicators."""
+    rsi: Optional[Dict] = None
+    macd: Optional[Dict] = None
+    bollinger_bands: Optional[Dict] = None
+    moving_averages: Optional[Dict] = None
+    stochastic: Optional[Dict] = None
+    williams_r: Optional[Dict] = None
+    atr: Optional[Dict] = None
+
+
+@dataclass
+class VolumeAnalysisConfig:
+    """Configuration for volume analysis."""
+    volume_surge: Optional[Dict] = None
+    obv: Optional[Dict] = None
+    vpt: Optional[Dict] = None
+    mfi: Optional[Dict] = None
+
+
+@dataclass
+class FundamentalRatiosConfig:
+    """Configuration for fundamental ratios."""
+    pe_ratio: Optional[Dict] = None
+    pb_ratio: Optional[Dict] = None
+    peg_ratio: Optional[Dict] = None
+    roe: Optional[Dict] = None
+    roa: Optional[Dict] = None
+    profit_margin: Optional[Dict] = None
+    debt_to_equity: Optional[Dict] = None
+    current_ratio: Optional[Dict] = None
+    quick_ratio: Optional[Dict] = None
+    revenue_growth: Optional[Dict] = None
+    earnings_growth: Optional[Dict] = None
+
+
+@dataclass
+class RiskMetricsConfig:
+    """Configuration for risk metrics."""
+    beta: Optional[Dict] = None
+    volatility: Optional[Dict] = None
+    sharpe_ratio: Optional[Dict] = None
+    max_drawdown: Optional[Dict] = None
+    var: Optional[Dict] = None
+
+
+@dataclass
+class MomentumConfig:
+    """Configuration for momentum indicators."""
+    price_momentum: Optional[Dict] = None
+    roc: Optional[Dict] = None
+    relative_strength: Optional[Dict] = None
+
+
+@dataclass
+class TrendAnalysisConfig:
+    """Configuration for trend analysis."""
+    trend_direction: Optional[Dict] = None
+    support_resistance: Optional[Dict] = None
+    chart_patterns: Optional[Dict] = None
+    adx: Optional[Dict] = None
+
+
+@dataclass
+class MarketFactorsConfig:
+    """Configuration for market factors."""
+    sector_performance: Optional[Dict] = None
+    market_regime: Optional[Dict] = None
+    seasonality: Optional[Dict] = None
+
+
+@dataclass
+class ScoringWeightsConfig:
+    """Configuration for scoring weights."""
+    technical_score: float = 0.30
+    fundamental_score: float = 0.25
+    risk_score: float = 0.20
+    momentum_score: float = 0.15
+    volume_score: float = 0.10
+
+
+@dataclass
+class FilteringThresholdsConfig:
+    """Configuration for filtering thresholds."""
+    minimum_total_score: int = 60
+    minimum_technical_score: int = 50
+    minimum_fundamental_score: int = 40
+    require_all_categories: bool = False
+
+
+@dataclass
+class Stage1FiltersConfig:
+    """Configuration for Stage 1 filters."""
+    tradeability: TradeabilityConfig = field(default_factory=TradeabilityConfig)
+    market_cap_categories: Dict[str, MarketCapConfig] = field(default_factory=dict)
+    price_volume_thresholds: Optional[Dict] = None
+    trading_status: TradingStatusConfig = field(default_factory=TradingStatusConfig)
+    liquidity: LiquidityRequirementsConfig = field(default_factory=LiquidityRequirementsConfig)
+
+
+@dataclass
+class Stage2FiltersConfig:
+    """Configuration for Stage 2 filters."""
+    technical_indicators: TechnicalIndicatorsConfig = field(default_factory=TechnicalIndicatorsConfig)
+    volume_analysis: VolumeAnalysisConfig = field(default_factory=VolumeAnalysisConfig)
+    fundamental_ratios: FundamentalRatiosConfig = field(default_factory=FundamentalRatiosConfig)
+    risk_metrics: RiskMetricsConfig = field(default_factory=RiskMetricsConfig)
+    momentum: MomentumConfig = field(default_factory=MomentumConfig)
+    trend_analysis: TrendAnalysisConfig = field(default_factory=TrendAnalysisConfig)
+    market_factors: MarketFactorsConfig = field(default_factory=MarketFactorsConfig)
+    scoring_weights: ScoringWeightsConfig = field(default_factory=ScoringWeightsConfig)
+    filtering_thresholds: FilteringThresholdsConfig = field(default_factory=FilteringThresholdsConfig)
 
 
 @dataclass
@@ -83,20 +242,64 @@ class SharesEstimationConfig:
 @dataclass
 class StockFilterConfig:
     """Main configuration class for stock filters."""
+    # Stage 1 filters (backward compatibility + new structure)
     tradeability: TradeabilityConfig = field(default_factory=TradeabilityConfig)
     market_cap_categories: Dict[str, MarketCapConfig] = field(default_factory=dict)
+    trading_status: TradingStatusConfig = field(default_factory=TradingStatusConfig)
+    liquidity_requirements: LiquidityRequirementsConfig = field(default_factory=LiquidityRequirementsConfig)
+
+    # Stage 1 and Stage 2 comprehensive filters
+    stage_1_filters: Optional[Stage1FiltersConfig] = None
+    stage_2_filters: Optional[Stage2FiltersConfig] = None
+
+    # Supporting configurations
     liquidity_scoring: LiquidityScoringConfig = field(default_factory=LiquidityScoringConfig)
     shares_estimation: SharesEstimationConfig = field(default_factory=SharesEstimationConfig)
 
+    # API and cache settings
     cache_duration: int = 3600
     screening_limit: int = 1000
     quote_batch_size: int = 20
     quote_rate_limit: float = 0.5
 
+    # Sector detection
     sector_keywords: Dict[str, list] = field(default_factory=dict)
 
+    # Logging settings
     enable_discovery_summary: bool = True
     top_stocks_per_category: int = 5
+
+    def get_stage1_config(self) -> Stage1FiltersConfig:
+        """Get Stage 1 configuration with defaults."""
+        if self.stage_1_filters:
+            return self.stage_1_filters
+        # Return backward compatible configuration
+        return Stage1FiltersConfig(
+            tradeability=self.tradeability,
+            market_cap_categories=self.market_cap_categories,
+            trading_status=self.trading_status,
+            liquidity=self.liquidity_requirements
+        )
+
+    def get_stage2_config(self) -> Optional[Stage2FiltersConfig]:
+        """Get Stage 2 configuration if available."""
+        return self.stage_2_filters
+
+    def is_stage2_enabled(self) -> bool:
+        """Check if Stage 2 filtering is configured and enabled."""
+        return self.stage_2_filters is not None
+
+    def get_technical_indicator(self, indicator_name: str) -> Optional[Dict]:
+        """Get specific technical indicator configuration."""
+        if not self.stage_2_filters or not self.stage_2_filters.technical_indicators:
+            return None
+        return getattr(self.stage_2_filters.technical_indicators, indicator_name, None)
+
+    def get_scoring_weights(self) -> ScoringWeightsConfig:
+        """Get scoring weights with defaults."""
+        if self.stage_2_filters and self.stage_2_filters.scoring_weights:
+            return self.stage_2_filters.scoring_weights
+        return ScoringWeightsConfig()
 
 
 class ConfigLoader:
@@ -152,9 +355,10 @@ class ConfigLoader:
         """Parse YAML data into configuration objects."""
         config = StockFilterConfig()
 
-        # Stage 1 filters
+        # Parse Stage 1 filters
         if 'stage_1_filters' in data:
             stage1 = data['stage_1_filters']
+            config.stage_1_filters = Stage1FiltersConfig()
 
             # Tradeability
             if 'tradeability' in stage1:
@@ -163,8 +367,11 @@ class ConfigLoader:
                     minimum_price=trade.get('minimum_price', 5.0),
                     maximum_price=trade.get('maximum_price', 10000.0),
                     minimum_volume=trade.get('minimum_volume', 10000),
-                    minimum_liquidity_score=trade.get('minimum_liquidity_score', 0.3)
+                    minimum_liquidity_score=trade.get('minimum_liquidity_score', 0.3),
+                    minimum_avg_volume=trade.get('minimum_avg_volume', 50000),
+                    minimum_trades_per_day=trade.get('minimum_trades_per_day', 100)
                 )
+                config.stage_1_filters.tradeability = config.tradeability
 
             # Market cap categories
             if 'market_cap_categories' in stage1:
@@ -174,6 +381,134 @@ class ConfigLoader:
                         maximum=cap_data.get('maximum'),
                         label=cap_data.get('label', cap_type)
                     )
+                config.stage_1_filters.market_cap_categories = config.market_cap_categories
+
+            # Trading status
+            if 'trading_status' in stage1:
+                ts = stage1['trading_status']
+                config.trading_status = TradingStatusConfig(
+                    exclude_suspended=ts.get('exclude_suspended', True),
+                    exclude_delisted=ts.get('exclude_delisted', True),
+                    exclude_stage_listed=ts.get('exclude_stage_listed', True),
+                    min_listing_days=ts.get('min_listing_days', 365)
+                )
+                config.stage_1_filters.trading_status = config.trading_status
+
+            # Liquidity requirements
+            if 'liquidity' in stage1:
+                liq = stage1['liquidity']
+                config.liquidity_requirements = LiquidityRequirementsConfig(
+                    minimum_bid_ask_spread=liq.get('minimum_bid_ask_spread', 0.01),
+                    maximum_bid_ask_spread=liq.get('maximum_bid_ask_spread', 5.0),
+                    minimum_market_depth=liq.get('minimum_market_depth', 1000)
+                )
+                config.stage_1_filters.liquidity = config.liquidity_requirements
+
+            # Price volume thresholds
+            if 'price_volume_thresholds' in stage1:
+                config.stage_1_filters.price_volume_thresholds = stage1['price_volume_thresholds']
+
+        # Parse Stage 2 filters
+        if 'stage_2_filters' in data:
+            stage2 = data['stage_2_filters']
+            config.stage_2_filters = Stage2FiltersConfig()
+
+            # Technical indicators
+            if 'technical_indicators' in stage2:
+                config.stage_2_filters.technical_indicators = TechnicalIndicatorsConfig(
+                    rsi=stage2['technical_indicators'].get('rsi'),
+                    macd=stage2['technical_indicators'].get('macd'),
+                    bollinger_bands=stage2['technical_indicators'].get('bollinger_bands'),
+                    moving_averages=stage2['technical_indicators'].get('moving_averages'),
+                    stochastic=stage2['technical_indicators'].get('stochastic'),
+                    williams_r=stage2['technical_indicators'].get('williams_r'),
+                    atr=stage2['technical_indicators'].get('atr')
+                )
+
+            # Volume analysis
+            if 'volume_analysis' in stage2:
+                config.stage_2_filters.volume_analysis = VolumeAnalysisConfig(
+                    volume_surge=stage2['volume_analysis'].get('volume_surge'),
+                    obv=stage2['volume_analysis'].get('obv'),
+                    vpt=stage2['volume_analysis'].get('vpt'),
+                    mfi=stage2['volume_analysis'].get('mfi')
+                )
+
+            # Fundamental ratios
+            if 'fundamental_ratios' in stage2:
+                fr = stage2['fundamental_ratios']
+                config.stage_2_filters.fundamental_ratios = FundamentalRatiosConfig(
+                    pe_ratio=fr.get('pe_ratio'),
+                    pb_ratio=fr.get('pb_ratio'),
+                    peg_ratio=fr.get('peg_ratio'),
+                    roe=fr.get('roe'),
+                    roa=fr.get('roa'),
+                    profit_margin=fr.get('profit_margin'),
+                    debt_to_equity=fr.get('debt_to_equity'),
+                    current_ratio=fr.get('current_ratio'),
+                    quick_ratio=fr.get('quick_ratio'),
+                    revenue_growth=fr.get('revenue_growth'),
+                    earnings_growth=fr.get('earnings_growth')
+                )
+
+            # Risk metrics
+            if 'risk_metrics' in stage2:
+                rm = stage2['risk_metrics']
+                config.stage_2_filters.risk_metrics = RiskMetricsConfig(
+                    beta=rm.get('beta'),
+                    volatility=rm.get('volatility'),
+                    sharpe_ratio=rm.get('sharpe_ratio'),
+                    max_drawdown=rm.get('max_drawdown'),
+                    var=rm.get('var')
+                )
+
+            # Momentum
+            if 'momentum' in stage2:
+                config.stage_2_filters.momentum = MomentumConfig(
+                    price_momentum=stage2['momentum'].get('price_momentum'),
+                    roc=stage2['momentum'].get('roc'),
+                    relative_strength=stage2['momentum'].get('relative_strength')
+                )
+
+            # Trend analysis
+            if 'trend_analysis' in stage2:
+                ta = stage2['trend_analysis']
+                config.stage_2_filters.trend_analysis = TrendAnalysisConfig(
+                    trend_direction=ta.get('trend_direction'),
+                    support_resistance=ta.get('support_resistance'),
+                    chart_patterns=ta.get('chart_patterns'),
+                    adx=ta.get('adx')
+                )
+
+            # Market factors
+            if 'market_factors' in stage2:
+                mf = stage2['market_factors']
+                config.stage_2_filters.market_factors = MarketFactorsConfig(
+                    sector_performance=mf.get('sector_performance'),
+                    market_regime=mf.get('market_regime'),
+                    seasonality=mf.get('seasonality')
+                )
+
+            # Scoring weights
+            if 'scoring_weights' in stage2:
+                sw = stage2['scoring_weights']
+                config.stage_2_filters.scoring_weights = ScoringWeightsConfig(
+                    technical_score=sw.get('technical_score', 0.30),
+                    fundamental_score=sw.get('fundamental_score', 0.25),
+                    risk_score=sw.get('risk_score', 0.20),
+                    momentum_score=sw.get('momentum_score', 0.15),
+                    volume_score=sw.get('volume_score', 0.10)
+                )
+
+            # Filtering thresholds
+            if 'filtering_thresholds' in stage2:
+                ft = stage2['filtering_thresholds']
+                config.stage_2_filters.filtering_thresholds = FilteringThresholdsConfig(
+                    minimum_total_score=ft.get('minimum_total_score', 60),
+                    minimum_technical_score=ft.get('minimum_technical_score', 50),
+                    minimum_fundamental_score=ft.get('minimum_fundamental_score', 40),
+                    require_all_categories=ft.get('require_all_categories', False)
+                )
 
         # Liquidity scoring
         if 'liquidity_scoring' in data:
@@ -268,8 +603,26 @@ class ConfigLoader:
         return self._config_path
 
 
-# Convenience function
+# Convenience functions
 def get_stock_filter_config() -> StockFilterConfig:
     """Get the stock filter configuration."""
     loader = ConfigLoader()
     return loader.get_config()
+
+
+def get_stage1_config() -> Stage1FiltersConfig:
+    """Get Stage 1 filter configuration."""
+    config = get_stock_filter_config()
+    return config.get_stage1_config()
+
+
+def get_stage2_config() -> Optional[Stage2FiltersConfig]:
+    """Get Stage 2 filter configuration."""
+    config = get_stock_filter_config()
+    return config.get_stage2_config()
+
+
+def reload_config():
+    """Reload the configuration from file."""
+    loader = ConfigLoader()
+    loader.reload_config()
