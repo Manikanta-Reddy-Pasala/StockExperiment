@@ -29,7 +29,6 @@ class FundamentalDataService:
         self.batch_size = 20  # Process in small batches
         
         # External API configurations
-        self.alpha_vantage_api_key = "demo"  # Replace with real API key
         self.yahoo_finance_base_url = "https://query1.finance.yahoo.com/v8/finance/chart"
         
     def update_fundamental_data_for_all_stocks(self, user_id: int = 1) -> Dict[str, Any]:
@@ -123,27 +122,58 @@ class FundamentalDataService:
     def _fetch_fundamental_data(self, symbol: str) -> Optional[Dict[str, Any]]:
         """Fetch fundamental data for a single stock from external APIs."""
         try:
-            # Try multiple data sources
+            # Try multiple data sources in priority order
             data = None
-            
-            # Try Yahoo Finance first (free, reliable)
+
+            # Try Fyers first (if fundamental data is available)
+            data = self._fetch_from_fyers(symbol)
+            if data:
+                return data
+
+            # Try Yahoo Finance as primary fallback (free, no rate limits)
             data = self._fetch_from_yahoo_finance(symbol)
             if data:
                 return data
-            
-            # Try Alpha Vantage as fallback (requires API key)
-            data = self._fetch_from_alpha_vantage(symbol)
-            if data:
-                return data
-            
-            # Fallback to estimated data based on sector
+
+            # Final fallback to estimated data based on sector
             data = self._get_estimated_fundamental_data(symbol)
             return data
             
         except Exception as e:
             logger.error(f"Error fetching fundamental data for {symbol}: {e}")
             return None
-    
+
+    def _fetch_from_fyers(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """Fetch fundamental data from Fyers API."""
+        try:
+            # Import Fyers service
+            try:
+                from ..brokers.fyers_service import FyersService
+            except ImportError:
+                from src.services.brokers.fyers_service import FyersService
+
+            fyers_service = FyersService()
+
+            # Check if Fyers is configured
+            config = fyers_service.get_broker_config(user_id=1)  # Default user
+            if not config or not config.get('is_connected'):
+                logger.debug("Fyers not configured or not connected, skipping")
+                return None
+
+            # Get API instance
+            api = fyers_service._get_api_instance(user_id=1)
+
+            # Note: Currently Fyers API doesn't provide direct fundamental data endpoints
+            # This is a placeholder for future implementation when Fyers adds fundamental data
+            # For now, we'll return None to proceed to the next data source
+
+            logger.debug(f"Fyers fundamental data not yet available for {symbol}")
+            return None
+
+        except Exception as e:
+            logger.debug(f"Fyers fundamental data failed for {symbol}: {e}")
+            return None
+
     def _fetch_from_yahoo_finance(self, symbol: str) -> Optional[Dict[str, Any]]:
         """Fetch fundamental data from Yahoo Finance API."""
         try:
@@ -170,35 +200,6 @@ class FundamentalDataService:
             logger.warning(f"Yahoo Finance API failed for {symbol}: {e}")
             return None
     
-    def _fetch_from_alpha_vantage(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """Fetch fundamental data from Alpha Vantage API."""
-        try:
-            if self.alpha_vantage_api_key == "demo":
-                logger.warning("Alpha Vantage API key not configured, skipping")
-                return None
-            
-            # Convert NSE symbol to Alpha Vantage format
-            av_symbol = self._convert_to_alpha_vantage_symbol(symbol)
-            if not av_symbol:
-                return None
-            
-            url = "https://www.alphavantage.co/query"
-            params = {
-                'function': 'OVERVIEW',
-                'symbol': av_symbol,
-                'apikey': self.alpha_vantage_api_key
-            }
-            
-            response = requests.get(url, params=params, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                return self._parse_alpha_vantage_data(data, symbol)
-            
-            return None
-            
-        except Exception as e:
-            logger.warning(f"Alpha Vantage API failed for {symbol}: {e}")
-            return None
     
     def _get_estimated_fundamental_data(self, symbol: str) -> Dict[str, Any]:
         """Generate estimated fundamental data based on sector and price."""
@@ -256,14 +257,6 @@ class FundamentalDataService:
         except:
             return None
     
-    def _convert_to_alpha_vantage_symbol(self, symbol: str) -> Optional[str]:
-        """Convert NSE symbol to Alpha Vantage format."""
-        try:
-            # Remove NSE: prefix and -EQ suffix
-            clean_symbol = symbol.replace("NSE:", "").replace("-EQ", "")
-            return f"{clean_symbol}.BSE"  # Alpha Vantage uses BSE for Indian stocks
-        except:
-            return None
     
     def _parse_yahoo_finance_data(self, data: Dict, symbol: str) -> Optional[Dict[str, Any]]:
         """Parse Yahoo Finance API response."""
@@ -274,22 +267,6 @@ class FundamentalDataService:
         except:
             return None
     
-    def _parse_alpha_vantage_data(self, data: Dict, symbol: str) -> Optional[Dict[str, Any]]:
-        """Parse Alpha Vantage API response."""
-        try:
-            if 'Error Message' in data:
-                return None
-            
-            return {
-                'pe_ratio': float(data.get('PERatio', 0)) if data.get('PERatio') != 'None' else None,
-                'pb_ratio': float(data.get('PriceToBookRatio', 0)) if data.get('PriceToBookRatio') != 'None' else None,
-                'roe': float(data.get('ReturnOnEquityTTM', 0)) if data.get('ReturnOnEquityTTM') != 'None' else None,
-                'debt_to_equity': float(data.get('DebtToEquity', 0)) if data.get('DebtToEquity') != 'None' else None,
-                'dividend_yield': float(data.get('DividendYield', 0)) if data.get('DividendYield') != 'None' else None,
-                'data_source': 'alpha_vantage'
-            }
-        except:
-            return None
     
     def _update_stock_fundamental_data_raw(self, session, stock_id: int, symbol: str, fundamental_data: Dict[str, Any]):
         """Update stock record with fundamental data using raw SQL."""
