@@ -220,6 +220,7 @@ CREATE TABLE IF NOT EXISTS stocks (
     sector VARCHAR(100),
     market_cap DOUBLE PRECISION,  -- in crores, matches SQLAlchemy Float
     market_cap_category VARCHAR(20),
+    listing_date DATE,
     current_price DOUBLE PRECISION,  -- matches SQLAlchemy Float
     volume BIGINT,  -- Handle high volume stocks like IDEA (2.6B+ volume)
     pe_ratio DOUBLE PRECISION,  -- matches SQLAlchemy Float
@@ -227,6 +228,17 @@ CREATE TABLE IF NOT EXISTS stocks (
     roe DOUBLE PRECISION,  -- matches SQLAlchemy Float
     debt_to_equity DOUBLE PRECISION,  -- matches SQLAlchemy Float
     dividend_yield DOUBLE PRECISION,  -- matches SQLAlchemy Float
+    peg_ratio DOUBLE PRECISION,
+    roa DOUBLE PRECISION,
+    operating_margin DOUBLE PRECISION,
+    net_margin DOUBLE PRECISION,
+    profit_margin DOUBLE PRECISION,
+    current_ratio DOUBLE PRECISION,
+    quick_ratio DOUBLE PRECISION,
+    revenue_growth DOUBLE PRECISION,
+    earnings_growth DOUBLE PRECISION,
+    eps DOUBLE PRECISION,
+    book_value DOUBLE PRECISION,
     beta DOUBLE PRECISION,  -- matches SQLAlchemy Float
     -- Volatility and risk metrics
     atr_14 DOUBLE PRECISION,  -- Average True Range (14-day period)
@@ -240,6 +252,9 @@ CREATE TABLE IF NOT EXISTS stocks (
     volatility_last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- For tracking volatility updates
     is_active BOOLEAN DEFAULT TRUE,
     is_tradeable BOOLEAN DEFAULT TRUE,
+    is_suspended BOOLEAN DEFAULT FALSE,
+    is_delisted BOOLEAN DEFAULT FALSE,
+    is_stage_listed BOOLEAN DEFAULT FALSE,
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

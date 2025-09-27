@@ -2,7 +2,7 @@
 Enhanced Data Models for Stock Management
 Adds comprehensive stock data storage and categorization
 """
-from sqlalchemy import Column, Integer, BigInteger, String, Float, DateTime, Boolean, Text, ForeignKey, UniqueConstraint, Enum
+from sqlalchemy import Column, Integer, BigInteger, String, Float, DateTime, Boolean, Text, ForeignKey, UniqueConstraint, Enum, Date
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -32,6 +32,7 @@ class Stock(Base):
     # Market capitalization data
     market_cap = Column(Float)  # in crores
     market_cap_category = Column(String(20), index=True)  # Use String instead of Enum for compatibility
+    listing_date = Column(Date)  # IPO/listing date for listing age checks
 
     # Current market data
     current_price = Column(Float)
@@ -43,6 +44,17 @@ class Stock(Base):
     roe = Column(Float)  # Return on Equity
     debt_to_equity = Column(Float)
     dividend_yield = Column(Float)
+    peg_ratio = Column(Float)  # Price/Earnings to Growth
+    roa = Column(Float)  # Return on Assets
+    operating_margin = Column(Float)
+    net_margin = Column(Float)
+    profit_margin = Column(Float)
+    current_ratio = Column(Float)
+    quick_ratio = Column(Float)
+    revenue_growth = Column(Float)
+    earnings_growth = Column(Float)
+    eps = Column(Float)
+    book_value = Column(Float)
     beta = Column(Float)
 
     # Volatility and Risk Metrics for Stage 1 Filtering
@@ -58,6 +70,9 @@ class Stock(Base):
     # Status and metadata
     is_active = Column(Boolean, default=True, index=True)
     is_tradeable = Column(Boolean, default=True)
+    is_suspended = Column(Boolean, default=False)
+    is_delisted = Column(Boolean, default=False)
+    is_stage_listed = Column(Boolean, default=False)
     volatility_last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)  # For volatility update tracking
     last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)  # For stock data update tracking
     created_at = Column(DateTime, default=datetime.utcnow)

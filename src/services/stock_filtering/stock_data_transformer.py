@@ -7,7 +7,7 @@ Separates data transformation logic from filtering and database operations.
 
 import logging
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, date
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +55,14 @@ class StockDataTransformer:
                 'sector': self._get_field_value(stock, 'sector', 'Unknown'),
                 'market_cap': self._get_field_value(stock, 'market_cap', 0.0),
                 'market_cap_category': self._get_field_value(stock, 'market_cap_category', 'mid_cap'),
+                'listing_date': self._format_datetime(
+                    self._get_field_value(stock, 'listing_date', None)
+                ),
+                'is_active': self._get_field_value(stock, 'is_active', True),
+                'is_tradeable': self._get_field_value(stock, 'is_tradeable', True),
+                'is_suspended': self._get_field_value(stock, 'is_suspended', False),
+                'is_delisted': self._get_field_value(stock, 'is_delisted', False),
+                'is_stage_listed': self._get_field_value(stock, 'is_stage_listed', False),
                 'last_updated': self._format_datetime(
                     self._get_field_value(stock, 'last_updated', None)
                 )
@@ -192,6 +200,9 @@ class StockDataTransformer:
         numeric_fields = [
             'current_price', 'volume', 'market_cap', 'pe_ratio',
             'pb_ratio', 'roe', 'debt_to_equity', 'dividend_yield',
+            'peg_ratio', 'roa', 'operating_margin', 'net_margin',
+            'profit_margin', 'current_ratio', 'quick_ratio',
+            'revenue_growth', 'earnings_growth', 'eps', 'book_value',
             'beta', 'atr_14', 'atr_percentage', 'historical_volatility_1y'
         ]
 
@@ -275,6 +286,8 @@ class StockDataTransformer:
             return None
         if isinstance(dt, datetime):
             return dt.isoformat()
+        if isinstance(dt, date):
+            return dt.isoformat()
         return str(dt)
 
     def _extract_volatility_metrics(self, stock: Any) -> Dict[str, Any]:
@@ -299,7 +312,18 @@ class StockDataTransformer:
             'pb_ratio': self._get_field_value(stock, 'pb_ratio', 0.0),
             'roe': self._get_field_value(stock, 'roe', 0.0),
             'debt_to_equity': self._get_field_value(stock, 'debt_to_equity', 0.0),
-            'dividend_yield': self._get_field_value(stock, 'dividend_yield', 0.0)
+            'dividend_yield': self._get_field_value(stock, 'dividend_yield', 0.0),
+            'peg_ratio': self._get_field_value(stock, 'peg_ratio', 0.0),
+            'roa': self._get_field_value(stock, 'roa', 0.0),
+            'operating_margin': self._get_field_value(stock, 'operating_margin', 0.0),
+            'net_margin': self._get_field_value(stock, 'net_margin', 0.0),
+            'profit_margin': self._get_field_value(stock, 'profit_margin', 0.0),
+            'current_ratio': self._get_field_value(stock, 'current_ratio', 0.0),
+            'quick_ratio': self._get_field_value(stock, 'quick_ratio', 0.0),
+            'revenue_growth': self._get_field_value(stock, 'revenue_growth', 0.0),
+            'earnings_growth': self._get_field_value(stock, 'earnings_growth', 0.0),
+            'eps': self._get_field_value(stock, 'eps', 0.0),
+            'book_value': self._get_field_value(stock, 'book_value', 0.0)
         }
 
     def _get_empty_stock_dict(self) -> Dict[str, Any]:
@@ -312,6 +336,12 @@ class StockDataTransformer:
             'sector': 'Unknown',
             'market_cap': 0.0,
             'market_cap_category': 'unknown',
+            'listing_date': None,
+            'is_active': False,
+            'is_tradeable': False,
+            'is_suspended': False,
+            'is_delisted': False,
+            'is_stage_listed': False,
             'last_updated': None
         }
 

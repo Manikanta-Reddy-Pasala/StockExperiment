@@ -25,7 +25,7 @@ from .enhanced_config_loader import (
 )
 from .enhanced_stock_filtering_service import (
     EnhancedStockFilteringService, get_enhanced_filtering_service,
-    FilteringResult, StockScore
+    FilteringResult, StockScore, StockContext
 )
 from .technical_indicators_calculator import (
     TechnicalIndicatorsCalculator, get_technical_calculator,
@@ -62,6 +62,7 @@ __all__ = [
     'get_enhanced_filtering_service',
     'FilteringResult',
     'StockScore',
+    'StockContext',
     'TechnicalIndicatorsCalculator',
     'get_technical_calculator',
     'TechnicalIndicators',
