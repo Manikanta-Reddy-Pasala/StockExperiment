@@ -141,51 +141,53 @@ class VolatilityCalculationService:
         return batch_results
 
     def _fetch_market_data(self, user_id: int, symbol: str, days: int = 365) -> Optional[pd.DataFrame]:
-        """Fetch historical market data for a symbol."""
+        """Fetch historical market data for a symbol from stored historical data."""
         try:
+            # Import here to avoid circular imports
+            from ...models.historical_models import HistoricalData
+
             # Calculate date range
-            end_date = datetime.now()
+            end_date = datetime.now().date()
             start_date = end_date - timedelta(days=days)
 
-            # Use unified broker service to get historical data
-            # This will route to the appropriate broker (FYERS) based on user config
-            # API only accepts period parameter, so request 1 year of data
-            historical_data = self.unified_broker_service.get_historical_data(
-                user_id=user_id,
-                symbol=symbol,
-                resolution='1D',
-                period='1y'  # Request 1 year of historical data (lowercase)
-            )
+            with self.db_manager.get_session() as session:
+                # Query historical data from database
+                historical_records = session.query(HistoricalData).filter(
+                    HistoricalData.symbol == symbol,
+                    HistoricalData.date >= start_date,
+                    HistoricalData.date <= end_date
+                ).order_by(HistoricalData.date).all()
 
-            if not historical_data:
-                return None
+                if not historical_records:
+                    logger.warning(f"No historical data found for {symbol} in database")
+                    return None
 
-            # Handle nested data structure from unified broker service
-            if 'data' in historical_data and 'candles' in historical_data['data']:
-                candles = historical_data['data']['candles']
-            elif 'candles' in historical_data:
-                candles = historical_data['candles']
-            else:
-                return None
+                # Convert to DataFrame
+                data = []
+                for record in historical_records:
+                    data.append({
+                        'date': record.date,
+                        'open': float(record.open),
+                        'high': float(record.high),
+                        'low': float(record.low),
+                        'close': float(record.close),
+                        'volume': int(record.volume)
+                    })
 
-            # Convert to DataFrame
-            if not candles:
-                return None
+                df = pd.DataFrame(data)
+                df['date'] = pd.to_datetime(df['date'])
+                df = df.sort_values('date')
 
-            df = pd.DataFrame(candles, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                # Validate data quality
+                if len(df) < 30:  # Need at least 30 days for meaningful volatility calculation
+                    logger.warning(f"Insufficient historical data for {symbol}: only {len(df)} records")
+                    return None
 
-            # Convert string values to numeric types
-            numeric_columns = ['open', 'high', 'low', 'close', 'volume']
-            for col in numeric_columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-
-            df['date'] = pd.to_datetime(df['timestamp'], unit='s')
-            df = df.sort_values('date')
-
-            return df
+                logger.info(f"📊 Retrieved {len(df)} days of historical data for {symbol} from database")
+                return df
 
         except Exception as e:
-            logger.error(f"Error fetching historical data for {symbol}: {e}")
+            logger.error(f"Error fetching historical data for {symbol} from database: {e}")
             return None
 
     def _calculate_all_volatility_metrics(self, stock_data: pd.DataFrame,

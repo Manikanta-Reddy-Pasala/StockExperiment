@@ -641,7 +641,7 @@ class StockInitializationService:
                     session.commit()
                     logger.info(f"✅ Updated verification status for {len(verified_symbols)} symbols")
 
-            # Step 5: Auto-trigger volatility calculation after stock sync
+            # Step 5: Auto-trigger volatility calculation (only if historical data exists)
             volatility_result = self._auto_trigger_volatility_calculation(user_id)
 
             # Step 6: Update fundamental data for stocks
@@ -678,13 +678,41 @@ class StockInitializationService:
         Auto-trigger volatility calculation after stock data is populated.
 
         This method:
-        1. Checks which stocks need volatility data updates based on dates
-        2. Prioritizes stocks intelligently
-        3. Triggers volatility calculation using real broker historical data
+        1. Checks if historical data is available first
+        2. Identifies stocks needing volatility updates based on dates
+        3. Triggers volatility calculation using stored historical data
         4. Runs automatically after each stock sync
         """
         try:
             logger.info("🔄 Auto-triggering volatility calculation after stock sync")
+
+            # First check if we have historical data available
+            try:
+                from ...models.historical_models import HistoricalData
+                with self.db_manager.get_session() as session:
+                    historical_count = session.query(HistoricalData).count()
+
+                    if historical_count == 0:
+                        logger.info("📊 No historical data available yet - skipping volatility calculation")
+                        logger.info("💡 Historical data will be populated by scheduler automatically")
+                        return {
+                            'triggered': False,
+                            'reason': 'No historical data available yet',
+                            'stocks_checked': 0,
+                            'stocks_updated': 0,
+                            'message': 'Historical data will be populated by scheduler'
+                        }
+
+                    logger.info(f"📈 Found {historical_count:,} historical records - proceeding with volatility calculation")
+
+            except ImportError:
+                logger.warning("Historical data models not available - skipping volatility calculation")
+                return {
+                    'triggered': False,
+                    'reason': 'Historical data models not available',
+                    'stocks_checked': 0,
+                    'stocks_updated': 0
+                }
 
             # Use stock master service to identify stocks needing volatility updates
             stock_symbols_needing_update = self.stock_master_service._identify_stocks_needing_volatility_update("NSE")
@@ -698,13 +726,13 @@ class StockInitializationService:
                     'stocks_updated': 0
                 }
 
-            # For auto-trigger, use all symbols that need updates (no prioritization to keep it simple)
-            stock_symbols = stock_symbols_needing_update
+            # Limit to first 20 stocks for initial sync to avoid overwhelming the system
+            stock_symbols = stock_symbols_needing_update[:20]
 
-            logger.info(f"📊 Found {len(stock_symbols)} stocks needing volatility updates")
-            logger.info(f"🎯 Prioritized top stocks for volatility calculation")
+            logger.info(f"📊 Found {len(stock_symbols_needing_update)} stocks needing volatility updates")
+            logger.info(f"🎯 Processing first {len(stock_symbols)} stocks for volatility calculation")
 
-            # Trigger volatility calculation using real broker historical data
+            # Trigger volatility calculation using stored historical data
             volatility_result = self.volatility_service.calculate_volatility_for_stocks(
                 user_id=user_id,
                 stock_symbols=stock_symbols
@@ -713,7 +741,7 @@ class StockInitializationService:
             if volatility_result.get('updated', 0) > 0:
                 logger.info(f"✅ Successfully updated volatility for {volatility_result['updated']} stocks")
             else:
-                logger.warning("⚠️ No stocks were updated with volatility data")
+                logger.warning("⚠️ No stocks were updated with volatility data - may need more historical data")
 
             return {
                 'triggered': True,
@@ -722,7 +750,8 @@ class StockInitializationService:
                 'stocks_updated': volatility_result.get('updated', 0),
                 'stocks_failed': volatility_result.get('failed', 0),
                 'duration_seconds': volatility_result.get('duration', 0),
-                'errors': volatility_result.get('errors', [])
+                'errors': volatility_result.get('errors', []),
+                'historical_records_available': historical_count
             }
 
         except Exception as e:

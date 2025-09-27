@@ -552,6 +552,104 @@ CREATE TABLE IF NOT EXISTS ml_trained_models (
     UNIQUE(user_id, symbol, model_type, is_active)
 );
 
+-- Historical Data Tables for Enhanced Technical Analysis
+-- Historical OHLCV data for comprehensive technical indicator calculations
+CREATE TABLE IF NOT EXISTS historical_data (
+    id SERIAL PRIMARY KEY,
+    symbol VARCHAR(50) NOT NULL,
+    date DATE NOT NULL,
+    open DOUBLE PRECISION NOT NULL,
+    high DOUBLE PRECISION NOT NULL,
+    low DOUBLE PRECISION NOT NULL,
+    close DOUBLE PRECISION NOT NULL,
+    volume BIGINT NOT NULL,
+    adj_close DOUBLE PRECISION,
+    turnover DOUBLE PRECISION,
+    is_adjusted BOOLEAN DEFAULT FALSE,
+    data_source VARCHAR(20) DEFAULT 'fyers',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(symbol, date)
+);
+
+-- Pre-calculated technical indicators for performance
+CREATE TABLE IF NOT EXISTS technical_indicators (
+    id SERIAL PRIMARY KEY,
+    symbol VARCHAR(50) NOT NULL,
+    date DATE NOT NULL,
+    -- Moving Averages
+    sma_5 DOUBLE PRECISION,
+    sma_10 DOUBLE PRECISION,
+    sma_20 DOUBLE PRECISION,
+    sma_50 DOUBLE PRECISION,
+    sma_100 DOUBLE PRECISION,
+    sma_200 DOUBLE PRECISION,
+    ema_12 DOUBLE PRECISION,
+    ema_26 DOUBLE PRECISION,
+    ema_50 DOUBLE PRECISION,
+    -- Momentum Indicators
+    rsi_14 DOUBLE PRECISION,
+    macd DOUBLE PRECISION,
+    macd_signal DOUBLE PRECISION,
+    macd_histogram DOUBLE PRECISION,
+    -- Volatility Indicators
+    atr_14 DOUBLE PRECISION,
+    atr_percentage DOUBLE PRECISION,
+    bb_upper DOUBLE PRECISION,
+    bb_middle DOUBLE PRECISION,
+    bb_lower DOUBLE PRECISION,
+    bb_width DOUBLE PRECISION,
+    -- Trend Indicators
+    adx_14 DOUBLE PRECISION,
+    -- Volume Indicators
+    obv DOUBLE PRECISION,
+    volume_sma_20 DOUBLE PRECISION,
+    volume_ratio DOUBLE PRECISION,
+    -- Custom indicators
+    price_momentum_5d DOUBLE PRECISION,
+    price_momentum_20d DOUBLE PRECISION,
+    volatility_rank DOUBLE PRECISION,
+    -- Metadata
+    calculation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_points_used INTEGER,
+    UNIQUE(symbol, date)
+);
+
+-- Market benchmark data for beta calculations
+CREATE TABLE IF NOT EXISTS market_benchmarks (
+    id SERIAL PRIMARY KEY,
+    benchmark VARCHAR(20) NOT NULL,
+    date DATE NOT NULL,
+    open DOUBLE PRECISION NOT NULL,
+    high DOUBLE PRECISION NOT NULL,
+    low DOUBLE PRECISION NOT NULL,
+    close DOUBLE PRECISION NOT NULL,
+    volume BIGINT,
+    market_cap DOUBLE PRECISION,
+    pe_ratio DOUBLE PRECISION,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(benchmark, date)
+);
+
+-- Data quality tracking
+CREATE TABLE IF NOT EXISTS data_quality_metrics (
+    id SERIAL PRIMARY KEY,
+    symbol VARCHAR(50) UNIQUE NOT NULL,
+    earliest_date DATE,
+    latest_date DATE,
+    total_days INTEGER,
+    missing_days INTEGER,
+    data_completeness DOUBLE PRECISION,
+    price_consistency_score DOUBLE PRECISION,
+    volume_consistency_score DOUBLE PRECISION,
+    overall_quality_score DOUBLE PRECISION,
+    has_200_day_history BOOLEAN DEFAULT FALSE,
+    has_1_year_history BOOLEAN DEFAULT FALSE,
+    meets_min_quality BOOLEAN DEFAULT FALSE,
+    last_quality_check TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_data_update TIMESTAMP
+);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_stocks_symbol ON stocks(symbol);
 CREATE INDEX IF NOT EXISTS idx_stocks_market_cap_category ON stocks(market_cap_category);
@@ -580,3 +678,27 @@ CREATE INDEX IF NOT EXISTS idx_stocks_beta ON stocks(beta);
 CREATE INDEX IF NOT EXISTS idx_stocks_historical_volatility ON stocks(historical_volatility_1y);
 CREATE INDEX IF NOT EXISTS idx_stocks_avg_volume_20d ON stocks(avg_daily_volume_20d);
 CREATE INDEX IF NOT EXISTS idx_stocks_volatility_last_updated ON stocks(volatility_last_updated);
+
+-- Historical Data Indexes for Performance
+CREATE INDEX IF NOT EXISTS idx_historical_symbol ON historical_data(symbol);
+CREATE INDEX IF NOT EXISTS idx_historical_date ON historical_data(date);
+CREATE INDEX IF NOT EXISTS idx_historical_symbol_date ON historical_data(symbol, date);
+CREATE INDEX IF NOT EXISTS idx_historical_date_desc ON historical_data(date DESC);
+CREATE INDEX IF NOT EXISTS idx_historical_symbol_date_desc ON historical_data(symbol, date DESC);
+
+-- Technical Indicators Indexes
+CREATE INDEX IF NOT EXISTS idx_technical_symbol ON technical_indicators(symbol);
+CREATE INDEX IF NOT EXISTS idx_technical_date ON technical_indicators(date);
+CREATE INDEX IF NOT EXISTS idx_technical_symbol_date ON technical_indicators(symbol, date);
+CREATE INDEX IF NOT EXISTS idx_technical_symbol_date_desc ON technical_indicators(symbol, date DESC);
+
+-- Market Benchmarks Indexes
+CREATE INDEX IF NOT EXISTS idx_benchmark_name ON market_benchmarks(benchmark);
+CREATE INDEX IF NOT EXISTS idx_benchmark_date ON market_benchmarks(date);
+CREATE INDEX IF NOT EXISTS idx_benchmark_name_date ON market_benchmarks(benchmark, date);
+CREATE INDEX IF NOT EXISTS idx_benchmark_date_desc ON market_benchmarks(date DESC);
+
+-- Data Quality Indexes
+CREATE INDEX IF NOT EXISTS idx_quality_symbol ON data_quality_metrics(symbol);
+CREATE INDEX IF NOT EXISTS idx_quality_has_1year ON data_quality_metrics(has_1_year_history);
+CREATE INDEX IF NOT EXISTS idx_quality_meets_min ON data_quality_metrics(meets_min_quality);

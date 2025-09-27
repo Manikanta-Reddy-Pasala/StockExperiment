@@ -183,20 +183,20 @@ class SchedulerService:
     def schedule_data_cleanup(self, interval_hours: int = 24):
         """
         Schedule periodic data cleanup tasks.
-        
+
         Args:
             interval_hours (int): Cleanup interval in hours
         """
         task_id = "data_cleanup"
-        
+
         def cleanup_data():
             try:
                 from src.models.database import get_database_manager
                 from src.models.models import Order, Trade
                 from datetime import datetime, timedelta
-                
+
                 db_manager = get_database_manager()
-                
+
                 with db_manager.get_session() as session:
                     # Clean up old completed orders (older than 30 days)
                     cutoff_date = datetime.now() - timedelta(days=30)
@@ -204,36 +204,203 @@ class SchedulerService:
                         Order.order_status == 'COMPLETE',
                         Order.created_at < cutoff_date
                     ).all()
-                    
+
                     for order in old_orders:
                         session.delete(order)
-                    
+
                     # Clean up old trades (older than 30 days)
                     old_trades = session.query(Trade).filter(
                         Trade.created_at < cutoff_date
                     ).all()
-                    
+
                     for trade in old_trades:
                         session.delete(trade)
-                    
+
                     session.commit()
-                    
+
                     logger.info(f"Data cleanup completed: removed {len(old_orders)} old orders and {len(old_trades)} old trades")
-                
+
             except Exception as e:
                 logger.error(f"Error in data cleanup: {e}")
-        
+
         # Schedule the job
         schedule.every(interval_hours).hours.do(cleanup_data)
-        
+
         # Store task information
         self.tasks[task_id] = {
             'type': 'data_cleanup',
             'interval_hours': interval_hours,
             'created_at': datetime.now()
         }
-        
+
         logger.info(f"Scheduled data cleanup every {interval_hours} hours")
+
+    def schedule_historical_data_update(self, user_id: int = 1, interval_hours: int = 6, max_stocks: int = 50):
+        """
+        Schedule periodic historical data updates.
+
+        Args:
+            user_id (int): User ID for API access
+            interval_hours (int): Update interval in hours
+            max_stocks (int): Maximum stocks to update per run
+        """
+        task_id = "historical_data_update"
+
+        def update_historical_data():
+            try:
+                logger.info("🔄 Starting scheduled historical data update...")
+
+                from ..data.historical_data_service import HistoricalDataService
+
+                hist_service = HistoricalDataService()
+
+                # Fetch historical data for active stocks
+                result = hist_service.fetch_historical_data_bulk(
+                    user_id=user_id,
+                    days=365,  # Fetch up to 1 year of data
+                    max_stocks=max_stocks
+                )
+
+                if result.get('success'):
+                    logger.info(f"📊 Historical data update completed: {result['successful']} stocks updated out of {result['processed']} processed")
+                else:
+                    logger.error(f"❌ Historical data update failed: {result.get('error', 'Unknown error')}")
+
+            except Exception as e:
+                logger.error(f"Error in scheduled historical data update: {e}")
+
+        # Schedule the job
+        schedule.every(interval_hours).hours.do(update_historical_data)
+
+        # Store task information
+        self.tasks[task_id] = {
+            'type': 'historical_data_update',
+            'user_id': user_id,
+            'interval_hours': interval_hours,
+            'max_stocks': max_stocks,
+            'created_at': datetime.now()
+        }
+
+        logger.info(f"📅 Scheduled historical data updates every {interval_hours} hours for max {max_stocks} stocks")
+
+    def schedule_technical_indicators_calculation(self, interval_hours: int = 4, max_symbols: int = 100):
+        """
+        Schedule periodic technical indicators calculation.
+
+        Args:
+            interval_hours (int): Calculation interval in hours
+            max_symbols (int): Maximum symbols to process per run
+        """
+        task_id = "technical_indicators_calculation"
+
+        def calculate_indicators():
+            try:
+                logger.info("🧮 Starting scheduled technical indicators calculation...")
+
+                from ..data.technical_indicators_service import TechnicalIndicatorsService
+
+                indicators_service = TechnicalIndicatorsService()
+
+                # Calculate indicators for symbols with sufficient historical data
+                result = indicators_service.calculate_indicators_bulk(
+                    symbols=None,  # Auto-select symbols with sufficient data
+                    max_symbols=max_symbols
+                )
+
+                if result.get('success'):
+                    logger.info(f"📈 Technical indicators calculation completed: {result['successful']} symbols processed out of {result['processed']}")
+
+                    # Log any errors for debugging
+                    if result.get('errors'):
+                        logger.warning(f"⚠️ Calculation errors occurred: {len(result['errors'])} errors")
+                        for error in result['errors'][:5]:  # Log first 5 errors
+                            logger.warning(f"  - {error}")
+                else:
+                    logger.error(f"❌ Technical indicators calculation failed: {result.get('error', 'Unknown error')}")
+
+            except Exception as e:
+                logger.error(f"Error in scheduled technical indicators calculation: {e}")
+
+        # Schedule the job
+        schedule.every(interval_hours).hours.do(calculate_indicators)
+
+        # Store task information
+        self.tasks[task_id] = {
+            'type': 'technical_indicators_calculation',
+            'interval_hours': interval_hours,
+            'max_symbols': max_symbols,
+            'created_at': datetime.now()
+        }
+
+        logger.info(f"📅 Scheduled technical indicators calculation every {interval_hours} hours for max {max_symbols} symbols")
+
+    def schedule_market_data_refresh(self, user_id: int = 1, interval_minutes: int = 30):
+        """
+        Schedule periodic market data refresh for current prices and volumes.
+
+        Args:
+            user_id (int): User ID for API access
+            interval_minutes (int): Refresh interval in minutes
+        """
+        task_id = "market_data_refresh"
+
+        def refresh_market_data():
+            try:
+                logger.info("💹 Starting scheduled market data refresh...")
+
+                from ..data.stock_initialization_service import StockInitializationService
+
+                init_service = StockInitializationService()
+
+                # Update current prices and volumes for active stocks
+                result = init_service.update_current_market_data(
+                    user_id=user_id,
+                    max_stocks=200  # Update current data for more stocks
+                )
+
+                if result.get('success'):
+                    logger.info(f"💰 Market data refresh completed: {result.get('updated', 0)} stocks updated")
+                else:
+                    logger.warning(f"⚠️ Market data refresh had issues: {result.get('message', 'Unknown issue')}")
+
+            except Exception as e:
+                logger.error(f"Error in scheduled market data refresh: {e}")
+
+        # Schedule the job
+        schedule.every(interval_minutes).minutes.do(refresh_market_data)
+
+        # Store task information
+        self.tasks[task_id] = {
+            'type': 'market_data_refresh',
+            'user_id': user_id,
+            'interval_minutes': interval_minutes,
+            'created_at': datetime.now()
+        }
+
+        logger.info(f"📅 Scheduled market data refresh every {interval_minutes} minutes")
+
+    def schedule_all_data_maintenance_tasks(self, user_id: int = 1):
+        """
+        Schedule all data maintenance tasks with optimal timing.
+
+        Args:
+            user_id (int): User ID for API access
+        """
+        logger.info("🔧 Setting up comprehensive data maintenance schedule...")
+
+        # Market data refresh - every 30 minutes during market hours
+        self.schedule_market_data_refresh(user_id=user_id, interval_minutes=30)
+
+        # Technical indicators calculation - every 4 hours
+        self.schedule_technical_indicators_calculation(interval_hours=4, max_symbols=100)
+
+        # Historical data update - every 6 hours (to catch new daily data)
+        self.schedule_historical_data_update(user_id=user_id, interval_hours=6, max_stocks=50)
+
+        # Data cleanup - daily
+        self.schedule_data_cleanup(interval_hours=24)
+
+        logger.info("✅ All data maintenance tasks scheduled successfully!")
     
     def get_scheduled_tasks(self) -> List[Dict[str, Any]]:
         """

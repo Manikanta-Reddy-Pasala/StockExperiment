@@ -104,8 +104,8 @@ def create_app():
     except Exception as e:
         app.logger.warning(f"Could not register FYERS refresh callback: {e}")
     
-    # Schedule default tasks
-    scheduler.schedule_data_cleanup(interval_hours=24)
+    # Schedule comprehensive data maintenance tasks
+    scheduler.schedule_all_data_maintenance_tasks(user_id=1)
 
     # Initialize stock initialization service with complete flow
     try:
