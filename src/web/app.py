@@ -77,6 +77,14 @@ def create_app():
     
     # Initialize database
     db_manager = get_database_manager()
+    
+    # Create database tables if they don't exist
+    try:
+        app.logger.info("🗄️ Creating database tables...")
+        db_manager.create_tables()
+        app.logger.info("✅ Database tables created successfully!")
+    except Exception as e:
+        app.logger.warning(f"⚠️ Could not create database tables: {e}")
 
     # Initialize services
     user_service = get_user_service(db_manager, bcrypt)

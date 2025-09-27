@@ -31,7 +31,7 @@ services:
       dragonfly:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://trader:trader_password@database:5432/trading_system
+      - DATABASE_URL=postgresql+psycopg://trader:trader_password@database:5432/trading_system
       - DRAGONFLY_URL=redis://dragonfly:6379/0
       - FLASK_ENV=production
       - PYTHONPATH=/app
