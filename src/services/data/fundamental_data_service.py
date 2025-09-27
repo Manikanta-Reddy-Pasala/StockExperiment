@@ -29,7 +29,7 @@ class FundamentalDataService:
         self.batch_size = 20  # Process in small batches
         
         # External API configurations
-        self.yahoo_finance_base_url = "https://query1.finance.yahoo.com/v8/finance/chart"
+        self.yahoo_finance_quote_url = "https://query1.finance.yahoo.com/v10/finance/quoteSummary"
         
     def update_fundamental_data_for_all_stocks(self, user_id: int = 1) -> Dict[str, Any]:
         """Update fundamental data for all stocks in the database."""
@@ -181,21 +181,24 @@ class FundamentalDataService:
             yahoo_symbol = self._convert_to_yahoo_symbol(symbol)
             if not yahoo_symbol:
                 return None
-            
-            url = f"{self.yahoo_finance_base_url}/{yahoo_symbol}"
+
+            # Use quoteSummary endpoint for fundamental data
+            url = f"{self.yahoo_finance_quote_url}/{yahoo_symbol}"
             params = {
-                'range': '1y',
-                'interval': '1d',
-                'includePrePost': 'false'
+                'modules': 'financialData,defaultKeyStatistics,summaryDetail'
             }
-            
-            response = requests.get(url, params=params, timeout=10)
+
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+
+            response = requests.get(url, params=params, headers=headers, timeout=10)
             if response.status_code == 200:
                 data = response.json()
                 return self._parse_yahoo_finance_data(data, symbol)
-            
+
             return None
-            
+
         except Exception as e:
             logger.warning(f"Yahoo Finance API failed for {symbol}: {e}")
             return None
@@ -259,12 +262,51 @@ class FundamentalDataService:
     
     
     def _parse_yahoo_finance_data(self, data: Dict, symbol: str) -> Optional[Dict[str, Any]]:
-        """Parse Yahoo Finance API response."""
+        """Parse Yahoo Finance quoteSummary API response."""
         try:
-            # Yahoo Finance doesn't provide fundamental data in the chart API
-            # This is a placeholder for future implementation
+            if 'quoteSummary' not in data or not data['quoteSummary'].get('result'):
+                return None
+
+            result = data['quoteSummary']['result'][0]
+
+            # Extract fundamental data from different modules
+            financial_data = result.get('financialData', {})
+            key_stats = result.get('defaultKeyStatistics', {})
+            summary_detail = result.get('summaryDetail', {})
+
+            def safe_get_value(obj, key):
+                """Safely extract numeric value from Yahoo Finance response"""
+                if not obj or key not in obj:
+                    return None
+                value = obj[key]
+                if isinstance(value, dict) and 'raw' in value:
+                    return value['raw']
+                elif isinstance(value, (int, float)):
+                    return float(value)
+                return None
+
+            # Extract fundamental ratios
+            pe_ratio = safe_get_value(summary_detail, 'trailingPE') or safe_get_value(key_stats, 'trailingPE')
+            pb_ratio = safe_get_value(key_stats, 'priceToBook')
+            roe = safe_get_value(financial_data, 'returnOnEquity')
+            debt_to_equity = safe_get_value(financial_data, 'debtToEquity')
+            dividend_yield = safe_get_value(summary_detail, 'dividendYield')
+
+            # Only return data if we have at least one valid metric
+            if any([pe_ratio, pb_ratio, roe, debt_to_equity, dividend_yield]):
+                return {
+                    'pe_ratio': pe_ratio,
+                    'pb_ratio': pb_ratio,
+                    'roe': roe * 100 if roe else None,  # Convert to percentage
+                    'debt_to_equity': debt_to_equity,
+                    'dividend_yield': dividend_yield * 100 if dividend_yield else None,  # Convert to percentage
+                    'data_source': 'yahoo_finance'
+                }
+
             return None
-        except:
+
+        except Exception as e:
+            logger.warning(f"Error parsing Yahoo Finance data for {symbol}: {e}")
             return None
     
     
