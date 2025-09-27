@@ -236,6 +236,7 @@ CREATE TABLE IF NOT EXISTS stocks (
     avg_daily_volume_20d DOUBLE PRECISION,  -- 20-day average daily volume
     avg_daily_turnover DOUBLE PRECISION,  -- Average daily turnover in crores
     trades_per_day INTEGER,  -- Average trades per day
+    liquidity_score DOUBLE PRECISION,  -- Liquidity score (0-1 scale) for Stage 1 filtering
     volatility_last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- For tracking volatility updates
     is_active BOOLEAN DEFAULT TRUE,
     is_tradeable BOOLEAN DEFAULT TRUE,
