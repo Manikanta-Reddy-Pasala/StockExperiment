@@ -269,12 +269,12 @@ stage_2_filters:
     risk_score: 0.20
     momentum_score: 0.25
     volume_score: 0.05
-    
+
   filtering_thresholds:
-    minimum_total_score: 60
-    minimum_technical_score: 50
-    minimum_fundamental_score: 40
-    minimum_risk_score: 50
+    minimum_total_score: 25           # Lowered from 60 to 25 (stocks scoring 30-70)
+    minimum_technical_score: 15       # Lowered from 50 to 15 (stocks scoring 1-40)
+    minimum_fundamental_score: 5      # Lowered from 40 to 5 (many scoring exactly 10)
+    minimum_risk_score: 20            # Lowered from 50 to 20 (varies widely)
     require_all_categories: false
 
 # -------------------------

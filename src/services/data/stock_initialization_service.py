@@ -548,8 +548,9 @@ class StockInitializationService:
                                             # Mark symbol as verified (will update DB later)
                                             # Note: Update database separately to avoid session issues
 
-                                            # Create stock record
-                                            market_cap_category = self._get_market_cap_category(price)
+                                            # Create stock record with market cap calculation
+                                            market_cap = self._estimate_market_cap(price, volume)
+                                            market_cap_category = self._determine_market_cap_category(market_cap)
 
                                             verified_stocks.append({
                                                 'symbol': symbol,
@@ -557,6 +558,7 @@ class StockInitializationService:
                                                 'exchange': symbol_obj['exchange'],
                                                 'current_price': price,
                                                 'volume': volume,
+                                                'market_cap': market_cap,
                                                 'market_cap_category': market_cap_category,
                                                 'sector': 'Technology',  # Default
                                                 'is_active': True,
