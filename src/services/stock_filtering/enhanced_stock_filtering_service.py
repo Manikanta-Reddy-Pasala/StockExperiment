@@ -328,12 +328,8 @@ class EnhancedStockFilteringService:
                 elif criteria == "technical_score":
                     sorted_stocks.sort(key=lambda x: x.technical_score, reverse=True)
         
-        # Apply maximum selection limit
-        max_stocks = selection_config.max_suggested_stocks
-        selected_stocks = sorted_stocks[:max_stocks]
-        
-        # Apply sector concentration limit
-        selected_stocks = self._apply_sector_concentration_limit(selected_stocks)
+        # Apply sector concentration limit FIRST
+        selected_stocks = self._apply_sector_concentration_limit(sorted_stocks)
         
         # Apply market cap mix requirement
         selected_stocks = self._apply_market_cap_mix(selected_stocks)
@@ -343,6 +339,9 @@ class EnhancedStockFilteringService:
         
         # Apply resistance distance filter
         selected_stocks = self._apply_resistance_distance_filter(selected_stocks)
+        
+        # No artificial stock limits here - let all qualifying stocks pass through
+        # The final limit will be applied after swing trading business logic
         
         # Determine rejected stocks
         rejected_stocks = []

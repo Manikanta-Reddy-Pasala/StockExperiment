@@ -218,8 +218,8 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
             if not strategies:
                 strategies = [StrategyType.DEFAULT_RISK, StrategyType.HIGH_RISK]
 
-            # If sector is specified and no config provided, create one with sector filter
-            if sector and not config:
+            # Ensure config is always loaded
+            if not config:
                 from ..stock_filtering.enhanced_config_loader import get_enhanced_filtering_config
                 config = get_enhanced_filtering_config()
 
@@ -276,9 +276,12 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
                                'pe_ratio', 'pb_ratio', 'roe', 'sales_growth']:
                     suggested_stocks.sort(key=lambda x: float(x.get(sort_by, 0) or 0), reverse=reverse)
 
+            # Return ALL qualifying stocks - no artificial limits
+            print(f"🎯 FINAL RESULT: Returning all {len(suggested_stocks)} qualifying stocks")
+
             return {
                 'success': True,
-                'data': suggested_stocks[:limit],
+                'data': suggested_stocks,
                 'total': len(suggested_stocks),
                 'search': search,
                 'sector': sector,
