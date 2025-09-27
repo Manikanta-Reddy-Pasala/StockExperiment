@@ -554,21 +554,44 @@ CREATE TABLE IF NOT EXISTS ml_trained_models (
 
 -- Historical Data Tables for Enhanced Technical Analysis
 -- Historical OHLCV data for comprehensive technical indicator calculations
+-- Stores ALL available data from Fyers API plus calculated fields
 CREATE TABLE IF NOT EXISTS historical_data (
     id SERIAL PRIMARY KEY,
     symbol VARCHAR(50) NOT NULL,
     date DATE NOT NULL,
+
+    -- Core OHLCV Data from Fyers API (ALL 6 fields)
+    timestamp BIGINT NOT NULL,  -- Original Unix timestamp
     open DOUBLE PRECISION NOT NULL,
     high DOUBLE PRECISION NOT NULL,
     low DOUBLE PRECISION NOT NULL,
     close DOUBLE PRECISION NOT NULL,
     volume BIGINT NOT NULL,
-    adj_close DOUBLE PRECISION,
-    turnover DOUBLE PRECISION,
+
+    -- Calculated fields for enhanced analysis
+    adj_close DOUBLE PRECISION,  -- Adjusted close for splits/dividends
+    turnover DOUBLE PRECISION,  -- Daily turnover in INR (price * volume)
+    price_change DOUBLE PRECISION,  -- Close - Open
+    price_change_pct DOUBLE PRECISION,  -- (Close - Open) / Open * 100
+    high_low_pct DOUBLE PRECISION,  -- (High - Low) / Close * 100
+    body_pct DOUBLE PRECISION,  -- |Close - Open| / (High - Low) * 100
+    upper_shadow_pct DOUBLE PRECISION,  -- Upper wick percentage
+    lower_shadow_pct DOUBLE PRECISION,  -- Lower wick percentage
+
+    -- Volume analysis
+    volume_sma_ratio DOUBLE PRECISION,  -- Volume / SMA(Volume, 20)
+    price_volume_trend DOUBLE PRECISION,  -- PVT indicator value
+
+    -- Data quality and metadata
     is_adjusted BOOLEAN DEFAULT FALSE,
     data_source VARCHAR(20) DEFAULT 'fyers',
+    api_resolution VARCHAR(10),  -- Original API resolution (1D, 5M, etc.)
+    data_quality_score DOUBLE PRECISION,  -- 0-1 score for data completeness
+
+    -- Timestamps
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
     UNIQUE(symbol, date)
 );
 
@@ -679,12 +702,15 @@ CREATE INDEX IF NOT EXISTS idx_stocks_historical_volatility ON stocks(historical
 CREATE INDEX IF NOT EXISTS idx_stocks_avg_volume_20d ON stocks(avg_daily_volume_20d);
 CREATE INDEX IF NOT EXISTS idx_stocks_volatility_last_updated ON stocks(volatility_last_updated);
 
--- Historical Data Indexes for Performance
+-- Historical Data Indexes for Performance (matches SQLAlchemy model)
 CREATE INDEX IF NOT EXISTS idx_historical_symbol ON historical_data(symbol);
 CREATE INDEX IF NOT EXISTS idx_historical_date ON historical_data(date);
 CREATE INDEX IF NOT EXISTS idx_historical_symbol_date ON historical_data(symbol, date);
 CREATE INDEX IF NOT EXISTS idx_historical_date_desc ON historical_data(date DESC);
 CREATE INDEX IF NOT EXISTS idx_historical_symbol_date_desc ON historical_data(symbol, date DESC);
+-- Composite indexes from SQLAlchemy model
+CREATE INDEX IF NOT EXISTS ix_historical_symbol_date ON historical_data(symbol, date);
+CREATE INDEX IF NOT EXISTS ix_historical_date_symbol ON historical_data(date, symbol);
 
 -- Technical Indicators Indexes
 CREATE INDEX IF NOT EXISTS idx_technical_symbol ON technical_indicators(symbol);

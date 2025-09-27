@@ -1069,19 +1069,31 @@ class StockInitializationService:
             # Import here to avoid circular imports
             from ..data.historical_data_service import HistoricalDataService
 
-            # Check if this is truly initial setup (no historical data exists)
+            # Check if this is truly initial setup (no recent historical data exists)
             try:
                 from ...models.historical_models import HistoricalData
-                with self.db_manager.get_session() as session:
-                    existing_historical_count = session.query(HistoricalData).count()
+                from datetime import datetime, timedelta
 
-                    if existing_historical_count > 1000:  # Already have substantial historical data
-                        logger.info(f"📊 Historical data already exists ({existing_historical_count:,} records) - skipping initial fetch")
+                with self.db_manager.get_session() as session:
+                    # Check if we have data up to yesterday/today
+                    yesterday = (datetime.now() - timedelta(days=1)).date()
+                    today = datetime.now().date()
+
+                    # Check if we have recent data (yesterday or today)
+                    recent_data_count = session.query(HistoricalData).filter(
+                        HistoricalData.date >= yesterday
+                    ).count()
+
+                    total_historical_count = session.query(HistoricalData).count()
+
+                    if recent_data_count > 0:  # Have recent data up to yesterday/today
+                        logger.info(f"📊 Recent historical data exists ({recent_data_count} records for {yesterday} onwards, {total_historical_count:,} total records) - skipping initial fetch")
                         return {
                             'success': True,
                             'skipped': True,
-                            'reason': 'Historical data already exists',
-                            'existing_records': existing_historical_count
+                            'reason': 'Recent historical data already exists',
+                            'recent_records': recent_data_count,
+                            'total_records': total_historical_count
                         }
             except ImportError:
                 logger.warning("Historical data models not available - skipping historical data fetch")

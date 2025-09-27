@@ -434,17 +434,49 @@ class HistoricalDataService:
                         if existing:
                             continue  # Skip existing records
 
-                        # Create new record
+                        # Create new record with ALL Fyers fields + calculated fields
+                        open_price = float(row['open'])
+                        high_price = float(row['high'])
+                        low_price = float(row['low'])
+                        close_price = float(row['close'])
+                        volume_val = int(row['volume'])
+
+                        # Calculate additional fields for enhanced analysis
+                        price_change = close_price - open_price
+                        price_change_pct = (price_change / open_price * 100) if open_price > 0 else 0
+                        high_low_range = high_price - low_price
+                        high_low_pct = (high_low_range / close_price * 100) if close_price > 0 and high_low_range > 0 else 0
+                        body_pct = (abs(close_price - open_price) / high_low_range * 100) if high_low_range > 0 else 0
+                        upper_shadow_pct = ((high_price - max(open_price, close_price)) / high_low_range * 100) if high_low_range > 0 else 0
+                        lower_shadow_pct = ((min(open_price, close_price) - low_price) / high_low_range * 100) if high_low_range > 0 else 0
+                        turnover_inr = close_price * volume_val / 10000000 if close_price and volume_val else 0  # in crores
+
                         historical_record = HistoricalData(
                             symbol=symbol,
                             date=row['date'],
-                            open=float(row['open']),
-                            high=float(row['high']),
-                            low=float(row['low']),
-                            close=float(row['close']),
-                            volume=int(row['volume']),
-                            turnover=float(row['close']) * int(row['volume']) / 10000000 if row['close'] and row['volume'] else None,
-                            data_source='fyers'
+                            timestamp=int(row.get('timestamp', 0)),  # Store original Unix timestamp
+
+                            # Core OHLCV from Fyers (ALL 6 fields)
+                            open=open_price,
+                            high=high_price,
+                            low=low_price,
+                            close=close_price,
+                            volume=volume_val,
+
+                            # Calculated fields for enhanced analysis
+                            turnover=turnover_inr,
+                            price_change=price_change,
+                            price_change_pct=price_change_pct,
+                            high_low_pct=high_low_pct,
+                            body_pct=body_pct,
+                            upper_shadow_pct=upper_shadow_pct,
+                            lower_shadow_pct=lower_shadow_pct,
+
+                            # Metadata
+                            data_source='fyers',
+                            api_resolution='1D',
+                            data_quality_score=1.0,  # Full data available
+                            is_adjusted=False
                         )
 
                         session.add(historical_record)

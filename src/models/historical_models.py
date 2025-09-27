@@ -17,7 +17,7 @@ except ImportError:
 class HistoricalData(Base):
     """
     Historical OHLCV data for stocks - optimized for technical analysis
-    Stores daily candle data for 2+ years for accurate indicator calculations
+    Stores ALL available data from Fyers API plus calculated fields
     """
     __tablename__ = 'historical_data'
 
@@ -25,20 +25,33 @@ class HistoricalData(Base):
     symbol = Column(String(50), nullable=False, index=True)
     date = Column(Date, nullable=False, index=True)
 
-    # OHLCV Data
+    # Core OHLCV Data from Fyers API (ALL 6 fields)
+    timestamp = Column(BigInteger, nullable=False)  # Original Unix timestamp
     open = Column(Float, nullable=False)
     high = Column(Float, nullable=False)
     low = Column(Float, nullable=False)
     close = Column(Float, nullable=False)
     volume = Column(BigInteger, nullable=False)
 
-    # Additional useful data
+    # Calculated fields for enhanced analysis
     adj_close = Column(Float)  # Adjusted close for splits/dividends
-    turnover = Column(Float)  # Daily turnover in crores
+    turnover = Column(Float)  # Daily turnover in INR (price * volume)
+    price_change = Column(Float)  # Close - Open
+    price_change_pct = Column(Float)  # (Close - Open) / Open * 100
+    high_low_pct = Column(Float)  # (High - Low) / Close * 100
+    body_pct = Column(Float)  # |Close - Open| / (High - Low) * 100
+    upper_shadow_pct = Column(Float)  # Upper wick percentage
+    lower_shadow_pct = Column(Float)  # Lower wick percentage
 
-    # Data quality flags
+    # Volume analysis
+    volume_sma_ratio = Column(Float)  # Volume / SMA(Volume, 20)
+    price_volume_trend = Column(Float)  # PVT indicator value
+
+    # Data quality and metadata
     is_adjusted = Column(Boolean, default=False)
     data_source = Column(String(20), default='fyers')
+    api_resolution = Column(String(10))  # Original API resolution (1D, 5M, etc.)
+    data_quality_score = Column(Float)  # 0-1 score for data completeness
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)

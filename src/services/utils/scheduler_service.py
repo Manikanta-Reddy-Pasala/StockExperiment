@@ -352,16 +352,15 @@ class SchedulerService:
 
                 init_service = StockInitializationService()
 
-                # Update current prices and volumes for active stocks
-                result = init_service.update_current_market_data(
-                    user_id=user_id,
-                    max_stocks=200  # Update current data for more stocks
-                )
+                # Update current prices and volumes for active stocks using fast sync
+                result = init_service.fast_sync_stocks(user_id=user_id)
 
                 if result.get('success'):
-                    logger.info(f"💰 Market data refresh completed: {result.get('updated', 0)} stocks updated")
+                    stocks_created = result.get('stocks_created', 0)
+                    symbols_processed = result.get('symbols_processed', 0)
+                    logger.info(f"💰 Market data refresh completed: {stocks_created} stocks created/updated from {symbols_processed} symbols processed")
                 else:
-                    logger.warning(f"⚠️ Market data refresh had issues: {result.get('message', 'Unknown issue')}")
+                    logger.warning(f"⚠️ Market data refresh had issues: {result.get('error', 'Unknown issue')}")
 
             except Exception as e:
                 logger.error(f"Error in scheduled market data refresh: {e}")
