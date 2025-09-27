@@ -641,10 +641,13 @@ class StockInitializationService:
                     session.commit()
                     logger.info(f"✅ Updated verification status for {len(verified_symbols)} symbols")
 
-            # Step 5: Auto-trigger volatility calculation (only if historical data exists)
+            # Step 5: Fetch historical data for all stocks (during initial setup)
+            historical_result = self._fetch_initial_historical_data(user_id, stocks_created)
+
+            # Step 6: Auto-trigger volatility calculation (only if historical data exists)
             volatility_result = self._auto_trigger_volatility_calculation(user_id)
 
-            # Step 6: Update fundamental data for stocks
+            # Step 7: Update fundamental data for stocks
             logger.info("📊 Updating fundamental data for stocks...")
             fundamental_result = self._update_fundamental_data(user_id)
 
@@ -660,6 +663,7 @@ class StockInitializationService:
                 'stocks_created': stocks_created,
                 'success_rate': stocks_created / len(symbols) * 100 if symbols else 0,
                 'speed_symbols_per_second': len(symbols) / duration if duration > 0 else 0,
+                'historical_data_fetch': historical_result,
                 'volatility_calculation': volatility_result,
                 'fundamental_data_update': fundamental_result
             }
@@ -1057,6 +1061,71 @@ class StockInitializationService:
                 'success': False,
                 'error': str(e),
                 'updated_count': 0
+            }
+
+    def _fetch_initial_historical_data(self, user_id: int, stocks_created: int) -> Dict[str, Any]:
+        """Fetch initial historical data during first-time setup."""
+        try:
+            # Import here to avoid circular imports
+            from ..data.historical_data_service import HistoricalDataService
+
+            # Check if this is truly initial setup (no historical data exists)
+            try:
+                from ...models.historical_models import HistoricalData
+                with self.db_manager.get_session() as session:
+                    existing_historical_count = session.query(HistoricalData).count()
+
+                    if existing_historical_count > 1000:  # Already have substantial historical data
+                        logger.info(f"📊 Historical data already exists ({existing_historical_count:,} records) - skipping initial fetch")
+                        return {
+                            'success': True,
+                            'skipped': True,
+                            'reason': 'Historical data already exists',
+                            'existing_records': existing_historical_count
+                        }
+            except ImportError:
+                logger.warning("Historical data models not available - skipping historical data fetch")
+                return {
+                    'success': False,
+                    'error': 'Historical data models not available'
+                }
+
+            # Only fetch historical data if we actually created new stocks
+            if stocks_created == 0:
+                logger.info("📊 No new stocks created - skipping historical data fetch")
+                return {
+                    'success': True,
+                    'skipped': True,
+                    'reason': 'No new stocks created'
+                }
+
+            logger.info("📈 Starting initial historical data fetch for all stocks (1+ year data)")
+            logger.info("💡 This is a one-time setup process - subsequent updates will be incremental")
+
+            # Use historical data service to fetch bulk data
+            historical_service = HistoricalDataService()
+
+            # Fetch 1+ year of data for up to 100 stocks initially (to avoid overwhelming system)
+            result = historical_service.fetch_historical_data_bulk(
+                user_id=user_id,
+                days=500,  # ~2 years of trading days
+                max_stocks=100  # Limit for initial setup
+            )
+
+            if result.get('success'):
+                logger.info(f"📊 Initial historical data fetch completed: {result.get('successful', 0)} stocks processed")
+                logger.info("🔄 Additional stocks will be processed by scheduler automatically")
+            else:
+                logger.warning(f"⚠️ Initial historical data fetch had issues: {result.get('error', 'Unknown error')}")
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error fetching initial historical data: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'processed': 0
             }
 
 
