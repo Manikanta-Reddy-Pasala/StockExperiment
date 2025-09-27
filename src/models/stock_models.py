@@ -53,6 +53,7 @@ class Stock(Base):
     avg_daily_turnover = Column(Float)  # Average daily turnover in crores
     bid_ask_spread = Column(Float)  # Bid-ask spread percentage
     trades_per_day = Column(Integer)  # Average trades per day
+    liquidity_score = Column(Float)  # Liquidity score (0-1 scale)
 
     # Status and metadata
     is_active = Column(Boolean, default=True, index=True)

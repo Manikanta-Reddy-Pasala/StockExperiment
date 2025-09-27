@@ -865,6 +865,171 @@ class StockInitializationService:
                 'updated_count': 0
             }
 
+    def _calculate_additional_fields(self, stock_data: Dict) -> Dict:
+        """Calculate additional fields required for filtering."""
+        try:
+            # Calculate daily turnover in INR (convert to crores for database)
+            current_price = stock_data.get('current_price', 0)
+            volume = stock_data.get('volume', 0)
+            daily_turnover_inr = current_price * volume if current_price and volume else 0
+            avg_daily_turnover = daily_turnover_inr / 10000000  # Convert to crores
+
+            # Calculate basic liquidity score (0-1 scale)
+            # Based on volume and reasonable price stability
+            liquidity_score = self._calculate_liquidity_score(current_price, volume, daily_turnover_inr)
+
+            # Estimate trades per day based on volume
+            # High volume stocks typically have more trades
+            trades_per_day = self._estimate_trades_per_day(volume, daily_turnover_inr)
+
+            # Add calculated fields to stock data
+            additional_fields = {
+                'avg_daily_turnover': avg_daily_turnover,
+                'liquidity_score': liquidity_score,
+                'trades_per_day': trades_per_day
+            }
+
+            # Merge with existing data
+            enhanced_data = stock_data.copy()
+            enhanced_data.update(additional_fields)
+
+            return enhanced_data
+
+        except Exception as e:
+            logger.warning(f"Error calculating additional fields for {stock_data.get('symbol', 'unknown')}: {e}")
+            return stock_data
+
+    def _calculate_liquidity_score(self, price: float, volume: int, turnover: float) -> float:
+        """Calculate liquidity score based on price, volume, and turnover."""
+        try:
+            if not price or not volume:
+                return 0.0
+
+            # Normalize factors
+            # Volume factor: higher volume = higher liquidity
+            volume_factor = min(1.0, volume / 1000000)  # Normalize to 1M shares
+
+            # Turnover factor: higher turnover = higher liquidity
+            turnover_factor = min(1.0, turnover / 50000000)  # Normalize to 5Cr INR
+
+            # Price stability factor: prices in reasonable range are more liquid
+            if 50 <= price <= 2000:
+                price_factor = 1.0
+            elif price < 50:
+                price_factor = price / 50  # Lower score for penny stocks
+            else:
+                price_factor = max(0.3, 2000 / price)  # Lower score for very expensive stocks
+
+            # Combined liquidity score (weighted average)
+            liquidity_score = (
+                volume_factor * 0.4 +
+                turnover_factor * 0.4 +
+                price_factor * 0.2
+            )
+
+            return round(liquidity_score, 3)
+
+        except Exception as e:
+            logger.warning(f"Error calculating liquidity score: {e}")
+            return 0.0
+
+    def _estimate_trades_per_day(self, volume: int, turnover: float) -> int:
+        """Estimate number of trades per day based on volume and turnover."""
+        try:
+            if not volume or not turnover:
+                return 0
+
+            # High volume stocks typically have more trades
+            # Rough estimation based on market patterns
+            if volume > 1000000:  # Very high volume
+                base_trades = 1000
+            elif volume > 500000:  # High volume
+                base_trades = 500
+            elif volume > 100000:  # Medium volume
+                base_trades = 200
+            elif volume > 50000:   # Low-medium volume
+                base_trades = 100
+            else:                  # Low volume
+                base_trades = 50
+
+            # Adjust based on turnover
+            turnover_multiplier = min(2.0, turnover / 10000000)  # Max 2x boost for 1Cr+ turnover
+
+            estimated_trades = int(base_trades * (1 + turnover_multiplier))
+
+            return max(0, estimated_trades)
+
+        except Exception as e:
+            logger.warning(f"Error estimating trades per day: {e}")
+            return 0
+
+    def _update_stocks_with_additional_fields(self) -> Dict:
+        """Update existing stocks with additional calculated fields."""
+        try:
+            logger.info("🔄 Calculating additional fields for all stocks...")
+
+            with self.db_manager.get_session() as session:
+                # Get all stocks that need additional field calculations
+                stocks = session.query(Stock).filter(
+                    and_(
+                        Stock.current_price > 0,
+                        Stock.volume > 0
+                    )
+                ).all()
+
+                updated_count = 0
+                batch_size = 100
+
+                for i in range(0, len(stocks), batch_size):
+                    batch = stocks[i:i + batch_size]
+
+                    for stock in batch:
+                        try:
+                            # Calculate additional fields
+                            stock_data = {
+                                'symbol': stock.symbol,
+                                'current_price': stock.current_price,
+                                'volume': stock.volume
+                            }
+
+                            enhanced_data = self._calculate_additional_fields(stock_data)
+
+                            # Update stock with calculated fields
+                            # Note: Only update if fields don't exist or are zero
+                            if not hasattr(stock, 'avg_daily_turnover') or not stock.avg_daily_turnover:
+                                stock.avg_daily_turnover = enhanced_data['avg_daily_turnover']
+
+                            if not hasattr(stock, 'liquidity_score') or not stock.liquidity_score:
+                                stock.liquidity_score = enhanced_data['liquidity_score']
+
+                            if not hasattr(stock, 'trades_per_day') or not stock.trades_per_day:
+                                stock.trades_per_day = enhanced_data['trades_per_day']
+
+                            updated_count += 1
+
+                        except Exception as e:
+                            logger.warning(f"Error updating additional fields for {stock.symbol}: {e}")
+                            continue
+
+                    # Commit batch
+                    session.commit()
+
+                logger.info(f"✅ Updated additional fields for {updated_count:,} stocks")
+
+                return {
+                    'success': True,
+                    'updated_count': updated_count,
+                    'message': f'Additional fields calculated for {updated_count:,} stocks'
+                }
+
+        except Exception as e:
+            logger.error(f"Error updating stocks with additional fields: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'updated_count': 0
+            }
+
 
 # Global service instance
 _stock_initialization_service = None
