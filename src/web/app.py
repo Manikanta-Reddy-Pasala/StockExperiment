@@ -1245,6 +1245,7 @@ def create_app():
         app.logger.warning(f"Suggested stocks routes not available: {e}")
         app.logger.warning("Suggested stocks functionality will be disabled")
 
+
     # Individual broker page routes
     @app.route('/brokers/fyers')
     @login_required

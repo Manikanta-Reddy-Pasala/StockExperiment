@@ -1,0 +1,136 @@
+# Ollama API Configuration
+# Configuration for Ollama web search API integration
+
+# -------------------------
+# API CONFIGURATION
+# -------------------------
+api:
+  base_url: "https://ollama.com/api/web_search"
+  api_key: "79ef8f3ed6b64e68ad0ebae4ec3a33fc.CyoLQTwx_zLGuqx_VBd25cPT"
+  timeout_seconds: 30
+  max_retries: 3
+
+# -------------------------
+# RATE LIMITING
+# -------------------------
+rate_limiting:
+  delay_between_calls: 1.0  # seconds between API calls
+  max_requests_per_minute: 60
+  burst_limit: 10
+  backoff_multiplier: 2.0
+  max_backoff_delay: 30.0
+
+# -------------------------
+# ENHANCEMENT LEVELS
+# -------------------------
+enhancement_levels:
+  light:
+    enabled: true
+    queries:
+      - "basic_analysis"
+    max_sources_per_query: 3
+    timeout_seconds: 15
+    
+  moderate:
+    enabled: true
+    queries:
+      - "basic_analysis"
+      - "financial_performance"
+      - "market_sentiment"
+    max_sources_per_query: 5
+    timeout_seconds: 30
+    
+  comprehensive:
+    enabled: true
+    queries:
+      - "basic_analysis"
+      - "financial_performance"
+      - "market_sentiment"
+      - "sector_analysis"
+      - "news_sentiment"
+    max_sources_per_query: 8
+    timeout_seconds: 45
+
+# -------------------------
+# QUERY TEMPLATES
+# -------------------------
+query_templates:
+  basic_analysis: "{company_name} stock analysis 2024"
+  financial_performance: "{company_name} financial results Q4 2024 earnings revenue profit"
+  market_sentiment: "{company_name} stock price target analyst recommendations buy sell hold"
+  sector_analysis: "{company_name} sector performance industry outlook 2024"
+  news_sentiment: "{company_name} latest news market updates recent developments"
+
+# -------------------------
+# DATA PROCESSING
+# -------------------------
+data_processing:
+  max_insights_per_source: 5
+  max_financial_metrics: 10
+  sentiment_analysis:
+    enabled: true
+    positive_keywords: ["growth", "profit", "increase", "strong", "positive", "bullish", "buy", "outperform"]
+    negative_keywords: ["decline", "loss", "decrease", "weak", "negative", "bearish", "sell", "underperform"]
+    neutral_threshold: 0.3
+  
+  financial_metrics:
+    percentage_pattern: r'(\d+\.?\d*%)'
+    currency_pattern: r'[₹$]\s*(\d+\.?\d*)\s*(crore|billion|million|lakh)'
+    max_percentages: 3
+    max_currencies: 3
+
+# -------------------------
+# SCORING CONFIGURATION
+# -------------------------
+scoring:
+  base_score: 0.3
+  sources_weight: 0.1
+  insights_weight: 0.05
+  sentiment_weight: 0.1
+  financial_metrics_weight: 0.02
+  max_score: 1.0
+  
+  enhancement_thresholds:
+    excellent: 0.8
+    good: 0.6
+    moderate: 0.4
+    poor: 0.2
+
+# -------------------------
+# ERROR HANDLING
+# -------------------------
+error_handling:
+  enable_fallback: true
+  fallback_to_original: true
+  log_errors: true
+  retry_on_failure: true
+  max_consecutive_failures: 3
+  
+  error_messages:
+    api_unavailable: "Ollama API temporarily unavailable"
+    rate_limit_exceeded: "Rate limit exceeded, please try again later"
+    invalid_response: "Invalid response from Ollama API"
+    timeout: "Request timeout, please try again"
+
+# -------------------------
+# CACHING (Future Enhancement)
+# -------------------------
+caching:
+  enabled: false  # Not implemented yet
+  cache_duration_hours: 24
+  cache_key_prefix: "ollama_enhancement_"
+  max_cache_size_mb: 100
+
+# -------------------------
+# LOGGING
+# -------------------------
+logging:
+  enable_debug: false
+  log_api_calls: true
+  log_enhancement_scores: true
+  log_error_details: true
+  log_performance_metrics: true
+  
+  performance_thresholds:
+    slow_request_seconds: 10.0
+    very_slow_request_seconds: 30.0

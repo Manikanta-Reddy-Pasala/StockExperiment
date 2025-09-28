@@ -159,15 +159,36 @@ class AdvancedStrategyService:
                 )
                 recommendations.append(recommendation)
             
-            total_investment = sum(rec.recommended_quantity * rec.stock_data.current_price for rec in recommendations)
+            # Convert recommendations to dict format for Ollama enhancement
+            recommendations_dict = [self._recommendation_to_dict(rec) for rec in recommendations]
+            
+            # Apply Ollama enhancement to final strategy recommendations
+            try:
+                from src.services.data.strategy_ollama_enhancement_service import get_strategy_ollama_enhancement_service
+                ollama_service = get_strategy_ollama_enhancement_service()
+                
+                logger.info(f"🔍 Applying Ollama enhancement to {len(recommendations_dict)} strategy recommendations")
+                enhanced_recommendations = ollama_service.enhance_strategy_recommendations(
+                    recommendations_dict, strategy_type, "comprehensive"
+                )
+                
+                # Update recommendations with enhanced data
+                recommendations_dict = enhanced_recommendations
+                logger.info(f"✅ Ollama enhancement completed for strategy recommendations")
+                
+            except Exception as e:
+                logger.warning(f"Ollama enhancement failed: {e}")
+                logger.warning("Continuing with original recommendations")
+            
+            total_investment = sum(rec.get('recommended_quantity', 0) * rec.get('current_price', 0) for rec in recommendations_dict)
             
             result = {
                 "success": True,
                 "strategy_type": strategy_type,
                 "strategy_name": config.name,
                 "broker_used": current_broker,
-                "total_recommendations": len(recommendations),
-                "recommendations": [self._recommendation_to_dict(rec) for rec in recommendations],
+                "total_recommendations": len(recommendations_dict),
+                "recommendations": recommendations_dict,
                 "summary": {"total_investment": total_investment}
             }
             

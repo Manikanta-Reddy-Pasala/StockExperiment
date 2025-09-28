@@ -160,6 +160,45 @@ class PortfolioStrategyEngine:
             logger.info("Step 4: Position management...")
             position_results = self.step4_position_management(entry_candidates, capital)
             
+            # Apply Ollama enhancement to final portfolio positions
+            try:
+                from src.services.data.strategy_ollama_enhancement_service import get_strategy_ollama_enhancement_service
+                ollama_service = get_strategy_ollama_enhancement_service()
+                
+                # Enhance portfolio-level results
+                if position_results.get('success', False) and position_results.get('executed_positions'):
+                    logger.info(f"🔍 Applying Ollama enhancement to {len(position_results['executed_positions'])} portfolio positions")
+                    
+                    # Convert positions to enhancement format
+                    positions_for_enhancement = []
+                    for position in position_results['executed_positions']:
+                        positions_for_enhancement.append({
+                            'symbol': position.get('symbol', ''),
+                            'name': position.get('symbol', ''),  # Use symbol as name if not available
+                            'current_price': position.get('entry_price', 0.0),
+                            'recommended_quantity': position.get('quantity', 0),
+                            'risk_bucket': position.get('risk_bucket', ''),
+                            'market_cap': position.get('market_cap', ''),
+                            'entry_reason': position.get('entry_reason', '')
+                        })
+                    
+                    # Apply Ollama enhancement
+                    enhanced_positions = ollama_service.enhance_strategy_recommendations(
+                        positions_for_enhancement, risk_bucket.value, "comprehensive"
+                    )
+                    
+                    # Update position results with enhanced data
+                    position_results['ollama_enhanced'] = True
+                    position_results['enhanced_positions'] = enhanced_positions
+                    position_results['ollama_enhancement_timestamp'] = datetime.now().isoformat()
+                    
+                    logger.info(f"✅ Ollama enhancement completed for portfolio positions")
+                    
+            except Exception as e:
+                logger.warning(f"Ollama enhancement failed: {e}")
+                logger.warning("Continuing with original portfolio positions")
+                position_results['ollama_enhanced'] = False
+            
             # Compile complete results
             results = {
                 "success": True,

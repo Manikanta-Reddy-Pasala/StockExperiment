@@ -1283,6 +1283,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
                 logger.error(f"Conversion failed: {e}")
                 suggested_stocks = []
 
+
             # Log comprehensive statistics
             self._log_pipeline_statistics(
                 total_stocks=len(screened_stocks),
