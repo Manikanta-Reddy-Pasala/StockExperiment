@@ -57,28 +57,20 @@ class PipelineSaga:
         self.retry_delay = 60  # 1 minute between retries
         
     def create_pipeline_tracking_table(self):
-        """Create table to track pipeline progress and failures."""
+        """Verify pipeline tracking table exists (created by init script)."""
         try:
             with self.db_manager.get_session() as session:
-                session.execute(text("""
-                    CREATE TABLE IF NOT EXISTS pipeline_tracking (
-                        id SERIAL PRIMARY KEY,
-                        step_name VARCHAR(50) NOT NULL,
-                        status VARCHAR(20) NOT NULL DEFAULT 'pending',
-                        started_at TIMESTAMP,
-                        completed_at TIMESTAMP,
-                        retry_count INTEGER DEFAULT 0,
-                        failure_reason TEXT,
-                        records_processed INTEGER DEFAULT 0,
-                        last_error TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """))
-                session.commit()
-                logger.info("✅ Pipeline tracking table created/verified")
+                # Just verify the table exists - it's created by init-scripts/01-init-db.sql
+                result = session.execute(text("""
+                    SELECT COUNT(*) FROM information_schema.tables
+                    WHERE table_name = 'pipeline_tracking'
+                """)).scalar()
+                if result > 0:
+                    logger.info("✅ Pipeline tracking table verified")
+                else:
+                    logger.error("❌ Pipeline tracking table not found - check init scripts")
         except Exception as e:
-            logger.error(f"Error creating pipeline tracking table: {e}")
+            logger.error(f"Error verifying pipeline tracking table: {e}")
     
     def get_step_status(self, step: PipelineStep) -> Dict[str, Any]:
         """Get current status of a pipeline step."""
@@ -105,26 +97,42 @@ class PipelineSaga:
             logger.error(f"Error getting step status: {e}")
             return {'status': 'pending', 'retry_count': 0}
     
-    def update_step_status(self, step: PipelineStep, status: PipelineStatus, 
+    def update_step_status(self, step: PipelineStep, status: PipelineStatus,
                           records_processed: int = 0, error: str = None):
-        """Update pipeline step status."""
+        """Update pipeline step status using UPSERT to handle unique constraint."""
         try:
             with self.db_manager.get_session() as session:
-                # Get current retry count
+                # Get current retry count for RETRYING status
                 current = session.execute(text("""
-                    SELECT retry_count FROM pipeline_tracking 
-                    WHERE step_name = :step_name 
-                    ORDER BY created_at DESC LIMIT 1
+                    SELECT retry_count FROM pipeline_tracking
+                    WHERE step_name = :step_name
+                    LIMIT 1
                 """), {'step_name': step.name}).fetchone()
-                
+
                 retry_count = (current.retry_count + 1) if current and status == PipelineStatus.RETRYING else (current.retry_count if current else 0)
-                
+
+                # Use UPSERT (INSERT ... ON CONFLICT ... DO UPDATE) to handle unique constraint
                 session.execute(text("""
-                    INSERT INTO pipeline_tracking 
-                    (step_name, status, started_at, completed_at, retry_count, failure_reason, 
+                    INSERT INTO pipeline_tracking
+                    (step_name, status, started_at, completed_at, retry_count, failure_reason,
                      records_processed, last_error, updated_at)
-                    VALUES (:step_name, :status, :started_at, :completed_at, :retry_count, 
+                    VALUES (:step_name, :status, :started_at, :completed_at, :retry_count,
                             :failure_reason, :records_processed, :last_error, :updated_at)
+                    ON CONFLICT (step_name) DO UPDATE SET
+                        status = EXCLUDED.status,
+                        started_at = CASE
+                            WHEN EXCLUDED.status = 'in_progress' THEN EXCLUDED.started_at
+                            ELSE pipeline_tracking.started_at
+                        END,
+                        completed_at = CASE
+                            WHEN EXCLUDED.status = 'completed' THEN EXCLUDED.completed_at
+                            ELSE pipeline_tracking.completed_at
+                        END,
+                        retry_count = EXCLUDED.retry_count,
+                        failure_reason = EXCLUDED.failure_reason,
+                        records_processed = EXCLUDED.records_processed,
+                        last_error = EXCLUDED.last_error,
+                        updated_at = EXCLUDED.updated_at
                 """), {
                     'step_name': step.name,
                     'status': status.value,
@@ -977,16 +985,12 @@ class PipelineSaga:
         try:
             with self.db_manager.get_session() as session:
                 results = session.execute(text("""
-                    SELECT step_name, status, retry_count, failure_reason, 
+                    SELECT step_name, status, retry_count, failure_reason,
                            records_processed, last_error, updated_at
-                    FROM pipeline_tracking 
-                    WHERE id IN (
-                        SELECT MAX(id) FROM pipeline_tracking 
-                        GROUP BY step_name
-                    )
+                    FROM pipeline_tracking
                     ORDER BY step_name
                 """)).fetchall()
-                
+
                 status = {}
                 for row in results:
                     status[row.step_name] = {
@@ -997,7 +1001,7 @@ class PipelineSaga:
                         'last_error': row.last_error,
                         'updated_at': row.updated_at
                     }
-                
+
                 return status
         except Exception as e:
             logger.error(f"Error getting pipeline status: {e}")
