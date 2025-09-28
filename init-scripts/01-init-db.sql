@@ -250,6 +250,7 @@ CREATE TABLE IF NOT EXISTS stocks (
     trades_per_day INTEGER,  -- Average trades per day
     liquidity_score DOUBLE PRECISION,  -- Liquidity score (0-1 scale) for Stage 1 filtering
     volatility_last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- For tracking volatility updates
+    volatility DECIMAL(10,6),  -- Calculated volatility for the stock
     is_active BOOLEAN DEFAULT TRUE,
     is_tradeable BOOLEAN DEFAULT TRUE,
     is_suspended BOOLEAN DEFAULT FALSE,

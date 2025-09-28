@@ -127,29 +127,24 @@ def create_app():
                 app.logger.info("🚀 Running COMPLETE system initialization...")
                 app.logger.info("📊 This includes: Symbol Master → Stocks → Historical Data → Technical Indicators → Volatility")
 
-                results = stock_init_service.complete_system_initialization()
+                # Use the new pipeline saga instead of old service
+                from src.services.data.pipeline_saga import get_pipeline_saga
+                pipeline_saga = get_pipeline_saga()
+                results = pipeline_saga.run_pipeline()
 
                 if results.get('success'):
                     app.logger.info("✅ Complete system initialization succeeded!")
                     app.logger.info(f"⏱️ Total duration: {results.get('total_duration', 0):.1f}s")
+                    app.logger.info(f"📊 Steps completed: {len(results.get('steps_completed', []))}")
+                    app.logger.info(f"📊 Total records processed: {results.get('total_records_processed', 0)}")
 
-                    # Log step results
-                    steps = results.get('steps', {})
-                    if 'stocks_sync' in steps:
-                        stocks = steps['stocks_sync']
-                        app.logger.info(f"📊 Stocks: {stocks.get('total_symbols', 0)} synced")
-
-                    if 'historical_data' in steps:
-                        historical = steps['historical_data']
-                        app.logger.info(f"📈 Historical: {historical.get('records_processed', 0)} records")
-
-                    if 'technical_indicators' in steps:
-                        indicators = steps['technical_indicators']
-                        app.logger.info(f"📊 Indicators: {indicators.get('symbols_processed', 0)} symbols")
-
-                    if 'volatility' in steps:
-                        volatility = steps['volatility']
-                        app.logger.info(f"📈 Volatility: {volatility.get('stocks_updated', 0)} stocks")
+                    # Log individual step results
+                    from src.services.data.pipeline_saga import get_pipeline_saga
+                    saga = get_pipeline_saga()
+                    status = saga.get_pipeline_status()
+                    
+                    for step, info in status.items():
+                        app.logger.info(f"📊 {step}: {info['status']} ({info['records_processed']} records)")
 
                 else:
                     app.logger.error(f"❌ Complete system initialization failed: {results.get('error', 'Unknown error')}")

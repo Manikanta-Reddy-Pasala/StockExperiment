@@ -30,6 +30,8 @@ class PipelineStep(Enum):
     STOCKS = 2
     HISTORICAL_DATA = 3
     TECHNICAL_INDICATORS = 4
+    VOLATILITY_CALCULATION = 5
+    PIPELINE_VALIDATION = 6
 
 
 class PipelineStatus(Enum):
@@ -254,7 +256,8 @@ class PipelineSaga:
                         'message': f'Stocks already has {count} records'
                     }
                 else:
-                    # Trigger stock sync
+                    # Trigger stock sync (volatility warning is expected here)
+                    # Volatility will be calculated in Step 5 (VOLATILITY_CALCULATION)
                     from ..data.stock_initialization_service import get_stock_initialization_service
                     init_service = get_stock_initialization_service()
                     result = init_service.fast_sync_stocks(user_id=1)
@@ -263,7 +266,7 @@ class PipelineSaga:
                         return {
                             'success': True,
                             'records_processed': result.get('stocks_created', 0),
-                            'message': 'Stocks populated successfully'
+                            'message': 'Stocks populated successfully (volatility will be calculated in Step 5)'
                         }
                     else:
                         return {
@@ -399,6 +402,182 @@ class PipelineSaga:
                 }
         except Exception as e:
             return {'success': False, 'error': str(e)}
+
+    def step_volatility_calculation(self) -> Dict[str, Any]:
+        """Step 5: Calculate volatility data for stocks."""
+        try:
+            logger.info("🔄 Starting volatility calculation step...")
+            
+            # Get stocks that need volatility calculation
+            stocks_needing_volatility = self._get_stocks_needing_volatility()
+            
+            if not stocks_needing_volatility:
+                logger.info("✅ All stocks already have volatility data")
+                return {
+                    'success': True,
+                    'records_processed': 0,
+                    'message': 'All stocks already have volatility data'
+                }
+            
+            logger.info(f"📊 Found {len(stocks_needing_volatility)} stocks needing volatility calculation")
+            
+            # Calculate volatility for each stock
+            records_processed = 0
+            for symbol in stocks_needing_volatility:
+                try:
+                    # Get historical data for volatility calculation
+                    with self.db_manager.get_session() as session:
+                        historical_data = session.query(HistoricalData).filter(
+                            HistoricalData.symbol == symbol
+                        ).order_by(HistoricalData.date.desc()).limit(30).all()
+                        
+                        if len(historical_data) < 20:  # Need at least 20 days for volatility
+                            logger.warning(f"⚠️ Insufficient data for volatility calculation: {symbol}")
+                            continue
+                        
+                        # Calculate volatility (standard deviation of returns)
+                        returns = []
+                        for i in range(1, len(historical_data)):
+                            prev_close = historical_data[i].close
+                            curr_close = historical_data[i-1].close
+                            if prev_close > 0:
+                                returns.append((curr_close - prev_close) / prev_close)
+                        
+                        if len(returns) < 10:
+                            logger.warning(f"⚠️ Insufficient returns for volatility calculation: {symbol}")
+                            continue
+                        
+                        import numpy as np
+                        volatility = np.std(returns) * np.sqrt(252)  # Annualized volatility
+                        
+                        # Update stock with volatility data
+                        stock = session.query(Stock).filter(Stock.symbol == symbol).first()
+                        if stock:
+                            stock.volatility = volatility
+                            session.commit()
+                            records_processed += 1
+                            logger.info(f"✅ Updated volatility for {symbol}: {volatility:.4f}")
+                    
+                
+                except Exception as e:
+                    logger.error(f"❌ Error calculating volatility for {symbol}: {e}")
+                    continue
+            
+            logger.info(f"✅ Volatility calculation completed: {records_processed} stocks updated")
+            return {
+                'success': True,
+                'records_processed': records_processed,
+                'message': f'Calculated volatility for {records_processed} stocks'
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Error in volatility calculation step: {e}")
+            return {
+                'success': False,
+                'records_processed': 0,
+                'message': f'Volatility calculation failed: {e}'
+            }
+
+    def step_pipeline_validation(self) -> Dict[str, Any]:
+        """Step 6: Final validation to ensure all steps completed successfully."""
+        try:
+            logger.info("🔄 Starting pipeline validation step...")
+            
+            validation_results = {
+                'symbol_master_count': 0,
+                'stocks_count': 0,
+                'historical_data_count': 0,
+                'technical_indicators_count': 0,
+                'volatility_calculated_count': 0,
+                'issues': []
+            }
+            
+            with self.db_manager.get_session() as session:
+                # Check symbol_master table
+                result = session.execute(text("SELECT COUNT(*) FROM symbol_master")).scalar()
+                validation_results['symbol_master_count'] = result
+                if result == 0:
+                    validation_results['issues'].append("❌ Symbol master table is empty")
+                
+                # Check stocks table
+                result = session.execute(text("SELECT COUNT(*) FROM stocks")).scalar()
+                validation_results['stocks_count'] = result
+                if result == 0:
+                    validation_results['issues'].append("❌ Stocks table is empty")
+                
+                # Check historical_data table
+                result = session.execute(text("SELECT COUNT(*) FROM historical_data")).scalar()
+                validation_results['historical_data_count'] = result
+                if result == 0:
+                    validation_results['issues'].append("❌ Historical data table is empty")
+                
+                # Check technical_indicators table
+                result = session.execute(text("SELECT COUNT(*) FROM technical_indicators")).scalar()
+                validation_results['technical_indicators_count'] = result
+                if result == 0:
+                    validation_results['issues'].append("❌ Technical indicators table is empty")
+                
+                # Check stocks with volatility data
+                result = session.execute(text("SELECT COUNT(*) FROM stocks WHERE volatility IS NOT NULL AND volatility > 0")).scalar()
+                validation_results['volatility_calculated_count'] = result
+                if result == 0:
+                    validation_results['issues'].append("❌ No stocks have volatility data")
+                
+                # Check data quality
+                symbols_with_historical = session.execute(text("""
+                    SELECT COUNT(DISTINCT symbol) FROM historical_data
+                """)).scalar()
+                
+                symbols_with_indicators = session.execute(text("""
+                    SELECT COUNT(DISTINCT symbol) FROM technical_indicators
+                """)).scalar()
+                
+                if symbols_with_historical != symbols_with_indicators:
+                    validation_results['issues'].append(
+                        f"⚠️ Data mismatch: {symbols_with_historical} symbols have historical data, "
+                        f"but only {symbols_with_indicators} have technical indicators"
+                    )
+            
+            # Determine overall success
+            success = len(validation_results['issues']) == 0
+            
+            if success:
+                logger.info("✅ Pipeline validation passed - all steps completed successfully")
+                message = "Pipeline validation passed - all data is complete"
+            else:
+                logger.warning(f"⚠️ Pipeline validation found {len(validation_results['issues'])} issues")
+                message = f"Pipeline validation found {len(validation_results['issues'])} issues"
+            
+            return {
+                'success': success,
+                'records_processed': 0,
+                'message': message,
+                'validation_results': validation_results
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Error in pipeline validation step: {e}")
+            return {
+                'success': False,
+                'records_processed': 0,
+                'message': f'Pipeline validation failed: {e}'
+            }
+
+    def _get_stocks_needing_volatility(self) -> List[str]:
+        """Get stocks that need volatility calculation."""
+        try:
+            with self.db_manager.get_session() as session:
+                # Get stocks that don't have volatility data or have NULL volatility
+                result = session.execute(text("""
+                    SELECT s.symbol FROM stocks s 
+                    WHERE s.volatility IS NULL OR s.volatility = 0
+                    ORDER BY s.volume DESC
+                    LIMIT 100
+                """))
+                return [row[0] for row in result.fetchall()]
+        except Exception as e:
+            logger.error(f"❌ Error getting stocks needing volatility: {e}")
+            return []
     
     def _store_historical_data(self, symbol: str, candles: list) -> int:
         """Store historical data from Fyers API response."""
@@ -495,7 +674,9 @@ class PipelineSaga:
                 (PipelineStep.SYMBOL_MASTER, self.step_symbol_master),
                 (PipelineStep.STOCKS, self.step_stocks),
                 (PipelineStep.HISTORICAL_DATA, self.step_historical_data),
-                (PipelineStep.TECHNICAL_INDICATORS, self.step_technical_indicators)
+                (PipelineStep.TECHNICAL_INDICATORS, self.step_technical_indicators),
+                (PipelineStep.VOLATILITY_CALCULATION, self.step_volatility_calculation),
+                (PipelineStep.PIPELINE_VALIDATION, self.step_pipeline_validation)
             ]
             
             for step, step_function in steps:
