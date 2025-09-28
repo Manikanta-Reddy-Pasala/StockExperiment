@@ -142,6 +142,30 @@ class FundamentalDataService:
         except Exception as e:
             logger.error(f"Error fetching fundamental data for {symbol}: {e}")
             return None
+    
+    def _fetch_fundamental_data_with_session(self, symbol: str, session) -> Optional[Dict[str, Any]]:
+        """Fetch fundamental data for a single stock using existing session."""
+        try:
+            # Try multiple data sources in priority order
+            data = None
+
+            # Try Fyers first (if fundamental data is available)
+            data = self._fetch_from_fyers(symbol)
+            if data:
+                return data
+
+            # Try Yahoo Finance as primary fallback (free, no rate limits)
+            data = self._fetch_from_yahoo_finance(symbol)
+            if data:
+                return data
+
+            # Final fallback to estimated data based on sector using existing session
+            data = self._get_estimated_fundamental_data_with_session(symbol, session)
+            return data
+            
+        except Exception as e:
+            logger.error(f"Error fetching fundamental data for {symbol}: {e}")
+            return None
 
     def _fetch_from_fyers(self, symbol: str) -> Optional[Dict[str, Any]]:
         """Fetch fundamental data from Fyers API."""
@@ -175,28 +199,52 @@ class FundamentalDataService:
             return None
 
     def _fetch_from_yahoo_finance(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """Fetch fundamental data from Yahoo Finance API."""
+        """Fetch fundamental data from Yahoo Finance API with enhanced error handling."""
         try:
             # Convert NSE symbol to Yahoo format
             yahoo_symbol = self._convert_to_yahoo_symbol(symbol)
             if not yahoo_symbol:
+                logger.debug(f"Could not convert {symbol} to Yahoo format")
                 return None
 
-            # Use quoteSummary endpoint for fundamental data
-            url = f"{self.yahoo_finance_quote_url}/{yahoo_symbol}"
-            params = {
-                'modules': 'financialData,defaultKeyStatistics,summaryDetail'
-            }
+            # Try multiple Yahoo Finance endpoints
+            endpoints_to_try = [
+                f"{self.yahoo_finance_quote_url}/{yahoo_symbol}",
+                f"https://query1.finance.yahoo.com/v8/finance/chart/{yahoo_symbol}",
+                f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{yahoo_symbol}"
+            ]
+            
+            for url in endpoints_to_try:
+                try:
+                    params = {
+                        'modules': 'financialData,defaultKeyStatistics,summaryDetail,incomeStatementHistory,balanceSheetHistory'
+                    }
 
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
+                    headers = {
+                        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                        'Accept': 'application/json',
+                        'Accept-Language': 'en-US,en;q=0.9',
+                        'Accept-Encoding': 'gzip, deflate, br',
+                        'Connection': 'keep-alive',
+                        'Upgrade-Insecure-Requests': '1'
+                    }
 
-            response = requests.get(url, params=params, headers=headers, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                return self._parse_yahoo_finance_data(data, symbol)
+                    response = requests.get(url, params=params, headers=headers, timeout=15)
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        parsed_data = self._parse_yahoo_finance_data(data, symbol)
+                        if parsed_data:
+                            logger.debug(f"Successfully fetched Yahoo Finance data for {symbol}")
+                            return parsed_data
+                    else:
+                        logger.debug(f"Yahoo Finance API returned {response.status_code} for {symbol}")
+                        
+                except Exception as e:
+                    logger.debug(f"Yahoo Finance endpoint {url} failed for {symbol}: {e}")
+                    continue
 
+            logger.debug(f"All Yahoo Finance endpoints failed for {symbol}")
             return None
 
         except Exception as e:
@@ -205,48 +253,152 @@ class FundamentalDataService:
     
     
     def _get_estimated_fundamental_data(self, symbol: str) -> Dict[str, Any]:
-        """Generate estimated fundamental data based on sector and price."""
+        """Generate realistic estimated fundamental data based on sector, price, and market cap."""
         try:
-            # Get stock price from database
+            # Get stock data from database
             with self.db_manager.get_session() as session:
                 stock = session.query(Stock).filter(Stock.symbol == symbol).first()
                 if not stock:
                     return None
                 
                 price = stock.current_price or 100
+                market_cap = stock.market_cap or 1000
                 sector = stock.sector or "Others"
+                volume = stock.volume or 100000
                 
-                # Generate realistic estimates based on sector
-                if "BANK" in symbol.upper() or "FINANCE" in symbol.upper():
-                    pe_ratio = 12.0 + (price / 1000) * 2
-                    pb_ratio = 1.5 + (price / 1000) * 0.3
-                    roe = 15.0 + (price / 1000) * 2
-                    debt_to_equity = 0.8 + (price / 1000) * 0.2
-                elif "IT" in symbol.upper() or "TECH" in symbol.upper():
-                    pe_ratio = 25.0 + (price / 1000) * 5
-                    pb_ratio = 4.0 + (price / 1000) * 1
-                    roe = 20.0 + (price / 1000) * 3
-                    debt_to_equity = 0.3 + (price / 1000) * 0.1
-                elif "PHARMA" in symbol.upper() or "HEALTH" in symbol.upper():
-                    pe_ratio = 18.0 + (price / 1000) * 3
-                    pb_ratio = 3.0 + (price / 1000) * 0.5
-                    roe = 18.0 + (price / 1000) * 2
-                    debt_to_equity = 0.5 + (price / 1000) * 0.2
-                else:
-                    pe_ratio = 15.0 + (price / 1000) * 2
-                    pb_ratio = 2.0 + (price / 1000) * 0.5
-                    roe = 12.0 + (price / 1000) * 2
-                    debt_to_equity = 0.6 + (price / 1000) * 0.2
+                # More sophisticated estimation based on multiple factors
+                import random
+                import math
+                
+                # Base values by sector (more realistic ranges)
+                sector_profiles = {
+                    'BANKING': {'pe_range': (8, 18), 'pb_range': (1.0, 2.5), 'roe_range': (12, 20), 'debt_range': (0.5, 1.2)},
+                    'IT': {'pe_range': (15, 35), 'pb_range': (2.5, 6.0), 'roe_range': (15, 25), 'debt_range': (0.1, 0.4)},
+                    'PHARMA': {'pe_range': (12, 25), 'pb_range': (2.0, 4.5), 'roe_range': (10, 20), 'debt_range': (0.2, 0.6)},
+                    'AUTO': {'pe_range': (8, 20), 'pb_range': (1.5, 3.5), 'roe_range': (8, 18), 'debt_range': (0.3, 0.8)},
+                    'FMCG': {'pe_range': (20, 45), 'pb_range': (3.0, 8.0), 'roe_range': (15, 30), 'debt_range': (0.1, 0.5)},
+                    'METAL': {'pe_range': (5, 15), 'pb_range': (0.8, 2.5), 'roe_range': (5, 15), 'debt_range': (0.4, 1.0)},
+                    'ENERGY': {'pe_range': (6, 18), 'pb_range': (1.0, 3.0), 'roe_range': (8, 18), 'debt_range': (0.3, 0.8)},
+                    'TELECOM': {'pe_range': (8, 25), 'pb_range': (1.5, 4.0), 'roe_range': (6, 16), 'debt_range': (0.5, 1.5)}
+                }
+                
+                # Determine sector profile
+                sector_key = 'BANKING'  # default
+                for key in sector_profiles.keys():
+                    if key in sector.upper() or key in symbol.upper():
+                        sector_key = key
+                        break
+                
+                profile = sector_profiles[sector_key]
+                
+                # Adjust based on market cap (larger companies tend to have different ratios)
+                market_cap_factor = min(2.0, max(0.5, math.log10(market_cap / 1000)))  # Normalize around 1000 crores
+                
+                # Adjust based on price level (higher price stocks often have different ratios)
+                price_factor = min(1.5, max(0.7, price / 500))  # Normalize around 500
+                
+                # Adjust based on volume (higher volume = more liquid = potentially different ratios)
+                volume_factor = min(1.3, max(0.8, math.log10(volume / 100000)))  # Normalize around 100k volume
+                
+                # Calculate ratios with some randomness for realism
+                pe_ratio = random.uniform(*profile['pe_range']) * (1 + (market_cap_factor - 1) * 0.2)
+                pb_ratio = random.uniform(*profile['pb_range']) * (1 + (price_factor - 1) * 0.1)
+                roe = random.uniform(*profile['roe_range']) * (1 + (volume_factor - 1) * 0.1)
+                debt_to_equity = random.uniform(*profile['debt_range']) * (1 + (market_cap_factor - 1) * 0.1)
+                
+                # Dividend yield based on sector and market cap
+                dividend_base = {'BANKING': 2.5, 'IT': 1.0, 'PHARMA': 1.5, 'AUTO': 2.0, 'FMCG': 1.8, 'METAL': 3.0, 'ENERGY': 2.2, 'TELECOM': 1.2}
+                dividend_yield = dividend_base.get(sector_key, 2.0) + random.uniform(-0.5, 1.0)
+                
+                # Beta calculation based on sector volatility
+                beta_base = {'BANKING': 1.2, 'IT': 1.4, 'PHARMA': 0.9, 'AUTO': 1.3, 'FMCG': 0.8, 'METAL': 1.5, 'ENERGY': 1.1, 'TELECOM': 1.0}
+                beta = beta_base.get(sector_key, 1.0) + random.uniform(-0.2, 0.3)
                 
                 return {
                     'pe_ratio': round(pe_ratio, 2),
                     'pb_ratio': round(pb_ratio, 2),
                     'roe': round(roe, 2),
                     'debt_to_equity': round(debt_to_equity, 2),
-                    'dividend_yield': round(2.0 + (price / 1000) * 0.5, 2),
-                    'data_source': 'estimated'
+                    'dividend_yield': round(dividend_yield, 2),
+                    'beta': round(beta, 2),
+                    'data_source': 'estimated_enhanced'
                 }
                 
+        except Exception as e:
+            logger.error(f"Error generating estimated data for {symbol}: {e}")
+            return None
+    
+    def _get_estimated_fundamental_data_with_session(self, symbol: str, session) -> Dict[str, Any]:
+        """Generate realistic estimated fundamental data using existing session."""
+        try:
+            # Get stock data from the existing session
+            stock = session.query(Stock).filter(Stock.symbol == symbol).first()
+            if not stock:
+                return None
+            
+            price = stock.current_price or 100
+            market_cap = stock.market_cap or 1000
+            sector = stock.sector or "Others"
+            volume = stock.volume or 100000
+            
+            # More sophisticated estimation based on multiple factors
+            import random
+            import math
+            
+            # Base values by sector (more realistic ranges)
+            sector_profiles = {
+                'BANKING': {'pe_range': (8, 18), 'pb_range': (1.0, 2.5), 'roe_range': (12, 20), 'debt_range': (0.5, 1.2)},
+                'IT': {'pe_range': (15, 35), 'pb_range': (2.5, 6.0), 'roe_range': (15, 25), 'debt_range': (0.1, 0.4)},
+                'PHARMA': {'pe_range': (12, 25), 'pb_range': (2.0, 4.5), 'roe_range': (10, 20), 'debt_range': (0.2, 0.6)},
+                'AUTO': {'pe_range': (8, 20), 'pb_range': (1.5, 3.5), 'roe_range': (8, 18), 'debt_range': (0.3, 0.8)},
+                'FMCG': {'pe_range': (20, 45), 'pb_range': (3.0, 8.0), 'roe_range': (15, 30), 'debt_range': (0.1, 0.5)},
+                'METAL': {'pe_range': (5, 15), 'pb_range': (0.8, 2.5), 'roe_range': (5, 15), 'debt_range': (0.4, 1.0)},
+                'ENERGY': {'pe_range': (6, 18), 'pb_range': (1.0, 3.0), 'roe_range': (8, 18), 'debt_range': (0.3, 0.8)},
+                'TELECOM': {'pe_range': (8, 25), 'pb_range': (1.5, 4.0), 'roe_range': (6, 16), 'debt_range': (0.5, 1.5)}
+            }
+            
+            # Determine sector profile
+            sector_key = 'BANKING'  # default
+            for key in sector_profiles.keys():
+                if key in sector.upper() or key in symbol.upper():
+                    sector_key = key
+                    break
+            
+            profile = sector_profiles[sector_key]
+            
+            # Adjust based on market cap (larger companies tend to have different ratios)
+            market_cap_factor = min(2.0, max(0.5, math.log10(market_cap / 1000)))  # Normalize around 1000 crores
+            
+            # Adjust based on price level (higher price stocks often have different ratios)
+            price_factor = min(1.5, max(0.7, price / 500))  # Normalize around 500
+            
+            # Adjust based on volume (higher volume = more liquid = potentially different ratios)
+            volume_factor = min(1.3, max(0.8, math.log10(volume / 100000)))  # Normalize around 100k volume
+            
+            # Calculate ratios with some randomness for realism
+            pe_ratio = random.uniform(*profile['pe_range']) * (1 + (market_cap_factor - 1) * 0.2)
+            pb_ratio = random.uniform(*profile['pb_range']) * (1 + (price_factor - 1) * 0.1)
+            roe = random.uniform(*profile['roe_range']) * (1 + (volume_factor - 1) * 0.1)
+            debt_to_equity = random.uniform(*profile['debt_range']) * (1 + (market_cap_factor - 1) * 0.1)
+            
+            # Dividend yield based on sector and market cap
+            dividend_base = {'BANKING': 2.5, 'IT': 1.0, 'PHARMA': 1.5, 'AUTO': 2.0, 'FMCG': 1.8, 'METAL': 3.0, 'ENERGY': 2.2, 'TELECOM': 1.2}
+            dividend_yield = dividend_base.get(sector_key, 2.0) + random.uniform(-0.5, 1.0)
+            
+            # Beta calculation based on sector volatility
+            beta_base = {'BANKING': 1.2, 'IT': 1.4, 'PHARMA': 0.9, 'AUTO': 1.3, 'FMCG': 0.8, 'METAL': 1.5, 'ENERGY': 1.1, 'TELECOM': 1.0}
+            beta = beta_base.get(sector_key, 1.0) + random.uniform(-0.2, 0.3)
+            
+            return {
+                'pe_ratio': round(pe_ratio, 2),
+                'pb_ratio': round(pb_ratio, 2),
+                'roe': round(roe, 2),
+                'debt_to_equity': round(debt_to_equity, 2),
+                'dividend_yield': round(dividend_yield, 2),
+                'beta': round(beta, 2),
+                'data_source': 'estimated_enhanced'
+            }
+            
         except Exception as e:
             logger.error(f"Error generating estimated data for {symbol}: {e}")
             return None
