@@ -124,22 +124,38 @@ def create_app():
         import threading
         def run_complete_stock_initialization():
             try:
-                app.logger.info("🚀 Running complete stock system initialization...")
-                app.logger.info("📊 This includes: Symbol Master → Verification → Stock Creation")
+                app.logger.info("🚀 Running COMPLETE system initialization...")
+                app.logger.info("📊 This includes: Symbol Master → Stocks → Historical Data → Technical Indicators → Volatility")
 
-                results = stock_init_service.fast_sync_stocks()
+                results = stock_init_service.complete_system_initialization()
 
                 if results.get('success'):
-                    app.logger.info("✅ Stock system initialization completed successfully!")
-                    app.logger.info(f"📊 Symbols Processed: {results.get('symbols_processed', 0)} symbols")
-                    app.logger.info(f"🔍 Verification: {results.get('symbols_processed', 0)} processed")
-                    app.logger.info(f"📈 Stocks: {results.get('stocks_created', 0)} created")
-                    app.logger.info(f"⚡ Performance: {results.get('duration_seconds', 0):.1f}s ({results.get('success_rate', 0):.1f}% success)")
+                    app.logger.info("✅ Complete system initialization succeeded!")
+                    app.logger.info(f"⏱️ Total duration: {results.get('total_duration', 0):.1f}s")
+
+                    # Log step results
+                    steps = results.get('steps', {})
+                    if 'stocks_sync' in steps:
+                        stocks = steps['stocks_sync']
+                        app.logger.info(f"📊 Stocks: {stocks.get('total_symbols', 0)} synced")
+
+                    if 'historical_data' in steps:
+                        historical = steps['historical_data']
+                        app.logger.info(f"📈 Historical: {historical.get('records_processed', 0)} records")
+
+                    if 'technical_indicators' in steps:
+                        indicators = steps['technical_indicators']
+                        app.logger.info(f"📊 Indicators: {indicators.get('symbols_processed', 0)} symbols")
+
+                    if 'volatility' in steps:
+                        volatility = steps['volatility']
+                        app.logger.info(f"📈 Volatility: {volatility.get('stocks_updated', 0)} stocks")
+
                 else:
-                    app.logger.error(f"❌ Stock system initialization failed: {results.get('error', 'Unknown error')}")
+                    app.logger.error(f"❌ Complete system initialization failed: {results.get('error', 'Unknown error')}")
 
             except Exception as e:
-                app.logger.error(f"❌ Stock system initialization failed: {e}")
+                app.logger.error(f"❌ Complete system initialization failed: {e}")
                 import traceback
                 app.logger.error(f"Stack trace: {traceback.format_exc()}")
 
@@ -839,70 +855,155 @@ def create_app():
     @app.route('/api/market/overview', methods=['GET'])
     @login_required
     def api_get_market_overview():
-        """Get market overview for NIFTY indices using broker_service quotes directly."""
+        """Get market overview for NIFTY indices using live API or cached database data."""
         user_id = current_user.id
         try:
             app.logger.info(f"Fetching market overview for user {user_id}")
-            
-            # Use existing broker_service which already handles auth/config
-            # FYERS symbols as provided: NIFTY50, NIFTYBANK, NIFTYMIDCAP150, NIFTYSMLCAP250
+
+            # NIFTY indices symbols mapping
             symbols_map = {
                 'NIFTY 50': 'NSE:NIFTY50-INDEX',
                 'BANK NIFTY': 'NSE:NIFTYBANK-INDEX',
                 'MIDCAP 150': 'NSE:NIFTYMIDCAP150-INDEX',
                 'SMALLCAP 250': 'NSE:NIFTYSMLCAP250-INDEX'
             }
+
+            # Try to get live data from broker service first
             symbols = ','.join(symbols_map.values())
             quotes_data = broker_service.get_fyers_quotes(user_id, symbols)
-            
-            if not quotes_data or quotes_data.get('s') != 'ok' or quotes_data.get('code') != 200:
-                error_msg = (quotes_data or {}).get('message', 'Failed to fetch quotes data from FYERS')
-                app.logger.warning(f"Market overview quotes fetch failed: {error_msg}")
-                return jsonify({'success': False, 'error': error_msg, 'data': {}, 'source': 'quotes'}), 400
-            
-            # Support both SDK shapes: {'data': {...}} or {'d': [...]}
-            payload = quotes_data.get('data') or quotes_data.get('d') or {}
+
+            # Check if we got valid live data
+            has_valid_data = False
+            if quotes_data and isinstance(quotes_data, dict):
+                if (quotes_data.get('success') == True or
+                    quotes_data.get('s') == 'ok' or
+                    quotes_data.get('status') == 'success' or
+                    (quotes_data.get('data') and not quotes_data.get('error')) or
+                    quotes_data.get('d')):
+                    has_valid_data = True
+
             market = {}
-            
-            # Handle payload either as dict keyed by symbol or list under 'd'
-            if isinstance(payload, dict):
-                for symbol, quote in payload.items():
-                    for name, fy_symbol in symbols_map.items():
-                        if symbol == fy_symbol:
-                            v = quote.get('v', quote)
-                            # Skip error payloads
-                            if isinstance(v, dict) and (v.get('s') == 'error' or v.get('errmsg')):
-                                continue
-                            lp = float(v.get('lp', 0))
-                            pc = float(v.get('prev_close_price', v.get('pc', lp)))
-                            chp = float(v.get('chp', ((lp - pc) / pc * 100) if pc > 0 else 0))
-                            market[name] = {
-                                'current_price': round(lp, 2),
-                                'change_percent': round(chp, 2),
-                                'is_positive': chp >= 0
-                            }
-            elif isinstance(payload, list):
-                for item in payload:
-                    symbol = item.get('symbol') or item.get('n')
-                    for name, fy_symbol in symbols_map.items():
-                        if symbol == fy_symbol:
-                            v = item.get('v', item)
-                            # Skip error payloads
-                            if isinstance(v, dict) and (v.get('s') == 'error' or v.get('errmsg')):
-                                continue
-                            lp = float(v.get('lp', 0))
-                            pc = float(v.get('prev_close_price', v.get('pc', lp)))
-                            chp = float(v.get('chp', ((lp - pc) / pc * 100) if pc > 0 else 0))
-                            market[name] = {
-                                'current_price': round(lp, 2),
-                                'change_percent': round(chp, 2),
-                                'is_positive': chp >= 0
-                            }
-            
-            return jsonify({'success': True, 'data': market, 'last_updated': datetime.now().isoformat(), 'source': 'broker_service.quotes'})
+
+            if has_valid_data:
+                app.logger.info("Using live market data from API")
+                # Support both SDK shapes: {'data': {...}} or {'d': [...]}
+                payload = quotes_data.get('data') or quotes_data.get('d') or {}
+
+                # Handle payload either as dict keyed by symbol or list under 'd'
+                if isinstance(payload, dict):
+                    for symbol, quote in payload.items():
+                        for name, fy_symbol in symbols_map.items():
+                            if symbol == fy_symbol:
+                                v = quote.get('v', quote)
+                                # Skip error payloads
+                                if isinstance(v, dict) and (v.get('s') == 'error' or v.get('errmsg')):
+                                    continue
+                                lp = float(v.get('lp', 0))
+                                pc = float(v.get('prev_close_price', v.get('pc', lp)))
+                                chp = float(v.get('chp', ((lp - pc) / pc * 100) if pc > 0 else 0))
+                                market[name] = {
+                                    'current_price': round(lp, 2),
+                                    'change_percent': round(chp, 2),
+                                    'is_positive': chp >= 0
+                                }
+                elif isinstance(payload, list):
+                    for item in payload:
+                        symbol = item.get('symbol') or item.get('n')
+                        for name, fy_symbol in symbols_map.items():
+                            if symbol == fy_symbol:
+                                v = item.get('v', item)
+                                # Skip error payloads
+                                if isinstance(v, dict) and (v.get('s') == 'error' or v.get('errmsg')):
+                                    continue
+                                lp = float(v.get('lp', 0))
+                                pc = float(v.get('prev_close_price', v.get('pc', lp)))
+                                chp = float(v.get('chp', ((lp - pc) / pc * 100) if pc > 0 else 0))
+                                market[name] = {
+                                    'current_price': round(lp, 2),
+                                    'change_percent': round(chp, 2),
+                                    'is_positive': chp >= 0
+                                }
+
+                if market:  # Only return if we got actual market data
+                    return jsonify({
+                        'success': True,
+                        'data': market,
+                        'last_updated': datetime.now().isoformat(),
+                        'source': 'live_api'
+                    })
+
+            # If live API failed, try to get cached data from database
+            app.logger.warning(f"Live API unavailable, attempting to retrieve cached market data")
+
+            try:
+                from sqlalchemy import text
+
+                # Get the most recent market data from database for these indices
+                with db_manager.get_session() as session:
+                    # Try to get latest cached market overview data
+                    symbol_list = list(symbols_map.values())
+                    placeholders = ','.join([f"'{symbol}'" for symbol in symbol_list])
+
+                    cache_result = session.execute(text(f"""
+                        SELECT symbol, close, date
+                        FROM historical_data
+                        WHERE symbol IN ({placeholders})
+                        AND date >= CURRENT_DATE - INTERVAL '7 days'
+                        ORDER BY symbol, date DESC
+                    """)).fetchall()
+
+                    if cache_result:
+                        app.logger.info(f"Found {len(cache_result)} cached market data records")
+
+                        # Group by symbol and get latest for each
+                        symbol_data = {}
+                        for row in cache_result:
+                            symbol, close_price, date = row
+                            if symbol not in symbol_data:
+                                symbol_data[symbol] = {'price': close_price, 'date': date}
+
+                        # Convert to market format
+                        for name, fy_symbol in symbols_map.items():
+                            if fy_symbol in symbol_data:
+                                market[name] = {
+                                    'current_price': round(float(symbol_data[fy_symbol]['price']), 2),
+                                    'change_percent': 0.0,  # Can't calculate without previous close
+                                    'is_positive': True,
+                                    'is_cached': True,
+                                    'cache_date': symbol_data[fy_symbol]['date'].isoformat()
+                                }
+
+                        if market:
+                            return jsonify({
+                                'success': True,
+                                'data': market,
+                                'last_updated': datetime.now().isoformat(),
+                                'source': 'database_cache',
+                                'note': 'Live API unavailable, showing cached data'
+                            })
+
+            except Exception as db_error:
+                app.logger.error(f"Error retrieving cached market data: {db_error}")
+
+            # If both live API and database cache fail, return error
+            error_msg = (quotes_data or {}).get('message', 'Market data unavailable')
+            app.logger.error(f"Market overview completely unavailable: {error_msg}")
+
+            return jsonify({
+                'success': False,
+                'error': 'Market data temporarily unavailable. Please check API authentication or try again later.',
+                'data': {},
+                'source': 'error'
+            }), 503  # Service Unavailable
+
         except Exception as e:
-            app.logger.error(f"Error fetching market overview: {e}")
-            return jsonify({'success': False, 'error': str(e), 'data': {}, 'source': 'exception'}), 500
+            app.logger.error(f"Error in market overview: {e}")
+            return jsonify({
+                'success': False,
+                'error': 'Internal server error while fetching market data',
+                'data': {},
+                'source': 'exception'
+            }), 500
 
     @app.route('/api/dashboard/portfolio-holdings', methods=['GET'])
     @login_required
