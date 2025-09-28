@@ -10753,6 +10753,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "101000000018840",
+      "symbol": "NSE:NIRAJISPAT-EQ",
+      "name": "NIRAJ ISPAT IND LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.05,
+      "isin": "INE326T01011",
+      "last_updated": ""
+    },
+    {
       "fytoken": "101000000018863",
       "symbol": "NSE:VERTOZ-EQ",
       "name": "VERTOZ LIMITED",
@@ -14434,6 +14446,18 @@
       "lot": 1,
       "tick": 0.1,
       "isin": "INE343G01021",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "1010000000235",
+      "symbol": "NSE:AAKASH-EQ",
+      "name": "AAKASH EXPLORATION SER L",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE087Z01024",
       "last_updated": ""
     },
     {
@@ -19837,6 +19861,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "10100000003807",
+      "symbol": "NSE:VINEETLAB-EQ",
+      "name": "VINEET LABORATORIES LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE505Y01010",
+      "last_updated": ""
+    },
+    {
       "fytoken": "1010000000381",
       "symbol": "NSE:SINTERCOM-EQ",
       "name": "SINTERCOM INDIA LIMITED",
@@ -22633,6 +22669,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "10100000006673",
+      "symbol": "NSE:FOODSIN-EQ",
+      "name": "FOODS & INNS LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE976E01023",
+      "last_updated": ""
+    },
+    {
       "fytoken": "10100000006705",
       "symbol": "NSE:PAYTM-EQ",
       "name": "ONE 97 COMMUNICATIONS LTD",
@@ -24685,6 +24733,30 @@
       "last_updated": ""
     },
     {
+      "fytoken": "1010000000759007",
+      "symbol": "NSE:ATLANTAELE-EQ",
+      "name": "ATLANTA ELECTRICALS LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.05,
+      "isin": "INE0Z4F01028",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "1010000000759012",
+      "symbol": "NSE:GANESHCP-EQ",
+      "name": "GANESH CONSUMER PRODUCT L",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.05,
+      "isin": "INE652V01016",
+      "last_updated": ""
+    },
+    {
       "fytoken": "1010000000759041",
       "symbol": "NSE:IVALUE-EQ",
       "name": "IVALUE INFOSOLUTIONS LTD",
@@ -24958,18 +25030,6 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE055C01020",
-      "last_updated": ""
-    },
-    {
-      "fytoken": "10100000007780",
-      "symbol": "NSE:BCONCEPTS-EQ",
-      "name": "BRAND CONCEPTS LIMITED",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.05,
-      "isin": "INE977Y01011",
       "last_updated": ""
     },
     {
@@ -26497,6 +26557,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "10100000009539",
+      "symbol": "NSE:SAKAR-EQ",
+      "name": "SAKAR HEALTHCARE LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.05,
+      "isin": "INE732S01012",
+      "last_updated": ""
+    },
+    {
       "fytoken": "1010000000955",
       "symbol": "NSE:ESABINDIA-EQ",
       "name": "ESAB INDIA LTD",
@@ -26965,6 +27037,6 @@
       "last_updated": ""
     }
   ],
-  "timestamp": "2025-09-26T22:46:14.417084",
+  "timestamp": "2025-09-28T13:02:49.430006",
   "exchange_type": "NSE_CM"
 }

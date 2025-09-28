@@ -1,0 +1,977 @@
+"""
+Suggested Stocks Saga Pattern
+Implements a comprehensive saga pattern for the suggested stocks pipeline with step-by-step updates and additional information.
+"""
+
+import logging
+import json
+from typing import Dict, List, Optional, Any, Tuple
+from datetime import datetime, timedelta
+from enum import Enum
+from dataclasses import dataclass, field
+import time
+
+logger = logging.getLogger(__name__)
+
+
+class SagaStepStatus(Enum):
+    """Status of each saga step."""
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+class SagaStatus(Enum):
+    """Overall saga status."""
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+@dataclass
+class SagaStep:
+    """Individual saga step with status and metadata."""
+    step_id: str
+    name: str
+    description: str
+    status: SagaStepStatus = SagaStepStatus.PENDING
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    duration_seconds: float = 0.0
+    input_count: int = 0
+    output_count: int = 0
+    filtered_count: int = 0
+    rejected_count: int = 0
+    error_message: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    results: List[Dict[str, Any]] = field(default_factory=list)
+    additional_info: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class SuggestedStocksSaga:
+    """Saga pattern for suggested stocks pipeline."""
+    saga_id: str
+    user_id: int
+    strategies: List[str]
+    limit: int
+    search_query: Optional[str] = None
+    sort_by: Optional[str] = None
+    sort_order: str = 'desc'
+    sector: Optional[str] = None
+    status: SagaStatus = SagaStatus.RUNNING
+    start_time: datetime = field(default_factory=datetime.now)
+    end_time: Optional[datetime] = None
+    total_duration_seconds: float = 0.0
+    steps: List[SagaStep] = field(default_factory=list)
+    final_results: List[Dict[str, Any]] = field(default_factory=list)
+    summary: Dict[str, Any] = field(default_factory=dict)
+    errors: List[str] = field(default_factory=list)
+    
+    def add_step(self, step: SagaStep) -> None:
+        """Add a step to the saga."""
+        self.steps.append(step)
+    
+    def get_step(self, step_id: str) -> Optional[SagaStep]:
+        """Get a step by ID."""
+        return next((step for step in self.steps if step.step_id == step_id), None)
+    
+    def update_step_status(self, step_id: str, status: SagaStepStatus, 
+                          error_message: Optional[str] = None,
+                          metadata: Optional[Dict[str, Any]] = None) -> None:
+        """Update step status and metadata."""
+        step = self.get_step(step_id)
+        if step:
+            step.status = status
+            if status == SagaStepStatus.IN_PROGRESS:
+                step.start_time = datetime.now()
+            elif status in [SagaStepStatus.COMPLETED, SagaStepStatus.FAILED, SagaStepStatus.SKIPPED]:
+                step.end_time = datetime.now()
+                if step.start_time:
+                    step.duration_seconds = (step.end_time - step.start_time).total_seconds()
+            
+            if error_message:
+                step.error_message = error_message
+                self.errors.append(f"Step {step_id}: {error_message}")
+            
+            if metadata:
+                step.metadata.update(metadata)
+    
+    def complete_saga(self, final_results: List[Dict[str, Any]], 
+                     summary: Dict[str, Any]) -> None:
+        """Complete the saga with final results."""
+        self.status = SagaStatus.COMPLETED
+        self.end_time = datetime.now()
+        self.total_duration_seconds = (self.end_time - self.start_time).total_seconds()
+        self.final_results = final_results
+        self.summary = summary
+    
+    def fail_saga(self, error_message: str) -> None:
+        """Fail the saga with error message."""
+        self.status = SagaStatus.FAILED
+        self.end_time = datetime.now()
+        self.total_duration_seconds = (self.end_time - self.start_time).total_seconds()
+        self.errors.append(error_message)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert saga to dictionary for serialization."""
+        return {
+            'saga_id': self.saga_id,
+            'user_id': self.user_id,
+            'strategies': self.strategies,
+            'limit': self.limit,
+            'search_query': self.search_query,
+            'sort_by': self.sort_by,
+            'sort_order': self.sort_order,
+            'sector': self.sector,
+            'status': self.status.value,
+            'start_time': self.start_time.isoformat(),
+            'end_time': self.end_time.isoformat() if self.end_time else None,
+            'total_duration_seconds': self.total_duration_seconds,
+            'steps': [
+                {
+                    'step_id': step.step_id,
+                    'name': step.name,
+                    'description': step.description,
+                    'status': step.status.value,
+                    'start_time': step.start_time.isoformat() if step.start_time else None,
+                    'end_time': step.end_time.isoformat() if step.end_time else None,
+                    'duration_seconds': step.duration_seconds,
+                    'input_count': step.input_count,
+                    'output_count': step.output_count,
+                    'filtered_count': step.filtered_count,
+                    'rejected_count': step.rejected_count,
+                    'error_message': step.error_message,
+                    'metadata': step.metadata,
+                    'additional_info': step.additional_info
+                }
+                for step in self.steps
+            ],
+            'final_results': self.final_results,
+            'summary': self.summary,
+            'errors': self.errors
+        }
+
+
+class SuggestedStocksSagaOrchestrator:
+    """Orchestrator for the suggested stocks saga pattern."""
+    
+    def __init__(self):
+        self.fyers_service = None
+        self.config = None
+        self.stock_filters_config = None
+    
+    def initialize_services(self, user_id: int) -> None:
+        """Initialize required services."""
+        try:
+            from ..brokers.fyers_service import get_fyers_service
+            from ..stock_filtering.enhanced_config_loader import get_enhanced_filtering_config
+            import yaml
+            import os
+            
+            self.fyers_service = get_fyers_service()
+            self.config = get_enhanced_filtering_config()
+            
+            # Load stock filters configuration
+            config_path = os.path.join(os.path.dirname(__file__), '../../../config/stock_filters.yaml')
+            with open(config_path, 'r') as f:
+                self.stock_filters_config = yaml.safe_load(f)
+            
+            logger.info("Services and stock filters configuration initialized successfully for saga orchestrator")
+        except Exception as e:
+            logger.error(f"Failed to initialize services: {e}")
+            raise
+    
+    def execute_suggested_stocks_saga(self, user_id: int, strategies: List[str] = None,
+                                   limit: int = 50, search: str = None, sort_by: str = None,
+                                   sort_order: str = 'desc', sector: str = None) -> Dict[str, Any]:
+        """
+        Execute the complete suggested stocks saga with step-by-step updates.
+        
+        Args:
+            user_id: User ID for the request
+            strategies: List of strategies to apply
+            limit: Maximum number of stocks to return
+            search: Search query string
+            sort_by: Field to sort results by
+            sort_order: Sort order ('asc' or 'desc')
+            sector: Filter by specific sector
+            
+        Returns:
+            Complete saga results with step-by-step information
+        """
+        # Initialize saga
+        saga_id = f"suggested_stocks_{user_id}_{int(datetime.now().timestamp())}"
+        saga = SuggestedStocksSaga(
+            saga_id=saga_id,
+            user_id=user_id,
+            strategies=strategies or ['DEFAULT_RISK', 'HIGH_RISK'],
+            limit=limit,
+            search_query=search,
+            sort_by=sort_by,
+            sort_order=sort_order,
+            sector=sector
+        )
+        
+        try:
+            # Initialize services
+            self.initialize_services(user_id)
+            
+            # Step 1: Stock Discovery
+            saga = self._execute_step1_stock_discovery(saga)
+            if saga.status == SagaStatus.FAILED:
+                return saga.to_dict()
+            
+            # Step 2: Database Filtering
+            saga = self._execute_step2_database_filtering(saga)
+            if saga.status == SagaStatus.FAILED:
+                return saga.to_dict()
+            
+            # Step 3: Strategy Application
+            saga = self._execute_step3_strategy_application(saga)
+            if saga.status == SagaStatus.FAILED:
+                return saga.to_dict()
+            
+            # Step 4: Search and Sort
+            saga = self._execute_step4_search_and_sort(saga)
+            if saga.status == SagaStatus.FAILED:
+                return saga.to_dict()
+            
+            # Step 5: Final Selection
+            saga = self._execute_step5_final_selection(saga)
+            if saga.status == SagaStatus.FAILED:
+                return saga.to_dict()
+            
+            # Complete saga
+            saga.complete_saga(saga.final_results, self._generate_saga_summary(saga))
+            
+            logger.info(f"Saga {saga_id} completed successfully")
+            return saga.to_dict()
+            
+        except Exception as e:
+            error_msg = f"Saga execution failed: {str(e)}"
+            logger.error(error_msg)
+            saga.fail_saga(error_msg)
+            return saga.to_dict()
+    
+    def _execute_step1_stock_discovery(self, saga: SuggestedStocksSaga) -> SuggestedStocksSaga:
+        """Step 1: Discover tradeable stocks from broker API."""
+        step = SagaStep(
+            step_id="step1_discovery",
+            name="Stock Discovery",
+            description="Discover tradeable stocks from broker API using search terms"
+        )
+        saga.add_step(step)
+        saga.update_step_status("step1_discovery", SagaStepStatus.IN_PROGRESS)
+        
+        try:
+            print(f"🔍 STAGE 1: Discovering tradeable stocks...")
+            
+            # Search terms for stock discovery
+            search_terms = [
+                "NIFTY", "SENSEX", "BANKNIFTY", "NIFTYNXT50", "FINNIFTY",
+                "BANK", "IT", "PHARMA", "AUTO", "FMCG", "METAL", "INFRA", "ENERGY",
+                "FINANCE", "TECH", "HEALTHCARE", "CONSUMER", "COMMODITY",
+                "LTD", "LIMITED", "CORP", "INC", "INDUSTRIES"
+            ]
+            
+            all_symbols = set()
+            discovered_stocks = []
+            successful_searches = 0
+            failed_searches = 0
+            
+            for term in search_terms:
+                try:
+                    search_result = self.fyers_service.search(saga.user_id, term, "NSE")
+                    
+                    if search_result.get('status') == 'success':
+                        symbols = search_result.get('data', [])
+                        for symbol_data in symbols:
+                            if symbol_data.get('symbol') not in all_symbols:
+                                all_symbols.add(symbol_data.get('symbol'))
+                                discovered_stocks.append(symbol_data)
+                        successful_searches += 1
+                    else:
+                        failed_searches += 1
+                        
+                except Exception as e:
+                    logger.warning(f"Search failed for term '{term}': {e}")
+                    failed_searches += 1
+            
+            step.input_count = len(search_terms)
+            step.output_count = len(discovered_stocks)
+            step.metadata = {
+                'successful_searches': successful_searches,
+                'failed_searches': failed_searches,
+                'unique_symbols': len(all_symbols),
+                'search_terms_used': search_terms
+            }
+            step.results = discovered_stocks
+            step.additional_info = {
+                'discovery_method': 'broker_api_search',
+                'exchange': 'NSE',
+                'search_coverage': f"{successful_searches}/{len(search_terms)} terms successful"
+            }
+            
+            saga.update_step_status("step1_discovery", SagaStepStatus.COMPLETED, 
+                                  metadata=step.metadata)
+            
+            print(f"   ✅ Discovered {len(discovered_stocks)} unique stocks from {successful_searches} successful searches")
+            
+            return saga
+            
+        except Exception as e:
+            error_msg = f"Stock discovery failed: {str(e)}"
+            saga.update_step_status("step1_discovery", SagaStepStatus.FAILED, error_msg)
+            return saga
+    
+    def _execute_step2_database_filtering(self, saga: SuggestedStocksSaga) -> SuggestedStocksSaga:
+        """Step 2: Apply database-driven filtering pipeline."""
+        step = SagaStep(
+            step_id="step2_filtering",
+            name="Database Filtering",
+            description="Apply comprehensive filtering pipeline using database screening"
+        )
+        saga.add_step(step)
+        saga.update_step_status("step2_filtering", SagaStepStatus.IN_PROGRESS)
+        
+        try:
+            print(f"🎯 STAGE 2: Applying database filtering pipeline...")
+            
+            # Get stocks from database using the database manager
+            from ...models.database import get_database_manager
+            from ...models.stock_models import Stock
+            
+            db_manager = get_database_manager()
+            
+            with db_manager.get_session() as session:
+                # Get all available stocks from database
+                available_stocks = session.query(Stock).filter(
+                    Stock.is_active == True,
+                    Stock.current_price > 0
+                ).all()
+                
+                if not available_stocks:
+                    raise Exception("No active stocks found in database")
+                
+                # Convert to dictionary format for filtering
+                stock_data_list = []
+                for stock in available_stocks:
+                    stock_data = {
+                        'symbol': stock.symbol,
+                        'name': stock.name,
+                        'current_price': float(stock.current_price),
+                        'market_cap': float(stock.market_cap) if stock.market_cap else 0,
+                        'pe_ratio': float(stock.pe_ratio) if stock.pe_ratio else None,
+                        'pb_ratio': float(stock.pb_ratio) if stock.pb_ratio else None,
+                        'roe': float(stock.roe) if stock.roe else None,
+                        'volume': int(stock.volume) if stock.volume else 0,
+                        'sector': stock.sector,
+                        'market_cap_category': stock.market_cap_category
+                    }
+                    stock_data_list.append(stock_data)
+                
+                # Apply filtering criteria from stock_filters.yaml
+                filtered_stocks = []
+                stage1_filters = self.stock_filters_config.get('stage_1_filters', {})
+                tradeability = stage1_filters.get('tradeability', {})
+                
+                min_price = tradeability.get('minimum_price', 5.0)
+                max_price = tradeability.get('maximum_price', 10000.0)
+                min_volume = tradeability.get('fallback_minimum_volume', 50000)
+                min_turnover = tradeability.get('minimum_daily_turnover_inr', 50000000)
+                
+                for stock_data in stock_data_list:
+                    current_price = stock_data['current_price']
+                    volume = stock_data['volume']
+                    market_cap = stock_data['market_cap']
+                    
+                    # Calculate daily turnover (price * volume)
+                    daily_turnover = current_price * volume
+                    
+                    # Apply stage 1 filtering criteria from config
+                    if (min_price <= current_price <= max_price and
+                        volume >= min_volume and
+                        daily_turnover >= min_turnover and
+                        market_cap > 0):
+                        filtered_stocks.append(stock_data)
+                
+                step.input_count = len(stock_data_list)
+                step.output_count = len(filtered_stocks)
+                step.filtered_count = len(filtered_stocks)
+                step.rejected_count = len(stock_data_list) - len(filtered_stocks)
+                step.metadata = {
+                    'total_available': len(stock_data_list),
+                    'filtered_count': len(filtered_stocks),
+                    'rejected_count': len(stock_data_list) - len(filtered_stocks),
+                    'filtering_criteria': 'basic_price_volume_market_cap'
+                }
+                step.results = filtered_stocks
+                step.additional_info = {
+                    'filtering_criteria': 'basic_database_filtering',
+                    'criteria_applied': ['min_price_10', 'min_volume_1000', 'min_market_cap_100'],
+                    'database_source': 'stocks_table'
+                }
+                
+                saga.update_step_status("step2_filtering", SagaStepStatus.COMPLETED, 
+                                      metadata=step.metadata)
+                
+                print(f"   ✅ Filtered {len(filtered_stocks)} stocks from {len(stock_data_list)} available")
+                
+                return saga
+            
+        except Exception as e:
+            error_msg = f"Database filtering failed: {str(e)}"
+            saga.update_step_status("step2_filtering", SagaStepStatus.FAILED, error_msg)
+            return saga
+    
+    def _execute_step3_strategy_application(self, saga: SuggestedStocksSaga) -> SuggestedStocksSaga:
+        """Step 3: Apply strategy-specific business logic."""
+        step = SagaStep(
+            step_id="step3_strategy",
+            name="Strategy Application",
+            description="Apply strategy-specific business logic and scoring"
+        )
+        saga.add_step(step)
+        saga.update_step_status("step3_strategy", SagaStepStatus.IN_PROGRESS)
+        
+        try:
+            print(f"🎯 STAGE 3: Applying strategy-specific business logic...")
+            
+            # Get filtered stocks from previous step
+            previous_step = saga.get_step("step2_filtering")
+            if not previous_step or not previous_step.results:
+                raise Exception("No filtered stocks available from previous step")
+            
+            filtered_stocks = previous_step.results
+            suggested_stocks = []
+            strategy_counts = {strategy: 0 for strategy in saga.strategies}
+            
+            # Apply strategy logic to each stock
+            for stock_data in filtered_stocks:
+                try:
+                    # Apply each strategy to the stock
+                    for strategy in saga.strategies:
+                        strategy_result = self._apply_strategy_logic(stock_data, strategy)
+                        if strategy_result:
+                            suggested_stocks.append(strategy_result)
+                            strategy_counts[strategy] += 1
+                            
+                except Exception as e:
+                    logger.warning(f"Failed to apply strategy to stock {stock_data.get('symbol', 'Unknown')}: {e}")
+                    continue
+            
+            step.input_count = len(filtered_stocks)
+            step.output_count = len(suggested_stocks)
+            step.metadata = {
+                'strategies_applied': saga.strategies,
+                'strategy_counts': strategy_counts,
+                'success_rate': len(suggested_stocks) / len(filtered_stocks) if filtered_stocks else 0,
+                'avg_suggestions_per_stock': len(suggested_stocks) / len(filtered_stocks) if filtered_stocks else 0
+            }
+            step.results = suggested_stocks
+            step.additional_info = {
+                'strategy_logic': 'swing_trading_focused',
+                'scoring_method': 'multi_factor_analysis',
+                'risk_assessment': 'strategy_specific',
+                'business_domain': 'swing_trading_2_week_hold'
+            }
+            
+            saga.update_step_status("step3_strategy", SagaStepStatus.COMPLETED, 
+                                  metadata=step.metadata)
+            
+            print(f"   ✅ Applied {len(saga.strategies)} strategies to {len(filtered_stocks)} stocks, generated {len(suggested_stocks)} suggestions")
+            
+            return saga
+            
+        except Exception as e:
+            error_msg = f"Strategy application failed: {str(e)}"
+            saga.update_step_status("step3_strategy", SagaStepStatus.FAILED, error_msg)
+            return saga
+    
+    def _execute_step4_search_and_sort(self, saga: SuggestedStocksSaga) -> SuggestedStocksSaga:
+        """Step 4: Apply search and sort operations."""
+        step = SagaStep(
+            step_id="step4_search_sort",
+            name="Search and Sort",
+            description="Apply search filtering and sorting operations"
+        )
+        saga.add_step(step)
+        saga.update_step_status("step4_search_sort", SagaStepStatus.IN_PROGRESS)
+        
+        try:
+            print(f"🎯 STAGE 4: Applying search and sort operations...")
+            
+            # Get suggested stocks from previous step
+            previous_step = saga.get_step("step3_strategy")
+            if not previous_step or not previous_step.results:
+                raise Exception("No suggested stocks available from previous step")
+            
+            suggested_stocks = previous_step.results.copy()
+            
+            # Apply search filter if provided
+            if saga.search_query:
+                search_query = saga.search_query.lower()
+                suggested_stocks = [
+                    stock for stock in suggested_stocks
+                    if (search_query in stock.get('symbol', '').lower() or
+                        search_query in stock.get('name', '').lower())
+                ]
+            
+            # Apply sector filter if provided
+            if saga.sector:
+                sector_filter = saga.sector.lower()
+                suggested_stocks = [
+                    stock for stock in suggested_stocks
+                    if sector_filter in stock.get('sector', '').lower()
+                ]
+            
+            # Apply sorting if provided
+            if saga.sort_by:
+                reverse = saga.sort_order == 'desc'
+                try:
+                    suggested_stocks.sort(key=lambda x: x.get(saga.sort_by, 0), reverse=reverse)
+                except Exception as e:
+                    logger.warning(f"Sorting failed: {e}")
+            
+            step.input_count = len(previous_step.results)
+            step.output_count = len(suggested_stocks)
+            step.metadata = {
+                'search_applied': bool(saga.search_query),
+                'sort_applied': bool(saga.sort_by),
+                'sector_filter_applied': bool(saga.sector),
+                'search_query': saga.search_query,
+                'sort_by': saga.sort_by,
+                'sort_order': saga.sort_order,
+                'sector': saga.sector
+            }
+            step.results = suggested_stocks
+            step.additional_info = {
+                'search_method': 'text_matching',
+                'sort_method': 'field_based',
+                'filtering_applied': ['search', 'sector', 'sort']
+            }
+            
+            saga.update_step_status("step4_search_sort", SagaStepStatus.COMPLETED, 
+                                  metadata=step.metadata)
+            
+            print(f"   ✅ Applied search/sort operations, {len(suggested_stocks)} stocks remaining")
+            
+            return saga
+            
+        except Exception as e:
+            error_msg = f"Search and sort failed: {str(e)}"
+            saga.update_step_status("step4_search_sort", SagaStepStatus.FAILED, error_msg)
+            return saga
+    
+    def _execute_step5_final_selection(self, saga: SuggestedStocksSaga) -> SuggestedStocksSaga:
+        """Step 5: Final selection and limit application."""
+        step = SagaStep(
+            step_id="step5_final_selection",
+            name="Final Selection",
+            description="Apply final selection criteria and limit results"
+        )
+        saga.add_step(step)
+        saga.update_step_status("step5_final_selection", SagaStepStatus.IN_PROGRESS)
+        
+        try:
+            print(f"🎯 STAGE 5: Applying final selection criteria...")
+            
+            # Get processed stocks from previous step
+            previous_step = saga.get_step("step4_search_sort")
+            if not previous_step or not previous_step.results:
+                raise Exception("No processed stocks available from previous step")
+            
+            processed_stocks = previous_step.results
+            
+            # Apply limit from configuration or saga limit
+            max_suggested = self.stock_filters_config.get('selection', {}).get('max_suggested_stocks', 10)
+            actual_limit = min(saga.limit, max_suggested)
+            final_stocks = processed_stocks[:actual_limit]
+            
+            # Add additional metadata to final results
+            for i, stock in enumerate(final_stocks):
+                stock['rank'] = i + 1
+                stock['selection_timestamp'] = datetime.now().isoformat()
+                stock['saga_id'] = saga.saga_id
+            
+            step.input_count = len(processed_stocks)
+            step.output_count = len(final_stocks)
+            step.metadata = {
+                'limit_applied': saga.limit,
+                'final_count': len(final_stocks),
+                'selection_criteria': 'top_ranked'
+            }
+            step.results = final_stocks
+            step.additional_info = {
+                'selection_method': 'ranking_based',
+                'limit_strategy': 'top_n_selection',
+                'ranking_criteria': 'strategy_score'
+            }
+            
+            saga.update_step_status("step5_final_selection", SagaStepStatus.COMPLETED, 
+                                  metadata=step.metadata)
+            
+            # Set final results
+            saga.final_results = final_stocks
+            
+            print(f"   ✅ Final selection completed: {len(final_stocks)} stocks selected")
+            
+            return saga
+            
+        except Exception as e:
+            error_msg = f"Final selection failed: {str(e)}"
+            saga.update_step_status("step5_final_selection", SagaStepStatus.FAILED, error_msg)
+            return saga
+    
+    def _apply_strategy_logic(self, stock_data: Dict[str, Any], strategy: str) -> Optional[Dict[str, Any]]:
+        """Apply strategy-specific logic to a stock using stock_filters.yaml configuration."""
+        try:
+            current_price = stock_data.get('current_price', 0.0)
+            market_cap = stock_data.get('market_cap', 0.0)
+            pe_ratio = stock_data.get('pe_ratio')
+            volume = stock_data.get('volume', 0)
+            
+            # Get filtering thresholds from configuration
+            stage2_filters = self.stock_filters_config.get('stage_2_filters', {})
+            filtering_thresholds = stage2_filters.get('filtering_thresholds', {})
+            fundamental_ratios = stage2_filters.get('fundamental_ratios', {})
+            
+            # Get market cap categories from config
+            market_cap_categories = self.stock_filters_config.get('stage_1_filters', {}).get('market_cap_categories', {})
+            large_cap_min = market_cap_categories.get('large_cap', {}).get('minimum', 20000)
+            mid_cap_min = market_cap_categories.get('mid_cap', {}).get('minimum', 5000)
+            
+            # Strategy-specific filtering and scoring
+            if strategy == 'DEFAULT_RISK':
+                # Conservative strategy - focus on stability (large/mid cap)
+                if (market_cap < mid_cap_min or  # Minimum market cap from config
+                    (pe_ratio and pe_ratio > fundamental_ratios.get('pe_ratio', {}).get('maximum', 50))):
+                    return None
+                
+                # Calculate conservative score using config weights
+                score = self._calculate_conservative_score_with_config(stock_data)
+                min_score = filtering_thresholds.get('minimum_total_score', 25) / 100.0
+                if score < min_score:
+                    return None
+                    
+            elif strategy == 'HIGH_RISK':
+                # Aggressive strategy - focus on growth potential (mid/small cap)
+                if (market_cap < 1000 or  # Lower market cap requirement for growth
+                    volume < 10000):  # Volume requirement
+                    return None
+                
+                # Calculate aggressive score using config weights
+                score = self._calculate_aggressive_score_with_config(stock_data)
+                min_score = filtering_thresholds.get('minimum_total_score', 25) / 100.0 * 0.8  # Lower threshold for high risk
+                if score < min_score:
+                    return None
+            else:
+                # Unknown strategy
+                return None
+            
+            # Create suggested stock with strategy-specific targets
+            suggested_stock = {
+                'symbol': stock_data.get('symbol', ''),
+                'name': stock_data.get('name', ''),
+                'current_price': current_price,
+                'market_cap': market_cap,
+                'pe_ratio': pe_ratio,
+                'pb_ratio': stock_data.get('pb_ratio'),
+                'roe': stock_data.get('roe'),
+                'sector': stock_data.get('sector', ''),
+                'strategy': strategy,
+                'selection_score': score,
+                'target_price': self._calculate_target_price(current_price, strategy),
+                'stop_loss': self._calculate_stop_loss(current_price, strategy),
+                'recommendation': 'BUY',
+                'reason': self._generate_reason(stock_data, strategy, score),
+                'selection_timestamp': datetime.now().isoformat()
+            }
+            
+            return suggested_stock
+            
+        except Exception as e:
+            logger.warning(f"Failed to apply strategy logic: {e}")
+            return None
+    
+    def _calculate_conservative_score(self, stock_data: Dict[str, Any]) -> float:
+        """Calculate score for conservative strategy."""
+        score = 0.0
+        
+        # Price stability (0-0.3)
+        current_price = stock_data.get('current_price', 0)
+        if 100 <= current_price <= 1000:
+            score += 0.3
+        elif 50 <= current_price <= 2000:
+            score += 0.2
+        
+        # Market cap stability (0-0.3)
+        market_cap = stock_data.get('market_cap', 0)
+        if market_cap > 10000:  # Large cap
+            score += 0.3
+        elif market_cap > 5000:  # Mid cap
+            score += 0.2
+        
+        # P/E ratio (0-0.2)
+        pe_ratio = stock_data.get('pe_ratio')
+        if pe_ratio and 10 <= pe_ratio <= 25:
+            score += 0.2
+        elif pe_ratio and 5 <= pe_ratio <= 35:
+            score += 0.1
+        
+        # Volume (0-0.2)
+        volume = stock_data.get('volume', 0)
+        if volume > 100000:
+            score += 0.2
+        elif volume > 50000:
+            score += 0.1
+        
+        return min(score, 1.0)
+    
+    def _calculate_conservative_score_with_config(self, stock_data: Dict[str, Any]) -> float:
+        """Calculate conservative score using stock_filters.yaml configuration."""
+        if not self.stock_filters_config:
+            return self._calculate_conservative_score(stock_data)
+        
+        # Get scoring weights from configuration
+        scoring_weights = self.stock_filters_config.get('stage_2_filters', {}).get('scoring_weights', {})
+        technical_weight = scoring_weights.get('technical_score', 0.30)
+        fundamental_weight = scoring_weights.get('fundamental_score', 0.20)
+        risk_weight = scoring_weights.get('risk_score', 0.20)
+        momentum_weight = scoring_weights.get('momentum_score', 0.25)
+        volume_weight = scoring_weights.get('volume_score', 0.05)
+        
+        # Calculate individual scores
+        technical_score = self._calculate_technical_score(stock_data)
+        fundamental_score = self._calculate_fundamental_score(stock_data)
+        risk_score = self._calculate_risk_score(stock_data)
+        momentum_score = self._calculate_momentum_score(stock_data)
+        volume_score = self._calculate_volume_score(stock_data)
+        
+        # Weighted total score
+        total_score = (
+            technical_score * technical_weight +
+            fundamental_score * fundamental_weight +
+            risk_score * risk_weight +
+            momentum_score * momentum_weight +
+            volume_score * volume_weight
+        )
+        
+        return min(total_score, 1.0)
+    
+    def _calculate_aggressive_score(self, stock_data: Dict[str, Any]) -> float:
+        """Calculate score for aggressive strategy."""
+        score = 0.0
+        
+        # Price momentum (0-0.4)
+        current_price = stock_data.get('current_price', 0)
+        if 50 <= current_price <= 500:  # Sweet spot for growth
+            score += 0.4
+        elif 20 <= current_price <= 1000:
+            score += 0.3
+        
+        # Market cap growth potential (0-0.3)
+        market_cap = stock_data.get('market_cap', 0)
+        if 1000 <= market_cap <= 10000:  # Mid cap growth
+            score += 0.3
+        elif 500 <= market_cap <= 50000:
+            score += 0.2
+        
+        # Volume activity (0-0.3)
+        volume = stock_data.get('volume', 0)
+        if volume > 50000:
+            score += 0.3
+        elif volume > 20000:
+            score += 0.2
+        
+        return min(score, 1.0)
+    
+    def _calculate_aggressive_score_with_config(self, stock_data: Dict[str, Any]) -> float:
+        """Calculate aggressive score using stock_filters.yaml configuration."""
+        if not self.stock_filters_config:
+            return self._calculate_aggressive_score(stock_data)
+        
+        # Use same weighted scoring as conservative but with different thresholds
+        return self._calculate_conservative_score_with_config(stock_data)
+    
+    def _calculate_technical_score(self, stock_data: Dict[str, Any]) -> float:
+        """Calculate technical score based on configuration."""
+        # Simplified technical scoring - in real implementation would use technical indicators
+        current_price = stock_data.get('current_price', 0)
+        volume = stock_data.get('volume', 0)
+        
+        score = 0.0
+        
+        # Price range scoring
+        if 50 <= current_price <= 2000:
+            score += 0.5
+        
+        # Volume scoring
+        if volume > 100000:
+            score += 0.5
+        elif volume > 50000:
+            score += 0.3
+        
+        return min(score, 1.0)
+    
+    def _calculate_fundamental_score(self, stock_data: Dict[str, Any]) -> float:
+        """Calculate fundamental score based on configuration."""
+        pe_ratio = stock_data.get('pe_ratio')
+        pb_ratio = stock_data.get('pb_ratio')
+        roe = stock_data.get('roe')
+        
+        score = 0.0
+        
+        # P/E ratio scoring
+        if pe_ratio and 10 <= pe_ratio <= 25:
+            score += 0.4
+        elif pe_ratio and 5 <= pe_ratio <= 35:
+            score += 0.2
+        
+        # P/B ratio scoring
+        if pb_ratio and 1 <= pb_ratio <= 3:
+            score += 0.3
+        elif pb_ratio and 0.5 <= pb_ratio <= 5:
+            score += 0.1
+        
+        # ROE scoring
+        if roe and roe > 15:
+            score += 0.3
+        elif roe and roe > 10:
+            score += 0.1
+        
+        return min(score, 1.0)
+    
+    def _calculate_risk_score(self, stock_data: Dict[str, Any]) -> float:
+        """Calculate risk score based on configuration."""
+        market_cap = stock_data.get('market_cap', 0)
+        current_price = stock_data.get('current_price', 0)
+        
+        score = 0.0
+        
+        # Market cap stability (higher market cap = lower risk)
+        if market_cap > 20000:  # Large cap
+            score += 0.5
+        elif market_cap > 5000:  # Mid cap
+            score += 0.3
+        
+        # Price stability
+        if 100 <= current_price <= 1000:
+            score += 0.5
+        elif 50 <= current_price <= 2000:
+            score += 0.3
+        
+        return min(score, 1.0)
+    
+    def _calculate_momentum_score(self, stock_data: Dict[str, Any]) -> float:
+        """Calculate momentum score based on configuration."""
+        volume = stock_data.get('volume', 0)
+        current_price = stock_data.get('current_price', 0)
+        
+        score = 0.0
+        
+        # Volume momentum
+        if volume > 200000:
+            score += 0.6
+        elif volume > 100000:
+            score += 0.4
+        
+        # Price momentum (simplified)
+        if 50 <= current_price <= 500:
+            score += 0.4
+        elif 20 <= current_price <= 1000:
+            score += 0.2
+        
+        return min(score, 1.0)
+    
+    def _calculate_volume_score(self, stock_data: Dict[str, Any]) -> float:
+        """Calculate volume score based on configuration."""
+        volume = stock_data.get('volume', 0)
+        
+        if volume > 500000:
+            return 1.0
+        elif volume > 200000:
+            return 0.8
+        elif volume > 100000:
+            return 0.6
+        elif volume > 50000:
+            return 0.4
+        else:
+            return 0.2
+    
+    def _calculate_target_price(self, current_price: float, strategy: str) -> float:
+        """Calculate target price based on strategy."""
+        if strategy == 'DEFAULT_RISK':
+            return current_price * 1.07  # 7% target
+        elif strategy == 'HIGH_RISK':
+            return current_price * 1.12  # 12% target
+        return current_price * 1.05  # Default 5%
+    
+    def _calculate_stop_loss(self, current_price: float, strategy: str) -> float:
+        """Calculate stop loss based on strategy."""
+        if strategy == 'DEFAULT_RISK':
+            return current_price * 0.95  # 5% stop loss
+        elif strategy == 'HIGH_RISK':
+            return current_price * 0.90  # 10% stop loss
+        return current_price * 0.95  # Default 5%
+    
+    def _generate_reason(self, stock_data: Dict[str, Any], strategy: str, score: float) -> str:
+        """Generate reason for stock selection."""
+        if strategy == 'DEFAULT_RISK':
+            return f"Conservative swing trading opportunity (Score: {score:.2f}, 2-week hold)"
+        elif strategy == 'HIGH_RISK':
+            return f"Aggressive growth potential (Score: {score:.2f}, 2-week hold)"
+        return f"Stock selection (Score: {score:.2f})"
+    
+    def _extract_rejection_reasons(self, rejected_stocks: List[Any]) -> Dict[str, int]:
+        """Extract rejection reasons from rejected stocks."""
+        reasons = {}
+        for stock in rejected_stocks:
+            if hasattr(stock, 'reject_reasons'):
+                for reason in stock.reject_reasons:
+                    reasons[reason] = reasons.get(reason, 0) + 1
+        return reasons
+    
+    def _generate_saga_summary(self, saga: SuggestedStocksSaga) -> Dict[str, Any]:
+        """Generate comprehensive saga summary."""
+        return {
+            'saga_id': saga.saga_id,
+            'total_steps': len(saga.steps),
+            'completed_steps': len([s for s in saga.steps if s.status == SagaStepStatus.COMPLETED]),
+            'failed_steps': len([s for s in saga.steps if s.status == SagaStepStatus.FAILED]),
+            'total_duration_seconds': saga.total_duration_seconds,
+            'final_result_count': len(saga.final_results),
+            'strategies_applied': saga.strategies,
+            'search_applied': bool(saga.search_query),
+            'sort_applied': bool(saga.sort_by),
+            'sector_filter_applied': bool(saga.sector),
+            'success_rate': len([s for s in saga.steps if s.status == SagaStepStatus.COMPLETED]) / len(saga.steps) if saga.steps else 0,
+            'step_summary': [
+                {
+                    'step_id': step.step_id,
+                    'name': step.name,
+                    'status': step.status.value,
+                    'duration_seconds': step.duration_seconds,
+                    'input_count': step.input_count,
+                    'output_count': step.output_count,
+                    'success_rate': step.output_count / step.input_count if step.input_count > 0 else 0
+                }
+                for step in saga.steps
+            ]
+        }
+
+
+# Global orchestrator instance
+_saga_orchestrator = None
+
+
+def get_suggested_stocks_saga_orchestrator() -> SuggestedStocksSagaOrchestrator:
+    """Get global saga orchestrator instance."""
+    global _saga_orchestrator
+    if _saga_orchestrator is None:
+        _saga_orchestrator = SuggestedStocksSagaOrchestrator()
+    return _saga_orchestrator
