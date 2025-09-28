@@ -56,3 +56,27 @@ Start in development mode with auto-reloading for faster development.
 
 -   **[Architecture Document](PROMPTS/architecture.md)**: An overview of the system architecture, modules, dependencies, and design patterns.
 -   **[Coding Guidelines](PROMPTS/guidelines.md)**: A set of coding style patterns and error handling rules to be followed when contributing to the project.
+
+
+  🎯 CORE STATIC TABLES
+
+  | Table         | Final Count | Description                              |
+  |---------------|-------------|------------------------------------------|
+  | symbol_master | 2,253       | All available NSE symbols from Fyers     |
+  | stocks        | 2,253       | Stock records with prices & fundamentals |
+
+  📈 HISTORICAL & ANALYTICS TABLES
+
+  | Table                | Final Count | Calculation                       |
+  |----------------------|-------------|-----------------------------------|
+  | historical_data      | ~806,574    | 2,253 symbols × ~358 trading days |
+  | technical_indicators | ~806,574    | 2,253 symbols × ~358 trading days |
+
+  🔄 DYNAMIC TABLES (Variable)
+
+  | Table            | Typical Range | Updated                |
+  |------------------|---------------|------------------------|
+  | suggested_stocks | 0 - 50        | On filtering requests  |
+  | screened_stocks  | 0 - 200       | On screening runs      |
+  | ml_predictions   | 0 - 2,253     | On ML model runs       |
+  | market_data      | 0 - 5,000     | Real-time market feeds |
