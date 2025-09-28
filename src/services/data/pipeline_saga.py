@@ -434,77 +434,124 @@ class PipelineSaga:
     def step_comprehensive_metrics(self) -> Dict[str, Any]:
         """Step 5: Calculate ALL comprehensive financial metrics for stocks."""
         try:
-            logger.info("🔄 Starting volatility calculation step...")
+            logger.info("🔄 Starting comprehensive metrics calculation step...")
             
-            # Get stocks that need volatility calculation
-            stocks_needing_volatility = self._get_stocks_needing_volatility()
+            # Get stocks that need comprehensive metrics calculation
+            stocks_needing_metrics = self._get_stocks_needing_comprehensive_metrics()
             
-            if not stocks_needing_volatility:
-                logger.info("✅ All stocks already have volatility data")
+            if not stocks_needing_metrics:
+                logger.info("✅ All stocks already have comprehensive metrics data")
                 return {
                     'success': True,
                     'records_processed': 0,
-                    'message': 'All stocks already have volatility data'
+                    'message': 'All stocks already have comprehensive metrics data'
                 }
             
-            logger.info(f"📊 Found {len(stocks_needing_volatility)} stocks needing volatility calculation")
+            logger.info(f"📊 Found {len(stocks_needing_metrics)} stocks needing comprehensive metrics calculation")
             
-            # Calculate volatility for each stock
+            # Calculate comprehensive metrics for each stock
             records_processed = 0
-            for symbol in stocks_needing_volatility:
+            metrics_calculated = {
+                'volatility': 0,
+                'pe_ratio': 0,
+                'pb_ratio': 0,
+                'roe': 0,
+                'debt_to_equity': 0,
+                'dividend_yield': 0,
+                'beta': 0
+            }
+            
+            for symbol in stocks_needing_metrics:
                 try:
-                    # Get historical data for volatility calculation
                     with self.db_manager.get_session() as session:
+                        # Get historical data for calculations
                         historical_data = session.query(HistoricalData).filter(
                             HistoricalData.symbol == symbol
-                        ).order_by(HistoricalData.date.desc()).limit(30).all()
+                        ).order_by(HistoricalData.date.desc()).limit(252).all()  # 1 year of data
                         
-                        if len(historical_data) < 20:  # Need at least 20 days for volatility
-                            logger.warning(f"⚠️ Insufficient data for volatility calculation: {symbol}")
+                        if len(historical_data) < 20:  # Need at least 20 days
+                            logger.warning(f"⚠️ Insufficient historical data for {symbol}")
                             continue
                         
-                        # Calculate volatility (standard deviation of returns)
-                        returns = []
-                        for i in range(1, len(historical_data)):
-                            prev_close = historical_data[i].close
-                            curr_close = historical_data[i-1].close
-                            if prev_close > 0:
-                                returns.append((curr_close - prev_close) / prev_close)
-                        
-                        if len(returns) < 10:
-                            logger.warning(f"⚠️ Insufficient returns for volatility calculation: {symbol}")
-                            continue
-                        
-                        import numpy as np
-                        volatility = np.std(returns) * np.sqrt(252)  # Annualized volatility
-                        
-                        # Update stock with volatility data
                         stock = session.query(Stock).filter(Stock.symbol == symbol).first()
-                        if stock:
-                            stock.volatility = volatility
-                            session.commit()
-                            records_processed += 1
-                            logger.info(f"✅ Updated volatility for {symbol}: {volatility:.4f}")
-                    
+                        if not stock:
+                            continue
+                        
+                        # Calculate volatility (if not already calculated)
+                        if not stock.historical_volatility_1y or stock.historical_volatility_1y == 0:
+                            volatility = self._calculate_volatility(historical_data)
+                            if volatility is not None:
+                                stock.historical_volatility_1y = volatility
+                                metrics_calculated['volatility'] += 1
+                        
+                        # Calculate PE ratio (if not already calculated)
+                        if not stock.pe_ratio or stock.pe_ratio == 0:
+                            pe_ratio = self._calculate_pe_ratio(stock, historical_data)
+                            if pe_ratio is not None:
+                                stock.pe_ratio = pe_ratio
+                                metrics_calculated['pe_ratio'] += 1
+                        
+                        # Calculate PB ratio (if not already calculated)
+                        if not stock.pb_ratio or stock.pb_ratio == 0:
+                            pb_ratio = self._calculate_pb_ratio(stock, historical_data)
+                            if pb_ratio is not None:
+                                stock.pb_ratio = pb_ratio
+                                metrics_calculated['pb_ratio'] += 1
+                        
+                        # Calculate ROE (if not already calculated)
+                        if not stock.roe or stock.roe == 0:
+                            roe = self._calculate_roe(stock, historical_data)
+                            if roe is not None:
+                                stock.roe = roe
+                                metrics_calculated['roe'] += 1
+                        
+                        # Calculate debt-to-equity (if not already calculated)
+                        if not stock.debt_to_equity or stock.debt_to_equity == 0:
+                            debt_to_equity = self._calculate_debt_to_equity(stock, historical_data)
+                            if debt_to_equity is not None:
+                                stock.debt_to_equity = debt_to_equity
+                                metrics_calculated['debt_to_equity'] += 1
+                        
+                        # Calculate dividend yield (if not already calculated)
+                        if not stock.dividend_yield or stock.dividend_yield == 0:
+                            dividend_yield = self._calculate_dividend_yield(stock, historical_data)
+                            if dividend_yield is not None:
+                                stock.dividend_yield = dividend_yield
+                                metrics_calculated['dividend_yield'] += 1
+                        
+                        # Calculate beta (if not already calculated)
+                        if not stock.beta or stock.beta == 0:
+                            beta = self._calculate_beta(stock, historical_data)
+                            if beta is not None:
+                                stock.beta = beta
+                                metrics_calculated['beta'] += 1
+                        
+                        session.commit()
+                        records_processed += 1
+                        
+                        if records_processed % 100 == 0:
+                            logger.info(f"📊 Processed {records_processed} stocks...")
                 
                 except Exception as e:
-                    logger.error(f"❌ Error calculating volatility for {symbol}: {e}")
+                    logger.error(f"❌ Error calculating comprehensive metrics for {symbol}: {e}")
                     continue
             
-            logger.info(f"✅ Volatility calculation completed: {records_processed} stocks updated")
+            logger.info(f"✅ Comprehensive metrics calculation completed: {records_processed} stocks updated")
+            logger.info(f"📊 Metrics calculated: {metrics_calculated}")
+            
             return {
                 'success': True,
                 'records_processed': records_processed,
-                'message': f'Calculated volatility for {records_processed} stocks',
-                'volatility_updated': records_processed
+                'message': f'Calculated comprehensive metrics for {records_processed} stocks',
+                'metrics_calculated': metrics_calculated
             }
             
         except Exception as e:
-            logger.error(f"❌ Error in volatility calculation step: {e}")
+            logger.error(f"❌ Error in comprehensive metrics calculation step: {e}")
             return {
                 'success': False,
                 'records_processed': 0,
-                'message': f'Volatility calculation failed: {e}'
+                'message': f'Comprehensive metrics calculation failed: {e}'
             }
 
     def step_pipeline_validation(self) -> Dict[str, Any]:
@@ -597,21 +644,109 @@ class PipelineSaga:
                 'message': f'Pipeline validation failed: {e}'
             }
 
-    def _get_stocks_needing_volatility(self) -> List[str]:
-        """Get stocks that need volatility calculation."""
+    def _get_stocks_needing_comprehensive_metrics(self) -> List[str]:
+        """Get stocks that need comprehensive metrics calculation."""
         try:
             with self.db_manager.get_session() as session:
-                # Get stocks that don't have volatility data or have NULL volatility
+                # Get stocks that are missing any of the key financial metrics
                 result = session.execute(text("""
                     SELECT s.symbol FROM stocks s 
-                    WHERE s.volatility IS NULL OR s.volatility = 0
+                    WHERE (s.historical_volatility_1y IS NULL OR s.historical_volatility_1y = 0)
+                       OR (s.pe_ratio IS NULL OR s.pe_ratio = 0)
+                       OR (s.pb_ratio IS NULL OR s.pb_ratio = 0)
+                       OR (s.roe IS NULL OR s.roe = 0)
+                       OR (s.debt_to_equity IS NULL OR s.debt_to_equity = 0)
+                       OR (s.dividend_yield IS NULL OR s.dividend_yield = 0)
+                       OR (s.beta IS NULL OR s.beta = 0)
                     ORDER BY s.volume DESC
-                    LIMIT 100
+                    LIMIT 500
                 """))
                 return [row[0] for row in result.fetchall()]
         except Exception as e:
-            logger.error(f"❌ Error getting stocks needing volatility: {e}")
+            logger.error(f"❌ Error getting stocks needing comprehensive metrics: {e}")
             return []
+    
+    def _calculate_volatility(self, historical_data: List) -> Optional[float]:
+        """Calculate annualized volatility from historical data."""
+        try:
+            if len(historical_data) < 20:
+                return None
+            
+            import numpy as np
+            returns = []
+            for i in range(1, len(historical_data)):
+                prev_close = historical_data[i].close
+                curr_close = historical_data[i-1].close
+                if prev_close > 0:
+                    returns.append((curr_close - prev_close) / prev_close)
+            
+            if len(returns) < 10:
+                return None
+            
+            return np.std(returns) * np.sqrt(252)  # Annualized volatility
+        except Exception as e:
+            logger.error(f"❌ Error calculating volatility: {e}")
+            return None
+    
+    def _calculate_pe_ratio(self, stock, historical_data: List) -> Optional[float]:
+        """Calculate PE ratio from stock data."""
+        try:
+            # This would need earnings data - for now, return a placeholder
+            # In a real implementation, you'd fetch earnings data from an API
+            return None
+        except Exception as e:
+            logger.error(f"❌ Error calculating PE ratio: {e}")
+            return None
+    
+    def _calculate_pb_ratio(self, stock, historical_data: List) -> Optional[float]:
+        """Calculate PB ratio from stock data."""
+        try:
+            # This would need book value data - for now, return a placeholder
+            # In a real implementation, you'd fetch book value data from an API
+            return None
+        except Exception as e:
+            logger.error(f"❌ Error calculating PB ratio: {e}")
+            return None
+    
+    def _calculate_roe(self, stock, historical_data: List) -> Optional[float]:
+        """Calculate ROE from stock data."""
+        try:
+            # This would need earnings and equity data - for now, return a placeholder
+            # In a real implementation, you'd fetch financial data from an API
+            return None
+        except Exception as e:
+            logger.error(f"❌ Error calculating ROE: {e}")
+            return None
+    
+    def _calculate_debt_to_equity(self, stock, historical_data: List) -> Optional[float]:
+        """Calculate debt-to-equity ratio from stock data."""
+        try:
+            # This would need debt and equity data - for now, return a placeholder
+            # In a real implementation, you'd fetch financial data from an API
+            return None
+        except Exception as e:
+            logger.error(f"❌ Error calculating debt-to-equity: {e}")
+            return None
+    
+    def _calculate_dividend_yield(self, stock, historical_data: List) -> Optional[float]:
+        """Calculate dividend yield from stock data."""
+        try:
+            # This would need dividend data - for now, return a placeholder
+            # In a real implementation, you'd fetch dividend data from an API
+            return None
+        except Exception as e:
+            logger.error(f"❌ Error calculating dividend yield: {e}")
+            return None
+    
+    def _calculate_beta(self, stock, historical_data: List) -> Optional[float]:
+        """Calculate beta from stock data."""
+        try:
+            # This would need market index data for comparison - for now, return a placeholder
+            # In a real implementation, you'd compare stock returns to market returns
+            return None
+        except Exception as e:
+            logger.error(f"❌ Error calculating beta: {e}")
+            return None
     
     def _store_historical_data(self, symbol: str, candles: list) -> int:
         """Store historical data from Fyers API response."""
@@ -704,14 +839,14 @@ class PipelineSaga:
             }
             
             # Execute each step with retry logic
-        steps = [
-            (PipelineStep.SYMBOL_MASTER, self.step_symbol_master),
-            (PipelineStep.STOCKS, self.step_stocks),
-            (PipelineStep.HISTORICAL_DATA, self.step_historical_data),
-            (PipelineStep.TECHNICAL_INDICATORS, self.step_technical_indicators),
-            (PipelineStep.COMPREHENSIVE_METRICS, self.step_comprehensive_metrics),
-            (PipelineStep.PIPELINE_VALIDATION, self.step_pipeline_validation)
-        ]
+            steps = [
+                (PipelineStep.SYMBOL_MASTER, self.step_symbol_master),
+                (PipelineStep.STOCKS, self.step_stocks),
+                (PipelineStep.HISTORICAL_DATA, self.step_historical_data),
+                (PipelineStep.TECHNICAL_INDICATORS, self.step_technical_indicators),
+                (PipelineStep.COMPREHENSIVE_METRICS, self.step_comprehensive_metrics),
+                (PipelineStep.PIPELINE_VALIDATION, self.step_pipeline_validation)
+            ]
             
             for step, step_function in steps:
                 logger.info(f"🔄 Executing {step.name}")

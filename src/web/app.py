@@ -145,8 +145,8 @@ def create_app():
                     
                     for step, info in status.items():
                         records = info.get('records_processed', 0)
-                        if step == 'VOLATILITY_CALCULATION':
-                            app.logger.info(f"📈 Volatility: {records} stocks")
+                        if step == 'COMPREHENSIVE_METRICS':
+                            app.logger.info(f"📈 Comprehensive Metrics: {records} stocks")
                         elif step == 'HISTORICAL_DATA':
                             app.logger.info(f"📈 Historical: {records} records")
                         elif step == 'TECHNICAL_INDICATORS':
