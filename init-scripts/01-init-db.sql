@@ -753,12 +753,16 @@ CREATE TABLE IF NOT EXISTS pipeline_tracking (
     records_processed INTEGER DEFAULT 0,
     retry_count INTEGER DEFAULT 0,
     error_message TEXT,
+    failure_reason TEXT,
+    last_error TEXT,
     started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     completed_at TIMESTAMP,
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(step_name)
 );
+
 
 -- Pipeline Tracking Indexes
 CREATE INDEX IF NOT EXISTS idx_pipeline_tracking_step ON pipeline_tracking(step_name);
