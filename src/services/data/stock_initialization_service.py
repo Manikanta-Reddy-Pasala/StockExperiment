@@ -679,6 +679,97 @@ class StockInitializationService:
                 'duration_seconds': duration
             }
 
+    def complete_system_initialization(self, user_id: int = 1) -> Dict:
+        """
+        Complete system initialization for all core tables:
+        1. Symbol Master (from Fyers API)
+        2. Stocks (with live prices)
+        3. Historical Data (1 year of data)
+        4. Technical Indicators (all symbols)
+        5. Volatility Calculations
+        """
+        start_time = time.time()
+        results = {
+            'success': True,
+            'total_duration': 0,
+            'steps': {}
+        }
+
+        try:
+            logger.info("🚀 Starting complete system initialization...")
+
+            # Step 1: Fast stock sync (symbol_master + stocks)
+            logger.info("📊 Step 1: Syncing symbol_master and stocks...")
+            sync_result = self.fast_sync_stocks(user_id)
+            results['steps']['stocks_sync'] = sync_result
+
+            if not sync_result.get('success'):
+                results['success'] = False
+                results['error'] = f"Stock sync failed: {sync_result.get('error')}"
+                return results
+
+            stocks_created = sync_result.get('stocks_created', 0)
+            total_stocks = sync_result.get('total_symbols', 0)
+            logger.info(f"✅ Step 1 completed: {total_stocks} stocks available")
+
+            # Step 2: Historical data bulk fetch
+            logger.info("📈 Step 2: Fetching historical data...")
+            historical_result = self._fetch_initial_historical_data(user_id, stocks_created)
+            results['steps']['historical_data'] = historical_result
+
+            if historical_result.get('success'):
+                logger.info(f"✅ Step 2 completed: Historical data fetched")
+            else:
+                logger.warning(f"⚠️ Step 2 partial: {historical_result.get('error', 'Unknown error')}")
+
+            # Step 3: Technical indicators calculation
+            logger.info("📊 Step 3: Calculating technical indicators...")
+            try:
+                from .technical_indicators_service import TechnicalIndicatorsService
+
+                tech_service = TechnicalIndicatorsService()
+                indicators_result = tech_service.calculate_indicators_bulk(max_symbols=100)
+                results['steps']['technical_indicators'] = indicators_result
+
+                if indicators_result.get('success'):
+                    logger.info(f"✅ Step 3 completed: Technical indicators calculated")
+                else:
+                    logger.warning(f"⚠️ Step 3 partial: {indicators_result.get('error', 'Unknown error')}")
+
+            except Exception as e:
+                logger.warning(f"⚠️ Step 3 failed: Technical indicators service error: {e}")
+                results['steps']['technical_indicators'] = {'success': False, 'error': str(e)}
+
+            # Step 4: Volatility calculation (final step)
+            logger.info("📊 Step 4: Calculating volatility metrics...")
+            volatility_result = self._auto_trigger_volatility_calculation(user_id)
+            results['steps']['volatility'] = volatility_result
+
+            if volatility_result.get('success'):
+                logger.info(f"✅ Step 4 completed: Volatility calculated")
+            else:
+                logger.warning(f"⚠️ Step 4 partial: {volatility_result.get('error', 'Unknown error')}")
+
+            # Calculate total duration
+            results['total_duration'] = time.time() - start_time
+
+            # Summary
+            logger.info("🎯 Complete system initialization finished!")
+            logger.info(f"⏱️ Total duration: {results['total_duration']:.1f}s")
+            logger.info(f"📊 Stocks: {total_stocks}")
+            logger.info(f"📈 Historical: {historical_result.get('records_processed', 0)} records")
+            logger.info(f"📊 Indicators: {results['steps']['technical_indicators'].get('symbols_processed', 0)} symbols")
+            logger.info(f"📈 Volatility: {volatility_result.get('stocks_updated', 0)} stocks")
+
+            return results
+
+        except Exception as e:
+            logger.error(f"❌ Complete system initialization failed: {e}")
+            results['success'] = False
+            results['error'] = str(e)
+            results['total_duration'] = time.time() - start_time
+            return results
+
     def _auto_trigger_volatility_calculation(self, user_id: int) -> Dict:
         """
         Auto-trigger volatility calculation after stock data is populated.
@@ -1104,14 +1195,18 @@ class StockInitializationService:
                     'error': 'Historical data models not available'
                 }
 
-            # Only fetch historical data if we actually created new stocks
-            if stocks_created == 0:
-                logger.info("📊 No new stocks created - skipping historical data fetch")
+            # Fetch historical data if we created new stocks OR if historical table is empty
+            if stocks_created == 0 and total_historical_count > 0:
+                logger.info("📊 No new stocks created and historical data exists - skipping historical data fetch")
                 return {
                     'success': True,
                     'skipped': True,
-                    'reason': 'No new stocks created'
+                    'reason': 'No new stocks created and historical data exists'
                 }
+            elif total_historical_count == 0:
+                logger.info("📊 Historical data table is empty - fetching historical data for all stocks")
+            else:
+                logger.info(f"📊 {stocks_created} new stocks created - fetching historical data")
 
             logger.info("📈 Starting initial historical data fetch for all stocks (1+ year data)")
             logger.info("💡 This is a one-time setup process - subsequent updates will be incremental")

@@ -32,8 +32,10 @@ class HistoricalDataService:
     def __init__(self):
         self.broker_service = get_unified_broker_service()
         self.db_manager = get_database_manager()
-        self.rate_limit_delay = 0.3  # 300ms between API calls to avoid rate limits
+        self.rate_limit_delay = 0.5  # 500ms between API calls for optimal balance
         self.batch_size = 10  # Process stocks in small batches
+        self.max_retries = 3  # Retry failed API calls up to 3 times
+        self.retry_delay = 2.0  # 2 seconds delay between retries
 
     def fetch_historical_data_bulk(self, user_id: int = 1, days: int = 500,
                                    max_stocks: int = 100) -> Dict[str, Any]:
@@ -272,9 +274,7 @@ class HistoricalDataService:
                 )
 
                 # Combine both queries and prioritize by volume (higher volume first)
-                stocks_needing_data = stocks_with_data.union(stocks_without_data).join(
-                    Stock, Stock.symbol == stocks_with_data.c.symbol
-                ).order_by(desc(Stock.volume)).limit(max_stocks).all()
+                stocks_needing_data = stocks_with_data.union(stocks_without_data).order_by(desc(Stock.volume)).limit(max_stocks).all()
 
                 if not stocks_needing_data:
                     # Fallback: get stocks without data at all
@@ -323,25 +323,48 @@ class HistoricalDataService:
         return results
 
     def _fetch_from_api(self, user_id: int, symbol: str, start_date: date, end_date: date) -> Optional[pd.DataFrame]:
-        """Fetch historical data from broker API."""
+        """Fetch historical data from broker API with retry logic."""
+
+        # Calculate number of days for the period parameter
+        days_diff = (end_date - start_date).days
+        period = f"{days_diff}d"
+
+        for attempt in range(self.max_retries + 1):  # +1 for initial attempt
+            try:
+                if attempt > 0:
+                    logger.info(f"🔄 Retry attempt {attempt}/{self.max_retries} for {symbol}")
+                    time.sleep(self.retry_delay)  # Wait before retry
+
+                # Use broker service to get historical data
+                result = self.broker_service.get_historical_data(
+                    user_id=user_id,
+                    symbol=symbol,
+                    resolution='1D',
+                    period=period
+                )
+
+                if not (result.get('success') or result.get('status') == 'success') or not result.get('data'):
+                    error_msg = result.get('error', 'No data')
+                    if attempt < self.max_retries:
+                        logger.warning(f"⚠️ API call failed for {symbol} (attempt {attempt + 1}): {error_msg}")
+                        continue  # Try again
+                    else:
+                        logger.error(f"❌ API call failed for {symbol} after {self.max_retries} retries: {error_msg}")
+                        return None
+
+                # Success - break out of retry loop
+                break
+
+            except Exception as e:
+                if attempt < self.max_retries:
+                    logger.warning(f"⚠️ Exception for {symbol} (attempt {attempt + 1}): {e}")
+                    continue  # Try again
+                else:
+                    logger.error(f"❌ Exception for {symbol} after {self.max_retries} retries: {e}")
+                    return None
+
+        # Convert to DataFrame (only reached after successful API call)
         try:
-            # Calculate number of days for the period parameter
-            days_diff = (end_date - start_date).days
-            period = f"{days_diff}d"
-
-            # Use broker service to get historical data
-            result = self.broker_service.get_historical_data(
-                user_id=user_id,
-                symbol=symbol,
-                resolution='1D',
-                period=period
-            )
-
-            if not (result.get('success') or result.get('status') == 'success') or not result.get('data'):
-                logger.warning(f"API call failed for {symbol}: {result.get('error', 'No data')}")
-                return None
-
-            # Convert to DataFrame
             data = result['data']
 
             # Handle different data formats from API
@@ -414,7 +437,7 @@ class HistoricalDataService:
             return None
 
         except Exception as e:
-            logger.error(f"Error fetching from API for {symbol}: {e}")
+            logger.error(f"Error processing API response for {symbol}: {e}")
             return None
 
     def _store_historical_data(self, symbol: str, df: pd.DataFrame) -> int:

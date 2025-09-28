@@ -1156,7 +1156,8 @@ class EnhancedStockFilteringService:
 
     def _compute_liquidity_score(self, context: StockContext) -> Optional[float]:
         """Compute liquidity score using volume and spread weighting."""
-        volume_norm = self.raw_config.get('liquidity_scoring', {}).get('volume_normalization', 1_000_000)
+        # More realistic volume normalization for Indian stocks - 100K shares for good liquidity
+        volume_norm = self.raw_config.get('liquidity_scoring', {}).get('volume_normalization', 100_000)
         weights = self.raw_config.get('liquidity_scoring', {}).get('weights', {'volume': 0.7, 'spread': 0.3})
         spread_multiplier = self.raw_config.get('liquidity_scoring', {}).get('spread_multiplier', 10)
 
@@ -1172,12 +1173,15 @@ class EnhancedStockFilteringService:
 
         avg_volume = context.avg_volume_20d or context.volume
         if not avg_volume or avg_volume <= 0:
-            return None
+            return 0.0  # Return 0.0 instead of None to avoid filtering issues
+
+        # Use realistic volume normalization - volume above 100K gets max score
         volume_component = min(1.0, avg_volume / volume_norm) if volume_norm else 0.0
 
         spread = context.bid_ask_spread
         if spread is None:
-            spread_component = 0.5
+            # Default to 0.7 spread component if no spread data (more generous than 0.5)
+            spread_component = 0.7
         else:
             spread_pct = spread / 100 if spread > 1 else spread
             spread_component = max(0.0, 1 - min(1.0, spread_pct * spread_multiplier))

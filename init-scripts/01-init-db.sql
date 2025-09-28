@@ -743,3 +743,22 @@ CREATE INDEX IF NOT EXISTS idx_benchmark_date_desc ON market_benchmarks(date DES
 CREATE INDEX IF NOT EXISTS idx_quality_symbol ON data_quality_metrics(symbol);
 CREATE INDEX IF NOT EXISTS idx_quality_has_1year ON data_quality_metrics(has_1_year_history);
 CREATE INDEX IF NOT EXISTS idx_quality_meets_min ON data_quality_metrics(meets_min_quality);
+
+-- Pipeline Tracking Table for Saga Pattern
+CREATE TABLE IF NOT EXISTS pipeline_tracking (
+    id SERIAL PRIMARY KEY,
+    step_name VARCHAR(50) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    records_processed INTEGER DEFAULT 0,
+    retry_count INTEGER DEFAULT 0,
+    error_message TEXT,
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(step_name)
+);
+
+-- Pipeline Tracking Indexes
+CREATE INDEX IF NOT EXISTS idx_pipeline_tracking_step ON pipeline_tracking(step_name);
+CREATE INDEX IF NOT EXISTS idx_pipeline_tracking_status ON pipeline_tracking(status);
+CREATE INDEX IF NOT EXISTS idx_pipeline_tracking_started_at ON pipeline_tracking(started_at);
