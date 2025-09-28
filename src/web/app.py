@@ -138,13 +138,29 @@ def create_app():
                     app.logger.info(f"📊 Steps completed: {len(results.get('steps_completed', []))}")
                     app.logger.info(f"📊 Total records processed: {results.get('total_records_processed', 0)}")
 
-                    # Log individual step results
+                    # Log individual step results with proper counts
                     from src.services.data.pipeline_saga import get_pipeline_saga
                     saga = get_pipeline_saga()
                     status = saga.get_pipeline_status()
                     
                     for step, info in status.items():
-                        app.logger.info(f"📊 {step}: {info['status']} ({info['records_processed']} records)")
+                        records = info.get('records_processed', 0)
+                        if step == 'VOLATILITY_CALCULATION':
+                            app.logger.info(f"📈 Volatility: {records} stocks")
+                        elif step == 'HISTORICAL_DATA':
+                            app.logger.info(f"📈 Historical: {records} records")
+                        elif step == 'TECHNICAL_INDICATORS':
+                            app.logger.info(f"📊 Indicators: {records} records")
+                        elif step == 'STOCKS':
+                            app.logger.info(f"📊 Stocks: {records} synced")
+                        elif step == 'SYMBOL_MASTER':
+                            app.logger.info(f"📊 Symbol Master: {records} records")
+                        elif step == 'PIPELINE_VALIDATION':
+                            # Show validation results
+                            validation_results = info.get('validation_results', {})
+                            app.logger.info(f"📊 Validation: {validation_results.get('symbol_master_count', 0)} symbols, {validation_results.get('stocks_count', 0)} stocks, {validation_results.get('historical_data_count', 0)} historical, {validation_results.get('technical_indicators_count', 0)} indicators, {validation_results.get('volatility_calculated_count', 0)} volatility")
+                        else:
+                            app.logger.info(f"📊 {step}: {records} records")
 
                 else:
                     app.logger.error(f"❌ Complete system initialization failed: {results.get('error', 'Unknown error')}")

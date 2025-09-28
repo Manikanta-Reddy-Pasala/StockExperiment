@@ -30,7 +30,7 @@ class PipelineStep(Enum):
     STOCKS = 2
     HISTORICAL_DATA = 3
     TECHNICAL_INDICATORS = 4
-    VOLATILITY_CALCULATION = 5
+    COMPREHENSIVE_METRICS = 5  # Calculate ALL financial metrics (PE, PB, ROE, volatility, etc.)
     PIPELINE_VALIDATION = 6
 
 
@@ -244,16 +244,32 @@ class PipelineSaga:
             return {'success': False, 'error': str(e)}
     
     def step_stocks(self) -> Dict[str, Any]:
-        """Step 2: Ensure stocks table is populated."""
+        """Step 2: Ensure stocks table is populated with fundamental data."""
         try:
             with self.db_manager.get_session() as session:
                 count = session.execute(text('SELECT COUNT(*) as count FROM stocks')).fetchone().count
                 
                 if count >= 2000:  # Expected ~2253 stocks
+                    logger.info(f"📊 Stocks already exist: {count} records")
+                    # Even if stocks exist, we need to update fundamental data
+                    logger.info("📊 Updating fundamental data for existing stocks...")
+                    from ..data.stock_initialization_service import get_stock_initialization_service
+                    init_service = get_stock_initialization_service()
+                    
+                    try:
+                        fundamental_result = init_service._update_fundamental_data(user_id=1)
+                        if fundamental_result.get('success'):
+                            logger.info(f"✅ Fundamental data updated: {fundamental_result.get('updated_count', 0)} stocks")
+                        else:
+                            logger.warning(f"⚠️ Fundamental data update failed: {fundamental_result.get('error', 'Unknown error')}")
+                    except Exception as e:
+                        logger.error(f"❌ Error updating fundamental data: {e}")
+                    
                     return {
                         'success': True,
                         'records_processed': count,
-                        'message': f'Stocks already has {count} records'
+                        'message': f'Stocks already has {count} records, fundamental data updated',
+                        'fundamental_updated': fundamental_result.get('updated_count', 0) if 'fundamental_result' in locals() else 0
                     }
                 else:
                     # Trigger stock sync (volatility warning is expected here)
@@ -263,10 +279,22 @@ class PipelineSaga:
                     result = init_service.fast_sync_stocks(user_id=1)
                     
                     if result.get('success'):
+                        # After basic stock sync, update fundamental data
+                        logger.info("📊 Updating fundamental data for stocks...")
+                        try:
+                            fundamental_result = init_service._update_fundamental_data(user_id=1)
+                            if fundamental_result.get('success'):
+                                logger.info(f"✅ Fundamental data updated: {fundamental_result.get('updated_count', 0)} stocks")
+                            else:
+                                logger.warning(f"⚠️ Fundamental data update failed: {fundamental_result.get('error', 'Unknown error')}")
+                        except Exception as e:
+                            logger.error(f"❌ Error updating fundamental data: {e}")
+                        
                         return {
                             'success': True,
                             'records_processed': result.get('stocks_created', 0),
-                            'message': 'Stocks populated successfully (volatility will be calculated in Step 5)'
+                            'message': 'Stocks populated successfully with fundamental data (volatility will be calculated in Step 5)',
+                            'fundamental_updated': fundamental_result.get('updated_count', 0) if 'fundamental_result' in locals() else 0
                         }
                     else:
                         return {
@@ -403,8 +431,8 @@ class PipelineSaga:
         except Exception as e:
             return {'success': False, 'error': str(e)}
 
-    def step_volatility_calculation(self) -> Dict[str, Any]:
-        """Step 5: Calculate volatility data for stocks."""
+    def step_comprehensive_metrics(self) -> Dict[str, Any]:
+        """Step 5: Calculate ALL comprehensive financial metrics for stocks."""
         try:
             logger.info("🔄 Starting volatility calculation step...")
             
@@ -467,7 +495,8 @@ class PipelineSaga:
             return {
                 'success': True,
                 'records_processed': records_processed,
-                'message': f'Calculated volatility for {records_processed} stocks'
+                'message': f'Calculated volatility for {records_processed} stocks',
+                'volatility_updated': records_processed
             }
             
         except Exception as e:
@@ -552,7 +581,12 @@ class PipelineSaga:
                 'success': success,
                 'records_processed': 0,
                 'message': message,
-                'validation_results': validation_results
+                'validation_results': validation_results,
+                'symbol_master_count': validation_results['symbol_master_count'],
+                'stocks_count': validation_results['stocks_count'],
+                'historical_data_count': validation_results['historical_data_count'],
+                'technical_indicators_count': validation_results['technical_indicators_count'],
+                'volatility_calculated_count': validation_results['volatility_calculated_count']
             }
             
         except Exception as e:
@@ -670,14 +704,14 @@ class PipelineSaga:
             }
             
             # Execute each step with retry logic
-            steps = [
-                (PipelineStep.SYMBOL_MASTER, self.step_symbol_master),
-                (PipelineStep.STOCKS, self.step_stocks),
-                (PipelineStep.HISTORICAL_DATA, self.step_historical_data),
-                (PipelineStep.TECHNICAL_INDICATORS, self.step_technical_indicators),
-                (PipelineStep.VOLATILITY_CALCULATION, self.step_volatility_calculation),
-                (PipelineStep.PIPELINE_VALIDATION, self.step_pipeline_validation)
-            ]
+        steps = [
+            (PipelineStep.SYMBOL_MASTER, self.step_symbol_master),
+            (PipelineStep.STOCKS, self.step_stocks),
+            (PipelineStep.HISTORICAL_DATA, self.step_historical_data),
+            (PipelineStep.TECHNICAL_INDICATORS, self.step_technical_indicators),
+            (PipelineStep.COMPREHENSIVE_METRICS, self.step_comprehensive_metrics),
+            (PipelineStep.PIPELINE_VALIDATION, self.step_pipeline_validation)
+        ]
             
             for step, step_function in steps:
                 logger.info(f"🔄 Executing {step.name}")

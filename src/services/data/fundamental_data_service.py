@@ -46,7 +46,7 @@ class FundamentalDataService:
                 result = session.execute(text("""
                     SELECT id, symbol, name FROM stocks 
                     WHERE is_active = true AND is_tradeable = true 
-                    LIMIT 100
+                    ORDER BY volume DESC
                 """))
                 
                 stocks = result.fetchall()
