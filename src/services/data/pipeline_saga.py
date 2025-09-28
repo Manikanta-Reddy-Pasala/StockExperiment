@@ -285,7 +285,7 @@ class PipelineSaga:
                         FROM historical_data 
                         GROUP BY symbol
                     ) h ON s.symbol = h.symbol 
-                    WHERE h.symbol IS NULL OR h.hist_count < 200
+                    WHERE h.symbol IS NULL OR h.hist_count < 300
                     AND s.symbol IN (
                         'NSE:RELIANCE-EQ', 'NSE:TCS-EQ', 'NSE:HDFCBANK-EQ', 'NSE:INFY-EQ', 'NSE:ITC-EQ',
                         'NSE:HINDUNILVR-EQ', 'NSE:ICICIBANK-EQ', 'NSE:KOTAKBANK-EQ', 'NSE:SBIN-EQ', 'NSE:BHARTIARTL-EQ',
@@ -316,10 +316,10 @@ class PipelineSaga:
                 
                 for symbol in symbols:
                     try:
-                        # Get historical data for the last 90 days (more reasonable for Fyers API)
+                        # Get historical data for the last 365 days (maximum Fyers API supports)
                         from datetime import datetime, timedelta
                         end_date = datetime.now()
-                        start_date = end_date - timedelta(days=90)
+                        start_date = end_date - timedelta(days=365)
                         
                         result = fyers_service.history(
                             user_id=1, 
