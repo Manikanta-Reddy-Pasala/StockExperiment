@@ -259,25 +259,13 @@ class PipelineSaga:
                 
                 if count >= 2000:  # Expected ~2253 stocks
                     logger.info(f"📊 Stocks already exist: {count} records")
-                    # Even if stocks exist, we need to update fundamental data
-                    logger.info("📊 Updating fundamental data for existing stocks...")
-                    from ..data.stock_initialization_service import get_stock_initialization_service
-                    init_service = get_stock_initialization_service()
-                    
-                    try:
-                        fundamental_result = init_service._update_fundamental_data(user_id=1)
-                        if fundamental_result.get('success'):
-                            logger.info(f"✅ Fundamental data updated: {fundamental_result.get('updated_count', 0)} stocks")
-                        else:
-                            logger.warning(f"⚠️ Fundamental data update failed: {fundamental_result.get('error', 'Unknown error')}")
-                    except Exception as e:
-                        logger.error(f"❌ Error updating fundamental data: {e}")
-                    
+                    # Skip fundamental data update for speed - can be done later via web interface
+                    logger.info("⚡ Skipping fundamental data update for faster saga completion")
+
                     return {
                         'success': True,
                         'records_processed': count,
-                        'message': f'Stocks already has {count} records, fundamental data updated',
-                        'fundamental_updated': fundamental_result.get('updated_count', 0) if 'fundamental_result' in locals() else 0
+                        'message': f'Stocks already has {count} records, fundamental data skipped for speed'
                     }
                 else:
                     # Trigger stock sync (volatility warning is expected here)
@@ -287,22 +275,13 @@ class PipelineSaga:
                     result = init_service.fast_sync_stocks(user_id=1)
                     
                     if result.get('success'):
-                        # After basic stock sync, update fundamental data
-                        logger.info("📊 Updating fundamental data for stocks...")
-                        try:
-                            fundamental_result = init_service._update_fundamental_data(user_id=1)
-                            if fundamental_result.get('success'):
-                                logger.info(f"✅ Fundamental data updated: {fundamental_result.get('updated_count', 0)} stocks")
-                            else:
-                                logger.warning(f"⚠️ Fundamental data update failed: {fundamental_result.get('error', 'Unknown error')}")
-                        except Exception as e:
-                            logger.error(f"❌ Error updating fundamental data: {e}")
-                        
+                        # Skip fundamental data update for speed - can be done later
+                        logger.info("⚡ Skipping fundamental data update for faster saga completion")
+
                         return {
                             'success': True,
                             'records_processed': result.get('stocks_created', 0),
-                            'message': 'Stocks populated successfully with fundamental data (volatility will be calculated in Step 5)',
-                            'fundamental_updated': fundamental_result.get('updated_count', 0) if 'fundamental_result' in locals() else 0
+                            'message': 'Stocks populated successfully (fundamental data skipped for speed, volatility will be calculated in Step 5)'
                         }
                     else:
                         return {
@@ -325,14 +304,8 @@ class PipelineSaga:
                         GROUP BY symbol
                     ) h ON s.symbol = h.symbol 
                     WHERE h.symbol IS NULL OR h.hist_count < 300
-                    AND s.symbol IN (
-                        'NSE:RELIANCE-EQ', 'NSE:TCS-EQ', 'NSE:HDFCBANK-EQ', 'NSE:INFY-EQ', 'NSE:ITC-EQ',
-                        'NSE:HINDUNILVR-EQ', 'NSE:ICICIBANK-EQ', 'NSE:KOTAKBANK-EQ', 'NSE:SBIN-EQ', 'NSE:BHARTIARTL-EQ',
-                        'NSE:ASIANPAINT-EQ', 'NSE:MARUTI-EQ', 'NSE:ULTRACEMCO-EQ', 'NSE:TITAN-EQ', 'NSE:SUNPHARMA-EQ',
-                        'NSE:WIPRO-EQ', 'NSE:LT-EQ', 'NSE:BAJAJFINSV-EQ', 'NSE:AXISBANK-EQ', 'NSE:NESTLEIND-EQ'
-                    )
+                    AND s.is_active = true AND s.is_tradeable = true
                     ORDER BY s.volume DESC
-                    LIMIT 20
                 """)).fetchall()
                 
                 if not stocks_needing_data:
