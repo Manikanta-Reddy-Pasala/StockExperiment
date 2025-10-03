@@ -200,61 +200,117 @@ class TechnicalIndicatorsService:
             return None
 
     def _calculate_all_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Calculate all technical indicators."""
+        """
+        Calculate comprehensive set of 20+ technical indicators for stock analysis.
+
+        This method computes trend, momentum, volatility, and volume indicators that are
+        essential for technical analysis and algorithmic trading strategies.
+
+        Args:
+            df: DataFrame with columns ['date', 'open', 'high', 'low', 'close', 'volume']
+
+        Returns:
+            DataFrame with all original data plus calculated indicator columns
+        """
 
         # Create a copy to avoid modifying original data
         indicators = df.copy()
 
-        # Moving Averages
-        indicators['sma_5'] = df['close'].rolling(window=5).mean()
-        indicators['sma_10'] = df['close'].rolling(window=10).mean()
-        indicators['sma_20'] = df['close'].rolling(window=20).mean()
-        indicators['sma_50'] = df['close'].rolling(window=50).mean()
-        indicators['sma_100'] = df['close'].rolling(window=100).mean()
-        indicators['sma_200'] = df['close'].rolling(window=200).mean()
+        # ===== TREND INDICATORS - Moving Averages =====
+        # Simple Moving Average (SMA): Average price over N periods
+        # Formula: SMA = Sum(Close prices for N periods) / N
+        # Usage: Identifies trend direction; price above SMA = bullish, below = bearish
+        indicators['sma_5'] = df['close'].rolling(window=5).mean()    # Very short-term trend
+        indicators['sma_10'] = df['close'].rolling(window=10).mean()  # Short-term trend
+        indicators['sma_20'] = df['close'].rolling(window=20).mean()  # Medium-term trend
+        indicators['sma_50'] = df['close'].rolling(window=50).mean()  # Intermediate trend
+        indicators['sma_100'] = df['close'].rolling(window=100).mean() # Long-term trend
+        indicators['sma_200'] = df['close'].rolling(window=200).mean() # Major trend (bull/bear market)
 
-        # Exponential Moving Averages
-        indicators['ema_12'] = df['close'].ewm(span=12).mean()
-        indicators['ema_26'] = df['close'].ewm(span=26).mean()
-        indicators['ema_50'] = df['close'].ewm(span=50).mean()
+        # Exponential Moving Average (EMA): Weighted average giving more weight to recent prices
+        # Formula: EMA = (Close × α) + (Previous_EMA × (1 - α)), where α = 2/(span+1)
+        # Usage: More responsive to recent price changes than SMA
+        indicators['ema_12'] = df['close'].ewm(span=12, adjust=False).mean()  # Fast EMA for MACD
+        indicators['ema_26'] = df['close'].ewm(span=26, adjust=False).mean()  # Slow EMA for MACD
+        indicators['ema_50'] = df['close'].ewm(span=50, adjust=False).mean()  # Medium-term trend
 
-        # RSI (Relative Strength Index)
+        # ===== MOMENTUM INDICATORS =====
+
+        # RSI (Relative Strength Index): Measures speed and magnitude of price changes
+        # Range: 0-100; >70 = overbought, <30 = oversold
         indicators['rsi_14'] = self._calculate_rsi(df['close'], 14)
 
-        # MACD
+        # MACD (Moving Average Convergence Divergence): Trend-following momentum indicator
+        # MACD Line = EMA(12) - EMA(26)
+        # Signal Line = EMA(9) of MACD
+        # Histogram = MACD - Signal (shows momentum strength)
         macd_data = self._calculate_macd(df['close'])
-        indicators['macd'] = macd_data['macd']
-        indicators['macd_signal'] = macd_data['signal']
-        indicators['macd_histogram'] = macd_data['histogram']
+        indicators['macd'] = macd_data['macd']              # Difference between fast and slow EMA
+        indicators['macd_signal'] = macd_data['signal']     # 9-period EMA of MACD (trigger line)
+        indicators['macd_histogram'] = macd_data['histogram'] # MACD - Signal (momentum strength)
 
-        # ATR (Average True Range)
+        # ===== VOLATILITY INDICATORS =====
+
+        # ATR (Average True Range): Measures market volatility
+        # True Range = max(High-Low, |High-PrevClose|, |Low-PrevClose|)
+        # ATR = Average of True Range over N periods
         atr_data = self._calculate_atr(df, 14)
-        indicators['atr_14'] = atr_data['atr']
+        indicators['atr_14'] = atr_data['atr']  # Absolute volatility measure
+        # ATR Percentage: ATR relative to price (normalized across different price levels)
+        # Formula: (ATR / Close) × 100
         indicators['atr_percentage'] = (atr_data['atr'] / df['close']) * 100
 
-        # Bollinger Bands
+        # Bollinger Bands: Volatility bands around moving average
+        # Middle Band = SMA(20)
+        # Upper Band = SMA(20) + (2 × StdDev)
+        # Lower Band = SMA(20) - (2 × StdDev)
+        # Usage: Price near upper band = overbought, near lower = oversold
         bb_data = self._calculate_bollinger_bands(df['close'], 20, 2)
-        indicators['bb_upper'] = bb_data['upper']
-        indicators['bb_middle'] = bb_data['middle']
-        indicators['bb_lower'] = bb_data['lower']
+        indicators['bb_upper'] = bb_data['upper']   # Upper volatility band
+        indicators['bb_middle'] = bb_data['middle'] # 20-period SMA (baseline)
+        indicators['bb_lower'] = bb_data['lower']   # Lower volatility band
+        # BB Width: Measures band expansion/contraction
+        # Formula: ((Upper - Lower) / Middle) × 100
+        # High width = high volatility, Low width = low volatility (squeeze)
         indicators['bb_width'] = ((bb_data['upper'] - bb_data['lower']) / bb_data['middle']) * 100
 
-        # ADX (Average Directional Index)
+        # ===== TREND STRENGTH INDICATORS =====
+
+        # ADX (Average Directional Index): Measures trend strength (not direction)
+        # Range: 0-100; >25 = trending, <20 = ranging/choppy
         indicators['adx_14'] = self._calculate_adx(df, 14)
 
-        # Volume Indicators
+        # ===== VOLUME INDICATORS =====
+
+        # OBV (On Balance Volume): Cumulative volume-based momentum indicator
+        # If Close > Prev_Close: OBV += Volume
+        # If Close < Prev_Close: OBV -= Volume
+        # If Close = Prev_Close: OBV unchanged
+        # Usage: Rising OBV = buying pressure, Falling OBV = selling pressure
         indicators['obv'] = self._calculate_obv(df['close'], df['volume'])
+
+        # Volume SMA: Average volume over 20 periods
         indicators['volume_sma_20'] = df['volume'].rolling(window=20).mean()
+
+        # Volume Ratio: Current volume relative to average
+        # Formula: Current_Volume / SMA_Volume(20)
+        # >1 = above average volume, <1 = below average
         indicators['volume_ratio'] = df['volume'] / indicators['volume_sma_20']
 
-        # Custom Momentum Indicators
-        indicators['price_momentum_5d'] = ((df['close'] / df['close'].shift(5)) - 1) * 100
-        indicators['price_momentum_20d'] = ((df['close'] / df['close'].shift(20)) - 1) * 100
+        # ===== CUSTOM MOMENTUM INDICATORS =====
 
-        # Volatility Rank (percentile of ATR over last 252 days)
+        # Price Momentum: Percentage change over N periods
+        # Formula: ((Close / Close_N_periods_ago) - 1) × 100
+        # Positive = upward momentum, Negative = downward momentum
+        indicators['price_momentum_5d'] = ((df['close'] / df['close'].shift(5)) - 1) * 100   # 1-week momentum
+        indicators['price_momentum_20d'] = ((df['close'] / df['close'].shift(20)) - 1) * 100 # 1-month momentum
+
+        # Volatility Rank: Percentile rank of current ATR vs last 252 days (1 year)
+        # Formula: Percentile_Rank(ATR_14, 252 periods) × 100
+        # Range: 0-100; High rank = current volatility is high relative to past year
         indicators['volatility_rank'] = indicators['atr_14'].rolling(window=252).rank(pct=True) * 100
 
-        # Calculate data points used for each indicator
+        # Metadata: Track how many data points were used for calculation
         indicators['data_points_used'] = len(df)
 
         return indicators

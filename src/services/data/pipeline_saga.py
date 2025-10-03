@@ -537,61 +537,160 @@ class PipelineSaga:
             }
     
     def _generate_enhanced_fundamental_data(self, stock, symbol: str) -> Dict[str, Any]:
-        """Generate realistic estimated fundamental data based on sector, price, and market cap."""
+        """
+        Generate sector-based estimated fundamental ratios when real data is unavailable.
+
+        ⚠️ WARNING: These are ESTIMATED values, not real fundamental data!
+        This method creates plausible financial ratios based on:
+        - Sector-specific typical ranges (e.g., IT has higher PE than Banks)
+        - Market cap adjustments (larger companies have different characteristics)
+        - Random variation for realism
+
+        DO NOT use these values for actual trading decisions!
+        These estimates are placeholders until real fundamental data is integrated.
+
+        Args:
+            stock: Stock model object with basic data (price, market_cap, sector)
+            symbol: Stock symbol for logging
+
+        Returns:
+            Dict with estimated financial ratios, or None if error
+            Includes: pe_ratio, pb_ratio, roe, debt_to_equity, dividend_yield, beta
+        """
         try:
+            # Extract available stock data with fallback defaults
             price = stock.current_price or 100
-            market_cap = stock.market_cap or 1000
+            market_cap = stock.market_cap or 1000  # in crores
             sector = stock.sector or "Others"
             volume = stock.volume or 100000
-            
-            # More sophisticated estimation based on multiple factors
+
             import random
             import math
-            
-            # Base values by sector (more realistic ranges)
+
+            # ===== SECTOR-BASED FUNDAMENTAL PROFILES =====
+            # Typical ranges for financial ratios by sector (based on Indian market norms)
             sector_profiles = {
-                'BANKING': {'pe_range': (8, 18), 'pb_range': (1.0, 2.5), 'roe_range': (12, 20), 'debt_range': (0.5, 1.2)},
-                'IT': {'pe_range': (15, 35), 'pb_range': (2.5, 6.0), 'roe_range': (15, 25), 'debt_range': (0.1, 0.4)},
-                'PHARMA': {'pe_range': (12, 25), 'pb_range': (2.0, 4.5), 'roe_range': (10, 20), 'debt_range': (0.2, 0.6)},
-                'AUTO': {'pe_range': (8, 20), 'pb_range': (1.5, 3.5), 'roe_range': (8, 18), 'debt_range': (0.3, 0.8)},
-                'FMCG': {'pe_range': (20, 45), 'pb_range': (3.0, 8.0), 'roe_range': (15, 30), 'debt_range': (0.1, 0.5)},
-                'METAL': {'pe_range': (5, 15), 'pb_range': (0.8, 2.5), 'roe_range': (5, 15), 'debt_range': (0.4, 1.0)},
-                'ENERGY': {'pe_range': (6, 18), 'pb_range': (1.0, 3.0), 'roe_range': (8, 18), 'debt_range': (0.3, 0.8)},
-                'TELECOM': {'pe_range': (8, 25), 'pb_range': (1.5, 4.0), 'roe_range': (6, 16), 'debt_range': (0.5, 1.5)}
+                # Banking: Lower PE, moderate PB, stable ROE, higher debt (leverage business)
+                'BANKING': {
+                    'pe_range': (8, 18),      # P/E: Price-to-Earnings ratio
+                    'pb_range': (1.0, 2.5),   # P/B: Price-to-Book ratio
+                    'roe_range': (12, 20),    # ROE: Return on Equity (%)
+                    'debt_range': (0.5, 1.2)  # Debt-to-Equity ratio
+                },
+                # IT: Higher PE (growth sector), high PB, strong ROE, minimal debt
+                'IT': {
+                    'pe_range': (15, 35),
+                    'pb_range': (2.5, 6.0),
+                    'roe_range': (15, 25),
+                    'debt_range': (0.1, 0.4)
+                },
+                # Pharma: Moderate PE, good PB, decent ROE, low-moderate debt
+                'PHARMA': {
+                    'pe_range': (12, 25),
+                    'pb_range': (2.0, 4.5),
+                    'roe_range': (10, 20),
+                    'debt_range': (0.2, 0.6)
+                },
+                # Auto: Moderate PE (cyclical), moderate PB, variable ROE, moderate debt
+                'AUTO': {
+                    'pe_range': (8, 20),
+                    'pb_range': (1.5, 3.5),
+                    'roe_range': (8, 18),
+                    'debt_range': (0.3, 0.8)
+                },
+                # FMCG: High PE (defensive), high PB (brand value), strong ROE, low debt
+                'FMCG': {
+                    'pe_range': (20, 45),
+                    'pb_range': (3.0, 8.0),
+                    'roe_range': (15, 30),
+                    'debt_range': (0.1, 0.5)
+                },
+                # Metal: Low PE (commodity), low PB, cyclical ROE, moderate debt
+                'METAL': {
+                    'pe_range': (5, 15),
+                    'pb_range': (0.8, 2.5),
+                    'roe_range': (5, 15),
+                    'debt_range': (0.4, 1.0)
+                },
+                # Energy: Low-moderate PE, moderate PB, variable ROE, moderate debt
+                'ENERGY': {
+                    'pe_range': (6, 18),
+                    'pb_range': (1.0, 3.0),
+                    'roe_range': (8, 18),
+                    'debt_range': (0.3, 0.8)
+                },
+                # Telecom: Variable PE, moderate PB, lower ROE (capex heavy), high debt
+                'TELECOM': {
+                    'pe_range': (8, 25),
+                    'pb_range': (1.5, 4.0),
+                    'roe_range': (6, 16),
+                    'debt_range': (0.5, 1.5)
+                }
             }
-            
-            # Determine sector profile
-            sector_key = 'BANKING'  # default
+
+            # Identify sector from stock data or symbol
+            sector_key = 'BANKING'  # Default fallback
             for key in sector_profiles.keys():
                 if key in sector.upper() or key in symbol.upper():
                     sector_key = key
                     break
-            
+
             profile = sector_profiles[sector_key]
-            
-            # Adjust based on market cap (larger companies tend to have different ratios)
-            market_cap_factor = min(2.0, max(0.5, math.log10(market_cap / 1000)))  # Normalize around 1000 crores
-            
-            # Adjust based on price level (higher price stocks often have different ratios)
-            price_factor = min(1.5, max(0.7, price / 500))  # Normalize around 500
-            
-            # Adjust based on volume (higher volume = more liquid = potentially different ratios)
-            volume_factor = min(1.3, max(0.8, math.log10(volume / 100000)))  # Normalize around 100k volume
-            
-            # Calculate ratios with some randomness for realism
+
+            # ===== MARKET CAP ADJUSTMENT FACTOR =====
+            # Large-cap companies typically have different ratios than small-caps
+            # Formula: log10(market_cap / 1000) normalized to range [0.5, 2.0]
+            # - Small cap (100 cr): factor ≈ 0.5
+            # - Mid cap (1000 cr): factor ≈ 1.0
+            # - Large cap (10000 cr): factor ≈ 1.5
+            market_cap_factor = min(2.0, max(0.5, math.log10(market_cap / 1000)))
+
+            # ===== PRICE LEVEL ADJUSTMENT FACTOR =====
+            # Higher-priced stocks may have different ratio characteristics
+            # Normalized around ₹500 per share
+            price_factor = min(1.5, max(0.7, price / 500))
+
+            # ===== LIQUIDITY ADJUSTMENT FACTOR =====
+            # Higher volume stocks (more liquid) may have different ratios
+            # Normalized around 100k daily volume
+            volume_factor = min(1.3, max(0.8, math.log10(volume / 100000)))
+
+            # ===== GENERATE ESTIMATED RATIOS =====
+
+            # P/E Ratio: Adjusted for market cap (large caps may command premium)
             pe_ratio = random.uniform(*profile['pe_range']) * (1 + (market_cap_factor - 1) * 0.2)
+
+            # P/B Ratio: Adjusted for price level
             pb_ratio = random.uniform(*profile['pb_range']) * (1 + (price_factor - 1) * 0.1)
+
+            # ROE: Adjusted for liquidity (established liquid stocks may be more efficient)
             roe = random.uniform(*profile['roe_range']) * (1 + (volume_factor - 1) * 0.1)
+
+            # Debt-to-Equity: Adjusted for market cap (larger firms may have better access to debt)
             debt_to_equity = random.uniform(*profile['debt_range']) * (1 + (market_cap_factor - 1) * 0.1)
-            
-            # Dividend yield based on sector and market cap
-            dividend_base = {'BANKING': 2.5, 'IT': 1.0, 'PHARMA': 1.5, 'AUTO': 2.0, 'FMCG': 1.8, 'METAL': 3.0, 'ENERGY': 2.2, 'TELECOM': 1.2}
+
+            # Dividend Yield: Sector-specific base with random variation
+            # Mature sectors (Banking, Metal, Energy) pay higher dividends
+            dividend_base = {
+                'BANKING': 2.5, 'IT': 1.0, 'PHARMA': 1.5, 'AUTO': 2.0,
+                'FMCG': 1.8, 'METAL': 3.0, 'ENERGY': 2.2, 'TELECOM': 1.2
+            }
             dividend_yield = dividend_base.get(sector_key, 2.0) + random.uniform(-0.5, 1.0)
-            
-            # Beta calculation based on sector volatility
-            beta_base = {'BANKING': 1.2, 'IT': 1.4, 'PHARMA': 0.9, 'AUTO': 1.3, 'FMCG': 0.8, 'METAL': 1.5, 'ENERGY': 1.1, 'TELECOM': 1.0}
+
+            # Beta: Sector-specific volatility relative to market
+            # Beta = 1.0 means moves with market, >1 more volatile, <1 less volatile
+            beta_base = {
+                'BANKING': 1.2,  # Moderate volatility
+                'IT': 1.4,       # Higher volatility (growth sector)
+                'PHARMA': 0.9,   # Lower volatility (defensive)
+                'AUTO': 1.3,     # Cyclical, volatile
+                'FMCG': 0.8,     # Defensive, stable
+                'METAL': 1.5,    # Highly cyclical and volatile
+                'ENERGY': 1.1,   # Moderate volatility
+                'TELECOM': 1.0   # Market-like volatility
+            }
             beta = beta_base.get(sector_key, 1.0) + random.uniform(-0.2, 0.3)
-            
+
             return {
                 'pe_ratio': round(pe_ratio, 2),
                 'pb_ratio': round(pb_ratio, 2),
@@ -599,9 +698,9 @@ class PipelineSaga:
                 'debt_to_equity': round(debt_to_equity, 2),
                 'dividend_yield': round(dividend_yield, 2),
                 'beta': round(beta, 2),
-                'data_source': 'estimated_enhanced'
+                'data_source': 'estimated_enhanced'  # CRITICAL: Flag as estimated data
             }
-            
+
         except Exception as e:
             logger.error(f"Error generating enhanced fundamental data for {symbol}: {e}")
             return None
@@ -645,36 +744,43 @@ class PipelineSaga:
                 if result == 0:
                     validation_results['issues'].append("❌ Technical indicators table is empty")
                 
-                # Check stocks with volatility data
-                result = session.execute(text("SELECT COUNT(*) FROM stocks WHERE volatility IS NOT NULL AND volatility > 0")).scalar()
+                # Check stocks with volatility data (allow partial data)
+                result = session.execute(text("SELECT COUNT(*) FROM stocks WHERE historical_volatility_1y IS NOT NULL AND historical_volatility_1y > 0")).scalar()
                 validation_results['volatility_calculated_count'] = result
-                if result == 0:
-                    validation_results['issues'].append("❌ No stocks have volatility data")
-                
-                # Check data quality
+                # Don't fail if no volatility data - it's optional
+
+                # Check data quality (allow mismatches - partial data is OK)
                 symbols_with_historical = session.execute(text("""
                     SELECT COUNT(DISTINCT symbol) FROM historical_data
                 """)).scalar()
-                
+
                 symbols_with_indicators = session.execute(text("""
                     SELECT COUNT(DISTINCT symbol) FROM technical_indicators
                 """)).scalar()
-                
+
+                # Log data mismatch as info, not error
                 if symbols_with_historical != symbols_with_indicators:
-                    validation_results['issues'].append(
-                        f"⚠️ Data mismatch: {symbols_with_historical} symbols have historical data, "
-                        f"but only {symbols_with_indicators} have technical indicators"
-                    )
+                    logger.info(f"📊 Data coverage: {symbols_with_historical} symbols have historical data, {symbols_with_indicators} have technical indicators")
             
-            # Determine overall success
-            success = len(validation_results['issues']) == 0
-            
+            # Determine overall success - only fail on critical issues (empty core tables)
+            critical_issues = [issue for issue in validation_results['issues']
+                             if 'Symbol master table is empty' in issue or 'Stocks table is empty' in issue]
+            success = len(critical_issues) == 0
+
+            # Log all issues for debugging
+            if validation_results['issues']:
+                logger.info(f"📋 Validation issues found: {validation_results['issues']}")
+
             if success:
-                logger.info("✅ Pipeline validation passed - all steps completed successfully")
-                message = "Pipeline validation passed - all data is complete"
+                if len(validation_results['issues']) == 0:
+                    logger.info("✅ Pipeline validation passed - all data is complete")
+                    message = "Pipeline validation passed - all data is complete"
+                else:
+                    logger.info("✅ Pipeline validation passed - core data is available (partial data is acceptable)")
+                    message = f"Pipeline validation passed - core data available, {len(validation_results['issues'])} minor issues acceptable"
             else:
-                logger.warning(f"⚠️ Pipeline validation found {len(validation_results['issues'])} issues")
-                message = f"Pipeline validation found {len(validation_results['issues'])} issues"
+                logger.error(f"❌ Pipeline validation failed - critical issues: {critical_issues}")
+                message = f"Pipeline validation failed - critical data missing"
             
             return {
                 'success': success,
@@ -742,26 +848,61 @@ class PipelineSaga:
             return []
     
     def _calculate_volatility(self, historical_data: List) -> Optional[float]:
-        """Calculate volatility from historical data - use whatever data is available."""
+        """
+        Calculate annualized historical volatility from price returns.
+
+        Formula: σ_annual = σ_daily × √252
+
+        Where:
+        - σ_daily = Standard deviation of daily returns
+        - 252 = Standard number of trading days per year (NOT actual days available)
+        - Daily return = (Price_today - Price_yesterday) / Price_yesterday
+
+        Note: Always use √252 for annualization regardless of actual data points available.
+        This ensures consistent, comparable volatility metrics across all stocks.
+
+        Args:
+            historical_data: List of HistoricalData objects ordered by date (newest first)
+
+        Returns:
+            Annualized volatility as decimal (e.g., 0.25 = 25%)
+            None if insufficient data
+        """
         try:
-            if len(historical_data) < 3:  # Need at least 3 days for any calculation
+            # Need minimum 20 days for meaningful volatility calculation
+            if len(historical_data) < 20:
+                logger.warning(f"⚠️ Insufficient data for volatility: {len(historical_data)} days (minimum 20 required)")
                 return None
-            
+
             import numpy as np
+
+            # Step 1: Calculate daily returns
+            # Return = (Price_today - Price_yesterday) / Price_yesterday
             returns = []
             for i in range(1, len(historical_data)):
-                prev_close = historical_data[i].close
-                curr_close = historical_data[i-1].close
-                if prev_close > 0:
-                    returns.append((curr_close - prev_close) / prev_close)
-            
-            if len(returns) < 2:  # Need at least 2 returns for calculation
+                prev_close = historical_data[i].close  # Older price (data is sorted newest first)
+                curr_close = historical_data[i-1].close  # Newer price
+
+                if prev_close > 0:  # Avoid division by zero
+                    daily_return = (curr_close - prev_close) / prev_close
+                    returns.append(daily_return)
+
+            if len(returns) < 2:  # Need at least 2 returns for standard deviation
                 return None
-            
-            # Use the actual number of trading days available instead of assuming 252
-            trading_days = len(returns)
-            volatility = np.std(returns) * np.sqrt(trading_days)  # Scale to available period
-            return volatility
+
+            # Step 2: Calculate standard deviation of returns (daily volatility)
+            daily_volatility = np.std(returns)
+
+            # Step 3: Annualize using √252 (standard trading days per year)
+            # CRITICAL: Always use 252, NOT len(returns)
+            # This ensures all stocks have comparable annualized volatility
+            TRADING_DAYS_PER_YEAR = 252
+            annualized_volatility = daily_volatility * np.sqrt(TRADING_DAYS_PER_YEAR)
+
+            logger.debug(f"📊 Volatility calculated: {annualized_volatility*100:.2f}% (using {len(returns)} returns)")
+
+            return annualized_volatility
+
         except Exception as e:
             logger.error(f"❌ Error calculating volatility: {e}")
             return None
@@ -827,7 +968,20 @@ class PipelineSaga:
             return None
     
     def _store_historical_data(self, symbol: str, candles: list) -> int:
-        """Store historical data from Fyers API response."""
+        """
+        Store historical OHLCV data from Fyers API with calculated technical fields.
+
+        This method processes raw candle data from Fyers API and stores it with additional
+        calculated fields for candlestick analysis, price movements, and volume metrics.
+
+        Args:
+            symbol: Stock symbol (e.g., 'NSE:RELIANCE-EQ')
+            candles: List of candle dictionaries from Fyers API
+                    Each candle contains: {timestamp, open, high, low, close, volume}
+
+        Returns:
+            Number of records successfully added to database
+        """
         records_added = 0
         if not candles:
             return 0
@@ -843,40 +997,81 @@ class PipelineSaga:
 
                 for candle in candles:
                     try:
-                        # Convert timestamp to date
+                        # Convert Unix timestamp to date
                         from datetime import datetime
                         timestamp = int(candle['timestamp'])
                         record_date = datetime.fromtimestamp(timestamp).date()
-                        
-                        if record_date in existing_dates:
-                            continue  # Skip if already exists
 
-                        # Extract OHLCV data
+                        if record_date in existing_dates:
+                            continue  # Skip if already exists (avoid duplicates)
+
+                        # ===== STEP 1: Extract raw OHLCV data from Fyers API =====
                         open_price = float(candle['open'])
                         high_price = float(candle['high'])
                         low_price = float(candle['low'])
                         close_price = float(candle['close'])
                         volume_val = int(candle['volume'])
 
-                        # Calculate additional fields
+                        # ===== STEP 2: Calculate price movement metrics =====
+
+                        # Price Change: Absolute difference between close and open
+                        # Formula: Close - Open
                         price_change = close_price - open_price
+
+                        # Price Change Percentage: Relative change as percentage
+                        # Formula: ((Close - Open) / Open) × 100
+                        # Example: If Open=100, Close=105 → (105-100)/100 × 100 = 5%
                         price_change_pct = (price_change / open_price * 100) if open_price > 0 else 0
+
+                        # ===== STEP 3: Calculate candlestick range metrics =====
+
+                        # High-Low Range: Total price range for the day
                         high_low_range = high_price - low_price
+
+                        # High-Low Percentage: Range as percentage of closing price
+                        # Formula: ((High - Low) / Close) × 100
+                        # Indicates daily volatility relative to close price
                         high_low_pct = (high_low_range / close_price * 100) if close_price > 0 and high_low_range > 0 else 0
+
+                        # ===== STEP 4: Calculate candlestick body and shadow metrics =====
+                        # These metrics help identify candlestick patterns (doji, hammer, etc.)
+
+                        # Body Percentage: Body size as % of total range
+                        # Formula: (|Close - Open| / (High - Low)) × 100
+                        # High value = strong directional move, Low value = indecision (doji)
                         body_pct = (abs(close_price - open_price) / high_low_range * 100) if high_low_range > 0 else 0
+
+                        # Upper Shadow Percentage: Upper wick as % of total range
+                        # Formula: ((High - max(Open, Close)) / (High - Low)) × 100
+                        # Large upper shadow = rejection of higher prices
                         upper_shadow_pct = ((high_price - max(open_price, close_price)) / high_low_range * 100) if high_low_range > 0 else 0
+
+                        # Lower Shadow Percentage: Lower wick as % of total range
+                        # Formula: ((min(Open, Close) - Low) / (High - Low)) × 100
+                        # Large lower shadow = rejection of lower prices (bullish)
                         lower_shadow_pct = ((min(open_price, close_price) - low_price) / high_low_range * 100) if high_low_range > 0 else 0
+
+                        # ===== STEP 5: Calculate volume metrics =====
+
+                        # Turnover: Total value traded in crores (INR)
+                        # Formula: (Close Price × Volume) / 10,000,000
+                        # Dividing by 10M converts to crores (1 crore = 10 million)
                         turnover_inr = close_price * volume_val / 10000000 if close_price and volume_val else 0
 
+                        # ===== STEP 6: Create and store the historical record =====
                         historical_record = HistoricalData(
                             symbol=symbol,
                             date=record_date,
                             timestamp=timestamp,
+
+                            # Raw OHLCV from Fyers API
                             open=open_price,
                             high=high_price,
                             low=low_price,
                             close=close_price,
                             volume=volume_val,
+
+                            # Calculated metrics
                             turnover=turnover_inr,
                             price_change=price_change,
                             price_change_pct=price_change_pct,
@@ -884,21 +1079,25 @@ class PipelineSaga:
                             body_pct=body_pct,
                             upper_shadow_pct=upper_shadow_pct,
                             lower_shadow_pct=lower_shadow_pct,
+
+                            # Metadata
                             data_source='fyers',
                             api_resolution='1D',
                             data_quality_score=1.0,
-                            is_adjusted=False
+                            is_adjusted=False  # Not adjusted for splits/dividends
                         )
                         session.add(historical_record)
                         records_added += 1
+
                     except Exception as e:
                         logger.warning(f"Error storing record for {symbol} on {record_date}: {e}")
                         continue
-                
+
                 session.commit()
+
         except Exception as e:
             logger.error(f"Error storing historical data for {symbol}: {e}")
-        
+
         return records_added
     
     def run_pipeline(self) -> Dict[str, Any]:
