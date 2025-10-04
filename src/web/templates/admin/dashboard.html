@@ -491,90 +491,12 @@
     <div class="col-12">
         <div class="card task-card">
             <div class="card-header bg-gradient-danger text-white">
-                <h5 class="mb-0"><i class="bi bi-lightning-charge-fill me-2"></i>Complete Pipeline</h5>
+                <h5 class="mb-0"><i class="bi bi-lightning-charge-fill me-2"></i>Execute Complete Pipeline</h5>
             </div>
             <div class="card-body">
                 <p class="mb-3">Execute all steps in sequence: Pipeline → Fill Data → Business Logic → ML Training → CSV Export</p>
                 <button class="btn btn-danger-trigger w-100" id="runAllBtn" onclick="triggerAll()">
                     <i class="bi bi-play-fill me-2"></i>Run All Steps (45-60 min)
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Individual Tasks -->
-<div class="row g-4 mb-4">
-    <!-- Data Pipeline -->
-    <div class="col-lg-4 col-md-6">
-        <div class="card task-card h-100">
-            <div class="card-header bg-light">
-                <h6 class="mb-0"><i class="bi bi-diagram-3-fill me-2"></i>Data Pipeline</h6>
-            </div>
-            <div class="card-body">
-                <p class="small text-muted mb-3">6-step saga: Symbols → Stocks → History → Indicators → Metrics → Validation</p>
-                <button class="btn btn-trigger w-100" onclick="triggerTask('pipeline', 'Data Pipeline')">
-                    <i class="bi bi-play-fill me-2"></i>Run Pipeline (20-30 min)
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Fill Missing Data -->
-    <div class="col-lg-4 col-md-6">
-        <div class="card task-card h-100">
-            <div class="card-header bg-light">
-                <h6 class="mb-0"><i class="bi bi-arrow-repeat me-2"></i>Fill Missing Data</h6>
-            </div>
-            <div class="card-body">
-                <p class="small text-muted mb-3">Populate adj_close, liquidity, ATR, volatility, volume averages</p>
-                <button class="btn btn-trigger w-100" onclick="triggerTask('fill-data', 'Fill Data')">
-                    <i class="bi bi-play-fill me-2"></i>Fill Data (2-5 min)
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Business Logic -->
-    <div class="col-lg-4 col-md-6">
-        <div class="card task-card h-100">
-            <div class="card-header bg-light">
-                <h6 class="mb-0"><i class="bi bi-calculator-fill me-2"></i>Business Logic</h6>
-            </div>
-            <div class="card-body">
-                <p class="small text-muted mb-3">Calculate EPS, margins, ratios, growth metrics (14+ fields)</p>
-                <button class="btn btn-trigger w-100" onclick="triggerTask('business-logic', 'Business Logic')">
-                    <i class="bi bi-play-fill me-2"></i>Calculate Metrics (2-5 min)
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ML Training -->
-    <div class="col-lg-4 col-md-6">
-        <div class="card task-card h-100">
-            <div class="card-header bg-light">
-                <h6 class="mb-0"><i class="bi bi-robot me-2"></i>ML Training</h6>
-            </div>
-            <div class="card-body">
-                <p class="small text-muted mb-3">Train Random Forest models with 365 days of historical data</p>
-                <button class="btn btn-success-trigger w-100" onclick="triggerTask('ml-training', 'ML Training')">
-                    <i class="bi bi-play-fill me-2"></i>Train Models (1-2 min)
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- CSV Export -->
-    <div class="col-lg-4 col-md-6">
-        <div class="card task-card h-100">
-            <div class="card-header bg-light">
-                <h6 class="mb-0"><i class="bi bi-file-earmark-spreadsheet me-2"></i>CSV Export</h6>
-            </div>
-            <div class="card-body">
-                <p class="small text-muted mb-3">Export stocks, history, indicators, and suggested stocks to CSV</p>
-                <button class="btn btn-trigger w-100" onclick="triggerTask('csv-export', 'CSV Export')">
-                    <i class="bi bi-play-fill me-2"></i>Export CSV (1-2 min)
                 </button>
             </div>
         </div>
@@ -804,18 +726,13 @@ async function monitorTask(taskId, taskName) {
                 } else if (task.status === 'completed') {
                     addLog(`✓ ${taskName} completed successfully`, 'success');
 
-                    // Mark all steps as completed in UI
+                    // Mark task as completed but keep visible
                     if (taskInfo) {
                         taskInfo.steps = task.steps || [];
+                        taskInfo.completed = true;
                         activeTasks.set(taskId, taskInfo);
                         updateActiveTasks();
                     }
-
-                    // Remove after a brief delay to show final state
-                    setTimeout(() => {
-                        activeTasks.delete(taskId);
-                        updateActiveTasks();
-                    }, 3000);
 
                     if (taskTimers.has(taskId)) {
                         clearInterval(taskTimers.get(taskId));
@@ -1007,6 +924,16 @@ function renderStepProgress(steps) {
     return html;
 }
 
+// Close/dismiss a task
+function closeTask(taskId) {
+    activeTasks.delete(taskId);
+    if (taskTimers.has(taskId)) {
+        clearInterval(taskTimers.get(taskId));
+        taskTimers.delete(taskId);
+    }
+    updateActiveTasks();
+}
+
 // Update active tasks display
 function updateActiveTasks() {
     const container = document.getElementById('activeTasksContainer');
@@ -1024,12 +951,18 @@ function updateActiveTasks() {
         const taskDiv = document.createElement('div');
         taskDiv.className = 'mb-4';
 
-        const statusBadge = taskInfo.failed
-            ? '<span class="badge-status badge-failed">Failed</span>'
-            : '<span class="badge-status badge-running"><span class="spinner me-2"></span>Running</span>';
-
+        let statusBadge = '';
         let buttonsHtml = '';
-        if (taskInfo.failed) {
+
+        if (taskInfo.completed) {
+            statusBadge = '<span class="badge-status badge-completed">Completed</span>';
+            buttonsHtml = `
+                <button class="btn btn-sm btn-outline-secondary" onclick="closeTask('${taskId}')">
+                    <i class="bi bi-x-lg"></i> Close
+                </button>
+            `;
+        } else if (taskInfo.failed) {
+            statusBadge = '<span class="badge-status badge-failed">Failed</span>';
             buttonsHtml = `
                 <button class="btn btn-sm btn-warning me-2" onclick="retryTask('${taskId}', '${taskInfo.type}', '${taskInfo.name}')">
                     <i class="bi bi-arrow-clockwise"></i> Retry All
@@ -1037,11 +970,18 @@ function updateActiveTasks() {
             `;
             if (taskInfo.failedSteps && taskInfo.failedSteps.length > 0) {
                 buttonsHtml += `
-                    <button class="btn btn-sm btn-info" onclick="retryFailedSteps('${taskId}')">
+                    <button class="btn btn-sm btn-info me-2" onclick="retryFailedSteps('${taskId}')">
                         <i class="bi bi-arrow-repeat"></i> Retry Failed Steps Only
                     </button>
                 `;
             }
+            buttonsHtml += `
+                <button class="btn btn-sm btn-outline-secondary" onclick="closeTask('${taskId}')">
+                    <i class="bi bi-x-lg"></i> Close
+                </button>
+            `;
+        } else {
+            statusBadge = '<span class="badge-status badge-running"><span class="spinner me-2"></span>Running</span>';
         }
 
         // Render step progress
