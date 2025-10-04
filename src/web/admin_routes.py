@@ -102,7 +102,8 @@ def trigger_pipeline():
         from src.services.data.pipeline_saga import PipelineSaga
 
         saga = PipelineSaga()
-        saga.execute()
+        result = saga.run_pipeline()
+        return result
 
     thread = threading.Thread(
         target=run_function_async,
@@ -178,7 +179,7 @@ def trigger_all():
             })
 
             saga = PipelineSaga()
-            saga.execute()
+            saga.run_pipeline()
 
             running_tasks[overall_task_id]['steps'][-1]['status'] = 'completed'
             running_tasks[overall_task_id]['steps'][-1]['end_time'] = datetime.now().isoformat()

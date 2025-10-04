@@ -55,8 +55,6 @@ class StockMLPredictor:
                 s.atr_14,
                 ti.rsi_14,
                 ti.macd,
-                ti.signal_line,
-                ti.macd_histogram,
                 ti.sma_50,
                 ti.sma_200,
                 ti.ema_12,
@@ -108,7 +106,7 @@ class StockMLPredictor:
             # Volatility
             'historical_volatility_1y', 'atr_14', 'atr_percentage',
             # Technical indicators
-            'rsi_14', 'macd', 'signal_line', 'macd_histogram',
+            'rsi_14', 'macd',
             'sma_50', 'sma_200', 'ema_12', 'ema_26'
         ]
         
