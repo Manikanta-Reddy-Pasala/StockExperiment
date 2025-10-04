@@ -28,13 +28,16 @@ def run_command_async(task_id, command, description):
             'output': '',
             'error': ''
         }
-        
+
+        # Get the project root directory (where run_pipeline.py lives)
+        project_root = '/app' if os.path.exists('/app/run_pipeline.py') else os.getcwd()
+
         result = subprocess.run(
             command,
             capture_output=True,
             text=True,
             timeout=3600,  # 1 hour timeout
-            cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            cwd=project_root
         )
         
         running_tasks[task_id]['status'] = 'completed' if result.returncode == 0 else 'failed'
@@ -117,13 +120,13 @@ def trigger_business_logic():
 def trigger_ml_training():
     """Trigger ML model training."""
     task_id = f"ml_training_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    
+
     thread = threading.Thread(
         target=run_command_async,
-        args=(task_id, ['python3', 'train_ml_model.py'], 'ML Model Training')
+        args=(task_id, ['python3', 'tools/train_ml_model.py'], 'ML Model Training')
     )
     thread.start()
-    
+
     return jsonify({
         'success': True,
         'task_id': task_id,
@@ -166,10 +169,13 @@ def trigger_all():
             ('pipeline', ['python3', 'run_pipeline.py'], 'Data Pipeline'),
             ('fill_data', ['python3', 'fill_data_sql.py'], 'Fill Missing Data'),
             ('business_logic', ['python3', 'fix_business_logic.py'], 'Business Logic'),
-            ('ml_training', ['python3', 'train_ml_model.py'], 'ML Training'),
+            ('ml_training', ['python3', 'tools/train_ml_model.py'], 'ML Training'),
             ('csv_export', ['python3', '-c', 'from data_scheduler import export_daily_csv; export_daily_csv()'], 'CSV Export')
         ]
-        
+
+        # Get the project root directory
+        project_root = '/app' if os.path.exists('/app/run_pipeline.py') else os.getcwd()
+
         overall_task_id = f"{base_task_id}_all"
         running_tasks[overall_task_id] = {
             'status': 'running',
@@ -179,10 +185,10 @@ def trigger_all():
             'output': '',
             'error': ''
         }
-        
+
         for step_name, command, description in tasks:
             step_task_id = f"{base_task_id}_{step_name}"
-            
+
             try:
                 running_tasks[overall_task_id]['steps'].append({
                     'name': step_name,
@@ -190,22 +196,24 @@ def trigger_all():
                     'status': 'running',
                     'start_time': datetime.now().isoformat()
                 })
-                
+
                 result = subprocess.run(
                     command,
                     capture_output=True,
                     text=True,
                     timeout=3600,
-                    cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                    cwd=project_root
                 )
                 
                 step_status = 'completed' if result.returncode == 0 else 'failed'
                 running_tasks[overall_task_id]['steps'][-1]['status'] = step_status
                 running_tasks[overall_task_id]['steps'][-1]['end_time'] = datetime.now().isoformat()
                 running_tasks[overall_task_id]['steps'][-1]['return_code'] = result.returncode
-                
+
                 if result.returncode != 0:
-                    running_tasks[overall_task_id]['error'] += f"\n{step_name} failed: {result.stderr}"
+                    error_msg = result.stderr or result.stdout or "Unknown error"
+                    running_tasks[overall_task_id]['steps'][-1]['error'] = error_msg
+                    running_tasks[overall_task_id]['error'] += f"\n{step_name} failed: {error_msg}"
                     # Continue even if step fails
                 
             except Exception as e:
