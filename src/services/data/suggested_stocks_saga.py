@@ -244,7 +244,17 @@ class SuggestedStocksSagaOrchestrator:
             saga = self._execute_step5_final_selection(saga)
             if saga.status == SagaStatus.FAILED:
                 return saga.to_dict()
-            
+
+            # Step 6: ML Prediction
+            saga = self._execute_step6_ml_prediction(saga)
+            if saga.status == SagaStatus.FAILED:
+                return saga.to_dict()
+
+            # Step 7: Daily Snapshot Save
+            saga = self._execute_step7_daily_snapshot(saga)
+            if saga.status == SagaStatus.FAILED:
+                return saga.to_dict()
+
             # Complete saga
             saga.complete_saga(saga.final_results, self._generate_saga_summary(saga))
             
@@ -966,7 +976,145 @@ class SuggestedStocksSagaOrchestrator:
                 for reason in stock.reject_reasons:
                     reasons[reason] = reasons.get(reason, 0) + 1
         return reasons
-    
+
+    def _execute_step6_ml_prediction(self, saga: SuggestedStocksSaga) -> SuggestedStocksSaga:
+        """Step 6: Apply ML predictions to suggested stocks."""
+        step = SagaStep(
+            step_id="step6_ml_prediction",
+            name="ML Prediction",
+            description="Apply machine learning models to predict price targets and risk scores"
+        )
+        saga.add_step(step)
+        saga.update_step_status("step6_ml_prediction", SagaStepStatus.IN_PROGRESS)
+
+        print(f"\n⚙️  Step 6: ML Prediction")
+        print(f"   Applying ML models to {len(saga.final_results)} stocks...")
+
+        try:
+            from ..ml.stock_predictor import StockMLPredictor
+            from src.models.database import get_database_manager
+
+            # Initialize ML predictor
+            db_manager = get_database_manager()
+            with db_manager.get_session() as session:
+                predictor = StockMLPredictor(session)
+
+                # Check if models are trained
+                if predictor.price_model is None:
+                    logger.warning("ML models not trained. Training now with 1 year data...")
+                    print(f"   ⚠️  ML models not found. Training with historical data...")
+                    predictor.train(lookback_days=365)
+                    print(f"   ✅ ML models trained successfully")
+
+                # Get ML predictions for all stocks
+                ml_predictions = {}
+                for stock in saga.final_results:
+                    try:
+                        prediction = predictor.predict(stock)
+                        symbol = stock.get('symbol')
+                        ml_predictions[symbol] = prediction
+
+                        # Add ML fields to stock data
+                        stock['ml_prediction_score'] = prediction['ml_prediction_score']
+                        stock['ml_price_target'] = prediction['ml_price_target']
+                        stock['ml_confidence'] = prediction['ml_confidence']
+                        stock['ml_risk_score'] = prediction['ml_risk_score']
+
+                    except Exception as e:
+                        logger.error(f"ML prediction failed for {stock.get('symbol')}: {e}")
+                        stock['ml_prediction_score'] = 0.5
+                        stock['ml_price_target'] = stock.get('current_price', 0)
+                        stock['ml_confidence'] = 0.0
+                        stock['ml_risk_score'] = 0.5
+
+                # Store ML predictions in step metadata
+                step.metadata = {
+                    'predictions_count': len(ml_predictions),
+                    'avg_prediction_score': sum(p['ml_prediction_score'] for p in ml_predictions.values()) / len(ml_predictions) if ml_predictions else 0,
+                    'avg_confidence': sum(p['ml_confidence'] for p in ml_predictions.values()) / len(ml_predictions) if ml_predictions else 0,
+                    'avg_risk_score': sum(p['ml_risk_score'] for p in ml_predictions.values()) / len(ml_predictions) if ml_predictions else 0
+                }
+                step.input_count = len(saga.final_results)
+                step.output_count = len(ml_predictions)
+
+                saga.update_step_status("step6_ml_prediction", SagaStepStatus.COMPLETED,
+                                      metadata=step.metadata)
+
+                print(f"   ✅ ML predictions applied: {len(ml_predictions)} stocks scored")
+                print(f"   📊 Avg ML Score: {step.metadata['avg_prediction_score']:.3f}, Avg Confidence: {step.metadata['avg_confidence']:.3f}")
+
+            return saga
+
+        except Exception as e:
+            error_msg = f"ML prediction failed: {str(e)}"
+            logger.error(error_msg)
+            saga.update_step_status("step6_ml_prediction", SagaStepStatus.FAILED, error_msg)
+            # Don't fail the saga - continue without ML predictions
+            return saga
+
+    def _execute_step7_daily_snapshot(self, saga: SuggestedStocksSaga) -> SuggestedStocksSaga:
+        """Step 7: Save daily snapshot with ML predictions."""
+        step = SagaStep(
+            step_id="step7_daily_snapshot",
+            name="Daily Snapshot",
+            description="Save daily snapshot of suggested stocks with ML predictions"
+        )
+        saga.add_step(step)
+        saga.update_step_status("step7_daily_snapshot", SagaStepStatus.IN_PROGRESS)
+
+        print(f"\n💾 Step 7: Daily Snapshot")
+        print(f"   Saving daily snapshot of {len(saga.final_results)} stocks...")
+
+        try:
+            from .daily_snapshot_service import DailySnapshotService
+            from src.models.database import get_database_manager
+            from datetime import date
+
+            # Initialize snapshot service
+            db_manager = get_database_manager()
+            with db_manager.get_session() as session:
+                snapshot_service = DailySnapshotService(session)
+
+                # Build ML predictions dict
+                ml_predictions = {}
+                for stock in saga.final_results:
+                    symbol = stock.get('symbol')
+                    ml_predictions[symbol] = {
+                        'ml_prediction_score': stock.get('ml_prediction_score'),
+                        'ml_price_target': stock.get('ml_price_target'),
+                        'ml_confidence': stock.get('ml_confidence'),
+                        'ml_risk_score': stock.get('ml_risk_score')
+                    }
+
+                # Add rank to stocks
+                for rank, stock in enumerate(saga.final_results, 1):
+                    stock['rank'] = rank
+
+                # Save snapshot (will replace same-day data)
+                stats = snapshot_service.save_daily_snapshot(
+                    suggested_stocks=saga.final_results,
+                    ml_predictions=ml_predictions,
+                    snapshot_date=date.today()
+                )
+
+                step.metadata = stats
+                step.input_count = len(saga.final_results)
+                step.output_count = stats['inserted'] + stats['updated']
+
+                saga.update_step_status("step7_daily_snapshot", SagaStepStatus.COMPLETED,
+                                      metadata=step.metadata)
+
+                print(f"   ✅ Daily snapshot saved: {stats['inserted']} inserted, {stats['updated']} updated")
+
+            return saga
+
+        except Exception as e:
+            error_msg = f"Daily snapshot save failed: {str(e)}"
+            logger.error(error_msg)
+            saga.update_step_status("step7_daily_snapshot", SagaStepStatus.FAILED, error_msg)
+            # Don't fail the saga - snapshot is optional
+            return saga
+
     def _generate_saga_summary(self, saga: SuggestedStocksSaga) -> Dict[str, Any]:
         """Generate comprehensive saga summary."""
         return {

@@ -1245,6 +1245,15 @@ def create_app():
         app.logger.warning(f"Suggested stocks routes not available: {e}")
         app.logger.warning("Suggested stocks functionality will be disabled")
 
+    # Register admin routes for manual triggers
+    try:
+        from .admin_routes import admin_bp
+        app.register_blueprint(admin_bp)
+        app.logger.info("Admin routes registered successfully")
+    except ImportError as e:
+        app.logger.warning(f"Admin routes not available: {e}")
+        app.logger.warning("Admin dashboard functionality will be disabled")
+
 
     # Individual broker page routes
     @app.route('/brokers/fyers')

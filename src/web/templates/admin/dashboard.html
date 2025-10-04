@@ -1,0 +1,597 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Triggers{% endblock %}
+
+{% block content %}
+<style>
+    .task-card {
+        transition: transform 0.3s, box-shadow 0.3s;
+        border-left: 4px solid #667eea;
+    }
+
+    .task-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 40px rgba(0,0,0,0.1);
+    }
+
+    .btn-trigger {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        color: white;
+        padding: 10px 20px;
+        font-weight: 600;
+        transition: opacity 0.3s, transform 0.3s;
+    }
+
+    .btn-trigger:hover {
+        opacity: 0.9;
+        transform: scale(1.02);
+        color: white;
+    }
+
+    .btn-trigger:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .btn-danger-trigger {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+
+    .btn-success-trigger {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+
+    .stat-card {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        border-left: 4px solid #667eea;
+    }
+
+    .stat-label {
+        color: #666;
+        font-size: 12px;
+        text-transform: uppercase;
+        margin-bottom: 5px;
+    }
+
+    .stat-value {
+        color: #333;
+        font-size: 28px;
+        font-weight: 700;
+    }
+
+    .task-log {
+        background: #1e1e1e;
+        color: #00ff00;
+        padding: 20px;
+        border-radius: 8px;
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .log-entry {
+        margin-bottom: 5px;
+        padding: 5px;
+        border-left: 3px solid #00ff00;
+        padding-left: 10px;
+    }
+
+    .log-entry.error {
+        color: #ff4444;
+        border-left-color: #ff4444;
+    }
+
+    .log-entry.success {
+        color: #00ff00;
+        border-left-color: #00ff00;
+    }
+
+    .log-entry.info {
+        color: #4444ff;
+        border-left-color: #4444ff;
+    }
+
+    .log-entry.warning {
+        color: #ffa500;
+        border-left-color: #ffa500;
+    }
+
+    .spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 3px solid rgba(255,255,255,.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .badge-status {
+        padding: 6px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .badge-running {
+        background: #ffd93d;
+        color: #333;
+    }
+
+    .badge-completed {
+        background: #6bcf7f;
+        color: white;
+    }
+
+    .badge-failed {
+        background: #ff6b6b;
+        color: white;
+    }
+
+    .badge-pending {
+        background: #95a5a6;
+        color: white;
+    }
+
+    .step-item {
+        padding: 10px;
+        margin: 5px 0;
+        border-radius: 6px;
+        background: #f8f9fa;
+        border-left: 4px solid #ccc;
+    }
+
+    .step-item.running {
+        border-left-color: #ffd93d;
+        background: #fffef0;
+    }
+
+    .step-item.completed {
+        border-left-color: #6bcf7f;
+        background: #f0fff4;
+    }
+
+    .step-item.failed {
+        border-left-color: #ff6b6b;
+        background: #fff5f5;
+    }
+</style>
+
+<!-- System Status -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card task-card">
+            <div class="card-header bg-gradient-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>System Status</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3" id="systemStatus">
+                    <div class="col-lg-3 col-md-6">
+                        <div class="stat-card">
+                            <div class="stat-label">Total Stocks</div>
+                            <div class="stat-value" id="totalStocks">-</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="stat-card">
+                            <div class="stat-label">Historical Records</div>
+                            <div class="stat-value" id="historyRecords">-</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="stat-card">
+                            <div class="stat-label">Latest Data</div>
+                            <div class="stat-value" id="latestData">-</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="stat-card">
+                            <div class="stat-label">Daily Snapshots</div>
+                            <div class="stat-value" id="snapshots">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Run All -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card task-card">
+            <div class="card-header bg-gradient-danger text-white">
+                <h5 class="mb-0"><i class="bi bi-lightning-charge-fill me-2"></i>Complete Pipeline</h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-3">Execute all steps in sequence: Pipeline → Fill Data → Business Logic → ML Training → CSV Export</p>
+                <button class="btn btn-danger-trigger w-100" id="runAllBtn" onclick="triggerAll()">
+                    <i class="bi bi-play-fill me-2"></i>Run All Steps (45-60 min)
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Individual Tasks -->
+<div class="row g-4 mb-4">
+    <!-- Data Pipeline -->
+    <div class="col-lg-4 col-md-6">
+        <div class="card task-card h-100">
+            <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="bi bi-diagram-3-fill me-2"></i>Data Pipeline</h6>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted mb-3">6-step saga: Symbols → Stocks → History → Indicators → Metrics → Validation</p>
+                <button class="btn btn-trigger w-100" onclick="triggerTask('pipeline', 'Data Pipeline')">
+                    <i class="bi bi-play-fill me-2"></i>Run Pipeline (20-30 min)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fill Missing Data -->
+    <div class="col-lg-4 col-md-6">
+        <div class="card task-card h-100">
+            <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="bi bi-arrow-repeat me-2"></i>Fill Missing Data</h6>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted mb-3">Populate adj_close, liquidity, ATR, volatility, volume averages</p>
+                <button class="btn btn-trigger w-100" onclick="triggerTask('fill-data', 'Fill Data')">
+                    <i class="bi bi-play-fill me-2"></i>Fill Data (2-5 min)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Business Logic -->
+    <div class="col-lg-4 col-md-6">
+        <div class="card task-card h-100">
+            <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="bi bi-calculator-fill me-2"></i>Business Logic</h6>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted mb-3">Calculate EPS, margins, ratios, growth metrics (14+ fields)</p>
+                <button class="btn btn-trigger w-100" onclick="triggerTask('business-logic', 'Business Logic')">
+                    <i class="bi bi-play-fill me-2"></i>Calculate Metrics (2-5 min)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ML Training -->
+    <div class="col-lg-4 col-md-6">
+        <div class="card task-card h-100">
+            <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="bi bi-robot me-2"></i>ML Training</h6>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted mb-3">Train Random Forest models with 365 days of historical data</p>
+                <button class="btn btn-success-trigger w-100" onclick="triggerTask('ml-training', 'ML Training')">
+                    <i class="bi bi-play-fill me-2"></i>Train Models (1-2 min)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CSV Export -->
+    <div class="col-lg-4 col-md-6">
+        <div class="card task-card h-100">
+            <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="bi bi-file-earmark-spreadsheet me-2"></i>CSV Export</h6>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted mb-3">Export stocks, history, indicators, and suggested stocks to CSV</p>
+                <button class="btn btn-trigger w-100" onclick="triggerTask('csv-export', 'CSV Export')">
+                    <i class="bi bi-play-fill me-2"></i>Export CSV (1-2 min)
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Active Tasks -->
+<div class="row mb-4" id="activeTasksContainer" style="display: none;">
+    <div class="col-12">
+        <div class="card task-card">
+            <div class="card-header bg-gradient-warning text-dark">
+                <h5 class="mb-0"><i class="bi bi-hourglass-split me-2"></i>Active Tasks</h5>
+            </div>
+            <div class="card-body">
+                <div id="activeTasksList"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Task Log -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card task-card">
+            <div class="card-header bg-gradient-dark text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-terminal-fill me-2"></i>Task Log</h5>
+                <button class="btn btn-sm btn-outline-light" onclick="clearLog()">
+                    <i class="bi bi-trash3-fill"></i> Clear
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="task-log" id="taskLog">
+                    <div class="log-entry info">[${new Date().toLocaleTimeString()}] Ready to execute tasks...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let activeTasks = new Map();
+let taskTimers = new Map();
+
+// Load system status
+async function loadSystemStatus() {
+    try {
+        const response = await fetch('/admin/system/status');
+        const data = await response.json();
+
+        if (data.success) {
+            const status = data.status;
+            document.getElementById('totalStocks').textContent = status.stocks.total.toLocaleString();
+            document.getElementById('historyRecords').textContent = status.historical_data.records.toLocaleString();
+            document.getElementById('latestData').textContent = status.stocks.last_updated ? status.stocks.last_updated.split('T')[0] : '-';
+            document.getElementById('snapshots').textContent = status.daily_snapshots.total.toLocaleString();
+        }
+    } catch (error) {
+        console.error('Error loading status:', error);
+        addLog('Error loading system status: ' + error.message, 'error');
+    }
+}
+
+// Add log entry
+function addLog(message, type = 'info') {
+    const log = document.getElementById('taskLog');
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${type}`;
+    entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+    log.insertBefore(entry, log.firstChild);
+
+    // Keep only last 100 entries
+    while (log.children.length > 100) {
+        log.removeChild(log.lastChild);
+    }
+}
+
+// Clear log
+function clearLog() {
+    const log = document.getElementById('taskLog');
+    log.innerHTML = '<div class="log-entry info">[' + new Date().toLocaleTimeString() + '] Log cleared</div>';
+}
+
+// Trigger single task
+async function triggerTask(taskType, taskName) {
+    try {
+        addLog(`Starting ${taskName}...`, 'info');
+
+        const response = await fetch(`/admin/trigger/${taskType}`, {
+            method: 'POST'
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            addLog(`✓ ${taskName} started (Task ID: ${data.task_id})`, 'success');
+            activeTasks.set(data.task_id, {name: taskName, type: taskType});
+            updateActiveTasks();
+            monitorTask(data.task_id, taskName);
+        } else {
+            addLog(`✗ Failed to start ${taskName}: ${data.error || 'Unknown error'}`, 'error');
+        }
+    } catch (error) {
+        addLog(`✗ Error starting ${taskName}: ${error.message}`, 'error');
+    }
+}
+
+// Trigger all tasks
+async function triggerAll() {
+    if (!confirm('This will run all tasks sequentially and may take 45-60 minutes. Continue?')) {
+        return;
+    }
+
+    document.getElementById('runAllBtn').disabled = true;
+
+    try {
+        addLog('Starting complete pipeline...', 'info');
+
+        const response = await fetch('/admin/trigger/all', {
+            method: 'POST'
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            addLog(`✓ Complete pipeline started (Task ID: ${data.task_id})`, 'success');
+            activeTasks.set(data.task_id, {name: 'Complete Pipeline', type: 'all'});
+            updateActiveTasks();
+            monitorTask(data.task_id, 'Complete Pipeline');
+        } else {
+            addLog('✗ Failed to start complete pipeline: ' + (data.error || 'Unknown error'), 'error');
+            document.getElementById('runAllBtn').disabled = false;
+        }
+    } catch (error) {
+        addLog(`✗ Error starting complete pipeline: ${error.message}`, 'error');
+        document.getElementById('runAllBtn').disabled = false;
+    }
+}
+
+// Retry failed task
+async function retryTask(taskId, taskType, taskName) {
+    addLog(`Retrying ${taskName}...`, 'info');
+
+    // Remove old task from tracking
+    activeTasks.delete(taskId);
+    if (taskTimers.has(taskId)) {
+        clearInterval(taskTimers.get(taskId));
+        taskTimers.delete(taskId);
+    }
+
+    // Trigger the task again
+    triggerTask(taskType, taskName);
+}
+
+// Retry only failed steps
+async function retryFailedSteps(taskId) {
+    try {
+        addLog('Retrying failed steps...', 'info');
+
+        const response = await fetch(`/admin/task/${taskId}/retry-failed`, {
+            method: 'POST'
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            addLog(`✓ Failed steps retry started (Task ID: ${data.task_id})`, 'success');
+            activeTasks.set(data.task_id, {name: 'Retry Failed Steps', type: 'retry'});
+            updateActiveTasks();
+            monitorTask(data.task_id, 'Retry Failed Steps');
+        } else {
+            addLog(`✗ Failed to retry: ${data.error || 'Unknown error'}`, 'error');
+        }
+    } catch (error) {
+        addLog(`✗ Error retrying failed steps: ${error.message}`, 'error');
+    }
+}
+
+// Monitor task status
+async function monitorTask(taskId, taskName) {
+    const checkStatus = async () => {
+        try {
+            const response = await fetch(`/admin/task/${taskId}/status`);
+            const data = await response.json();
+
+            if (data.success) {
+                const task = data.task;
+
+                if (task.status === 'running') {
+                    // Still running, show progress
+                    if (task.steps && task.steps.length > 0) {
+                        const completedSteps = task.steps.filter(s => s.status === 'completed').length;
+                        const failedSteps = task.steps.filter(s => s.status === 'failed').length;
+                        const runningStep = task.steps.find(s => s.status === 'running');
+
+                        if (runningStep) {
+                            addLog(`  Running: ${runningStep.description}`, 'info');
+                        }
+                        addLog(`  Progress: ${completedSteps}/${task.steps.length} completed, ${failedSteps} failed`, 'info');
+                    }
+                } else if (task.status === 'completed') {
+                    addLog(`✓ ${taskName} completed successfully`, 'success');
+                    activeTasks.delete(taskId);
+                    if (taskTimers.has(taskId)) {
+                        clearInterval(taskTimers.get(taskId));
+                        taskTimers.delete(taskId);
+                    }
+                    updateActiveTasks();
+                    loadSystemStatus(); // Refresh stats
+                    document.getElementById('runAllBtn').disabled = false;
+                } else {
+                    const failedSteps = task.steps ? task.steps.filter(s => s.status === 'failed') : [];
+                    addLog(`✗ ${taskName} failed: ${task.error || 'Unknown error'}`, 'error');
+                    if (failedSteps.length > 0) {
+                        addLog(`  Failed steps: ${failedSteps.map(s => s.name).join(', ')}`, 'warning');
+                    }
+
+                    const taskInfo = activeTasks.get(taskId);
+                    if (taskInfo) {
+                        taskInfo.failed = true;
+                        taskInfo.failedSteps = failedSteps;
+                        activeTasks.set(taskId, taskInfo);
+                    }
+
+                    if (taskTimers.has(taskId)) {
+                        clearInterval(taskTimers.get(taskId));
+                        taskTimers.delete(taskId);
+                    }
+                    updateActiveTasks();
+                    document.getElementById('runAllBtn').disabled = false;
+                }
+            }
+        } catch (error) {
+            console.error('Error checking task status:', error);
+            addLog(`  Error monitoring ${taskName}: ${error.message}`, 'error');
+        }
+    };
+
+    // Start monitoring with interval
+    checkStatus(); // Check immediately
+    const timer = setInterval(checkStatus, 5000); // Check every 5 seconds
+    taskTimers.set(taskId, timer);
+}
+
+// Update active tasks display
+function updateActiveTasks() {
+    const container = document.getElementById('activeTasksContainer');
+    const list = document.getElementById('activeTasksList');
+
+    if (activeTasks.size === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    container.style.display = 'block';
+    list.innerHTML = '';
+
+    activeTasks.forEach((taskInfo, taskId) => {
+        const taskDiv = document.createElement('div');
+        taskDiv.className = 'mb-3';
+
+        const statusBadge = taskInfo.failed
+            ? '<span class="badge-status badge-failed">Failed</span>'
+            : '<span class="badge-status badge-running"><span class="spinner me-2"></span>Running</span>';
+
+        let buttonsHtml = '';
+        if (taskInfo.failed) {
+            buttonsHtml = `
+                <button class="btn btn-sm btn-warning me-2" onclick="retryTask('${taskId}', '${taskInfo.type}', '${taskInfo.name}')">
+                    <i class="bi bi-arrow-clockwise"></i> Retry All
+                </button>
+            `;
+            if (taskInfo.failedSteps && taskInfo.failedSteps.length > 0) {
+                buttonsHtml += `
+                    <button class="btn btn-sm btn-info" onclick="retryFailedSteps('${taskId}')">
+                        <i class="bi bi-arrow-repeat"></i> Retry Failed Steps Only
+                    </button>
+                `;
+            }
+        }
+
+        taskDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>${taskInfo.name}</strong>
+                    <small class="text-muted ms-2">(${taskId})</small>
+                    ${statusBadge}
+                </div>
+                <div>
+                    ${buttonsHtml}
+                </div>
+            </div>
+        `;
+
+        list.appendChild(taskDiv);
+    });
+}
+
+// Auto-refresh system status
+setInterval(loadSystemStatus, 30000); // Every 30 seconds
+
+// Initial load
+loadSystemStatus();
+</script>
+{% endblock %}

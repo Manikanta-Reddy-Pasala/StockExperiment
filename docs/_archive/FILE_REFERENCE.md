@@ -9,19 +9,25 @@
 - **`config.py`** - Application configuration and settings
 - **`run_pipeline.py`** - Main data pipeline orchestration (6-step saga)
 
-### Setup & Configuration
-- **`configure_fyers.py`** - Interactive script to configure Fyers API credentials
-- **`check_status.sh`** - System health check (containers, database, API status)
+### Automation Scripts
+- **`data_scheduler.py`** - Data pipeline scheduler (9 PM daily: pipeline → fill → calc → export)
+- **`scheduler.py`** - ML scheduler (2 AM daily: train → snapshot → cleanup)
 
-### Utility Scripts
-- **`fill_data_sql.py`** - Populate missing data fields (adj_close, liquidity, ATR, volatility)
-- **`fix_business_logic.py`** - Calculate derived financial metrics (EPS, margins, ratios, growth)
+### Tools & Utilities (`/tools`)
+- **`train_ml_model.py`** - Manual ML model training script
+- **`check_scheduler.sh`** - ML scheduler status check
+- **`check_all_schedulers.sh`** - Complete system status (both schedulers + database + exports)
+- **`README.md`** - Tools directory documentation
 
 ### Documentation
 - **`README.md`** - Project overview and quick start guide
 - **`PRODUCTION_SETUP.md`** - Complete production setup instructions with Fyers API
 - **`DEVELOPMENT.md`** - Development guidelines and architecture
 - **`AGENTS.md`** - AI agent patterns and best practices
+- **`COMPLETE_AUTOMATION_GUIDE.md`** - Complete automation overview (data + ML)
+- **`DATA_SCHEDULER.md`** - Data pipeline scheduler (CSV, history, calculations)
+- **`SCHEDULER.md`** - ML scheduler (training & daily snapshots)
+- **`ML_IMPLEMENTATION_SUMMARY.md`** - ML technical implementation details
 - **`FILE_REFERENCE.md`** - This file - reference for all project files
 
 ---
@@ -29,12 +35,19 @@
 ## 🗂️ Key Directories
 
 ### `/src` - Source Code
-- `/models` - SQLAlchemy models (stocks, historical_data, technical_indicators)
+- `/models` - SQLAlchemy models (stocks, historical_data, technical_indicators, daily_suggested_stocks)
 - `/services` - Business logic and API services
-  - `/data` - Data pipeline services (saga pattern)
+  - `/data` - Data pipeline services (saga pattern, daily snapshots)
   - `/broker` - Fyers API integration
+  - `/ml` - Machine learning models (stock prediction, risk assessment)
 - `/web` - Flask web routes and templates
 - `/utils` - Helper utilities and logging
+
+### `/tools` - Utility Scripts & Monitoring
+- `train_ml_model.py` - Manual ML training
+- `check_scheduler.sh` - ML scheduler status
+- `check_all_schedulers.sh` - Complete system status
+- `README.md` - Tools documentation
 
 ### `/config` - Configuration Files
 - `stock_filters.yaml` - Stock screening criteria and thresholds

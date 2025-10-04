@@ -529,6 +529,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "101000000010568",
+      "symbol": "NSE:RAMAPHO-EQ",
+      "name": "RAMA PHOSPHATES LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE809A01032",
+      "last_updated": ""
+    },
+    {
       "fytoken": "101000000010576",
       "symbol": "NSE:NIFTYBEES-EQ",
       "name": "NIP IND ETF NIFTY BEES",
@@ -884,7 +896,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.1,
+      "tick": 0.05,
       "isin": "INE096B01018",
       "last_updated": ""
     },
@@ -1868,7 +1880,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.1,
+      "tick": 0.05,
       "isin": "INE365B01017",
       "last_updated": ""
     },
@@ -1904,7 +1916,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE572J01011",
       "last_updated": ""
     },
@@ -1940,7 +1952,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.1,
+      "tick": 0.5,
       "isin": "INE417C01014",
       "last_updated": ""
     },
@@ -1990,6 +2002,18 @@
       "lot": 1,
       "tick": 0.1,
       "isin": "INE369A01029",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "101000000011480",
+      "symbol": "NSE:KRIDHANINF-EQ",
+      "name": "KRIDHAN INFRA LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE524L01026",
       "last_updated": ""
     },
     {
@@ -2168,7 +2192,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE0A1101019",
       "last_updated": ""
     },
@@ -2288,7 +2312,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.1,
+      "tick": 0.05,
       "isin": "INE386C01029",
       "last_updated": ""
     },
@@ -2660,7 +2684,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 1.0,
+      "tick": 0.1,
       "isin": "INE260B01028",
       "last_updated": ""
     },
@@ -2864,7 +2888,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE0KL801015",
       "last_updated": ""
     },
@@ -3056,7 +3080,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE483B01026",
       "last_updated": ""
     },
@@ -3116,7 +3140,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.1,
       "isin": "INE547E01014",
       "last_updated": ""
     },
@@ -3380,7 +3404,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE00M201021",
       "last_updated": ""
     },
@@ -3584,7 +3608,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.1,
+      "tick": 0.5,
       "isin": "INE117A01022",
       "last_updated": ""
     },
@@ -3920,7 +3944,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE142Q01026",
       "last_updated": ""
     },
@@ -4054,6 +4078,18 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE350H01032",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "101000000013295",
+      "symbol": "NSE:VISASTEEL-EQ",
+      "name": "VISA STEEL LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE286H01012",
       "last_updated": ""
     },
     {
@@ -4196,7 +4232,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE786F01031",
       "last_updated": ""
     },
@@ -4849,6 +4885,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "101000000013730",
+      "symbol": "NSE:INSPIRISYS-EQ",
+      "name": "INSPIRISYS SOLUTIONS LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE020G01017",
+      "last_updated": ""
+    },
+    {
       "fytoken": "101000000013735",
       "symbol": "NSE:GLOBALVECT-EQ",
       "name": "GLOBAL VEC HELICORP LTD",
@@ -5408,7 +5456,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE229C01021",
       "last_updated": ""
     },
@@ -5518,6 +5566,18 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE05ST01028",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "10100000001415",
+      "symbol": "NSE:GLOBAL-EQ",
+      "name": "GLOBAL EDUCATION LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE291W01037",
       "last_updated": ""
     },
     {
@@ -5684,7 +5744,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE891D01026",
       "last_updated": ""
     },
@@ -5948,7 +6008,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.5,
+      "tick": 0.1,
       "isin": "INE058A01010",
       "last_updated": ""
     },
@@ -6428,7 +6488,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE508G01029",
       "last_updated": ""
     },
@@ -6728,7 +6788,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE280H01015",
       "last_updated": ""
     },
@@ -6764,7 +6824,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.1,
       "isin": "INE930H01031",
       "last_updated": ""
     },
@@ -7052,7 +7112,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.1,
       "isin": "INE0LCL01028",
       "last_updated": ""
     },
@@ -7088,7 +7148,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE621H01010",
       "last_updated": ""
     },
@@ -7645,6 +7705,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "101000000015360",
+      "symbol": "NSE:NAHARCAP-EQ",
+      "name": "NAHAR CAP & FIN.",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.05,
+      "isin": "INE049I01012",
+      "last_updated": ""
+    },
+    {
       "fytoken": "101000000015362",
       "symbol": "NSE:VGUARD-EQ",
       "name": "V-GUARD IND LTD.",
@@ -7856,7 +7928,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 1.0,
+      "tick": 0.5,
       "isin": "INE322A01010",
       "last_updated": ""
     },
@@ -7976,7 +8048,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE07S101038",
       "last_updated": ""
     },
@@ -7988,7 +8060,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.5,
+      "tick": 1.0,
       "isin": "INE672A01018",
       "last_updated": ""
     },
@@ -8050,18 +8122,6 @@
       "lot": 1,
       "tick": 0.1,
       "isin": "INE495P01012",
-      "last_updated": ""
-    },
-    {
-      "fytoken": "101000000016292",
-      "symbol": "NSE:PANACHE-EQ",
-      "name": "PANACHE DIGILIFE LIMITED",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE895W01019",
       "last_updated": ""
     },
     {
@@ -8193,7 +8253,7 @@
       "instrument_type": "EQ",
       "lot": 1,
       "tick": 0.05,
-      "isin": "INE0A0S01010",
+      "isin": "INE0A0S01028",
       "last_updated": ""
     },
     {
@@ -8600,7 +8660,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.1,
+      "tick": 0.05,
       "isin": "INE619A01035",
       "last_updated": ""
     },
@@ -8660,7 +8720,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE568Z01015",
       "last_updated": ""
     },
@@ -8696,7 +8756,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE883N01014",
       "last_updated": ""
     },
@@ -8948,7 +9008,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE498E01010",
       "last_updated": ""
     },
@@ -8996,7 +9056,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE814H01029",
       "last_updated": ""
     },
@@ -9116,7 +9176,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.1,
+      "tick": 0.05,
       "isin": "INE201K01015",
       "last_updated": ""
     },
@@ -9248,7 +9308,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.1,
+      "tick": 0.05,
       "isin": "INE073G01016",
       "last_updated": ""
     },
@@ -9308,7 +9368,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.1,
+      "tick": 0.05,
       "isin": "INE768C01028",
       "last_updated": ""
     },
@@ -9704,7 +9764,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.5,
+      "tick": 0.1,
       "isin": "INE462A01022",
       "last_updated": ""
     },
@@ -9728,7 +9788,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE531E01026",
       "last_updated": ""
     },
@@ -9886,6 +9946,18 @@
       "lot": 1,
       "tick": 0.05,
       "isin": "INE837H01020",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "101000000018049",
+      "symbol": "NSE:MINDTECK-EQ",
+      "name": "MINDTECK (INDIA) LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE110B01017",
       "last_updated": ""
     },
     {
@@ -10304,7 +10376,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE149K01016",
       "last_updated": ""
     },
@@ -10316,7 +10388,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.5,
+      "tick": 0.1,
       "isin": "INE262H01021",
       "last_updated": ""
     },
@@ -10880,7 +10952,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE562X01013",
       "last_updated": ""
     },
@@ -11216,7 +11288,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.1,
       "isin": "INE919H01018",
       "last_updated": ""
     },
@@ -11576,7 +11648,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.5,
+      "tick": 0.1,
       "isin": "INE849A01020",
       "last_updated": ""
     },
@@ -12008,7 +12080,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.1,
+      "tick": 0.5,
       "isin": "INE162B01018",
       "last_updated": ""
     },
@@ -12296,8 +12368,20 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.1,
+      "tick": 0.05,
       "isin": "INE331A01037",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "101000000020453",
+      "symbol": "NSE:APCL-EQ",
+      "name": "ANJANI PORTLAND CEM LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE071F01012",
       "last_updated": ""
     },
     {
@@ -12562,6 +12646,18 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE0FRK01020",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "101000000020790",
+      "symbol": "NSE:SUMEETINDS-EQ",
+      "name": "SUMEET IND LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE235C01036",
       "last_updated": ""
     },
     {
@@ -13285,18 +13381,6 @@
       "last_updated": ""
     },
     {
-      "fytoken": "101000000021676",
-      "symbol": "NSE:HINDMOTORS-EQ",
-      "name": "HINDUSTAN MOTORS LIMITED",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE253A01025",
-      "last_updated": ""
-    },
-    {
       "fytoken": "10100000002168",
       "symbol": "NSE:RAJMET-EQ",
       "name": "RAJNANDINI METAL LIMITED",
@@ -13496,7 +13580,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.1,
       "isin": "INE393P01035",
       "last_updated": ""
     },
@@ -13678,18 +13762,6 @@
       "lot": 1,
       "tick": 0.05,
       "isin": "INE155Z01011",
-      "last_updated": ""
-    },
-    {
-      "fytoken": "101000000022360",
-      "symbol": "NSE:MCL-EQ",
-      "name": "MADHAV COPPER LIMITED",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE813V01022",
       "last_updated": ""
     },
     {
@@ -14050,6 +14122,18 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INF247L01AP3",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "10100000002275",
+      "symbol": "NSE:IRISDOREME-EQ",
+      "name": "IRIS CLOTHINGS LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE01GN01025",
       "last_updated": ""
     },
     {
@@ -15025,18 +15109,6 @@
       "last_updated": ""
     },
     {
-      "fytoken": "101000000024385",
-      "symbol": "NSE:KARMAENG-EQ",
-      "name": "KARMA ENERGY LIMITED",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE725L01011",
-      "last_updated": ""
-    },
-    {
       "fytoken": "101000000024386",
       "symbol": "NSE:BANSALWIRE-EQ",
       "name": "BANSAL WIRE INDUSTRIES L",
@@ -15332,7 +15404,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE0AG901020",
       "last_updated": ""
     },
@@ -15382,6 +15454,18 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE00U401027",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "10100000002481",
+      "symbol": "NSE:ONWARDTEC-EQ",
+      "name": "ONWARD TECHNOLOGIES LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.05,
+      "isin": "INE229A01017",
       "last_updated": ""
     },
     {
@@ -15620,7 +15704,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.1,
       "isin": "INE0BS701011",
       "last_updated": ""
     },
@@ -15632,7 +15716,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE06HJ01020",
       "last_updated": ""
     },
@@ -15752,7 +15836,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.1,
       "isin": "INE0DAB01012",
       "last_updated": ""
     },
@@ -15812,7 +15896,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.5,
+      "tick": 0.1,
       "isin": "INE0UOS01011",
       "last_updated": ""
     },
@@ -15968,7 +16052,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE850M01015",
       "last_updated": ""
     },
@@ -16112,7 +16196,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE337M01021",
       "last_updated": ""
     },
@@ -16376,7 +16460,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE692Z01013",
       "last_updated": ""
     },
@@ -16448,7 +16532,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE497S01012",
       "last_updated": ""
     },
@@ -16664,7 +16748,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE03YM01018",
       "last_updated": ""
     },
@@ -16928,7 +17012,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.1,
       "isin": "INE704B01017",
       "last_updated": ""
     },
@@ -17132,7 +17216,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE0HLU01028",
       "last_updated": ""
     },
@@ -17660,7 +17744,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE0RYC01010",
       "last_updated": ""
     },
@@ -17881,18 +17965,6 @@
       "last_updated": ""
     },
     {
-      "fytoken": "101000000029583",
-      "symbol": "NSE:NATCAPSUQ-EQ",
-      "name": "NATURAL CAPSULES LIMITED",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE936B01015",
-      "last_updated": ""
-    },
-    {
       "fytoken": "101000000029598",
       "symbol": "NSE:REPCOHOME-EQ",
       "name": "REPCO HOME FINANCE LTD",
@@ -17996,7 +18068,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.1,
       "isin": "INE0SII01026",
       "last_updated": ""
     },
@@ -18056,7 +18128,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.1,
+      "tick": 0.05,
       "isin": "INE418L01047",
       "last_updated": ""
     },
@@ -18385,6 +18457,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "101000000030249",
+      "symbol": "NSE:ISHANCH-EQ",
+      "name": "ISHAN DYES N CHEMICALS L",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE561M01018",
+      "last_updated": ""
+    },
+    {
       "fytoken": "101000000030274",
       "symbol": "NSE:SILVERCASE-EQ",
       "name": "ZERODHAAMC - SILVERCASE",
@@ -18572,7 +18656,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE896L01010",
       "last_updated": ""
     },
@@ -18716,7 +18800,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE382M01027",
       "last_updated": ""
     },
@@ -18728,7 +18812,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE757B01015",
       "last_updated": ""
     },
@@ -18766,6 +18850,18 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE142K01011",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "101000000031475",
+      "symbol": "NSE:ORBTEXP-EQ",
+      "name": "ORBIT EXPORTS LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE231G01010",
       "last_updated": ""
     },
     {
@@ -18992,7 +19088,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE937A01023",
       "last_updated": ""
     },
@@ -19004,7 +19100,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.1,
       "isin": "INE287B01021",
       "last_updated": ""
     },
@@ -19052,7 +19148,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.1,
+      "tick": 0.05,
       "isin": "INE387A01021",
       "last_updated": ""
     },
@@ -19328,7 +19424,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE305A01023",
       "last_updated": ""
     },
@@ -19453,6 +19549,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "10100000003512",
+      "symbol": "NSE:TNTELE-EQ",
+      "name": "TAMILNADU TELECOMMUNICATI",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE141D01018",
+      "last_updated": ""
+    },
+    {
       "fytoken": "10100000003518",
       "symbol": "NSE:TORNTPHARM-EQ",
       "name": "TORRENT PHARMACEUTICALS L",
@@ -19496,7 +19604,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.1,
       "isin": "INE364U01010",
       "last_updated": ""
     },
@@ -19546,6 +19654,18 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE514Y01020",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "1010000000359",
+      "symbol": "NSE:ROML-EQ",
+      "name": "RAJ OIL MILLS LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE294G01026",
       "last_updated": ""
     },
     {
@@ -19952,7 +20072,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 1.0,
+      "tick": 0.5,
       "isin": "INE838B01013",
       "last_updated": ""
     },
@@ -20293,6 +20413,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "10100000004116",
+      "symbol": "NSE:HBSL-EQ",
+      "name": "HB STOCKHOLDINGS LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE550B01022",
+      "last_updated": ""
+    },
+    {
       "fytoken": "10100000004127",
       "symbol": "NSE:SAMBHAAV-EQ",
       "name": "SAMBHAAV MEDIA LTD",
@@ -20336,7 +20468,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE681C01015",
       "last_updated": ""
     },
@@ -20348,7 +20480,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE058B01018",
       "last_updated": ""
     },
@@ -20413,6 +20545,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "10100000004221",
+      "symbol": "NSE:VISAKAIND-EQ",
+      "name": "VISAKA INDUSTRIES LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE392A01021",
+      "last_updated": ""
+    },
+    {
       "fytoken": "10100000004235",
       "symbol": "NSE:WENDT-EQ",
       "name": "WENDT (INDIA) LIMITED",
@@ -20444,20 +20588,8 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE834I01025",
-      "last_updated": ""
-    },
-    {
-      "fytoken": "1010000000426",
-      "symbol": "NSE:BHARATGEAR-EQ",
-      "name": "BHARAT GEARS LTD.",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE561C01019",
       "last_updated": ""
     },
     {
@@ -20516,7 +20648,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE133Y01011",
       "last_updated": ""
     },
@@ -20804,7 +20936,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE028A01039",
       "last_updated": ""
     },
@@ -21697,18 +21829,6 @@
       "last_updated": ""
     },
     {
-      "fytoken": "10100000005428",
-      "symbol": "NSE:TRIGYN-EQ",
-      "name": "TRIGYN TECHNOLOGIES LTD",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE948A01012",
-      "last_updated": ""
-    },
-    {
       "fytoken": "10100000005435",
       "symbol": "NSE:APTUS-EQ",
       "name": "APTUS VALUE HSG FIN I LTD",
@@ -21764,7 +21884,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.1,
+      "tick": 0.05,
       "isin": "INE384C01016",
       "last_updated": ""
     },
@@ -21805,6 +21925,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "10100000005549",
+      "symbol": "NSE:ABMINTLLTD-EQ",
+      "name": "ABM INTERNATIONAL LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE251C01025",
+      "last_updated": ""
+    },
+    {
       "fytoken": "10100000005578",
       "symbol": "NSE:ACUTAAS-EQ",
       "name": "ACUTAAS CHEMICALS LIMITED",
@@ -21824,7 +21956,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.1,
+      "tick": 0.05,
       "isin": "INE043W01024",
       "last_updated": ""
     },
@@ -22237,6 +22369,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "10100000006156",
+      "symbol": "NSE:ARTNIRMAN-EQ",
+      "name": "ART NIRMAN LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE738V01013",
+      "last_updated": ""
+    },
+    {
       "fytoken": "10100000006164",
       "symbol": "NSE:BHAGCHEM-EQ",
       "name": "BHAGIRADHA CHEM & INDS L",
@@ -22513,6 +22657,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "10100000006429",
+      "symbol": "NSE:RSSOFTWARE-EQ",
+      "name": "R. S. SOFTWARE (INDIA) LI",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE165B01029",
+      "last_updated": ""
+    },
+    {
       "fytoken": "10100000006445",
       "symbol": "NSE:TECHNOE-EQ",
       "name": "TECHNO ELEC & ENG CO. LTD",
@@ -22736,7 +22892,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.1,
       "isin": "INE749A01030",
       "last_updated": ""
     },
@@ -22933,6 +23089,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "10100000006951",
+      "symbol": "NSE:LINC-EQ",
+      "name": "LINC LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE802B01027",
+      "last_updated": ""
+    },
+    {
       "fytoken": "10100000006961",
       "symbol": "NSE:MENONBE-EQ",
       "name": "MENON BEARINGS LIMITED",
@@ -22966,18 +23134,6 @@
       "lot": 1,
       "tick": 0.05,
       "isin": "INE505A01010",
-      "last_updated": ""
-    },
-    {
-      "fytoken": "10100000006977",
-      "symbol": "NSE:ICDSLTD-EQ",
-      "name": "ICDS LTD",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE613B01010",
       "last_updated": ""
     },
     {
@@ -23156,7 +23312,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE597J01018",
       "last_updated": ""
     },
@@ -23473,18 +23629,6 @@
       "last_updated": ""
     },
     {
-      "fytoken": "10100000007411",
-      "symbol": "NSE:NILASPACES-EQ",
-      "name": "NILA SPACES LIMITED",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE00S901012",
-      "last_updated": ""
-    },
-    {
       "fytoken": "10100000007412",
       "symbol": "NSE:ALPHA-EQ",
       "name": "KOTAKMAMC - KOTAKALPHA",
@@ -23518,18 +23662,6 @@
       "lot": 1,
       "tick": 0.05,
       "isin": "INE757A01017",
-      "last_updated": ""
-    },
-    {
-      "fytoken": "10100000007420",
-      "symbol": "NSE:MANAKALUCO-EQ",
-      "name": "MANAK ALUMINIUM CO. LTD.",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE859Q01017",
       "last_updated": ""
     },
     {
@@ -23912,7 +24044,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE0INX01018",
       "last_updated": ""
     },
@@ -24032,7 +24164,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.1,
+      "tick": 0.01,
       "isin": "INE771F01041",
       "last_updated": ""
     },
@@ -24176,7 +24308,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE219Y01026",
       "last_updated": ""
     },
@@ -24656,7 +24788,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE0P6P01016",
       "last_updated": ""
     },
@@ -24805,6 +24937,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "1010000000759079",
+      "symbol": "NSE:DEVX-EQ",
+      "name": "DEV ACCELERATOR LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE0VOV01021",
+      "last_updated": ""
+    },
+    {
       "fytoken": "1010000000759084",
       "symbol": "NSE:URBANCO-EQ",
       "name": "URBAN COMPANY LIMITED",
@@ -24860,7 +25004,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE0JYY01011",
       "last_updated": ""
     },
@@ -24877,6 +25021,54 @@
       "last_updated": ""
     },
     {
+      "fytoken": "1010000000759210",
+      "symbol": "NSE:TRUALT-EQ",
+      "name": "TRUALT BIOENERGY LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.05,
+      "isin": "INE0MWH01014",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "1010000000759239",
+      "symbol": "NSE:FINKURVE-EQ",
+      "name": "FINKURVE FINANCIAL SERV L",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE734I01027",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "1010000000759244",
+      "symbol": "NSE:JAINREC-EQ",
+      "name": "JAIN RESOURCE RECYCLING L",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE0YD401026",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "1010000000759251",
+      "symbol": "NSE:EPACKPEB-EQ",
+      "name": "EPACK PREFAB TECHN LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE0MLS01022",
+      "last_updated": ""
+    },
+    {
       "fytoken": "1010000000759291",
       "symbol": "NSE:BLUESTONE-EQ",
       "name": "BLUESTONE JEWEL LFSTL LTD",
@@ -24889,6 +25081,30 @@
       "last_updated": ""
     },
     {
+      "fytoken": "1010000000759342",
+      "symbol": "NSE:PACEDIGITK-EQ",
+      "name": "PACE DIGITEK LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE0S3G01027",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "1010000000759355",
+      "symbol": "NSE:SYSTMTXC-EQ",
+      "name": "SYSTEMATIX CORP SERVICE L",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE356B01024",
+      "last_updated": ""
+    },
+    {
       "fytoken": "1010000000759439",
       "symbol": "NSE:PATELRMART-EQ",
       "name": "PATEL RETAIL LIMITED",
@@ -24896,7 +25112,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE0R8B01010",
       "last_updated": ""
     },
@@ -24908,7 +25124,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE1B6101010",
       "last_updated": ""
     },
@@ -24944,7 +25160,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.05,
+      "tick": 0.01,
       "isin": "INE06XZ01023",
       "last_updated": ""
     },
@@ -24958,6 +25174,54 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE198501012",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "1010000000759929",
+      "symbol": "NSE:SOLARWORLD-EQ",
+      "name": "SOLARWORLD ENERGY SOL LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.05,
+      "isin": "INE0TY101024",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "1010000000759934",
+      "symbol": "NSE:STYL-EQ",
+      "name": "SESHAASAI TECHNOLOGIES L",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.05,
+      "isin": "INE04VU01023",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "1010000000759951",
+      "symbol": "NSE:JARO-EQ",
+      "name": "JARO INS OF TEC MG N RE L",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.05,
+      "isin": "INE00YJ01010",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "1010000000759956",
+      "symbol": "NSE:ARSSBL-EQ",
+      "name": "ANAND RATHI SH N STK BR L",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.05,
+      "isin": "INE549H01021",
       "last_updated": ""
     },
     {
@@ -25621,6 +25885,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "10100000008341",
+      "symbol": "NSE:CALSOFT-EQ",
+      "name": "CALIFORNIA SOFTWARE CO LT",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE526B01014",
+      "last_updated": ""
+    },
+    {
       "fytoken": "10100000008342",
       "symbol": "NSE:GSEC5IETF-EQ",
       "name": "ICICIPRAMC - ICICI5GSEC",
@@ -25736,7 +26012,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.1,
+      "tick": 0.05,
       "isin": "INE427F01016",
       "last_updated": ""
     },
@@ -25760,7 +26036,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.01,
+      "tick": 0.05,
       "isin": "INE589A01014",
       "last_updated": ""
     },
@@ -26134,6 +26410,18 @@
       "lot": 1,
       "tick": 0.1,
       "isin": "INE294Z01018",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "10100000009020",
+      "symbol": "NSE:VCL-EQ",
+      "name": "VAXTEX COTFAB LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE098201036",
       "last_updated": ""
     },
     {
@@ -26576,7 +26864,7 @@
       "segment": "CM",
       "instrument_type": "EQ",
       "lot": 1,
-      "tick": 0.5,
+      "tick": 0.1,
       "isin": "INE284A01012",
       "last_updated": ""
     },
@@ -26722,18 +27010,6 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE750D01016",
-      "last_updated": ""
-    },
-    {
-      "fytoken": "10100000009667",
-      "symbol": "NSE:MEDICO-EQ",
-      "name": "MEDICO REMEDIES LIMITED",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE630Y01024",
       "last_updated": ""
     },
     {
@@ -27037,6 +27313,6 @@
       "last_updated": ""
     }
   ],
-  "timestamp": "2025-09-28T13:02:49.430006",
+  "timestamp": "2025-10-04T10:19:00.441971",
   "exchange_type": "NSE_CM"
 }
