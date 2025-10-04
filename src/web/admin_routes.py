@@ -118,13 +118,15 @@ def get_active_tasks_from_db():
 
         tasks = {}
         for row in results:
+            # PostgreSQL JSONB is already parsed as Python object
+            steps = row[6] if row[6] else []
             tasks[row[0]] = {
                 'type': row[1],
                 'description': row[2],
                 'status': row[3],
                 'start_time': row[4].isoformat() if row[4] else None,
                 'end_time': row[5].isoformat() if row[5] else None,
-                'steps': json.loads(row[6]) if row[6] else [],
+                'steps': steps if isinstance(steps, list) else json.loads(steps) if steps else [],
                 'output': row[7] or '',
                 'error': row[8] or '',
                 'failed': row[3] == 'failed',
