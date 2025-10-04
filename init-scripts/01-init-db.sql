@@ -768,3 +768,22 @@ CREATE TABLE IF NOT EXISTS pipeline_tracking (
 CREATE INDEX IF NOT EXISTS idx_pipeline_tracking_step ON pipeline_tracking(step_name);
 CREATE INDEX IF NOT EXISTS idx_pipeline_tracking_status ON pipeline_tracking(status);
 CREATE INDEX IF NOT EXISTS idx_pipeline_tracking_started_at ON pipeline_tracking(started_at);
+
+-- Admin Task Tracking Table for UI persistence
+CREATE TABLE IF NOT EXISTS admin_task_tracking (
+    task_id VARCHAR(100) PRIMARY KEY,
+    task_type VARCHAR(50) NOT NULL,
+    description VARCHAR(255),
+    status VARCHAR(20) NOT NULL,
+    start_time TIMESTAMP NOT NULL,
+    end_time TIMESTAMP,
+    steps JSONB DEFAULT '[]'::jsonb,
+    output TEXT,
+    error TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Admin Task Tracking Indexes
+CREATE INDEX IF NOT EXISTS idx_admin_task_status ON admin_task_tracking(status);
+CREATE INDEX IF NOT EXISTS idx_admin_task_created ON admin_task_tracking(created_at DESC);

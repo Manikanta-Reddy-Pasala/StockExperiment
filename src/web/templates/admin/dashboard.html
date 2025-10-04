@@ -1007,10 +1007,35 @@ function updateActiveTasks() {
     });
 }
 
+// Load active tasks from database on page load
+async function loadActiveTasks() {
+    try {
+        const response = await fetch('/admin/tasks/active');
+        const data = await response.json();
+
+        if (data.success && data.tasks) {
+            // Restore active tasks to the map
+            Object.entries(data.tasks).forEach(([taskId, taskInfo]) => {
+                activeTasks.set(taskId, taskInfo);
+
+                // Start monitoring if still running
+                if (taskInfo.status === 'running') {
+                    monitorTask(taskId, taskInfo.description || 'Task');
+                }
+            });
+
+            updateActiveTasks();
+        }
+    } catch (error) {
+        console.error('Error loading active tasks:', error);
+    }
+}
+
 // Auto-refresh system status
 setInterval(loadSystemStatus, 30000); // Every 30 seconds
 
 // Initial load
 loadSystemStatus();
+loadActiveTasks();
 </script>
 {% endblock %}

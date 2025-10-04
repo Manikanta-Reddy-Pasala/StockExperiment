@@ -20,8 +20,116 @@ logger = logging.getLogger(__name__)
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
-# Track running tasks
+# Track running tasks (in-memory cache + database persistence)
 running_tasks = {}
+
+
+def save_task_to_db(task_id, task_data):
+    """Save task state to database for persistence across page refreshes."""
+    from src.models.database import get_database_manager
+    from sqlalchemy import text
+    import json
+
+    db_manager = get_database_manager()
+    with db_manager.get_session() as session:
+        # Convert steps list to JSON
+        steps_json = json.dumps(task_data.get('steps', []))
+
+        # Upsert task
+        query = text("""
+            INSERT INTO admin_task_tracking
+            (task_id, task_type, description, status, start_time, end_time, steps, output, error, updated_at)
+            VALUES
+            (:task_id, :task_type, :description, :status, :start_time, :end_time, :steps::jsonb, :output, :error, NOW())
+            ON CONFLICT (task_id)
+            DO UPDATE SET
+                status = EXCLUDED.status,
+                end_time = EXCLUDED.end_time,
+                steps = EXCLUDED.steps,
+                output = EXCLUDED.output,
+                error = EXCLUDED.error,
+                updated_at = NOW()
+        """)
+
+        session.execute(query, {
+            'task_id': task_id,
+            'task_type': task_data.get('type', 'unknown'),
+            'description': task_data.get('description', ''),
+            'status': task_data.get('status', 'pending'),
+            'start_time': task_data.get('start_time'),
+            'end_time': task_data.get('end_time'),
+            'steps': steps_json,
+            'output': task_data.get('output', ''),
+            'error': task_data.get('error', '')
+        })
+        session.commit()
+
+
+def get_task_from_db(task_id):
+    """Get task state from database."""
+    from src.models.database import get_database_manager
+    from sqlalchemy import text
+    import json
+
+    db_manager = get_database_manager()
+    with db_manager.get_session() as session:
+        query = text("""
+            SELECT task_id, task_type, description, status, start_time, end_time, steps, output, error
+            FROM admin_task_tracking
+            WHERE task_id = :task_id
+        """)
+
+        result = session.execute(query, {'task_id': task_id}).fetchone()
+
+        if result:
+            return {
+                'type': result[1],
+                'description': result[2],
+                'status': result[3],
+                'start_time': result[4].isoformat() if result[4] else None,
+                'end_time': result[5].isoformat() if result[5] else None,
+                'steps': json.loads(result[6]) if result[6] else [],
+                'output': result[7] or '',
+                'error': result[8] or ''
+            }
+    return None
+
+
+def get_active_tasks_from_db():
+    """Get all active (running) tasks from database."""
+    from src.models.database import get_database_manager
+    from sqlalchemy import text
+    import json
+
+    db_manager = get_database_manager()
+    with db_manager.get_session() as session:
+        query = text("""
+            SELECT task_id, task_type, description, status, start_time, end_time, steps, output, error
+            FROM admin_task_tracking
+            WHERE status IN ('running', 'pending')
+            OR (status IN ('failed', 'completed') AND updated_at > NOW() - INTERVAL '1 hour')
+            ORDER BY created_at DESC
+            LIMIT 10
+        """)
+
+        results = session.execute(query).fetchall()
+
+        tasks = {}
+        for row in results:
+            tasks[row[0]] = {
+                'type': row[1],
+                'description': row[2],
+                'status': row[3],
+                'start_time': row[4].isoformat() if row[4] else None,
+                'end_time': row[5].isoformat() if row[5] else None,
+                'steps': json.loads(row[6]) if row[6] else [],
+                'output': row[7] or '',
+                'error': row[8] or '',
+                'failed': row[3] == 'failed',
+                'completed': row[3] == 'completed'
+            }
+
+        return tasks
 
 
 def run_command_async(task_id, command, description):
@@ -68,16 +176,20 @@ def admin_dashboard():
     return render_template('admin/dashboard.html')
 
 
-def run_function_async(task_id, func, description, *args, **kwargs):
+def run_function_async(task_id, func, description, task_type='generic', *args, **kwargs):
     """Run a Python function asynchronously and track its status."""
     try:
-        running_tasks[task_id] = {
+        task_data = {
+            'type': task_type,
             'status': 'running',
             'description': description,
             'start_time': datetime.now().isoformat(),
             'output': '',
-            'error': ''
+            'error': '',
+            'steps': []
         }
+        running_tasks[task_id] = task_data
+        save_task_to_db(task_id, task_data)
 
         # Run the function
         result = func(*args, **kwargs)
@@ -85,11 +197,13 @@ def run_function_async(task_id, func, description, *args, **kwargs):
         running_tasks[task_id]['status'] = 'completed'
         running_tasks[task_id]['output'] = str(result) if result else 'Completed successfully'
         running_tasks[task_id]['end_time'] = datetime.now().isoformat()
+        save_task_to_db(task_id, running_tasks[task_id])
 
     except Exception as e:
         running_tasks[task_id]['status'] = 'failed'
         running_tasks[task_id]['error'] = str(e)
         running_tasks[task_id]['end_time'] = datetime.now().isoformat()
+        save_task_to_db(task_id, running_tasks[task_id])
         logger.error(f"Task {task_id} failed: {e}", exc_info=True)
 
 
@@ -158,7 +272,8 @@ def trigger_all():
         from src.models.database import get_database_manager
 
         overall_task_id = f"{base_task_id}_all"
-        running_tasks[overall_task_id] = {
+        task_data = {
+            'type': 'all',
             'status': 'running',
             'description': 'Complete Data + ML Pipeline',
             'start_time': datetime.now().isoformat(),
@@ -166,6 +281,8 @@ def trigger_all():
             'output': '',
             'error': ''
         }
+        running_tasks[overall_task_id] = task_data
+        save_task_to_db(overall_task_id, task_data)
 
         db_manager = get_database_manager()
 
@@ -177,18 +294,21 @@ def trigger_all():
                 'status': 'running',
                 'start_time': datetime.now().isoformat()
             })
+            save_task_to_db(overall_task_id, running_tasks[overall_task_id])
 
             saga = PipelineSaga()
             saga.run_pipeline()
 
             running_tasks[overall_task_id]['steps'][-1]['status'] = 'completed'
             running_tasks[overall_task_id]['steps'][-1]['end_time'] = datetime.now().isoformat()
+            save_task_to_db(overall_task_id, running_tasks[overall_task_id])
 
         except Exception as e:
             running_tasks[overall_task_id]['steps'][-1]['status'] = 'failed'
             running_tasks[overall_task_id]['steps'][-1]['error'] = str(e)
             running_tasks[overall_task_id]['steps'][-1]['end_time'] = datetime.now().isoformat()
             running_tasks[overall_task_id]['error'] += f"\nPipeline failed: {str(e)}"
+            save_task_to_db(overall_task_id, running_tasks[overall_task_id])
             logger.error(f"Pipeline failed: {e}", exc_info=True)
 
         # Step 2: ML Training
@@ -199,6 +319,7 @@ def trigger_all():
                 'status': 'running',
                 'start_time': datetime.now().isoformat()
             })
+            save_task_to_db(overall_task_id, running_tasks[overall_task_id])
 
             with db_manager.get_session() as session:
                 predictor = StockMLPredictor(session)
@@ -206,18 +327,21 @@ def trigger_all():
 
             running_tasks[overall_task_id]['steps'][-1]['status'] = 'completed'
             running_tasks[overall_task_id]['steps'][-1]['end_time'] = datetime.now().isoformat()
+            save_task_to_db(overall_task_id, running_tasks[overall_task_id])
 
         except Exception as e:
             running_tasks[overall_task_id]['steps'][-1]['status'] = 'failed'
             running_tasks[overall_task_id]['steps'][-1]['error'] = str(e)
             running_tasks[overall_task_id]['steps'][-1]['end_time'] = datetime.now().isoformat()
             running_tasks[overall_task_id]['error'] += f"\nML Training failed: {str(e)}"
+            save_task_to_db(overall_task_id, running_tasks[overall_task_id])
             logger.error(f"ML Training failed: {e}", exc_info=True)
 
         # Mark overall task as completed
         failed_count = len([s for s in running_tasks[overall_task_id]['steps'] if s['status'] == 'failed'])
         running_tasks[overall_task_id]['status'] = 'completed' if failed_count == 0 else 'failed'
         running_tasks[overall_task_id]['end_time'] = datetime.now().isoformat()
+        save_task_to_db(overall_task_id, running_tasks[overall_task_id])
 
     thread = threading.Thread(target=run_all_tasks)
     thread.start()
@@ -232,25 +356,52 @@ def trigger_all():
 @admin_bp.route('/task/<task_id>/status', methods=['GET'])
 def get_task_status(task_id):
     """Get status of a running task."""
-    if task_id not in running_tasks:
+    # Check in-memory first
+    if task_id in running_tasks:
         return jsonify({
-            'success': False,
-            'error': 'Task not found'
-        }), 404
-    
+            'success': True,
+            'task': running_tasks[task_id]
+        })
+
+    # Check database
+    task_data = get_task_from_db(task_id)
+    if task_data:
+        # Add flags for UI
+        task_data['failed'] = task_data['status'] == 'failed'
+        task_data['completed'] = task_data['status'] == 'completed'
+        if task_data['status'] == 'failed':
+            task_data['failedSteps'] = [s for s in task_data.get('steps', []) if s.get('status') == 'failed']
+
+        return jsonify({
+            'success': True,
+            'task': task_data
+        })
+
     return jsonify({
-        'success': True,
-        'task': running_tasks[task_id]
-    })
+        'success': False,
+        'error': 'Task not found'
+    }), 404
 
 
 @admin_bp.route('/tasks', methods=['GET'])
 def list_tasks():
     """List all tasks."""
+    # Get from database (includes completed/failed from last hour)
+    db_tasks = get_active_tasks_from_db()
+
+    # Merge with in-memory tasks
+    all_tasks = {**db_tasks, **running_tasks}
+
     return jsonify({
         'success': True,
-        'tasks': running_tasks
+        'tasks': all_tasks
     })
+
+
+@admin_bp.route('/tasks/active', methods=['GET'])
+def get_active_tasks():
+    """Get all active tasks (for page load)."""
+    return list_tasks()
 
 
 @admin_bp.route('/task/<task_id>/retry-failed', methods=['POST'])
