@@ -5,6 +5,7 @@ Single file that handles the entire data pipeline with retry logic
 
 import logging
 import time
+import threading
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from sqlalchemy import text, func
@@ -292,85 +293,94 @@ class PipelineSaga:
             return {'success': False, 'error': str(e)}
     
     def step_historical_data(self) -> Dict[str, Any]:
-        """Step 3: Download historical data for stocks missing data."""
+        """Step 3: Download historical data for stocks missing data using concurrent requests."""
         try:
             # Get stocks that need historical data
             with self.db_manager.get_session() as session:
                 stocks_needing_data = session.execute(text("""
-                    SELECT s.symbol FROM stocks s 
+                    SELECT s.symbol FROM stocks s
                     LEFT JOIN (
-                        SELECT symbol, COUNT(*) as hist_count 
-                        FROM historical_data 
+                        SELECT symbol, COUNT(*) as hist_count
+                        FROM historical_data
                         GROUP BY symbol
-                    ) h ON s.symbol = h.symbol 
+                    ) h ON s.symbol = h.symbol
                     WHERE h.symbol IS NULL OR h.hist_count < 300
                     AND s.is_active = true AND s.is_tradeable = true
                     ORDER BY s.volume DESC
                 """)).fetchall()
-                
+
                 if not stocks_needing_data:
                     return {
                         'success': True,
                         'records_processed': 0,
                         'message': 'All stocks have sufficient historical data'
                     }
-                
+
                 symbols = [row.symbol for row in stocks_needing_data]
-                logger.info(f"📊 Downloading historical data for {len(symbols)} stocks")
-                
-                # Download historical data using Fyers service directly
+                logger.info(f"📊 Downloading historical data for {len(symbols)} stocks (concurrent mode)")
+
+                # Download historical data using concurrent requests
                 from ..brokers.fyers_service import get_fyers_service
+                from concurrent.futures import ThreadPoolExecutor, as_completed
+                from datetime import datetime, timedelta
+
                 fyers_service = get_fyers_service()
-                
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=365)
+
                 total_records = 0
                 successful_downloads = 0
                 failed_downloads = 0
-                
-                for symbol in symbols:
+                results_lock = threading.Lock()
+
+                def download_symbol(symbol):
+                    """Download historical data for a single symbol."""
                     try:
-                        # Get historical data for the last 365 days (maximum Fyers API supports)
-                        from datetime import datetime, timedelta
-                        end_date = datetime.now()
-                        start_date = end_date - timedelta(days=365)
-                        
                         result = fyers_service.history(
-                            user_id=1, 
-                            symbol=symbol, 
-                            exchange='NSE', 
+                            user_id=1,
+                            symbol=symbol,
+                            exchange='NSE',
                             interval='1D',
                             start_date=start_date.strftime('%Y-%m-%d'),
                             end_date=end_date.strftime('%Y-%m-%d')
                         )
-                        
+
                         if result.get('status') == 'success' and result.get('data', {}).get('candles'):
-                            # Store the data
                             candles = result['data']['candles']
                             records_added = self._store_historical_data(symbol, candles)
-                            total_records += records_added
-                            successful_downloads += 1
                             logger.info(f"✅ Downloaded {records_added} records for {symbol}")
+                            return {'success': True, 'symbol': symbol, 'records': records_added}
                         else:
-                            failed_downloads += 1
                             error_msg = result.get('message', 'Unknown error')
                             logger.warning(f"⚠️ No data for {symbol}: {error_msg}")
-                            
-                            # If we get too many API failures, stop trying
-                            if failed_downloads > 10:
-                                logger.warning(f"🛑 Too many API failures, stopping download after {failed_downloads} failures")
-                                break
-                            
-                        time.sleep(self.rate_limit_delay)
+                            return {'success': False, 'symbol': symbol, 'error': error_msg}
                     except Exception as e:
-                        failed_downloads += 1
-                        logger.warning(f"Error downloading data for {symbol}: {e}")
-                        continue
-                
-                logger.info(f"📊 Download summary: {successful_downloads} successful, {failed_downloads} failed")
-                
+                        logger.warning(f"Error downloading {symbol}: {e}")
+                        return {'success': False, 'symbol': symbol, 'error': str(e)}
+
+                # Use ThreadPoolExecutor for concurrent downloads (10 parallel threads)
+                with ThreadPoolExecutor(max_workers=10) as executor:
+                    futures = {executor.submit(download_symbol, symbol): symbol for symbol in symbols}
+
+                    for future in as_completed(futures):
+                        result = future.result()
+                        with results_lock:
+                            if result['success']:
+                                successful_downloads += 1
+                                total_records += result.get('records', 0)
+                            else:
+                                failed_downloads += 1
+
+                        # Progress logging every 50 stocks
+                        if (successful_downloads + failed_downloads) % 50 == 0:
+                            logger.info(f"Progress: {successful_downloads + failed_downloads}/{len(symbols)} - Success: {successful_downloads}, Failed: {failed_downloads}")
+
+                logger.info(f"📊 Download summary: {successful_downloads} successful, {failed_downloads} failed, {total_records} total records")
+
                 return {
                     'success': True,
                     'records_processed': total_records,
-                    'message': f'Downloaded historical data for {len(symbols)} stocks'
+                    'message': f'Downloaded historical data for {successful_downloads}/{len(symbols)} stocks'
                 }
         except Exception as e:
             return {'success': False, 'error': str(e)}

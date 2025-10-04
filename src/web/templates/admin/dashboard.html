@@ -504,7 +504,7 @@
 </div>
 
 <!-- Active Tasks -->
-<div class="row mb-4" id="activeTasksContainer" style="display: none;">
+<div class="row mb-4" id="activeTasksContainer">
     <div class="col-12">
         <div class="card" style="border: none; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border-radius: 12px; overflow: hidden;">
             <div class="card-header" style="background: linear-gradient(135deg, #ffd93d 0%, #ffb300 100%); color: #333; border: none; padding: 20px;">
@@ -924,6 +924,47 @@ function renderStepProgress(steps) {
     return html;
 }
 
+// Render console output logs for a task
+function renderConsoleOutput(taskInfo) {
+    if (!taskInfo.output && !taskInfo.error) {
+        return '';
+    }
+
+    let html = '<div class="task-console" style="margin-top: 20px; background: #1e1e1e; color: #d4d4d4; border-radius: 8px; padding: 15px; font-family: \'Courier New\', monospace; font-size: 13px; max-height: 400px; overflow-y: auto;">';
+    html += '<div style="display: flex; justify-content: between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #444; padding-bottom: 10px;">';
+    html += '<div style="font-weight: bold; color: #4EC9B0;"><i class="bi bi-terminal-fill me-2"></i>Console Output</div>';
+    html += '</div>';
+
+    if (taskInfo.output) {
+        const lines = taskInfo.output.split('\n').slice(-50); // Last 50 lines
+        lines.forEach(line => {
+            let color = '#d4d4d4';
+            if (line.includes('ERROR') || line.includes('Failed')) color = '#f48771';
+            else if (line.includes('WARNING')) color = '#dcdcaa';
+            else if (line.includes('SUCCESS') || line.includes('✅')) color = '#4EC9B0';
+            else if (line.includes('INFO') || line.includes('ℹ️')) color = '#9cdcfe';
+
+            html += `<div style="color: ${color}; line-height: 1.6;">${escapeHtml(line)}</div>`;
+        });
+    }
+
+    if (taskInfo.error) {
+        html += `<div style="color: #f48771; font-weight: bold; margin-top: 10px; padding: 10px; background: rgba(244, 135, 113, 0.1); border-left: 3px solid #f48771;">`;
+        html += `<i class="bi bi-exclamation-triangle-fill me-2"></i>ERROR: ${escapeHtml(taskInfo.error)}`;
+        html += `</div>`;
+    }
+
+    html += '</div>';
+    return html;
+}
+
+// Escape HTML to prevent XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // Close/dismiss a task
 function closeTask(taskId) {
     activeTasks.delete(taskId);
@@ -987,6 +1028,9 @@ function updateActiveTasks() {
         // Render step progress
         const stepProgressHtml = taskInfo.steps ? renderStepProgress(taskInfo.steps) : '';
 
+        // Render console output
+        const consoleOutputHtml = renderConsoleOutput(taskInfo);
+
         taskDiv.innerHTML = `
             <div style="background: #f8f9fa; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px;">
                 <div class="d-flex justify-content-between align-items-center">
@@ -1001,6 +1045,7 @@ function updateActiveTasks() {
                 </div>
             </div>
             ${stepProgressHtml}
+            ${consoleOutputHtml}
         `;
 
         list.appendChild(taskDiv);

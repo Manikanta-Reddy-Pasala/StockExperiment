@@ -40,7 +40,7 @@ def save_task_to_db(task_id, task_data):
             INSERT INTO admin_task_tracking
             (task_id, task_type, description, status, start_time, end_time, steps, output, error, updated_at)
             VALUES
-            (:task_id, :task_type, :description, :status, :start_time, :end_time, :steps::jsonb, :output, :error, NOW())
+            (:task_id, :task_type, :description, :status, :start_time, :end_time, CAST(:steps AS jsonb), :output, :error, NOW())
             ON CONFLICT (task_id)
             DO UPDATE SET
                 status = EXCLUDED.status,
@@ -82,13 +82,15 @@ def get_task_from_db(task_id):
         result = session.execute(query, {'task_id': task_id}).fetchone()
 
         if result:
+            # PostgreSQL JSONB is already parsed as Python object, no need for json.loads()
+            steps = result[6] if result[6] else []
             return {
                 'type': result[1],
                 'description': result[2],
                 'status': result[3],
                 'start_time': result[4].isoformat() if result[4] else None,
                 'end_time': result[5].isoformat() if result[5] else None,
-                'steps': json.loads(result[6]) if result[6] else [],
+                'steps': steps if isinstance(steps, list) else json.loads(steps) if steps else [],
                 'output': result[7] or '',
                 'error': result[8] or ''
             }
