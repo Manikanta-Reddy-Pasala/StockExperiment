@@ -357,7 +357,7 @@ class SuggestedStocksSagaOrchestrator:
                 if not available_stocks:
                     raise Exception("No active stocks found in database")
                 
-                # Convert to dictionary format for filtering
+                # Convert to dictionary format for filtering with all calculated fields
                 stock_data_list = []
                 for stock in available_stocks:
                     stock_data = {
@@ -368,6 +368,20 @@ class SuggestedStocksSagaOrchestrator:
                         'pe_ratio': float(stock.pe_ratio) if stock.pe_ratio else None,
                         'pb_ratio': float(stock.pb_ratio) if stock.pb_ratio else None,
                         'roe': float(stock.roe) if stock.roe else None,
+                        'eps': float(stock.eps) if stock.eps else None,
+                        'book_value': float(stock.book_value) if stock.book_value else None,
+                        'beta': float(stock.beta) if stock.beta else None,
+                        'peg_ratio': float(stock.peg_ratio) if stock.peg_ratio else None,
+                        'roa': float(stock.roa) if stock.roa else None,
+                        'debt_to_equity': float(stock.debt_to_equity) if stock.debt_to_equity else None,
+                        'current_ratio': float(stock.current_ratio) if stock.current_ratio else None,
+                        'quick_ratio': float(stock.quick_ratio) if stock.quick_ratio else None,
+                        'revenue_growth': float(stock.revenue_growth) if stock.revenue_growth else None,
+                        'earnings_growth': float(stock.earnings_growth) if stock.earnings_growth else None,
+                        'operating_margin': float(stock.operating_margin) if stock.operating_margin else None,
+                        'net_margin': float(stock.net_margin) if stock.net_margin else None,
+                        'profit_margin': float(stock.profit_margin) if stock.profit_margin else None,
+                        'dividend_yield': float(stock.dividend_yield) if stock.dividend_yield else None,
                         'volume': int(stock.volume) if stock.volume else 0,
                         'sector': stock.sector,
                         'market_cap_category': stock.market_cap_category
@@ -645,25 +659,27 @@ class SuggestedStocksSagaOrchestrator:
             large_cap_min = market_cap_categories.get('large_cap', {}).get('minimum', 20000)
             mid_cap_min = market_cap_categories.get('mid_cap', {}).get('minimum', 5000)
             
-            # Strategy-specific filtering and scoring
-            if strategy == 'DEFAULT_RISK':
+            # Strategy-specific filtering and scoring (case-insensitive)
+            strategy_upper = strategy.upper()
+
+            if strategy_upper == 'DEFAULT_RISK':
                 # Conservative strategy - focus on stability (large/mid cap)
                 if (market_cap < mid_cap_min or  # Minimum market cap from config
                     (pe_ratio and pe_ratio > fundamental_ratios.get('pe_ratio', {}).get('maximum', 50))):
                     return None
-                
+
                 # Calculate conservative score using config weights
                 score = self._calculate_conservative_score_with_config(stock_data)
                 min_score = filtering_thresholds.get('minimum_total_score', 25) / 100.0
                 if score < min_score:
                     return None
-                    
-            elif strategy == 'HIGH_RISK':
+
+            elif strategy_upper == 'HIGH_RISK':
                 # Aggressive strategy - focus on growth potential (mid/small cap)
                 if (market_cap < 1000 or  # Lower market cap requirement for growth
                     volume < 10000):  # Volume requirement
                     return None
-                
+
                 # Calculate aggressive score using config weights
                 score = self._calculate_aggressive_score_with_config(stock_data)
                 min_score = filtering_thresholds.get('minimum_total_score', 25) / 100.0 * 0.8  # Lower threshold for high risk
@@ -673,7 +689,7 @@ class SuggestedStocksSagaOrchestrator:
                 # Unknown strategy
                 return None
             
-            # Create suggested stock with strategy-specific targets
+            # Create suggested stock with strategy-specific targets and all calculated fields
             suggested_stock = {
                 'symbol': stock_data.get('symbol', ''),
                 'name': stock_data.get('name', ''),
@@ -682,7 +698,22 @@ class SuggestedStocksSagaOrchestrator:
                 'pe_ratio': pe_ratio,
                 'pb_ratio': stock_data.get('pb_ratio'),
                 'roe': stock_data.get('roe'),
+                'eps': stock_data.get('eps'),
+                'book_value': stock_data.get('book_value'),
+                'beta': stock_data.get('beta'),
+                'peg_ratio': stock_data.get('peg_ratio'),
+                'roa': stock_data.get('roa'),
+                'debt_to_equity': stock_data.get('debt_to_equity'),
+                'current_ratio': stock_data.get('current_ratio'),
+                'quick_ratio': stock_data.get('quick_ratio'),
+                'revenue_growth': stock_data.get('revenue_growth'),
+                'earnings_growth': stock_data.get('earnings_growth'),
+                'operating_margin': stock_data.get('operating_margin'),
+                'net_margin': stock_data.get('net_margin'),
+                'profit_margin': stock_data.get('profit_margin'),
+                'dividend_yield': stock_data.get('dividend_yield'),
                 'sector': stock_data.get('sector', ''),
+                'market_cap_category': stock_data.get('market_cap_category', ''),
                 'strategy': strategy,
                 'selection_score': score,
                 'target_price': self._calculate_target_price(current_price, strategy),

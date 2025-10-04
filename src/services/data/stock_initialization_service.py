@@ -551,6 +551,7 @@ class StockInitializationService:
                                             # Create stock record with market cap calculation
                                             market_cap = self._estimate_market_cap(price, volume)
                                             market_cap_category = self._determine_market_cap_category(market_cap)
+                                            sector = self._determine_sector(symbol_obj['name'])
 
                                             verified_stocks.append({
                                                 'symbol': symbol,
@@ -560,7 +561,7 @@ class StockInitializationService:
                                                 'volume': volume,
                                                 'market_cap': market_cap,
                                                 'market_cap_category': market_cap_category,
-                                                'sector': 'Technology',  # Default
+                                                'sector': sector,
                                                 'is_active': True,
                                                 'is_tradeable': True,
                                                 'last_updated': datetime.utcnow()
@@ -898,6 +899,7 @@ class StockInitializationService:
                                 existing_stock.name = data['name']
                                 existing_stock.current_price = data['current_price']
                                 existing_stock.volume = data['volume']
+                                existing_stock.market_cap = data.get('market_cap')
                                 existing_stock.market_cap_category = data['market_cap_category']
                                 existing_stock.sector = data['sector']
                                 existing_stock.is_active = data['is_active']
@@ -912,6 +914,7 @@ class StockInitializationService:
                                     exchange=data['exchange'],
                                     current_price=data['current_price'],
                                     volume=data['volume'],
+                                    market_cap=data.get('market_cap'),
                                     market_cap_category=data['market_cap_category'],
                                     sector=data['sector'],
                                     is_active=data['is_active'],
