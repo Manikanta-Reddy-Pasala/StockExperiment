@@ -494,9 +494,9 @@
                 <h5 class="mb-0"><i class="bi bi-lightning-charge-fill me-2"></i>Execute Complete Pipeline</h5>
             </div>
             <div class="card-body">
-                <p class="mb-3">Execute all steps in sequence: Pipeline → Fill Data → Business Logic → ML Training → CSV Export</p>
+                <p class="mb-3">Execute complete pipeline: Data Pipeline (6-step saga) → ML Training</p>
                 <button class="btn btn-danger-trigger w-100" id="runAllBtn" onclick="triggerAll()">
-                    <i class="bi bi-play-fill me-2"></i>Run All Steps (45-60 min)
+                    <i class="bi bi-play-fill me-2"></i>Run Complete Pipeline (25-35 min)
                 </button>
             </div>
         </div>
@@ -506,11 +506,11 @@
 <!-- Active Tasks -->
 <div class="row mb-4" id="activeTasksContainer" style="display: none;">
     <div class="col-12">
-        <div class="card task-card">
-            <div class="card-header bg-gradient-warning text-dark">
-                <h5 class="mb-0"><i class="bi bi-hourglass-split me-2"></i>Active Tasks</h5>
+        <div class="card" style="border: none; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border-radius: 12px; overflow: hidden;">
+            <div class="card-header" style="background: linear-gradient(135deg, #ffd93d 0%, #ffb300 100%); color: #333; border: none; padding: 20px;">
+                <h5 class="mb-0" style="font-weight: 700;"><i class="bi bi-hourglass-split me-2"></i>Active Tasks</h5>
             </div>
-            <div class="card-body">
+            <div class="card-body" style="padding: 25px; background: #fff;">
                 <div id="activeTasksList"></div>
             </div>
         </div>
@@ -988,14 +988,16 @@ function updateActiveTasks() {
         const stepProgressHtml = taskInfo.steps ? renderStepProgress(taskInfo.steps) : '';
 
         taskDiv.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <strong>${taskInfo.name}</strong>
-                    <small class="text-muted ms-2">(${taskId})</small>
-                    ${statusBadge}
-                </div>
-                <div>
-                    ${buttonsHtml}
+            <div style="background: #f8f9fa; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong style="font-size: 16px; color: #333;">${taskInfo.name}</strong>
+                        <small class="text-muted ms-2" style="font-size: 11px;">(${taskId})</small>
+                        <span class="ms-3">${statusBadge}</span>
+                    </div>
+                    <div>
+                        ${buttonsHtml}
+                    </div>
                 </div>
             </div>
             ${stepProgressHtml}

@@ -9,6 +9,12 @@ import subprocess
 import threading
 import logging
 import os
+import sys
+from pathlib import Path
+
+# Add project root to path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 logger = logging.getLogger(__name__)
 
@@ -62,57 +68,52 @@ def admin_dashboard():
     return render_template('admin/dashboard.html')
 
 
+def run_function_async(task_id, func, description, *args, **kwargs):
+    """Run a Python function asynchronously and track its status."""
+    try:
+        running_tasks[task_id] = {
+            'status': 'running',
+            'description': description,
+            'start_time': datetime.now().isoformat(),
+            'output': '',
+            'error': ''
+        }
+
+        # Run the function
+        result = func(*args, **kwargs)
+
+        running_tasks[task_id]['status'] = 'completed'
+        running_tasks[task_id]['output'] = str(result) if result else 'Completed successfully'
+        running_tasks[task_id]['end_time'] = datetime.now().isoformat()
+
+    except Exception as e:
+        running_tasks[task_id]['status'] = 'failed'
+        running_tasks[task_id]['error'] = str(e)
+        running_tasks[task_id]['end_time'] = datetime.now().isoformat()
+        logger.error(f"Task {task_id} failed: {e}", exc_info=True)
+
+
 @admin_bp.route('/trigger/pipeline', methods=['POST'])
 def trigger_pipeline():
     """Trigger complete data pipeline."""
     task_id = f"pipeline_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    
+
+    def run_pipeline():
+        from src.services.data.pipeline_saga import PipelineSaga
+
+        saga = PipelineSaga()
+        saga.execute()
+
     thread = threading.Thread(
-        target=run_command_async,
-        args=(task_id, ['python3', 'run_pipeline.py'], 'Data Pipeline (6-step saga)')
+        target=run_function_async,
+        args=(task_id, run_pipeline, 'Data Pipeline (6-step saga)')
     )
     thread.start()
-    
+
     return jsonify({
         'success': True,
         'task_id': task_id,
         'message': 'Data pipeline started'
-    })
-
-
-@admin_bp.route('/trigger/fill-data', methods=['POST'])
-def trigger_fill_data():
-    """Trigger fill missing data."""
-    task_id = f"fill_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    
-    thread = threading.Thread(
-        target=run_command_async,
-        args=(task_id, ['python3', 'fill_data_sql.py'], 'Fill Missing Data')
-    )
-    thread.start()
-    
-    return jsonify({
-        'success': True,
-        'task_id': task_id,
-        'message': 'Fill data task started'
-    })
-
-
-@admin_bp.route('/trigger/business-logic', methods=['POST'])
-def trigger_business_logic():
-    """Trigger business logic calculations."""
-    task_id = f"business_logic_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    
-    thread = threading.Thread(
-        target=run_command_async,
-        args=(task_id, ['python3', 'fix_business_logic.py'], 'Business Logic Calculations')
-    )
-    thread.start()
-    
-    return jsonify({
-        'success': True,
-        'task_id': task_id,
-        'message': 'Business logic calculation started'
     })
 
 
@@ -121,9 +122,19 @@ def trigger_ml_training():
     """Trigger ML model training."""
     task_id = f"ml_training_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
+    def run_ml_training():
+        from src.services.ml.stock_predictor import StockMLPredictor
+        from src.models.database import get_database_manager
+
+        db_manager = get_database_manager()
+        with db_manager.get_session() as session:
+            predictor = StockMLPredictor(session)
+            predictor.train(lookback_days=365)
+            return "ML models trained successfully"
+
     thread = threading.Thread(
-        target=run_command_async,
-        args=(task_id, ['python3', 'tools/train_ml_model.py'], 'ML Model Training')
+        target=run_function_async,
+        args=(task_id, run_ml_training, 'ML Model Training')
     )
     thread.start()
 
@@ -134,47 +145,16 @@ def trigger_ml_training():
     })
 
 
-@admin_bp.route('/trigger/csv-export', methods=['POST'])
-def trigger_csv_export():
-    """Trigger CSV export."""
-    task_id = f"csv_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    
-    # Use Python to call the export function directly
-    command = [
-        'python3', '-c',
-        'from data_scheduler import export_daily_csv; export_daily_csv()'
-    ]
-    
-    thread = threading.Thread(
-        target=run_command_async,
-        args=(task_id, command, 'CSV Export')
-    )
-    thread.start()
-    
-    return jsonify({
-        'success': True,
-        'task_id': task_id,
-        'message': 'CSV export started'
-    })
-
-
 @admin_bp.route('/trigger/all', methods=['POST'])
 def trigger_all():
     """Trigger all processes in sequence."""
     base_task_id = f"all_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    
+
     def run_all_tasks():
         """Run all tasks sequentially."""
-        tasks = [
-            ('pipeline', ['python3', 'run_pipeline.py'], 'Data Pipeline'),
-            ('fill_data', ['python3', 'fill_data_sql.py'], 'Fill Missing Data'),
-            ('business_logic', ['python3', 'fix_business_logic.py'], 'Business Logic'),
-            ('ml_training', ['python3', 'tools/train_ml_model.py'], 'ML Training'),
-            ('csv_export', ['python3', '-c', 'from data_scheduler import export_daily_csv; export_daily_csv()'], 'CSV Export')
-        ]
-
-        # Get the project root directory
-        project_root = '/app' if os.path.exists('/app/run_pipeline.py') else os.getcwd()
+        from src.services.data.pipeline_saga import PipelineSaga
+        from src.services.ml.stock_predictor import StockMLPredictor
+        from src.models.database import get_database_manager
 
         overall_task_id = f"{base_task_id}_all"
         running_tasks[overall_task_id] = {
@@ -186,47 +166,61 @@ def trigger_all():
             'error': ''
         }
 
-        for step_name, command, description in tasks:
-            step_task_id = f"{base_task_id}_{step_name}"
+        db_manager = get_database_manager()
 
-            try:
-                running_tasks[overall_task_id]['steps'].append({
-                    'name': step_name,
-                    'description': description,
-                    'status': 'running',
-                    'start_time': datetime.now().isoformat()
-                })
+        # Step 1: Data Pipeline
+        try:
+            running_tasks[overall_task_id]['steps'].append({
+                'name': 'pipeline',
+                'description': 'Data Pipeline',
+                'status': 'running',
+                'start_time': datetime.now().isoformat()
+            })
 
-                result = subprocess.run(
-                    command,
-                    capture_output=True,
-                    text=True,
-                    timeout=3600,
-                    cwd=project_root
-                )
-                
-                step_status = 'completed' if result.returncode == 0 else 'failed'
-                running_tasks[overall_task_id]['steps'][-1]['status'] = step_status
-                running_tasks[overall_task_id]['steps'][-1]['end_time'] = datetime.now().isoformat()
-                running_tasks[overall_task_id]['steps'][-1]['return_code'] = result.returncode
+            saga = PipelineSaga()
+            saga.execute()
 
-                if result.returncode != 0:
-                    error_msg = result.stderr or result.stdout or "Unknown error"
-                    running_tasks[overall_task_id]['steps'][-1]['error'] = error_msg
-                    running_tasks[overall_task_id]['error'] += f"\n{step_name} failed: {error_msg}"
-                    # Continue even if step fails
-                
-            except Exception as e:
-                running_tasks[overall_task_id]['steps'][-1]['status'] = 'error'
-                running_tasks[overall_task_id]['steps'][-1]['error'] = str(e)
-                running_tasks[overall_task_id]['error'] += f"\n{step_name} error: {str(e)}"
-        
-        running_tasks[overall_task_id]['status'] = 'completed'
+            running_tasks[overall_task_id]['steps'][-1]['status'] = 'completed'
+            running_tasks[overall_task_id]['steps'][-1]['end_time'] = datetime.now().isoformat()
+
+        except Exception as e:
+            running_tasks[overall_task_id]['steps'][-1]['status'] = 'failed'
+            running_tasks[overall_task_id]['steps'][-1]['error'] = str(e)
+            running_tasks[overall_task_id]['steps'][-1]['end_time'] = datetime.now().isoformat()
+            running_tasks[overall_task_id]['error'] += f"\nPipeline failed: {str(e)}"
+            logger.error(f"Pipeline failed: {e}", exc_info=True)
+
+        # Step 2: ML Training
+        try:
+            running_tasks[overall_task_id]['steps'].append({
+                'name': 'ml_training',
+                'description': 'ML Training',
+                'status': 'running',
+                'start_time': datetime.now().isoformat()
+            })
+
+            with db_manager.get_session() as session:
+                predictor = StockMLPredictor(session)
+                predictor.train(lookback_days=365)
+
+            running_tasks[overall_task_id]['steps'][-1]['status'] = 'completed'
+            running_tasks[overall_task_id]['steps'][-1]['end_time'] = datetime.now().isoformat()
+
+        except Exception as e:
+            running_tasks[overall_task_id]['steps'][-1]['status'] = 'failed'
+            running_tasks[overall_task_id]['steps'][-1]['error'] = str(e)
+            running_tasks[overall_task_id]['steps'][-1]['end_time'] = datetime.now().isoformat()
+            running_tasks[overall_task_id]['error'] += f"\nML Training failed: {str(e)}"
+            logger.error(f"ML Training failed: {e}", exc_info=True)
+
+        # Mark overall task as completed
+        failed_count = len([s for s in running_tasks[overall_task_id]['steps'] if s['status'] == 'failed'])
+        running_tasks[overall_task_id]['status'] = 'completed' if failed_count == 0 else 'failed'
         running_tasks[overall_task_id]['end_time'] = datetime.now().isoformat()
-    
+
     thread = threading.Thread(target=run_all_tasks)
     thread.start()
-    
+
     return jsonify({
         'success': True,
         'task_id': f"{base_task_id}_all",
