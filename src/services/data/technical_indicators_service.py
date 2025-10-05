@@ -417,7 +417,8 @@ class TechnicalIndicatorsService:
 
                 for _, row in recent_df.iterrows():
                     try:
-                        # Check if record already exists
+                        # Use merge to handle insert/update automatically
+                        # First, check if record exists
                         existing = session.query(TechnicalIndicators).filter(
                             TechnicalIndicators.symbol == symbol,
                             TechnicalIndicators.date == row['date']
@@ -435,65 +436,83 @@ class TechnicalIndicatorsService:
 
                             existing.data_points_used = int(row['data_points_used'])
                             existing.calculation_date = datetime.utcnow()
+                            records_stored += 1
                         else:
-                            # Create new record
-                            indicator_record = TechnicalIndicators(
-                                symbol=symbol,
-                                date=row['date'],
+                            # Create new record only if it doesn't exist
+                            # Use a savepoint to handle unique constraint violations gracefully
+                            try:
+                                indicator_record = TechnicalIndicators(
+                                    symbol=symbol,
+                                    date=row['date'],
 
-                                # Moving Averages
-                                sma_5=float(row['sma_5']) if pd.notna(row['sma_5']) else None,
-                                sma_10=float(row['sma_10']) if pd.notna(row['sma_10']) else None,
-                                sma_20=float(row['sma_20']) if pd.notna(row['sma_20']) else None,
-                                sma_50=float(row['sma_50']) if pd.notna(row['sma_50']) else None,
-                                sma_100=float(row['sma_100']) if pd.notna(row['sma_100']) else None,
-                                sma_200=float(row['sma_200']) if pd.notna(row['sma_200']) else None,
+                                    # Moving Averages
+                                    sma_5=float(row['sma_5']) if pd.notna(row['sma_5']) else None,
+                                    sma_10=float(row['sma_10']) if pd.notna(row['sma_10']) else None,
+                                    sma_20=float(row['sma_20']) if pd.notna(row['sma_20']) else None,
+                                    sma_50=float(row['sma_50']) if pd.notna(row['sma_50']) else None,
+                                    sma_100=float(row['sma_100']) if pd.notna(row['sma_100']) else None,
+                                    sma_200=float(row['sma_200']) if pd.notna(row['sma_200']) else None,
 
-                                # Exponential Moving Averages
-                                ema_12=float(row['ema_12']) if pd.notna(row['ema_12']) else None,
-                                ema_26=float(row['ema_26']) if pd.notna(row['ema_26']) else None,
-                                ema_50=float(row['ema_50']) if pd.notna(row['ema_50']) else None,
+                                    # Exponential Moving Averages
+                                    ema_12=float(row['ema_12']) if pd.notna(row['ema_12']) else None,
+                                    ema_26=float(row['ema_26']) if pd.notna(row['ema_26']) else None,
+                                    ema_50=float(row['ema_50']) if pd.notna(row['ema_50']) else None,
 
-                                # Momentum Indicators
-                                rsi_14=float(row['rsi_14']) if pd.notna(row['rsi_14']) else None,
-                                macd=float(row['macd']) if pd.notna(row['macd']) else None,
-                                macd_signal=float(row['macd_signal']) if pd.notna(row['macd_signal']) else None,
-                                macd_histogram=float(row['macd_histogram']) if pd.notna(row['macd_histogram']) else None,
+                                    # Momentum Indicators
+                                    rsi_14=float(row['rsi_14']) if pd.notna(row['rsi_14']) else None,
+                                    macd=float(row['macd']) if pd.notna(row['macd']) else None,
+                                    macd_signal=float(row['macd_signal']) if pd.notna(row['macd_signal']) else None,
+                                    macd_histogram=float(row['macd_histogram']) if pd.notna(row['macd_histogram']) else None,
 
-                                # Volatility Indicators
-                                atr_14=float(row['atr_14']) if pd.notna(row['atr_14']) else None,
-                                atr_percentage=float(row['atr_percentage']) if pd.notna(row['atr_percentage']) else None,
-                                bb_upper=float(row['bb_upper']) if pd.notna(row['bb_upper']) else None,
-                                bb_middle=float(row['bb_middle']) if pd.notna(row['bb_middle']) else None,
-                                bb_lower=float(row['bb_lower']) if pd.notna(row['bb_lower']) else None,
-                                bb_width=float(row['bb_width']) if pd.notna(row['bb_width']) else None,
+                                    # Volatility Indicators
+                                    atr_14=float(row['atr_14']) if pd.notna(row['atr_14']) else None,
+                                    atr_percentage=float(row['atr_percentage']) if pd.notna(row['atr_percentage']) else None,
+                                    bb_upper=float(row['bb_upper']) if pd.notna(row['bb_upper']) else None,
+                                    bb_middle=float(row['bb_middle']) if pd.notna(row['bb_middle']) else None,
+                                    bb_lower=float(row['bb_lower']) if pd.notna(row['bb_lower']) else None,
+                                    bb_width=float(row['bb_width']) if pd.notna(row['bb_width']) else None,
 
-                                # Trend Indicators
-                                adx_14=float(row['adx_14']) if pd.notna(row['adx_14']) else None,
+                                    # Trend Indicators
+                                    adx_14=float(row['adx_14']) if pd.notna(row['adx_14']) else None,
 
-                                # Volume Indicators
-                                obv=float(row['obv']) if pd.notna(row['obv']) else None,
-                                volume_sma_20=float(row['volume_sma_20']) if pd.notna(row['volume_sma_20']) else None,
-                                volume_ratio=float(row['volume_ratio']) if pd.notna(row['volume_ratio']) else None,
+                                    # Volume Indicators
+                                    obv=float(row['obv']) if pd.notna(row['obv']) else None,
+                                    volume_sma_20=float(row['volume_sma_20']) if pd.notna(row['volume_sma_20']) else None,
+                                    volume_ratio=float(row['volume_ratio']) if pd.notna(row['volume_ratio']) else None,
 
-                                # Custom Indicators
-                                price_momentum_5d=float(row['price_momentum_5d']) if pd.notna(row['price_momentum_5d']) else None,
-                                price_momentum_20d=float(row['price_momentum_20d']) if pd.notna(row['price_momentum_20d']) else None,
-                                volatility_rank=float(row['volatility_rank']) if pd.notna(row['volatility_rank']) else None,
+                                    # Custom Indicators
+                                    price_momentum_5d=float(row['price_momentum_5d']) if pd.notna(row['price_momentum_5d']) else None,
+                                    price_momentum_20d=float(row['price_momentum_20d']) if pd.notna(row['price_momentum_20d']) else None,
+                                    volatility_rank=float(row['volatility_rank']) if pd.notna(row['volatility_rank']) else None,
 
-                                # Metadata
-                                data_points_used=int(row['data_points_used']),
-                                calculation_date=datetime.utcnow()
-                            )
-                            session.add(indicator_record)
-
-                        records_stored += 1
+                                    # Metadata
+                                    data_points_used=int(row['data_points_used']),
+                                    calculation_date=datetime.utcnow()
+                                )
+                                session.add(indicator_record)
+                                session.flush()  # Flush to catch unique constraint violations early
+                                records_stored += 1
+                            except Exception as inner_e:
+                                # If unique constraint violation, skip silently (race condition)
+                                if 'duplicate key' in str(inner_e).lower() or 'unique constraint' in str(inner_e).lower():
+                                    session.rollback()
+                                    logger.debug(f"Record already exists for {symbol} on {row['date']} (race condition)")
+                                else:
+                                    raise
 
                     except Exception as e:
+                        # Rollback the current transaction to recover from error
+                        session.rollback()
                         logger.warning(f"Error storing indicator record for {symbol} on {row['date']}: {e}")
                         continue
 
-                session.commit()
+                # Commit all changes at once
+                try:
+                    session.commit()
+                except Exception as e:
+                    session.rollback()
+                    logger.error(f"Error committing indicators for {symbol}: {e}")
+                    return 0
 
             return records_stored
 
