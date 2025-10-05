@@ -61,7 +61,7 @@ def main():
                 s.pe_ratio, s.pb_ratio, s.roe, s.eps, s.beta,
                 s.debt_to_equity, s.revenue_growth, s.earnings_growth,
                 s.operating_margin, s.net_margin, s.historical_volatility_1y, s.atr_14,
-                ti.rsi_14, ti.macd, ti.signal_line, ti.macd_histogram,
+                ti.rsi_14, ti.macd, ti.macd_signal, ti.macd_histogram,
                 ti.sma_50, ti.sma_200, ti.ema_12, ti.ema_26, ti.atr_percentage
             FROM stocks s
             LEFT JOIN (

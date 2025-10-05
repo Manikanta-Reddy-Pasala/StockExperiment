@@ -36,8 +36,8 @@ class StockMLPredictor:
         logger.info(f"Preparing training data with {lookback_days} days lookback")
         
         # Get training data - join stocks, historical_data, and technical_indicators
-        query = text("""
-            SELECT 
+        query = text(f"""
+            SELECT
                 s.symbol,
                 s.current_price,
                 s.market_cap,
@@ -66,20 +66,20 @@ class StockMLPredictor:
                 -- Target: price 14 days later
                 LEAD(hd.close, 14) OVER (PARTITION BY s.symbol ORDER BY hd.date) as future_price,
                 -- Risk target: max drawdown in next 14 days
-                (SELECT MIN(close) FROM historical_data 
-                 WHERE symbol = s.symbol 
-                 AND date > hd.date 
+                (SELECT MIN(close) FROM historical_data
+                 WHERE symbol = s.symbol
+                 AND date > hd.date
                  AND date <= hd.date + INTERVAL '14 days') as min_price_14d
             FROM stocks s
             JOIN historical_data hd ON s.symbol = hd.symbol
             LEFT JOIN technical_indicators ti ON s.symbol = ti.symbol AND hd.date = ti.date
-            WHERE hd.date >= NOW() - INTERVAL ':lookback_days days'
+            WHERE hd.date >= NOW() - INTERVAL '{lookback_days} days'
             AND s.current_price IS NOT NULL
             AND s.market_cap IS NOT NULL
             ORDER BY s.symbol, hd.date
         """)
-        
-        result = self.db.execute(query, {"lookback_days": f"{lookback_days} days"})
+
+        result = self.db.execute(query)
         df = pd.DataFrame(result.fetchall(), columns=result.keys())
         
         # Drop rows without future prices (last 14 days of each stock)
@@ -146,10 +146,16 @@ class StockMLPredictor:
         
         # Prepare features
         X = self._select_features(df)
-        
+
+        # Filter out rows with NaN in targets
+        valid_mask = df['price_change_pct'].notna() & df['max_drawdown_pct'].notna()
+        X = X[valid_mask]
+        df = df[valid_mask]
+        logger.info(f"After filtering NaN targets: {len(df)} samples")
+
         # Scale features
         X_scaled = self.scaler.fit_transform(X)
-        
+
         # Train price prediction model
         logger.info("Training price prediction model...")
         y_price = df['price_change_pct'].values
@@ -162,7 +168,7 @@ class StockMLPredictor:
             n_jobs=-1
         )
         self.price_model.fit(X_scaled, y_price)
-        
+
         # Train risk assessment model (predicting max drawdown)
         logger.info("Training risk assessment model...")
         y_risk = df['max_drawdown_pct'].values
@@ -175,7 +181,7 @@ class StockMLPredictor:
             n_jobs=-1
         )
         self.risk_model.fit(X_scaled, y_risk)
-        
+
         # Calculate training scores
         price_score = self.price_model.score(X_scaled, y_price)
         risk_score = self.risk_model.score(X_scaled, y_risk)
