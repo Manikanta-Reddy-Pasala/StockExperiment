@@ -27,9 +27,37 @@ class FundamentalDataService:
         self.db_manager = get_database_manager()
         self.rate_limit_delay = 0.3  # 300ms between API calls
         self.batch_size = 50  # Larger batches for better performance
-        
+
         # External API configurations
         self.yahoo_finance_quote_url = "https://query1.finance.yahoo.com/v10/finance/quoteSummary"
+
+    def _get_last_trading_day(self) -> date:
+        """Get the last expected trading day (skip weekends, not holidays yet)."""
+        today = datetime.now().date()
+
+        # If today is Saturday (5) or Sunday (6), go back to Friday
+        if today.weekday() == 5:  # Saturday
+            return today - timedelta(days=1)  # Friday
+        elif today.weekday() == 6:  # Sunday
+            return today - timedelta(days=2)  # Friday
+        else:
+            # Weekday - check if market has closed (after 3:30 PM IST)
+            now = datetime.now()
+            market_close_time = now.replace(hour=15, minute=30, second=0, microsecond=0)
+
+            if now >= market_close_time:
+                # Market closed today, today is the last trading day
+                return today
+            else:
+                # Market not closed yet, yesterday is the last complete trading day
+                yesterday = today - timedelta(days=1)
+                # If yesterday was weekend, go to Friday
+                if yesterday.weekday() == 5:  # Saturday
+                    return yesterday - timedelta(days=1)  # Friday
+                elif yesterday.weekday() == 6:  # Sunday
+                    return yesterday - timedelta(days=2)  # Friday
+                else:
+                    return yesterday
         
     def update_fundamental_data_for_all_stocks(self, user_id: int = 1) -> Dict[str, Any]:
         """Update fundamental data for all stocks in the database."""
@@ -43,11 +71,16 @@ class FundamentalDataService:
                 from sqlalchemy import text
                 
                 # Get stock symbols using raw SQL
+                # Check if we need to update based on last trading day
+                last_trading_day = self._get_last_trading_day()
+                logger.info(f"📅 Checking fundamental data updates (last trading day: {last_trading_day})")
+
                 result = session.execute(text("""
-                    SELECT id, symbol, name FROM stocks 
-                    WHERE is_active = true AND is_tradeable = true 
+                    SELECT id, symbol, name FROM stocks
+                    WHERE is_active = true AND is_tradeable = true
+                    AND (last_updated IS NULL OR DATE(last_updated) < :last_trading_day)
                     ORDER BY volume DESC
-                """))
+                """), {'last_trading_day': last_trading_day})
                 
                 stocks = result.fetchall()
                 

@@ -36,6 +36,34 @@ class StockMasterService:
         self.config = get_stock_filter_config()
         self.refresh_interval_hours = 24  # Refresh daily
 
+    def _get_last_trading_day(self) -> date:
+        """Get the last expected trading day (skip weekends, not holidays yet)."""
+        today = datetime.now().date()
+
+        # If today is Saturday (5) or Sunday (6), go back to Friday
+        if today.weekday() == 5:  # Saturday
+            return today - timedelta(days=1)  # Friday
+        elif today.weekday() == 6:  # Sunday
+            return today - timedelta(days=2)  # Friday
+        else:
+            # Weekday - check if market has closed (after 3:30 PM IST)
+            now = datetime.now()
+            market_close_time = now.replace(hour=15, minute=30, second=0, microsecond=0)
+
+            if now >= market_close_time:
+                # Market closed today, today is the last trading day
+                return today
+            else:
+                # Market not closed yet, yesterday is the last complete trading day
+                yesterday = today - timedelta(days=1)
+                # If yesterday was weekend, go to Friday
+                if yesterday.weekday() == 5:  # Saturday
+                    return yesterday - timedelta(days=1)  # Friday
+                elif yesterday.weekday() == 6:  # Sunday
+                    return yesterday - timedelta(days=2)  # Friday
+                else:
+                    return yesterday
+
     def refresh_all_stocks(self, user_id: int = 1, exchange: str = "NSE") -> Dict:
         """
         Refresh the complete stock master database with all available stocks.
@@ -961,14 +989,14 @@ class StockMasterService:
 
     def _identify_stocks_needing_volatility_update(self, exchange: str) -> List[str]:
         """
-        Identify stocks that need volatility data updates based on updated_at timestamp.
+        Identify stocks that need volatility data updates based on last trading day.
         Returns list of stock symbols needing updates.
         """
         try:
             with self.db_manager.get_session() as session:
-                # Get volatility update threshold from environment (default: 24 hours)
-                hours_threshold = int(os.getenv('VOLATILITY_UPDATE_HOURS', '24'))
-                threshold_time = datetime.utcnow() - timedelta(hours=hours_threshold)
+                # Get last trading day (accounting for weekends and market hours)
+                last_trading_day = self._get_last_trading_day()
+                logger.info(f"📅 Checking volatility updates for stocks (last trading day: {last_trading_day})")
 
                 # Find stocks needing volatility updates
                 stocks_needing_update = session.query(Stock).filter(
@@ -983,9 +1011,9 @@ class StockMasterService:
                             Stock.historical_volatility_1y.is_(None),
                             Stock.avg_daily_turnover.is_(None),
                             Stock.trades_per_day.is_(None),
-                            # Outdated volatility data
+                            # Volatility not updated since last trading day
                             Stock.volatility_last_updated.is_(None),
-                            Stock.volatility_last_updated < threshold_time
+                            func.date(Stock.volatility_last_updated) < last_trading_day
                         )
                     )
                 ).all()

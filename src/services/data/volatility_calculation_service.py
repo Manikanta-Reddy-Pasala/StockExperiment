@@ -120,15 +120,32 @@ class VolatilityCalculationService:
                 # Calculate volatility metrics
                 volatility_metrics = self._calculate_all_volatility_metrics(stock_data, nifty_data)
 
-                # Update stock in database
+                # Get stock from database
                 stock = session.query(Stock).filter_by(symbol=symbol).first()
-                if stock:
+                if not stock:
+                    batch_results['errors'].append(f"{symbol}: Stock not found in database")
+                    batch_results['failed'] += 1
+                    continue
+
+                # Check if we got valid metrics
+                has_valid_metrics = volatility_metrics and any([
+                    volatility_metrics.get('atr_14'),
+                    volatility_metrics.get('atr_percentage'),
+                    volatility_metrics.get('historical_volatility_1y')
+                ])
+
+                if has_valid_metrics:
+                    # Update with valid data
                     self._update_stock_volatility(stock, volatility_metrics)
                     batch_results['updated'] += 1
                     logger.debug(f"Updated volatility for {symbol}: ATR={volatility_metrics.get('atr_percentage', 'N/A'):.2f}%")
                 else:
-                    batch_results['errors'].append(f"{symbol}: Stock not found in database")
-                    batch_results['failed'] += 1
+                    # No valid metrics but update timestamp to mark we checked today
+                    # This prevents re-checking on weekends/holidays
+                    stock.volatility_last_updated = datetime.now()
+                    batch_results['updated'] += 1
+                    logger.debug(f"Marked volatility check for {symbol} (no trading data available)")
+
 
                 # Rate limiting between stocks
                 time.sleep(self.rate_limit_delay)

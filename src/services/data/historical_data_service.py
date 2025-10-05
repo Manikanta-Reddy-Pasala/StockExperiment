@@ -37,6 +37,34 @@ class HistoricalDataService:
         self.max_retries = 3  # Retry failed API calls up to 3 times
         self.retry_delay = 2.0  # 2 seconds delay between retries
 
+    def _get_last_trading_day(self) -> date:
+        """Get the last expected trading day (skip weekends, not holidays yet)."""
+        today = datetime.now().date()
+
+        # If today is Saturday (5) or Sunday (6), go back to Friday
+        if today.weekday() == 5:  # Saturday
+            return today - timedelta(days=1)  # Friday
+        elif today.weekday() == 6:  # Sunday
+            return today - timedelta(days=2)  # Friday
+        else:
+            # Weekday - check if market has closed (after 3:30 PM IST)
+            now = datetime.now()
+            market_close_time = now.replace(hour=15, minute=30, second=0, microsecond=0)
+
+            if now >= market_close_time:
+                # Market closed today, today is the last trading day
+                return today
+            else:
+                # Market not closed yet, yesterday is the last complete trading day
+                yesterday = today - timedelta(days=1)
+                # If yesterday was weekend, go to Friday
+                if yesterday.weekday() == 5:  # Saturday
+                    return yesterday - timedelta(days=1)  # Friday
+                elif yesterday.weekday() == 6:  # Sunday
+                    return yesterday - timedelta(days=2)  # Friday
+                else:
+                    return yesterday
+
     def fetch_historical_data_bulk(self, user_id: int = 1, days: int = 500,
                                    max_stocks: int = 100) -> Dict[str, Any]:
         """
@@ -170,7 +198,7 @@ class HistoricalDataService:
             historical_data = self._fetch_from_api(user_id, symbol, start_date, end_date)
 
             if historical_data is None or (hasattr(historical_data, 'empty') and historical_data.empty):
-                logger.warning(f"❌ No historical data received for {symbol}")
+                logger.warning(f"❌ No historical data received for {symbol} from {start_date} to {end_date}")
                 return {
                     'success': False,
                     'symbol': symbol,
@@ -236,10 +264,14 @@ class HistoricalDataService:
             }
 
     def _get_stocks_needing_data(self, max_stocks: int) -> List[str]:
-        """Get list of stock symbols that need historical data based on last updated time."""
+        """Get list of stock symbols that need historical data based on last trading day."""
         try:
             with self.db_manager.get_session() as session:
+                # Get the last expected trading day (accounts for weekends and market hours)
+                last_trading_day = self._get_last_trading_day()
                 today = datetime.now().date()
+
+                logger.info(f"📅 Last expected trading day: {last_trading_day}, Today: {today}")
 
                 # Get active stocks with current prices (indicates they're being tracked)
                 base_query = session.query(Stock.symbol).filter(
@@ -250,8 +282,7 @@ class HistoricalDataService:
 
                 # Find stocks that need historical data updates:
                 # 1. Stocks with no historical data at all
-                # 2. Stocks with historical data older than today (skip if already pulled today)
-                # 3. Stocks missing recent trading days data
+                # 2. Stocks missing data for the last trading day
 
                 # Get last historical data date for each stock
                 latest_data_subquery = session.query(
@@ -260,13 +291,13 @@ class HistoricalDataService:
                 ).group_by(HistoricalData.symbol).subquery()
 
                 # Join with stocks to find those needing updates
-                # Skip stocks that already have data for today
+                # Only update if we don't have data for the last trading day
                 stocks_with_data = session.query(Stock.symbol).join(
                     latest_data_subquery,
                     Stock.symbol == latest_data_subquery.c.symbol
                 ).filter(
-                    # Data is NOT from today (avoid re-pulling same day data)
-                    latest_data_subquery.c.latest_date < today
+                    # Missing data from last trading day
+                    latest_data_subquery.c.latest_date < last_trading_day
                 )
 
                 # Stocks with no historical data at all
@@ -284,7 +315,7 @@ class HistoricalDataService:
                     stocks_needing_data = stocks_without_data.order_by(desc(Stock.volume)).limit(max_stocks).all()
 
                 symbols = [stock.symbol for stock in stocks_needing_data]
-                logger.info(f"📊 Found {len(symbols)} stocks needing historical data updates (excluding already pulled today)")
+                logger.info(f"📊 Found {len(symbols)} stocks needing data up to {last_trading_day}")
 
                 return symbols
 
@@ -647,6 +678,38 @@ class HistoricalDataService:
 
         except Exception as e:
             logger.error(f"Error updating data quality metrics: {e}")
+
+    def _mark_data_check_attempted(self, symbol: str, check_date: date):
+        """Mark that we attempted to fetch data for this symbol on this date (for holidays/weekends)."""
+        try:
+            with self.db_manager.get_session() as session:
+                # Check if a placeholder record already exists for this date
+                existing = session.query(HistoricalData).filter(
+                    HistoricalData.symbol == symbol,
+                    HistoricalData.date == check_date
+                ).first()
+
+                if not existing:
+                    # Create a placeholder record with NULL values to mark the check
+                    placeholder = HistoricalData(
+                        symbol=symbol,
+                        date=check_date,
+                        timestamp=int(datetime.now().timestamp()),
+                        open=None,
+                        high=None,
+                        low=None,
+                        close=None,
+                        volume=0,
+                        data_source='fyers',
+                        api_resolution='1D',
+                        data_quality_score=0.0,  # 0 indicates no trading data
+                        is_adjusted=False
+                    )
+                    session.add(placeholder)
+                    session.commit()
+                    logger.debug(f"Marked data check attempt for {symbol} on {check_date}")
+        except Exception as e:
+            logger.error(f"Error marking data check for {symbol}: {e}")
 
     def _calculate_data_quality(self, session, symbol: str) -> Optional[Dict]:
         """Calculate data quality metrics for a symbol."""
