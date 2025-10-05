@@ -9,10 +9,21 @@ import pandas as pd
 import numpy as np
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime, timedelta, date
+from enum import Enum
 import time
 from sqlalchemy import and_, desc, func
 
 logger = logging.getLogger(__name__)
+
+
+class APIResponseType(Enum):
+    """API response classification for intelligent handling."""
+    SUCCESS_WITH_DATA = "success_with_data"
+    SUCCESS_NO_DATA_MARKET_CLOSED = "success_no_data_market_closed"
+    ERROR_RATE_LIMIT = "error_rate_limit"
+    ERROR_TIMEOUT = "error_timeout"
+    ERROR_SERVER = "error_server"
+    ERROR_UNKNOWN = "error_unknown"
 
 try:
     from ..core.unified_broker_service import get_unified_broker_service
@@ -35,7 +46,7 @@ class HistoricalDataService:
         self.rate_limit_delay = 0.2  # Fyers API limit: 10 req/s, using 0.2s for safe margin (5 req/s)
         self.batch_size = 10  # Process stocks in small batches
         self.max_retries = 3  # Retry failed API calls up to 3 times
-        self.retry_delay = 2.0  # 2 seconds delay between retries
+        self.retry_delays = [2, 5, 10]  # Exponential backoff: 2s, 5s, 10s
 
     def _get_last_trading_day(self) -> date:
         """Get the last expected trading day (skip weekends, not holidays yet)."""
@@ -198,12 +209,28 @@ class HistoricalDataService:
             historical_data = self._fetch_from_api(user_id, symbol, start_date, end_date)
 
             if historical_data is None or (hasattr(historical_data, 'empty') and historical_data.empty):
-                logger.warning(f"❌ No historical data received for {symbol} from {start_date} to {end_date}")
-                return {
-                    'success': False,
-                    'symbol': symbol,
-                    'error': 'No data received from API'
-                }
+                # Check if this is expected (weekend/holiday) or an error
+                last_trading_day = self._get_last_trading_day()
+
+                if end_date >= last_trading_day:
+                    # Requesting current/recent data but market might be closed
+                    # Mark as checked with placeholder
+                    self._mark_data_check_attempted(symbol, last_trading_day)
+                    logger.info(f"ℹ️ No data for {symbol} up to {last_trading_day} (market likely closed)")
+                    return {
+                        'success': True,
+                        'symbol': symbol,
+                        'records_added': 0,
+                        'message': 'Market closed - no new data available'
+                    }
+                else:
+                    # Requesting historical data that should exist - genuine error
+                    logger.warning(f"❌ No historical data received for {symbol} from {start_date} to {end_date}")
+                    return {
+                        'success': False,
+                        'symbol': symbol,
+                        'error': 'No data received from API'
+                    }
 
             # Store in database
             records_added = self._store_historical_data(symbol, historical_data)
@@ -356,8 +383,33 @@ class HistoricalDataService:
 
         return results
 
+    def _classify_api_response(self, result: Dict, symbol: str) -> Tuple[APIResponseType, Optional[Any]]:
+        """Classify API response for intelligent handling."""
+        # Check for rate limit error
+        if 'rate limit' in str(result.get('error', '')).lower() or result.get('status_code') == 429:
+            return APIResponseType.ERROR_RATE_LIMIT, None
+
+        # Check for timeout
+        if 'timeout' in str(result.get('error', '')).lower():
+            return APIResponseType.ERROR_TIMEOUT, None
+
+        # Check for server errors
+        if result.get('status_code') in [500, 502, 503]:
+            return APIResponseType.ERROR_SERVER, None
+
+        # Success with data
+        if (result.get('success') or result.get('status') == 'success') and result.get('data'):
+            return APIResponseType.SUCCESS_WITH_DATA, result['data']
+
+        # Success but no data (could be market closed/holiday)
+        if (result.get('success') or result.get('status') == 'success') and not result.get('data'):
+            return APIResponseType.SUCCESS_NO_DATA_MARKET_CLOSED, None
+
+        # Unknown error
+        return APIResponseType.ERROR_UNKNOWN, None
+
     def _fetch_from_api(self, user_id: int, symbol: str, start_date: date, end_date: date) -> Optional[pd.DataFrame]:
-        """Fetch historical data from broker API with retry logic."""
+        """Fetch historical data from broker API with intelligent retry logic."""
 
         # Calculate number of days for the period parameter
         days_diff = (end_date - start_date).days
@@ -366,8 +418,9 @@ class HistoricalDataService:
         for attempt in range(self.max_retries + 1):  # +1 for initial attempt
             try:
                 if attempt > 0:
-                    logger.info(f"🔄 Retry attempt {attempt}/{self.max_retries} for {symbol}")
-                    time.sleep(self.retry_delay)  # Wait before retry
+                    delay = self.retry_delays[attempt - 1]
+                    logger.info(f"🔄 Retry attempt {attempt}/{self.max_retries} for {symbol} (waiting {delay}s)")
+                    time.sleep(delay)
 
                 # Use broker service to get historical data
                 result = self.broker_service.get_historical_data(
@@ -377,22 +430,38 @@ class HistoricalDataService:
                     period=period
                 )
 
-                if not (result.get('success') or result.get('status') == 'success') or not result.get('data'):
-                    error_msg = result.get('error', 'No data')
-                    if attempt < self.max_retries:
-                        logger.warning(f"⚠️ API call failed for {symbol} (attempt {attempt + 1}): {error_msg}")
-                        continue  # Try again
-                    else:
-                        logger.error(f"❌ API call failed for {symbol} after {self.max_retries} retries: {error_msg}")
-                        return None
+                # Classify response
+                response_type, data = self._classify_api_response(result, symbol)
 
-                # Success - break out of retry loop
-                break
+                # Handle based on response type
+                if response_type == APIResponseType.SUCCESS_WITH_DATA:
+                    # Success - proceed with data
+                    break
+                elif response_type == APIResponseType.SUCCESS_NO_DATA_MARKET_CLOSED:
+                    # Market closed/holiday - don't retry, return None gracefully
+                    logger.info(f"ℹ️ No data for {symbol} (market likely closed)")
+                    return None
+                elif response_type in [APIResponseType.ERROR_RATE_LIMIT, APIResponseType.ERROR_TIMEOUT]:
+                    # Retryable errors - continue loop
+                    if attempt < self.max_retries:
+                        logger.warning(f"⚠️ {response_type.value} for {symbol} (attempt {attempt + 1})")
+                        continue
+                    else:
+                        logger.error(f"❌ {response_type.value} for {symbol} after {self.max_retries} retries")
+                        return None
+                else:
+                    # Other errors - retry but with less confidence
+                    if attempt < self.max_retries:
+                        logger.warning(f"⚠️ {response_type.value} for {symbol} (attempt {attempt + 1})")
+                        continue
+                    else:
+                        logger.error(f"❌ {response_type.value} for {symbol} after {self.max_retries} retries")
+                        return None
 
             except Exception as e:
                 if attempt < self.max_retries:
                     logger.warning(f"⚠️ Exception for {symbol} (attempt {attempt + 1}): {e}")
-                    continue  # Try again
+                    continue
                 else:
                     logger.error(f"❌ Exception for {symbol} after {self.max_retries} retries: {e}")
                     return None

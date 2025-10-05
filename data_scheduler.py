@@ -364,28 +364,24 @@ def run_scheduler():
     logger.info("  - Symbol Master Update:    Weekly (Monday) at 06:00 AM")
     logger.info("  - Data Pipeline (6 steps): Daily at 09:00 PM (after market close)")
     logger.info("  - Fill Missing Data:       Daily at 09:30 PM")
-    logger.info("  - Business Logic Calc:     Daily at 09:45 PM")
+    logger.info("  - Business Logic Calc:     Daily at 09:30 PM (parallel with fill)")
     logger.info("  - CSV Export:              Daily at 10:00 PM")
-    logger.info("  - Data Quality Check:      Daily at 10:30 PM")
+    logger.info("  - Data Quality Check:      Daily at 10:00 PM (parallel with CSV)")
     logger.info("=" * 80)
-    
+
     # Weekly symbol master update (Monday 6 AM)
     schedule.every().monday.at("06:00").do(update_symbol_master)
-    
+
     # Daily data pipeline (9 PM - after market close at 3:30 PM + buffer)
     schedule.every().day.at("21:00").do(run_data_pipeline)
-    
-    # Fill missing data (9:30 PM - after pipeline completes)
+
+    # Fill missing data & business logic in parallel (9:30 PM - after pipeline completes)
     schedule.every().day.at("21:30").do(fill_missing_data)
-    
-    # Calculate business logic (9:45 PM - after filling data)
-    schedule.every().day.at("21:45").do(calculate_business_logic)
-    
-    # Export CSV files (10 PM - after calculations)
+    schedule.every().day.at("21:30").do(calculate_business_logic)
+
+    # Export CSV & validate quality in parallel (10 PM - after calculations)
     schedule.every().day.at("22:00").do(export_daily_csv)
-    
-    # Validate data quality (10:30 PM - final check)
-    schedule.every().day.at("22:30").do(validate_data_quality)
+    schedule.every().day.at("22:00").do(validate_data_quality)
     
     # Optional: Run immediately on startup for testing
     # Uncomment to run tasks on scheduler start

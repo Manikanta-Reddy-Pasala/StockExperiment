@@ -119,17 +119,17 @@ def run_scheduler():
     logger.info("Trading System Scheduler Started")
     logger.info("=" * 80)
     logger.info("Scheduled Tasks:")
-    logger.info("  - ML Training:           Daily at 02:00 AM")
-    logger.info("  - Daily Snapshot Update: Daily at 02:15 AM")
+    logger.info("  - ML Training:           Daily at 10:00 PM (after data pipeline)")
+    logger.info("  - Daily Snapshot Update: Daily at 10:15 PM (after ML training)")
     logger.info("  - Cleanup Old Snapshots: Weekly (Sunday) at 03:00 AM")
     logger.info("=" * 80)
-    
-    # Schedule daily ML training at 2:00 AM
-    schedule.every().day.at("02:00").do(train_ml_models)
-    
-    # Schedule daily snapshot update at 2:15 AM (after ML training)
-    schedule.every().day.at("02:15").do(update_daily_snapshot)
-    
+
+    # Schedule daily ML training at 10:00 PM (after data pipeline completes)
+    schedule.every().day.at("22:00").do(train_ml_models)
+
+    # Schedule daily snapshot update at 10:15 PM (after ML training)
+    schedule.every().day.at("22:15").do(update_daily_snapshot)
+
     # Schedule weekly cleanup on Sunday at 3:00 AM
     schedule.every().sunday.at("03:00").do(cleanup_old_snapshots)
     
