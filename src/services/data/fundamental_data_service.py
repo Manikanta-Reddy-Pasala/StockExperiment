@@ -7,7 +7,7 @@ import logging
 import requests
 import time
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import json
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,8 @@ class FundamentalDataService:
     
     def __init__(self):
         self.db_manager = get_database_manager()
-        self.rate_limit_delay = 0.3  # 300ms between API calls
+        import os
+        self.rate_limit_delay = float(os.getenv('SCREENING_QUOTES_RATE_LIMIT_DELAY', '0.3'))
         self.batch_size = 50  # Larger batches for better performance
 
         # External API configurations

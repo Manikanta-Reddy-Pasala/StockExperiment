@@ -43,7 +43,8 @@ class HistoricalDataService:
     def __init__(self):
         self.broker_service = get_unified_broker_service()
         self.db_manager = get_database_manager()
-        self.rate_limit_delay = 0.2  # Fyers API limit: 10 req/s, using 0.2s for safe margin (5 req/s)
+        import os
+        self.rate_limit_delay = float(os.getenv('SCREENING_QUOTES_RATE_LIMIT_DELAY', '0.3'))
         self.batch_size = 10  # Process stocks in small batches
         self.max_retries = 3  # Retry failed API calls up to 3 times
         self.retry_delays = [2, 5, 10]  # Exponential backoff: 2s, 5s, 10s

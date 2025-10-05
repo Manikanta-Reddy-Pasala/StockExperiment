@@ -10,7 +10,7 @@ import logging
 import os
 import time
 from typing import List, Dict, Optional, Set
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from sqlalchemy import and_, or_
 
 logger = logging.getLogger(__name__)

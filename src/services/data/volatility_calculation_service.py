@@ -31,8 +31,9 @@ class VolatilityCalculationService:
     def __init__(self):
         self.unified_broker_service = get_unified_broker_service()
         self.db_manager = get_database_manager()
-        self.max_workers = 5  # Limit concurrent API calls
-        self.rate_limit_delay = 0.2  # Fyers API limit: 10 req/s, using 0.2s for safe margin (5 req/s)
+        import os
+        self.max_workers = int(os.getenv('VOLATILITY_MAX_WORKERS', '3'))
+        self.rate_limit_delay = float(os.getenv('VOLATILITY_RATE_LIMIT_DELAY', '0.3'))
 
     def calculate_volatility_for_stocks(self, user_id: int, stock_symbols: List[str]) -> Dict:
         """

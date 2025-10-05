@@ -6,7 +6,8 @@ Single file that handles the entire data pipeline with retry logic
 import logging
 import time
 import threading
-from datetime import datetime, timedelta
+import os
+from datetime import datetime, timedelta, date
 from typing import Dict, List, Optional, Any
 from sqlalchemy import text, func
 from enum import Enum
@@ -18,11 +19,13 @@ try:
     from ...models.stock_models import Stock, SymbolMaster
     from ...models.historical_models import HistoricalData, TechnicalIndicators
     from ..core.unified_broker_service import get_unified_broker_service
+    from .historical_data_service import get_historical_data_service
 except ImportError:
     from src.models.database import get_database_manager
     from src.models.stock_models import Stock, SymbolMaster
     from src.models.historical_models import HistoricalData, TechnicalIndicators
     from src.services.core.unified_broker_service import get_unified_broker_service
+    from src.services.data.historical_data_service import get_historical_data_service
 
 
 class PipelineStep(Enum):
@@ -53,9 +56,42 @@ class PipelineSaga:
     def __init__(self):
         self.db_manager = get_database_manager()
         self.broker_service = get_unified_broker_service()
-        self.rate_limit_delay = 0.5
+        # Get configuration from environment variables
+        self.rate_limit_delay = float(os.getenv('SCREENING_QUOTES_RATE_LIMIT_DELAY', '0.2'))
+        self.max_workers = int(os.getenv('VOLATILITY_MAX_WORKERS', '5'))
+        self.max_stocks = int(os.getenv('VOLATILITY_MAX_STOCKS', '500'))
         self.max_retries = 3
         self.retry_delay = 60  # 1 minute between retries
+
+        logger.info(f"📋 Pipeline configuration: rate_limit={self.rate_limit_delay}s, max_workers={self.max_workers}, max_stocks={self.max_stocks}")
+
+    def _get_last_trading_day(self) -> date:
+        """Get the last expected trading day (skip weekends, not holidays yet)."""
+        today = datetime.now().date()
+
+        # If today is Saturday (5) or Sunday (6), go back to Friday
+        if today.weekday() == 5:  # Saturday
+            return today - timedelta(days=1)  # Friday
+        elif today.weekday() == 6:  # Sunday
+            return today - timedelta(days=2)  # Friday
+        else:
+            # Weekday - check if market has closed (after 3:30 PM IST)
+            now = datetime.now()
+            market_close_time = now.replace(hour=15, minute=30, second=0, microsecond=0)
+
+            if now >= market_close_time:
+                # Market closed today, today is the last trading day
+                return today
+            else:
+                # Market not closed yet, yesterday is the last complete trading day
+                yesterday = today - timedelta(days=1)
+                # If yesterday was weekend, go to Friday
+                if yesterday.weekday() == 5:  # Saturday
+                    return yesterday - timedelta(days=1)  # Friday
+                elif yesterday.weekday() == 6:  # Sunday
+                    return yesterday - timedelta(days=2)  # Friday
+                else:
+                    return yesterday
         
     def create_pipeline_tracking_table(self):
         """Verify pipeline tracking table exists (created by init script)."""
@@ -293,40 +329,46 @@ class PipelineSaga:
             return {'success': False, 'error': str(e)}
     
     def step_historical_data(self) -> Dict[str, Any]:
-        """Step 3: Download historical data for stocks missing data using concurrent requests."""
+        """Step 3: Download historical data for stocks missing data for last trading day."""
         try:
-            # Get stocks that need historical data
+            # Get the last expected trading day
+            last_trading_day = self._get_last_trading_day()
+            logger.info(f"📅 Checking historical data up to last trading day: {last_trading_day}")
+
+            # Get stocks that need historical data (missing data for last trading day)
             with self.db_manager.get_session() as session:
                 stocks_needing_data = session.execute(text("""
                     SELECT s.symbol FROM stocks s
                     LEFT JOIN (
-                        SELECT symbol, COUNT(*) as hist_count
+                        SELECT symbol, MAX(date) as latest_date
                         FROM historical_data
                         GROUP BY symbol
                     ) h ON s.symbol = h.symbol
-                    WHERE h.symbol IS NULL OR h.hist_count < 300
+                    WHERE (h.symbol IS NULL OR h.latest_date < :last_trading_day)
                     AND s.is_active = true AND s.is_tradeable = true
                     ORDER BY s.volume DESC
-                """)).fetchall()
+                    LIMIT :max_stocks
+                """), {'last_trading_day': last_trading_day, 'max_stocks': self.max_stocks}).fetchall()
 
                 if not stocks_needing_data:
+                    logger.info(f"✅ All stocks have data up to {last_trading_day}")
                     return {
                         'success': True,
                         'records_processed': 0,
-                        'message': 'All stocks have sufficient historical data'
+                        'message': f'All stocks have data up to {last_trading_day}'
                     }
 
                 symbols = [row.symbol for row in stocks_needing_data]
-                logger.info(f"📊 Downloading historical data for {len(symbols)} stocks (concurrent mode)")
+                logger.info(f"📊 Downloading historical data for {len(symbols)} stocks missing data for {last_trading_day}")
 
-                # Download historical data using concurrent requests
-                from ..brokers.fyers_service import get_fyers_service
+                # Use historical_data_service which has all smart logic:
+                # - API response classification
+                # - Retry with exponential backoff
+                # - Placeholder records for holidays/weekends
+                # - Smart error handling
                 from concurrent.futures import ThreadPoolExecutor, as_completed
-                from datetime import datetime, timedelta
 
-                fyers_service = get_fyers_service()
-                end_date = datetime.now()
-                start_date = end_date - timedelta(days=365)
+                historical_service = get_historical_data_service()
 
                 total_records = 0
                 successful_downloads = 0
@@ -334,32 +376,45 @@ class PipelineSaga:
                 results_lock = threading.Lock()
 
                 def download_symbol(symbol):
-                    """Download historical data for a single symbol."""
+                    """
+                    Download historical data for a single symbol using the service.
+                    This ensures consistent logic across scheduled and startup pipelines.
+                    """
                     try:
-                        result = fyers_service.history(
+                        # Rate limiting before API call
+                        time.sleep(self.rate_limit_delay)
+
+                        # Use the historical_data_service which has all the smart logic
+                        result = historical_service.fetch_single_stock_history(
                             user_id=1,
                             symbol=symbol,
-                            exchange='NSE',
-                            interval='1D',
-                            start_date=start_date.strftime('%Y-%m-%d'),
-                            end_date=end_date.strftime('%Y-%m-%d')
+                            days=365
                         )
 
-                        if result.get('status') == 'success' and result.get('data', {}).get('candles'):
-                            candles = result['data']['candles']
-                            records_added = self._store_historical_data(symbol, candles)
-                            logger.info(f"✅ Downloaded {records_added} records for {symbol}")
-                            return {'success': True, 'symbol': symbol, 'records': records_added}
+                        # Service handles:
+                        # - Checking if data exists for last_trading_day
+                        # - API response classification (rate limit, timeout, success, etc.)
+                        # - Creating placeholder records for holidays/weekends
+                        # - Retry logic with exponential backoff
+                        # - Smart error handling
+
+                        if result.get('success'):
+                            records = result.get('records_added', 0)
+                            if records > 0:
+                                logger.info(f"✅ Downloaded {records} records for {symbol}")
+                            else:
+                                logger.info(f"ℹ️ {symbol}: {result.get('message', 'No new data')}")
+                            return {'success': True, 'symbol': symbol, 'records': records}
                         else:
-                            error_msg = result.get('message', 'Unknown error')
+                            error_msg = result.get('error', 'Unknown error')
                             logger.warning(f"⚠️ No data for {symbol}: {error_msg}")
                             return {'success': False, 'symbol': symbol, 'error': error_msg}
                     except Exception as e:
                         logger.warning(f"Error downloading {symbol}: {e}")
                         return {'success': False, 'symbol': symbol, 'error': str(e)}
 
-                # Use ThreadPoolExecutor for concurrent downloads (10 parallel threads)
-                with ThreadPoolExecutor(max_workers=10) as executor:
+                # Use ThreadPoolExecutor for concurrent downloads (configurable workers to respect rate limits)
+                with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                     futures = {executor.submit(download_symbol, symbol): symbol for symbol in symbols}
 
                     for future in as_completed(futures):
