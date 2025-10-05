@@ -32,7 +32,7 @@ class HistoricalDataService:
     def __init__(self):
         self.broker_service = get_unified_broker_service()
         self.db_manager = get_database_manager()
-        self.rate_limit_delay = 0.5  # 500ms between API calls for optimal balance
+        self.rate_limit_delay = 0.2  # Fyers API limit: 10 req/s, using 0.2s for safe margin (5 req/s)
         self.batch_size = 10  # Process stocks in small batches
         self.max_retries = 3  # Retry failed API calls up to 3 times
         self.retry_delay = 2.0  # 2 seconds delay between retries
@@ -239,6 +239,8 @@ class HistoricalDataService:
         """Get list of stock symbols that need historical data based on last updated time."""
         try:
             with self.db_manager.get_session() as session:
+                today = datetime.now().date()
+
                 # Get active stocks with current prices (indicates they're being tracked)
                 base_query = session.query(Stock.symbol).filter(
                     Stock.is_active == True,
@@ -248,7 +250,7 @@ class HistoricalDataService:
 
                 # Find stocks that need historical data updates:
                 # 1. Stocks with no historical data at all
-                # 2. Stocks with historical data older than 7 days
+                # 2. Stocks with historical data older than today (skip if already pulled today)
                 # 3. Stocks missing recent trading days data
 
                 # Get last historical data date for each stock
@@ -258,12 +260,13 @@ class HistoricalDataService:
                 ).group_by(HistoricalData.symbol).subquery()
 
                 # Join with stocks to find those needing updates
+                # Skip stocks that already have data for today
                 stocks_with_data = session.query(Stock.symbol).join(
                     latest_data_subquery,
                     Stock.symbol == latest_data_subquery.c.symbol
                 ).filter(
-                    # Data is older than 7 days
-                    latest_data_subquery.c.latest_date < datetime.now().date() - timedelta(days=7)
+                    # Data is NOT from today (avoid re-pulling same day data)
+                    latest_data_subquery.c.latest_date < today
                 )
 
                 # Stocks with no historical data at all
@@ -281,7 +284,7 @@ class HistoricalDataService:
                     stocks_needing_data = stocks_without_data.order_by(desc(Stock.volume)).limit(max_stocks).all()
 
                 symbols = [stock.symbol for stock in stocks_needing_data]
-                logger.info(f"📊 Found {len(symbols)} stocks needing historical data updates")
+                logger.info(f"📊 Found {len(symbols)} stocks needing historical data updates (excluding already pulled today)")
 
                 return symbols
 

@@ -264,8 +264,8 @@ class StockMasterService:
                                 cleaned_symbol = self._clean_symbol(original_symbol)
                                 all_symbols.add(cleaned_symbol)
 
-                    # Rate limiting
-                    time.sleep(0.2)  # Rate limiting for API calls
+                    # Fyers API limit: 10 req/s, using 0.2s for safe margin (5 req/s)
+                    time.sleep(0.2)
 
                 except Exception as e:
                     logger.warning(f"Search failed for pattern '{pattern}': {e}")

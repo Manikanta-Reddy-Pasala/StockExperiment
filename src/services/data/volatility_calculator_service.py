@@ -117,9 +117,9 @@ class VolatilityCalculatorService:
                     if processed % 5 == 0:  # Progress logging
                         logger.info(f"📈 Processed {processed}/{min(len(symbols), max_symbols)} symbols")
 
-                # Rate limiting to avoid API throttling
+                # Fyers API limit: 10 req/s, using 0.2s for safe margin (5 req/s)
                 import time
-                time.sleep(0.1)  # 100ms delay between requests
+                time.sleep(0.2)
 
             except Exception as e:
                 logger.warning(f"Failed to process {symbol}: {e}")

@@ -494,8 +494,8 @@ class FyersService:
                 failed_count += 1
                 logger.debug(f"Exception getting individual quote for {symbol}: {e}")
 
-            # Small delay to respect rate limits
-            time.sleep(0.05)
+            # Fyers API limit: 10 req/s, using 0.2s for safe margin (5 req/s)
+            time.sleep(0.2)
 
         if successful_quotes:
             logger.info(f"Individual quotes successful: {len(successful_quotes)}, failed: {failed_count}")
