@@ -20,6 +20,7 @@ class APIResponseType(Enum):
     """API response classification for intelligent handling."""
     SUCCESS_WITH_DATA = "success_with_data"
     SUCCESS_NO_DATA_MARKET_CLOSED = "success_no_data_market_closed"
+    ERROR_INVALID_SYMBOL = "error_invalid_symbol"
     ERROR_RATE_LIMIT = "error_rate_limit"
     ERROR_TIMEOUT = "error_timeout"
     ERROR_SERVER = "error_server"
@@ -215,9 +216,8 @@ class HistoricalDataService:
 
                 if end_date >= last_trading_day:
                     # Requesting current/recent data but market might be closed
-                    # Mark as checked with placeholder
-                    self._mark_data_check_attempted(symbol, last_trading_day)
-                    logger.info(f"ℹ️ No data for {symbol} up to {last_trading_day} (market likely closed)")
+                    # No need to create placeholder - just log and return success
+                    logger.info(f"ℹ️ No data for {symbol} up to {last_trading_day} (market likely closed/holiday)")
                     return {
                         'success': True,
                         'symbol': symbol,
@@ -386,6 +386,12 @@ class HistoricalDataService:
 
     def _classify_api_response(self, result: Dict, symbol: str) -> Tuple[APIResponseType, Optional[Any]]:
         """Classify API response for intelligent handling."""
+        # Check for invalid symbol (delisted or not available on broker)
+        if (result.get('status') == 'error' and
+            ('invalid symbol' in str(result.get('message', '')).lower() or
+             result.get('error_code') == -300)):
+            return APIResponseType.ERROR_INVALID_SYMBOL, None
+
         # Check for rate limit error
         if 'rate limit' in str(result.get('error', '')).lower() or result.get('status_code') == 429:
             return APIResponseType.ERROR_RATE_LIMIT, None
@@ -406,7 +412,8 @@ class HistoricalDataService:
         if (result.get('success') or result.get('status') == 'success') and not result.get('data'):
             return APIResponseType.SUCCESS_NO_DATA_MARKET_CLOSED, None
 
-        # Unknown error
+        # Unknown error - log details for debugging
+        logger.debug(f"Unknown error for {symbol}: success={result.get('success')}, status={result.get('status')}, message={result.get('message')}, error={result.get('error')}, error_code={result.get('error_code')}, status_code={result.get('status_code')}")
         return APIResponseType.ERROR_UNKNOWN, None
 
     def _fetch_from_api(self, user_id: int, symbol: str, start_date: date, end_date: date) -> Optional[pd.DataFrame]:
@@ -441,6 +448,10 @@ class HistoricalDataService:
                 elif response_type == APIResponseType.SUCCESS_NO_DATA_MARKET_CLOSED:
                     # Market closed/holiday - don't retry, return None gracefully
                     logger.info(f"ℹ️ No data for {symbol} (market likely closed)")
+                    return None
+                elif response_type == APIResponseType.ERROR_INVALID_SYMBOL:
+                    # Invalid symbol (delisted/not available) - don't retry
+                    logger.warning(f"⚠️ Invalid symbol {symbol} - skipping (delisted or not available on broker)")
                     return None
                 elif response_type in [APIResponseType.ERROR_RATE_LIMIT, APIResponseType.ERROR_TIMEOUT]:
                     # Retryable errors - continue loop
@@ -749,37 +760,6 @@ class HistoricalDataService:
         except Exception as e:
             logger.error(f"Error updating data quality metrics: {e}")
 
-    def _mark_data_check_attempted(self, symbol: str, check_date: date):
-        """Mark that we attempted to fetch data for this symbol on this date (for holidays/weekends)."""
-        try:
-            with self.db_manager.get_session() as session:
-                # Check if a placeholder record already exists for this date
-                existing = session.query(HistoricalData).filter(
-                    HistoricalData.symbol == symbol,
-                    HistoricalData.date == check_date
-                ).first()
-
-                if not existing:
-                    # Create a placeholder record with NULL values to mark the check
-                    placeholder = HistoricalData(
-                        symbol=symbol,
-                        date=check_date,
-                        timestamp=int(datetime.now().timestamp()),
-                        open=None,
-                        high=None,
-                        low=None,
-                        close=None,
-                        volume=0,
-                        data_source='fyers',
-                        api_resolution='1D',
-                        data_quality_score=0.0,  # 0 indicates no trading data
-                        is_adjusted=False
-                    )
-                    session.add(placeholder)
-                    session.commit()
-                    logger.debug(f"Marked data check attempt for {symbol} on {check_date}")
-        except Exception as e:
-            logger.error(f"Error marking data check for {symbol}: {e}")
 
     def _calculate_data_quality(self, session, symbol: str) -> Optional[Dict]:
         """Calculate data quality metrics for a symbol."""
