@@ -115,6 +115,35 @@ def create_app():
     # Schedule comprehensive data maintenance tasks
     scheduler.schedule_all_data_maintenance_tasks(user_id=1)
 
+    # Check ML models on startup
+    try:
+        app.logger.info("🤖 Checking ML models on startup...")
+        from pathlib import Path
+        from ..services.ml.enhanced_stock_predictor import EnhancedStockPredictor
+
+        model_dir = Path('ml_models')
+        models_exist = (
+            model_dir.exists() and
+            (model_dir / 'rf_price_model.pkl').exists() and
+            (model_dir / 'rf_risk_model.pkl').exists() and
+            (model_dir / 'metadata.pkl').exists()
+        )
+
+        if not models_exist:
+            app.logger.warning("⚠️  ML models not found. Training required before using suggested stocks.")
+            app.logger.info("💡 Run 'python scheduler.py' to train models, or they will be trained on first use.")
+        else:
+            app.logger.info("✅ ML models found and ready to use")
+            import pickle
+            try:
+                with open(model_dir / 'metadata.pkl', 'rb') as f:
+                    metadata = pickle.load(f)
+                app.logger.info(f"   Last trained: {metadata.get('trained_at', 'Unknown')}")
+            except:
+                pass
+    except Exception as e:
+        app.logger.warning(f"⚠️  Could not check ML models: {e}")
+
     # Initialize stock initialization service with complete flow
     try:
         from ..services.data.stock_initialization_service import get_stock_initialization_service

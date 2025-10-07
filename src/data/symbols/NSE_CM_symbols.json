@@ -4585,18 +4585,6 @@
       "last_updated": ""
     },
     {
-      "fytoken": "101000000013585",
-      "symbol": "NSE:ATLANTAA-EQ",
-      "name": "ATLANTAA LIMITED",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE285H01022",
-      "last_updated": ""
-    },
-    {
       "fytoken": "101000000013587",
       "symbol": "NSE:ACE-EQ",
       "name": "ACTION CONST EQUIP LTD",
@@ -22297,18 +22285,6 @@
       "last_updated": ""
     },
     {
-      "fytoken": "10100000006051",
-      "symbol": "NSE:CYBERTECH-EQ",
-      "name": "CYBERTECH SYSTEMS & SOFTW",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE214A01019",
-      "last_updated": ""
-    },
-    {
       "fytoken": "10100000006062",
       "symbol": "NSE:LICNETFGSC-EQ",
       "name": "LICNAMC - LICNMFET",
@@ -25105,6 +25081,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "1010000000759397",
+      "symbol": "NSE:SOLEX-EQ",
+      "name": "SOLEX ENERGY LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.05,
+      "isin": "INE880Y01017",
+      "last_updated": ""
+    },
+    {
       "fytoken": "1010000000759439",
       "symbol": "NSE:PATELRMART-EQ",
       "name": "PATEL RETAIL LIMITED",
@@ -27325,6 +27313,6 @@
       "last_updated": ""
     }
   ],
-  "timestamp": "2025-10-07T23:12:38.582876",
+  "timestamp": "2025-10-07T23:55:59.783130",
   "exchange_type": "NSE_CM"
 }

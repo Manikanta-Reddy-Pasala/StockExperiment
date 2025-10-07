@@ -52,7 +52,7 @@ class EnhancedStockPredictor:
     - Feature importance tracking
     """
 
-    def __init__(self, db_session):
+    def __init__(self, db_session, auto_load=True):
         self.db = db_session
 
         # Models
@@ -78,6 +78,10 @@ class EnhancedStockPredictor:
         # Calibrated scoring
         self.calibrated_scorer = CalibratedScorer() if HAS_CALIBRATION else None
         self.adaptive_scorer = AdaptiveScorer() if HAS_CALIBRATION else None
+
+        # Try to load existing models
+        if auto_load:
+            self.load_models()
 
     def prepare_training_data(self, lookback_days: int = 365) -> pd.DataFrame:
         """
@@ -471,7 +475,8 @@ class EnhancedStockPredictor:
             self.calibrated_scorer.fit(predictions, y_price)
             logger.info("Calibration model fitted successfully")
 
-        return {
+        # Save training stats for persistence
+        self.training_stats = {
             'samples': len(df),
             'features': len(self.feature_columns),
             'price_r2': self.rf_price_model.score(X_scaled, y_price),
@@ -480,6 +485,12 @@ class EnhancedStockPredictor:
             'cv_risk_r2': self.cv_scores['risk_cv_mean'],
             'top_features': [f[0] for f in top_features]
         }
+
+        # Auto-save models after training
+        logger.info("Saving trained models to disk...")
+        self.save_models()
+
+        return self.training_stats
 
     def predict(self, stock_data: Dict) -> Dict:
         """
@@ -597,3 +608,125 @@ class EnhancedStockPredictor:
         X = X.fillna(0)
 
         return X
+
+    def save_models(self, model_dir='ml_models'):
+        """
+        Save trained models to disk for persistence.
+
+        Args:
+            model_dir: Directory to save models (default: 'ml_models')
+        """
+        import pickle
+        from pathlib import Path
+
+        model_path = Path(model_dir)
+        model_path.mkdir(parents=True, exist_ok=True)
+
+        logger.info(f"Saving models to {model_path}...")
+
+        # Save models
+        if self.rf_price_model:
+            with open(model_path / 'rf_price_model.pkl', 'wb') as f:
+                pickle.dump(self.rf_price_model, f)
+
+        if self.rf_risk_model:
+            with open(model_path / 'rf_risk_model.pkl', 'wb') as f:
+                pickle.dump(self.rf_risk_model, f)
+
+        if self.xgb_price_model:
+            with open(model_path / 'xgb_price_model.pkl', 'wb') as f:
+                pickle.dump(self.xgb_price_model, f)
+
+        if self.xgb_risk_model:
+            with open(model_path / 'xgb_risk_model.pkl', 'wb') as f:
+                pickle.dump(self.xgb_risk_model, f)
+
+        # Save scaler and metadata
+        with open(model_path / 'feature_scaler.pkl', 'wb') as f:
+            pickle.dump(self.feature_scaler, f)
+
+        with open(model_path / 'metadata.pkl', 'wb') as f:
+            pickle.dump({
+                'feature_columns': self.feature_columns,
+                'feature_importance': self.feature_importance,
+                'cv_scores': self.cv_scores,
+                'ensemble_weights': self.ensemble_weights,
+                'training_stats': getattr(self, 'training_stats', {}),
+                'saved_at': datetime.now().isoformat()
+            }, f)
+
+        logger.info(f"✓ Models saved successfully to {model_path}")
+
+    def load_models(self, model_dir='ml_models'):
+        """
+        Load trained models from disk.
+
+        Args:
+            model_dir: Directory containing saved models
+
+        Returns:
+            bool: True if models loaded successfully, False otherwise
+        """
+        import pickle
+        from pathlib import Path
+
+        model_path = Path(model_dir)
+
+        if not model_path.exists():
+            logger.info(f"Model directory {model_path} does not exist")
+            return False
+
+        try:
+            logger.info(f"Loading models from {model_path}...")
+
+            # Load models
+            rf_price_path = model_path / 'rf_price_model.pkl'
+            if rf_price_path.exists():
+                with open(rf_price_path, 'rb') as f:
+                    self.rf_price_model = pickle.load(f)
+                logger.info("  ✓ Loaded RF price model")
+
+            rf_risk_path = model_path / 'rf_risk_model.pkl'
+            if rf_risk_path.exists():
+                with open(rf_risk_path, 'rb') as f:
+                    self.rf_risk_model = pickle.load(f)
+                logger.info("  ✓ Loaded RF risk model")
+
+            xgb_price_path = model_path / 'xgb_price_model.pkl'
+            if xgb_price_path.exists() and HAS_XGB:
+                with open(xgb_price_path, 'rb') as f:
+                    self.xgb_price_model = pickle.load(f)
+                logger.info("  ✓ Loaded XGBoost price model")
+
+            xgb_risk_path = model_path / 'xgb_risk_model.pkl'
+            if xgb_risk_path.exists() and HAS_XGB:
+                with open(xgb_risk_path, 'rb') as f:
+                    self.xgb_risk_model = pickle.load(f)
+                logger.info("  ✓ Loaded XGBoost risk model")
+
+            # Load scaler
+            scaler_path = model_path / 'feature_scaler.pkl'
+            if scaler_path.exists():
+                with open(scaler_path, 'rb') as f:
+                    self.feature_scaler = pickle.load(f)
+                logger.info("  ✓ Loaded feature scaler")
+
+            # Load metadata
+            metadata_path = model_path / 'metadata.pkl'
+            if metadata_path.exists():
+                with open(metadata_path, 'rb') as f:
+                    metadata = pickle.load(f)
+                    self.feature_columns = metadata.get('feature_columns', [])
+                    self.feature_importance = metadata.get('feature_importance', {})
+                    self.cv_scores = metadata.get('cv_scores', {})
+                    self.ensemble_weights = metadata.get('ensemble_weights', self.ensemble_weights)
+                    self.training_stats = metadata.get('training_stats', {})
+                    saved_at = metadata.get('saved_at', 'unknown')
+                logger.info(f"  ✓ Loaded metadata (saved at: {saved_at})")
+
+            logger.info(f"✓ Models loaded successfully from {model_path}")
+            return True
+
+        except Exception as e:
+            logger.error(f"✗ Error loading models: {e}")
+            return False

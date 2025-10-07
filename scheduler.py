@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 def train_ml_models():
-    """Daily ML model training task (runs at 2 AM)."""
+    """Daily ML model training task (runs at 10 PM)."""
     logger.info("=" * 80)
     logger.info("Starting Scheduled ML Model Training")
     logger.info("=" * 80)
@@ -41,7 +41,14 @@ def train_ml_models():
         db_manager = get_database_manager()
         with db_manager.get_session() as session:
             logger.info("Using ENHANCED ML Predictor (RF + XGBoost + Chaos Features)")
-            predictor = EnhancedStockPredictor(session)
+            predictor = EnhancedStockPredictor(session, auto_load=True)
+
+            # Check if models are already trained
+            if predictor.rf_price_model is not None:
+                logger.info("✅ ML models already trained and loaded from cache")
+                logger.info("🔄 Re-training to update with latest market data...")
+            else:
+                logger.info("⚠️  ML models not found. Training from scratch...")
 
             # Train with walk-forward validation
             logger.info("Training enhanced models with 365 days + walk-forward CV...")
@@ -55,7 +62,7 @@ def train_ml_models():
             logger.info(f"  CV Price R²: {stats['cv_price_r2']:.4f} (walk-forward)")
             logger.info(f"  CV Risk R²: {stats['cv_risk_r2']:.4f} (walk-forward)")
             logger.info(f"  Top Features: {', '.join(stats['top_features'][:5])}")
-            logger.info("✅ Enhanced ML models trained successfully")
+            logger.info("✅ Enhanced ML models trained and saved successfully")
 
     except Exception as e:
         logger.error(f"❌ ML training failed: {e}", exc_info=True)
@@ -117,6 +124,54 @@ def cleanup_old_snapshots():
         logger.error(f"❌ Snapshot cleanup failed: {e}", exc_info=True)
 
 
+def check_ml_models_on_startup():
+    """Check if ML models exist on startup, train if needed."""
+    logger.info("=" * 80)
+    logger.info("Startup ML Model Check")
+    logger.info("=" * 80)
+
+    try:
+        from pathlib import Path
+
+        # Check if models exist on disk
+        model_dir = Path('ml_models')
+        if not model_dir.exists():
+            logger.warning("⚠️  ML models directory not found")
+            logger.info("🔄 Training ML models for the first time...")
+            train_ml_models()
+            return
+
+        # Check if critical model files exist
+        critical_files = [
+            'rf_price_model.pkl',
+            'rf_risk_model.pkl',
+            'metadata.pkl'
+        ]
+
+        missing_files = [f for f in critical_files if not (model_dir / f).exists()]
+
+        if missing_files:
+            logger.warning(f"⚠️  Missing ML model files: {', '.join(missing_files)}")
+            logger.info("🔄 Training ML models...")
+            train_ml_models()
+        else:
+            logger.info("✅ ML models found on disk - ready to use")
+
+            # Load metadata to show info
+            import pickle
+            try:
+                with open(model_dir / 'metadata.pkl', 'rb') as f:
+                    metadata = pickle.load(f)
+                logger.info(f"   Trained: {metadata.get('trained_at', 'Unknown')}")
+                logger.info(f"   Samples: {metadata.get('training_samples', 'Unknown'):,}")
+                logger.info(f"   Features: {metadata.get('n_features', 'Unknown')}")
+            except Exception as e:
+                logger.warning(f"   Could not load metadata: {e}")
+
+    except Exception as e:
+        logger.error(f"❌ Startup ML check failed: {e}", exc_info=True)
+
+
 def run_scheduler():
     """Main scheduler loop."""
     logger.info("=" * 80)
@@ -128,6 +183,9 @@ def run_scheduler():
     logger.info("  - Cleanup Old Snapshots: Weekly (Sunday) at 03:00 AM")
     logger.info("=" * 80)
 
+    # Check ML models on startup and train if needed
+    check_ml_models_on_startup()
+
     # Schedule daily ML training at 10:00 PM (after data pipeline completes)
     schedule.every().day.at("22:00").do(train_ml_models)
 
@@ -136,15 +194,7 @@ def run_scheduler():
 
     # Schedule weekly cleanup on Sunday at 3:00 AM
     schedule.every().sunday.at("03:00").do(cleanup_old_snapshots)
-    
-    # Run immediately on startup (optional - for testing)
-    # Uncomment these lines to run tasks immediately when scheduler starts
-    # logger.info("Running initial ML training...")
-    # train_ml_models()
-    # time.sleep(5)
-    # logger.info("Running initial snapshot update...")
-    # update_daily_snapshot()
-    
+
     # Keep scheduler running
     logger.info("Scheduler is now running. Press Ctrl+C to stop.")
     while True:

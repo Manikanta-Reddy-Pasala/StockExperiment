@@ -11,16 +11,41 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.models.database import get_database_manager
 from src.services.ml.enhanced_stock_predictor import EnhancedStockPredictor
+from pathlib import Path
 
 print("=" * 80)
 print("ML TRAINING STATUS CHECK")
 print("=" * 80)
 
+# Check if models exist on disk
+model_dir = Path('ml_models')
+models_on_disk = False
+
+if model_dir.exists():
+    rf_price = model_dir / 'rf_price_model.pkl'
+    rf_risk = model_dir / 'rf_risk_model.pkl'
+    metadata = model_dir / 'metadata.pkl'
+
+    if rf_price.exists() and rf_risk.exists() and metadata.exists():
+        models_on_disk = True
+        print("\n✓ Model files found on disk")
+
+        # Load metadata to show info
+        import pickle
+        with open(metadata, 'rb') as f:
+            meta = pickle.load(f)
+            print(f"  Saved at: {meta.get('saved_at', 'unknown')}")
+            if 'training_stats' in meta:
+                stats = meta['training_stats']
+                print(f"  Samples: {stats.get('samples', 'N/A'):,}")
+                print(f"  Features: {stats.get('features', 'N/A')}")
+                print(f"  CV R²: {stats.get('cv_price_r2', 0):.3f}")
+
 db_manager = get_database_manager()
 
 try:
     with db_manager.get_session() as session:
-        predictor = EnhancedStockPredictor(session)
+        predictor = EnhancedStockPredictor(session, auto_load=True)
 
         # Check if models are trained
         if predictor.rf_price_model is not None:

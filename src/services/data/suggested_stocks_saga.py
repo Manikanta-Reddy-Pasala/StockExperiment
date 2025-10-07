@@ -994,17 +994,20 @@ class SuggestedStocksSagaOrchestrator:
             from ..ml.enhanced_stock_predictor import EnhancedStockPredictor
             from src.models.database import get_database_manager
 
-            # Initialize Enhanced ML predictor
+            # Initialize Enhanced ML predictor (auto-loads models if available)
             db_manager = get_database_manager()
             with db_manager.get_session() as session:
-                predictor = EnhancedStockPredictor(session)
+                predictor = EnhancedStockPredictor(session, auto_load=True)
 
                 # Check if models are trained
                 if predictor.rf_price_model is None:
                     logger.warning("Enhanced ML models not trained. Training now with walk-forward CV...")
                     print(f"   ⚠️  Enhanced ML models not found. Training with historical data...")
+                    print(f"   This will take 10-15 minutes (one-time training)...")
                     predictor.train_with_walk_forward(lookback_days=365, n_splits=5)
-                    print(f"   ✅ Enhanced ML models trained successfully")
+                    print(f"   ✅ Enhanced ML models trained and saved successfully")
+                else:
+                    print(f"   ✅ Using cached ML models (loaded from disk)")
 
                 # Get ML predictions for all stocks
                 ml_predictions = {}
