@@ -17473,18 +17473,6 @@
       "last_updated": ""
     },
     {
-      "fytoken": "101000000028859",
-      "symbol": "NSE:PROZONER-EQ",
-      "name": "PROZONE REALTY LIMITED",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE195N01013",
-      "last_updated": ""
-    },
-    {
       "fytoken": "101000000028879",
       "symbol": "NSE:CARRARO-EQ",
       "name": "CARRARO INDIA LIMITED",
@@ -19666,6 +19654,18 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE294G01026",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "10100000003594",
+      "symbol": "NSE:UNITECH-EQ",
+      "name": "UNITECH LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE694A01020",
       "last_updated": ""
     },
     {
@@ -25237,6 +25237,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "1010000000760116",
+      "symbol": "NSE:GLOTTIS-EQ",
+      "name": "GLOTTIS LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE0TQE01026",
+      "last_updated": ""
+    },
+    {
       "fytoken": "10100000007603",
       "symbol": "NSE:CMSINFO-EQ",
       "name": "CMS INFO SYSTEMS LIMITED",
@@ -27313,6 +27325,6 @@
       "last_updated": ""
     }
   ],
-  "timestamp": "2025-10-04T10:19:00.441971",
+  "timestamp": "2025-10-07T20:11:22.644266",
   "exchange_type": "NSE_CM"
 }
