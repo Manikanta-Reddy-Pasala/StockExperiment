@@ -991,20 +991,20 @@ class SuggestedStocksSagaOrchestrator:
         print(f"   Applying ML models to {len(saga.final_results)} stocks...")
 
         try:
-            from ..ml.stock_predictor import StockMLPredictor
+            from ..ml.enhanced_stock_predictor import EnhancedStockPredictor
             from src.models.database import get_database_manager
 
-            # Initialize ML predictor
+            # Initialize Enhanced ML predictor
             db_manager = get_database_manager()
             with db_manager.get_session() as session:
-                predictor = StockMLPredictor(session)
+                predictor = EnhancedStockPredictor(session)
 
                 # Check if models are trained
-                if predictor.price_model is None:
-                    logger.warning("ML models not trained. Training now with 1 year data...")
-                    print(f"   ⚠️  ML models not found. Training with historical data...")
-                    predictor.train(lookback_days=365)
-                    print(f"   ✅ ML models trained successfully")
+                if predictor.rf_price_model is None:
+                    logger.warning("Enhanced ML models not trained. Training now with walk-forward CV...")
+                    print(f"   ⚠️  Enhanced ML models not found. Training with historical data...")
+                    predictor.train_with_walk_forward(lookback_days=365, n_splits=5)
+                    print(f"   ✅ Enhanced ML models trained successfully")
 
                 # Get ML predictions for all stocks
                 ml_predictions = {}

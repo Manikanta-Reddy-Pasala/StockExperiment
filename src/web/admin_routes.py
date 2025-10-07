@@ -242,14 +242,14 @@ def trigger_ml_training():
     task_id = f"ml_training_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
     def run_ml_training():
-        from src.services.ml.stock_predictor import StockMLPredictor
+        from src.services.ml.enhanced_stock_predictor import EnhancedStockPredictor
         from src.models.database import get_database_manager
 
         db_manager = get_database_manager()
         with db_manager.get_session() as session:
-            predictor = StockMLPredictor(session)
-            predictor.train(lookback_days=365)
-            return "ML models trained successfully"
+            predictor = EnhancedStockPredictor(session)
+            stats = predictor.train_with_walk_forward(lookback_days=365, n_splits=5)
+            return f"Enhanced ML models trained successfully (R²: {stats['cv_price_r2']:.3f})"
 
     thread = threading.Thread(
         target=run_function_async,
@@ -272,7 +272,7 @@ def trigger_all():
     def run_all_tasks():
         """Run all tasks sequentially."""
         from src.services.data.pipeline_saga import PipelineSaga
-        from src.services.ml.stock_predictor import StockMLPredictor
+        from src.services.ml.enhanced_stock_predictor import EnhancedStockPredictor
         from src.models.database import get_database_manager
 
         overall_task_id = f"{base_task_id}_all"
@@ -326,8 +326,8 @@ def trigger_all():
             save_task_to_db(overall_task_id, running_tasks[overall_task_id])
 
             with db_manager.get_session() as session:
-                predictor = StockMLPredictor(session)
-                predictor.train(lookback_days=365)
+                predictor = EnhancedStockPredictor(session)
+                predictor.train_with_walk_forward(lookback_days=365, n_splits=5)
 
             running_tasks[overall_task_id]['steps'][-1]['status'] = 'completed'
             running_tasks[overall_task_id]['steps'][-1]['end_time'] = datetime.now().isoformat()

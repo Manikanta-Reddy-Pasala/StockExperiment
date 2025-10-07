@@ -15,13 +15,9 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent))
 
 from src.models.database import get_database_manager
-from src.services.ml.stock_predictor import StockMLPredictor
 from src.services.ml.enhanced_stock_predictor import EnhancedStockPredictor
 from src.services.data.suggested_stocks_saga import SuggestedStocksSagaOrchestrator
 from src.services.data.daily_snapshot_service import DailySnapshotService
-
-# Configuration: Choose which ML predictor to use
-USE_ENHANCED_MODEL = True  # Set to False to use original model
 
 # Configure logging
 logging.basicConfig(
@@ -44,37 +40,22 @@ def train_ml_models():
     try:
         db_manager = get_database_manager()
         with db_manager.get_session() as session:
-            if USE_ENHANCED_MODEL:
-                logger.info("Using ENHANCED ML Predictor (RF + XGBoost + Chaos Features)")
-                predictor = EnhancedStockPredictor(session)
+            logger.info("Using ENHANCED ML Predictor (RF + XGBoost + Chaos Features)")
+            predictor = EnhancedStockPredictor(session)
 
-                # Train with walk-forward validation
-                logger.info("Training enhanced models with 365 days + walk-forward CV...")
-                stats = predictor.train_with_walk_forward(lookback_days=365, n_splits=5)
+            # Train with walk-forward validation
+            logger.info("Training enhanced models with 365 days + walk-forward CV...")
+            stats = predictor.train_with_walk_forward(lookback_days=365, n_splits=5)
 
-                logger.info("ML Training Complete!")
-                logger.info(f"  Training Samples: {stats['samples']:,}")
-                logger.info(f"  Features Used: {stats['features']}")
-                logger.info(f"  Price Model R²: {stats['price_r2']:.4f}")
-                logger.info(f"  Risk Model R²: {stats['risk_r2']:.4f}")
-                logger.info(f"  CV Price R²: {stats['cv_price_r2']:.4f} (walk-forward)")
-                logger.info(f"  CV Risk R²: {stats['cv_risk_r2']:.4f} (walk-forward)")
-                logger.info(f"  Top Features: {', '.join(stats['top_features'][:5])}")
-                logger.info("✅ Enhanced ML models trained successfully")
-            else:
-                logger.info("Using ORIGINAL ML Predictor (RF only)")
-                predictor = StockMLPredictor(session)
-
-                # Train models with 1 year of historical data
-                logger.info("Training ML models with 365 days of historical data...")
-                stats = predictor.train(lookback_days=365)
-
-                logger.info("ML Training Complete!")
-                logger.info(f"  Training Samples: {stats['samples']:,}")
-                logger.info(f"  Features Used: {stats['features']}")
-                logger.info(f"  Price Model R²: {stats['price_r2']:.4f}")
-                logger.info(f"  Risk Model R²: {stats['risk_r2']:.4f}")
-                logger.info("✅ ML models trained successfully")
+            logger.info("ML Training Complete!")
+            logger.info(f"  Training Samples: {stats['samples']:,}")
+            logger.info(f"  Features Used: {stats['features']}")
+            logger.info(f"  Price Model R²: {stats['price_r2']:.4f}")
+            logger.info(f"  Risk Model R²: {stats['risk_r2']:.4f}")
+            logger.info(f"  CV Price R²: {stats['cv_price_r2']:.4f} (walk-forward)")
+            logger.info(f"  CV Risk R²: {stats['cv_risk_r2']:.4f} (walk-forward)")
+            logger.info(f"  Top Features: {', '.join(stats['top_features'][:5])}")
+            logger.info("✅ Enhanced ML models trained successfully")
 
     except Exception as e:
         logger.error(f"❌ ML training failed: {e}", exc_info=True)
