@@ -111,9 +111,6 @@ def create_app():
         register_fyers_refresh_callback()
     except Exception as e:
         app.logger.warning(f"Could not register FYERS refresh callback: {e}")
-    
-    # Schedule comprehensive data maintenance tasks
-    scheduler.schedule_all_data_maintenance_tasks(user_id=1)
 
     # Check ML models on startup
     try:

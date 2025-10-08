@@ -687,7 +687,7 @@ class HistoricalDataService:
             logger.error(f"Error fetching benchmark {benchmark}: {e}")
             return {'success': False, 'error': str(e)}
 
-    def _get_existing_data_range(self, symbol: str) -> Optional[Tuple[date, date]]:
+    def _get_existing_data_range(self, symbol: str) -> Optional[Dict[str, date]]:
         """Get the date range of existing historical data for a symbol."""
         try:
             with self.db_manager.get_session() as session:
@@ -697,17 +697,18 @@ class HistoricalDataService:
                 ).filter(HistoricalData.symbol == symbol).first()
 
                 if result and result.earliest and result.latest:
-                    return (result.earliest, result.latest)
+                    return {'earliest_date': result.earliest, 'latest_date': result.latest}
                 return None
 
         except Exception as e:
             logger.error(f"Error getting existing data range for {symbol}: {e}")
             return None
 
-    def _is_data_sufficient(self, existing_range: Tuple[date, date],
+    def _is_data_sufficient(self, existing_range: Dict[str, date],
                            required_start: date, required_end: date) -> bool:
         """Check if existing data covers the required range sufficiently."""
-        earliest, latest = existing_range
+        earliest = existing_range['earliest_date']
+        latest = existing_range['latest_date']
 
         # Check if we have data covering at least 80% of the required range
         required_days = (required_end - required_start).days
