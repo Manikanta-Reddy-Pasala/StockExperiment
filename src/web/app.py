@@ -112,11 +112,10 @@ def create_app():
     except Exception as e:
         app.logger.warning(f"Could not register FYERS refresh callback: {e}")
 
-    # Check and auto-train ML models on startup if missing
+    # Check ML models on startup (training will happen after pipeline completes)
     try:
         app.logger.info("🤖 Checking ML models on startup...")
         from pathlib import Path
-        from ..services.ml.enhanced_stock_predictor import EnhancedStockPredictor
 
         model_dir = Path('ml_models')
         models_exist = (
@@ -127,38 +126,7 @@ def create_app():
         )
 
         if not models_exist:
-            app.logger.warning("⚠️  ML models not found. Training models on first startup...")
-
-            # Train models in background thread to not block app startup
-            import threading
-            def train_ml_models_background():
-                try:
-                    app.logger.info("🔄 Starting ML model training in background...")
-                    db_mgr = get_database_manager()
-                    with db_mgr.get_session() as session:
-                        predictor = EnhancedStockPredictor(session, auto_load=False)
-
-                        # Train with walk-forward validation
-                        app.logger.info("📊 Training enhanced models with 365 days + walk-forward CV...")
-                        stats = predictor.train_with_walk_forward(lookback_days=365, n_splits=5)
-
-                        app.logger.info("✅ ML Training Complete!")
-                        app.logger.info(f"   Training Samples: {stats['samples']:,}")
-                        app.logger.info(f"   Features Used: {stats['features']}")
-                        app.logger.info(f"   Price Model R²: {stats['price_r2']:.4f}")
-                        app.logger.info(f"   Risk Model R²: {stats['risk_r2']:.4f}")
-                        app.logger.info(f"   CV Price R²: {stats['cv_price_r2']:.4f}")
-                        app.logger.info(f"   CV Risk R²: {stats['cv_risk_r2']:.4f}")
-
-                except Exception as e:
-                    app.logger.error(f"❌ ML training failed: {e}")
-                    import traceback
-                    app.logger.error(f"Stack trace: {traceback.format_exc()}")
-
-            # Start training in background thread
-            training_thread = threading.Thread(target=train_ml_models_background, daemon=True)
-            training_thread.start()
-            app.logger.info("🚀 ML training launched in background thread")
+            app.logger.warning("⚠️  ML models not found. Will train after pipeline completes.")
         else:
             app.logger.info("✅ ML models found and ready to use")
             import pickle
@@ -198,6 +166,38 @@ def create_app():
                     from src.services.data.pipeline_saga import get_pipeline_saga
                     saga = get_pipeline_saga()
                     status = saga.get_pipeline_status()
+
+                    # Train ML models after pipeline completes (if models don't exist)
+                    from pathlib import Path
+                    model_dir = Path('ml_models')
+                    models_exist = (
+                        model_dir.exists() and
+                        (model_dir / 'rf_price_model.pkl').exists() and
+                        (model_dir / 'rf_risk_model.pkl').exists() and
+                        (model_dir / 'metadata.pkl').exists()
+                    )
+
+                    if not models_exist:
+                        app.logger.info("🤖 Pipeline complete. Starting ML model training...")
+                        try:
+                            from src.services.ml.enhanced_stock_predictor import EnhancedStockPredictor
+                            db_mgr = get_database_manager()
+                            with db_mgr.get_session() as session:
+                                predictor = EnhancedStockPredictor(session, auto_load=False)
+                                app.logger.info("📊 Training enhanced models with 365 days + walk-forward CV...")
+                                stats = predictor.train_with_walk_forward(lookback_days=365, n_splits=5)
+
+                                app.logger.info("✅ ML Training Complete!")
+                                app.logger.info(f"   Training Samples: {stats['samples']:,}")
+                                app.logger.info(f"   Features Used: {stats['features']}")
+                                app.logger.info(f"   Price Model R²: {stats['price_r2']:.4f}")
+                                app.logger.info(f"   Risk Model R²: {stats['risk_r2']:.4f}")
+                                app.logger.info(f"   CV Price R²: {stats['cv_price_r2']:.4f}")
+                                app.logger.info(f"   CV Risk R²: {stats['cv_risk_r2']:.4f}")
+                        except Exception as ml_error:
+                            app.logger.error(f"❌ ML training failed: {ml_error}")
+                            import traceback
+                            app.logger.error(f"Stack trace: {traceback.format_exc()}")
                     
                     for step, info in status.items():
                         records = info.get('records_processed', 0)
