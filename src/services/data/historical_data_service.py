@@ -622,9 +622,16 @@ class HistoricalDataService:
 
                     except Exception as e:
                         logger.warning(f"Error storing record for {symbol} on {row['date']}: {e}")
+                        session.rollback()  # Rollback failed transaction
                         continue
 
-                session.commit()
+                # Commit all successfully added records
+                try:
+                    session.commit()
+                except Exception as e:
+                    logger.warning(f"Error committing records for {symbol}: {e}")
+                    session.rollback()
+
                 return records_added
 
         except Exception as e:
