@@ -561,16 +561,18 @@ class HistoricalDataService:
             records_added = 0
 
             with self.db_manager.get_session() as session:
+                # Get all existing dates for this symbol in one query (more efficient)
+                existing_dates = set(
+                    date for (date,) in session.query(HistoricalData.date).filter(
+                        HistoricalData.symbol == symbol
+                    ).all()
+                )
+
                 for _, row in df.iterrows():
                     try:
-                        # Check if record already exists
-                        existing = session.query(HistoricalData).filter(
-                            HistoricalData.symbol == symbol,
-                            HistoricalData.date == row['date']
-                        ).first()
-
-                        if existing:
-                            continue  # Skip existing records
+                        # Skip if record already exists
+                        if row['date'] in existing_dates:
+                            continue
 
                         # Create new record with ALL Fyers fields + calculated fields
                         open_price = float(row['open'])
@@ -619,6 +621,8 @@ class HistoricalDataService:
 
                         session.add(historical_record)
                         records_added += 1
+                        # Add to existing_dates set to prevent duplicates within same batch
+                        existing_dates.add(row['date'])
 
                     except Exception as e:
                         logger.warning(f"Error storing record for {symbol} on {row['date']}: {e}")
