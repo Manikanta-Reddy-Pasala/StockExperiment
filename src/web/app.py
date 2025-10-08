@@ -112,7 +112,7 @@ def create_app():
     except Exception as e:
         app.logger.warning(f"Could not register FYERS refresh callback: {e}")
 
-    # Check ML models on startup
+    # Check and auto-train ML models on startup if missing
     try:
         app.logger.info("🤖 Checking ML models on startup...")
         from pathlib import Path
@@ -127,8 +127,38 @@ def create_app():
         )
 
         if not models_exist:
-            app.logger.warning("⚠️  ML models not found. Training required before using suggested stocks.")
-            app.logger.info("💡 Run 'python scheduler.py' to train models, or they will be trained on first use.")
+            app.logger.warning("⚠️  ML models not found. Training models on first startup...")
+
+            # Train models in background thread to not block app startup
+            import threading
+            def train_ml_models_background():
+                try:
+                    app.logger.info("🔄 Starting ML model training in background...")
+                    db_mgr = get_database_manager()
+                    with db_mgr.get_session() as session:
+                        predictor = EnhancedStockPredictor(session, auto_load=False)
+
+                        # Train with walk-forward validation
+                        app.logger.info("📊 Training enhanced models with 365 days + walk-forward CV...")
+                        stats = predictor.train_with_walk_forward(lookback_days=365, n_splits=5)
+
+                        app.logger.info("✅ ML Training Complete!")
+                        app.logger.info(f"   Training Samples: {stats['samples']:,}")
+                        app.logger.info(f"   Features Used: {stats['features']}")
+                        app.logger.info(f"   Price Model R²: {stats['price_r2']:.4f}")
+                        app.logger.info(f"   Risk Model R²: {stats['risk_r2']:.4f}")
+                        app.logger.info(f"   CV Price R²: {stats['cv_price_r2']:.4f}")
+                        app.logger.info(f"   CV Risk R²: {stats['cv_risk_r2']:.4f}")
+
+                except Exception as e:
+                    app.logger.error(f"❌ ML training failed: {e}")
+                    import traceback
+                    app.logger.error(f"Stack trace: {traceback.format_exc()}")
+
+            # Start training in background thread
+            training_thread = threading.Thread(target=train_ml_models_background, daemon=True)
+            training_thread.start()
+            app.logger.info("🚀 ML training launched in background thread")
         else:
             app.logger.info("✅ ML models found and ready to use")
             import pickle
