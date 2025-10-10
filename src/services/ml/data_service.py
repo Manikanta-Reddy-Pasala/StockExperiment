@@ -525,3 +525,75 @@ def create_features(df):
         'Mean_Reversion_5d', 'Mean_Reversion_20d'
     ]
     return df, features
+
+
+def get_raw_ohlcv_data(
+    symbol: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    period: Optional[str] = "3y",
+    user_id: int = 1
+) -> pd.DataFrame:
+    """
+    Fetch raw OHLCV data without any feature engineering.
+
+    This function is specifically for the simplified LSTM model approach from the
+    Korean stock prediction research, which showed that raw OHLCV data can match
+    or exceed the performance of heavily engineered features.
+
+    Parameters:
+    -----------
+    symbol : str
+        Stock symbol (e.g., 'RELIANCE', 'TCS')
+    start_date : Optional[date]
+        Start date for historical data
+    end_date : Optional[date]
+        End date for historical data
+    period : Optional[str]
+        Period string if dates not provided (e.g., '1y', '3y')
+    user_id : int
+        User ID for broker authentication
+
+    Returns:
+    --------
+    pd.DataFrame
+        DataFrame with columns: ['open', 'high', 'low', 'close', 'volume']
+        Indexed by date, sorted chronologically
+    """
+    logger.info(f"Fetching raw OHLCV data for {symbol} (period={period})")
+
+    # Get data using existing function
+    df = get_stock_data(
+        symbol=symbol,
+        start_date=start_date,
+        end_date=end_date,
+        period=period,
+        interval="1d",
+        user_id=user_id
+    )
+
+    if df is None or len(df) == 0:
+        raise ValueError(f"No data available for {symbol}")
+
+    # Ensure lowercase column names (required by raw OHLCV LSTM)
+    df.columns = df.columns.str.lower()
+
+    # Ensure required columns exist
+    required_cols = ['open', 'high', 'low', 'close', 'volume']
+    for col in required_cols:
+        if col not in df.columns:
+            raise ValueError(f"Missing required column: {col}")
+
+    # Return only OHLCV columns (no feature engineering)
+    df_clean = df[required_cols].copy()
+
+    # Remove any NaN values
+    initial_len = len(df_clean)
+    df_clean = df_clean.dropna()
+
+    if len(df_clean) < initial_len:
+        logger.warning(f"Removed {initial_len - len(df_clean)} rows with NaN values")
+
+    logger.info(f"Returned {len(df_clean)} clean OHLCV samples for {symbol}")
+
+    return df_clean

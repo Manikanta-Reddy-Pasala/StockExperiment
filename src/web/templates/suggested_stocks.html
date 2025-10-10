@@ -1,117 +1,245 @@
 {% extends "base.html" %}
 
-{% block title %}Suggested Stocks{% endblock %}
+{% block title %}Suggested Stocks - Dual Model View{% endblock %}
 
 {% block content %}
-<!-- Basic Stock Filtering Section -->
+<!-- Header Section -->
 <div class="card hover-lift animate-fade-in-up mb-4">
-    <div class="card-header bg-gradient-success text-white">
+    <div class="card-header bg-gradient-info text-white">
         <div class="d-flex justify-content-between align-items-center">
-            <h5 class="card-title mb-0 text-white">
-                <i class="bi bi-funnel me-2"></i>Swing Trading Suggestions
-                <small class="opacity-75">2-Week Timeframe with Profit Targets & Stop Loss</small>
-            </h5>
-            <div class="d-flex gap-2 align-items-center">
-                <select class="form-select form-select-sm" id="time-filter" style="min-width: 120px;">
-                    <option value="today">Today</option>
-                    <option value="week" selected>This Week</option>
-                    <option value="month">This Month</option>
-                    <option value="all">All Time</option>
-                </select>
-                <div class="dropdown">
-                    <button class="btn btn-light btn-sm dropdown-toggle" type="button" id="strategy-filter" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="bi bi-funnel"></i> Risk Level
-                    </button>
-                    <ul class="dropdown-menu" aria-labelledby="strategy-filter">
-                        <li>
-                            <div class="form-check ms-2">
-                                <input class="form-check-input strategy-radio" type="radio" name="strategy" value="default_risk" id="strategy-default" checked>
-                                <label class="form-check-label" for="strategy-default">
-                                    <i class="bi bi-shield-check text-success me-2"></i>Default Risk
-                                    <small class="text-muted d-block">Conservative swing trading: 5-7% targets, 3% stop loss</small>
-                                </label>
-                            </div>
-                        </li>
-                        <li>
-                            <div class="form-check ms-2">
-                                <input class="form-check-input strategy-radio" type="radio" name="strategy" value="high_risk" id="strategy-high">
-                                <label class="form-check-label" for="strategy-high">
-                                    <i class="bi bi-lightning-charge text-warning me-2"></i>High Risk
-                                    <small class="text-muted d-block">Aggressive swing trading: 8-10% targets, 3% stop loss</small>
-                                </label>
-                            </div>
-                        </li>
-                    </ul>
-                </div>
-                    <button class="btn btn-sm btn-outline-primary" id="refresh-btn">
-                        <i class="bi bi-arrow-repeat"></i>
-                    </button>
+            <div>
+                <h5 class="card-title mb-0 text-white">
+                    <i class="bi bi-graph-up-arrow me-2"></i>Stock Suggestions - Dual Model Comparison
+                </h5>
+                <small class="opacity-75">Compare Traditional ML vs Research-Based Raw LSTM predictions</small>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-light btn-sm" id="refresh-btn">
+                    <i class="bi bi-arrow-repeat"></i> Refresh
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body bg-light">
+        <div class="row text-center">
+            <div class="col-md-3">
+                <div class="card border-primary h-100">
+                    <div class="card-body">
+                        <h6 class="text-primary mb-2">🏛️ Traditional Model</h6>
+                        <small class="text-muted">Feature-Engineered<br>RF + XGB + LSTM</small>
+                        <h4 class="mt-2 mb-0" id="trad-count">-</h4>
+                    </div>
                 </div>
             </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover" id="basic-stocks-table">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Symbol</th>
-                                <th>Company</th>
-                                <th>Current Price</th>
-                                <th>Target Price</th>
-                                <th>Expected Return</th>
-                                <th>Market Cap</th>
-                                <th>Sector</th>
-                                <th>Basic Score</th>
-                                <th>Risk Level</th>
-                                <th>Recommendation</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Basic filtered stocks will be populated by JavaScript -->
-                        </tbody>
-                    </table>
+            <div class="col-md-3">
+                <div class="card border-success h-100">
+                    <div class="card-body">
+                        <h6 class="text-success mb-2">🤖 Raw LSTM Model</h6>
+                        <small class="text-muted">Research-Based<br>Raw OHLCV Only</small>
+                        <h4 class="mt-2 mb-0" id="lstm-count">-</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-info h-100">
+                    <div class="card-body">
+                        <h6 class="text-info mb-2">🛡️ Default Risk</h6>
+                        <small class="text-muted">Conservative<br>5-7% Targets</small>
+                        <h4 class="mt-2 mb-0" id="default-count">-</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-warning h-100">
+                    <div class="card-body">
+                        <h6 class="text-warning mb-2">⚡ High Risk</h6>
+                        <small class="text-muted">Aggressive<br>8-10% Targets</small>
+                        <h4 class="mt-2 mb-0" id="high-count">-</h4>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Optional ML Enhancement Section -->
-<div class="card hover-lift animate-fade-in-up">
-    <div class="card-header bg-gradient-primary text-white">
-        <div class="d-flex justify-content-between align-items-center">
-            <h5 class="card-title mb-0 text-white">
-                <i class="bi bi-robot me-2"></i>ML Enhancement (Optional)
-                <small class="opacity-75">AI-Powered BUY Signals</small>
-            </h5>
-            <button class="btn btn-light btn-sm" id="apply-ml-btn">
-                <i class="bi bi-magic"></i> Apply ML Analysis
-            </button>
+<!-- Dual Model Comparison -->
+<div class="row">
+    <!-- Traditional Model -->
+    <div class="col-lg-6 mb-4">
+        <div class="card hover-lift animate-fade-in-up h-100">
+            <div class="card-header bg-gradient-primary text-white">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="bi bi-layers me-2"></i>Traditional Model
+                    <small class="d-block mt-1 opacity-75">Feature-Engineered Ensemble (70+ indicators)</small>
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- Tabs for Risk Levels -->
+                <ul class="nav nav-tabs mb-3" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-bs-toggle="tab" href="#trad-default">
+                            <i class="bi bi-shield-check text-success"></i> Default Risk
+                            <span class="badge bg-secondary ms-2" id="trad-default-badge">0</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#trad-high">
+                            <i class="bi bi-lightning-charge text-warning"></i> High Risk
+                            <span class="badge bg-secondary ms-2" id="trad-high-badge">0</span>
+                        </a>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    <!-- Traditional - Default Risk -->
+                    <div class="tab-pane fade show active" id="trad-default">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm" id="traditional-default-table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Symbol</th>
+                                        <th>Company</th>
+                                        <th>Score</th>
+                                        <th>Target</th>
+                                        <th>Rec</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Data populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Traditional - High Risk -->
+                    <div class="tab-pane fade" id="trad-high">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm" id="traditional-high-table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Symbol</th>
+                                        <th>Company</th>
+                                        <th>Score</th>
+                                        <th>Target</th>
+                                        <th>Rec</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Data populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
-    <div class="card-body" id="ml-section" style="display: none;">
-        <div class="alert alert-info mb-3">
-            <i class="bi bi-info-circle me-2"></i>
-            ML analysis shows only stocks with <strong>BUY</strong> signals based on advanced technical and fundamental analysis.
+
+    <!-- Raw LSTM Model -->
+    <div class="col-lg-6 mb-4">
+        <div class="card hover-lift animate-fade-in-up h-100">
+            <div class="card-header bg-gradient-success text-white">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="bi bi-robot me-2"></i>Raw LSTM Model
+                    <small class="d-block mt-1 opacity-75">Research-Based Raw OHLCV (5 features only)</small>
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- Tabs for Risk Levels -->
+                <ul class="nav nav-tabs mb-3" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-bs-toggle="tab" href="#lstm-default">
+                            <i class="bi bi-shield-check text-success"></i> Default Risk
+                            <span class="badge bg-secondary ms-2" id="lstm-default-badge">0</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#lstm-high">
+                            <i class="bi bi-lightning-charge text-warning"></i> High Risk
+                            <span class="badge bg-secondary ms-2" id="lstm-high-badge">0</span>
+                        </a>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    <!-- Raw LSTM - Default Risk -->
+                    <div class="tab-pane fade show active" id="lstm-default">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm" id="lstm-default-table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Symbol</th>
+                                        <th>Company</th>
+                                        <th>Score</th>
+                                        <th>Target</th>
+                                        <th>Rec</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Data populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Raw LSTM - High Risk -->
+                    <div class="tab-pane fade" id="lstm-high">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm" id="lstm-high-table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Symbol</th>
+                                        <th>Company</th>
+                                        <th>Score</th>
+                                        <th>Target</th>
+                                        <th>Rec</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Data populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="table-responsive">
-            <table class="table table-hover" id="ml-stocks-table">
-                <thead class="table-light">
-                    <tr>
-                        <th>Symbol</th>
-                        <th>Company</th>
-                        <th>Current Price</th>
-                        <th>ML Target</th>
-                        <th>ML Confidence</th>
-                        <th>Expected Return</th>
-                        <th>Risk Score</th>
-                        <th>Signal Strength</th>
-                        <th>Holding Period</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- ML BUY signals will be populated by JavaScript -->
-                </tbody>
-            </table>
+    </div>
+</div>
+
+<!-- Statistics Section -->
+<div class="card hover-lift animate-fade-in-up">
+    <div class="card-header bg-gradient-dark text-white">
+        <h5 class="card-title mb-0 text-white">
+            <i class="bi bi-bar-chart-line me-2"></i>Model Statistics
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row text-center">
+            <div class="col-md-3">
+                <h6 class="text-primary">Traditional - Default</h6>
+                <p class="mb-1">Avg Score: <strong id="trad-default-avg">-</strong></p>
+                <p class="mb-0">Avg Confidence: <strong id="trad-default-conf">-</strong></p>
+            </div>
+            <div class="col-md-3">
+                <h6 class="text-primary">Traditional - High</h6>
+                <p class="mb-1">Avg Score: <strong id="trad-high-avg">-</strong></p>
+                <p class="mb-0">Avg Confidence: <strong id="trad-high-conf">-</strong></p>
+            </div>
+            <div class="col-md-3">
+                <h6 class="text-success">Raw LSTM - Default</h6>
+                <p class="mb-1">Avg Score: <strong id="lstm-default-avg">-</strong></p>
+                <p class="mb-0">Avg Confidence: <strong id="lstm-default-conf">-</strong></p>
+            </div>
+            <div class="col-md-3">
+                <h6 class="text-success">Raw LSTM - High</h6>
+                <p class="mb-1">Avg Score: <strong id="lstm-high-avg">-</strong></p>
+                <p class="mb-0">Avg Confidence: <strong id="lstm-high-conf">-</strong></p>
+            </div>
         </div>
     </div>
 </div>
@@ -120,25 +248,17 @@
 
 {% block scripts %}
 <script>
-    // Data from APIs
-    let basicStocks = [];
-    let mlStocks = [];
+    // Global data storage
+    let dualModelData = null;
+    let statistics = null;
 
-    // Get selected risk strategy
-    function getSelectedRiskStrategy() {
-        const selectedRadio = document.querySelector('input[name="strategy"]:checked');
-        return selectedRadio ? selectedRadio.value : 'default_risk';
-    }
-
-    // Fetch basic filtered stocks (always loads first)
-    async function fetchBasicStocks() {
+    // Fetch dual model view from new API endpoint
+    async function fetchDualModelView() {
         try {
-            showLoadingSpinner('basic-stocks-table');
+            showLoadingState();
 
-            const riskStrategy = getSelectedRiskStrategy();
-
-            // Use the proper suggested stocks API endpoint
-            const response = await fetch(`/api/suggested-stocks/?strategy=${riskStrategy}&limit=20`, {
+            // Call the NEW dual-model-view endpoint
+            const response = await fetch('/api/suggested-stocks/dual-model-view?limit=10', {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -153,284 +273,192 @@
             const data = await response.json();
 
             if (data.success) {
-                basicStocks = data.data || [];
-                populateBasicStocksTable(basicStocks);
-                console.log(`✅ Basic filtering: ${basicStocks.length} stocks loaded`);
+                dualModelData = data.data;
+                statistics = data.statistics;
+
+                // Populate all 4 tables
+                populateTable('traditional-default-table', dualModelData.traditional.default_risk, 'primary');
+                populateTable('traditional-high-table', dualModelData.traditional.high_risk, 'primary');
+                populateTable('lstm-default-table', dualModelData.raw_lstm.default_risk, 'success');
+                populateTable('lstm-high-table', dualModelData.raw_lstm.high_risk, 'success');
+
+                // Update statistics
+                updateStatistics();
+
+                console.log('✅ Dual model data loaded successfully');
+                console.log('Traditional Default:', dualModelData.traditional.default_risk.length);
+                console.log('Traditional High:', dualModelData.traditional.high_risk.length);
+                console.log('Raw LSTM Default:', dualModelData.raw_lstm.default_risk.length);
+                console.log('Raw LSTM High:', dualModelData.raw_lstm.high_risk.length);
             } else {
-                throw new Error(data.error || 'Failed to fetch basic stocks');
+                throw new Error(data.error || 'Failed to fetch dual model view');
             }
 
         } catch (error) {
-            console.error('Error fetching basic stocks:', error);
-            showErrorMessage('basic-stocks-table', 'Failed to load basic filtered stocks: ' + error.message);
+            console.error('Error fetching dual model view:', error);
+            showError(error.message);
         } finally {
-            hideLoadingSpinner('basic-stocks-table');
+            hideLoadingState();
         }
     }
 
-    // Fetch ML-enhanced stocks (only when requested)
-    async function fetchMLStocks() {
-        try {
-            showLoadingSpinner('ml-stocks-table');
-
-            const riskStrategy = getSelectedRiskStrategy();
-
-            // Use suggested stocks API - ML analysis can be added as future enhancement
-            const response = await fetch(`/api/suggested-stocks/?strategy=${riskStrategy}&limit=20`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'same-origin'
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            if (data.success) {
-                // Filter only BUY recommendations
-                mlStocks = (data.data || []).filter(stock => stock.recommendation === 'BUY');
-                populateMLStocksTable(mlStocks);
-                console.log(`✅ ML analysis: ${mlStocks.length} BUY signals found`);
-            } else {
-                throw new Error(data.error || 'Failed to fetch ML stocks');
-            }
-
-        } catch (error) {
-            console.error('Error fetching ML stocks:', error);
-            showErrorMessage('ml-stocks-table', 'Failed to load ML analysis: ' + error.message);
-        } finally {
-            hideLoadingSpinner('ml-stocks-table');
-        }
-    }
-
-    // Populate basic stocks table
-    function populateBasicStocksTable(stocks) {
-        const table = document.getElementById('basic-stocks-table').getElementsByTagName('tbody')[0];
-        table.innerHTML = '';
+    // Populate a table with stock data
+    function populateTable(tableId, stocks, colorTheme = 'primary') {
+        const table = document.getElementById(tableId);
+        const tbody = table.getElementsByTagName('tbody')[0];
+        tbody.innerHTML = '';
 
         if (stocks.length === 0) {
-            const row = table.insertRow();
-            const cell = row.insertCell();
-            cell.colSpan = 10;
-            cell.className = 'text-center text-muted py-4';
-            cell.innerHTML = '<i class="bi bi-info-circle me-2"></i>No stocks found for the selected risk level.';
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        <i class="bi bi-info-circle me-2"></i>No predictions available yet
+                    </td>
+                </tr>
+            `;
             return;
         }
 
-        stocks.forEach(stock => {
-            const row = table.insertRow();
+        stocks.forEach((stock, index) => {
+            const row = tbody.insertRow();
+
+            // Rank
+            const rankCell = row.insertCell(0);
+            rankCell.textContent = index + 1;
+            rankCell.className = 'text-muted';
 
             // Symbol
-            const symbolCell = row.insertCell(0);
+            const symbolCell = row.insertCell(1);
             symbolCell.innerHTML = `<strong>${stock.symbol || 'N/A'}</strong>`;
 
-            // Company name
-            row.insertCell(1).textContent = stock.name || 'N/A';
+            // Company name (truncated)
+            const nameCell = row.insertCell(2);
+            const companyName = stock.stock_name || 'N/A';
+            nameCell.textContent = companyName.length > 20 ? companyName.substring(0, 20) + '...' : companyName;
+            nameCell.title = companyName; // Full name on hover
 
-            // Current Price
-            row.insertCell(2).textContent = '₹' + (stock.current_price || 0).toFixed(2);
+            // ML Score
+            const scoreCell = row.insertCell(3);
+            const score = (stock.ml_prediction_score || 0) * 100;
+            scoreCell.textContent = score.toFixed(1) + '%';
+            scoreCell.className = score > 60 ? 'text-success fw-bold' : score > 40 ? 'text-warning' : 'text-danger';
 
             // Target Price
-            row.insertCell(3).textContent = '₹' + (stock.target_price || 0).toFixed(2);
-
-            // Expected Return
-            const returnCell = row.insertCell(4);
-            const expectedReturn = stock.expected_return || 0;
-            returnCell.textContent = expectedReturn.toFixed(1) + '%';
-            returnCell.className = expectedReturn > 0 ? 'text-success fw-bold' : 'text-danger fw-bold';
-
-            // Market Cap
-            const marketCapCell = row.insertCell(5);
-            const marketCap = stock.market_cap || 0;
-            marketCapCell.textContent = '₹' + (marketCap / 10000000).toFixed(0) + ' Cr';
-
-            // Sector
-            row.insertCell(6).textContent = stock.sector || 'Others';
-
-            // Basic Score
-            const scoreCell = row.insertCell(7);
-            const basicScore = stock.basic_score || 0;
-            scoreCell.textContent = basicScore.toFixed(2);
-            scoreCell.className = basicScore > 0.7 ? 'text-success fw-bold' : basicScore > 0.5 ? 'text-warning fw-bold' : 'text-danger';
-
-            // Risk Level
-            const riskCell = row.insertCell(8);
-            const riskLevel = stock.risk_level || 'Medium';
-            const riskColor = riskLevel === 'Low' ? 'success' : riskLevel === 'High' ? 'danger' : 'warning';
-            riskCell.innerHTML = `<span class="badge bg-${riskColor}">${riskLevel}</span>`;
+            const targetCell = row.insertCell(4);
+            targetCell.textContent = '₹' + (stock.ml_price_target || 0).toFixed(2);
+            targetCell.className = 'text-primary';
 
             // Recommendation
-            const recommendationCell = row.insertCell(9);
-            const recommendation = stock.recommendation || 'HOLD';
-            const recColor = recommendation === 'BUY' ? 'success' : recommendation === 'SELL' ? 'danger' : 'secondary';
-            recommendationCell.innerHTML = `<span class="badge bg-${recColor}">${recommendation}</span>`;
+            const recCell = row.insertCell(5);
+            const rec = stock.recommendation || 'HOLD';
+            const recColor = rec === 'BUY' ? 'success' : rec === 'SELL' ? 'danger' : 'secondary';
+            recCell.innerHTML = `<span class="badge bg-${recColor}">${rec}</span>`;
         });
+
+        // Update badge count
+        const badgeId = tableId.replace('-table', '-badge');
+        const badge = document.getElementById(badgeId);
+        if (badge) {
+            badge.textContent = stocks.length;
+            badge.className = stocks.length > 0 ? 'badge bg-success ms-2' : 'badge bg-secondary ms-2';
+        }
     }
 
-    // Populate ML stocks table (only BUY signals)
-    function populateMLStocksTable(stocks) {
-        const table = document.getElementById('ml-stocks-table').getElementsByTagName('tbody')[0];
-        table.innerHTML = '';
+    // Update statistics display
+    function updateStatistics() {
+        if (!statistics) return;
 
-        if (stocks.length === 0) {
-            const row = table.insertRow();
-            const cell = row.insertCell();
-            cell.colSpan = 9;
-            cell.className = 'text-center text-muted py-4';
-            cell.innerHTML = '<i class="bi bi-info-circle me-2"></i>No BUY signals found. Try a different risk level or refresh data.';
-            return;
+        // Traditional - Default Risk
+        updateStatElement('trad-default-avg', statistics.traditional.default_risk.avg_score);
+        updateStatElement('trad-default-conf', statistics.traditional.default_risk.avg_confidence);
+        document.getElementById('trad-default-badge').textContent = statistics.traditional.default_risk.count;
+
+        // Traditional - High Risk
+        updateStatElement('trad-high-avg', statistics.traditional.high_risk.avg_score);
+        updateStatElement('trad-high-conf', statistics.traditional.high_risk.avg_confidence);
+        document.getElementById('trad-high-badge').textContent = statistics.traditional.high_risk.count;
+
+        // Raw LSTM - Default Risk
+        updateStatElement('lstm-default-avg', statistics.raw_lstm.default_risk.avg_score);
+        updateStatElement('lstm-default-conf', statistics.raw_lstm.default_risk.avg_confidence);
+        document.getElementById('lstm-default-badge').textContent = statistics.raw_lstm.default_risk.count;
+
+        // Raw LSTM - High Risk
+        updateStatElement('lstm-high-avg', statistics.raw_lstm.high_risk.avg_score);
+        updateStatElement('lstm-high-conf', statistics.raw_lstm.high_risk.avg_confidence);
+        document.getElementById('lstm-high-badge').textContent = statistics.raw_lstm.high_risk.count;
+
+        // Update header counts
+        const tradTotal = statistics.traditional.default_risk.count + statistics.traditional.high_risk.count;
+        const lstmTotal = statistics.raw_lstm.default_risk.count + statistics.raw_lstm.high_risk.count;
+        const defaultTotal = statistics.traditional.default_risk.count + statistics.raw_lstm.default_risk.count;
+        const highTotal = statistics.traditional.high_risk.count + statistics.raw_lstm.high_risk.count;
+
+        document.getElementById('trad-count').textContent = tradTotal;
+        document.getElementById('lstm-count').textContent = lstmTotal;
+        document.getElementById('default-count').textContent = defaultTotal;
+        document.getElementById('high-count').textContent = highTotal;
+    }
+
+    // Update a single statistic element
+    function updateStatElement(elementId, value) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.textContent = value ? (value * 100).toFixed(1) + '%' : 'N/A';
         }
+    }
 
-        stocks.forEach(stock => {
-            const row = table.insertRow();
+    // Show loading state
+    function showLoadingState() {
+        const tables = ['traditional-default-table', 'traditional-high-table',
+                       'lstm-default-table', 'lstm-high-table'];
 
-            // Symbol with ML badge
-            const symbolCell = row.insertCell(0);
-            symbolCell.innerHTML = `
-                <div>
-                    <strong>${stock.symbol || 'N/A'}</strong>
-                    <br>
-                    <span class="badge bg-primary bg-gradient" style="font-size: 0.7em;">
-                        <i class="bi bi-robot me-1"></i>ML
-                    </span>
-                </div>
+        tables.forEach(tableId => {
+            const table = document.getElementById(tableId);
+            const tbody = table.getElementsByTagName('tbody')[0];
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center py-4">
+                        <div class="spinner-border text-primary spinner-border-sm" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <div class="mt-2 small">Loading predictions...</div>
+                    </td>
+                </tr>
             `;
-
-            // Company name
-            row.insertCell(1).textContent = stock.name || 'N/A';
-
-            // Current Price
-            row.insertCell(2).textContent = '₹' + (stock.current_price || 0).toFixed(2);
-
-            // ML Target
-            row.insertCell(3).textContent = '₹' + (stock.target_price || 0).toFixed(2);
-
-            // ML Confidence
-            const confidenceCell = row.insertCell(4);
-            const confidence = (stock.basic_score || 0) * 100; // Convert to percentage
-            confidenceCell.textContent = confidence.toFixed(0) + '%';
-            confidenceCell.className = confidence > 70 ? 'text-success fw-bold' : confidence > 50 ? 'text-warning fw-bold' : 'text-danger';
-
-            // Expected Return
-            const returnCell = row.insertCell(5);
-            const expectedReturn = stock.expected_return || 0;
-            returnCell.textContent = expectedReturn.toFixed(1) + '%';
-            returnCell.className = 'text-success fw-bold';
-
-            // Risk Score
-            const riskScoreCell = row.insertCell(6);
-            const riskScore = 1 - (stock.basic_score || 0.5); // Inverse of basic score
-            riskScoreCell.textContent = riskScore.toFixed(2);
-            riskScoreCell.className = riskScore < 0.3 ? 'text-success' : riskScore < 0.5 ? 'text-warning' : 'text-danger';
-
-            // Signal Strength
-            const signalCell = row.insertCell(7);
-            const signalStrength = stock.basic_score > 0.8 ? 'Strong' : stock.basic_score > 0.6 ? 'Medium' : 'Weak';
-            const signalColor = signalStrength === 'Strong' ? 'success' : signalStrength === 'Medium' ? 'warning' : 'danger';
-            signalCell.innerHTML = `<span class="badge bg-${signalColor}">${signalStrength}</span>`;
-
-            // Holding Period
-            row.insertCell(8).textContent = stock.holding_period || '3-6 weeks';
         });
     }
 
-    // Utility functions
-    function showLoadingSpinner(tableId) {
-        const table = document.getElementById(tableId).getElementsByTagName('tbody')[0];
-        table.innerHTML = `
-            <tr>
-                <td colspan="10" class="text-center py-4">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <div class="mt-2">Loading stocks...</div>
-                </td>
-            </tr>
-        `;
+    // Hide loading state
+    function hideLoadingState() {
+        // Loading will be replaced by actual data or error message
     }
 
-    function hideLoadingSpinner(tableId) {
-        // The spinner will be replaced when populate function is called
-    }
+    // Show error message
+    function showError(message) {
+        const tables = ['traditional-default-table', 'traditional-high-table',
+                       'lstm-default-table', 'lstm-high-table'];
 
-    function showErrorMessage(tableId, message) {
-        const table = document.getElementById(tableId).getElementsByTagName('tbody')[0];
-        table.innerHTML = `
-            <tr>
-                <td colspan="10" class="text-center text-danger py-4">
-                    <i class="bi bi-exclamation-triangle me-2"></i>${message}
-                </td>
-            </tr>
-        `;
-    }
-
-    function showNotification(message, type = 'info') {
-        // Simple console log for now - can be enhanced with toast notifications
-        console.log(`${type.toUpperCase()}: ${message}`);
-    }
-
-    // Event handlers
-    function handleStrategyFilter() {
-        fetchBasicStocks(); // Always refresh basic stocks when strategy changes
-
-        // Hide ML section if it's open
-        const mlSection = document.getElementById('ml-section');
-        if (mlSection.style.display !== 'none') {
-            mlSection.style.display = 'none';
-            document.getElementById('apply-ml-btn').innerHTML = '<i class="bi bi-magic"></i> Apply ML Analysis';
-        }
-    }
-
-    function toggleMLSection() {
-        const mlSection = document.getElementById('ml-section');
-        const mlBtn = document.getElementById('apply-ml-btn');
-
-        if (mlSection.style.display === 'none') {
-            mlSection.style.display = 'block';
-            mlBtn.innerHTML = '<i class="bi bi-eye-slash"></i> Hide ML Analysis';
-            fetchMLStocks();
-        } else {
-            mlSection.style.display = 'none';
-            mlBtn.innerHTML = '<i class="bi bi-magic"></i> Apply ML Analysis';
-        }
+        tables.forEach(tableId => {
+            const table = document.getElementById(tableId);
+            const tbody = table.getElementsByTagName('tbody')[0];
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center text-danger py-4">
+                        <i class="bi bi-exclamation-triangle me-2"></i>${message}
+                    </td>
+                </tr>
+            `;
+        });
     }
 
     // Event listeners
-    document.getElementById('refresh-btn').addEventListener('click', () => {
-        fetchBasicStocks();
-        const mlSection = document.getElementById('ml-section');
-        if (mlSection.style.display !== 'none') {
-            fetchMLStocks();
-        }
-    });
-
-    document.getElementById('apply-ml-btn').addEventListener('click', toggleMLSection);
-
-    // Add event listeners to strategy radio buttons
-    document.querySelectorAll('input[name="strategy"]').forEach(radio => {
-        radio.addEventListener('change', handleStrategyFilter);
-    });
+    document.getElementById('refresh-btn').addEventListener('click', fetchDualModelView);
 
     // Initialize page when loaded
     document.addEventListener('DOMContentLoaded', function() {
-        // Check if strategy is specified in URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const strategyParam = urlParams.get('strategy');
-
-        if (strategyParam && ['default_risk', 'high_risk'].includes(strategyParam)) {
-            // Set the radio button based on URL parameter
-            const radioButton = document.getElementById(`strategy-${strategyParam.replace('_', '-')}`);
-            if (radioButton) {
-                radioButton.checked = true;
-            }
-        }
-
-        // Always load basic stocks first
-        fetchBasicStocks();
+        console.log('📊 Initializing Dual Model View...');
+        fetchDualModelView();
     });
 </script>
 {% endblock %}

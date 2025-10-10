@@ -1,0 +1,122 @@
+# Triple Barrier Labeling Configuration
+# Based on Korean Stock Prediction Research (2024)
+
+# Default barrier parameters (from research paper)
+default:
+  upper_barrier: 9.0        # Take-profit barrier in percentage (e.g., +9%)
+  lower_barrier: 9.0        # Stop-loss barrier in percentage (e.g., -9%)
+  time_horizon: 29          # Time barrier in days
+
+# Alternative configurations for experimentation
+conservative:
+  upper_barrier: 5.0        # Smaller profit target
+  lower_barrier: 5.0        # Tighter stop loss
+  time_horizon: 14          # Shorter holding period
+
+aggressive:
+  upper_barrier: 15.0       # Larger profit target
+  lower_barrier: 15.0       # Wider stop loss
+  time_horizon: 60          # Longer holding period
+
+# For different market cap categories
+large_cap:
+  upper_barrier: 7.0        # More stable stocks
+  lower_barrier: 7.0
+  time_horizon: 21
+
+mid_cap:
+  upper_barrier: 9.0        # Medium volatility
+  lower_barrier: 9.0
+  time_horizon: 29
+
+small_cap:
+  upper_barrier: 12.0       # Higher volatility
+  lower_barrier: 12.0
+  time_horizon: 42
+
+# For different trading strategies
+day_trading:
+  upper_barrier: 3.0        # Quick profits
+  lower_barrier: 2.0        # Tight stop loss
+  time_horizon: 1           # Same day exit
+
+swing_trading:
+  upper_barrier: 8.0        # Medium term
+  lower_barrier: 6.0
+  time_horizon: 10
+
+position_trading:
+  upper_barrier: 20.0       # Long term
+  lower_barrier: 15.0
+  time_horizon: 90
+
+# Raw OHLCV LSTM Model Configuration
+# Based on research findings
+lstm_model:
+  # Model architecture
+  hidden_size: 8            # Paper's optimal: 8 (not 128, 256, etc!)
+  window_length: 100        # Paper's optimal: 100 days lookback
+  use_full_ohlcv: true      # true = OHLCV (F1: 0.4312), false = close only (F1: 0.4170)
+  dropout: 0.2              # Regularization
+
+  # Training parameters
+  epochs: 100               # Maximum epochs
+  batch_size: 32            # Batch size
+  validation_split: 0.1     # Validation proportion
+  early_stopping_patience: 15  # Stop if no improvement
+  test_size: 0.2            # Test set proportion
+
+  # Learning rate schedule
+  initial_lr: 0.001         # Initial learning rate
+  reduce_lr_factor: 0.5     # Reduce by 50% on plateau
+  reduce_lr_patience: 5     # Patience for LR reduction
+  min_lr: 1e-7              # Minimum learning rate
+
+# Model comparison settings
+comparison:
+  metrics_to_track:
+    - accuracy
+    - f1_macro
+    - f1_weighted
+    - precision_macro
+    - recall_macro
+
+  primary_metric: f1_macro  # Metric for selecting best model
+
+  benchmark_models:
+    - raw_ohlcv_lstm         # Research-based approach
+    - traditional_ensemble   # Your current approach
+    - random_forest          # Simple baseline
+    - xgboost                # Gradient boosting baseline
+
+# Data requirements
+data:
+  min_samples_training: 300    # Minimum samples needed (increased from paper's requirement)
+  min_samples_window: 100      # For creating windows
+  required_columns:
+    - open
+    - high
+    - low
+    - close
+    - volume
+
+# Auto-tuning settings
+auto_tuning:
+  enabled: false              # Set to true to auto-find best barrier parameters
+  target_balance: 0.33        # Target proportion for each class
+  barrier_range: [5, 7, 9, 11, 13, 15]  # Barrier percentages to try
+  horizon_range: [14, 21, 29, 42, 60]   # Time horizons to try
+
+# Logging and monitoring
+logging:
+  log_level: INFO
+  save_training_history: true
+  save_predictions: true
+  save_comparison_reports: true
+
+# File paths
+paths:
+  models_dir: ml_models/raw_ohlcv_lstm
+  comparison_dir: ml_models/comparison
+  reports_dir: reports/ml_comparison
+  logs_dir: logs/ml
