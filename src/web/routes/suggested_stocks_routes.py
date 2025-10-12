@@ -299,7 +299,16 @@ def get_dual_model_view():
                     'error': 'Invalid date format. Use YYYY-MM-DD'
                 }), 400
         else:
-            query_date = dt_date.today()
+            # Get the most recent date with data instead of today
+            with get_database_manager().get_session() as session:
+                recent_date_result = session.execute(text("""
+                    SELECT MAX(date) as max_date FROM daily_suggested_stocks
+                """)).first()
+
+                if recent_date_result and recent_date_result[0]:
+                    query_date = recent_date_result[0]
+                else:
+                    query_date = dt_date.today()
 
         user_id = current_user.id
 

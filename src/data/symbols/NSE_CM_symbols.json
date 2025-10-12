@@ -253,6 +253,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "101000000010346",
+      "symbol": "NSE:DGCONTENT-EQ",
+      "name": "DIGICONTENT LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE03JI01017",
+      "last_updated": ""
+    },
+    {
       "fytoken": "101000000010350",
       "symbol": "NSE:CSLFINANCE-EQ",
       "name": "CSL FINANCE LIMITED",
@@ -889,6 +901,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "101000000010786",
+      "symbol": "NSE:NOIDATOLL-EQ",
+      "name": "NOIDA TOLL BRIDGE CO LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE781B01015",
+      "last_updated": ""
+    },
+    {
       "fytoken": "101000000010791",
       "symbol": "NSE:NUCLEUS-EQ",
       "name": "NUCLEUS SOFTWARE EXPORTS",
@@ -958,6 +982,18 @@
       "lot": 1,
       "tick": 0.1,
       "isin": "INE524A01029",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "101000000010859",
+      "symbol": "NSE:DREAMFOLKS-EQ",
+      "name": "DREAMFOLKS SERVICES LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE0JS101016",
       "last_updated": ""
     },
     {
@@ -1246,6 +1282,18 @@
       "lot": 1,
       "tick": 0.05,
       "isin": "INE0D6I01023",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "101000000011065",
+      "symbol": "NSE:NATHBIOGEN-EQ",
+      "name": "NATH BIO-GENES (I) LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE448G01010",
       "last_updated": ""
     },
     {
@@ -2341,18 +2389,6 @@
       "last_updated": ""
     },
     {
-      "fytoken": "101000000011627",
-      "symbol": "NSE:NARMADA-EQ",
-      "name": "NARMADA AGROBASE LIMITED",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE117Z01011",
-      "last_updated": ""
-    },
-    {
       "fytoken": "101000000011630",
       "symbol": "NSE:NTPC-EQ",
       "name": "NTPC LTD",
@@ -2989,18 +3025,6 @@
       "last_updated": ""
     },
     {
-      "fytoken": "101000000011943",
-      "symbol": "NSE:MCLEODRUSS-EQ",
-      "name": "MCLEOD RUSSEL INDIA LTD.",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE942G01012",
-      "last_updated": ""
-    },
-    {
       "fytoken": "101000000011956",
       "symbol": "NSE:MEDANTA-EQ",
       "name": "GLOBAL HEALTH LIMITED",
@@ -3022,6 +3046,18 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE531A01024",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "101000000011961",
+      "symbol": "NSE:SEMAC-EQ",
+      "name": "SEMAC CONSTRUCTION LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.05,
+      "isin": "INE617A01013",
       "last_updated": ""
     },
     {
@@ -3430,18 +3466,6 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE172A01027",
-      "last_updated": ""
-    },
-    {
-      "fytoken": "101000000012533",
-      "symbol": "NSE:AAATECH-EQ",
-      "name": "AAA TECHNOLOGIES LIMITED",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE0D0U01013",
       "last_updated": ""
     },
     {
@@ -6757,6 +6781,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "101000000014890",
+      "symbol": "NSE:AKI-EQ",
+      "name": "AKI INDIA LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE642Z01026",
+      "last_updated": ""
+    },
+    {
       "fytoken": "101000000014894",
       "symbol": "NSE:CENTRALBK-EQ",
       "name": "CENTRAL BANK OF INDIA",
@@ -7393,6 +7429,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "101000000015209",
+      "symbol": "NSE:PPAP-EQ",
+      "name": "PPAP AUTOMOTIVE LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE095I01015",
+      "last_updated": ""
+    },
+    {
       "fytoken": "10100000001521",
       "symbol": "NSE:INDIAGLYCO-EQ",
       "name": "INDIA GLYCOLS LTD",
@@ -8005,6 +8053,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "10100000001607",
+      "symbol": "NSE:GODHA-EQ",
+      "name": "GODHA CABCON INSULAT LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE925Y01036",
+      "last_updated": ""
+    },
+    {
       "fytoken": "101000000016123",
       "symbol": "NSE:BHARATWIRE-EQ",
       "name": "BHARAT WIRE ROPES LTD.",
@@ -8230,18 +8290,6 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE087B01017",
-      "last_updated": ""
-    },
-    {
-      "fytoken": "101000000016658",
-      "symbol": "NSE:SIGMA-EQ",
-      "name": "SIGMA SOLVE LIMITED",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.05,
-      "isin": "INE0A0S01028",
       "last_updated": ""
     },
     {
@@ -9382,6 +9430,18 @@
       "lot": 1,
       "tick": 0.05,
       "isin": "INE637C01025",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "101000000017659",
+      "symbol": "NSE:UNIVPHOTO-EQ",
+      "name": "UNIVERSUS IMAGINGS LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.05,
+      "isin": "INE03V001013",
       "last_updated": ""
     },
     {
@@ -11101,18 +11161,6 @@
       "last_updated": ""
     },
     {
-      "fytoken": "101000000019126",
-      "symbol": "NSE:KIOCL-EQ",
-      "name": "KIOCL LIMITED",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.05,
-      "isin": "INE880L01014",
-      "last_updated": ""
-    },
-    {
       "fytoken": "101000000019142",
       "symbol": "NSE:UMESLTD-EQ",
       "name": "USHA MARTIN EDU & SOL LTD",
@@ -12277,6 +12325,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "101000000020321",
+      "symbol": "NSE:SHANKARA-EQ",
+      "name": "SHANKARA BLDG PRODUCT LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE274V01019",
+      "last_updated": ""
+    },
+    {
       "fytoken": "101000000020322",
       "symbol": "NSE:FEDFINA-EQ",
       "name": "FEDBANK FINANCIAL SER L",
@@ -12634,18 +12694,6 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE0FRK01020",
-      "last_updated": ""
-    },
-    {
-      "fytoken": "101000000020790",
-      "symbol": "NSE:SUMEETINDS-EQ",
-      "name": "SUMEET IND LIMITED",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE235C01036",
       "last_updated": ""
     },
     {
@@ -13694,7 +13742,7 @@
     },
     {
       "fytoken": "101000000022277",
-      "symbol": "NSE:WORTH-EQ",
+      "symbol": "NSE:WORTHPERI-EQ",
       "name": "WORTH PERIPHERALS LIMITED",
       "exchange": "NSE",
       "segment": "CM",
@@ -15189,7 +15237,7 @@
       "instrument_type": "EQ",
       "lot": 1,
       "tick": 0.1,
-      "isin": "INE976R01025",
+      "isin": "INE976R01033",
       "last_updated": ""
     },
     {
@@ -16177,18 +16225,6 @@
       "last_updated": ""
     },
     {
-      "fytoken": "101000000025608",
-      "symbol": "NSE:INDOTHAI-EQ",
-      "name": "INDO THAI SEC LTD",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.05,
-      "isin": "INE337M01021",
-      "last_updated": ""
-    },
-    {
       "fytoken": "10100000002562",
       "symbol": "NSE:HUHTAMAKI-EQ",
       "name": "HUHTAMAKI INDIA LIMITED",
@@ -16942,6 +16978,18 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE247M01014",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "10100000002711",
+      "symbol": "NSE:PRECOT-EQ",
+      "name": "PRECOT LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.05,
+      "isin": "INE283A01014",
       "last_updated": ""
     },
     {
@@ -18770,8 +18818,8 @@
     },
     {
       "fytoken": "10100000003127",
-      "symbol": "NSE:BARBEQUE-EQ",
-      "name": "BARBEQUE NATION HOSP. LTD",
+      "symbol": "NSE:UFBL-EQ",
+      "name": "UNITED FOODBRANDS LIMITED",
       "exchange": "NSE",
       "segment": "CM",
       "instrument_type": "EQ",
@@ -20377,6 +20425,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "10100000004064",
+      "symbol": "NSE:CUBEXTUB-EQ",
+      "name": "CUBEX TUBINGS LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE144D01012",
+      "last_updated": ""
+    },
+    {
       "fytoken": "10100000004067",
       "symbol": "NSE:MARICO-EQ",
       "name": "MARICO LIMITED",
@@ -21166,6 +21226,18 @@
       "lot": 1,
       "tick": 0.05,
       "isin": "INE967H01025",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "10100000004870",
+      "symbol": "NSE:INDSWFTLAB-EQ",
+      "name": "IND SWIFT LABORATORIES LT",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE915B01019",
       "last_updated": ""
     },
     {
@@ -22273,6 +22345,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "10100000006040",
+      "symbol": "NSE:EIFFL-EQ",
+      "name": "EURO (I) FRESH FOODS LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE546V01010",
+      "last_updated": ""
+    },
+    {
       "fytoken": "10100000006045",
       "symbol": "NSE:PASUPTAC-EQ",
       "name": "PASUPATI ACRYLON LIMITED",
@@ -22330,6 +22414,18 @@
       "lot": 1,
       "tick": 0.1,
       "isin": "INE127I01024",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "10100000006127",
+      "symbol": "NSE:DIGJAMLMTD-EQ",
+      "name": "DIGJAM LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE731U01028",
       "last_updated": ""
     },
     {
@@ -22678,6 +22774,18 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INF209KB11D8",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "10100000006489",
+      "symbol": "NSE:IRIS-EQ",
+      "name": "IRIS BUSINESS SERV LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.05,
+      "isin": "INE864K01010",
       "last_updated": ""
     },
     {
@@ -23281,6 +23389,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "10100000007129",
+      "symbol": "NSE:ZODIAC-EQ",
+      "name": "ZODIAC ENERGY LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.05,
+      "isin": "INE761Y01019",
+      "last_updated": ""
+    },
+    {
       "fytoken": "1010000000714",
       "symbol": "NSE:SHALBY-EQ",
       "name": "SHALBY LIMITED",
@@ -23689,6 +23809,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "10100000007457",
+      "symbol": "NSE:HAVISHA-EQ",
+      "name": "SRI HAVISHA HOSP & INFR L",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE293B01029",
+      "last_updated": ""
+    },
+    {
       "fytoken": "10100000007506",
       "symbol": "NSE:WOCKPHARMA-EQ",
       "name": "WOCKHARDT LIMITED",
@@ -23919,7 +24051,7 @@
     {
       "fytoken": "1010000000757014",
       "symbol": "NSE:THELEELA-EQ",
-      "name": "SCHLOSS BANGALORE LIMITED",
+      "name": "LEELA PALACES HOTEL LTD",
       "exchange": "NSE",
       "segment": "CM",
       "instrument_type": "EQ",
@@ -24973,6 +25105,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "1010000000759152",
+      "symbol": "NSE:VMSTMT-EQ",
+      "name": "VMS TMT LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE0SJA01013",
+      "last_updated": ""
+    },
+    {
       "fytoken": "1010000000759169",
       "symbol": "NSE:MWL-EQ",
       "name": "MANGALAM WORLDWIDE LTD",
@@ -25045,6 +25189,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "1010000000759265",
+      "symbol": "NSE:TATACAP-EQ",
+      "name": "TATA CAPITAL LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.05,
+      "isin": "INE976I01016",
+      "last_updated": ""
+    },
+    {
       "fytoken": "1010000000759291",
       "symbol": "NSE:BLUESTONE-EQ",
       "name": "BLUESTONE JEWEL LFSTL LTD",
@@ -25090,6 +25246,30 @@
       "lot": 1,
       "tick": 0.05,
       "isin": "INE880Y01017",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "1010000000759428",
+      "symbol": "NSE:GROWWRLTY-EQ",
+      "name": "GROWWAMC - GROWWRLTY",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INF666M01MN2",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "1010000000759434",
+      "symbol": "NSE:WEWORK-EQ",
+      "name": "WEWORK INDIA MANAGEMENT L",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.05,
+      "isin": "INE085001019",
       "last_updated": ""
     },
     {
@@ -25150,6 +25330,18 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE06XZ01023",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "1010000000759466",
+      "symbol": "NSE:ELIQUID-EQ",
+      "name": "EDELAMC - ELIQUID",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INF754K01VW2",
       "last_updated": ""
     },
     {
@@ -26269,6 +26461,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "10100000008842",
+      "symbol": "NSE:UMAEXPORTS-EQ",
+      "name": "UMA EXPORTS LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE0GIU01018",
+      "last_updated": ""
+    },
+    {
       "fytoken": "10100000008866",
       "symbol": "NSE:CHOICEIN-EQ",
       "name": "CHOICE INTERNATIONAL LTD",
@@ -26821,18 +27025,6 @@
       "last_updated": ""
     },
     {
-      "fytoken": "10100000009436",
-      "symbol": "NSE:AXISCADES-EQ",
-      "name": "AXISCADES TECH LTD",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.1,
-      "isin": "INE555B01013",
-      "last_updated": ""
-    },
-    {
       "fytoken": "10100000009480",
       "symbol": "NSE:LICI-EQ",
       "name": "LIFE INSURA CORP OF INDIA",
@@ -27313,6 +27505,6 @@
       "last_updated": ""
     }
   ],
-  "timestamp": "2025-10-07T23:55:59.783130",
+  "timestamp": "2025-10-11T02:27:17.727186",
   "exchange_type": "NSE_CM"
 }

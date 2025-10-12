@@ -17,7 +17,7 @@ from .stock_models import (
 class User(UserMixin, Base):
     """User authentication and profile information."""
     __tablename__ = 'users'
-    
+
     id = Column(Integer, primary_key=True)
     username = Column(String(80), unique=True, nullable=False)
     email = Column(String(120), unique=True, nullable=False)
@@ -26,6 +26,7 @@ class User(UserMixin, Base):
     last_name = Column(String(50))
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
+    is_mock_trading_mode = Column(Boolean, default=True)  # Mock trading enabled by default
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime)
     last_activity = Column(DateTime)
@@ -89,7 +90,7 @@ class MarketData(Base):
 class Order(Base):
     """Order details and state tracking."""
     __tablename__ = 'orders'
-    
+
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     order_id = Column(String(50), unique=True, nullable=False)
@@ -114,6 +115,11 @@ class Order(Base):
     placed_at = Column(DateTime)
     placed_by = Column(String(50))
     variety = Column(String(20))
+    is_mock_order = Column(Boolean, default=False)  # Mock order flag
+    model_type = Column(String(20))  # 'traditional' or 'raw_lstm'
+    strategy = Column(String(50))  # 'default_risk' or 'high_risk'
+    ml_prediction_score = Column(Float)  # ML prediction at time of order
+    ml_price_target = Column(Float)  # Price target from ML
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

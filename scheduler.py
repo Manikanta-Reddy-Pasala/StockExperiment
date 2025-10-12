@@ -69,38 +69,129 @@ def train_ml_models():
 
 
 def update_daily_snapshot():
-    """Update daily suggested stocks snapshot (runs at 2:15 AM, after ML training)."""
+    """Update daily suggested stocks snapshot (runs at 10:15 PM, after ML training)."""
     logger.info("=" * 80)
-    logger.info("Starting Daily Suggested Stocks Update")
+    logger.info("Starting Daily Suggested Stocks Update - DUAL MODEL + DUAL STRATEGY MODE")
     logger.info("=" * 80)
-    
+
+    # Run BOTH strategies to populate all 4 model/risk combinations
+    strategies_to_run = ['default_risk', 'high_risk']
+    total_stocks_stored = 0
+
     try:
-        # Run suggested stocks saga to get fresh recommendations
+        # ============================================================
+        # PART 1: Traditional Model (via Saga Orchestrator)
+        # ============================================================
+        logger.info("\n" + "="*80)
+        logger.info("TRADITIONAL MODEL PREDICTIONS")
+        logger.info("="*80)
+
         orchestrator = SuggestedStocksSagaOrchestrator()
-        result = orchestrator.execute_suggested_stocks_saga(
-            user_id=1,
-            strategies=['default_risk'],
-            limit=50  # Store top 50 daily picks
-        )
-        
-        if result['status'] == 'completed':
-            logger.info("✅ Daily snapshot updated successfully at 2:15 AM")
-            logger.info(f"  Total stocks stored: {result['summary'].get('final_result_count', 0)}")
-            
-            # Check if ML predictions were applied
-            ml_step = next((s for s in result['summary']['step_summary'] 
-                          if s['step_id'] == 'step6_ml_prediction'), None)
-            if ml_step and ml_step['status'] == 'completed':
-                logger.info(f"  ML predictions applied to all stocks")
-            
-            # Check snapshot save
-            snapshot_step = next((s for s in result['summary']['step_summary'] 
-                                if s['step_id'] == 'step7_daily_snapshot'), None)
-            if snapshot_step and snapshot_step['status'] == 'completed':
-                logger.info(f"  Snapshot saved: {snapshot_step.get('metadata', {})}")
-        else:
-            logger.error(f"❌ Daily snapshot update failed: {result.get('errors', [])}")
-            
+
+        for strategy in strategies_to_run:
+            logger.info("-" * 80)
+            logger.info(f"Running Traditional Model: {strategy.upper()}")
+            logger.info("-" * 80)
+
+            try:
+                # Run suggested stocks saga for this strategy
+                result = orchestrator.execute_suggested_stocks_saga(
+                    user_id=1,
+                    strategies=[strategy],
+                    limit=50  # Store top 50 daily picks per strategy
+                )
+
+                if result['status'] == 'completed':
+                    stocks_count = result['summary'].get('final_result_count', 0)
+                    total_stocks_stored += stocks_count
+                    logger.info(f"✅ Traditional {strategy} snapshot updated successfully")
+                    logger.info(f"  Stocks stored: {stocks_count}")
+
+                    # Check if ML predictions were applied
+                    ml_step = next((s for s in result['summary']['step_summary']
+                                  if s['step_id'] == 'step6_ml_prediction'), None)
+                    if ml_step and ml_step['status'] == 'completed':
+                        logger.info(f"  ML predictions: ✅ Applied (Avg Score: {ml_step['metadata'].get('avg_prediction_score', 0):.3f})")
+
+                    # Check snapshot save
+                    snapshot_step = next((s for s in result['summary']['step_summary']
+                                        if s['step_id'] == 'step7_daily_snapshot'), None)
+                    if snapshot_step and snapshot_step['status'] == 'completed':
+                        metadata = snapshot_step.get('metadata', {})
+                        logger.info(f"  Snapshot: ✅ Saved ({metadata.get('inserted', 0)} inserted, {metadata.get('updated', 0)} updated)")
+                else:
+                    logger.error(f"❌ Traditional {strategy} snapshot update failed: {result.get('errors', [])}")
+
+            except Exception as e:
+                logger.error(f"❌ Traditional {strategy} strategy failed: {e}", exc_info=True)
+                continue
+
+        # ============================================================
+        # PART 2: Raw LSTM Model (Direct Service Call)
+        # ============================================================
+        logger.info("\n" + "="*80)
+        logger.info("RAW LSTM MODEL PREDICTIONS")
+        logger.info("="*80)
+
+        try:
+            from pathlib import Path
+            from src.services.ml.raw_lstm_prediction_service import get_raw_lstm_prediction_service
+
+            # Get trained Raw LSTM models
+            model_dir = Path('ml_models/raw_ohlcv_lstm')
+            if model_dir.exists():
+                symbols = [d.name for d in model_dir.iterdir()
+                          if d.is_dir() and ((d / 'lstm_model.h5').exists() or (d / 'model.h5').exists())]
+
+                if symbols:
+                    logger.info(f"Found {len(symbols)} trained Raw LSTM models")
+
+                    service = get_raw_lstm_prediction_service()
+
+                    for strategy in strategies_to_run:
+                        logger.info("-" * 80)
+                        logger.info(f"Running Raw LSTM Model: {strategy.upper()}")
+                        logger.info("-" * 80)
+
+                        try:
+                            # Generate predictions with strategy
+                            predictions = service.batch_predict(symbols, user_id=1, strategy=strategy)
+
+                            if predictions:
+                                # Sort by prediction score
+                                predictions.sort(key=lambda x: x['ml_prediction_score'], reverse=True)
+
+                                # Save to database
+                                service.save_to_suggested_stocks(predictions, strategy=strategy)
+
+                                total_stocks_stored += len(predictions)
+                                logger.info(f"✅ Raw LSTM {strategy} predictions saved")
+                                logger.info(f"  Stocks stored: {len(predictions)}")
+                            else:
+                                logger.warning(f"⚠️  No Raw LSTM predictions generated for {strategy}")
+
+                        except Exception as e:
+                            logger.error(f"❌ Raw LSTM {strategy} failed: {e}", exc_info=True)
+                            continue
+                else:
+                    logger.warning("⚠️  No trained Raw LSTM models found - skipping")
+            else:
+                logger.warning("⚠️  Raw LSTM model directory not found - skipping")
+
+        except Exception as e:
+            logger.error(f"❌ Raw LSTM predictions failed: {e}", exc_info=True)
+
+        # ============================================================
+        # Summary
+        # ============================================================
+        logger.info("\n" + "="*80)
+        logger.info(f"✅ Daily Snapshot Update Complete (Dual Model + Dual Strategy)!")
+        logger.info("="*80)
+        logger.info(f"  Total stocks stored across ALL models and strategies: {total_stocks_stored}")
+        logger.info(f"  Traditional Model strategies: {len(strategies_to_run)}")
+        logger.info(f"  Raw LSTM Model strategies: {len(strategies_to_run)}")
+        logger.info("="*80)
+
     except Exception as e:
         logger.error(f"❌ Daily snapshot update failed: {e}", exc_info=True)
 
@@ -180,6 +271,9 @@ def run_scheduler():
     logger.info("Scheduled Tasks:")
     logger.info("  - ML Training:           Daily at 10:00 PM (after data pipeline)")
     logger.info("  - Daily Snapshot Update: Daily at 10:15 PM (after ML training)")
+    logger.info("    → Models: TRADITIONAL + RAW_LSTM (both)")
+    logger.info("    → Strategies: DEFAULT_RISK + HIGH_RISK (both)")
+    logger.info("    → Total: 4 combinations (2 models × 2 strategies)")
     logger.info("  - Cleanup Old Snapshots: Weekly (Sunday) at 03:00 AM")
     logger.info("=" * 80)
 

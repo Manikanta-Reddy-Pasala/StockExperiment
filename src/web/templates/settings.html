@@ -25,8 +25,11 @@
                                 <option value="development">Development (Paper Trading)</option>
                                 <option value="production">Production (Live Trading)</option>
                             </select>
+                            <div class="form-text">
+                                Development mode saves orders to database only (no broker execution) - ideal for evaluating ML model performance.
+                            </div>
                         </div>
-                        
+
                         <div class="col-md-12">
                             <h5 class="mt-4">Active Strategies</h5>
                             <hr>
@@ -64,40 +67,59 @@
                         </div>
                         
                         <div class="col-md-12">
-                            <h5 class="mt-4">Risk Management</h5>
+                            <h5 class="mt-4">Account & Auto-Trading</h5>
                             <hr>
                         </div>
-                        
+
                         <div class="col-md-6 mb-3">
-                            <label for="max-capital-per-trade" class="form-label">Max Capital Per Trade (%)</label>
-                            <input type="number" class="form-control" id="max-capital-per-trade" step="0.01" value="1.00">
+                            <label for="account-balance" class="form-label">Account Balance (₹)</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="account-balance" readonly value="Loading...">
+                                <button class="btn btn-outline-primary" type="button" id="refresh-balance-btn">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                            </div>
+                            <div class="form-text">
+                                <span id="balance-source">Fetched from FYERS API</span>
+                                <span id="balance-timestamp" class="text-muted ms-2"></span>
+                            </div>
                         </div>
-                        
+
                         <div class="col-md-6 mb-3">
-                            <label for="max-concurrent-trades" class="form-label">Max Concurrent Trades</label>
-                            <input type="number" class="form-control" id="max-concurrent-trades" value="10">
+                            <label for="auto-buy-enabled" class="form-label">Auto-Buy on Predictions</label>
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" id="auto-buy-enabled">
+                                <label class="form-check-label" for="auto-buy-enabled">
+                                    Enable Automatic Buying
+                                </label>
+                            </div>
+                            <div class="form-text">Automatically place orders when new predictions are generated</div>
                         </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="daily-loss-limit" class="form-label">Daily Loss Limit (%)</label>
-                            <input type="number" class="form-control" id="daily-loss-limit" step="0.01" value="2.00">
+
+                        <div class="col-md-6 mb-3" id="auto-buy-amount-container" style="display: none;">
+                            <label for="auto-buy-amount" class="form-label">Auto-Buy Amount (₹)</label>
+                            <input type="number" class="form-control" id="auto-buy-amount" step="5000" value="50000">
+                            <div class="form-text">Amount to invest per auto-buy session</div>
                         </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="single-name-exposure" class="form-label">Single Name Exposure Limit (%)</label>
-                            <input type="number" class="form-control" id="single-name-exposure" step="0.01" value="5.00">
+
+                        <div class="col-md-6 mb-3" id="auto-buy-strategies-container" style="display: none;">
+                            <label for="auto-buy-strategies" class="form-label">Auto-Buy Strategies</label>
+                            <select multiple class="form-select" id="auto-buy-strategies" size="4">
+                                <option value="traditional_default_risk">Traditional + Default Risk</option>
+                                <option value="traditional_high_risk">Traditional + High Risk</option>
+                                <option value="raw_lstm_default_risk">Raw LSTM + Default Risk</option>
+                                <option value="raw_lstm_high_risk">Raw LSTM + High Risk</option>
+                            </select>
+                            <div class="form-text">Select which strategies to auto-buy (hold Ctrl/Cmd for multiple)</div>
                         </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="stop-loss-percent" class="form-label">Default Stop Loss (%)</label>
-                            <input type="number" class="form-control" id="stop-loss-percent" step="0.01" value="5.00">
+
+                        <div class="col-md-12 mb-3" id="auto-buy-info" style="display: none;">
+                            <div class="alert alert-warning">
+                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                <strong>Auto-Buy Warning:</strong> Orders will be placed automatically using ML score-based allocation when new predictions are available. Make sure you have sufficient account balance.
+                            </div>
                         </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="take-profit-percent" class="form-label">Default Take Profit (%)</label>
-                            <input type="number" class="form-control" id="take-profit-percent" step="0.01" value="10.00">
-                        </div>
-                        
+
                         <div class="col-md-12">
                             <h5 class="mt-4">Notification Settings</h5>
                             <hr>
@@ -217,27 +239,118 @@
         }, 5000);
     }
     
+    // Toggle auto-buy options visibility
+    function toggleAutoBuyOptions() {
+        const autoBuyEnabled = document.getElementById('auto-buy-enabled').checked;
+        const amountContainer = document.getElementById('auto-buy-amount-container');
+        const strategiesContainer = document.getElementById('auto-buy-strategies-container');
+        const infoContainer = document.getElementById('auto-buy-info');
+
+        if (autoBuyEnabled) {
+            amountContainer.style.display = 'block';
+            strategiesContainer.style.display = 'block';
+            infoContainer.style.display = 'block';
+        } else {
+            amountContainer.style.display = 'none';
+            strategiesContainer.style.display = 'none';
+            infoContainer.style.display = 'none';
+        }
+    }
+
+    // Fetch account balance from FYERS API
+    async function fetchAccountBalance() {
+        const balanceInput = document.getElementById('account-balance');
+        const balanceSource = document.getElementById('balance-source');
+        const balanceTimestamp = document.getElementById('balance-timestamp');
+        const refreshBtn = document.getElementById('refresh-balance-btn');
+
+        // Show loading state
+        balanceInput.value = 'Loading...';
+        refreshBtn.disabled = true;
+        refreshBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Loading...';
+
+        try {
+            // Get broker provider from settings
+            const brokerProvider = document.getElementById('broker-provider').value || 'fyers';
+
+            // Fetch funds/balance from broker API
+            const response = await fetch(`/api/brokers/${brokerProvider}/funds`);
+            const data = await response.json();
+
+            if (data.success && data.data) {
+                // FYERS API response structure: data.data contains fund_limit array
+                // Extract available balance from FYERS response
+                let balance = 0;
+
+                if (data.data.fund_limit && Array.isArray(data.data.fund_limit)) {
+                    // FYERS API returns array of fund limits
+                    const fundLimit = data.data.fund_limit[0];
+                    balance = fundLimit.equityAmount || fundLimit.net_available || 0;
+                } else if (data.data.available_balance) {
+                    balance = data.data.available_balance;
+                } else if (data.data.cash_available) {
+                    balance = data.data.cash_available;
+                }
+
+                balanceInput.value = `₹${balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                balanceSource.textContent = `Fetched from ${brokerProvider.toUpperCase()} API`;
+                balanceSource.className = 'text-success';
+
+                // Update timestamp
+                const now = new Date();
+                balanceTimestamp.textContent = `Last updated: ${now.toLocaleTimeString()}`;
+
+                // Store raw balance value for use in auto-buy
+                balanceInput.dataset.rawBalance = balance;
+
+                showNotification(`Balance updated: ₹${balance.toLocaleString('en-IN')}`, 'success');
+            } else {
+                throw new Error(data.error || 'Failed to fetch balance');
+            }
+        } catch (error) {
+            console.error('Error fetching account balance:', error);
+            balanceInput.value = 'Error loading balance';
+            balanceSource.textContent = `Failed to fetch from broker: ${error.message}`;
+            balanceSource.className = 'text-danger';
+            showNotification('Failed to fetch account balance from broker', 'error');
+        } finally {
+            refreshBtn.disabled = false;
+            refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Refresh';
+        }
+    }
+
     // Fetch current settings
     async function fetchSettings() {
         try {
             const response = await fetch('/api/settings');
             const data = await response.json();
-            
+
             if (data.success && data.settings) {
                 const settings = data.settings;
-                
+
                 // Populate form with current settings
                 document.getElementById('trading-mode').value = settings.trading_mode || 'development';
-                document.getElementById('max-capital-per-trade').value = settings.max_capital_per_trade || 1.00;
-                document.getElementById('stop-loss-percent').value = settings.stop_loss_percentage || 2.0;
-                document.getElementById('take-profit-percent').value = settings.take_profit_percentage || 5.0;
+                // Account balance is fetched from broker API, not from settings
+                document.getElementById('auto-buy-enabled').checked = settings.auto_buy_enabled || false;
+                document.getElementById('auto-buy-amount').value = settings.auto_buy_amount || 50000;
                 document.getElementById('primary-data-source').value = settings.primary_data_source || 'fyers';
                 document.getElementById('backup-data-source').value = settings.backup_data_source || 'fyers';
                 document.getElementById('broker-provider').value = settings.broker_provider || 'fyers';
                 document.getElementById('email-notifications').value = settings.email_notifications ? 'all' : 'none';
                 document.getElementById('sms-notifications').value = settings.sms_notifications ? 'critical' : 'none';
                 document.getElementById('notification-email').value = settings.notification_email || 'trader@example.com';
-                
+
+                // Handle auto-buy strategies
+                if (settings.auto_buy_strategies && Array.isArray(settings.auto_buy_strategies)) {
+                    const strategiesSelect = document.getElementById('auto-buy-strategies');
+                    Array.from(strategiesSelect.options).forEach(option => {
+                        option.selected = settings.auto_buy_strategies.includes(option.value);
+                    });
+                }
+
+                // Toggle auto-buy options visibility
+                toggleAutoBuyOptions();
+
                 // Update broker status based on selected provider
                 updateBrokerStatus(settings.broker_provider || 'fyers');
             }
@@ -245,17 +358,22 @@
             console.error('Error fetching settings:', error);
         }
     }
-    
+
     // Handle form submission
     document.getElementById('system-config-form').addEventListener('submit', async function(e) {
         e.preventDefault();
-        
+
+        // Get selected auto-buy strategies
+        const strategiesSelect = document.getElementById('auto-buy-strategies');
+        const selectedStrategies = Array.from(strategiesSelect.selectedOptions).map(option => option.value);
+
         // Collect form data
         const settings = {
             trading_mode: document.getElementById('trading-mode').value,
-            max_capital_per_trade: parseFloat(document.getElementById('max-capital-per-trade').value),
-            stop_loss_percentage: parseFloat(document.getElementById('stop-loss-percent').value),
-            take_profit_percentage: parseFloat(document.getElementById('take-profit-percent').value),
+            // account_balance is fetched from broker API, not saved in settings
+            auto_buy_enabled: document.getElementById('auto-buy-enabled').checked,
+            auto_buy_amount: parseFloat(document.getElementById('auto-buy-amount').value),
+            auto_buy_strategies: selectedStrategies,
             primary_data_source: document.getElementById('primary-data-source').value,
             backup_data_source: document.getElementById('backup-data-source').value,
             broker_provider: document.getElementById('broker-provider').value,
@@ -532,12 +650,19 @@
     // Event listeners for strategy settings
     document.getElementById('save-strategy-settings').addEventListener('click', saveStrategySettings);
     document.getElementById('reset-strategy-settings').addEventListener('click', resetStrategySettings);
-    
+
+    // Event listener for auto-buy toggle
+    document.getElementById('auto-buy-enabled').addEventListener('change', toggleAutoBuyOptions);
+
+    // Event listener for refresh balance button
+    document.getElementById('refresh-balance-btn').addEventListener('click', fetchAccountBalance);
+
     // Fetch data when page loads
     document.addEventListener('DOMContentLoaded', function() {
         fetchSettings();
         fetchBrokerStatus();
         loadStrategySettings();
+        fetchAccountBalance(); // Fetch balance from broker API
     });
 </script>
 {% endblock %}

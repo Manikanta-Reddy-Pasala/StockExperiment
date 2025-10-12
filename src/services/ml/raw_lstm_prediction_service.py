@@ -223,7 +223,58 @@ class RawLSTMPredictionService:
             logger.error(f"Error predicting {symbol}: {e}")
             return None
 
-    def batch_predict(self, symbols: List[str], user_id: int = 1, max_workers: int = 4) -> List[Dict]:
+    def apply_risk_strategy(self, prediction: Dict, strategy: str = 'default_risk') -> Dict:
+        """
+        Apply risk strategy adjustments to prediction (default_risk or high_risk).
+
+        Parameters:
+        -----------
+        prediction : Dict
+            Base prediction dictionary
+        strategy : str
+            Risk strategy: 'default_risk' or 'high_risk'
+
+        Returns:
+        --------
+        Dict
+            Adjusted prediction with strategy-specific targets and stop loss
+        """
+        current_price = prediction['current_price']
+        predicted_class = prediction['predicted_class']
+
+        if strategy == 'high_risk':
+            # High Risk: More aggressive targets (12% profit target, 5% stop loss)
+            if predicted_class == 2:  # Profit prediction
+                prediction['target_price'] = round(current_price * 1.12, 2)  # 12% target
+                prediction['ml_price_target'] = round(current_price * 1.12, 2)
+                prediction['stop_loss'] = round(current_price * 0.95, 2)  # 5% stop loss
+            elif predicted_class == 0:  # Loss prediction
+                prediction['ml_price_target'] = round(current_price * 0.88, 2)  # -12% target
+                prediction['target_price'] = round(current_price * 0.88, 2)
+                prediction['stop_loss'] = None
+            else:  # Neutral
+                prediction['ml_price_target'] = current_price
+                prediction['target_price'] = current_price
+                prediction['stop_loss'] = None
+
+        else:  # default_risk (conservative)
+            # Default Risk: Conservative targets (7% profit target, 3% stop loss)
+            if predicted_class == 2:  # Profit prediction
+                prediction['target_price'] = round(current_price * 1.07, 2)  # 7% target
+                prediction['ml_price_target'] = round(current_price * 1.07, 2)
+                prediction['stop_loss'] = round(current_price * 0.97, 2)  # 3% stop loss
+            elif predicted_class == 0:  # Loss prediction
+                prediction['ml_price_target'] = round(current_price * 0.93, 2)  # -7% target
+                prediction['target_price'] = round(current_price * 0.93, 2)
+                prediction['stop_loss'] = None
+            else:  # Neutral
+                prediction['ml_price_target'] = current_price
+                prediction['target_price'] = current_price
+                prediction['stop_loss'] = None
+
+        return prediction
+
+    def batch_predict(self, symbols: List[str], user_id: int = 1, max_workers: int = 4, strategy: str = 'default_risk') -> List[Dict]:
         """
         Generate predictions for multiple stocks in batch.
 
@@ -235,23 +286,65 @@ class RawLSTMPredictionService:
             User ID for data fetching
         max_workers : int
             Number of parallel workers
+        strategy : str
+            Risk strategy: 'default_risk' or 'high_risk'
 
         Returns:
         --------
         List[Dict]
             List of prediction dictionaries
         """
-        logger.info(f"Batch predicting {len(symbols)} stocks...")
+        logger.info(f"Batch predicting {len(symbols)} stocks with strategy={strategy}...")
+
+        # FILTER SYMBOLS BY MARKET CAP BEFORE PREDICTION (strategy-specific)
+        filtered_symbols = self._filter_symbols_by_strategy(symbols, strategy)
+        logger.info(f"Filtered to {len(filtered_symbols)} symbols for {strategy} strategy")
 
         predictions = []
-        for symbol in symbols:
+        for symbol in filtered_symbols:
             prediction = self.predict_single_stock(symbol, user_id)
             if prediction:
+                # Apply risk strategy adjustments
+                prediction = self.apply_risk_strategy(prediction, strategy)
                 predictions.append(prediction)
 
-        logger.info(f"Generated {len(predictions)} predictions from {len(symbols)} symbols")
+        logger.info(f"Generated {len(predictions)} predictions from {len(filtered_symbols)} symbols")
 
         return predictions
+
+    def _filter_symbols_by_strategy(self, symbols: List[str], strategy: str) -> List[str]:
+        """
+        Filter symbols by market cap based on risk strategy.
+
+        DEFAULT_RISK: Large cap only (> 20,000 Cr)
+        HIGH_RISK: Small/Mid cap only (1,000 - 20,000 Cr)
+        """
+        with self.db.get_session() as session:
+            query = text("""
+                SELECT symbol, market_cap
+                FROM stocks
+                WHERE symbol = ANY(:symbols)
+                AND is_active = true
+            """)
+
+            result = session.execute(query, {'symbols': symbols})
+            rows = result.fetchall()
+
+            filtered = []
+            for row in rows:
+                symbol = row[0]
+                market_cap = float(row[1]) if row[1] else 0
+
+                if strategy.upper() == 'DEFAULT_RISK':
+                    # Large cap only: > 20,000 Cr
+                    if market_cap > 20000:
+                        filtered.append(symbol)
+                elif strategy.upper() == 'HIGH_RISK':
+                    # Small/Mid cap only: 1,000 - 20,000 Cr (exclude large cap)
+                    if 1000 <= market_cap <= 20000:
+                        filtered.append(symbol)
+
+            return filtered
 
     def save_to_suggested_stocks(self, predictions: List[Dict], strategy: str = 'raw_lstm', prediction_date: Optional[date] = None):
         """

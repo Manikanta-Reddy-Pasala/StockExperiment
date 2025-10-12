@@ -1196,14 +1196,143 @@ def create_app():
             data = request.get_json()
             from ..services.utils.user_settings_service import get_user_settings_service
             user_settings_service = get_user_settings_service()
-            
+
             # Save settings to database
             saved_settings = user_settings_service.save_user_settings(current_user.id, data)
-            
+
             app.logger.info(f"Settings saved for user {current_user.id}: {data}")
             return jsonify({'success': True, 'message': 'Settings saved successfully', 'settings': saved_settings})
         except Exception as e:
             app.logger.error(f"Error saving settings for user {current_user.id}: {str(e)}")
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+    # Mock Trading API Routes
+    @app.route('/api/mock-trading/toggle', methods=['POST'])
+    @login_required
+    def api_toggle_mock_trading():
+        """Toggle mock trading mode for a user."""
+        try:
+            data = request.get_json()
+            enabled = data.get('enabled', True)
+
+            with db_manager.get_session() as session:
+                user = session.query(User).filter(User.id == current_user.id).first()
+                if not user:
+                    return jsonify({'success': False, 'error': 'User not found'}), 404
+
+                user.is_mock_trading_mode = enabled
+                session.commit()
+
+                app.logger.info(f"Mock trading mode {'enabled' if enabled else 'disabled'} for user {current_user.id}")
+                return jsonify({
+                    'success': True,
+                    'message': f"Mock trading mode {'enabled' if enabled else 'disabled'}",
+                    'is_mock_trading_mode': enabled
+                })
+        except Exception as e:
+            app.logger.error(f"Error toggling mock trading for user {current_user.id}: {str(e)}")
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+    @app.route('/api/mock-trading/status', methods=['GET'])
+    @login_required
+    def api_get_mock_trading_status():
+        """Get mock trading status for a user."""
+        try:
+            with db_manager.get_session() as session:
+                user = session.query(User).filter(User.id == current_user.id).first()
+                if not user:
+                    return jsonify({'success': False, 'error': 'User not found'}), 404
+
+                return jsonify({
+                    'success': True,
+                    'is_mock_trading_mode': user.is_mock_trading_mode
+                })
+        except Exception as e:
+            app.logger.error(f"Error getting mock trading status for user {current_user.id}: {str(e)}")
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+    @app.route('/api/mock-trading/order', methods=['POST'])
+    @login_required
+    def api_place_mock_order():
+        """Place a mock order."""
+        try:
+            data = request.get_json()
+            symbol = data.get('symbol')
+            quantity = data.get('quantity', 1)
+            model_type = data.get('model_type', 'traditional')
+            strategy = data.get('strategy', 'default_risk')
+            ml_prediction_score = data.get('ml_prediction_score')
+            ml_price_target = data.get('ml_price_target')
+
+            if not symbol:
+                return jsonify({'success': False, 'error': 'Symbol is required'}), 400
+
+            from ..services.trading.mock_trading_service import get_mock_trading_service
+            with db_manager.get_session() as session:
+                mock_trading_service = get_mock_trading_service(session)
+                result = mock_trading_service.place_mock_order(
+                    user_id=current_user.id,
+                    symbol=symbol,
+                    quantity=quantity,
+                    model_type=model_type,
+                    strategy=strategy,
+                    ml_prediction_score=ml_prediction_score,
+                    ml_price_target=ml_price_target
+                )
+
+            if result['success']:
+                app.logger.info(f"Mock order placed: {symbol} x{quantity} for user {current_user.id}")
+                return jsonify(result)
+            else:
+                return jsonify(result), 400
+        except Exception as e:
+            app.logger.error(f"Error placing mock order for user {current_user.id}: {str(e)}", exc_info=True)
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+    @app.route('/api/mock-trading/orders', methods=['GET'])
+    @login_required
+    def api_get_mock_orders():
+        """Get mock orders for a user."""
+        try:
+            model_type = request.args.get('model_type')
+            strategy = request.args.get('strategy')
+            limit = int(request.args.get('limit', 50))
+
+            from ..services.trading.mock_trading_service import get_mock_trading_service
+            with db_manager.get_session() as session:
+                mock_trading_service = get_mock_trading_service(session)
+                orders = mock_trading_service.get_mock_orders(
+                    user_id=current_user.id,
+                    model_type=model_type,
+                    strategy=strategy,
+                    limit=limit
+                )
+
+            return jsonify({
+                'success': True,
+                'orders': orders,
+                'total': len(orders)
+            })
+        except Exception as e:
+            app.logger.error(f"Error getting mock orders for user {current_user.id}: {str(e)}")
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+    @app.route('/api/mock-trading/performance', methods=['GET'])
+    @login_required
+    def api_get_mock_performance():
+        """Get performance metrics for mock trading."""
+        try:
+            from ..services.trading.mock_trading_service import get_mock_trading_service
+            with db_manager.get_session() as session:
+                mock_trading_service = get_mock_trading_service(session)
+                result = mock_trading_service.calculate_model_performance(current_user.id)
+
+            if result['success']:
+                return jsonify(result)
+            else:
+                return jsonify(result), 400
+        except Exception as e:
+            app.logger.error(f"Error getting mock performance for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
     # Broker Selection API

@@ -673,9 +673,12 @@ class SuggestedStocksSagaOrchestrator:
             strategy_upper = strategy.upper()
 
             if strategy_upper == 'DEFAULT_RISK':
-                # Conservative strategy - focus on stability (large/mid cap)
-                if (market_cap < mid_cap_min or  # Minimum market cap from config
-                    (pe_ratio and pe_ratio > fundamental_ratios.get('pe_ratio', {}).get('maximum', 50))):
+                # Conservative strategy - focus on stability (LARGE CAP ONLY)
+                # STRICT FILTERING: Large cap (>20000 Cr), stable price range, good fundamentals
+                if (market_cap <= large_cap_min or  # MUST be large cap (>20000 Cr) - FIXED: use <= to require >
+                    current_price < 100 or current_price > 10000 or  # Stable price range
+                    (pe_ratio and (pe_ratio < 5 or pe_ratio > 40)) or  # Reasonable PE ratio
+                    volume < 50000):  # Good liquidity
                     return None
 
                 # Calculate conservative score using config weights
@@ -685,14 +688,16 @@ class SuggestedStocksSagaOrchestrator:
                     return None
 
             elif strategy_upper == 'HIGH_RISK':
-                # Aggressive strategy - focus on growth potential (mid/small cap)
-                if (market_cap < 1000 or  # Lower market cap requirement for growth
-                    volume < 10000):  # Volume requirement
+                # Aggressive strategy - focus on growth potential (SMALL/MID CAP ONLY)
+                # STRICT FILTERING: Small/Mid cap (1000-20000 Cr), volatile price, high volume
+                if (market_cap < 1000 or market_cap >= large_cap_min or  # MUST be small/mid cap (exclude large cap)
+                    current_price > 5000 or  # Exclude very expensive stocks
+                    volume < 10000):  # Minimum volume for growth stocks
                     return None
 
                 # Calculate aggressive score using config weights
                 score = self._calculate_aggressive_score_with_config(stock_data)
-                min_score = filtering_thresholds.get('minimum_total_score', 25) / 100.0 * 0.8  # Lower threshold for high risk
+                min_score = filtering_thresholds.get('minimum_total_score', 25) / 100.0 * 0.7  # Lower threshold for high risk
                 if score < min_score:
                     return None
             else:
