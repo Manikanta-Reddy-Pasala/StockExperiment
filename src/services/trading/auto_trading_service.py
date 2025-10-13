@@ -314,16 +314,17 @@ class AutoTradingService:
             from src.services.core.unified_broker_service import get_unified_broker_service
 
             unified_service = get_unified_broker_service()
-            funds_result = unified_service.get_funds(user_id)
+            balance_result = unified_service.get_account_balance(user_id)
 
-            if not funds_result.get('success'):
+            if not balance_result.get('success'):
                 return {
                     'proceed': False,
                     'message': 'Failed to fetch account balance'
                 }
 
-            available_balance = funds_result.get('available_cash', 0.0)
-            total_balance = funds_result.get('total_balance', 0.0)
+            balance_data = balance_result.get('data', {})
+            available_balance = balance_data.get('available_cash', 0.0)
+            total_balance = balance_data.get('total_balance', 0.0)
 
             # Store in execution log
             execution.account_balance = total_balance
