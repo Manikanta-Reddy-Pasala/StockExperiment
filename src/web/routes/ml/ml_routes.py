@@ -80,6 +80,60 @@ def train_new_model():
         return jsonify({'error': 'Internal server error', 'success': False}), 500
 
 
+@ml_bp.route('/train-all', methods=['POST'])
+@login_required
+def train_all_models():
+    """Trigger training for all 3 ML models (Traditional ML, Raw LSTM, Kronos)"""
+    try:
+        import threading
+        import subprocess
+
+        def run_training():
+            """Run training in background thread"""
+            try:
+                logger.info("🚀 Starting training for all 3 ML models...")
+
+                # Run the training script as a subprocess
+                # This is more reliable than importing in a thread
+                result = subprocess.run(
+                    ['python3', '-c',
+                     'import sys; sys.path.insert(0, "/app"); '
+                     'from scheduler import train_all_ml_models; '
+                     'train_all_ml_models()'],
+                    capture_output=True,
+                    text=True,
+                    cwd='/app'
+                )
+
+                if result.returncode == 0:
+                    logger.info("✅ Training completed for all models")
+                    logger.info(result.stdout)
+                else:
+                    logger.error(f"❌ Training failed with return code {result.returncode}")
+                    logger.error(result.stderr)
+
+            except Exception as e:
+                logger.error(f"Error in background training: {e}", exc_info=True)
+
+        # Start training in background thread
+        training_thread = threading.Thread(target=run_training)
+        training_thread.daemon = True
+        training_thread.start()
+
+        return jsonify({
+            'success': True,
+            'message': 'Training started for all 3 models (Traditional ML, Raw LSTM, Kronos)',
+            'status': 'running'
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error starting training: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': 'Failed to start training'
+        }), 500
+
+
 @ml_bp.route('/training_progress/<int:job_id>', methods=['GET'])
 @login_required
 def get_training_progress(job_id):

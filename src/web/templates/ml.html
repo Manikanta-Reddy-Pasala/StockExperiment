@@ -5,39 +5,119 @@
 {% block content %}
 
 
-<!-- ML Dashboard Header -->
+<!-- ML Models Dashboard -->
 <div class="row mb-4">
     <div class="col-12">
         <div class="card hover-lift animate-fade-in-up">
-            <div class="card-header bg-gradient-primary text-white">
+            <div class="card-header bg-gradient-primary text-white d-flex justify-content-between align-items-center">
                 <h5 class="card-title mb-0 text-white">
-                    <i class="bi bi-robot me-2"></i>Machine Learning Dashboard
+                    <i class="bi bi-robot me-2"></i>Machine Learning Models
                 </h5>
+                <button class="btn btn-light btn-sm" onclick="trainAllModels()" id="train-all-btn">
+                    <i class="bi bi-play-circle me-2"></i>Train All Models
+                </button>
             </div>
             <div class="card-body">
-                <div class="row g-4">
-                    <div class="col-lg-4 col-md-6">
-                        <div class="text-center">
-                            <h3 class="text-primary mb-2" id="trained-models-count">
-                                <span class="spinner-border spinner-border-sm me-2"></span>Loading...
-                            </h3>
-                            <p class="text-muted mb-0">Trained Stocks</p>
+                <div class="row g-4" id="ml-models-container">
+                    <!-- Model 1: Traditional ML -->
+                    <div class="col-lg-4">
+                        <div class="card border-success h-100">
+                            <div class="card-header bg-gradient-success text-white">
+                                <h6 class="mb-0">
+                                    <i class="bi bi-cpu me-2"></i>Traditional ML
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted small mb-3">Random Forest + XGBoost</p>
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="text-muted small">Stocks Trained</span>
+                                        <strong id="traditional-stocks-count" class="text-success">
+                                            <span class="spinner-border spinner-border-sm"></span>
+                                        </strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="text-muted small">Last Trained</span>
+                                        <span id="traditional-last-trained" class="small">
+                                            <span class="spinner-border spinner-border-sm"></span>
+                                        </span>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <span class="text-muted small">Status</span>
+                                        <span id="traditional-status" class="badge bg-secondary">
+                                            Loading...
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-lg-4 col-md-6">
-                        <div class="text-center">
-                            <h3 class="text-success mb-2" id="training-success-rate">
-                                <span class="spinner-border spinner-border-sm me-2"></span>Loading...
-                            </h3>
-                            <p class="text-muted mb-0">Success Rate</p>
+
+                    <!-- Model 2: Raw LSTM -->
+                    <div class="col-lg-4">
+                        <div class="card border-info h-100">
+                            <div class="card-header bg-gradient-info text-white">
+                                <h6 class="mb-0">
+                                    <i class="bi bi-diagram-3 me-2"></i>Raw LSTM
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted small mb-3">Deep Learning (OHLCV Sequences)</p>
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="text-muted small">Stocks Trained</span>
+                                        <strong id="lstm-stocks-count" class="text-info">
+                                            <span class="spinner-border spinner-border-sm"></span>
+                                        </strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="text-muted small">Last Trained</span>
+                                        <span id="lstm-last-trained" class="small">
+                                            <span class="spinner-border spinner-border-sm"></span>
+                                        </span>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <span class="text-muted small">Status</span>
+                                        <span id="lstm-status" class="badge bg-secondary">
+                                            Loading...
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-lg-4 col-md-6">
-                        <div class="text-center">
-                            <h3 class="text-info mb-2" id="last-updated">
-                                <span class="spinner-border spinner-border-sm me-2"></span>Loading...
-                            </h3>
-                            <p class="text-muted mb-0">Last Updated</p>
+
+                    <!-- Model 3: Kronos -->
+                    <div class="col-lg-4">
+                        <div class="card border-warning h-100">
+                            <div class="card-header bg-gradient-warning text-white">
+                                <h6 class="mb-0">
+                                    <i class="bi bi-graph-up-arrow me-2"></i>Kronos
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted small mb-3">K-line Tokenization</p>
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="text-muted small">Stocks Trained</span>
+                                        <strong id="kronos-stocks-count" class="text-warning">
+                                            <span class="spinner-border spinner-border-sm"></span>
+                                        </strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="text-muted small">Last Trained</span>
+                                        <span id="kronos-last-trained" class="small">
+                                            <span class="spinner-border spinner-border-sm"></span>
+                                        </span>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <span class="text-muted small">Status</span>
+                                        <span id="kronos-status" class="badge bg-secondary">
+                                            Loading...
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -91,8 +171,13 @@
                     <div class="mb-3">
                         <div class="alert alert-info">
                             <i class="bi bi-cpu-fill me-2"></i>
-                            <strong>Enhanced Ensemble Model:</strong> Random Forest + XGBoost + LSTM
+                            <strong>Trains All 3 Models:</strong>
                             <br>
+                            <small>
+                                • Traditional ML (Random Forest + XGBoost)<br>
+                                • Raw LSTM (Deep Learning)<br>
+                                • Kronos (K-line Tokenization)
+                            </small>
                         </div>
                     </div>
 
@@ -184,38 +269,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- Trained Stocks Section -->
-        <div class="card hover-lift animate-fade-in-up mt-4" style="animation-delay: 0.3s;">
-            <div class="card-header bg-gradient-warning text-white">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0 text-white">
-                        <i class="bi bi-cpu-fill me-2"></i>Trained Stocks
-                    </h5>
-                    <button class="btn btn-light btn-sm" onclick="refreshTrainedModels()">
-                        <i class="bi bi-arrow-clockwise"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                    <table class="table table-hover mb-0" id="trained-models-table">
-                        <thead class="table-light sticky-top">
-                            <tr>
-                                <th class="border-0">Symbol</th>
-                                <th class="border-0">Type</th>
-                                <th class="border-0">Accuracy</th>
-                                <th class="border-0">Trained</th>
-                                <th class="border-0">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Models will be populated by JavaScript -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- Right Column: Stock Prediction -->
@@ -289,23 +342,15 @@
                     </div>
 
                     <!-- Individual Model Predictions -->
-                    <div class="row g-3 mt-2" id="individual-predictions" style="display: none;">
+                    <div class="row g-3 mt-2" id="individual-predictions">
                         <div class="col-12">
-                            <h6 class="text-muted mb-3">Individual Model Predictions</h6>
+                            <h6 class="text-muted mb-3">Predictions from All 3 Models</h6>
                         </div>
                         <div class="col-lg-4 col-md-4">
                             <div class="card bg-light border-success">
                                 <div class="card-body text-center py-2">
-                                    <h6 class="text-success mb-1" id="rf-prediction">₹0.00</h6>
-                                    <small class="text-muted">Random Forest</small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-lg-4 col-md-4">
-                            <div class="card bg-light border-warning">
-                                <div class="card-body text-center py-2">
-                                    <h6 class="text-warning mb-1" id="xgb-prediction">₹0.00</h6>
-                                    <small class="text-muted">XGBoost</small>
+                                    <h6 class="text-success mb-1" id="traditional-prediction">₹0.00</h6>
+                                    <small class="text-muted">Traditional ML</small>
                                 </div>
                             </div>
                         </div>
@@ -313,7 +358,15 @@
                             <div class="card bg-light border-info">
                                 <div class="card-body text-center py-2">
                                     <h6 class="text-info mb-1" id="lstm-prediction">₹0.00</h6>
-                                    <small class="text-muted">LSTM</small>
+                                    <small class="text-muted">Raw LSTM</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4 col-md-4">
+                            <div class="card bg-light border-warning">
+                                <div class="card-body text-center py-2">
+                                    <h6 class="text-warning mb-1" id="kronos-prediction">₹0.00</h6>
+                                    <small class="text-muted">Kronos</small>
                                 </div>
                             </div>
                         </div>
@@ -380,143 +433,6 @@
     </div>
 </div>
 
-<!-- ML-Powered Stock Screening Section -->
-<div class="row g-4 mt-2">
-    <div class="col-12">
-        <div class="card hover-lift animate-fade-in-up">
-            <div class="card-header bg-gradient-success text-white">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0 text-white">
-                        <i class="bi bi-robot me-2"></i>ML-Suggested Stocks
-                        <small class="opacity-75">by Risk Profile</small>
-                    </h5>
-                    <div class="d-flex gap-2 align-items-center">
-                        <select class="form-select form-select-sm" id="risk-strategy-select" style="min-width: 170px;">
-                            <option value="default">Balanced Portfolio</option>
-                            <option value="high_risk">Aggressive Growth</option>
-                        </select>
-                        <button class="btn btn-light btn-sm" onclick="discoverStocks()" title="Discover tradeable stocks">
-                            <i class="bi bi-search"></i>
-                        </button>
-                        <button class="btn btn-light btn-sm" onclick="refreshMLRecommendations()" title="Get AI recommendations">
-                            <i class="bi bi-magic"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Portfolio Strategy Info -->
-            <div class="card-body border-bottom">
-                <div class="row text-center" id="strategy-info">
-                    <div class="col-md-3">
-                        <div class="mb-2">
-                            <h6 class="text-muted mb-1">Strategy</h6>
-                            <span class="badge bg-primary" id="strategy-name">Balanced Portfolio</span>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="mb-2">
-                            <h6 class="text-muted mb-1">Large Cap</h6>
-                            <span class="fw-bold text-primary" id="large-cap-allocation">60%</span>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="mb-2">
-                            <h6 class="text-muted mb-1">Mid Cap</h6>
-                            <span class="fw-bold text-warning" id="mid-cap-allocation">30%</span>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="mb-2">
-                            <h6 class="text-muted mb-1">Small Cap</h6>
-                            <span class="fw-bold text-danger" id="small-cap-allocation">10%</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card-body p-0">
-                <!-- ML Analysis Status Banner -->
-                <div class="alert alert-info border-0 rounded-0 mb-0" style="background: linear-gradient(135deg, #17a2b8, #138496);">
-                    <div class="d-flex align-items-center text-white">
-                        <i class="bi bi-cpu-fill me-2" style="font-size: 1.2em;"></i>
-                        <div>
-                            <strong>ML Analysis Applied</strong>
-                            <small class="d-block opacity-75">All stocks below are analyzed using 70 advanced ML features and filtered by your selected risk profile</small>
-                        </div>
-                        <div class="ms-auto">
-                            <span class="badge bg-light text-dark" id="ml-analysis-count">0 stocks analyzed</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
-                    <table class="table table-hover mb-0" id="ml-recommendations-table">
-                        <thead class="table-light sticky-top">
-                            <tr>
-                                <th class="border-0">Symbol</th>
-                                <th class="border-0">Company</th>
-                                <th class="border-0">Market Cap</th>
-                                <th class="border-0">Current Price</th>
-                                <th class="border-0">Target Price</th>
-                                <th class="border-0">Stop Loss</th>
-                                <th class="border-0">ML Score</th>
-                                <th class="border-0">Expected Return</th>
-                                <th class="border-0">Recommendation</th>
-                                <th class="border-0">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- ML recommendations will be populated by JavaScript -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Portfolio Summary Section -->
-<div class="row g-4 mt-2" id="portfolio-summary-section" style="display: none;">
-    <div class="col-12">
-        <div class="card hover-lift animate-fade-in-up">
-            <div class="card-header bg-gradient-info text-white">
-                <h5 class="card-title mb-0 text-white">
-                    <i class="bi bi-pie-chart me-2"></i>Portfolio Summary
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row g-4">
-                    <div class="col-lg-3 col-md-6">
-                        <div class="text-center">
-                            <h4 class="text-primary mb-1" id="total-stocks">0</h4>
-                            <small class="text-muted">Total Stocks</small>
-                        </div>
-                    </div>
-                    <div class="col-lg-3 col-md-6">
-                        <div class="text-center">
-                            <h4 class="text-success mb-1" id="expected-portfolio-return">0.0%</h4>
-                            <small class="text-muted">Expected Return</small>
-                        </div>
-                    </div>
-                    <div class="col-lg-3 col-md-6">
-                        <div class="text-center">
-                            <h4 class="text-warning mb-1" id="portfolio-risk">0.0</h4>
-                            <small class="text-muted">Risk Score</small>
-                        </div>
-                    </div>
-                    <div class="col-lg-3 col-md-6">
-                        <div class="text-center">
-                            <h4 class="text-info mb-1" id="diversification-score">0.0</h4>
-                            <small class="text-muted">Diversification</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Active Trainings Section (Only shown when there are active trainings) -->
 <div class="row g-4 mt-2" id="active-trainings-section" style="display: none;">
     <div class="col-12">
@@ -558,7 +474,6 @@
 // ML Dashboard JavaScript
 document.addEventListener('DOMContentLoaded', function() {
     loadMLDashboardData();
-    loadTrainedModels();
     loadActiveTrainings();
 
     // Training form submission
@@ -572,19 +487,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Symbol search
     document.getElementById('search-symbol-btn').addEventListener('click', searchSymbol);
-
-    // ML recommendations functionality
-    document.getElementById('risk-strategy-select').addEventListener('change', loadMLRecommendations);
-
-    // Load ML recommendations on page load
-    loadMLRecommendations();
 });
 
 // Load ML Dashboard Overview Data
 async function loadMLDashboardData() {
     try {
         const response = await fetch('/api/v1/ml/overview');
-        
+
         if (!response.ok) {
             if (response.status === 401) {
                 window.location.href = '/login';
@@ -592,80 +501,120 @@ async function loadMLDashboardData() {
             }
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
+
         const result = await response.json();
 
-        if (result.success) {
-            document.getElementById('trained-models-count').textContent = result.data.trained_stocks || 0;
-            document.getElementById('training-success-rate').textContent = (result.data.success_rate || 0) + '%';
-            document.getElementById('last-updated').textContent = result.data.last_updated || 'Never';
+        if (result.success && result.data.models) {
+            // Update each model card with data
+            result.data.models.forEach(model => {
+                const modelType = model.type; // 'traditional', 'raw_lstm', 'kronos'
+
+                // Update stocks count
+                const stocksCountEl = document.getElementById(`${modelType}-stocks-count`);
+                if (stocksCountEl) {
+                    stocksCountEl.innerHTML = model.stocks_trained || 0;
+                }
+
+                // Update last trained date
+                const lastTrainedEl = document.getElementById(`${modelType}-last-trained`);
+                if (lastTrainedEl) {
+                    lastTrainedEl.textContent = model.last_trained || 'Never';
+                }
+
+                // Update status
+                const statusEl = document.getElementById(`${modelType}-status`);
+                if (statusEl) {
+                    if (model.status === 'trained') {
+                        statusEl.className = 'badge bg-success';
+                        statusEl.textContent = 'Trained';
+                    } else {
+                        statusEl.className = 'badge bg-warning';
+                        statusEl.textContent = 'Not Trained';
+                    }
+                }
+            });
         }
     } catch (error) {
         console.error('Error loading ML dashboard data:', error);
+        // Show error state on all model cards
+        ['traditional', 'raw_lstm', 'kronos'].forEach(type => {
+            const stocksCountEl = document.getElementById(`${type}-stocks-count`);
+            if (stocksCountEl) {
+                stocksCountEl.innerHTML = '<span class="text-danger">Error</span>';
+            }
+            const lastTrainedEl = document.getElementById(`${type}-last-trained`);
+            if (lastTrainedEl) {
+                lastTrainedEl.textContent = 'Error';
+            }
+            const statusEl = document.getElementById(`${type}-status`);
+            if (statusEl) {
+                statusEl.className = 'badge bg-danger';
+                statusEl.textContent = 'Error';
+            }
+        });
     }
 }
 
-// Load Trained Stocks
-async function loadTrainedModels() {
-    try {
-        const response = await fetch('/api/v1/ml/models');
-        const result = await response.json();
+// Train All Models
+async function trainAllModels() {
+    const trainBtn = document.getElementById('train-all-btn');
+    const originalContent = trainBtn.innerHTML;
 
-        if (result.success && result.data) {
-            updateTrainedModelsTable(result.data);
-        }
-    } catch (error) {
-        console.error('Error loading trained models:', error);
-        showTrainedModelsError();
-    }
-}
-
-// Update Trained Stocks Table
-function updateTrainedModelsTable(models) {
-    const tbody = document.querySelector('#trained-models-table tbody');
-    tbody.innerHTML = '';
-
-    if (models.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No trained models yet</td></tr>';
+    if (!confirm('This will train all 3 ML models (Traditional ML, Raw LSTM, and Kronos). This may take several minutes. Continue?')) {
         return;
     }
 
-    models.forEach(model => {
-        const row = tbody.insertRow();
+    try {
+        // Disable button and show loading state
+        trainBtn.disabled = true;
+        trainBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Training...';
 
-        // Symbol
-        row.insertCell(0).innerHTML = `<strong>${model.symbol}</strong>`;
+        const response = await fetch('/api/v1/ml/train-all', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
 
-        // Type
-        const typeCell = row.insertCell(1);
-        const typeBadge = getModelTypeBadge(model.type);
-        typeCell.innerHTML = `<span class="badge ${typeBadge}">${model.type}</span>`;
+        if (!response.ok) {
+            if (response.status === 401) {
+                alert('Your session has expired. Please log in again.');
+                window.location.href = '/login';
+                return;
+            }
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-        // Accuracy
-        const accuracyCell = row.insertCell(2);
-        const accuracy = parseFloat(model.accuracy || 0);
-        const accuracyColor = accuracy >= 80 ? 'text-success' : accuracy >= 60 ? 'text-warning' : 'text-danger';
-        accuracyCell.innerHTML = `<span class="${accuracyColor}">${accuracy.toFixed(1)}%</span>`;
+        const result = await response.json();
 
-        // Trained date
-        row.insertCell(3).innerHTML = `<small class="text-muted">${formatDate(model.trained_date)}</small>`;
+        if (result.success) {
+            // Show success message
+            alert('Training started successfully for all 3 models!\n\nThis process will run in the background. The page will refresh in a moment to show updated status.');
 
-        // Actions
-        const actionsCell = row.insertCell(4);
-        actionsCell.innerHTML = `
-            <div class="btn-group btn-group-sm">
-                <button class="btn btn-outline-primary" onclick="predictStock('${model.symbol}')" title="Predict">
-                    <i class="bi bi-magic"></i>
-                </button>
-                <button class="btn btn-outline-info" onclick="viewModelDetails('${model.id}')" title="Details">
-                    <i class="bi bi-info-circle"></i>
-                </button>
-                <button class="btn btn-outline-danger" onclick="deleteModel('${model.id}')" title="Delete">
-                    <i class="bi bi-trash"></i>
-                </button>
-            </div>
-        `;
-    });
+            // Update model cards to show "training" status
+            ['traditional', 'raw_lstm', 'kronos'].forEach(type => {
+                const statusEl = document.getElementById(`${type}-status`);
+                if (statusEl) {
+                    statusEl.className = 'badge bg-info';
+                    statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Training';
+                }
+            });
+
+            // Refresh data after 5 seconds
+            setTimeout(() => {
+                loadMLDashboardData();
+            }, 5000);
+        } else {
+            alert('Failed to start training: ' + (result.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error starting training:', error);
+        alert('Failed to start training: Network error');
+    } finally {
+        // Re-enable button
+        trainBtn.disabled = false;
+        trainBtn.innerHTML = originalContent;
+    }
 }
 
 // Load Active Trainings
@@ -1516,369 +1465,40 @@ function hideTrainingResults() {
 }
 
 function displayIndividualPredictions(data) {
-    const individualSection = document.getElementById('individual-predictions');
-    if (!individualSection) return;
-
-    let hasIndividualPredictions = false;
-
-    // Update Random Forest prediction
-    if (data.rf_predicted_price) {
-        const rfElement = document.getElementById('rf-prediction');
-        if (rfElement) {
-            rfElement.textContent = `₹${parseFloat(data.rf_predicted_price).toFixed(2)}`;
-            hasIndividualPredictions = true;
+    // Update Traditional ML prediction (RF + XGBoost)
+    const traditionalElement = document.getElementById('traditional-prediction');
+    if (traditionalElement) {
+        if (data.rf_predicted_price && data.xgb_predicted_price) {
+            // Average of RF and XGBoost
+            const traditionalPrice = (parseFloat(data.rf_predicted_price) + parseFloat(data.xgb_predicted_price)) / 2;
+            traditionalElement.textContent = `₹${traditionalPrice.toFixed(2)}`;
+        } else if (data.final_predicted_price) {
+            // Fallback to final prediction
+            traditionalElement.textContent = `₹${parseFloat(data.final_predicted_price).toFixed(2)}`;
+        } else {
+            traditionalElement.textContent = 'N/A';
         }
     }
 
-    // Update XGBoost prediction
-    if (data.xgb_predicted_price) {
-        const xgbElement = document.getElementById('xgb-prediction');
-        if (xgbElement) {
-            xgbElement.textContent = `₹${parseFloat(data.xgb_predicted_price).toFixed(2)}`;
-            hasIndividualPredictions = true;
-        }
-    }
-
-    // Update LSTM prediction
-    if (data.lstm_predicted_price) {
-        const lstmElement = document.getElementById('lstm-prediction');
-        if (lstmElement) {
+    // Update Raw LSTM prediction
+    const lstmElement = document.getElementById('lstm-prediction');
+    if (lstmElement) {
+        if (data.lstm_predicted_price) {
             lstmElement.textContent = `₹${parseFloat(data.lstm_predicted_price).toFixed(2)}`;
-            hasIndividualPredictions = true;
-        }
-    }
-
-    // Show/hide the individual predictions section
-    if (hasIndividualPredictions) {
-        individualSection.style.display = 'block';
-    } else {
-        individualSection.style.display = 'none';
-    }
-}
-
-// ML Recommendations Functions
-async function loadMLRecommendations() {
-    try {
-        const riskProfile = document.getElementById('risk-strategy-select').value;
-        showMLRecommendationsLoading();
-        updateStrategyInfo(riskProfile);
-
-        const response = await fetch('/api/v1/screening/screen', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                risk_profile: riskProfile,
-                auto_train: false
-            })
-        });
-
-        if (!response.ok) {
-            if (response.status === 401) {
-                window.location.href = '/login';
-                return;
-            }
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const result = await response.json();
-
-        if (result.success) {
-            displayMLRecommendations(result.portfolio);
-            displayPortfolioSummary(result.portfolio);
         } else {
-            showMLRecommendationsError(result.error || 'Failed to load ML recommendations');
+            lstmElement.textContent = 'N/A';
         }
-    } catch (error) {
-        console.error('Error loading ML recommendations:', error);
-        showMLRecommendationsError('Network error loading ML recommendations');
-    }
-}
-
-function displayMLRecommendations(portfolio) {
-    const tbody = document.querySelector('#ml-recommendations-table tbody');
-    tbody.innerHTML = '';
-
-    // Combine all stocks from different categories
-    const allStocks = [
-        ...portfolio.stocks.large_cap.map(s => ({ ...s, category: 'Large Cap' })),
-        ...portfolio.stocks.mid_cap.map(s => ({ ...s, category: 'Mid Cap' })),
-        ...portfolio.stocks.small_cap.map(s => ({ ...s, category: 'Small Cap' }))
-    ];
-
-    if (allStocks.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="10" class="text-center text-muted py-4">
-                    <i class="bi bi-info-circle me-2"></i>
-                    No ML recommendations found for the selected risk profile. Try refreshing or switch to discovery mode.
-                </td>
-            </tr>
-        `;
-        return;
     }
 
-    // Sort by overall score (highest first)
-    allStocks.sort((a, b) => b.overall_score - a.overall_score);
-
-    // Update ML analysis count
-    document.getElementById('ml-analysis-count').textContent = `${allStocks.length} stocks analyzed`;
-
-    allStocks.forEach(stock => {
-        const row = tbody.insertRow();
-
-        // Symbol with ML Suggested Tag
-        const symbolCell = row.insertCell(0);
-        symbolCell.innerHTML = `
-            <div>
-                <strong>${stock.symbol}</strong>
-                <br>
-                <span class="badge bg-success bg-gradient" style="font-size: 0.7em;">
-                    <i class="bi bi-robot me-1"></i>ML Suggested
-                </span>
-            </div>
-        `;
-
-        // Company Name
-        row.insertCell(1).textContent = stock.name || 'N/A';
-
-        // Market Cap Category
-        const categoryCell = row.insertCell(2);
-        const categoryColor = stock.category === 'Large Cap' ? 'primary' :
-                             stock.category === 'Mid Cap' ? 'warning' : 'danger';
-        categoryCell.innerHTML = `<span class="badge bg-${categoryColor}">${stock.category}</span>`;
-
-        // Current Price
-        row.insertCell(3).innerHTML = `₹${stock.current_price.toFixed(2)}`;
-
-        // Target Price
-        row.insertCell(4).innerHTML = `₹${stock.target_price.toFixed(2)}`;
-
-        // Stop Loss
-        row.insertCell(5).innerHTML = `₹${stock.stop_loss.toFixed(2)}`;
-
-        // ML Score (Overall Score)
-        const scoreCell = row.insertCell(6);
-        const score = stock.overall_score * 100;
-        scoreCell.innerHTML = `
-            <div class="d-flex align-items-center">
-                <div class="progress flex-grow-1 me-2" style="height: 8px;">
-                    <div class="progress-bar bg-${score >= 70 ? 'success' : score >= 50 ? 'warning' : 'danger'}"
-                         style="width: ${score}%"></div>
-                </div>
-                <small class="text-muted">${score.toFixed(0)}</small>
-            </div>
-        `;
-
-        // Expected Return
-        const returnCell = row.insertCell(7);
-        const expectedReturn = stock.expected_return * 100;
-        returnCell.textContent = `${expectedReturn.toFixed(1)}%`;
-        returnCell.className = expectedReturn > 0 ? 'text-success fw-bold' : 'text-danger fw-bold';
-
-        // Recommendation with Risk Profile Tag
-        const recCell = row.insertCell(8);
-        const recColor = stock.recommendation === 'BUY' ? 'success' :
-                        stock.recommendation === 'SELL' ? 'danger' : 'warning';
-
-        const riskProfile = document.getElementById('risk-strategy-select').value;
-        const riskTag = riskProfile === 'high_risk' ?
-            '<small class="d-block text-danger"><i class="bi bi-exclamation-triangle"></i> High Risk</small>' :
-            '<small class="d-block text-primary"><i class="bi bi-shield-check"></i> Balanced</small>';
-
-        recCell.innerHTML = `
-            <div>
-                <span class="badge bg-${recColor}">${stock.recommendation}</span>
-                ${riskTag}
-            </div>
-        `;
-
-        // Actions
-        const actionsCell = row.insertCell(9);
-        actionsCell.innerHTML = `
-            <div class="btn-group btn-group-sm">
-                <button class="btn btn-outline-primary" onclick="predictStock('${stock.symbol}')" title="Predict">
-                    <i class="bi bi-magic"></i>
-                </button>
-                <button class="btn btn-outline-info" onclick="analyzeStock('${stock.symbol}')" title="Analyze">
-                    <i class="bi bi-graph-up"></i>
-                </button>
-                <button class="btn btn-outline-success" onclick="viewStockDetails('${stock.symbol}')" title="Details">
-                    <i class="bi bi-info-circle"></i>
-                </button>
-            </div>
-        `;
-    });
-}
-
-function displayPortfolioSummary(portfolio) {
-    const summarySection = document.getElementById('portfolio-summary-section');
-    summarySection.style.display = 'block';
-
-    document.getElementById('total-stocks').textContent = portfolio.portfolio_metrics.total_stocks;
-    document.getElementById('expected-portfolio-return').textContent =
-        `${portfolio.portfolio_metrics.expected_return.toFixed(1)}%`;
-    document.getElementById('portfolio-risk').textContent =
-        portfolio.portfolio_metrics.portfolio_risk.toFixed(2);
-    document.getElementById('diversification-score').textContent =
-        portfolio.portfolio_metrics.diversification_score.toFixed(2);
-}
-
-function updateStrategyInfo(riskProfile) {
-    const strategyName = document.getElementById('strategy-name');
-    const largeCap = document.getElementById('large-cap-allocation');
-    const midCap = document.getElementById('mid-cap-allocation');
-    const smallCap = document.getElementById('small-cap-allocation');
-
-    if (riskProfile === 'high_risk') {
-        strategyName.textContent = 'Aggressive Growth';
-        strategyName.className = 'badge bg-danger';
-        largeCap.textContent = '0%';
-        midCap.textContent = '50%';
-        smallCap.textContent = '50%';
-
-        // Update ML banner for high risk
-        updateMLBannerText('High-Risk ML Analysis: Focus on Mid & Small Cap growth stocks with higher volatility tolerance');
-    } else {
-        strategyName.textContent = 'Balanced Portfolio';
-        strategyName.className = 'badge bg-primary';
-        largeCap.textContent = '60%';
-        midCap.textContent = '30%';
-        smallCap.textContent = '10%';
-
-        // Update ML banner for balanced risk
-        updateMLBannerText('Balanced ML Analysis: Conservative approach with focus on Large Cap stability and moderate growth');
-    }
-}
-
-function updateMLBannerText(description) {
-    const bannerText = document.querySelector('.alert-info small');
-    if (bannerText) {
-        bannerText.textContent = description;
-    }
-}
-
-function showMLRecommendationsLoading() {
-    const tbody = document.querySelector('#ml-recommendations-table tbody');
-
-    // Update ML banner for loading state
-    document.getElementById('ml-analysis-count').innerHTML = `
-        <span class="spinner-border spinner-border-sm me-2"></span>Analyzing...
-    `;
-
-    tbody.innerHTML = `
-        <tr>
-            <td colspan="10" class="text-center py-5">
-                <div class="d-flex flex-column justify-content-center align-items-center">
-                    <div class="spinner-border text-primary mb-3" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <h6 class="text-primary mb-2">
-                        <i class="bi bi-cpu-fill me-2"></i>ML Analysis in Progress
-                    </h6>
-                    <p class="text-muted mb-0">
-                        Analyzing stocks with 70 advanced features • Auto-training models • Risk filtering
-                    </p>
-                </div>
-            </td>
-        </tr>
-    `;
-}
-
-function showMLRecommendationsError(message) {
-    const tbody = document.querySelector('#ml-recommendations-table tbody');
-
-    // Update ML banner for error state
-    document.getElementById('ml-analysis-count').innerHTML = `
-        <span class="badge bg-danger">Analysis Failed</span>
-    `;
-
-    tbody.innerHTML = `
-        <tr>
-            <td colspan="10" class="text-center py-5">
-                <div class="text-danger">
-                    <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
-                    <h6 class="mt-3 mb-2">ML Analysis Failed</h6>
-                    <p class="text-muted">${message}</p>
-                    <button class="btn btn-outline-primary btn-sm mt-2" onclick="refreshMLRecommendations()">
-                        <i class="bi bi-arrow-repeat me-2"></i>Retry Analysis
-                    </button>
-                </div>
-            </td>
-        </tr>
-    `;
-}
-
-async function discoverStocks() {
-    try {
-        showMLRecommendationsLoading();
-
-        const response = await fetch('/api/v1/screening/discover?refresh=true');
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const result = await response.json();
-
-        if (result.success) {
-            alert(`Discovered ${result.summary.total_stocks} tradeable stocks!\n` +
-                  `Large Cap: ${result.summary.large_cap_count}\n` +
-                  `Mid Cap: ${result.summary.mid_cap_count}\n` +
-                  `Small Cap: ${result.summary.small_cap_count}`);
-
-            // Reload recommendations with fresh data
-            loadMLRecommendations();
+    // Update Kronos prediction
+    const kronosElement = document.getElementById('kronos-prediction');
+    if (kronosElement) {
+        if (data.kronos_predicted_price) {
+            kronosElement.textContent = `₹${parseFloat(data.kronos_predicted_price).toFixed(2)}`;
         } else {
-            showMLRecommendationsError('Failed to discover stocks: ' + result.error);
+            kronosElement.textContent = 'N/A';
         }
-    } catch (error) {
-        console.error('Error discovering stocks:', error);
-        showMLRecommendationsError('Network error during stock discovery');
     }
-}
-
-function refreshMLRecommendations() {
-    loadMLRecommendations();
-}
-
-async function analyzeStock(symbol) {
-    try {
-        const response = await fetch('/api/v1/screening/analyze-stock', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                symbol: symbol,
-                auto_train: false
-            })
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            const analysis = result.analysis;
-            alert(`ML Analysis for ${symbol}:\n\n` +
-                  `Overall Score: ${(analysis.overall_score * 100).toFixed(1)}/100\n` +
-                  `Technical Score: ${(analysis.technical_score * 100).toFixed(1)}/100\n` +
-                  `Risk Score: ${(analysis.risk_score * 100).toFixed(1)}/100\n` +
-                  `ML Prediction: ₹${analysis.ml_prediction.toFixed(2)}\n` +
-                  `Confidence: ${(analysis.prediction_confidence * 100).toFixed(1)}%\n` +
-                  `Recommendation: ${analysis.recommendation}\n\n` +
-                  `Reasons: ${analysis.reasons.join(', ')}`);
-        } else {
-            alert('Analysis failed: ' + result.error);
-        }
-    } catch (error) {
-        alert('Network error during analysis');
-    }
-}
-
-function viewStockDetails(symbol) {
-    // Navigate to stock details or show modal
-    alert(`Detailed analysis for ${symbol} - Advanced features coming soon!`);
 }
 </script>
 {% endblock %}

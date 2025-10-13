@@ -317,9 +317,11 @@ class AutoTradingService:
             balance_result = unified_service.get_account_balance(user_id)
 
             if not balance_result.get('success'):
+                error_msg = balance_result.get('error', 'Unknown error fetching account balance')
+                logger.warning(f"⚠️  Failed to fetch account balance: {error_msg}")
                 return {
                     'proceed': False,
-                    'message': 'Failed to fetch account balance'
+                    'message': f'Failed to fetch account balance: {error_msg}'
                 }
 
             balance_data = balance_result.get('data', {})
@@ -343,7 +345,7 @@ class AutoTradingService:
             }
 
         except Exception as e:
-            logger.error(f"Error checking account balance: {e}")
+            logger.error(f"Error checking account balance: {e}", exc_info=True)
             return {
                 'proceed': False,
                 'message': f'Error checking account balance: {str(e)}'

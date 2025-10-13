@@ -271,7 +271,27 @@ class FyersDashboardProvider(IDashboardProvider):
         """Get account balance and available funds using FYERS API."""
         try:
             funds_response = self.fyers_service.funds(user_id)
-            
+
+            # Handle case where API returns a string error instead of dict
+            if isinstance(funds_response, str):
+                logger.warning(f"Fyers API returned string response for funds: {funds_response}")
+                return {
+                    'success': False,
+                    'error': f'API error: {funds_response}',
+                    'data': {'available_cash': 0, 'total_balance': 0, 'margin_used': 0},
+                    'last_updated': datetime.now().isoformat()
+                }
+
+            # Check if response is not a dictionary
+            if not isinstance(funds_response, dict):
+                logger.warning(f"Fyers API returned unexpected type for funds: {type(funds_response)}")
+                return {
+                    'success': False,
+                    'error': 'Unexpected API response format',
+                    'data': {'available_cash': 0, 'total_balance': 0, 'margin_used': 0},
+                    'last_updated': datetime.now().isoformat()
+                }
+
             if funds_response.get('status') != 'success':
                 return {
                     'success': False,
@@ -279,7 +299,7 @@ class FyersDashboardProvider(IDashboardProvider):
                     'data': {'available_cash': 0, 'total_balance': 0, 'margin_used': 0},
                     'last_updated': datetime.now().isoformat()
                 }
-            
+
             funds = funds_response.get('data', [])
             balance_data = {
                 'available_cash': 0,
@@ -288,30 +308,39 @@ class FyersDashboardProvider(IDashboardProvider):
                 'utilized_amount': 0,
                 'available_limit': 0
             }
-            
-            for fund in funds:
-                title = fund.get('title', '')
-                equity_amount = fund.get('equityAmount', 0)
-                
-                if 'Available Cash' in title:
-                    balance_data['available_cash'] = equity_amount
-                elif 'Total Balance' in title:
-                    balance_data['total_balance'] = equity_amount
-                elif 'Margin Used' in title:
-                    balance_data['margin_used'] = equity_amount
-                elif 'Utilized Amount' in title:
-                    balance_data['utilized_amount'] = equity_amount
-                elif 'Available Limit' in title:
-                    balance_data['available_limit'] = equity_amount
-            
+
+            # Handle both list and dict formats
+            if isinstance(funds, list):
+                for fund in funds:
+                    title = fund.get('title', '')
+                    equity_amount = fund.get('equityAmount', 0)
+
+                    if 'Available Cash' in title:
+                        balance_data['available_cash'] = equity_amount
+                    elif 'Total Balance' in title:
+                        balance_data['total_balance'] = equity_amount
+                    elif 'Margin Used' in title:
+                        balance_data['margin_used'] = equity_amount
+                    elif 'Utilized Amount' in title:
+                        balance_data['utilized_amount'] = equity_amount
+                    elif 'Available Limit' in title:
+                        balance_data['available_limit'] = equity_amount
+            elif isinstance(funds, dict):
+                # Direct dict format
+                balance_data['available_cash'] = funds.get('available_cash', 0)
+                balance_data['total_balance'] = funds.get('total_balance', 0)
+                balance_data['margin_used'] = funds.get('margin_used', 0)
+                balance_data['utilized_amount'] = funds.get('utilized_amount', 0)
+                balance_data['available_limit'] = funds.get('available_limit', 0)
+
             return {
                 'success': True,
                 'data': balance_data,
                 'last_updated': datetime.now().isoformat()
             }
-            
+
         except Exception as e:
-            logger.error(f"Error fetching account balance for user {user_id}: {str(e)}")
+            logger.error(f"Error fetching account balance for user {user_id}: {str(e)}", exc_info=True)
             return {
                 'success': False,
                 'error': str(e),

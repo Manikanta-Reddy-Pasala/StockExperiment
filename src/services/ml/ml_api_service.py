@@ -397,48 +397,144 @@ class MLAPIService:
 
     def get_ml_overview(self, user_id):
         """
-        Get ML dashboard overview statistics.
-        Returns overview data or error.
+        Get ML dashboard overview statistics for all 3 models.
+        Returns overview data for Traditional ML, Raw LSTM, and Kronos models.
         """
         try:
+            from pathlib import Path
+            import os
+            from sqlalchemy import text
+
+            models_data = []
+
+            # MODEL 1: Traditional ML (RF + XGBoost)
+            traditional_model = {
+                'name': 'Traditional ML',
+                'description': 'Random Forest + XGBoost',
+                'type': 'traditional',
+                'stocks_trained': 0,
+                'last_trained': 'Never',
+                'status': 'not_trained',
+                'accuracy': 0
+            }
+
+            # Check if traditional models exist
+            model_dir = Path('ml_models')
+            rf_model = model_dir / 'rf_price_model.pkl'
+            xgb_model = model_dir / 'xgb_price_model.pkl'
+            metadata_file = model_dir / 'metadata.pkl'
+
+            if rf_model.exists() and xgb_model.exists():
+                traditional_model['status'] = 'trained'
+
+                # Get metadata if available
+                if metadata_file.exists():
+                    try:
+                        import pickle
+                        with open(metadata_file, 'rb') as f:
+                            metadata = pickle.load(f)
+                            traditional_model['stocks_trained'] = metadata.get('samples', 0)
+                            traditional_model['accuracy'] = round(metadata.get('price_r2', 0) * 100, 1)
+
+                            # Get last modified time
+                            last_modified = rf_model.stat().st_mtime
+                            traditional_model['last_trained'] = datetime.fromtimestamp(last_modified).strftime('%Y-%m-%d %H:%M')
+                    except Exception as e:
+                        logger.warning(f"Error loading traditional ML metadata: {e}")
+                else:
+                    # Fallback to file modification time
+                    last_modified = rf_model.stat().st_mtime
+                    traditional_model['last_trained'] = datetime.fromtimestamp(last_modified).strftime('%Y-%m-%d %H:%M')
+
+            models_data.append(traditional_model)
+
+            # MODEL 2: Raw LSTM (Deep Learning)
+            lstm_model = {
+                'name': 'Raw LSTM',
+                'description': 'Deep Learning OHLCV',
+                'type': 'raw_lstm',
+                'stocks_trained': 0,
+                'last_trained': 'Never',
+                'status': 'not_trained',
+                'accuracy': 0
+            }
+
+            # Count LSTM models (each stock has its own model)
+            lstm_dir = Path('ml_models/raw_ohlcv_lstm')
+            if lstm_dir.exists():
+                lstm_models = [d for d in lstm_dir.iterdir() if d.is_dir() and (d / 'lstm_model.h5').exists()]
+                lstm_model['stocks_trained'] = len(lstm_models)
+
+                if lstm_models:
+                    lstm_model['status'] = 'trained'
+
+                    # Get the most recent model
+                    latest_lstm = max(lstm_models, key=lambda d: (d / 'lstm_model.h5').stat().st_mtime)
+                    last_modified = (latest_lstm / 'lstm_model.h5').stat().st_mtime
+                    lstm_model['last_trained'] = datetime.fromtimestamp(last_modified).strftime('%Y-%m-%d %H:%M')
+
+                    # Try to get accuracy from metadata
+                    try:
+                        metadata_file = latest_lstm / 'metadata.pkl'
+                        if metadata_file.exists():
+                            import pickle
+                            with open(metadata_file, 'rb') as f:
+                                metadata = pickle.load(f)
+                                lstm_model['accuracy'] = round(metadata.get('val_loss', 0) * 100, 1)
+                    except Exception as e:
+                        logger.warning(f"Error loading LSTM metadata: {e}")
+
+            models_data.append(lstm_model)
+
+            # MODEL 3: Kronos (K-line Tokenization)
+            kronos_model = {
+                'name': 'Kronos',
+                'description': 'K-line Tokenization',
+                'type': 'kronos',
+                'stocks_trained': 0,
+                'last_trained': 'Never',
+                'status': 'not_trained',
+                'accuracy': 0
+            }
+
+            # Check if Kronos predictions exist in daily_suggested_stocks
             with self.db_manager.get_session() as session:
-                # Count trained models
-                trained_count = session.query(MLTrainedModel).filter(
-                    MLTrainedModel.user_id == user_id
-                ).count()
+                # Count distinct stocks with Kronos predictions
+                result = session.execute(text("""
+                    SELECT COUNT(DISTINCT symbol), MAX(date), AVG(ml_confidence)
+                    FROM daily_suggested_stocks
+                    WHERE model_type = 'kronos'
+                    AND date >= CURRENT_DATE - INTERVAL '7 days'
+                """)).fetchone()
 
-                # Get training success rate
-                total_jobs = session.query(MLTrainingJob).filter(
-                    MLTrainingJob.user_id == user_id
-                ).count()
+                if result and result[0] > 0:
+                    kronos_model['stocks_trained'] = result[0]
+                    kronos_model['status'] = 'trained'
 
-                successful_jobs = session.query(MLTrainingJob).filter(
-                    and_(
-                        MLTrainingJob.user_id == user_id,
-                        MLTrainingJob.status == 'completed'
-                    )
-                ).count()
+                    if result[1]:
+                        kronos_model['last_trained'] = result[1].strftime('%Y-%m-%d %H:%M')
 
-                success_rate = (successful_jobs / total_jobs * 100) if total_jobs > 0 else 0
+                    if result[2]:
+                        kronos_model['accuracy'] = round(result[2] * 100, 1)
 
-                # Get last updated date
-                latest_model = session.query(MLTrainedModel).filter(
-                    MLTrainedModel.user_id == user_id
-                ).order_by(MLTrainedModel.created_at.desc()).first()
+            models_data.append(kronos_model)
 
-                last_updated = latest_model.created_at.strftime('%Y-%m-%d') if latest_model else 'Never'
+            # Calculate overall stats
+            total_stocks = sum(m['stocks_trained'] for m in models_data)
+            trained_models = sum(1 for m in models_data if m['status'] == 'trained')
 
-                return {
-                    'success': True,
-                    'data': {
-                        'trained_stocks': trained_count,
-                        'success_rate': round(success_rate, 1),
-                        'last_updated': last_updated
-                    }
+            return {
+                'success': True,
+                'data': {
+                    'models': models_data,
+                    'total_stocks_trained': total_stocks,
+                    'trained_models_count': trained_models,
+                    'total_models_count': 3
                 }
+            }
 
         except Exception as e:
-            logger.error(f"Error getting ML overview: {e}")
+            logger.error(f"Error getting ML overview: {e}", exc_info=True)
             return {
                 'success': False,
                 'error': f'Failed to get overview: {str(e)}'
