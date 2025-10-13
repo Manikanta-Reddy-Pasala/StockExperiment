@@ -367,7 +367,7 @@ def create_app():
     @app.route('/suggested_stocks')
     @login_required
     def suggested_stocks():
-        """Suggested stocks page."""
+        """Suggested stocks page - Triple Model View (Traditional ML + Raw LSTM + Kronos)."""
         return render_template('suggested_stocks.html')
     
     @app.route('/reports')

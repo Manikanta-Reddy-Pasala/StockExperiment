@@ -265,21 +265,20 @@ def get_available_strategies():
         }), 500
 
 
-@suggested_stocks_bp.route('/dual-model-view', methods=['GET'])
+@suggested_stocks_bp.route('/triple-model-view', methods=['GET'])
 @login_required
-def get_dual_model_view():
+def get_triple_model_view():
     """
-    Get suggested stocks from BOTH models (traditional + raw_lstm) and BOTH risk levels.
+    Get suggested stocks from ALL THREE models (traditional + raw_lstm + kronos) and BOTH risk levels.
 
     Returns a comprehensive view showing:
-    - Traditional Model + Default Risk
-    - Traditional Model + High Risk
-    - Raw LSTM Model + Default Risk
-    - Raw LSTM Model + High Risk
+    - Traditional Model + Default Risk / High Risk
+    - Raw LSTM Model + Default Risk / High Risk
+    - Kronos Model + Default Risk / High Risk
 
     Query parameters:
     - limit: Number of stocks per model/strategy combination (default: 10)
-    - date: Date to fetch (default: today)
+    - date: Date to fetch (default: most recent data)
     """
     try:
         from datetime import datetime, date as dt_date
@@ -299,7 +298,7 @@ def get_dual_model_view():
                     'error': 'Invalid date format. Use YYYY-MM-DD'
                 }), 400
         else:
-            # Get the most recent date with data instead of today
+            # Get the most recent date with data
             with get_database_manager().get_session() as session:
                 recent_date_result = session.execute(text("""
                     SELECT MAX(date) as max_date FROM daily_suggested_stocks
@@ -312,7 +311,7 @@ def get_dual_model_view():
 
         user_id = current_user.id
 
-        logger.info(f"🎯 Dual model view request: limit={limit}, date={query_date}, user={user_id}")
+        logger.info(f"🎯 Triple model view request: limit={limit}, date={query_date}, user={user_id}")
 
         db = get_database_manager()
 
@@ -357,6 +356,10 @@ def get_dual_model_view():
             'raw_lstm': {
                 'default_risk': [],
                 'high_risk': []
+            },
+            'kronos': {
+                'default_risk': [],
+                'high_risk': []
             }
         }
 
@@ -370,7 +373,7 @@ def get_dual_model_view():
             elif 'high' in strategy.lower() or strategy.upper() == 'HIGH_RISK':
                 risk_level = 'high_risk'
             else:
-                # For raw_lstm strategy, use default_risk
+                # Fallback
                 risk_level = 'default_risk'
 
             # Initialize if model_type doesn't exist
@@ -387,32 +390,16 @@ def get_dual_model_view():
                 grouped_results[model_type][risk_level] = grouped_results[model_type][risk_level][:limit]
 
         # Calculate statistics
-        stats = {
-            'traditional': {
-                'default_risk': {
-                    'count': len(grouped_results['traditional']['default_risk']),
-                    'avg_score': sum(s['ml_prediction_score'] or 0 for s in grouped_results['traditional']['default_risk']) / len(grouped_results['traditional']['default_risk']) if grouped_results['traditional']['default_risk'] else 0,
-                    'avg_confidence': sum(s['ml_confidence'] or 0 for s in grouped_results['traditional']['default_risk']) / len(grouped_results['traditional']['default_risk']) if grouped_results['traditional']['default_risk'] else 0,
-                },
-                'high_risk': {
-                    'count': len(grouped_results['traditional']['high_risk']),
-                    'avg_score': sum(s['ml_prediction_score'] or 0 for s in grouped_results['traditional']['high_risk']) / len(grouped_results['traditional']['high_risk']) if grouped_results['traditional']['high_risk'] else 0,
-                    'avg_confidence': sum(s['ml_confidence'] or 0 for s in grouped_results['traditional']['high_risk']) / len(grouped_results['traditional']['high_risk']) if grouped_results['traditional']['high_risk'] else 0,
+        stats = {}
+        for model_type in grouped_results:
+            stats[model_type] = {}
+            for risk_level in grouped_results[model_type]:
+                stocks_in_group = grouped_results[model_type][risk_level]
+                stats[model_type][risk_level] = {
+                    'count': len(stocks_in_group),
+                    'avg_score': sum(s['ml_prediction_score'] or 0 for s in stocks_in_group) / len(stocks_in_group) if stocks_in_group else 0,
+                    'avg_confidence': sum(s['ml_confidence'] or 0 for s in stocks_in_group) / len(stocks_in_group) if stocks_in_group else 0,
                 }
-            },
-            'raw_lstm': {
-                'default_risk': {
-                    'count': len(grouped_results['raw_lstm']['default_risk']),
-                    'avg_score': sum(s['ml_prediction_score'] or 0 for s in grouped_results['raw_lstm']['default_risk']) / len(grouped_results['raw_lstm']['default_risk']) if grouped_results['raw_lstm']['default_risk'] else 0,
-                    'avg_confidence': sum(s['ml_confidence'] or 0 for s in grouped_results['raw_lstm']['default_risk']) / len(grouped_results['raw_lstm']['default_risk']) if grouped_results['raw_lstm']['default_risk'] else 0,
-                },
-                'high_risk': {
-                    'count': len(grouped_results['raw_lstm']['high_risk']),
-                    'avg_score': sum(s['ml_prediction_score'] or 0 for s in grouped_results['raw_lstm']['high_risk']) / len(grouped_results['raw_lstm']['high_risk']) if grouped_results['raw_lstm']['high_risk'] else 0,
-                    'avg_confidence': sum(s['ml_confidence'] or 0 for s in grouped_results['raw_lstm']['high_risk']) / len(grouped_results['raw_lstm']['high_risk']) if grouped_results['raw_lstm']['high_risk'] else 0,
-                }
-            }
-        }
 
         response = {
             'success': True,
@@ -423,13 +410,24 @@ def get_dual_model_view():
             'total_stocks': sum(len(grouped_results[mt][rl]) for mt in grouped_results for rl in grouped_results[mt])
         }
 
-        logger.info(f"✅ Dual model view: {response['total_stocks']} total stocks across all groups")
+        logger.info(f"✅ Triple model view: {response['total_stocks']} total stocks across all groups")
 
         return jsonify(response), 200
 
     except Exception as e:
-        logger.error(f"Error getting dual model view: {e}", exc_info=True)
+        logger.error(f"Error getting triple model view: {e}", exc_info=True)
         return jsonify({
             'success': False,
             'error': f'Internal server error: {str(e)}'
         }), 500
+
+
+# Keep old endpoint for backward compatibility
+@suggested_stocks_bp.route('/dual-model-view', methods=['GET'])
+@login_required
+def get_dual_model_view():
+    """
+    DEPRECATED: Use /triple-model-view instead.
+    Redirects to triple-model-view endpoint.
+    """
+    return get_triple_model_view()
