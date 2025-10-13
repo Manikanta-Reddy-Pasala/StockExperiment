@@ -224,9 +224,21 @@ class StrategyOllamaEnhancementService:
                     percentages = re.findall(r'(\d+\.?\d*%)', content)
                     financial_metrics.extend(percentages[:3])  # Limit to 3 metrics
                     
-                    # Simple sentiment analysis
-                    positive_words = ['growth', 'profit', 'increase', 'strong', 'positive', 'bullish']
-                    negative_words = ['decline', 'loss', 'decrease', 'weak', 'negative', 'bearish']
+                    # India-specific sentiment analysis keywords
+                    positive_words = [
+                        'growth', 'profit', 'increase', 'strong', 'positive', 'bullish', 'rally',
+                        'surge', 'gain', 'outperform', 'buy', 'upgrade', 'optimistic', 'recovery',
+                        'fii buying', 'dii buying', 'inflows', 'gdp growth', 'earnings beat',
+                        'nifty gains', 'sensex rises', 'india vix falls', 'rupee strengthens',
+                        'good monsoon', 'rate cut', 'easing inflation', 'export growth'
+                    ]
+                    negative_words = [
+                        'decline', 'loss', 'decrease', 'weak', 'negative', 'bearish', 'crash',
+                        'fall', 'drop', 'underperform', 'sell', 'downgrade', 'pessimistic', 'slowdown',
+                        'fii selling', 'dii selling', 'outflows', 'gdp contraction', 'earnings miss',
+                        'nifty falls', 'sensex drops', 'india vix spikes', 'rupee weakens',
+                        'poor monsoon', 'rate hike', 'high inflation', 'import surge', 'deficit'
+                    ]
                     
                     positive_count = sum(1 for word in positive_words if word.lower() in content.lower())
                     negative_count = sum(1 for word in negative_words if word.lower() in content.lower())
@@ -297,28 +309,28 @@ class StrategyOllamaEnhancementService:
         else:
             return "very_low"
     
-    def enhance_portfolio_recommendations(self, portfolio_recommendations: Dict[str, Any], 
+    def enhance_portfolio_recommendations(self, portfolio_recommendations: Dict[str, Any],
                                        strategy_type: str) -> Dict[str, Any]:
         """Enhance portfolio-level recommendations with market intelligence."""
         try:
             logger.info(f"🔍 Enhancing portfolio recommendations for {strategy_type} strategy")
-            
+
             # Extract individual recommendations
             recommendations = portfolio_recommendations.get('recommendations', [])
             if not recommendations:
                 return portfolio_recommendations
-            
+
             # Enhance individual recommendations
             enhanced_recommendations = self.enhance_strategy_recommendations(
                 recommendations, strategy_type, "comprehensive"
             )
-            
+
             # Calculate portfolio-level metrics
             total_enhancement_score = sum(
-                rec.get('ollama_enhancement', {}).get('enhancement_score', 0.3) 
+                rec.get('ollama_enhancement', {}).get('enhancement_score', 0.3)
                 for rec in enhanced_recommendations
             ) / len(enhanced_recommendations)
-            
+
             # Update portfolio recommendations
             enhanced_portfolio = portfolio_recommendations.copy()
             enhanced_portfolio['recommendations'] = enhanced_recommendations
@@ -328,13 +340,174 @@ class StrategyOllamaEnhancementService:
                 'portfolio_enhancement_score': total_enhancement_score,
                 'enhanced_recommendations': len(enhanced_recommendations)
             }
-            
+
             logger.info(f"✅ Portfolio enhancement completed with score: {total_enhancement_score:.2f}")
             return enhanced_portfolio
-            
+
         except Exception as e:
             logger.error(f"Error enhancing portfolio recommendations: {e}")
             return portfolio_recommendations
+
+    def get_market_sentiment(self) -> Dict[str, Any]:
+        """
+        Get overall market sentiment for Indian stock market.
+
+        Returns:
+            Dict with sentiment analysis including:
+            - sentiment_type: 'greedy', 'fear', or 'neutral'
+            - sentiment_score: numeric score (-1 to 1)
+            - confidence: 'high', 'medium', or 'low'
+            - recommendation: investment recommendation
+            - analysis: detailed analysis text
+            - sources: list of news sources
+        """
+        try:
+            logger.info("🔍 Fetching Indian market sentiment from Ollama...")
+
+            # Create comprehensive India-specific market sentiment queries
+            queries = [
+                "NSE BSE Indian stock market sentiment today Nifty 50 Sensex investor mood bullish bearish",
+                "India Nifty Bank Nifty IT sector performance today market outlook FII DII buying selling",
+                "Indian stock market news today RBI monetary policy inflation rupee dollar rate impact",
+                "India Fear Greed Index investor sentiment retail participation mutual fund inflows today",
+                "NSE India VIX volatility index Nifty options PCR ratio market direction today",
+                "Indian economy GDP growth manufacturing PMI services sector today investment climate"
+            ]
+
+            all_sources = []
+            all_insights = []
+            overall_sentiment_score = 0.0
+            query_count = 0
+
+            for query in queries:
+                try:
+                    intelligence = self._search_market_intelligence(query)
+                    if intelligence:
+                        all_sources.extend(intelligence.get('sources', []))
+                        all_insights.extend(intelligence.get('insights', []))
+                        overall_sentiment_score += intelligence.get('sentiment_score', 0.0)
+                        query_count += 1
+
+                    # Rate limiting between queries
+                    time.sleep(self.rate_limit_delay)
+
+                except Exception as e:
+                    logger.warning(f"Failed to fetch market intelligence for query: {e}")
+                    continue
+
+            # Calculate average sentiment
+            if query_count > 0:
+                overall_sentiment_score /= query_count
+
+            # Determine sentiment type
+            sentiment_type = "neutral"
+            if overall_sentiment_score > 0.3:
+                sentiment_type = "greedy"
+            elif overall_sentiment_score < -0.3:
+                sentiment_type = "fear"
+
+            # Determine confidence
+            sources_count = len(all_sources)
+            if sources_count >= 5:
+                confidence = "high"
+            elif sources_count >= 3:
+                confidence = "medium"
+            else:
+                confidence = "low"
+
+            # Generate recommendation
+            if sentiment_type == "greedy":
+                recommendation = "CAUTION - Market may be overvalued. Consider booking profits or waiting for correction."
+                emoji = "⚠️"
+                color = "warning"
+            elif sentiment_type == "fear":
+                recommendation = "OPPORTUNITY - Market fear creates buying opportunities. Consider quality stocks."
+                emoji = "✅"
+                color = "success"
+            else:
+                recommendation = "NEUTRAL - Market balanced. Continue with your investment strategy."
+                emoji = "ℹ️"
+                color = "info"
+
+            # Generate analysis
+            analysis = self._generate_market_analysis(
+                sentiment_type, overall_sentiment_score, all_insights
+            )
+
+            result = {
+                'success': True,
+                'timestamp': datetime.now().isoformat(),
+                'sentiment_type': sentiment_type,
+                'sentiment_score': round(overall_sentiment_score, 2),
+                'confidence': confidence,
+                'recommendation': recommendation,
+                'analysis': analysis,
+                'emoji': emoji,
+                'color': color,
+                'sources_count': sources_count,
+                'sources': all_sources[:5],  # Top 5 sources
+                'insights': all_insights[:3]  # Top 3 insights
+            }
+
+            logger.info(f"✅ Market sentiment: {sentiment_type.upper()} (score: {overall_sentiment_score:.2f})")
+            return result
+
+        except Exception as e:
+            logger.error(f"❌ Error fetching market sentiment: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'sentiment_type': 'unknown',
+                'sentiment_score': 0.0,
+                'confidence': 'low',
+                'recommendation': 'Unable to fetch market sentiment. Please try again later.',
+                'emoji': '❌',
+                'color': 'secondary'
+            }
+
+    def _generate_market_analysis(self, sentiment_type: str, score: float,
+                                 insights: List[str]) -> str:
+        """Generate detailed India-specific market analysis text."""
+        try:
+            if sentiment_type == "greedy":
+                analysis = (
+                    f"Indian market sentiment is GREEDY with a score of {score:.2f}. "
+                    "NSE/BSE indices are showing strong optimism, which may lead to overvaluation. "
+                    "Heavy FII buying and high retail participation suggest market euphoria. "
+                    "This is typically a signal to book profits, avoid fresh lump-sum investments, "
+                    "and wait for market correction. Consider switching to SIPs or defensive sectors "
+                    "(FMCG, Pharma, IT)."
+                )
+            elif sentiment_type == "fear":
+                analysis = (
+                    f"Indian market sentiment is FEARFUL with a score of {score:.2f}. "
+                    "NSE/BSE indices are showing pessimism, which often creates buying opportunities. "
+                    "Heavy selling by FIIs and panic among retail investors suggest oversold conditions. "
+                    "Quality large-cap stocks may be available at attractive valuations. "
+                    "This could be an excellent time for long-term investors to enter or increase "
+                    "SIP amounts. Focus on fundamentally strong companies in Banking, IT, and Consumer sectors."
+                )
+            else:
+                analysis = (
+                    f"Indian market sentiment is NEUTRAL with a score of {score:.2f}. "
+                    "NSE/BSE indices are showing balanced trading with mixed FII/DII activity. "
+                    "No extreme greed or fear in the market. India VIX is at moderate levels. "
+                    "Continue with your regular investment strategy (SIPs, diversified portfolio). "
+                    "Focus on stock-specific opportunities and sector rotation rather than market timing. "
+                    "Monitor RBI policy, inflation data, and global cues for direction."
+                )
+
+            # Add key insights if available
+            if insights and len(insights) > 0:
+                analysis += "\n\nKey Market Insights:\n"
+                for i, insight in enumerate(insights[:3], 1):
+                    analysis += f"{i}. {insight}\n"
+
+            return analysis
+
+        except Exception as e:
+            logger.error(f"Error generating market analysis: {e}")
+            return "Market analysis unavailable."
 
 
 # Global service instance

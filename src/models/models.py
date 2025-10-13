@@ -42,6 +42,9 @@ class User(UserMixin, Base):
     suggested_stocks = relationship("SuggestedStock", back_populates="user")
     broker_configurations = relationship("BrokerConfiguration", back_populates="user")
     strategy_settings = relationship("UserStrategySettings", back_populates="user")
+    auto_trading_settings = relationship("AutoTradingSettings", back_populates="user", uselist=False)
+    auto_trading_executions = relationship("AutoTradingExecution", back_populates="user")
+    order_performances = relationship("OrderPerformance", back_populates="user")
     
     def __repr__(self):
         return f'<User {self.username}>'
@@ -538,3 +541,165 @@ class MLTrainedModel(Base):
     # Relationships
     training_job = relationship("MLTrainingJob")
     user = relationship("User")
+
+
+class AutoTradingSettings(Base):
+    """Auto-trading settings and weekly limits."""
+    __tablename__ = 'auto_trading_settings'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, unique=True)
+    is_enabled = Column(Boolean, default=False)  # Auto-trading enabled/disabled
+    max_amount_per_week = Column(Float, default=10000.0)  # Max investment per week (₹)
+    max_buys_per_week = Column(Integer, default=5)  # Max number of trades per week
+    preferred_strategies = Column(Text)  # JSON array of preferred strategies
+    minimum_confidence_score = Column(Float, default=0.7)  # Minimum AI confidence to trade
+    minimum_market_sentiment = Column(Float, default=0.0)  # Minimum market sentiment (-1 to 1)
+    preferred_model_types = Column(Text)  # JSON array: ['traditional', 'raw_lstm', 'kronos']
+    auto_stop_loss_enabled = Column(Boolean, default=True)  # Auto set stop-loss
+    auto_target_price_enabled = Column(Boolean, default=True)  # Auto set target price
+    execution_time = Column(String(10), default='09:20')  # Time to execute (HH:MM format, market opens 9:15 AM)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    user = relationship("User")
+    executions = relationship("AutoTradingExecution", back_populates="settings")
+
+    def __repr__(self):
+        return f'<AutoTradingSettings user_id={self.user_id} enabled={self.is_enabled}>'
+
+
+class AutoTradingExecution(Base):
+    """Log of auto-trading executions."""
+    __tablename__ = 'auto_trading_executions'
+
+    id = Column(Integer, primary_key=True)
+    settings_id = Column(Integer, ForeignKey('auto_trading_settings.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    execution_date = Column(DateTime, default=datetime.utcnow)
+    status = Column(String(20), nullable=False)  # 'success', 'skipped', 'failed', 'partial'
+
+    # Market sentiment at execution time
+    market_sentiment_type = Column(String(20))  # 'greedy', 'fear', 'neutral'
+    market_sentiment_score = Column(Float)
+    ai_confidence = Column(Float)
+
+    # Weekly limits check
+    weekly_amount_spent = Column(Float, default=0.0)
+    weekly_buys_count = Column(Integer, default=0)
+    remaining_weekly_amount = Column(Float)
+    remaining_weekly_buys = Column(Integer)
+
+    # Account balance check
+    account_balance = Column(Float)
+    available_to_invest = Column(Float)
+
+    # Execution results
+    orders_created = Column(Integer, default=0)
+    total_amount_invested = Column(Float, default=0.0)
+    selected_strategies = Column(Text)  # JSON array of strategies used
+    execution_details = Column(Text)  # JSON string of execution details
+    error_message = Column(Text)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    settings = relationship("AutoTradingSettings", back_populates="executions")
+    user = relationship("User")
+    orders = relationship("OrderPerformance", back_populates="auto_execution")
+
+    def __repr__(self):
+        return f'<AutoTradingExecution id={self.id} user_id={self.user_id} status={self.status}>'
+
+
+class OrderPerformance(Base):
+    """Track order performance and metrics."""
+    __tablename__ = 'order_performance'
+
+    id = Column(Integer, primary_key=True)
+    order_id = Column(String(50), ForeignKey('orders.order_id'), nullable=False, unique=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    auto_execution_id = Column(Integer, ForeignKey('auto_trading_executions.id'), nullable=True)
+
+    # Order details at creation
+    symbol = Column(String(50), nullable=False)
+    entry_price = Column(Float, nullable=False)
+    quantity = Column(Integer, nullable=False)
+    stop_loss = Column(Float)
+    target_price = Column(Float)
+    model_type = Column(String(20))
+    strategy = Column(String(50))
+
+    # ML predictions at order time
+    ml_prediction_score = Column(Float)
+    ml_price_target = Column(Float)
+    ml_confidence = Column(Float)
+    ml_risk_score = Column(Float)
+
+    # Current status
+    current_price = Column(Float)
+    current_value = Column(Float)
+    unrealized_pnl = Column(Float)
+    unrealized_pnl_pct = Column(Float)
+
+    # Exit details (when order is closed)
+    exit_price = Column(Float)
+    exit_date = Column(DateTime)
+    exit_reason = Column(String(50))  # 'stop_loss', 'target_reached', 'manual', 'time_based'
+    realized_pnl = Column(Float)
+    realized_pnl_pct = Column(Float)
+
+    # Performance metrics
+    days_held = Column(Integer)
+    max_profit_reached = Column(Float)  # Maximum profit during holding period
+    max_loss_reached = Column(Float)    # Maximum loss during holding period
+    prediction_accuracy = Column(Float)  # How accurate was ML prediction
+
+    # Status tracking
+    is_active = Column(Boolean, default=True)
+    is_profitable = Column(Boolean)
+    performance_rating = Column(String(20))  # 'excellent', 'good', 'poor', 'loss'
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_checked_at = Column(DateTime)
+
+    # Relationships
+    order = relationship("Order")
+    user = relationship("User")
+    auto_execution = relationship("AutoTradingExecution", back_populates="orders")
+    daily_snapshots = relationship("OrderPerformanceSnapshot", back_populates="order_performance")
+
+    def __repr__(self):
+        return f'<OrderPerformance order_id={self.order_id} symbol={self.symbol} pnl={self.unrealized_pnl}>'
+
+
+class OrderPerformanceSnapshot(Base):
+    """Daily snapshots of order performance."""
+    __tablename__ = 'order_performance_snapshots'
+
+    id = Column(Integer, primary_key=True)
+    order_performance_id = Column(Integer, ForeignKey('order_performance.id'), nullable=False)
+    snapshot_date = Column(DateTime, default=datetime.utcnow)
+
+    # Price and value at snapshot time
+    price = Column(Float, nullable=False)
+    value = Column(Float, nullable=False)
+    unrealized_pnl = Column(Float, nullable=False)
+    unrealized_pnl_pct = Column(Float, nullable=False)
+
+    # Additional metrics
+    days_since_entry = Column(Integer)
+    price_change_from_entry_pct = Column(Float)
+    distance_to_target_pct = Column(Float)
+    distance_to_stoploss_pct = Column(Float)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    order_performance = relationship("OrderPerformance", back_populates="daily_snapshots")
+
+    def __repr__(self):
+        return f'<OrderPerformanceSnapshot id={self.id} date={self.snapshot_date} pnl={self.unrealized_pnl}>'

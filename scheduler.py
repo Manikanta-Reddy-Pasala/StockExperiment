@@ -18,6 +18,8 @@ from src.models.database import get_database_manager
 from src.services.ml.enhanced_stock_predictor import EnhancedStockPredictor
 from src.services.data.suggested_stocks_saga import SuggestedStocksSagaOrchestrator
 from src.services.data.daily_snapshot_service import DailySnapshotService
+from src.services.trading.auto_trading_service import get_auto_trading_service
+from src.services.trading.order_performance_tracking_service import get_performance_tracking_service
 
 # Configure logging
 logging.basicConfig(
@@ -397,18 +399,81 @@ def cleanup_old_snapshots():
     logger.info("=" * 80)
     logger.info("Starting Old Snapshots Cleanup")
     logger.info("=" * 80)
-    
+
     try:
         db_manager = get_database_manager()
         with db_manager.get_session() as session:
             snapshot_service = DailySnapshotService(session)
-            
+
             # Delete snapshots older than 90 days
             deleted = snapshot_service.delete_old_snapshots(keep_days=90)
             logger.info(f"✅ Cleaned up {deleted} old snapshot records (>90 days)")
-            
+
     except Exception as e:
         logger.error(f"❌ Snapshot cleanup failed: {e}", exc_info=True)
+
+
+def execute_auto_trading():
+    """Execute auto-trading for all enabled users (runs daily at 9:00 AM)."""
+    logger.info("\n" + "=" * 80)
+    logger.info("AUTOMATED TRADING EXECUTION")
+    logger.info("=" * 80)
+
+    try:
+        auto_trading_service = get_auto_trading_service()
+
+        logger.info("🤖 Starting auto-trading for all enabled users...")
+
+        result = auto_trading_service.execute_auto_trading_for_all_users()
+
+        if result.get('success'):
+            total_users = result.get('total_users', 0)
+            logger.info(f"✅ Auto-trading completed for {total_users} users")
+
+            # Log results per user
+            for user_result in result.get('results', []):
+                user_id = user_result['user_id']
+                user_res = user_result['result']
+
+                if user_res.get('success'):
+                    status = user_res.get('status')
+                    if status == 'success':
+                        logger.info(f"  User {user_id}: ✅ {user_res.get('orders_created', 0)} orders, "
+                                   f"₹{user_res.get('total_invested', 0):.2f} invested")
+                    elif status == 'skipped':
+                        logger.info(f"  User {user_id}: ⏭️  {user_res.get('message', 'Skipped')}")
+                else:
+                    logger.error(f"  User {user_id}: ❌ {user_res.get('error', 'Failed')}")
+        else:
+            logger.error(f"❌ Auto-trading failed: {result.get('error')}")
+
+    except Exception as e:
+        logger.error(f"❌ Auto-trading execution failed: {e}", exc_info=True)
+
+
+def update_order_performance():
+    """Update performance tracking for all active orders (runs daily at 6:00 PM)."""
+    logger.info("\n" + "=" * 80)
+    logger.info("ORDER PERFORMANCE UPDATE")
+    logger.info("=" * 80)
+
+    try:
+        performance_service = get_performance_tracking_service()
+
+        logger.info("📊 Updating performance for all active orders...")
+
+        result = performance_service.update_all_active_orders()
+
+        if result.get('success'):
+            logger.info(f"✅ Performance update completed")
+            logger.info(f"  Orders updated: {result.get('orders_updated', 0)}")
+            logger.info(f"  Snapshots created: {result.get('snapshots_created', 0)}")
+            logger.info(f"  Orders closed: {result.get('orders_closed', 0)}")
+        else:
+            logger.error(f"❌ Performance update failed: {result.get('error')}")
+
+    except Exception as e:
+        logger.error(f"❌ Performance tracking failed: {e}", exc_info=True)
 
 
 def check_training_needed():
@@ -483,6 +548,12 @@ def run_scheduler():
     logger.info("Trading System Scheduler Started")
     logger.info("=" * 80)
     logger.info("Scheduled Tasks:")
+    logger.info("  - Auto-Trading Execution:    Daily at 09:20 AM (5 min after market opens)")
+    logger.info("    → Check AI market sentiment, weekly limits, account balance")
+    logger.info("    → Auto-place orders with stop-loss and target price")
+    logger.info("  - Performance Tracking:      Daily at 06:00 PM (after market close)")
+    logger.info("    → Update order performance, create daily snapshots")
+    logger.info("    → Check stop-loss/target, close orders if needed")
     logger.info("  - ML Training (ALL 3 MODELS): Daily at 10:00 PM (after data pipeline)")
     logger.info("    → Model 1: Traditional ML (RF + XGBoost)")
     logger.info("    → Model 2: Raw LSTM (Deep Learning)")
@@ -496,6 +567,12 @@ def run_scheduler():
 
     # Check if training is needed today and train if necessary
     check_training_needed()
+
+    # Schedule auto-trading at 9:20 AM (5 minutes after market opens at 9:15 AM)
+    schedule.every().day.at("09:20").do(execute_auto_trading)
+
+    # Schedule performance tracking at 6:00 PM (after market closes)
+    schedule.every().day.at("18:00").do(update_order_performance)
 
     # Schedule daily ML training at 10:00 PM (all 3 models)
     schedule.every().day.at("22:00").do(train_all_ml_models)

@@ -1430,6 +1430,15 @@ def create_app():
         app.logger.warning(f"Suggested stocks routes not available: {e}")
         app.logger.warning("Suggested stocks functionality will be disabled")
 
+    # Register auto-trading blueprints
+    try:
+        from .routes.auto_trading_routes import auto_trading_bp
+        app.register_blueprint(auto_trading_bp)
+        app.logger.info("Auto-trading routes registered successfully")
+    except ImportError as e:
+        app.logger.warning(f"Auto-trading routes not available: {e}")
+        app.logger.warning("Auto-trading functionality will be disabled")
+
     # Register admin routes for manual triggers
     try:
         from .admin_routes import admin_bp

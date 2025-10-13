@@ -538,3 +538,45 @@ def get_dual_model_view():
     Redirects to triple-model-view endpoint.
     """
     return get_triple_model_view()
+
+
+@suggested_stocks_bp.route('/market-sentiment', methods=['GET'])
+@login_required
+def get_market_sentiment():
+    """
+    Get overall Indian market sentiment using Ollama AI.
+
+    Returns market sentiment analysis including:
+    - sentiment_type: 'greedy', 'fear', or 'neutral'
+    - recommendation: investment advice
+    - analysis: detailed market analysis
+    - sources: news sources used
+    """
+    try:
+        logger.info("📊 Market sentiment request received")
+
+        # Get Ollama service
+        from ...services.data.strategy_ollama_enhancement_service import get_strategy_ollama_enhancement_service
+
+        ollama_service = get_strategy_ollama_enhancement_service()
+
+        # Get market sentiment
+        sentiment_result = ollama_service.get_market_sentiment()
+
+        if sentiment_result.get('success'):
+            logger.info(f"✅ Market sentiment: {sentiment_result['sentiment_type'].upper()}")
+            return jsonify(sentiment_result), 200
+        else:
+            logger.warning(f"⚠️ Market sentiment fetch failed: {sentiment_result.get('error')}")
+            return jsonify(sentiment_result), 500
+
+    except Exception as e:
+        logger.error(f"❌ Error getting market sentiment: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error',
+            'sentiment_type': 'unknown',
+            'recommendation': 'Unable to fetch market sentiment at this time.',
+            'emoji': '❌',
+            'color': 'secondary'
+        }), 500

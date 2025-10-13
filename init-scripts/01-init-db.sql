@@ -787,3 +787,194 @@ CREATE TABLE IF NOT EXISTS admin_task_tracking (
 -- Admin Task Tracking Indexes
 CREATE INDEX IF NOT EXISTS idx_admin_task_status ON admin_task_tracking(status);
 CREATE INDEX IF NOT EXISTS idx_admin_task_created ON admin_task_tracking(created_at DESC);
+
+-- ============================================================================
+-- AUTO-TRADING TABLES
+-- Handles auto-trading settings, execution tracking, and performance monitoring
+-- ============================================================================
+
+-- Auto-Trading Settings Table
+CREATE TABLE IF NOT EXISTS auto_trading_settings (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    is_enabled BOOLEAN DEFAULT FALSE,
+    max_amount_per_week FLOAT DEFAULT 10000.0,
+    max_buys_per_week INTEGER DEFAULT 5,
+    preferred_strategies TEXT,  -- JSON array
+    minimum_confidence_score FLOAT DEFAULT 0.7,
+    minimum_market_sentiment FLOAT DEFAULT 0.0,
+    preferred_model_types TEXT,  -- JSON array
+    auto_stop_loss_enabled BOOLEAN DEFAULT TRUE,
+    auto_target_price_enabled BOOLEAN DEFAULT TRUE,
+    execution_time VARCHAR(10) DEFAULT '09:20',  -- Market opens at 9:15 AM, execute 5 min later
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Auto-Trading Settings Index
+CREATE INDEX IF NOT EXISTS idx_auto_trading_settings_user ON auto_trading_settings(user_id);
+
+-- Auto-Trading Executions Table
+CREATE TABLE IF NOT EXISTS auto_trading_executions (
+    id SERIAL PRIMARY KEY,
+    settings_id INTEGER NOT NULL REFERENCES auto_trading_settings(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    execution_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(20) NOT NULL,  -- 'success', 'skipped', 'failed', 'partial'
+
+    -- Market sentiment
+    market_sentiment_type VARCHAR(20),
+    market_sentiment_score FLOAT,
+    ai_confidence FLOAT,
+
+    -- Weekly limits
+    weekly_amount_spent FLOAT DEFAULT 0.0,
+    weekly_buys_count INTEGER DEFAULT 0,
+    remaining_weekly_amount FLOAT,
+    remaining_weekly_buys INTEGER,
+
+    -- Account balance
+    account_balance FLOAT,
+    available_to_invest FLOAT,
+
+    -- Results
+    orders_created INTEGER DEFAULT 0,
+    total_amount_invested FLOAT DEFAULT 0.0,
+    selected_strategies TEXT,  -- JSON array
+    execution_details TEXT,  -- JSON
+    error_message TEXT,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Auto-Trading Executions Indexes
+CREATE INDEX IF NOT EXISTS idx_auto_trading_executions_user ON auto_trading_executions(user_id);
+CREATE INDEX IF NOT EXISTS idx_auto_trading_executions_date ON auto_trading_executions(execution_date);
+CREATE INDEX IF NOT EXISTS idx_auto_trading_executions_status ON auto_trading_executions(status);
+
+-- Order Performance Table
+CREATE TABLE IF NOT EXISTS order_performance (
+    id SERIAL PRIMARY KEY,
+    order_id VARCHAR(50) NOT NULL UNIQUE REFERENCES orders(order_id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    auto_execution_id INTEGER REFERENCES auto_trading_executions(id) ON DELETE SET NULL,
+
+    -- Order details
+    symbol VARCHAR(50) NOT NULL,
+    entry_price FLOAT NOT NULL,
+    quantity INTEGER NOT NULL,
+    stop_loss FLOAT,
+    target_price FLOAT,
+    model_type VARCHAR(20),
+    strategy VARCHAR(50),
+
+    -- ML predictions
+    ml_prediction_score FLOAT,
+    ml_price_target FLOAT,
+    ml_confidence FLOAT,
+    ml_risk_score FLOAT,
+
+    -- Current status
+    current_price FLOAT,
+    current_value FLOAT,
+    unrealized_pnl FLOAT,
+    unrealized_pnl_pct FLOAT,
+
+    -- Exit details
+    exit_price FLOAT,
+    exit_date TIMESTAMP,
+    exit_reason VARCHAR(50),
+    realized_pnl FLOAT,
+    realized_pnl_pct FLOAT,
+
+    -- Performance metrics
+    days_held INTEGER,
+    max_profit_reached FLOAT,
+    max_loss_reached FLOAT,
+    prediction_accuracy FLOAT,
+
+    -- Status
+    is_active BOOLEAN DEFAULT TRUE,
+    is_profitable BOOLEAN,
+    performance_rating VARCHAR(20),
+
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_checked_at TIMESTAMP
+);
+
+-- Order Performance Indexes
+CREATE INDEX IF NOT EXISTS idx_order_performance_user ON order_performance(user_id);
+CREATE INDEX IF NOT EXISTS idx_order_performance_symbol ON order_performance(symbol);
+CREATE INDEX IF NOT EXISTS idx_order_performance_active ON order_performance(is_active);
+CREATE INDEX IF NOT EXISTS idx_order_performance_execution ON order_performance(auto_execution_id);
+
+-- Order Performance Snapshots Table
+CREATE TABLE IF NOT EXISTS order_performance_snapshots (
+    id SERIAL PRIMARY KEY,
+    order_performance_id INTEGER NOT NULL REFERENCES order_performance(id) ON DELETE CASCADE,
+    snapshot_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    -- Snapshot values
+    price FLOAT NOT NULL,
+    value FLOAT NOT NULL,
+    unrealized_pnl FLOAT NOT NULL,
+    unrealized_pnl_pct FLOAT NOT NULL,
+
+    -- Metrics
+    days_since_entry INTEGER,
+    price_change_from_entry_pct FLOAT,
+    distance_to_target_pct FLOAT,
+    distance_to_stoploss_pct FLOAT,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Order Performance Snapshots Indexes
+CREATE INDEX IF NOT EXISTS idx_order_snapshots_performance ON order_performance_snapshots(order_performance_id);
+CREATE INDEX IF NOT EXISTS idx_order_snapshots_date ON order_performance_snapshots(snapshot_date);
+
+-- Trigger function for updating updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Trigger for auto_trading_settings
+DROP TRIGGER IF EXISTS update_auto_trading_settings_updated_at ON auto_trading_settings;
+CREATE TRIGGER update_auto_trading_settings_updated_at
+    BEFORE UPDATE ON auto_trading_settings
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Trigger for order_performance
+DROP TRIGGER IF EXISTS update_order_performance_updated_at ON order_performance;
+CREATE TRIGGER update_order_performance_updated_at
+    BEFORE UPDATE ON order_performance
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Grant permissions for auto-trading tables
+GRANT ALL PRIVILEGES ON TABLE auto_trading_settings TO trader;
+GRANT ALL PRIVILEGES ON TABLE auto_trading_executions TO trader;
+GRANT ALL PRIVILEGES ON TABLE order_performance TO trader;
+GRANT ALL PRIVILEGES ON TABLE order_performance_snapshots TO trader;
+
+GRANT USAGE, SELECT ON SEQUENCE auto_trading_settings_id_seq TO trader;
+GRANT USAGE, SELECT ON SEQUENCE auto_trading_executions_id_seq TO trader;
+GRANT USAGE, SELECT ON SEQUENCE order_performance_id_seq TO trader;
+GRANT USAGE, SELECT ON SEQUENCE order_performance_snapshots_id_seq TO trader;
+
+-- Insert default auto-trading settings for existing users
+INSERT INTO auto_trading_settings (user_id, is_enabled, preferred_strategies, preferred_model_types)
+SELECT
+    id,
+    FALSE,
+    '["default_risk"]',
+    '["traditional", "raw_lstm", "kronos"]'
+FROM users
+ON CONFLICT (user_id) DO NOTHING;

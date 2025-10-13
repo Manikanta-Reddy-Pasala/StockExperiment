@@ -85,38 +85,183 @@
                             </div>
                         </div>
 
-                        <div class="col-md-6 mb-3">
-                            <label for="auto-buy-enabled" class="form-label">Auto-Buy on Predictions</label>
-                            <div class="form-check form-switch mt-2">
-                                <input class="form-check-input" type="checkbox" id="auto-buy-enabled">
-                                <label class="form-check-label" for="auto-buy-enabled">
-                                    Enable Automatic Buying
-                                </label>
-                            </div>
-                            <div class="form-text">Automatically place orders when new predictions are generated</div>
+                        <div class="col-md-12">
+                            <h5 class="mt-4">Automated Trading System (9 AM Execution)</h5>
+                            <hr>
                         </div>
 
-                        <div class="col-md-6 mb-3" id="auto-buy-amount-container" style="display: none;">
-                            <label for="auto-buy-amount" class="form-label">Auto-Buy Amount (₹)</label>
-                            <input type="number" class="form-control" id="auto-buy-amount" step="5000" value="50000">
-                            <div class="form-text">Amount to invest per auto-buy session</div>
-                        </div>
+                        <div class="col-md-12 mb-4">
+                            <div class="card border-0 bg-light">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h6 class="card-title mb-0">
+                                            <i class="bi bi-robot me-2"></i>Auto-Trading Configuration
+                                        </h6>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="auto-trading-enabled">
+                                            <label class="form-check-label fw-bold" for="auto-trading-enabled">
+                                                Enable Auto-Trading
+                                            </label>
+                                        </div>
+                                    </div>
 
-                        <div class="col-md-6 mb-3" id="auto-buy-strategies-container" style="display: none;">
-                            <label for="auto-buy-strategies" class="form-label">Auto-Buy Strategies</label>
-                            <select multiple class="form-select" id="auto-buy-strategies" size="4">
-                                <option value="traditional_default_risk">Traditional + Default Risk</option>
-                                <option value="traditional_high_risk">Traditional + High Risk</option>
-                                <option value="raw_lstm_default_risk">Raw LSTM + Default Risk</option>
-                                <option value="raw_lstm_high_risk">Raw LSTM + High Risk</option>
-                            </select>
-                            <div class="form-text">Select which strategies to auto-buy (hold Ctrl/Cmd for multiple)</div>
-                        </div>
+                                    <div class="alert alert-info mb-3">
+                                        <i class="bi bi-info-circle me-2"></i>
+                                        <strong>How it works:</strong> Every day at 9:20 AM (5 min after market opens), the system checks AI market sentiment, validates weekly limits, and automatically places orders based on your configuration.
+                                    </div>
 
-                        <div class="col-md-12 mb-3" id="auto-buy-info" style="display: none;">
-                            <div class="alert alert-warning">
-                                <i class="bi bi-exclamation-triangle me-2"></i>
-                                <strong>Auto-Buy Warning:</strong> Orders will be placed automatically using ML score-based allocation when new predictions are available. Make sure you have sufficient account balance.
+                                    <div id="auto-trading-config" style="display: none;">
+                                        <!-- Weekly Limits -->
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label for="max-amount-per-week" class="form-label">Max Amount Per Week (₹)</label>
+                                                <input type="number" class="form-control" id="max-amount-per-week"
+                                                       min="1000" step="1000" value="10000">
+                                                <div class="form-text">Maximum investment amount per week (min: ₹1,000)</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="max-buys-per-week" class="form-label">Max Trades Per Week</label>
+                                                <input type="number" class="form-control" id="max-buys-per-week"
+                                                       min="1" max="20" value="5">
+                                                <div class="form-text">Maximum number of buy orders per week (1-20)</div>
+                                            </div>
+                                        </div>
+
+                                        <!-- AI Confidence & Market Sentiment -->
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label for="min-confidence-score" class="form-label">
+                                                    Minimum AI Confidence: <span id="confidence-value">0.70</span>
+                                                </label>
+                                                <input type="range" class="form-range" id="min-confidence-score"
+                                                       min="0.5" max="0.95" step="0.05" value="0.70">
+                                                <div class="form-text">Only execute if AI confidence is above this threshold</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="min-market-sentiment" class="form-label">
+                                                    Minimum Market Sentiment: <span id="sentiment-value">0.0</span>
+                                                </label>
+                                                <input type="range" class="form-range" id="min-market-sentiment"
+                                                       min="-1.0" max="1.0" step="0.1" value="0.0">
+                                                <div class="form-text">Reject if market is GREEDY (sentiment > 0.7)</div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Strategy Selection -->
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Preferred Strategies</label>
+                                                <div class="form-check">
+                                                    <input class="form-check-input auto-trading-strategy" type="checkbox"
+                                                           value="default_risk" id="strategy-default-risk" checked>
+                                                    <label class="form-check-label" for="strategy-default-risk">
+                                                        Default Risk (Conservative)
+                                                    </label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input auto-trading-strategy" type="checkbox"
+                                                           value="high_risk" id="strategy-high-risk">
+                                                    <label class="form-check-label" for="strategy-high-risk">
+                                                        High Risk (Aggressive)
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Preferred ML Models</label>
+                                                <div class="form-check">
+                                                    <input class="form-check-input auto-trading-model" type="checkbox"
+                                                           value="traditional" id="model-traditional" checked>
+                                                    <label class="form-check-label" for="model-traditional">
+                                                        Traditional ML (RF + XGBoost)
+                                                    </label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input auto-trading-model" type="checkbox"
+                                                           value="raw_lstm" id="model-raw-lstm" checked>
+                                                    <label class="form-check-label" for="model-raw-lstm">
+                                                        Raw LSTM (Deep Learning)
+                                                    </label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input auto-trading-model" type="checkbox"
+                                                           value="kronos" id="model-kronos" checked>
+                                                    <label class="form-check-label" for="model-kronos">
+                                                        Kronos (Hybrid Model)
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Auto Stop-Loss & Target -->
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" id="auto-stop-loss" checked>
+                                                    <label class="form-check-label" for="auto-stop-loss">
+                                                        Auto Stop-Loss (Strategy-based)
+                                                    </label>
+                                                </div>
+                                                <div class="form-text">Automatically set stop-loss based on strategy</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" id="auto-target-price" checked>
+                                                    <label class="form-check-label" for="auto-target-price">
+                                                        Auto Target Price (Strategy-based)
+                                                    </label>
+                                                </div>
+                                                <div class="form-text">Automatically set target price based on strategy</div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Execution Time -->
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label for="execution-time" class="form-label">Execution Time</label>
+                                                <input type="time" class="form-control" id="execution-time" value="09:20">
+                                                <div class="form-text">Daily execution time (market opens at 9:15 AM, recommended: 9:20 AM)</div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Weekly Status -->
+                                        <div class="row mb-3" id="weekly-status-section">
+                                            <div class="col-md-12">
+                                                <h6 class="mb-2">
+                                                    <i class="bi bi-calendar-week me-2"></i>This Week's Status
+                                                    <button class="btn btn-sm btn-outline-primary ms-2" id="refresh-weekly-status">
+                                                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                                                    </button>
+                                                </h6>
+                                                <div id="weekly-status-content">
+                                                    <div class="text-center py-3">
+                                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                            <span class="visually-hidden">Loading...</span>
+                                                        </div>
+                                                        <p class="mt-2 text-muted small">Loading weekly status...</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Test Execution Button -->
+                                        <div class="row">
+                                            <div class="col-md-12">
+                                                <button type="button" class="btn btn-outline-warning" id="test-auto-trading">
+                                                    <i class="bi bi-lightning-fill me-2"></i>Test Execution Now
+                                                </button>
+                                                <small class="text-muted ms-2">
+                                                    Trigger auto-trading manually (respects all limits and checks)
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-3">
+                                        <button type="button" class="btn btn-primary" id="save-auto-trading-settings">
+                                            <i class="bi bi-check-circle me-2"></i>Save Auto-Trading Settings
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -238,24 +383,6 @@
             }
         }, 5000);
     }
-    
-    // Toggle auto-buy options visibility
-    function toggleAutoBuyOptions() {
-        const autoBuyEnabled = document.getElementById('auto-buy-enabled').checked;
-        const amountContainer = document.getElementById('auto-buy-amount-container');
-        const strategiesContainer = document.getElementById('auto-buy-strategies-container');
-        const infoContainer = document.getElementById('auto-buy-info');
-
-        if (autoBuyEnabled) {
-            amountContainer.style.display = 'block';
-            strategiesContainer.style.display = 'block';
-            infoContainer.style.display = 'block';
-        } else {
-            amountContainer.style.display = 'none';
-            strategiesContainer.style.display = 'none';
-            infoContainer.style.display = 'none';
-        }
-    }
 
     // Fetch account balance from FYERS API
     async function fetchAccountBalance() {
@@ -331,25 +458,12 @@
                 // Populate form with current settings
                 document.getElementById('trading-mode').value = settings.trading_mode || 'development';
                 // Account balance is fetched from broker API, not from settings
-                document.getElementById('auto-buy-enabled').checked = settings.auto_buy_enabled || false;
-                document.getElementById('auto-buy-amount').value = settings.auto_buy_amount || 50000;
                 document.getElementById('primary-data-source').value = settings.primary_data_source || 'fyers';
                 document.getElementById('backup-data-source').value = settings.backup_data_source || 'fyers';
                 document.getElementById('broker-provider').value = settings.broker_provider || 'fyers';
                 document.getElementById('email-notifications').value = settings.email_notifications ? 'all' : 'none';
                 document.getElementById('sms-notifications').value = settings.sms_notifications ? 'critical' : 'none';
                 document.getElementById('notification-email').value = settings.notification_email || 'trader@example.com';
-
-                // Handle auto-buy strategies
-                if (settings.auto_buy_strategies && Array.isArray(settings.auto_buy_strategies)) {
-                    const strategiesSelect = document.getElementById('auto-buy-strategies');
-                    Array.from(strategiesSelect.options).forEach(option => {
-                        option.selected = settings.auto_buy_strategies.includes(option.value);
-                    });
-                }
-
-                // Toggle auto-buy options visibility
-                toggleAutoBuyOptions();
 
                 // Update broker status based on selected provider
                 updateBrokerStatus(settings.broker_provider || 'fyers');
@@ -363,17 +477,10 @@
     document.getElementById('system-config-form').addEventListener('submit', async function(e) {
         e.preventDefault();
 
-        // Get selected auto-buy strategies
-        const strategiesSelect = document.getElementById('auto-buy-strategies');
-        const selectedStrategies = Array.from(strategiesSelect.selectedOptions).map(option => option.value);
-
         // Collect form data
         const settings = {
             trading_mode: document.getElementById('trading-mode').value,
             // account_balance is fetched from broker API, not saved in settings
-            auto_buy_enabled: document.getElementById('auto-buy-enabled').checked,
-            auto_buy_amount: parseFloat(document.getElementById('auto-buy-amount').value),
-            auto_buy_strategies: selectedStrategies,
             primary_data_source: document.getElementById('primary-data-source').value,
             backup_data_source: document.getElementById('backup-data-source').value,
             broker_provider: document.getElementById('broker-provider').value,
@@ -651,11 +758,286 @@
     document.getElementById('save-strategy-settings').addEventListener('click', saveStrategySettings);
     document.getElementById('reset-strategy-settings').addEventListener('click', resetStrategySettings);
 
-    // Event listener for auto-buy toggle
-    document.getElementById('auto-buy-enabled').addEventListener('change', toggleAutoBuyOptions);
-
     // Event listener for refresh balance button
     document.getElementById('refresh-balance-btn').addEventListener('click', fetchAccountBalance);
+
+    // ============================================
+    // AUTO-TRADING SETTINGS FUNCTIONS
+    // ============================================
+
+    // Toggle auto-trading config visibility
+    function toggleAutoTradingConfig() {
+        const autoTradingEnabled = document.getElementById('auto-trading-enabled').checked;
+        const configContainer = document.getElementById('auto-trading-config');
+        configContainer.style.display = autoTradingEnabled ? 'block' : 'none';
+
+        // Load weekly status if enabled
+        if (autoTradingEnabled) {
+            fetchWeeklyStatus();
+        }
+    }
+
+    // Update slider value displays
+    function updateSliderValues() {
+        const confidenceSlider = document.getElementById('min-confidence-score');
+        const confidenceValue = document.getElementById('confidence-value');
+        confidenceValue.textContent = parseFloat(confidenceSlider.value).toFixed(2);
+
+        const sentimentSlider = document.getElementById('min-market-sentiment');
+        const sentimentValue = document.getElementById('sentiment-value');
+        sentimentValue.textContent = parseFloat(sentimentSlider.value).toFixed(1);
+    }
+
+    // Fetch auto-trading settings
+    async function fetchAutoTradingSettings() {
+        try {
+            const response = await fetch('/api/auto-trading/settings');
+            const data = await response.json();
+
+            if (data.success && data.settings) {
+                const settings = data.settings;
+
+                // Populate form
+                document.getElementById('auto-trading-enabled').checked = settings.is_enabled || false;
+                document.getElementById('max-amount-per-week').value = settings.max_amount_per_week || 10000;
+                document.getElementById('max-buys-per-week').value = settings.max_buys_per_week || 5;
+                document.getElementById('min-confidence-score').value = settings.minimum_confidence_score || 0.7;
+                document.getElementById('min-market-sentiment').value = settings.minimum_market_sentiment || 0.0;
+                document.getElementById('auto-stop-loss').checked = settings.auto_stop_loss_enabled !== false;
+                document.getElementById('auto-target-price').checked = settings.auto_target_price_enabled !== false;
+                document.getElementById('execution-time').value = settings.execution_time || '09:20';
+
+                // Update slider displays
+                updateSliderValues();
+
+                // Populate strategies
+                const preferredStrategies = settings.preferred_strategies || ['default_risk'];
+                document.querySelectorAll('.auto-trading-strategy').forEach(checkbox => {
+                    checkbox.checked = preferredStrategies.includes(checkbox.value);
+                });
+
+                // Populate models
+                const preferredModels = settings.preferred_model_types || ['traditional', 'raw_lstm', 'kronos'];
+                document.querySelectorAll('.auto-trading-model').forEach(checkbox => {
+                    checkbox.checked = preferredModels.includes(checkbox.value);
+                });
+
+                // Toggle config visibility
+                toggleAutoTradingConfig();
+            }
+        } catch (error) {
+            console.error('Error fetching auto-trading settings:', error);
+        }
+    }
+
+    // Save auto-trading settings
+    async function saveAutoTradingSettings() {
+        const saveButton = document.getElementById('save-auto-trading-settings');
+        const originalText = saveButton.innerHTML;
+
+        saveButton.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
+        saveButton.disabled = true;
+
+        try {
+            // Get selected strategies
+            const selectedStrategies = Array.from(document.querySelectorAll('.auto-trading-strategy:checked'))
+                .map(cb => cb.value);
+
+            // Get selected models
+            const selectedModels = Array.from(document.querySelectorAll('.auto-trading-model:checked'))
+                .map(cb => cb.value);
+
+            // Validate
+            if (document.getElementById('auto-trading-enabled').checked) {
+                if (selectedStrategies.length === 0) {
+                    showNotification('Please select at least one strategy', 'error');
+                    return;
+                }
+                if (selectedModels.length === 0) {
+                    showNotification('Please select at least one ML model', 'error');
+                    return;
+                }
+            }
+
+            // Collect settings
+            const settings = {
+                is_enabled: document.getElementById('auto-trading-enabled').checked,
+                max_amount_per_week: parseFloat(document.getElementById('max-amount-per-week').value),
+                max_buys_per_week: parseInt(document.getElementById('max-buys-per-week').value),
+                preferred_strategies: selectedStrategies,
+                minimum_confidence_score: parseFloat(document.getElementById('min-confidence-score').value),
+                minimum_market_sentiment: parseFloat(document.getElementById('min-market-sentiment').value),
+                preferred_model_types: selectedModels,
+                auto_stop_loss_enabled: document.getElementById('auto-stop-loss').checked,
+                auto_target_price_enabled: document.getElementById('auto-target-price').checked,
+                execution_time: document.getElementById('execution-time').value
+            };
+
+            const response = await fetch('/api/auto-trading/settings', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(settings)
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showNotification('Auto-trading settings saved successfully!', 'success');
+                // Refresh weekly status
+                if (settings.is_enabled) {
+                    fetchWeeklyStatus();
+                }
+            } else {
+                showNotification('Failed to save settings: ' + (data.error || 'Unknown error'), 'error');
+            }
+        } catch (error) {
+            console.error('Error saving auto-trading settings:', error);
+            showNotification('Error saving settings: ' + error.message, 'error');
+        } finally {
+            saveButton.innerHTML = originalText;
+            saveButton.disabled = false;
+        }
+    }
+
+    // Fetch weekly status
+    async function fetchWeeklyStatus() {
+        const statusContent = document.getElementById('weekly-status-content');
+
+        statusContent.innerHTML = `
+            <div class="text-center py-3">
+                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2 text-muted small">Loading weekly status...</p>
+            </div>
+        `;
+
+        try {
+            const response = await fetch('/api/auto-trading/weekly-status');
+            const data = await response.json();
+
+            if (data.success) {
+                const amountUsedPct = data.percentage_used.amount || 0;
+                const buysUsedPct = data.percentage_used.buys || 0;
+
+                statusContent.innerHTML = `
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="card border-primary">
+                                <div class="card-body">
+                                    <h6 class="card-subtitle mb-2 text-muted">Amount Used</h6>
+                                    <h4 class="card-title mb-2">₹${data.spent.amount.toLocaleString('en-IN')}</h4>
+                                    <div class="progress mb-2" style="height: 8px;">
+                                        <div class="progress-bar ${amountUsedPct >= 90 ? 'bg-danger' : amountUsedPct >= 70 ? 'bg-warning' : 'bg-success'}"
+                                             role="progressbar" style="width: ${amountUsedPct}%"></div>
+                                    </div>
+                                    <small class="text-muted">
+                                        ${amountUsedPct.toFixed(1)}% of ₹${data.limits.max_amount.toLocaleString('en-IN')}
+                                        <br>Remaining: ₹${data.remaining.amount.toLocaleString('en-IN')}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-info">
+                                <div class="card-body">
+                                    <h6 class="card-subtitle mb-2 text-muted">Trades Made</h6>
+                                    <h4 class="card-title mb-2">${data.spent.buys} / ${data.limits.max_buys}</h4>
+                                    <div class="progress mb-2" style="height: 8px;">
+                                        <div class="progress-bar ${buysUsedPct >= 90 ? 'bg-danger' : buysUsedPct >= 70 ? 'bg-warning' : 'bg-info'}"
+                                             role="progressbar" style="width: ${buysUsedPct}%"></div>
+                                    </div>
+                                    <small class="text-muted">
+                                        ${buysUsedPct.toFixed(1)}% of weekly limit
+                                        <br>Remaining: ${data.remaining.buys} trades
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="alert alert-light mt-3 mb-0">
+                        <i class="bi bi-calendar-check me-2"></i>
+                        <small>
+                            Week: ${new Date(data.week_start).toLocaleDateString()} - ${new Date(data.week_end).toLocaleDateString()}
+                        </small>
+                    </div>
+                `;
+            } else {
+                statusContent.innerHTML = `
+                    <div class="alert alert-warning mb-0">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        ${data.error || 'Failed to load weekly status'}
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error fetching weekly status:', error);
+            statusContent.innerHTML = `
+                <div class="alert alert-danger mb-0">
+                    <i class="bi bi-x-circle me-2"></i>
+                    Error loading weekly status: ${error.message}
+                </div>
+            `;
+        }
+    }
+
+    // Test auto-trading execution
+    async function testAutoTrading() {
+        const testButton = document.getElementById('test-auto-trading');
+        const originalText = testButton.innerHTML;
+
+        if (!confirm('This will trigger auto-trading execution immediately. All limits and checks will be applied. Continue?')) {
+            return;
+        }
+
+        testButton.innerHTML = '<i class="bi bi-hourglass-split"></i> Executing...';
+        testButton.disabled = true;
+
+        try {
+            const response = await fetch('/api/auto-trading/test', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                let message = `Auto-trading execution completed!\n\n`;
+                message += `Status: ${data.status}\n`;
+                message += `Orders Created: ${data.orders_created || 0}\n`;
+                message += `Total Invested: ₹${(data.total_amount_invested || 0).toLocaleString('en-IN')}`;
+
+                if (data.message) {
+                    message += `\n\nMessage: ${data.message}`;
+                }
+
+                showNotification(message, 'success');
+
+                // Refresh weekly status
+                fetchWeeklyStatus();
+            } else {
+                showNotification('Auto-trading execution failed: ' + (data.error || data.message || 'Unknown error'), 'error');
+            }
+        } catch (error) {
+            console.error('Error testing auto-trading:', error);
+            showNotification('Error executing auto-trading: ' + error.message, 'error');
+        } finally {
+            testButton.innerHTML = originalText;
+            testButton.disabled = false;
+        }
+    }
+
+    // Event listeners for auto-trading
+    document.getElementById('auto-trading-enabled').addEventListener('change', toggleAutoTradingConfig);
+    document.getElementById('min-confidence-score').addEventListener('input', updateSliderValues);
+    document.getElementById('min-market-sentiment').addEventListener('input', updateSliderValues);
+    document.getElementById('save-auto-trading-settings').addEventListener('click', saveAutoTradingSettings);
+    document.getElementById('refresh-weekly-status').addEventListener('click', fetchWeeklyStatus);
+    document.getElementById('test-auto-trading').addEventListener('click', testAutoTrading);
 
     // Fetch data when page loads
     document.addEventListener('DOMContentLoaded', function() {
@@ -663,6 +1045,7 @@
         fetchBrokerStatus();
         loadStrategySettings();
         fetchAccountBalance(); // Fetch balance from broker API
+        fetchAutoTradingSettings(); // Fetch auto-trading settings
     });
 </script>
 {% endblock %}
