@@ -192,10 +192,54 @@ function createStockRow(stock, rank, modelType, strategy) {
     // Recommendation badge color
     const recColor = rec === 'BUY' ? 'success' : rec === 'SELL' ? 'danger' : 'secondary';
 
+    // Ollama enhancement (if available)
+    let ollamaHtml = '';
+    if (stock.ollama_enhancement) {
+        const enhancement = stock.ollama_enhancement;
+        const marketIntel = enhancement.market_intelligence || {};
+        const sentiment = marketIntel.sentiment_score || 0;
+        const confidence = enhancement.strategy_confidence || 'N/A';
+
+        // Sentiment badge
+        let sentimentBadge = '';
+        let sentimentIcon = '';
+        if (sentiment > 0.3) {
+            sentimentBadge = '<span class="badge bg-success" title="Bullish sentiment">📈</span>';
+            sentimentIcon = '📈';
+        } else if (sentiment < -0.3) {
+            sentimentBadge = '<span class="badge bg-danger" title="Bearish sentiment">📉</span>';
+            sentimentIcon = '📉';
+        } else {
+            sentimentBadge = '<span class="badge bg-secondary" title="Neutral sentiment">➖</span>';
+            sentimentIcon = '➖';
+        }
+
+        // Confidence badge
+        let confidenceBadge = '';
+        if (confidence === 'HIGH') {
+            confidenceBadge = '<span class="badge bg-success" title="High AI confidence">🔥</span>';
+        } else if (confidence === 'MODERATE') {
+            confidenceBadge = '<span class="badge bg-warning" title="Moderate AI confidence">⚡</span>';
+        } else if (confidence === 'LOW') {
+            confidenceBadge = '<span class="badge bg-secondary" title="Low AI confidence">💤</span>';
+        }
+
+        // Sources count
+        const sourcesCount = marketIntel.sources?.length || 0;
+        const sourcesHtml = sourcesCount > 0
+            ? `<span class="badge bg-info" title="${sourcesCount} news sources">📰 ${sourcesCount}</span>`
+            : '';
+
+        ollamaHtml = `<div class="small">${sentimentBadge} ${confidenceBadge} ${sourcesHtml}</div>`;
+    }
+
     tr.innerHTML = `
         <td>${rank}</td>
         <td><span class="badge bg-light text-dark">${cleanSymbol}</span></td>
-        <td class="small">${stock.stock_name || cleanSymbol}</td>
+        <td class="small">
+            ${stock.stock_name || cleanSymbol}
+            ${ollamaHtml}
+        </td>
         <td><span class="badge bg-primary">${score}%</span></td>
         <td class="text-success fw-bold">${target}</td>
         <td><span class="badge bg-${recColor}">${rec}</span></td>

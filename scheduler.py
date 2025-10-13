@@ -31,10 +31,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def train_ml_models():
-    """Daily ML model training task (runs at 10 PM)."""
-    logger.info("=" * 80)
-    logger.info("Starting Scheduled ML Model Training")
+def train_traditional_ml_models():
+    """Train Traditional ML models (RF + XGBoost)."""
+    logger.info("\n" + "=" * 80)
+    logger.info("TRAINING MODEL 1: TRADITIONAL ML (RF + XGBoost)")
     logger.info("=" * 80)
 
     try:
@@ -43,18 +43,11 @@ def train_ml_models():
             logger.info("Using ENHANCED ML Predictor (RF + XGBoost + Chaos Features)")
             predictor = EnhancedStockPredictor(session, auto_load=True)
 
-            # Check if models are already trained
-            if predictor.rf_price_model is not None:
-                logger.info("✅ ML models already trained and loaded from cache")
-                logger.info("🔄 Re-training to update with latest market data...")
-            else:
-                logger.info("⚠️  ML models not found. Training from scratch...")
-
             # Train with walk-forward validation
             logger.info("Training enhanced models with 365 days + walk-forward CV...")
             stats = predictor.train_with_walk_forward(lookback_days=365, n_splits=5)
 
-            logger.info("ML Training Complete!")
+            logger.info("Traditional ML Training Complete!")
             logger.info(f"  Training Samples: {stats['samples']:,}")
             logger.info(f"  Features Used: {stats['features']}")
             logger.info(f"  Price Model R²: {stats['price_r2']:.4f}")
@@ -62,10 +55,97 @@ def train_ml_models():
             logger.info(f"  CV Price R²: {stats['cv_price_r2']:.4f} (walk-forward)")
             logger.info(f"  CV Risk R²: {stats['cv_risk_r2']:.4f} (walk-forward)")
             logger.info(f"  Top Features: {', '.join(stats['top_features'][:5])}")
-            logger.info("✅ Enhanced ML models trained and saved successfully")
+            logger.info("✅ Traditional ML models trained and saved successfully")
 
     except Exception as e:
-        logger.error(f"❌ ML training failed: {e}", exc_info=True)
+        logger.error(f"❌ Traditional ML training failed: {e}", exc_info=True)
+
+
+def train_lstm_models():
+    """Train Raw LSTM models for top liquid stocks."""
+    logger.info("\n" + "=" * 80)
+    logger.info("TRAINING MODEL 2: RAW LSTM (Deep Learning)")
+    logger.info("=" * 80)
+
+    try:
+        import subprocess
+        from sqlalchemy import text
+
+        # Get existing trained models count
+        model_dir = Path('ml_models/raw_ohlcv_lstm')
+        existing_models = len([d for d in model_dir.iterdir() if d.is_dir()]) if model_dir.exists() else 0
+
+        logger.info(f"Existing LSTM models: {existing_models}")
+
+        # Train large-cap stocks (DEFAULT_RISK)
+        logger.info("\n🎯 Training LSTM models for large-cap stocks (DEFAULT_RISK)...")
+        result1 = subprocess.run(['python3', 'tools/batch_train_lstm_top_stocks.py'],
+                                capture_output=True, text=True)
+        if result1.returncode == 0:
+            logger.info("✅ Large-cap LSTM training completed")
+        else:
+            logger.error(f"❌ Large-cap LSTM training failed: {result1.stderr}")
+
+        # Train small/mid-cap stocks (HIGH_RISK)
+        logger.info("\n🎯 Training LSTM models for small/mid-cap stocks (HIGH_RISK)...")
+        result2 = subprocess.run(['python3', 'tools/batch_train_lstm_small_mid_cap.py'],
+                                capture_output=True, text=True)
+        if result2.returncode == 0:
+            logger.info("✅ Small/mid-cap LSTM training completed")
+        else:
+            logger.error(f"❌ Small/mid-cap LSTM training failed: {result2.stderr}")
+
+        # Count new models
+        new_models = len([d for d in model_dir.iterdir() if d.is_dir()]) if model_dir.exists() else 0
+        logger.info(f"\n✅ LSTM Training Complete: {new_models} total models ({new_models - existing_models} new)")
+
+    except Exception as e:
+        logger.error(f"❌ LSTM training failed: {e}", exc_info=True)
+
+
+def train_kronos_models():
+    """Train/Update Kronos models (K-line tokenization)."""
+    logger.info("\n" + "=" * 80)
+    logger.info("TRAINING MODEL 3: KRONOS (K-line Tokenization)")
+    logger.info("=" * 80)
+
+    try:
+        import subprocess
+
+        logger.info("🎯 Generating Kronos predictions for all strategies...")
+        result = subprocess.run(['python3', 'tools/generate_kronos_predictions.py'],
+                               capture_output=True, text=True)
+
+        if result.returncode == 0:
+            logger.info("✅ Kronos predictions generated successfully")
+        else:
+            logger.error(f"❌ Kronos generation failed: {result.stderr}")
+
+    except Exception as e:
+        logger.error(f"❌ Kronos training failed: {e}", exc_info=True)
+
+
+def train_all_ml_models():
+    """Train all 3 ML models: Traditional, LSTM, Kronos."""
+    logger.info("\n\n" + "█" * 80)
+    logger.info("DAILY ML TRAINING - ALL 3 MODELS")
+    logger.info("█" * 80)
+
+    start_time = datetime.now()
+
+    # Train all 3 models
+    train_traditional_ml_models()
+    train_lstm_models()
+    train_kronos_models()
+
+    # Summary
+    duration = (datetime.now() - start_time).total_seconds()
+    logger.info("\n" + "=" * 80)
+    logger.info("✅ ALL ML MODELS TRAINING COMPLETE!")
+    logger.info("=" * 80)
+    logger.info(f"  Duration: {duration:.1f} seconds ({duration/60:.1f} minutes)")
+    logger.info(f"  Models Trained: Traditional ML, Raw LSTM, Kronos")
+    logger.info("=" * 80)
 
 
 def update_daily_snapshot():
@@ -182,14 +262,130 @@ def update_daily_snapshot():
             logger.error(f"❌ Raw LSTM predictions failed: {e}", exc_info=True)
 
         # ============================================================
+        # PART 3: Kronos Model (Direct Service Call)
+        # ============================================================
+        logger.info("\n" + "="*80)
+        logger.info("KRONOS MODEL PREDICTIONS")
+        logger.info("="*80)
+
+        try:
+            import subprocess
+
+            logger.info("🎯 Generating Kronos predictions for all strategies...")
+            result = subprocess.run(['python3', 'tools/generate_kronos_predictions.py'],
+                                   capture_output=True, text=True)
+
+            if result.returncode == 0:
+                # Count Kronos predictions from stdout
+                logger.info("✅ Kronos predictions generated successfully")
+
+                # Parse output to get count
+                from sqlalchemy import text
+                with db_manager.get_session() as session:
+                    count_query = text("""
+                        SELECT COUNT(*)
+                        FROM daily_suggested_stocks
+                        WHERE model_type = 'kronos'
+                        AND date = CURRENT_DATE
+                    """)
+                    kronos_count = session.execute(count_query).scalar()
+                    total_stocks_stored += kronos_count
+                    logger.info(f"  Stocks stored: {kronos_count}")
+            else:
+                logger.error(f"❌ Kronos generation failed: {result.stderr}")
+
+        except Exception as e:
+            logger.error(f"❌ Kronos predictions failed: {e}", exc_info=True)
+
+        # ============================================================
+        # PART 4: Ollama Enhancement (Optional - If Enabled)
+        # ============================================================
+        try:
+            from src.config.ollama_config import get_ollama_config
+            ollama_config = get_ollama_config()
+
+            # Check if daily predictions enhancement is enabled
+            daily_pred_config = ollama_config._config.get('daily_predictions', {})
+            if daily_pred_config.get('enabled', False):
+                logger.info("\n" + "="*80)
+                logger.info("OLLAMA AI ENHANCEMENT")
+                logger.info("="*80)
+
+                from src.services.data.strategy_ollama_enhancement_service import get_strategy_ollama_enhancement_service
+                from sqlalchemy import text
+
+                ollama_service = get_strategy_ollama_enhancement_service()
+                enhancement_level = daily_pred_config.get('enhancement_level', 'light')
+                max_stocks = daily_pred_config.get('max_stocks_to_enhance', 50)
+
+                logger.info(f"🔍 Enhancing top {max_stocks} stocks with Ollama AI")
+                logger.info(f"   Enhancement Level: {enhancement_level}")
+
+                total_enhanced = 0
+
+                for strategy in strategies_to_run:
+                    try:
+                        # Get top stocks for this strategy from database
+                        db_manager = get_database_manager()
+                        with db_manager.get_session() as session:
+                            query = text("""
+                                SELECT
+                                    symbol, stock_name as name, current_price,
+                                    ml_prediction_score, recommendation
+                                FROM daily_suggested_stocks
+                                WHERE date = CURRENT_DATE
+                                AND strategy = :strategy
+                                ORDER BY ml_prediction_score DESC
+                                LIMIT :limit
+                            """)
+
+                            result = session.execute(query, {
+                                'strategy': strategy,
+                                'limit': max_stocks
+                            })
+                            stocks = [dict(row._mapping) for row in result]
+
+                        if stocks:
+                            logger.info(f"\n🎯 Enhancing {len(stocks)} stocks for {strategy}...")
+
+                            # Enhance stocks (this adds market intelligence)
+                            enhanced_stocks = ollama_service.enhance_strategy_recommendations(
+                                stocks, strategy, enhancement_level
+                            )
+
+                            total_enhanced += len(enhanced_stocks)
+                            logger.info(f"   ✅ Enhanced {len(enhanced_stocks)} stocks")
+
+                            # Note: Ollama adds metadata to predictions but doesn't
+                            # update database - it's available in real-time API calls
+
+                    except Exception as e:
+                        if daily_pred_config.get('skip_on_failure', True):
+                            logger.warning(f"⚠️  Ollama enhancement failed for {strategy}, skipping: {e}")
+                            continue
+                        else:
+                            raise
+
+                logger.info(f"\n✅ Ollama enhancement completed: {total_enhanced} stocks enhanced")
+
+            else:
+                logger.info("\n⏭️  Ollama enhancement disabled in config - skipping")
+
+        except Exception as e:
+            logger.warning(f"⚠️  Ollama enhancement service unavailable: {e}")
+            logger.info("   Continuing without Ollama enhancement...")
+
+        # ============================================================
         # Summary
         # ============================================================
         logger.info("\n" + "="*80)
-        logger.info(f"✅ Daily Snapshot Update Complete (Dual Model + Dual Strategy)!")
+        logger.info(f"✅ Daily Snapshot Update Complete (Triple Model + Dual Strategy + AI)!")
         logger.info("="*80)
         logger.info(f"  Total stocks stored across ALL models and strategies: {total_stocks_stored}")
         logger.info(f"  Traditional Model strategies: {len(strategies_to_run)}")
         logger.info(f"  Raw LSTM Model strategies: {len(strategies_to_run)}")
+        logger.info(f"  Kronos Model strategies: {len(strategies_to_run)}")
+        logger.info(f"  Ollama AI Enhancement: {'✅ Enabled' if daily_pred_config.get('enabled', False) else '❌ Disabled'}")
         logger.info("="*80)
 
     except Exception as e:
@@ -215,52 +411,70 @@ def cleanup_old_snapshots():
         logger.error(f"❌ Snapshot cleanup failed: {e}", exc_info=True)
 
 
-def check_ml_models_on_startup():
-    """Check if ML models exist on startup, train if needed."""
+def check_training_needed():
+    """Check if training is needed today, train if yes."""
     logger.info("=" * 80)
-    logger.info("Startup ML Model Check")
+    logger.info("Startup Training Check")
     logger.info("=" * 80)
 
     try:
-        from pathlib import Path
+        from sqlalchemy import text
 
-        # Check if models exist on disk
-        model_dir = Path('ml_models')
-        if not model_dir.exists():
-            logger.warning("⚠️  ML models directory not found")
-            logger.info("🔄 Training ML models for the first time...")
-            train_ml_models()
-            return
+        # Check if training happened today
+        db_manager = get_database_manager()
+        with db_manager.get_session() as session:
+            today = datetime.now().date()
 
-        # Check if critical model files exist
-        critical_files = [
-            'rf_price_model.pkl',
-            'rf_risk_model.pkl',
-            'metadata.pkl'
-        ]
+            # Check Traditional ML last training
+            traditional_query = text("""
+                SELECT created_at::date as training_date
+                FROM daily_suggested_stocks
+                WHERE model_type = 'traditional'
+                ORDER BY created_at DESC
+                LIMIT 1
+            """)
+            traditional_result = session.execute(traditional_query).fetchone()
+            traditional_trained_today = traditional_result and traditional_result[0] == today
 
-        missing_files = [f for f in critical_files if not (model_dir / f).exists()]
+            # Check LSTM last training
+            lstm_query = text("""
+                SELECT created_at::date as training_date
+                FROM daily_suggested_stocks
+                WHERE model_type = 'raw_lstm'
+                ORDER BY created_at DESC
+                LIMIT 1
+            """)
+            lstm_result = session.execute(lstm_query).fetchone()
+            lstm_trained_today = lstm_result and lstm_result[0] == today
 
-        if missing_files:
-            logger.warning(f"⚠️  Missing ML model files: {', '.join(missing_files)}")
-            logger.info("🔄 Training ML models...")
-            train_ml_models()
-        else:
-            logger.info("✅ ML models found on disk - ready to use")
+            # Check Kronos last training
+            kronos_query = text("""
+                SELECT created_at::date as training_date
+                FROM daily_suggested_stocks
+                WHERE model_type = 'kronos'
+                ORDER BY created_at DESC
+                LIMIT 1
+            """)
+            kronos_result = session.execute(kronos_query).fetchone()
+            kronos_trained_today = kronos_result and kronos_result[0] == today
 
-            # Load metadata to show info
-            import pickle
-            try:
-                with open(model_dir / 'metadata.pkl', 'rb') as f:
-                    metadata = pickle.load(f)
-                logger.info(f"   Trained: {metadata.get('trained_at', 'Unknown')}")
-                logger.info(f"   Samples: {metadata.get('training_samples', 'Unknown'):,}")
-                logger.info(f"   Features: {metadata.get('n_features', 'Unknown')}")
-            except Exception as e:
-                logger.warning(f"   Could not load metadata: {e}")
+            logger.info("\nTraining Status for Today:")
+            logger.info(f"  Traditional ML: {'✅ Done' if traditional_trained_today else '❌ Needed'}")
+            logger.info(f"  Raw LSTM:       {'✅ Done' if lstm_trained_today else '❌ Needed'}")
+            logger.info(f"  Kronos:         {'✅ Done' if kronos_trained_today else '❌ Needed'}")
+
+            # If any model needs training, train all
+            if not (traditional_trained_today and lstm_trained_today and kronos_trained_today):
+                logger.info("\n🔄 Training needed - starting full training cycle...")
+                train_all_ml_models()
+                update_daily_snapshot()
+            else:
+                logger.info("\n✅ All models already trained today - skipping")
 
     except Exception as e:
-        logger.error(f"❌ Startup ML check failed: {e}", exc_info=True)
+        logger.error(f"❌ Training check failed: {e}", exc_info=True)
+        logger.info("🔄 Attempting training anyway as a safety measure...")
+        train_all_ml_models()
 
 
 def run_scheduler():
@@ -269,19 +483,22 @@ def run_scheduler():
     logger.info("Trading System Scheduler Started")
     logger.info("=" * 80)
     logger.info("Scheduled Tasks:")
-    logger.info("  - ML Training:           Daily at 10:00 PM (after data pipeline)")
-    logger.info("  - Daily Snapshot Update: Daily at 10:15 PM (after ML training)")
-    logger.info("    → Models: TRADITIONAL + RAW_LSTM (both)")
+    logger.info("  - ML Training (ALL 3 MODELS): Daily at 10:00 PM (after data pipeline)")
+    logger.info("    → Model 1: Traditional ML (RF + XGBoost)")
+    logger.info("    → Model 2: Raw LSTM (Deep Learning)")
+    logger.info("    → Model 3: Kronos (K-line Tokenization)")
+    logger.info("  - Daily Snapshot Update:     Daily at 10:15 PM (after ML training)")
+    logger.info("    → Models: TRADITIONAL + RAW_LSTM + KRONOS (all 3)")
     logger.info("    → Strategies: DEFAULT_RISK + HIGH_RISK (both)")
-    logger.info("    → Total: 4 combinations (2 models × 2 strategies)")
-    logger.info("  - Cleanup Old Snapshots: Weekly (Sunday) at 03:00 AM")
+    logger.info("    → Total: 6 combinations (3 models × 2 strategies)")
+    logger.info("  - Cleanup Old Snapshots:     Weekly (Sunday) at 03:00 AM")
     logger.info("=" * 80)
 
-    # Check ML models on startup and train if needed
-    check_ml_models_on_startup()
+    # Check if training is needed today and train if necessary
+    check_training_needed()
 
-    # Schedule daily ML training at 10:00 PM (after data pipeline completes)
-    schedule.every().day.at("22:00").do(train_ml_models)
+    # Schedule daily ML training at 10:00 PM (all 3 models)
+    schedule.every().day.at("22:00").do(train_all_ml_models)
 
     # Schedule daily snapshot update at 10:15 PM (after ML training)
     schedule.every().day.at("22:15").do(update_daily_snapshot)

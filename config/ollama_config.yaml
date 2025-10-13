@@ -29,8 +29,8 @@ enhancement_levels:
     queries:
       - "basic_analysis"
     max_sources_per_query: 3
-    timeout_seconds: 15
-    
+    timeout_seconds: 10     # Reduced from 15 for faster response
+
   moderate:
     enabled: true
     queries:
@@ -38,10 +38,10 @@ enhancement_levels:
       - "financial_performance"
       - "market_sentiment"
     max_sources_per_query: 5
-    timeout_seconds: 30
-    
+    timeout_seconds: 20     # Reduced from 30 for better performance
+
   comprehensive:
-    enabled: true
+    enabled: false          # Disabled by default (too slow for daily use)
     queries:
       - "basic_analysis"
       - "financial_performance"
@@ -50,6 +50,14 @@ enhancement_levels:
       - "news_sentiment"
     max_sources_per_query: 8
     timeout_seconds: 45
+
+  # New: Fast mode for daily predictions
+  fast:
+    enabled: true
+    queries:
+      - "basic_analysis"
+    max_sources_per_query: 2
+    timeout_seconds: 5      # Very fast for batch processing
 
 # -------------------------
 # QUERY TEMPLATES
@@ -111,6 +119,16 @@ error_handling:
     rate_limit_exceeded: "Rate limit exceeded, please try again later"
     invalid_response: "Invalid response from Ollama API"
     timeout: "Request timeout, please try again"
+
+# -------------------------
+# DAILY PREDICTIONS ENHANCEMENT
+# -------------------------
+daily_predictions:
+  enabled: true                    # Enable Ollama for daily predictions
+  enhancement_level: "light"       # Use 'light' for faster daily processing
+  max_stocks_to_enhance: 50        # Limit to top 50 stocks per strategy
+  skip_on_failure: true            # Continue if Ollama fails
+  log_enhancements: true           # Log enhancement results
 
 # -------------------------
 # CACHING (Future Enhancement)

@@ -14,3 +14,5 @@ debug_*.txt
 test_*.txt
 raw_*.txt
 *.cookie
+
+ml_models/
