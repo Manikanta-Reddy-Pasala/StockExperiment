@@ -1,6 +1,6 @@
 # Automated Trading System
 
-**High-performance automated trading system with machine learning, real-time market data, and complete automation.**
+**High-performance automated trading system with triple ML models, dual strategies, and complete automation.**
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
 [![Docker](https://img.shields.io/badge/Docker-20.10+-blue.svg)](https://www.docker.com/)
@@ -55,43 +55,62 @@ http://localhost:5001/admin
 
 ### 🤖 Complete Automation
 - **100% Automated Data Collection** - Runs daily at 9 PM after market close
-- **Automated ML Training** - Trains models daily at 2 AM with fresh data
-- **Automated Stock Selection** - Generates daily top 50 stock picks
+- **Automated ML Training** - Trains 3 models daily at 10 PM with fresh data
+- **Automated Stock Selection** - Generates daily top 50 picks × 3 models × 2 strategies
+- **Automated Trading Execution** - Places orders at 9:20 AM with stop-loss/targets
 - **Automated CSV Exports** - Daily backups for analysis and reporting
-- **Self-Healing** - Auto-restart on failures, retry failed steps
+- **Self-Healing** - Saga pattern with retry logic (3 attempts, 60s delay)
 - **Zero Manual Intervention** - Set it and forget it!
 
-### 🧠 Machine Learning
-- **Random Forest Models** - Price prediction and risk assessment
-- **2-Week Price Targets** - ML-predicted target prices with confidence scores
-- **Risk Assessment** - Maximum drawdown prediction (0-1 score)
-- **25-30 Features** - Technical indicators + fundamental metrics
-- **Fast Training** - Only 1-2 minutes for 600K+ samples
-- **Daily Updates** - Models retrained with latest market data
+### 🧠 Triple Machine Learning Models
+- **Traditional ML** (Random Forest + XGBoost ensemble)
+  - Walk-forward cross-validation (5 splits)
+  - 25-30 features (technical + fundamental)
+  - Fast training (~1-2 minutes)
+- **Raw LSTM** (Deep learning)
+  - Per-symbol models with 60-day lookback
+  - Predicts 14 days ahead
+  - OHLCV sequence modeling
+- **Kronos** (K-line tokenization)
+  - Candlestick pattern recognition
+  - Advanced technical analysis
+  - Experimental cutting-edge model
 
 ### 📊 Comprehensive Data Pipeline
 - **6-Step Saga Pattern** - Symbols → Stocks → History → Indicators → Metrics → Validation
-- **2,259 Stocks** - All NSE-listed stocks with complete fundamental data
+- **2,259+ NSE Stocks** - All NSE-listed stocks with complete data
 - **1-Year Historical Data** - 820K+ OHLCV records
 - **Technical Indicators** - RSI, MACD, SMA, EMA, ATR, Bollinger Bands
-- **Real-Time Updates** - Market data refresh every 30 minutes during trading hours
-- **Robust Error Handling** - Retry logic, compensation, saga rollback
+- **Real-Time Updates** - Market data refresh during trading hours
+- **Robust Error Handling** - Retry logic with exponential backoff
+
+### 🎯 Dual Strategy System
+- **DEFAULT_RISK** (Conservative)
+  - Large-cap stocks (>20,000 Cr market cap)
+  - PE ratio 5-40, price ₹100-10,000
+  - Target gain: 7%, Stop loss: 5%
+  - Good liquidity requirements
+- **HIGH_RISK** (Aggressive)
+  - Small/Mid-cap stocks (1,000-20,000 Cr)
+  - Broader criteria, lower score threshold
+  - Target gain: 12%, Stop loss: 10%
+  - Higher volatility tolerance
 
 ### 🌐 API & Interface
 - **REST API** - Fast, cached endpoints with ML predictions
 - **Admin Dashboard** - Manual task triggers with real-time monitoring
 - **Web Interface** - Portfolio management and trading controls
-- **Multi-Broker Support** - Fyers, Zerodha (Kite), Simulator
+- **Multi-Broker Support** - Unified broker service (Fyers, Zerodha, Simulator)
 - **Real-Time Status** - Live task monitoring and logs
-- **Retry Mechanism** - Smart retry for failed tasks and individual steps
+- **Auto-Trading** - Automated order placement with risk management
 
 ### 📈 Analytics & Insights
+- **6 Model Combinations** - 3 models × 2 strategies = comprehensive coverage
 - **ML Prediction Scores** - 0-1 score for opportunity ranking
 - **Confidence Levels** - Model confidence in predictions
 - **Risk Scores** - Lower = safer investment
-- **Strategy-Based Filtering** - Growth, Value, Balanced, Momentum strategies
-- **Sector Analysis** - Performance across different sectors
-- **Historical Backtesting** - Test strategies on historical data
+- **Performance Tracking** - Daily P&L snapshots
+- **Ollama AI Enhancement** - Optional market intelligence layer
 
 ---
 
@@ -104,14 +123,27 @@ http://localhost:5001/admin
 │                    AUTOMATED DAILY SCHEDULE                   │
 └─────────────────────────────────────────────────────────────┘
 
-🌅 Morning (Monday Only):
-  06:00 AM → Symbol Master Update
+🌅 Morning:
+  06:00 AM → Symbol Master Update (Monday Only)
              • Refresh NSE symbols from Fyers API
              • ~2,300 stocks
              • Duration: 1-2 minutes
 
+  09:20 AM → Auto-Trading Execution (Daily)
+             • Check AI market sentiment
+             • Apply weekly limits
+             • Place orders with stop-loss/targets
+             • Duration: 2-3 minutes
+
 🌆 Evening (Daily After Market Close):
-  21:00 PM → Data Pipeline (6-step saga)
+  06:00 PM → Performance Tracking
+             • Update order performance
+             • Create daily snapshots
+             • Check stop-loss/targets
+             • Close orders if needed
+             • Duration: 1-2 minutes
+
+  09:00 PM → Data Pipeline (6-step saga)
              • Update all stock prices
              • Fetch 1-year historical OHLCV
              • Calculate technical indicators
@@ -120,52 +152,40 @@ http://localhost:5001/admin
              • Duration: 20-30 minutes
              • Records: 2,259 stocks updated
 
-  21:30 PM → Fill Missing Data
+  09:30 PM → Fill Missing Data & Business Logic (Parallel)
              • Populate adj_close, liquidity
-             • Calculate ATR, volatility, volume averages
-             • Duration: 2-5 minutes
-
-  21:45 PM → Business Logic Calculations
+             • Calculate ATR, volatility
              • EPS, Book Value, PEG Ratio, ROA
              • Operating/Net/Profit Margins
-             • Current/Quick Ratios
-             • Debt to Equity, Growth metrics
-             • Duration: 2-5 minutes
+             • Current/Quick Ratios, Debt to Equity
+             • Duration: 5-10 minutes
 
-  22:00 PM → CSV Export
-             • stocks_YYYY-MM-DD.csv (all stocks)
-             • historical_30d_YYYY-MM-DD.csv (30 days OHLCV)
-             • technical_indicators_YYYY-MM-DD.csv (indicators)
-             • suggested_stocks_YYYY-MM-DD.csv (top picks)
-             • Duration: 1-2 minutes
-
-  22:30 PM → Data Quality Validation
-             • Check record counts
-             • Verify data freshness
-             • Detect anomalies
-             • Duration: < 1 minute
-
-🌙 Early Morning (Next Day):
-  02:00 AM → ML Model Training
-             • Train Random Forest price model
-             • Train Random Forest risk model
-             • Use 365 days historical data
-             • 25-30 features (technical + fundamental)
-             • Duration: 1-2 minutes
-
-  02:15 AM → Daily Stock Selection
-             • Run suggested stocks saga
-             • Apply ML predictions to all stocks
-             • Select top 50 stocks
-             • Save to daily_suggested_stocks table
+  10:00 PM → CSV Export & Data Validation (Parallel)
+             • Export 4 CSV files (stocks, history, indicators, picks)
+             • Validate data quality
              • Duration: 2-3 minutes
+
+🌙 Late Evening:
+  10:00 PM → ML Model Training (3 Models)
+             • Model 1: Traditional ML (RF + XGBoost)
+             • Model 2: Raw LSTM (Deep Learning)
+             • Model 3: Kronos (K-line Tokenization)
+             • Duration: 5-10 minutes total
+
+  10:15 PM → Daily Stock Selection (Triple Model × Dual Strategy)
+             • Run for all 3 models
+             • Apply both strategies (DEFAULT_RISK, HIGH_RISK)
+             • Generate 6 combinations total
+             • Optional: Ollama AI enhancement
+             • Save to daily_suggested_stocks table
+             • Duration: 3-5 minutes
 
   03:00 AM → Cleanup Old Data (Sunday Only)
              • Remove snapshots > 90 days
              • Remove CSV exports > 30 days
              • Duration: < 1 minute
 
-Total Daily Automation Time: ~40-50 minutes
+Total Daily Automation Time: ~45-60 minutes
 Total Manual Intervention: ZERO! 🎉
 ```
 
@@ -184,7 +204,6 @@ External APIs:
 ┌──────────────┐  │
 │ Zerodha API  │──┤
 └──────────────┘  │
-                  │
                   ↓
          ┌────────────────┐
          │  Flask App     │ ← HTTP Requests
@@ -192,30 +211,48 @@ External APIs:
          └────────────────┘
                   ↓
          ┌────────────────┐
-         │  Redis Cache   │
-         │  (Dragonfly)   │
+         │  Dragonfly     │
+         │  (Redis Cache) │
          └────────────────┘
                   ↓
-    ┌─────────────────────────┐
-    │    PostgreSQL DB        │
-    │  ┌──────────────────┐   │
-    │  │ stocks (2,259)   │   │
-    │  │ historical_data  │   │
-    │  │ tech_indicators  │   │
-    │  │ daily_suggested  │   │
-    │  │ pipeline_track   │   │
-    │  │ users, orders    │   │
-    │  └──────────────────┘   │
-    └─────────────────────────┘
+    ┌─────────────────────────────┐
+    │    PostgreSQL DB (15 tables)│
+    │  ┌──────────────────────┐   │
+    │  │ stocks (2,259)       │   │
+    │  │ historical_data      │   │
+    │  │ tech_indicators      │   │
+    │  │ daily_suggested      │   │
+    │  │ pipeline_tracking    │   │
+    │  │ orders, trades       │   │
+    │  │ auto_trading_settings│   │
+    │  └──────────────────────┘   │
+    └─────────────────────────────┘
                   ↑
     ┌─────────────┴─────────────┐
     │                           │
 ┌───────────────┐      ┌──────────────┐
 │ Data Scheduler│      │ ML Scheduler │
-│  (9 PM daily) │      │ (2 AM daily) │
+│  (9 PM daily) │      │ (10 PM daily)│
 └───────────────┘      └──────────────┘
 
-Storage:
+ML Models Storage:
+┌────────────────────────────┐
+│ Traditional ML:            │
+│ ml_models/                 │
+│ ├── rf_price_model.pkl     │
+│ └── xgb_price_model.pkl    │
+│                            │
+│ Raw LSTM:                  │
+│ ml_models/raw_ohlcv_lstm/  │
+│ └── {symbol}/              │
+│     └── lstm_model.h5      │
+│                            │
+│ Kronos:                    │
+│ ml_models/kronos/          │
+│ └── kronos_model.pkl       │
+└────────────────────────────┘
+
+CSV Exports:
 ┌────────────┐        ┌────────────┐
 │  /exports  │        │   /logs    │
 │ (CSV files)│        │ (App logs) │
@@ -300,7 +337,7 @@ http://localhost:5001/admin
 http://localhost:5001/api/suggested-stocks/
 
 # Database (PostgreSQL)
-docker exec -it trading_system_db_dev psql -U trader -d trading_system
+docker exec -it trading_system_db psql -U trader -d trading_system
 ```
 
 ---
@@ -313,9 +350,11 @@ docker exec -it trading_system_db_dev psql -U trader -d trading_system
 - **Python 3.10+** - Core language
 - **Flask 3.0** - Web framework
 - **SQLAlchemy 2.0** - ORM for database
-- **PostgreSQL 15** - Primary database
+- **PostgreSQL 15** - Primary database (11 tables)
 - **Dragonfly (Redis)** - Caching layer
-- **Scikit-learn** - Machine learning models
+- **Scikit-learn** - Random Forest models
+- **XGBoost** - Gradient boosting
+- **TensorFlow 2.16+** - LSTM models
 - **Pandas/NumPy** - Data processing
 - **Schedule** - Task scheduling
 
@@ -326,7 +365,7 @@ docker exec -it trading_system_db_dev psql -U trader -d trading_system
 - **Jinja2** - Template engine
 
 **DevOps:**
-- **Docker & Docker Compose** - Containerization
+- **Docker & Docker Compose** - 5 containers orchestration
 - **Git** - Version control
 - **GitHub Actions** - CI/CD (optional)
 
@@ -335,6 +374,7 @@ docker exec -it trading_system_db_dev psql -U trader -d trading_system
 ```
 /StockExperiment
 ├── README.md                     # This file
+├── CLAUDE.md                     # AI assistant instructions
 ├── .env                          # Environment variables (create this)
 ├── .gitignore                    # Git ignore rules
 ├── requirements.txt              # Python dependencies
@@ -348,28 +388,37 @@ docker exec -it trading_system_db_dev psql -U trader -d trading_system
 │
 ├── run_pipeline.py               # Data pipeline orchestrator
 ├── data_scheduler.py             # Data automation (9 PM)
-├── scheduler.py                  # ML automation (2 AM)
+├── scheduler.py                  # ML automation (10 PM)
 │
 ├── /src                          # Source code
 │   ├── __init__.py
 │   │
 │   ├── /models                   # Database models (SQLAlchemy ORM)
 │   │   ├── database.py           # DB connection, session management
-│   │   └── models.py             # Table definitions (11 tables)
+│   │   ├── models.py             # Core tables (users, orders, trades)
+│   │   ├── stock_models.py       # Stock, SymbolMaster models
+│   │   └── historical_models.py  # HistoricalData, TechnicalIndicators
 │   │
 │   ├── /services                 # Business logic
 │   │   ├── /data                 # Data pipeline services
 │   │   │   ├── pipeline_saga.py  # 6-step data saga
-│   │   │   ├── suggested_stocks_saga.py  # Stock selection saga
-│   │   │   └── daily_snapshot_service.py # Daily snapshot logic
+│   │   │   ├── suggested_stocks_saga.py  # 7-step stock selection
+│   │   │   ├── historical_data_service.py # Smart data fetching
+│   │   │   └── fyers_symbol_service.py  # Symbol management
 │   │   │
-│   │   ├── /broker               # Broker integrations
-│   │   │   ├── fyers_service.py  # Fyers API wrapper
-│   │   │   └── zerodha_service.py # Zerodha API wrapper
+│   │   ├── /brokers              # Broker integrations
+│   │   │   └── /core
+│   │   │       └── unified_broker_service.py # Multi-broker abstraction
 │   │   │
-│   │   └── /ml                   # Machine learning
-│   │       ├── stock_predictor.py # Random Forest models
-│   │       └── config_loader.py   # ML configuration
+│   │   ├── /ml                   # Machine learning
+│   │   │   ├── enhanced_stock_predictor.py # Traditional ML (RF + XGBoost)
+│   │   │   ├── raw_lstm_prediction_service.py # Raw LSTM models
+│   │   │   ├── kronos_prediction_service.py # Kronos K-line model
+│   │   │   └── training_service.py # Model training orchestration
+│   │   │
+│   │   └── /trading              # Trading services
+│   │       ├── auto_trading_service.py # Automated trading
+│   │       └── order_performance_tracking_service.py # P&L tracking
 │   │
 │   ├── /web                      # Flask routes & templates
 │   │   ├── app.py                # Flask app factory
@@ -391,21 +440,21 @@ docker exec -it trading_system_db_dev psql -U trader -d trading_system
 │   ├── database.yaml             # Database settings
 │   └── broker_config.yaml        # Broker settings
 │
-├── /docker                       # Docker files
-│   ├── docker-compose.yml        # Services definition
-│   └── /database                 # Database files
+├── /ml_models                    # Trained ML models
+│   ├── rf_price_model.pkl        # Random Forest price model
+│   ├── xgb_price_model.pkl       # XGBoost price model
+│   ├── /raw_ohlcv_lstm           # Per-symbol LSTM models
+│   │   └── {SYMBOL}/lstm_model.h5
+│   └── /kronos                   # Kronos models
+│       └── kronos_model.pkl
 │
 ├── /tools                        # Utility scripts
 │   ├── README.md                 # Tools documentation
 │   ├── train_ml_model.py         # Manual ML training
-│   ├── check_scheduler.sh        # ML scheduler status
+│   ├── batch_train_lstm_top_stocks.py # LSTM training for large-caps
+│   ├── batch_train_lstm_small_mid_cap.py # LSTM for small/mid-caps
+│   ├── generate_kronos_predictions.py # Kronos predictions
 │   └── check_all_schedulers.sh   # Complete system status
-│
-├── /docs                         # Documentation
-│   ├── AUTOMATION.md             # Automation guide
-│   ├── ML_GUIDE.md               # ML guide
-│   ├── STRUCTURE.md              # Project structure
-│   └── /_archive                 # Old docs
 │
 ├── /logs                         # Application logs
 │   ├── data_scheduler.log        # Data pipeline logs
@@ -425,7 +474,7 @@ docker exec -it trading_system_db_dev psql -U trader -d trading_system
 services:
   database:
     image: postgres:15
-    container_name: trading_system_db_dev
+    container_name: trading_system_db
     ports: ["5432:5432"]
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -443,13 +492,14 @@ services:
 
   trading_system:
     build: .
-    container_name: trading_system_app_dev
+    container_name: trading_system_app
     ports: ["5001:5001"]
     depends_on: [database, dragonfly]
     volumes:
       - .:/app
       - ./logs:/app/logs
       - ./exports:/app/exports
+      - ./ml_models:/app/ml_models
     environment:
       DATABASE_URL: postgresql://trader:trader_password@database:5432/trading_system
       REDIS_HOST: dragonfly
@@ -472,27 +522,30 @@ services:
     volumes:
       - .:/app
       - ./logs:/app/logs
+      - ./ml_models:/app/ml_models
 ```
 
 ---
 
 ## 🗄️ Database Schema
 
-### Table Overview (11 Tables Total)
+### Table Overview (11+ Tables)
 
 | Table | Records | Description |
 |-------|---------|-------------|
 | **stocks** | 2,259 | Current prices, fundamentals, ratios |
 | **historical_data** | ~820,000 | 1-year OHLCV data |
 | **technical_indicators** | ~820,000 | RSI, MACD, SMA, EMA, ATR |
-| **daily_suggested_stocks** | ~4,500 | Daily top 50 picks with ML |
-| **pipeline_execution_tracking** | Variable | Pipeline saga logs |
+| **daily_suggested_stocks** | Growing | Daily picks (3 models × 2 strategies) |
+| **pipeline_tracking** | Variable | Pipeline saga status |
+| **symbol_master** | ~2,259 | Complete NSE symbol list |
 | **users** | Variable | User accounts |
 | **strategies** | Variable | Trading strategies |
-| **orders** | Variable | Order history |
+| **orders** | Variable | Order history with model/strategy |
 | **trades** | Variable | Executed trades |
 | **positions** | Variable | Current positions |
 | **broker_configurations** | Variable | API credentials |
+| **auto_trading_settings** | Variable | Per-user trading preferences |
 
 ### Core Tables Schema
 
@@ -541,67 +594,13 @@ CREATE TABLE stocks (
     sector VARCHAR(100),
     industry VARCHAR(100),
     market_cap_category VARCHAR(20),
+    data_source VARCHAR(50), -- 'real' or 'estimated_enhanced'
     last_updated TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
-#### `historical_data` Table
-```sql
-CREATE TABLE historical_data (
-    id SERIAL PRIMARY KEY,
-    symbol VARCHAR(50) NOT NULL,
-    date DATE NOT NULL,
-    open DOUBLE PRECISION,
-    high DOUBLE PRECISION,
-    low DOUBLE PRECISION,
-    close DOUBLE PRECISION,
-    adj_close DOUBLE PRECISION,
-    volume BIGINT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    UNIQUE(symbol, date),
-    FOREIGN KEY (symbol) REFERENCES stocks(symbol)
-);
-CREATE INDEX idx_hist_symbol_date ON historical_data(symbol, date DESC);
-```
-
-#### `technical_indicators` Table
-```sql
-CREATE TABLE technical_indicators (
-    id SERIAL PRIMARY KEY,
-    symbol VARCHAR(50) NOT NULL,
-    date DATE NOT NULL,
-
-    -- Momentum Indicators
-    rsi_14 DOUBLE PRECISION,
-
-    -- Trend Indicators
-    macd DOUBLE PRECISION,
-    signal_line DOUBLE PRECISION,
-    macd_histogram DOUBLE PRECISION,
-    sma_20 DOUBLE PRECISION,
-    sma_50 DOUBLE PRECISION,
-    sma_200 DOUBLE PRECISION,
-    ema_12 DOUBLE PRECISION,
-    ema_26 DOUBLE PRECISION,
-
-    -- Volatility Indicators
-    atr_14 DOUBLE PRECISION,
-    atr_percentage DOUBLE PRECISION,
-    bollinger_upper DOUBLE PRECISION,
-    bollinger_middle DOUBLE PRECISION,
-    bollinger_lower DOUBLE PRECISION,
-
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    UNIQUE(symbol, date),
-    FOREIGN KEY (symbol) REFERENCES stocks(symbol)
-);
-CREATE INDEX idx_tech_symbol_date ON technical_indicators(symbol, date DESC);
-```
-
-#### `daily_suggested_stocks` Table
+#### `daily_suggested_stocks` Table (Enhanced)
 ```sql
 CREATE TABLE daily_suggested_stocks (
     id SERIAL PRIMARY KEY,
@@ -611,14 +610,15 @@ CREATE TABLE daily_suggested_stocks (
     current_price DOUBLE PRECISION,
     market_cap DOUBLE PRECISION,
 
-    -- Strategy & Selection
-    strategy VARCHAR(50) NOT NULL,
+    -- Model & Strategy
+    model_type VARCHAR(50),  -- 'traditional', 'raw_lstm', 'kronos'
+    strategy VARCHAR(50) NOT NULL, -- 'default_risk', 'high_risk'
     selection_score DOUBLE PRECISION,
     rank INTEGER,
 
     -- ML Predictions
     ml_prediction_score DOUBLE PRECISION,  -- 0-1 (higher = better)
-    ml_price_target DOUBLE PRECISION,      -- Predicted price in 2 weeks
+    ml_price_target DOUBLE PRECISION,      -- Predicted price
     ml_confidence DOUBLE PRECISION,        -- Model confidence 0-1
     ml_risk_score DOUBLE PRECISION,        -- Risk score 0-1 (lower = safer)
 
@@ -651,10 +651,29 @@ CREATE TABLE daily_suggested_stocks (
     market_cap_category VARCHAR(20),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    UNIQUE(date, symbol, strategy)  -- Upsert key
+    UNIQUE(date, symbol, strategy, model_type)  -- Allows upsert
 );
 CREATE INDEX idx_daily_suggested_date ON daily_suggested_stocks(date DESC);
 CREATE INDEX idx_daily_suggested_ml_score ON daily_suggested_stocks(ml_prediction_score DESC);
+CREATE INDEX idx_daily_suggested_model ON daily_suggested_stocks(model_type);
+```
+
+#### `pipeline_tracking` Table
+```sql
+CREATE TABLE pipeline_tracking (
+    id SERIAL PRIMARY KEY,
+    pipeline_id VARCHAR(100) UNIQUE NOT NULL,
+    step VARCHAR(50) NOT NULL,
+    status VARCHAR(50) NOT NULL, -- 'pending', 'in_progress', 'completed', 'failed', 'retrying'
+    started_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    retry_count INTEGER DEFAULT 0,
+    max_retries INTEGER DEFAULT 3,
+    error_message TEXT,
+    records_processed INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
 ---
@@ -668,7 +687,8 @@ GET /api/suggested-stocks/
 ```
 
 **Query Parameters:**
-- `strategy` - Trading strategy: `growth`, `value`, `balanced`, `momentum` (default: `balanced`)
+- `strategy` - Trading strategy: `default_risk`, `high_risk` (default: `default_risk`)
+- `model_type` - ML model: `traditional`, `raw_lstm`, `kronos` (optional, returns all if not specified)
 - `limit` - Number of stocks to return (default: `50`, max: `100`)
 - `sector` - Filter by sector (optional)
 - `search` - Search by symbol or name (optional)
@@ -677,7 +697,7 @@ GET /api/suggested-stocks/
 
 **Example Request:**
 ```bash
-curl "http://localhost:5001/api/suggested-stocks/?strategy=balanced&limit=10&sort_by=ml_prediction_score"
+curl "http://localhost:5001/api/suggested-stocks/?strategy=default_risk&model_type=traditional&limit=10"
 ```
 
 **Example Response:**
@@ -685,8 +705,9 @@ curl "http://localhost:5001/api/suggested-stocks/?strategy=balanced&limit=10&sor
 {
   "success": true,
   "count": 10,
-  "strategy": "balanced",
-  "generated_at": "2025-10-04T14:30:00",
+  "strategy": "default_risk",
+  "model_type": "traditional",
+  "generated_at": "2025-10-14T22:15:00",
   "stocks": [
     {
       "symbol": "RELIANCE",
@@ -695,6 +716,7 @@ curl "http://localhost:5001/api/suggested-stocks/?strategy=balanced&limit=10&sor
       "current_price": 2450.50,
       "market_cap": 16500000.0,
       "sector": "Energy",
+      "model_type": "traditional",
 
       "ml_prediction_score": 0.78,
       "ml_price_target": 2650.20,
@@ -720,8 +742,8 @@ curl "http://localhost:5001/api/suggested-stocks/?strategy=balanced&limit=10&sor
       },
 
       "trading_signals": {
-        "target_price": 2650.0,
-        "stop_loss": 2300.0,
+        "target_price": 2625.0,
+        "stop_loss": 2328.0,
         "recommendation": "BUY"
       }
     }
@@ -745,21 +767,23 @@ GET /admin/system/status
       "total": 2259,
       "with_price": 2250,
       "with_market_cap": 2240,
-      "last_updated": "2025-10-04T21:30:00"
+      "last_updated": "2025-10-14T21:30:00"
     },
     "historical_data": {
       "symbols": 2259,
       "records": 820574,
-      "latest_date": "2025-10-04"
+      "latest_date": "2025-10-14"
     },
-    "technical_indicators": {
-      "symbols": 2259,
-      "latest_date": "2025-10-04"
+    "ml_models": {
+      "traditional": "trained",
+      "raw_lstm": "84 symbols trained",
+      "kronos": "trained"
     },
     "daily_snapshots": {
-      "total": 4500,
+      "total": 15000,
       "unique_dates": 90,
-      "latest_date": "2025-10-04"
+      "latest_date": "2025-10-14",
+      "model_combinations": 6
     }
   }
 }
@@ -770,64 +794,9 @@ GET /admin/system/status
 POST /admin/trigger/pipeline           # Run data pipeline
 POST /admin/trigger/fill-data          # Fill missing data
 POST /admin/trigger/business-logic     # Calculate metrics
-POST /admin/trigger/ml-training        # Train ML models
+POST /admin/trigger/ml-training        # Train all ML models
 POST /admin/trigger/csv-export         # Export CSV files
 POST /admin/trigger/all                # Run all tasks sequentially
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "task_id": "pipeline_20251004_143000",
-  "message": "Data pipeline started"
-}
-```
-
-#### Check Task Status
-```http
-GET /admin/task/{task_id}/status
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "task": {
-    "task_id": "pipeline_20251004_143000",
-    "status": "running",
-    "description": "Data Pipeline (6-step saga)",
-    "start_time": "2025-10-04T14:30:00",
-    "steps": [
-      {
-        "name": "SYMBOL_MASTER",
-        "status": "completed",
-        "start_time": "2025-10-04T14:30:00",
-        "end_time": "2025-10-04T14:31:00"
-      },
-      {
-        "name": "STOCKS",
-        "status": "running",
-        "start_time": "2025-10-04T14:31:00"
-      }
-    ]
-  }
-}
-```
-
-#### Retry Failed Steps
-```http
-POST /admin/task/{task_id}/retry-failed
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "task_id": "retry_20251004_143500",
-  "message": "Retrying 2 failed steps",
-  "failed_steps": ["HISTORICAL_DATA", "TECHNICAL_INDICATORS"]
-}
 ```
 
 ---
@@ -839,36 +808,19 @@ POST /admin/task/{task_id}/retry-failed
 **Schedule:**
 - Symbol Master: Monday 6:00 AM
 - Data Pipeline: Daily 9:00 PM
-- Fill Data: Daily 9:30 PM
-- Business Logic: Daily 9:45 PM
-- CSV Export: Daily 10:00 PM
-- Validation: Daily 10:30 PM
-
-**Configuration:**
-```python
-# Edit data_scheduler.py to change schedule
-schedule.every().monday.at("06:00").do(update_symbol_master)
-schedule.every().day.at("21:00").do(run_data_pipeline)
-schedule.every().day.at("21:30").do(fill_missing_data)
-schedule.every().day.at("21:45").do(calculate_business_logic)
-schedule.every().day.at("22:00").do(export_daily_csv)
-schedule.every().day.at("22:30").do(validate_data_quality)
-```
+- Fill Data: Daily 9:30 PM (parallel)
+- Business Logic: Daily 9:30 PM (parallel)
+- CSV Export: Daily 10:00 PM (parallel)
+- Data Validation: Daily 10:00 PM (parallel)
 
 ### ML Scheduler (`scheduler.py`)
 
 **Schedule:**
-- ML Training: Daily 2:00 AM
-- Daily Snapshot: Daily 2:15 AM
+- Auto-Trading: Daily 9:20 AM (5 min after market opens)
+- Performance Tracking: Daily 6:00 PM (after market close)
+- ML Training (3 models): Daily 10:00 PM
+- Daily Snapshot: Daily 10:15 PM (6 combinations)
 - Cleanup: Sunday 3:00 AM
-
-**Configuration:**
-```python
-# Edit scheduler.py to change schedule
-schedule.every().day.at("02:00").do(train_ml_models)
-schedule.every().day.at("02:15").do(update_daily_snapshot)
-schedule.every().sunday.at("03:00").do(cleanup_old_snapshots)
-```
 
 ### Manual Task Execution
 
@@ -888,7 +840,14 @@ python3 run_pipeline.py
 # Train ML models
 python3 tools/train_ml_model.py
 
-# Fill missing data (if pipeline completed)
+# Train LSTM models
+python3 tools/batch_train_lstm_top_stocks.py
+python3 tools/batch_train_lstm_small_mid_cap.py
+
+# Generate Kronos predictions
+python3 tools/generate_kronos_predictions.py
+
+# Fill missing data
 python3 fill_data_sql.py
 python3 fix_business_logic.py
 ```
@@ -897,75 +856,84 @@ python3 fix_business_logic.py
 
 ## 🧠 Machine Learning
 
-### Models
+### Triple Model Architecture
 
-**1. Price Prediction Model**
-- **Algorithm:** Random Forest Regressor
-- **Target:** 2-week price change percentage
-- **Output:** `ml_prediction_score` (0-1), `ml_price_target` (₹), `ml_confidence` (0-1)
+#### 1. Traditional ML (Enhanced)
+- **Algorithms:** Random Forest + XGBoost ensemble
+- **Features:** 25-30 (technical + fundamental + chaos features)
+- **Training:** Walk-forward cross-validation (5 splits)
+- **Output:** Price predictions, risk assessment
+- **Performance:** R² 0.15-0.35 (good for stocks)
+- **Training Time:** 1-2 minutes
 
-**2. Risk Assessment Model**
-- **Algorithm:** Random Forest Regressor
-- **Target:** Maximum drawdown in next 2 weeks
-- **Output:** `ml_risk_score` (0-1, lower = safer)
+#### 2. Raw LSTM (Deep Learning)
+- **Architecture:** LSTM neural networks
+- **Input:** 60-day OHLCV sequences
+- **Prediction:** 14 days ahead
+- **Training:** Per-symbol models
+- **Coverage:** Top liquid stocks
+- **Training Time:** 5-10 minutes per batch
 
-### Features (25-30 total)
+#### 3. Kronos (K-line Tokenization)
+- **Approach:** Candlestick pattern recognition
+- **Features:** K-line tokens, technical patterns
+- **Innovation:** Experimental cutting-edge model
+- **Coverage:** All stocks
+- **Training Time:** 2-3 minutes
 
-**Price & Market:**
-- `current_price`, `market_cap`, `volume`
+### Dual Strategy System
 
-**Fundamentals:**
-- `pe_ratio`, `pb_ratio`, `roe`, `eps`, `beta`, `debt_to_equity`
-
-**Growth & Profitability:**
-- `revenue_growth`, `earnings_growth`, `operating_margin`, `net_margin`
-
-**Volatility:**
-- `historical_volatility_1y`, `atr_14`, `atr_percentage`
-
-**Technical Indicators:**
-- `rsi_14`, `macd`, `signal_line`, `macd_histogram`
-- `sma_50`, `sma_200`, `ema_12`, `ema_26`
-
-**Engineered Features:**
-- `sma_ratio` = sma_50 / sma_200
-- `ema_diff` = ema_12 - ema_26
-- `price_vs_sma50`, `price_vs_sma200`
-
-### Training Details
-
-**Data:**
-- 365 days lookback
-- ~600,000-700,000 training samples
-- Train/test split not needed (time series)
-
-**Model Configuration:**
-```python
-RandomForestRegressor(
-    n_estimators=100,      # 100 trees (fast training)
-    max_depth=10,          # Shallow trees
-    min_samples_split=20,  # Prevents overfitting
-    min_samples_leaf=10,   # Larger leaves
-    n_jobs=-1              # Parallel processing
-)
+#### DEFAULT_RISK (Conservative)
+```yaml
+target_market_cap: "> 20,000 Cr"
+pe_ratio: "5-40"
+price_range: "₹100-10,000"
+liquidity: "High"
+target_gain: "7%"
+stop_loss: "5%"
+typical_stocks: "RELIANCE, TCS, HDFC, INFY"
 ```
 
-**Performance:**
-- Price R²: 0.15-0.35 (good for stock prediction!)
-- Risk R²: 0.20-0.40
-- Training time: 1-2 minutes
+#### HIGH_RISK (Aggressive)
+```yaml
+target_market_cap: "1,000-20,000 Cr"
+pe_ratio: "Broader range"
+price_range: "Flexible"
+liquidity: "Medium"
+target_gain: "12%"
+stop_loss: "10%"
+typical_stocks: "Mid/Small-cap growth stocks"
+```
 
-### Interpretation
+### Model Performance Metrics
 
-**High Opportunity:**
-- `ml_prediction_score > 0.7` + `ml_confidence > 0.7` = Strong buy signal
+**Total Combinations:** 6 (3 models × 2 strategies)
 
-**Low Risk:**
-- `ml_risk_score < 0.3` = Limited downside expected
+Each combination provides:
+- `ml_prediction_score` (0-1): Higher = better opportunity
+- `ml_price_target`: Expected price
+- `ml_confidence` (0-1): Model confidence
+- `ml_risk_score` (0-1): Lower = safer
 
-**Combined Signal:**
-- Score >0.7 + Risk <0.3 + Confidence >0.7 = **Strong buy with low risk**
-- Score <0.4 + Risk >0.5 = **Avoid**
+### Feature Engineering
+
+**Technical Features:**
+- Price momentum, volume patterns
+- RSI, MACD, Bollinger Bands
+- SMA/EMA crossovers
+- ATR volatility
+
+**Fundamental Features:**
+- PE, PB, ROE, ROA ratios
+- Growth metrics (revenue, earnings)
+- Profitability margins
+- Liquidity ratios
+
+**Engineered Features:**
+- Chaos features (fractal dimension)
+- Market regime indicators
+- Sector relative strength
+- Sentiment scores (optional)
 
 ---
 
@@ -995,84 +963,71 @@ SECRET_KEY=your_secret_key_here
 
 # Logging
 LOG_LEVEL=INFO
-LOG_FILE=/app/logs/app.log
 
-# Screening Thresholds (Optional)
-SCREENING_MIN_PRICE_THRESHOLD=50.0
-SCREENING_MIN_MARKET_CAP_CRORES=500
-SCREENING_MIN_VOLUME=100000
+# Screening Parameters (Optional)
+SCREENING_QUOTES_RATE_LIMIT_DELAY=0.2
+VOLATILITY_MAX_WORKERS=5
+VOLATILITY_MAX_STOCKS=500
 ```
 
 ### Stock Filters (`config/stock_filters.yaml`)
 
 ```yaml
-# Minimum thresholds
-min_price: 50.0
-max_price: 5000.0
-min_market_cap_crores: 500
-min_volume: 100000
+stage_1_filters:  # Market data screening
+  tradeability:
+    minimum_price: 50.0
+    maximum_price: 10000.0
+    minimum_daily_volume: 50000
+    minimum_daily_turnover_inr: 50000000
 
-# Technical indicators
-min_rsi: 30
-max_rsi: 70
-min_macd: -50
-max_macd: 50
-
-# Fundamental ratios
-max_pe_ratio: 50
-min_roe: 10
-max_debt_to_equity: 2.0
-
-# ML scores
-min_ml_prediction_score: 0.5
-max_ml_risk_score: 0.5
+stage_2_filters:  # Business logic screening
+  filtering_thresholds:
+    minimum_total_score: 25
+  fundamental_ratios:
+    max_pe_ratio: 50.0
+    min_roe: 5.0
+    max_debt_equity: 2.0
 ```
 
 ---
 
 ## 💼 Usage Examples
 
-### Example 1: Get Top 10 Growth Stocks
+### Example 1: Get Top Conservative Picks (Traditional ML)
 
 ```bash
-curl "http://localhost:5001/api/suggested-stocks/?strategy=growth&limit=10"
+curl "http://localhost:5001/api/suggested-stocks/?strategy=default_risk&model_type=traditional&limit=10"
 ```
 
-### Example 2: Get Balanced Stocks in IT Sector
+### Example 2: Get Aggressive LSTM Picks
 
 ```bash
-curl "http://localhost:5001/api/suggested-stocks/?strategy=balanced&sector=IT&limit=20"
+curl "http://localhost:5001/api/suggested-stocks/?strategy=high_risk&model_type=raw_lstm&limit=20"
 ```
 
-### Example 3: Search for Specific Stock
+### Example 3: Get All Kronos Predictions
 
 ```bash
-curl "http://localhost:5001/api/suggested-stocks/?search=RELIANCE"
+curl "http://localhost:5001/api/suggested-stocks/?model_type=kronos&limit=50"
 ```
 
-### Example 4: Manually Trigger Data Pipeline
+### Example 4: Query Database for Model Comparison
 
-```python
-import requests
+```sql
+-- Connect to database
+docker exec -it trading_system_db psql -U trader -d trading_system
 
-response = requests.post('http://localhost:5001/admin/trigger/pipeline')
-data = response.json()
-print(f"Task ID: {data['task_id']}")
-
-# Check status
-status_response = requests.get(f"http://localhost:5001/admin/task/{data['task_id']}/status")
-print(status_response.json())
-```
-
-### Example 5: Query Database Directly
-
-```bash
-docker exec -it trading_system_db_dev psql -U trader -d trading_system
-
-# SQL queries
-SELECT COUNT(*) FROM stocks;
-SELECT COUNT(*) FROM historical_data;
-SELECT * FROM daily_suggested_stocks WHERE date = CURRENT_DATE ORDER BY rank LIMIT 10;
+-- Compare model performance
+SELECT
+    model_type,
+    strategy,
+    COUNT(*) as stocks,
+    AVG(ml_prediction_score) as avg_score,
+    AVG(ml_confidence) as avg_confidence
+FROM daily_suggested_stocks
+WHERE date = CURRENT_DATE
+GROUP BY model_type, strategy
+ORDER BY avg_score DESC;
 ```
 
 ---
@@ -1084,9 +1039,6 @@ SELECT * FROM daily_suggested_stocks WHERE date = CURRENT_DATE ORDER BY rank LIM
 ```bash
 # Complete system status
 ./tools/check_all_schedulers.sh
-
-# ML scheduler only
-./tools/check_scheduler.sh
 
 # Docker containers
 docker compose ps
@@ -1101,111 +1053,75 @@ docker compose logs -f trading_system
 ### Database Queries
 
 ```sql
--- Latest updates
+-- Model coverage
 SELECT
-    'Stocks' as table_name,
-    COUNT(*) as records,
-    MAX(last_updated) as last_update
-FROM stocks;
-
--- Today's top picks
-SELECT symbol, stock_name, ml_prediction_score, ml_price_target, rank
+    model_type,
+    COUNT(DISTINCT symbol) as unique_stocks,
+    COUNT(*) as total_records
 FROM daily_suggested_stocks
 WHERE date = CURRENT_DATE
-ORDER BY rank
-LIMIT 10;
+GROUP BY model_type;
 
--- Data coverage
+-- Today's top picks across all models
 SELECT
-    COUNT(*) as total_stocks,
-    COUNT(current_price) as with_price,
-    COUNT(DISTINCT h.symbol) as with_history,
-    COUNT(DISTINCT ti.symbol) as with_indicators
-FROM stocks s
-LEFT JOIN historical_data h ON s.symbol = h.symbol
-LEFT JOIN technical_indicators ti ON s.symbol = ti.symbol;
-```
+    symbol,
+    stock_name,
+    model_type,
+    strategy,
+    ml_prediction_score,
+    ml_price_target,
+    rank
+FROM daily_suggested_stocks
+WHERE date = CURRENT_DATE
+ORDER BY ml_prediction_score DESC
+LIMIT 20;
 
-### Log Files
-
-```bash
-# Data scheduler logs
-tail -f logs/data_scheduler.log
-
-# ML scheduler logs
-tail -f logs/scheduler.log
-
-# Flask app logs
-tail -f logs/app.log
+-- Pipeline status
+SELECT * FROM pipeline_tracking
+ORDER BY updated_at DESC
+LIMIT 10;
 ```
 
 ---
 
 ## 🔧 Troubleshooting
 
-### Schedulers Not Running
+### Common Issues
 
+#### Pipeline Fails at HISTORICAL_DATA
 ```bash
-# Check container status
-docker compose ps
+# Rate limiting issue - increase delay
+export SCREENING_QUOTES_RATE_LIMIT_DELAY=0.5
 
-# Restart schedulers
-docker compose restart data_scheduler ml_scheduler
+# Reduce parallel workers
+export VOLATILITY_MAX_WORKERS=3
 
-# View errors
-docker compose logs data_scheduler | grep ERROR
-docker compose logs ml_scheduler | grep ERROR
-```
-
-### Missing Data
-
-```bash
-# Re-run pipeline
+# Restart pipeline
 python3 run_pipeline.py
-
-# Or via Docker
-docker compose exec data_scheduler python3 run_pipeline.py
-
-# Fill missing data
-python3 fill_data_sql.py
-python3 fix_business_logic.py
 ```
 
-### Database Connection Issues
-
-```bash
-# Check database is running
-docker compose ps database
-
-# Test connection
-docker exec -it trading_system_db_dev psql -U trader -d trading_system -c "SELECT 1;"
-
-# Restart database
-docker compose restart database
-```
-
-### ML Training Errors
-
+#### ML Training Fails
 ```bash
 # Check data availability
-docker exec -it trading_system_db_dev psql -U trader -d trading_system -c "SELECT COUNT(*) FROM historical_data;"
+docker exec -it trading_system_db psql -U trader -d trading_system -c "SELECT COUNT(*) FROM historical_data;"
+
+# Check disk space for models
+df -h ml_models/
 
 # Manual training
 python3 tools/train_ml_model.py
+```
+
+#### Scheduler Not Running
+```bash
+# Check process
+docker compose ps
+
+# Restart schedulers
+docker compose restart ml_scheduler data_scheduler
 
 # Check logs
 docker compose logs ml_scheduler | tail -50
-```
-
-### CSV Exports Not Generated
-
-```bash
-# Create directory
-mkdir -p exports
-chmod 755 exports
-
-# Manual export
-docker compose exec data_scheduler python3 -c "from data_scheduler import export_daily_csv; export_daily_csv()"
 ```
 
 ---
@@ -1215,20 +1131,21 @@ docker compose exec data_scheduler python3 -c "from data_scheduler import export
 ### Metrics
 
 - **Data Pipeline:** 20-30 minutes (2,259 stocks)
-- **ML Training:** 1-2 minutes (600K+ samples, 100 trees)
-- **API Response:** < 100ms (with Redis cache)
-- **Stock Sync:** ~113 stocks/second
+- **Traditional ML Training:** 1-2 minutes
+- **LSTM Training:** 5-10 minutes (batch)
+- **Kronos Training:** 2-3 minutes
+- **Daily Snapshot:** 3-5 minutes (6 combinations)
+- **API Response:** < 100ms (with cache)
 - **Database Size:** ~1.6M records, ~500MB
 - **Memory Usage:** ~500MB (Flask), ~1GB (PostgreSQL)
-- **CPU Usage:** Multi-core (parallel processing)
 
 ### Optimization Tips
 
-1. **Increase Cache TTL** - Edit Redis cache timeout
-2. **Add Indexes** - For frequently queried fields
-3. **Batch Processing** - Process stocks in batches
-4. **Connection Pooling** - Adjust SQLAlchemy pool size
-5. **Reduce Lookback** - Use 180 days instead of 365 for faster training
+1. **Saga Pattern:** Automatic retry prevents failures
+2. **Parallel Processing:** Data tasks run in parallel
+3. **Model Caching:** Models loaded once, cached in memory
+4. **Database Indexes:** Optimized for common queries
+5. **Redis Caching:** API responses cached
 
 ---
 
@@ -1237,9 +1154,10 @@ docker compose exec data_scheduler python3 -c "from data_scheduler import export
 | Document | Description |
 |----------|-------------|
 | **[README.md](README.md)** | This file - comprehensive overview |
-| **[AUTOMATION.md](docs/AUTOMATION.md)** | Complete automation guide (schedulers, tasks, monitoring) |
-| **[ML_GUIDE.md](docs/ML_GUIDE.md)** | Machine learning models, training, predictions, customization |
-| **[STRUCTURE.md](docs/STRUCTURE.md)** | Project structure, data flow, configuration |
+| **[CLAUDE.md](CLAUDE.md)** | AI assistant instructions & codebase guide |
+| **[AUTOMATION.md](docs/AUTOMATION.md)** | Complete automation guide |
+| **[ML_GUIDE.md](docs/ML_GUIDE.md)** | Machine learning models documentation |
+| **[STRUCTURE.md](docs/STRUCTURE.md)** | Project structure & data flow |
 | **[tools/README.md](tools/README.md)** | Utility scripts documentation |
 
 ---
@@ -1255,7 +1173,7 @@ cd StockExperiment
 
 # Create virtual environment
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
@@ -1268,22 +1186,9 @@ pip install -r requirements.txt
 
 - **Python:** PEP 8, type hints preferred
 - **SQL:** Uppercase keywords, snake_case tables
-- **JavaScript:** ES6, camelCase
-- **Comments:** Docstrings for functions, inline comments for complex logic
-
-### Testing
-
-```bash
-# Run tests (when implemented)
-pytest tests/
-
-# Code coverage
-pytest --cov=src tests/
-
-# Linting
-flake8 src/
-pylint src/
-```
+- **Saga Pattern:** Use for multi-step operations
+- **Sessions:** Always use context managers
+- **Models:** Lazy loading with caching
 
 ---
 
@@ -1295,16 +1200,16 @@ MIT License - See [LICENSE](LICENSE) file for details.
 
 ## 🎉 Summary
 
-✅ **100% Automated** - Data collection, ML training, stock selection
-✅ **2,259 Stocks** - Complete fundamental and technical data
-✅ **1-Year Historical** - 820K+ OHLCV records with indicators
-✅ **ML Predictions** - Price targets, risk scores, confidence levels
-✅ **Daily Top 50** - Automated stock picks with ML
-✅ **CSV Exports** - Daily backups for analysis
-✅ **Admin Dashboard** - Manual controls and monitoring
-✅ **REST API** - Fast, cached endpoints
-✅ **Self-Healing** - Auto-restart, retry failed steps
-✅ **Production-Ready** - Docker, logging, error handling
+✅ **100% Automated** - Data collection, ML training, stock selection, trading execution
+✅ **Triple ML Models** - Traditional (RF+XGBoost), Raw LSTM, Kronos
+✅ **Dual Strategies** - Conservative (DEFAULT_RISK) and Aggressive (HIGH_RISK)
+✅ **6 Combinations Daily** - 3 models × 2 strategies = comprehensive coverage
+✅ **2,259+ NSE Stocks** - Complete fundamental and technical data
+✅ **Saga Pattern** - Reliable multi-step operations with retry logic
+✅ **Auto-Trading** - Automated order placement with risk management
+✅ **Performance Tracking** - Daily P&L snapshots and order monitoring
+✅ **Multi-Broker Support** - Unified service for Fyers, Zerodha, Simulator
+✅ **Production-Ready** - Docker, logging, error handling, monitoring
 
 **Zero manual intervention required!** 🚀
 
@@ -1343,11 +1248,11 @@ python3 run_pipeline.py
 python3 tools/train_ml_model.py
 
 # Database access
-docker exec -it trading_system_db_dev psql -U trader -d trading_system
+docker exec -it trading_system_db psql -U trader -d trading_system
 ```
 
 ---
 
 **Built with ❤️ for automated stock trading and analysis**
 
-Last Updated: October 4, 2025
+Last Updated: October 14, 2025
