@@ -9,7 +9,7 @@ import logging
 import schedule
 import time
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -31,6 +31,115 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+
+def _get_last_trading_day() -> datetime.date:
+    """
+    Get the last expected trading day (accounting for weekends).
+
+    Returns:
+        date: The last trading day (Friday if today is Saturday/Sunday)
+    """
+    today = datetime.now().date()
+
+    # If Saturday, last trading day is Friday
+    if today.weekday() == 5:  # Saturday
+        return today - timedelta(days=1)
+    # If Sunday, last trading day is Friday
+    elif today.weekday() == 6:  # Sunday
+        return today - timedelta(days=2)
+    else:
+        # Weekday - check if market has closed (3:30 PM IST = 10:00 AM UTC)
+        now = datetime.utcnow()
+        market_close_utc = now.replace(hour=10, minute=0, second=0, microsecond=0)
+
+        if now >= market_close_utc:
+            # Market closed, today is the last trading day
+            return today
+        else:
+            # Market not yet closed, yesterday is the last complete day
+            yesterday = today - timedelta(days=1)
+            # If yesterday was weekend, go back to Friday
+            if yesterday.weekday() == 5:  # Saturday
+                return yesterday - timedelta(days=1)
+            elif yesterday.weekday() == 6:  # Sunday
+                return yesterday - timedelta(days=2)
+            return yesterday
+
+
+def check_data_freshness(max_age_days: int = 3) -> dict:
+    """
+    Check if historical data is fresh enough for ML training.
+    Considers weekends and holidays.
+
+    Args:
+        max_age_days: Maximum acceptable age of data (default 3 days to handle long weekends)
+
+    Returns:
+        dict with keys:
+            - fresh (bool): True if data is fresh enough
+            - last_data_date (date): Latest data date in database
+            - expected_date (date): Expected last trading day
+            - age_days (int): Age of data in days
+            - message (str): Description of data status
+    """
+    try:
+        from sqlalchemy import text
+
+        db_manager = get_database_manager()
+        with db_manager.get_session() as session:
+            # Get the latest data date from historical_data
+            query = text("""
+                SELECT MAX(date) as latest_date, COUNT(DISTINCT symbol) as symbols_count
+                FROM historical_data
+            """)
+            result = session.execute(query).fetchone()
+
+            if not result or not result[0]:
+                return {
+                    'fresh': False,
+                    'last_data_date': None,
+                    'expected_date': _get_last_trading_day(),
+                    'age_days': 999,
+                    'message': 'No historical data found in database'
+                }
+
+            last_data_date = result[0]
+            symbols_count = result[1]
+            expected_date = _get_last_trading_day()
+
+            # Calculate age in days
+            age_days = (expected_date - last_data_date).days
+
+            # Data is fresh if it's from the expected last trading day or within max_age_days
+            # We allow some tolerance for holidays and long weekends
+            is_fresh = age_days <= max_age_days
+
+            if age_days == 0:
+                message = f'✅ Data is current ({last_data_date}, {symbols_count:,} symbols)'
+            elif age_days <= max_age_days:
+                message = f'✅ Data is acceptable ({last_data_date}, {age_days} days old, {symbols_count:,} symbols)'
+            else:
+                message = f'❌ Data is stale ({last_data_date}, {age_days} days old, expected {expected_date})'
+
+            return {
+                'fresh': is_fresh,
+                'last_data_date': last_data_date,
+                'expected_date': expected_date,
+                'age_days': age_days,
+                'symbols_count': symbols_count,
+                'message': message
+            }
+
+    except Exception as e:
+        logger.error(f"Failed to check data freshness: {e}")
+        return {
+            'fresh': False,
+            'last_data_date': None,
+            'expected_date': _get_last_trading_day(),
+            'age_days': 999,
+            'message': f'Error checking data: {str(e)}'
+        }
 
 
 def train_traditional_ml_models():
@@ -127,6 +236,34 @@ def train_all_ml_models():
     logger.info("\n\n" + "█" * 80)
     logger.info("DAILY ML TRAINING - ALL 3 MODELS")
     logger.info("█" * 80)
+
+    # Check data freshness before training
+    logger.info("\n" + "=" * 80)
+    logger.info("DATA FRESHNESS CHECK")
+    logger.info("=" * 80)
+
+    freshness = check_data_freshness(max_age_days=3)
+    logger.info(freshness['message'])
+
+    if not freshness['fresh']:
+        logger.warning("⚠️  Data is too old for reliable ML training!")
+        logger.warning(f"   Last data: {freshness['last_data_date']}")
+        logger.warning(f"   Expected: {freshness['expected_date']}")
+        logger.warning(f"   Age: {freshness['age_days']} days")
+        logger.warning("")
+        logger.warning("Possible reasons:")
+        logger.warning("  1. Market holiday (NSE closed)")
+        logger.warning("  2. Data pipeline didn't run")
+        logger.warning("  3. Weekend - data should be from Friday")
+        logger.warning("")
+        logger.warning("⏭️  SKIPPING ML TRAINING - Run data pipeline first!")
+        logger.warning("   Manual command: docker compose restart data_scheduler")
+        logger.warning("   Or run: python3 run_pipeline.py")
+        return
+
+    logger.info(f"✅ Data is fresh - proceeding with ML training")
+    logger.info(f"   Latest data: {freshness['last_data_date']}")
+    logger.info(f"   Symbols: {freshness['symbols_count']:,}")
 
     start_time = datetime.now()
 
