@@ -1,15 +1,14 @@
 """
-Kronos-Inspired Financial Foundation Model Prediction Service
+Kronos Financial Foundation Model Prediction Service
 
-Implements key principles from the Kronos paper:
-- K-line (candlestick) tokenization using hierarchical autoencoder
-- Discrete token-based sequence modeling
-- Coarse-to-fine prediction with probabilistic forecasting
-- Pre-trained on financial time series patterns
+This service uses the REAL Kronos foundation model from:
+https://github.com/shiyu-coder/Kronos
 
-Note: This is a Kronos-inspired implementation using similar principles.
-The actual Kronos model requires 12B+ records pre-training which is not feasible here.
-Instead, we use pattern-based tokenization and probabilistic forecasting.
+Kronos is a family of decoder-only foundation models, pre-trained on 12B+
+financial K-line records from 45 global exchanges. It uses:
+- Specialized tokenizer for OHLCV data
+- Pre-trained Transformer models (mini, small, base)
+- Autoregressive probabilistic forecasting
 """
 
 import numpy as np
@@ -19,463 +18,151 @@ from datetime import datetime, date, timedelta
 from pathlib import Path
 import logging
 from sqlalchemy import text
+import warnings
+
+# Suppress warnings
+warnings.filterwarnings('ignore')
 
 from src.models.database import get_database_manager
+
+# Import the REAL Kronos model
+import sys
+sys.path.insert(0, str(Path(__file__).parent / 'kronos_model'))
+
+try:
+    from src.services.ml.kronos_model import Kronos, KronosTokenizer, KronosPredictor
+    KRONOS_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"Failed to import Kronos model: {e}")
+    logging.warning("Kronos prediction service will not be available.")
+    KRONOS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
 
-class KLineTokenizer:
-    """
-    K-line tokenizer that converts OHLCVA candlestick data into discrete tokens.
-
-    Inspired by Kronos paper:
-    - Binary Spherical Quantization (BSQ) for efficient tokenization
-    - Hierarchical tokens (coarse + fine) for multi-scale pattern capture
-    - Captures market microstructure patterns
-    """
-
-    def __init__(self, coarse_vocab_size: int = 256, fine_vocab_size: int = 256):
-        """
-        Initialize K-line tokenizer.
-
-        Parameters:
-        -----------
-        coarse_vocab_size : int
-            Size of coarse token vocabulary (captures broad patterns)
-        fine_vocab_size : int
-            Size of fine token vocabulary (captures detailed patterns)
-        """
-        self.coarse_vocab_size = coarse_vocab_size
-        self.fine_vocab_size = fine_vocab_size
-
-        # Pattern definitions (coarse-level)
-        self.coarse_patterns = {
-            'strong_bullish': 0,      # Large green candle, high volume
-            'bullish': 1,             # Green candle
-            'weak_bullish': 2,        # Small green candle
-            'neutral': 3,             # Doji or very small body
-            'weak_bearish': 4,        # Small red candle
-            'bearish': 5,             # Red candle
-            'strong_bearish': 6,      # Large red candle, high volume
-            'hammer': 7,              # Bullish reversal (long lower shadow)
-            'shooting_star': 8,       # Bearish reversal (long upper shadow)
-            'engulfing_bull': 9,      # Bullish engulfing pattern
-            'engulfing_bear': 10,     # Bearish engulfing pattern
-        }
-
-    def tokenize_kline(self, ohlcva: pd.Series) -> Tuple[int, int]:
-        """
-        Convert a single K-line (OHLCVA) into hierarchical tokens.
-
-        Parameters:
-        -----------
-        ohlcva : pd.Series
-            Row with columns: open, high, low, close, volume, amount
-
-        Returns:
-        --------
-        Tuple[int, int]
-            (coarse_token, fine_token)
-        """
-        try:
-            open_price = float(ohlcva['open'])
-            high = float(ohlcva['high'])
-            low = float(ohlcva['low'])
-            close = float(ohlcva['close'])
-            volume = float(ohlcva['volume']) if 'volume' in ohlcva else 0
-
-            # Calculate pattern features
-            body = abs(close - open_price)
-            range_hl = high - low
-            upper_shadow = high - max(open_price, close)
-            lower_shadow = min(open_price, close) - low
-
-            # Avoid division by zero
-            if range_hl == 0:
-                range_hl = 0.001
-
-            body_pct = (body / range_hl) * 100
-            upper_shadow_pct = (upper_shadow / range_hl) * 100
-            lower_shadow_pct = (lower_shadow / range_hl) * 100
-
-            # Direction
-            is_bullish = close > open_price
-            is_bearish = close < open_price
-
-            # Volume analysis (normalized to avoid dependency on absolute values)
-            # We'll use relative volume later when we have historical context
-
-            # COARSE TOKEN: Identify candlestick pattern
-            coarse_token = self._identify_coarse_pattern(
-                body_pct, upper_shadow_pct, lower_shadow_pct, is_bullish, is_bearish
-            )
-
-            # FINE TOKEN: Quantize price movement and volume
-            # Fine token encodes: price change magnitude, volume level, volatility
-            fine_token = self._quantize_fine_features(
-                body_pct, upper_shadow_pct, lower_shadow_pct, volume
-            )
-
-            return coarse_token, fine_token
-
-        except Exception as e:
-            logger.warning(f"Error tokenizing K-line: {e}")
-            return 3, 127  # Return neutral pattern as fallback
-
-    def _identify_coarse_pattern(
-        self, body_pct: float, upper_shadow_pct: float,
-        lower_shadow_pct: float, is_bullish: bool, is_bearish: bool
-    ) -> int:
-        """Identify coarse candlestick pattern."""
-
-        # Doji or very small body (neutral)
-        if body_pct < 10:
-            return self.coarse_patterns['neutral']
-
-        # Hammer (bullish reversal) - small body, long lower shadow
-        if body_pct < 30 and lower_shadow_pct > 60:
-            return self.coarse_patterns['hammer']
-
-        # Shooting star (bearish reversal) - small body, long upper shadow
-        if body_pct < 30 and upper_shadow_pct > 60:
-            return self.coarse_patterns['shooting_star']
-
-        # Strong patterns (large body > 70%)
-        if body_pct > 70:
-            if is_bullish:
-                return self.coarse_patterns['strong_bullish']
-            else:
-                return self.coarse_patterns['strong_bearish']
-
-        # Medium patterns (40-70%)
-        if body_pct >= 40:
-            if is_bullish:
-                return self.coarse_patterns['bullish']
-            else:
-                return self.coarse_patterns['bearish']
-
-        # Weak patterns (10-40%)
-        if is_bullish:
-            return self.coarse_patterns['weak_bullish']
-        else:
-            return self.coarse_patterns['weak_bearish']
-
-    def _quantize_fine_features(
-        self, body_pct: float, upper_shadow_pct: float,
-        lower_shadow_pct: float, volume: float
-    ) -> int:
-        """
-        Quantize fine-grained features into a discrete token.
-
-        Returns a token in range [0, 255] representing:
-        - Body size (0-100%)
-        - Shadow imbalance
-        - Volume level (relative)
-        """
-        # Quantize body percentage to 0-7 (3 bits)
-        body_quantized = min(7, int(body_pct / 12.5))
-
-        # Quantize shadow imbalance to 0-7 (3 bits)
-        shadow_imbalance = upper_shadow_pct - lower_shadow_pct
-        shadow_quantized = min(7, int((shadow_imbalance + 100) / 25))
-
-        # Volume quantization (placeholder, needs historical context)
-        # For now, use log scale
-        volume_quantized = min(3, int(np.log10(volume + 1) / 2)) if volume > 0 else 0
-
-        # Combine into 8-bit token (3 + 3 + 2 bits = 8 bits = 256 values)
-        fine_token = (body_quantized << 5) | (shadow_quantized << 2) | volume_quantized
-
-        return fine_token
-
-    def tokenize_sequence(self, df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Tokenize a sequence of K-lines.
-
-        Parameters:
-        -----------
-        df : pd.DataFrame
-            DataFrame with OHLCVA data
-
-        Returns:
-        --------
-        Tuple[np.ndarray, np.ndarray]
-            (coarse_tokens, fine_tokens) - arrays of shape (n_samples,)
-        """
-        coarse_tokens = []
-        fine_tokens = []
-
-        for _, row in df.iterrows():
-            coarse, fine = self.tokenize_kline(row)
-            coarse_tokens.append(coarse)
-            fine_tokens.append(fine)
-
-        return np.array(coarse_tokens), np.array(fine_tokens)
-
-
-class KronosInspiredPredictor:
-    """
-    Kronos-inspired financial time series predictor.
-
-    Key principles from Kronos paper:
-    - Token-based sequence modeling
-    - Autoregressive probabilistic forecasting
-    - Coarse-to-fine prediction hierarchy
-    - Pattern-based market understanding
-    """
-
-    def __init__(self, lookback_window: int = 60, forecast_horizon: int = 14):
-        """
-        Initialize Kronos-inspired predictor.
-
-        Parameters:
-        -----------
-        lookback_window : int
-            Number of historical K-lines to consider
-        forecast_horizon : int
-            Number of days to forecast
-        """
-        self.lookback_window = lookback_window
-        self.forecast_horizon = forecast_horizon
-        self.tokenizer = KLineTokenizer()
-
-        # Pattern transition probabilities (learned from data)
-        # In real Kronos, this would be a large Transformer model
-        # Here, we use simplified pattern-based rules
-        self.pattern_transitions = self._initialize_pattern_transitions()
-
-    def _initialize_pattern_transitions(self) -> Dict:
-        """
-        Initialize pattern transition probabilities.
-
-        In real Kronos, this would be learned from 12B+ records.
-        Here, we use domain knowledge of candlestick patterns.
-        """
-        return {
-            'strong_bullish': {'bullish': 0.4, 'weak_bullish': 0.3, 'neutral': 0.2, 'weak_bearish': 0.1},
-            'bullish': {'strong_bullish': 0.2, 'bullish': 0.3, 'weak_bullish': 0.3, 'neutral': 0.2},
-            'weak_bullish': {'bullish': 0.3, 'weak_bullish': 0.2, 'neutral': 0.3, 'weak_bearish': 0.2},
-            'neutral': {'bullish': 0.25, 'bearish': 0.25, 'neutral': 0.3, 'weak_bullish': 0.1, 'weak_bearish': 0.1},
-            'weak_bearish': {'bearish': 0.3, 'weak_bearish': 0.2, 'neutral': 0.3, 'weak_bullish': 0.2},
-            'bearish': {'strong_bearish': 0.2, 'bearish': 0.3, 'weak_bearish': 0.3, 'neutral': 0.2},
-            'strong_bearish': {'bearish': 0.4, 'weak_bearish': 0.3, 'neutral': 0.2, 'weak_bullish': 0.1},
-            'hammer': {'strong_bullish': 0.4, 'bullish': 0.4, 'neutral': 0.2},
-            'shooting_star': {'strong_bearish': 0.4, 'bearish': 0.4, 'neutral': 0.2},
-        }
-
-    def predict(self, df: pd.DataFrame) -> Dict:
-        """
-        Generate Kronos-style prediction for stock data.
-
-        Parameters:
-        -----------
-        df : pd.DataFrame
-            Historical OHLCVA data (at least lookback_window rows)
-
-        Returns:
-        --------
-        Dict
-            Prediction results with ML scores
-        """
-        if len(df) < self.lookback_window:
-            raise ValueError(f"Insufficient data: need {self.lookback_window} rows, got {len(df)}")
-
-        # Use last N days
-        recent_data = df.tail(self.lookback_window).copy()
-
-        # Tokenize sequence
-        coarse_tokens, fine_tokens = self.tokenizer.tokenize_sequence(recent_data)
-
-        # Analyze token sequence patterns
-        pattern_score = self._analyze_pattern_sequence(coarse_tokens)
-
-        # Probabilistic forecast using autoregressive model
-        forecast_probs = self._probabilistic_forecast(coarse_tokens, fine_tokens)
-
-        # Calculate ML scores
-        current_price = float(recent_data.iloc[-1]['close'])
-
-        # Prediction score: weighted by pattern strength and forecast probability
-        ml_prediction_score = self._calculate_prediction_score(pattern_score, forecast_probs)
-
-        # Price target: based on probabilistic scenarios
-        ml_price_target = self._calculate_price_target(current_price, forecast_probs)
-
-        # Confidence: based on pattern clarity and forecast certainty
-        ml_confidence = self._calculate_confidence(coarse_tokens, forecast_probs)
-
-        # Risk score: based on volatility patterns and downside probability
-        ml_risk_score = self._calculate_risk_score(recent_data, forecast_probs)
-
-        return {
-            'ml_prediction_score': float(ml_prediction_score),
-            'ml_price_target': float(ml_price_target),
-            'ml_confidence': float(ml_confidence),
-            'ml_risk_score': float(ml_risk_score),
-            'pattern_score': float(pattern_score),
-            'forecast_probabilities': forecast_probs,
-            'recent_patterns': self._get_recent_pattern_names(coarse_tokens[-5:])
-        }
-
-    def _analyze_pattern_sequence(self, coarse_tokens: np.ndarray) -> float:
-        """Analyze the pattern sequence for bullish/bearish trends."""
-        # Map tokens to pattern strengths
-        pattern_strengths = {
-            0: 1.0,   # strong_bullish
-            1: 0.6,   # bullish
-            2: 0.3,   # weak_bullish
-            3: 0.0,   # neutral
-            4: -0.3,  # weak_bearish
-            5: -0.6,  # bearish
-            6: -1.0,  # strong_bearish
-            7: 0.7,   # hammer (bullish reversal)
-            8: -0.7,  # shooting_star (bearish reversal)
-            9: 0.8,   # engulfing_bull
-            10: -0.8, # engulfing_bear
-        }
-
-        # Weight recent patterns more heavily
-        weights = np.exp(np.linspace(-1, 0, len(coarse_tokens)))
-        weights = weights / weights.sum()
-
-        scores = np.array([pattern_strengths.get(t, 0) for t in coarse_tokens])
-        weighted_score = np.sum(scores * weights)
-
-        # Normalize to [0, 1]
-        normalized_score = (weighted_score + 1) / 2
-
-        return np.clip(normalized_score, 0, 1)
-
-    def _probabilistic_forecast(
-        self, coarse_tokens: np.ndarray, fine_tokens: np.ndarray
-    ) -> Dict[str, float]:
-        """
-        Generate probabilistic forecast using autoregressive token prediction.
-
-        Returns probabilities for different price movement scenarios.
-        """
-        # Get last pattern
-        last_coarse = coarse_tokens[-1]
-
-        # Reverse pattern map
-        pattern_names = {v: k for k, v in self.tokenizer.coarse_patterns.items()}
-        last_pattern_name = pattern_names.get(last_coarse, 'neutral')
-
-        # Get transition probabilities
-        transitions = self.pattern_transitions.get(last_pattern_name, {'neutral': 1.0})
-
-        # Calculate probabilities for different outcomes
-        bullish_prob = sum(
-            prob for pattern, prob in transitions.items()
-            if 'bullish' in pattern or pattern == 'hammer'
-        )
-
-        bearish_prob = sum(
-            prob for pattern, prob in transitions.items()
-            if 'bearish' in pattern or pattern == 'shooting_star'
-        )
-
-        neutral_prob = 1.0 - bullish_prob - bearish_prob
-
-        return {
-            'bullish': float(bullish_prob),
-            'bearish': float(bearish_prob),
-            'neutral': float(neutral_prob)
-        }
-
-    def _calculate_prediction_score(
-        self, pattern_score: float, forecast_probs: Dict[str, float]
-    ) -> float:
-        """Calculate final ML prediction score combining patterns and forecast."""
-        # Weighted combination
-        combined_score = (
-            pattern_score * 0.6 +
-            forecast_probs['bullish'] * 0.4
-        )
-        return np.clip(combined_score, 0, 1)
-
-    def _calculate_price_target(
-        self, current_price: float, forecast_probs: Dict[str, float]
-    ) -> float:
-        """Calculate price target based on probabilistic scenarios."""
-        # Expected return based on probabilities
-        expected_return = (
-            forecast_probs['bullish'] * 0.09 +    # +9% for bullish
-            forecast_probs['bearish'] * -0.09 +   # -9% for bearish
-            forecast_probs['neutral'] * 0.0       # 0% for neutral
-        )
-
-        return current_price * (1 + expected_return)
-
-    def _calculate_confidence(
-        self, coarse_tokens: np.ndarray, forecast_probs: Dict[str, float]
-    ) -> float:
-        """Calculate prediction confidence."""
-        # Confidence based on forecast certainty (max probability)
-        max_prob = max(forecast_probs.values())
-
-        # Pattern consistency (how stable are recent patterns)
-        recent_patterns = coarse_tokens[-10:]
-        pattern_variance = np.var(recent_patterns) / 10.0  # Normalize
-        pattern_consistency = 1.0 - min(pattern_variance, 1.0)
-
-        # Combined confidence
-        confidence = (max_prob * 0.6 + pattern_consistency * 0.4)
-
-        return np.clip(confidence, 0, 1)
-
-    def _calculate_risk_score(
-        self, df: pd.DataFrame, forecast_probs: Dict[str, float]
-    ) -> float:
-        """Calculate risk score based on volatility and downside probability."""
-        # Calculate recent volatility
-        returns = df['close'].pct_change().dropna()
-        volatility = returns.std() if len(returns) > 0 else 0
-
-        # Downside risk from forecast
-        downside_prob = forecast_probs['bearish']
-
-        # Combined risk score
-        risk_score = (
-            volatility * 5.0 * 0.5 +      # Volatility component (scaled)
-            downside_prob * 0.5            # Downside probability component
-        )
-
-        return np.clip(risk_score, 0, 1)
-
-    def _get_recent_pattern_names(self, coarse_tokens: np.ndarray) -> List[str]:
-        """Get human-readable pattern names for recent tokens."""
-        pattern_names = {v: k for k, v in self.tokenizer.coarse_patterns.items()}
-        return [pattern_names.get(t, 'unknown') for t in coarse_tokens]
-
-
 class KronosPredictionService:
     """
-    Service for generating stock predictions using Kronos-inspired model.
+    Service for generating stock predictions using the real Kronos foundation model.
 
     Integrates with the existing dual-model architecture.
     """
 
-    def __init__(self, model_dir: str = 'ml_models/kronos'):
-        self.model_dir = Path(model_dir)
-        self.model_dir.mkdir(parents=True, exist_ok=True)
+    def __init__(
+        self,
+        model_name: str = "NeoQuasar/Kronos-small",
+        tokenizer_name: str = "NeoQuasar/Kronos-Tokenizer-base",
+        device: str = "cpu",
+        max_context: int = 512,
+        lookback_window: int = 200,  # Reduced from 400 (database has max 255 days)
+        forecast_horizon: int = 14
+    ):
+        """
+        Initialize Kronos prediction service with pre-trained models.
+
+        Parameters:
+        -----------
+        model_name : str
+            Hugging Face model name (Kronos-mini, Kronos-small, or Kronos-base)
+        tokenizer_name : str
+            Hugging Face tokenizer name
+        device : str
+            Device to run model on ('cpu' or 'cuda:0')
+        max_context : int
+            Maximum context length (512 for small/base, 2048 for mini)
+        lookback_window : int
+            Number of historical days to use for prediction
+        forecast_horizon : int
+            Number of days to forecast
+        """
+        if not KRONOS_AVAILABLE:
+            raise RuntimeError("Kronos model not available. Check imports.")
+
+        self.model_name = model_name
+        self.tokenizer_name = tokenizer_name
+        self.device = device
+        self.max_context = max_context
+        self.lookback_window = min(lookback_window, max_context)  # Don't exceed max_context
+        self.forecast_horizon = forecast_horizon
 
         self.db = get_database_manager()
-        self.predictor = KronosInspiredPredictor(lookback_window=60, forecast_horizon=14)
 
-        logger.info(f"KronosPredictionService initialized (model_dir: {self.model_dir})")
+        # Lazy loading of model and predictor
+        self._tokenizer = None
+        self._model = None
+        self._predictor = None
 
-    def predict_single_stock(self, symbol: str, user_id: int = 1) -> Optional[Dict]:
+        logger.info(
+            f"KronosPredictionService initialized (model={model_name}, "
+            f"device={device}, lookback={self.lookback_window}, forecast={forecast_horizon})"
+        )
+
+    @property
+    def tokenizer(self):
+        """Lazy load tokenizer from Hugging Face."""
+        if self._tokenizer is None:
+            logger.info(f"Loading Kronos tokenizer: {self.tokenizer_name}")
+            try:
+                self._tokenizer = KronosTokenizer.from_pretrained(self.tokenizer_name)
+                logger.info("✓ Tokenizer loaded successfully")
+            except Exception as e:
+                logger.error(f"Failed to load tokenizer: {e}")
+                raise
+        return self._tokenizer
+
+    @property
+    def model(self):
+        """Lazy load Kronos model from Hugging Face."""
+        if self._model is None:
+            logger.info(f"Loading Kronos model: {self.model_name}")
+            try:
+                self._model = Kronos.from_pretrained(self.model_name)
+                logger.info("✓ Model loaded successfully")
+            except Exception as e:
+                logger.error(f"Failed to load model: {e}")
+                raise
+        return self._model
+
+    @property
+    def predictor(self):
+        """Lazy load Kronos predictor."""
+        if self._predictor is None:
+            logger.info("Initializing Kronos predictor...")
+            try:
+                self._predictor = KronosPredictor(
+                    self.model,
+                    self.tokenizer,
+                    device=self.device,
+                    max_context=self.max_context
+                )
+                logger.info("✓ Predictor initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize predictor: {e}")
+                raise
+        return self._predictor
+
+    def predict_single_stock(
+        self,
+        symbol: str,
+        user_id: int = 1,
+        temperature: float = 1.0,
+        top_p: float = 0.9,
+        sample_count: int = 1
+    ) -> Optional[Dict]:
         """
         Generate Kronos prediction for a single stock.
 
         Parameters:
         -----------
         symbol : str
-            Stock symbol
+            Stock symbol (e.g., 'NSE:RELIANCE-EQ')
         user_id : int
             User ID for data fetching
+        temperature : float
+            Sampling temperature (higher = more random)
+        top_p : float
+            Nucleus sampling probability
+        sample_count : int
+            Number of forecast paths to generate and average
 
         Returns:
         --------
@@ -483,26 +170,54 @@ class KronosPredictionService:
             Prediction dictionary or None if failed
         """
         try:
-            # Fetch historical OHLCVA data
+            # Fetch historical OHLCV data
             with self.db.get_session() as session:
                 query = text("""
                     SELECT date, open, high, low, close, volume
                     FROM historical_data
                     WHERE symbol = :symbol
                     ORDER BY date DESC
-                    LIMIT 100
+                    LIMIT :limit
                 """)
 
-                result = session.execute(query, {'symbol': symbol})
+                result = session.execute(query, {
+                    'symbol': symbol,
+                    'limit': self.lookback_window + 50  # Extra buffer
+                })
                 rows = result.fetchall()
 
-                if len(rows) < 60:
-                    logger.warning(f"Insufficient data for {symbol}: {len(rows)} days")
+                if len(rows) < self.lookback_window:
+                    logger.warning(
+                        f"Insufficient data for {symbol}: {len(rows)} days "
+                        f"(need {self.lookback_window})"
+                    )
                     return None
 
                 # Convert to DataFrame
-                df = pd.DataFrame(rows, columns=['date', 'open', 'high', 'low', 'close', 'volume'])
-                df = df.sort_values('date')
+                df = pd.DataFrame(
+                    rows,
+                    columns=['date', 'open', 'high', 'low', 'close', 'volume']
+                )
+                df = df.sort_values('date').reset_index(drop=True)
+
+                # Prepare data for Kronos
+                # Use last N days as context
+                x_df = df.tail(self.lookback_window)[['open', 'high', 'low', 'close', 'volume']].copy()
+
+                # Don't add 'amount' column - Kronos will calculate it automatically:
+                # amount = volume × mean(open, high, low, close)
+                # See kronos.py line 496
+
+                # Generate timestamps (must be Series, not DatetimeIndex)
+                x_timestamp = pd.Series(pd.to_datetime(df.tail(self.lookback_window)['date']).values)
+
+                # Generate future timestamps for forecast
+                last_date = x_timestamp.iloc[-1]
+                y_timestamp = pd.Series(pd.date_range(
+                    start=last_date + pd.Timedelta(days=1),
+                    periods=self.forecast_horizon,
+                    freq='B'  # Business days
+                ))
 
                 # Get stock fundamentals
                 stock_query = text("""
@@ -523,11 +238,48 @@ class KronosPredictionService:
                 stock_data = dict(stock_result._mapping)
 
             # Generate Kronos prediction
-            prediction = self.predictor.predict(df)
+            logger.debug(f"Predicting {symbol} with Kronos (lookback={len(x_df)}, forecast={self.forecast_horizon})")
+
+            pred_df = self.predictor.predict(
+                df=x_df,
+                x_timestamp=x_timestamp,
+                y_timestamp=y_timestamp,
+                pred_len=self.forecast_horizon,
+                T=temperature,
+                top_p=top_p,
+                sample_count=sample_count,
+                verbose=False
+            )
+
+            # Calculate ML scores from predictions
+            current_price = float(stock_data.get('current_price', x_df['close'].iloc[-1]))
+            predicted_prices = pred_df['close'].values
+
+            # ML Prediction Score: Based on upward trend strength
+            price_changes = np.diff(predicted_prices)
+            positive_changes = price_changes[price_changes > 0].sum()
+            negative_changes = abs(price_changes[price_changes < 0].sum())
+            total_changes = positive_changes + negative_changes
+
+            if total_changes > 0:
+                ml_prediction_score = positive_changes / total_changes
+            else:
+                ml_prediction_score = 0.5  # Neutral if no change
+
+            # Price Target: Average of last 5 predicted prices
+            ml_price_target = float(predicted_prices[-5:].mean())
+
+            # Confidence: Based on prediction consistency (lower std = higher confidence)
+            price_std = predicted_prices.std()
+            price_mean = predicted_prices.mean()
+            coefficient_of_variation = price_std / price_mean if price_mean > 0 else 1.0
+            ml_confidence = float(max(0.0, min(1.0, 1.0 - coefficient_of_variation)))
+
+            # Risk Score: Based on volatility of predictions
+            returns = np.diff(predicted_prices) / predicted_prices[:-1]
+            ml_risk_score = float(min(1.0, abs(returns).std() * 10))
 
             # Build result dictionary (compatible with existing system)
-            current_price = stock_data.get('current_price', 0)
-
             result = {
                 'symbol': symbol,
                 'stock_name': stock_data.get('stock_name'),
@@ -537,15 +289,20 @@ class KronosPredictionService:
                 'market_cap_category': stock_data.get('market_cap_category'),
 
                 # ML Predictions (Kronos)
-                'ml_prediction_score': prediction['ml_prediction_score'],
-                'ml_price_target': prediction['ml_price_target'],
-                'ml_confidence': prediction['ml_confidence'],
-                'ml_risk_score': prediction['ml_risk_score'],
+                'ml_prediction_score': float(ml_prediction_score),
+                'ml_price_target': float(ml_price_target),
+                'ml_confidence': float(ml_confidence),
+                'ml_risk_score': float(ml_risk_score),
 
                 # Kronos-specific metadata
-                'pattern_score': prediction['pattern_score'],
-                'forecast_probabilities': prediction['forecast_probabilities'],
-                'recent_patterns': prediction['recent_patterns'],
+                'forecast_prices': predicted_prices.tolist(),
+                'forecast_dates': y_timestamp.dt.strftime('%Y-%m-%d').tolist(),
+                'model_params': {
+                    'temperature': temperature,
+                    'top_p': top_p,
+                    'sample_count': sample_count,
+                    'lookback': self.lookback_window
+                },
 
                 # Fundamentals
                 'pe_ratio': stock_data.get('pe_ratio'),
@@ -558,8 +315,8 @@ class KronosPredictionService:
                 'operating_margin': stock_data.get('operating_margin'),
 
                 # Trading signals
-                'recommendation': self._get_recommendation(prediction),
-                'target_price': prediction['ml_price_target'],
+                'recommendation': self._get_recommendation(ml_prediction_score, ml_confidence),
+                'target_price': ml_price_target,
                 'stop_loss': current_price * 0.95,  # 5% stop loss
 
                 # Model type
@@ -572,19 +329,20 @@ class KronosPredictionService:
             logger.error(f"Error predicting {symbol}: {e}", exc_info=True)
             return None
 
-    def _get_recommendation(self, prediction: Dict) -> str:
+    def _get_recommendation(self, prediction_score: float, confidence: float) -> str:
         """Generate trading recommendation based on Kronos prediction."""
-        score = prediction['ml_prediction_score']
-        confidence = prediction['ml_confidence']
-
-        if score > 0.65 and confidence > 0.6:
+        if prediction_score > 0.65 and confidence > 0.6:
             return "BUY"
-        elif score < 0.35 and confidence > 0.6:
+        elif prediction_score < 0.35 and confidence > 0.6:
             return "SELL"
         else:
             return "HOLD"
 
-    def apply_risk_strategy(self, prediction: Dict, strategy: str = 'default_risk') -> Dict:
+    def apply_risk_strategy(
+        self,
+        prediction: Dict,
+        strategy: str = 'default_risk'
+    ) -> Dict:
         """
         Apply risk strategy adjustments to prediction.
 
@@ -622,8 +380,14 @@ class KronosPredictionService:
         return prediction
 
     def batch_predict(
-        self, symbols: List[str], user_id: int = 1,
-        max_workers: int = 4, strategy: str = 'default_risk'
+        self,
+        symbols: List[str],
+        user_id: int = 1,
+        max_workers: int = 1,  # Sequential for now (can parallelize later)
+        strategy: str = 'default_risk',
+        temperature: float = 1.0,
+        top_p: float = 0.9,
+        sample_count: int = 1
     ) -> List[Dict]:
         """
         Generate predictions for multiple stocks in batch.
@@ -635,49 +399,93 @@ class KronosPredictionService:
         user_id : int
             User ID
         max_workers : int
-            Number of parallel workers (not used yet)
+            Number of parallel workers (not implemented yet)
         strategy : str
             Risk strategy: 'default_risk' or 'high_risk'
+        temperature : float
+            Sampling temperature
+        top_p : float
+            Nucleus sampling probability
+        sample_count : int
+            Number of forecast paths to average
 
         Returns:
         --------
         List[Dict]
             List of prediction dictionaries
         """
-        logger.info(f"Batch predicting {len(symbols)} stocks with Kronos (strategy={strategy})...")
+        logger.info(
+            f"Batch predicting {len(symbols)} stocks with Kronos "
+            f"(strategy={strategy})..."
+        )
 
-        # Filter symbols by strategy-specific market cap
-        filtered_symbols = self._filter_symbols_by_strategy(symbols, strategy)
-        logger.info(f"Filtered to {len(filtered_symbols)} symbols for {strategy} strategy")
+        # Skip additional filtering - the saga orchestrator already applied
+        # comprehensive model-specific + strategy-specific filters before calling us
+        # No need to filter again here (would cause double filtering and reject everything)
+        filtered_symbols = symbols
+        logger.info(f"Processing {len(filtered_symbols)} pre-filtered symbols from saga")
 
         predictions = []
-        for symbol in filtered_symbols:
-            prediction = self.predict_single_stock(symbol, user_id)
-            if prediction:
-                # Apply risk strategy
-                prediction = self.apply_risk_strategy(prediction, strategy)
-                predictions.append(prediction)
+        success_count = 0
+        fail_count = 0
+
+        for i, symbol in enumerate(filtered_symbols, 1):
+            if i % 50 == 0:
+                logger.info(f"Progress: {i}/{len(filtered_symbols)} symbols processed ({success_count} successful)")
+
+            try:
+                prediction = self.predict_single_stock(
+                    symbol,
+                    user_id,
+                    temperature=temperature,
+                    top_p=top_p,
+                    sample_count=sample_count
+                )
+
+                if prediction:
+                    # Apply risk strategy
+                    prediction = self.apply_risk_strategy(prediction, strategy)
+                    predictions.append(prediction)
+                    success_count += 1
+                else:
+                    fail_count += 1
+
+            except Exception as e:
+                logger.warning(f"Failed to predict {symbol}: {e}")
+                fail_count += 1
 
         # Sort by prediction score
         predictions.sort(key=lambda x: x['ml_prediction_score'], reverse=True)
 
-        logger.info(f"Generated {len(predictions)} Kronos predictions from {len(filtered_symbols)} symbols")
+        logger.info(
+            f"Generated {len(predictions)} Kronos predictions from "
+            f"{len(filtered_symbols)} symbols ({success_count} success, {fail_count} failed)"
+        )
 
         return predictions
 
-    def _filter_symbols_by_strategy(self, symbols: List[str], strategy: str) -> List[str]:
+    def _filter_symbols_by_strategy(
+        self,
+        symbols: List[str],
+        strategy: str
+    ) -> List[str]:
         """
-        Filter symbols by market cap based on risk strategy.
+        Filter symbols by comprehensive quality criteria based on risk strategy.
 
-        DEFAULT_RISK: Large cap only (> 20,000 Cr)
-        HIGH_RISK: Small/Mid cap only (1,000 - 20,000 Cr)
+        DEFAULT_RISK: Large cap only (> 20,000 Cr) with strict quality filters
+        HIGH_RISK: Small/Mid cap (1,000 - 20,000 Cr) with moderate quality filters
         """
         with self.db.get_session() as session:
             query = text("""
-                SELECT symbol, market_cap
+                SELECT
+                    symbol, market_cap, current_price, volume,
+                    pe_ratio, roe, debt_to_equity,
+                    operating_margin, avg_volume_30d
                 FROM stocks
                 WHERE symbol = ANY(:symbols)
                 AND is_active = true
+                AND current_price IS NOT NULL
+                AND volume IS NOT NULL
             """)
 
             result = session.execute(query, {'symbols': symbols})
@@ -687,20 +495,85 @@ class KronosPredictionService:
             for row in rows:
                 symbol = row[0]
                 market_cap = float(row[1]) if row[1] else 0
+                current_price = float(row[2]) if row[2] else 0
+                volume = int(row[3]) if row[3] else 0
+                pe_ratio = float(row[4]) if row[4] else None
+                roe = float(row[5]) if row[5] else None
+                debt_to_equity = float(row[6]) if row[6] else None
+                operating_margin = float(row[7]) if row[7] else None
+                avg_volume_30d = int(row[8]) if row[8] else 0
+
+                # Calculate daily turnover
+                daily_turnover = current_price * volume if current_price and volume else 0
 
                 if strategy.upper() == 'DEFAULT_RISK':
-                    # Large cap only: > 20,000 Cr
-                    if market_cap > 20000:
-                        filtered.append(symbol)
+                    # STRICT FILTERS for conservative strategy
+                    # 1. Market Cap: Large cap only (> 20,000 Cr)
+                    if market_cap <= 20000:
+                        continue
+
+                    # 2. Price Range: Avoid penny stocks and very expensive stocks
+                    if not (100 <= current_price <= 10000):
+                        continue
+
+                    # 3. Liquidity: High volume and turnover required
+                    if volume < 50000 or daily_turnover < 50000000:  # 5 Cr minimum turnover
+                        continue
+
+                    # 4. PE Ratio: Reasonable valuation (avoid overvalued)
+                    if pe_ratio is not None and (pe_ratio < 5 or pe_ratio > 40):
+                        continue
+
+                    # 5. ROE: Minimum profitability (if available)
+                    if roe is not None and roe < 5:
+                        continue
+
+                    # 6. Debt: Avoid highly leveraged companies
+                    if debt_to_equity is not None and debt_to_equity > 2.0:
+                        continue
+
+                    # 7. Consistent Volume: Avoid sudden spikes (manipulation)
+                    if avg_volume_30d > 0:
+                        volume_ratio = volume / avg_volume_30d
+                        if volume_ratio > 5.0 or volume_ratio < 0.2:  # Too much deviation
+                            continue
+
+                    filtered.append(symbol)
+
                 elif strategy.upper() == 'HIGH_RISK':
-                    # Small/Mid cap: 1,000 - 20,000 Cr
-                    if 1000 <= market_cap <= 20000:
-                        filtered.append(symbol)
+                    # MODERATE FILTERS for aggressive strategy
+                    # 1. Market Cap: Small/Mid cap (1,000 - 20,000 Cr)
+                    if not (1000 <= market_cap <= 20000):
+                        continue
+
+                    # 2. Price Range: Flexible but avoid extreme penny stocks
+                    if current_price < 20 or current_price > 5000:
+                        continue
+
+                    # 3. Liquidity: Minimum volume for tradeability
+                    if volume < 10000 or daily_turnover < 10000000:  # 1 Cr minimum turnover
+                        continue
+
+                    # 4. PE Ratio: More lenient (growth stocks can have high PE)
+                    if pe_ratio is not None and pe_ratio > 100:  # Only exclude extreme cases
+                        continue
+
+                    # 5. Operating Margin: Minimum business viability
+                    if operating_margin is not None and operating_margin < -20:  # Allow losses but not huge
+                        continue
+
+                    # 6. Debt: More lenient for growth stocks
+                    if debt_to_equity is not None and debt_to_equity > 5.0:
+                        continue
+
+                    filtered.append(symbol)
 
             return filtered
 
     def save_to_suggested_stocks(
-        self, predictions: List[Dict], strategy: str = 'kronos',
+        self,
+        predictions: List[Dict],
+        strategy: str = 'kronos',
         prediction_date: Optional[date] = None
     ):
         """
@@ -744,7 +617,7 @@ class KronosPredictionService:
                         :target_price, :stop_loss, :recommendation,
                         :sector, :market_cap_category, :model_type, NOW()
                     )
-                    ON CONFLICT (date, symbol, strategy) DO UPDATE SET
+                    ON CONFLICT (date, symbol, strategy, model_type) DO UPDATE SET
                         stock_name = EXCLUDED.stock_name,
                         current_price = EXCLUDED.current_price,
                         market_cap = EXCLUDED.market_cap,
@@ -796,11 +669,27 @@ class KronosPredictionService:
 # Singleton instance
 _kronos_service = None
 
-def get_kronos_prediction_service():
-    """Get the singleton Kronos prediction service instance."""
+
+def get_kronos_prediction_service(
+    model_name: str = "NeoQuasar/Kronos-small",
+    device: str = "cpu"
+):
+    """
+    Get the singleton Kronos prediction service instance.
+
+    Parameters:
+    -----------
+    model_name : str
+        Hugging Face model name (default: Kronos-small)
+    device : str
+        Device to run on ('cpu' or 'cuda:0')
+    """
     global _kronos_service
     if _kronos_service is None:
-        _kronos_service = KronosPredictionService()
+        _kronos_service = KronosPredictionService(
+            model_name=model_name,
+            device=device
+        )
     return _kronos_service
 
 
@@ -811,7 +700,11 @@ if __name__ == '__main__':
         format='%(asctime)s - %(levelname)s - %(message)s'
     )
 
-    service = get_kronos_prediction_service()
+    if not KRONOS_AVAILABLE:
+        print("ERROR: Kronos model not available. Cannot run test.")
+        exit(1)
+
+    service = get_kronos_prediction_service(device="cpu")
 
     # Test on a stock
     test_symbol = 'NSE:RELIANCE-EQ'
@@ -820,7 +713,7 @@ if __name__ == '__main__':
     prediction = service.predict_single_stock(test_symbol)
     if prediction:
         print("\n" + "="*60)
-        print("KRONOS PREDICTION RESULT")
+        print("KRONOS PREDICTION RESULT (Real Foundation Model)")
         print("="*60)
         print(f"Symbol: {prediction['symbol']}")
         print(f"Company: {prediction['stock_name']}")
@@ -830,13 +723,10 @@ if __name__ == '__main__':
         print(f"  Price Target: ₹{prediction['ml_price_target']:.2f}")
         print(f"  Confidence: {prediction['ml_confidence']:.4f} ({prediction['ml_confidence']*100:.1f}%)")
         print(f"  Risk Score: {prediction['ml_risk_score']:.4f} ({prediction['ml_risk_score']*100:.1f}%)")
-        print(f"\nKronos-Specific:")
-        print(f"  Pattern Score: {prediction['pattern_score']:.4f}")
-        print(f"  Forecast Probabilities:")
-        print(f"    Bullish: {prediction['forecast_probabilities']['bullish']:.2%}")
-        print(f"    Bearish: {prediction['forecast_probabilities']['bearish']:.2%}")
-        print(f"    Neutral: {prediction['forecast_probabilities']['neutral']:.2%}")
-        print(f"  Recent Patterns: {', '.join(prediction['recent_patterns'])}")
+        print(f"\nForecast (next {len(prediction['forecast_prices'])} days):")
+        for date, price in zip(prediction['forecast_dates'][:5], prediction['forecast_prices'][:5]):
+            print(f"  {date}: ₹{price:.2f}")
+        print(f"  ...")
         print(f"\nRecommendation: {prediction['recommendation']}")
         print(f"Target Price: ₹{prediction['target_price']:.2f}")
         print(f"Stop Loss: ₹{prediction['stop_loss']:.2f}")

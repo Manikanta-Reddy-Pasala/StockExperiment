@@ -112,19 +112,14 @@ def train_kronos_models():
     logger.info("=" * 80)
 
     try:
-        import subprocess
-
-        logger.info("🎯 Generating Kronos predictions for all strategies...")
-        result = subprocess.run(['python3', 'tools/generate_kronos_predictions.py'],
-                               capture_output=True, text=True)
-
-        if result.returncode == 0:
-            logger.info("✅ Kronos predictions generated successfully")
-        else:
-            logger.error(f"❌ Kronos generation failed: {result.stderr}")
+        # Kronos doesn't require separate training - it uses K-line tokenization on-the-fly
+        # The actual predictions happen during the saga execution in update_daily_snapshot()
+        logger.info("ℹ️  Kronos uses on-the-fly K-line tokenization")
+        logger.info("   No pre-training required - predictions generated during saga execution")
+        logger.info("✅ Kronos ready for prediction (will run during snapshot update)")
 
     except Exception as e:
-        logger.error(f"❌ Kronos training failed: {e}", exc_info=True)
+        logger.error(f"❌ Kronos training check failed: {e}", exc_info=True)
 
 
 def train_all_ml_models():
@@ -209,7 +204,7 @@ def update_daily_snapshot():
                 continue
 
         # ============================================================
-        # PART 2: Raw LSTM Model (Direct Service Call)
+        # PART 2: Raw LSTM Model (via Saga Orchestrator)
         # ============================================================
         logger.info("\n" + "="*80)
         logger.info("RAW LSTM MODEL PREDICTIONS")
@@ -217,9 +212,8 @@ def update_daily_snapshot():
 
         try:
             from pathlib import Path
-            from src.services.ml.raw_lstm_prediction_service import get_raw_lstm_prediction_service
 
-            # Get trained Raw LSTM models
+            # Check if any trained Raw LSTM models exist
             model_dir = Path('ml_models/raw_ohlcv_lstm')
             if model_dir.exists():
                 symbols = [d.name for d in model_dir.iterdir()
@@ -228,32 +222,44 @@ def update_daily_snapshot():
                 if symbols:
                     logger.info(f"Found {len(symbols)} trained Raw LSTM models")
 
-                    service = get_raw_lstm_prediction_service()
-
+                    # Use saga orchestrator for Raw LSTM (same pipeline as Traditional/Kronos)
                     for strategy in strategies_to_run:
                         logger.info("-" * 80)
                         logger.info(f"Running Raw LSTM Model: {strategy.upper()}")
                         logger.info("-" * 80)
 
                         try:
-                            # Generate predictions with strategy
-                            predictions = service.batch_predict(symbols, user_id=1, strategy=strategy)
+                            # Run suggested stocks saga for Raw LSTM model
+                            result = orchestrator.execute_suggested_stocks_saga(
+                                user_id=1,
+                                strategies=[strategy],
+                                limit=50,  # Store top 50 daily picks per strategy
+                                model_type='raw_lstm'  # Use Raw LSTM model
+                            )
 
-                            if predictions:
-                                # Sort by prediction score
-                                predictions.sort(key=lambda x: x['ml_prediction_score'], reverse=True)
+                            if result['status'] == 'completed':
+                                stocks_count = result['summary'].get('final_result_count', 0)
+                                total_stocks_stored += stocks_count
+                                logger.info(f"✅ Raw LSTM {strategy} snapshot updated successfully")
+                                logger.info(f"  Stocks stored: {stocks_count}")
 
-                                # Save to database
-                                service.save_to_suggested_stocks(predictions, strategy=strategy)
+                                # Check if ML predictions were applied
+                                ml_step = next((s for s in result['summary']['step_summary']
+                                              if s['step_id'] == 'step6_ml_prediction'), None)
+                                if ml_step and ml_step['status'] == 'completed':
+                                    logger.info(f"  LSTM predictions: ✅ Applied (Avg Score: {ml_step['metadata'].get('avg_prediction_score', 0):.3f})")
 
-                                total_stocks_stored += len(predictions)
-                                logger.info(f"✅ Raw LSTM {strategy} predictions saved")
-                                logger.info(f"  Stocks stored: {len(predictions)}")
+                                # Check snapshot save
+                                snapshot_step = next((s for s in result['summary']['step_summary']
+                                                    if s['step_id'] == 'step7_daily_snapshot'), None)
+                                if snapshot_step and snapshot_step['status'] == 'completed':
+                                    metadata = snapshot_step.get('metadata', {})
+                                    logger.info(f"  Snapshot: ✅ Saved ({metadata.get('inserted', 0)} inserted, {metadata.get('updated', 0)} updated)")
                             else:
-                                logger.warning(f"⚠️  No Raw LSTM predictions generated for {strategy}")
+                                logger.error(f"❌ Raw LSTM {strategy} snapshot update failed: {result.get('errors', [])}")
 
                         except Exception as e:
-                            logger.error(f"❌ Raw LSTM {strategy} failed: {e}", exc_info=True)
+                            logger.error(f"❌ Raw LSTM {strategy} strategy failed: {e}", exc_info=True)
                             continue
                 else:
                     logger.warning("⚠️  No trained Raw LSTM models found - skipping")
@@ -264,37 +270,52 @@ def update_daily_snapshot():
             logger.error(f"❌ Raw LSTM predictions failed: {e}", exc_info=True)
 
         # ============================================================
-        # PART 3: Kronos Model (Direct Service Call)
+        # PART 3: Kronos Model (via Saga Orchestrator)
         # ============================================================
         logger.info("\n" + "="*80)
         logger.info("KRONOS MODEL PREDICTIONS")
         logger.info("="*80)
 
         try:
-            import subprocess
+            # Reuse the same orchestrator instance
+            for strategy in strategies_to_run:
+                logger.info("-" * 80)
+                logger.info(f"Running Kronos Model: {strategy.upper()}")
+                logger.info("-" * 80)
 
-            logger.info("🎯 Generating Kronos predictions for all strategies...")
-            result = subprocess.run(['python3', 'tools/generate_kronos_predictions.py'],
-                                   capture_output=True, text=True)
+                try:
+                    # Run suggested stocks saga for Kronos model
+                    result = orchestrator.execute_suggested_stocks_saga(
+                        user_id=1,
+                        strategies=[strategy],
+                        limit=50,  # Store top 50 daily picks per strategy
+                        model_type='kronos'  # Use Kronos model
+                    )
 
-            if result.returncode == 0:
-                # Count Kronos predictions from stdout
-                logger.info("✅ Kronos predictions generated successfully")
+                    if result['status'] == 'completed':
+                        stocks_count = result['summary'].get('final_result_count', 0)
+                        total_stocks_stored += stocks_count
+                        logger.info(f"✅ Kronos {strategy} snapshot updated successfully")
+                        logger.info(f"  Stocks stored: {stocks_count}")
 
-                # Parse output to get count
-                from sqlalchemy import text
-                with db_manager.get_session() as session:
-                    count_query = text("""
-                        SELECT COUNT(*)
-                        FROM daily_suggested_stocks
-                        WHERE model_type = 'kronos'
-                        AND date = CURRENT_DATE
-                    """)
-                    kronos_count = session.execute(count_query).scalar()
-                    total_stocks_stored += kronos_count
-                    logger.info(f"  Stocks stored: {kronos_count}")
-            else:
-                logger.error(f"❌ Kronos generation failed: {result.stderr}")
+                        # Check if ML predictions were applied
+                        ml_step = next((s for s in result['summary']['step_summary']
+                                      if s['step_id'] == 'step6_ml_prediction'), None)
+                        if ml_step and ml_step['status'] == 'completed':
+                            logger.info(f"  Kronos predictions: ✅ Applied (Avg Score: {ml_step['metadata'].get('avg_prediction_score', 0):.3f})")
+
+                        # Check snapshot save
+                        snapshot_step = next((s for s in result['summary']['step_summary']
+                                            if s['step_id'] == 'step7_daily_snapshot'), None)
+                        if snapshot_step and snapshot_step['status'] == 'completed':
+                            metadata = snapshot_step.get('metadata', {})
+                            logger.info(f"  Snapshot: ✅ Saved ({metadata.get('inserted', 0)} inserted, {metadata.get('updated', 0)} updated)")
+                    else:
+                        logger.error(f"❌ Kronos {strategy} snapshot update failed: {result.get('errors', [])}")
+
+                except Exception as e:
+                    logger.error(f"❌ Kronos {strategy} strategy failed: {e}", exc_info=True)
+                    continue
 
         except Exception as e:
             logger.error(f"❌ Kronos predictions failed: {e}", exc_info=True)
@@ -381,12 +402,14 @@ def update_daily_snapshot():
         # Summary
         # ============================================================
         logger.info("\n" + "="*80)
-        logger.info(f"✅ Daily Snapshot Update Complete (Triple Model + Dual Strategy + AI)!")
+        logger.info(f"✅ Daily Snapshot Update Complete (Triple Model + Dual Strategy + UNIFIED Saga Pipeline)!")
         logger.info("="*80)
         logger.info(f"  Total stocks stored across ALL models and strategies: {total_stocks_stored}")
-        logger.info(f"  Traditional Model strategies: {len(strategies_to_run)}")
-        logger.info(f"  Raw LSTM Model strategies: {len(strategies_to_run)}")
-        logger.info(f"  Kronos Model strategies: {len(strategies_to_run)}")
+        logger.info(f"  Traditional Model: {len(strategies_to_run)} strategies (via Saga)")
+        logger.info(f"  Raw LSTM Model: {len(strategies_to_run)} strategies (via Saga)")
+        logger.info(f"  Kronos Model: {len(strategies_to_run)} strategies (via Saga)")
+        logger.info(f"  Pipeline: ALL 3 MODELS use full 7-step saga (Stage 1 + Stage 2 filtering)")
+        logger.info(f"  Quality: Only liquid, tradeable stocks with proper fundamentals")
         logger.info(f"  Ollama AI Enhancement: {'✅ Enabled' if daily_pred_config.get('enabled', False) else '❌ Disabled'}")
         logger.info("="*80)
 
@@ -554,14 +577,18 @@ def run_scheduler():
     logger.info("  - Performance Tracking:      Daily at 06:00 PM (after market close)")
     logger.info("    → Update order performance, create daily snapshots")
     logger.info("    → Check stop-loss/target, close orders if needed")
-    logger.info("  - ML Training (ALL 3 MODELS): Daily at 10:00 PM (after data pipeline)")
+    logger.info("  - ML Training (ALL 3 MODELS): Daily at 06:00 AM IST (12:30 AM UTC)")
     logger.info("    → Model 1: Traditional ML (RF + XGBoost)")
     logger.info("    → Model 2: Raw LSTM (Deep Learning)")
-    logger.info("    → Model 3: Kronos (K-line Tokenization)")
-    logger.info("  - Daily Snapshot Update:     Daily at 10:15 PM (after ML training)")
+    logger.info("    → Model 3: Kronos (K-line Tokenization - on-the-fly)")
+    logger.info("  - Daily Snapshot Update:     Daily at 07:00 AM IST (01:30 AM UTC)")
+    logger.info("    → Ready 2+ hours before market open (9:15 AM IST)")
     logger.info("    → Models: TRADITIONAL + RAW_LSTM + KRONOS (all 3)")
     logger.info("    → Strategies: DEFAULT_RISK + HIGH_RISK (both)")
     logger.info("    → Total: 6 combinations (3 models × 2 strategies)")
+    logger.info("    → Pipeline: ALL 3 MODELS use unified 7-step saga")
+    logger.info("    → Filtering: Stage 1 (tradeability) + Stage 2 (scoring) for all")
+    logger.info("    → Data Check: Kronos pre-filters stocks with <200 days history")
     logger.info("  - Cleanup Old Snapshots:     Weekly (Sunday) at 03:00 AM")
     logger.info("=" * 80)
 
@@ -574,11 +601,12 @@ def run_scheduler():
     # Schedule performance tracking at 6:00 PM (after market closes)
     schedule.every().day.at("18:00").do(update_order_performance)
 
-    # Schedule daily ML training at 10:00 PM (all 3 models)
-    schedule.every().day.at("22:00").do(train_all_ml_models)
+    # Schedule daily ML training at 6:00 AM IST (12:30 AM UTC / 00:30 UTC) - all 3 models
+    schedule.every().day.at("00:30").do(train_all_ml_models)
 
-    # Schedule daily snapshot update at 10:15 PM (after ML training)
-    schedule.every().day.at("22:15").do(update_daily_snapshot)
+    # Schedule daily snapshot update at 7:00 AM IST (1:30 AM UTC / 01:30 UTC) - after ML training
+    # This ensures predictions are ready 2+ hours before market open (9:15 AM IST)
+    schedule.every().day.at("01:30").do(update_daily_snapshot)
 
     # Schedule weekly cleanup on Sunday at 3:00 AM
     schedule.every().sunday.at("03:00").do(cleanup_old_snapshots)

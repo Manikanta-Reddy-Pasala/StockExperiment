@@ -63,45 +63,48 @@ class DailySnapshotService:
                     'stock_name': stock.get('name'),
                     'current_price': stock.get('current_price'),
                     'market_cap': stock.get('market_cap'),
-                    
+
                     # Strategy & Selection
                     'strategy': strategy,
                     'selection_score': stock.get('selection_score'),
                     'rank': stock.get('rank'),
-                    
+
                     # ML Predictions
                     'ml_prediction_score': ml_pred.get('ml_prediction_score'),
                     'ml_price_target': ml_pred.get('ml_price_target'),
                     'ml_confidence': ml_pred.get('ml_confidence'),
                     'ml_risk_score': ml_pred.get('ml_risk_score'),
-                    
+
                     # Technical Indicators
                     'rsi_14': stock.get('rsi_14'),
                     'macd': stock.get('macd'),
                     'sma_50': stock.get('sma_50'),
                     'sma_200': stock.get('sma_200'),
-                    
+
                     # Fundamental Metrics
                     'pe_ratio': stock.get('pe_ratio'),
                     'pb_ratio': stock.get('pb_ratio'),
                     'roe': stock.get('roe'),
                     'eps': stock.get('eps'),
                     'beta': stock.get('beta'),
-                    
+
                     # Growth & Profitability
                     'revenue_growth': stock.get('revenue_growth'),
                     'earnings_growth': stock.get('earnings_growth'),
                     'operating_margin': stock.get('operating_margin'),
-                    
+
                     # Trading Signals
                     'target_price': stock.get('target_price'),
                     'stop_loss': stock.get('stop_loss'),
                     'recommendation': stock.get('recommendation'),
                     'reason': stock.get('reason'),
-                    
+
                     # Metadata
                     'sector': stock.get('sector'),
-                    'market_cap_category': stock.get('market_cap_category')
+                    'market_cap_category': stock.get('market_cap_category'),
+
+                    # Model type - default to 'traditional' if not provided
+                    'model_type': stock.get('model_type', 'traditional')
                 }
                 
                 # Insert with ON CONFLICT UPDATE (upsert)
@@ -114,7 +117,7 @@ class DailySnapshotService:
                         pe_ratio, pb_ratio, roe, eps, beta,
                         revenue_growth, earnings_growth, operating_margin,
                         target_price, stop_loss, recommendation, reason,
-                        sector, market_cap_category, created_at
+                        sector, market_cap_category, model_type, created_at
                     ) VALUES (
                         :date, :symbol, :stock_name, :current_price, :market_cap,
                         :strategy, :selection_score, :rank,
@@ -123,9 +126,9 @@ class DailySnapshotService:
                         :pe_ratio, :pb_ratio, :roe, :eps, :beta,
                         :revenue_growth, :earnings_growth, :operating_margin,
                         :target_price, :stop_loss, :recommendation, :reason,
-                        :sector, :market_cap_category, CURRENT_TIMESTAMP
+                        :sector, :market_cap_category, :model_type, CURRENT_TIMESTAMP
                     )
-                    ON CONFLICT (date, symbol, strategy) 
+                    ON CONFLICT (date, symbol, strategy, model_type)
                     DO UPDATE SET
                         stock_name = EXCLUDED.stock_name,
                         current_price = EXCLUDED.current_price,
@@ -154,6 +157,7 @@ class DailySnapshotService:
                         reason = EXCLUDED.reason,
                         sector = EXCLUDED.sector,
                         market_cap_category = EXCLUDED.market_cap_category,
+                        model_type = EXCLUDED.model_type,
                         created_at = CURRENT_TIMESTAMP
                     RETURNING (xmax = 0) AS inserted
                 """)

@@ -2101,18 +2101,6 @@
       "last_updated": ""
     },
     {
-      "fytoken": "101000000011511",
-      "symbol": "NSE:CENTEXT-EQ",
-      "name": "CENTURY EXTRUSIONS LTD",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE281A01026",
-      "last_updated": ""
-    },
-    {
       "fytoken": "101000000011522",
       "symbol": "NSE:NIITLTD-EQ",
       "name": "NIIT LIMITED",
@@ -4102,18 +4090,6 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE350H01032",
-      "last_updated": ""
-    },
-    {
-      "fytoken": "101000000013295",
-      "symbol": "NSE:VISASTEEL-EQ",
-      "name": "VISA STEEL LIMITED",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE286H01012",
       "last_updated": ""
     },
     {
@@ -6141,7 +6117,7 @@
       "instrument_type": "EQ",
       "lot": 1,
       "tick": 0.05,
-      "isin": "INE314T01025",
+      "isin": "INE314T01033",
       "last_updated": ""
     },
     {
@@ -6853,18 +6829,6 @@
       "last_updated": ""
     },
     {
-      "fytoken": "101000000014917",
-      "symbol": "NSE:TAKE-EQ",
-      "name": "TAKE SOLUTIONS LTD",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE142I01023",
-      "last_updated": ""
-    },
-    {
       "fytoken": "101000000014922",
       "symbol": "NSE:PURVA-EQ",
       "name": "PURAVANKARA LIMITED",
@@ -6922,18 +6886,6 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE07T201019",
-      "last_updated": ""
-    },
-    {
-      "fytoken": "101000000014942",
-      "symbol": "NSE:NAGREEKCAP-EQ",
-      "name": "NAGREEKA CAP & INFR.LTD",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE245I01016",
       "last_updated": ""
     },
     {
@@ -8109,7 +8061,7 @@
       "instrument_type": "EQ",
       "lot": 1,
       "tick": 1.0,
-      "isin": "INE672A01018",
+      "isin": "INE672A01026",
       "last_updated": ""
     },
     {
@@ -9250,18 +9202,6 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE399K01017",
-      "last_updated": ""
-    },
-    {
-      "fytoken": "101000000017527",
-      "symbol": "NSE:MAHASTEEL-EQ",
-      "name": "MAHAMAYA STEEL INDS LTD",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.05,
-      "isin": "INE451L01014",
       "last_updated": ""
     },
     {
@@ -11446,18 +11386,6 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE268B01013",
-      "last_updated": ""
-    },
-    {
-      "fytoken": "101000000019372",
-      "symbol": "NSE:SPCENET-EQ",
-      "name": "SPACENET ENTERS IND LTD",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE970N01027",
       "last_updated": ""
     },
     {
@@ -18973,18 +18901,6 @@
       "last_updated": ""
     },
     {
-      "fytoken": "10100000003186",
-      "symbol": "NSE:SKFINDIA-EQ",
-      "name": "SKF INDIA LTD",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.1,
-      "isin": "INE640A01023",
-      "last_updated": ""
-    },
-    {
       "fytoken": "10100000003220",
       "symbol": "NSE:LODHA-EQ",
       "name": "LODHA DEVELOPERS LIMITED",
@@ -22417,18 +22333,6 @@
       "last_updated": ""
     },
     {
-      "fytoken": "10100000006127",
-      "symbol": "NSE:DIGJAMLMTD-EQ",
-      "name": "DIGJAM LTD",
-      "exchange": "NSE",
-      "segment": "CM",
-      "instrument_type": "EQ",
-      "lot": 1,
-      "tick": 0.01,
-      "isin": "INE731U01028",
-      "last_updated": ""
-    },
-    {
       "fytoken": "10100000006141",
       "symbol": "NSE:PANSARI-EQ",
       "name": "PANSARI DEVELOPERS LTD",
@@ -25237,6 +25141,18 @@
       "last_updated": ""
     },
     {
+      "fytoken": "1010000000759381",
+      "symbol": "NSE:MONEYBOXX-EQ",
+      "name": "MONEYBOXX FINANCE LIMITED",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE296Q01012",
+      "last_updated": ""
+    },
+    {
       "fytoken": "1010000000759397",
       "symbol": "NSE:SOLEX-EQ",
       "name": "SOLEX ENERGY LIMITED",
@@ -25426,6 +25342,30 @@
       "lot": 1,
       "tick": 0.01,
       "isin": "INE0TQE01026",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "1010000000760204",
+      "symbol": "NSE:MARKOLINES-EQ",
+      "name": "MARKOLINES PAVEMENT TEC L",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.01,
+      "isin": "INE0FW001016",
+      "last_updated": ""
+    },
+    {
+      "fytoken": "1010000000760213",
+      "symbol": "NSE:LGEINDIA-EQ",
+      "name": "LG ELECTRONICS INDIA LTD",
+      "exchange": "NSE",
+      "segment": "CM",
+      "instrument_type": "EQ",
+      "lot": 1,
+      "tick": 0.1,
+      "isin": "INE324D01010",
       "last_updated": ""
     },
     {
@@ -27505,6 +27445,6 @@
       "last_updated": ""
     }
   ],
-  "timestamp": "2025-10-13T19:58:10.762443",
+  "timestamp": "2025-10-15T23:48:27.235255",
   "exchange_type": "NSE_CM"
 }

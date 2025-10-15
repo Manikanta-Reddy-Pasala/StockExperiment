@@ -389,7 +389,7 @@ class RawLSTMPredictionService:
                         :target_price, :stop_loss, :recommendation,
                         :sector, :market_cap_category, :model_type, NOW()
                     )
-                    ON CONFLICT (date, symbol, strategy) DO UPDATE SET
+                    ON CONFLICT (date, symbol, strategy, model_type) DO UPDATE SET
                         stock_name = EXCLUDED.stock_name,
                         current_price = EXCLUDED.current_price,
                         market_cap = EXCLUDED.market_cap,

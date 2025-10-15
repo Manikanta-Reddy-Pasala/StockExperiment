@@ -30,6 +30,12 @@ optuna>=3.6.1
 tensorflow>=2.16.1
 protobuf>=5.29.3   # aligns TensorFlow (>=5.28.0) and fyers-apiv3 (==5.29.3)
 
+# Kronos foundation model dependencies
+torch>=2.0.0
+einops==0.8.1
+huggingface_hub>=0.33.1
+safetensors>=0.6.2
+
 # Testing
 pytest==7.4.0
 pytest-mock==3.11.1
