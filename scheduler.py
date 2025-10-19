@@ -714,11 +714,11 @@ def run_scheduler():
     logger.info("  - Performance Tracking:      Daily at 06:00 PM (after market close)")
     logger.info("    → Update order performance, create daily snapshots")
     logger.info("    → Check stop-loss/target, close orders if needed")
-    logger.info("  - ML Training (ALL 3 MODELS): Daily at 06:00 AM IST (12:30 AM UTC)")
+    logger.info("  - ML Training (ALL 3 MODELS): Daily at 06:00 AM IST")
     logger.info("    → Model 1: Traditional ML (RF + XGBoost)")
     logger.info("    → Model 2: Raw LSTM (Deep Learning)")
     logger.info("    → Model 3: Kronos (K-line Tokenization - on-the-fly)")
-    logger.info("  - Daily Snapshot Update:     Daily at 07:00 AM IST (01:30 AM UTC)")
+    logger.info("  - Daily Snapshot Update:     Daily at 07:00 AM IST")
     logger.info("    → Ready 2+ hours before market open (9:15 AM IST)")
     logger.info("    → Models: TRADITIONAL + RAW_LSTM + KRONOS (all 3)")
     logger.info("    → Strategies: DEFAULT_RISK + HIGH_RISK (both)")
@@ -738,12 +738,13 @@ def run_scheduler():
     # Schedule performance tracking at 6:00 PM (after market closes)
     schedule.every().day.at("18:00").do(update_order_performance)
 
-    # Schedule daily ML training at 6:00 AM IST (12:30 AM UTC / 00:30 UTC) - all 3 models
-    schedule.every().day.at("00:30").do(train_all_ml_models)
+    # Schedule daily ML training at 6:00 AM IST - all 3 models
+    # Container timezone is set to Asia/Kolkata, so times are in IST
+    schedule.every().day.at("06:00").do(train_all_ml_models)
 
-    # Schedule daily snapshot update at 7:00 AM IST (1:30 AM UTC / 01:30 UTC) - after ML training
+    # Schedule daily snapshot update at 7:00 AM IST - after ML training
     # This ensures predictions are ready 2+ hours before market open (9:15 AM IST)
-    schedule.every().day.at("01:30").do(update_daily_snapshot)
+    schedule.every().day.at("07:00").do(update_daily_snapshot)
 
     # Schedule weekly cleanup on Sunday at 3:00 AM
     schedule.every().sunday.at("03:00").do(cleanup_old_snapshots)

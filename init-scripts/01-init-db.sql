@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
     last_name VARCHAR(50),
     is_active BOOLEAN DEFAULT TRUE,
     is_admin BOOLEAN DEFAULT FALSE,
+    is_mock_trading_mode BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_login TIMESTAMP,
     last_activity TIMESTAMP

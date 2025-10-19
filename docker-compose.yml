@@ -7,6 +7,7 @@ services:
       POSTGRES_DB: trading_system
       POSTGRES_USER: trader
       POSTGRES_PASSWORD: trader_password
+      TZ: Asia/Kolkata
     ports:
       - "5432:5432"
     volumes:
@@ -31,6 +32,7 @@ services:
       dragonfly:
         condition: service_healthy
     environment:
+      - TZ=Asia/Kolkata
       - DATABASE_URL=postgresql+psycopg://trader:trader_password@database:5432/trading_system
       - DRAGONFLY_URL=redis://dragonfly:6379/0
       - FLASK_ENV=production
@@ -73,6 +75,7 @@ services:
       - "5001:5001"
     volumes:
       - ./logs:/app/src/data/logs
+      - ./ml_models:/app/ml_models
     restart: unless-stopped
     networks:
       - trading_network
@@ -82,6 +85,8 @@ services:
   dragonfly:
     image: docker.dragonflydb.io/dragonflydb/dragonfly
     container_name: trading_system_dragonfly
+    environment:
+      - TZ=Asia/Kolkata
     ports:
       - "6379:6379"
     restart: unless-stopped
@@ -103,6 +108,7 @@ services:
       dragonfly:
         condition: service_healthy
     environment:
+      - TZ=Asia/Kolkata
       - DATABASE_URL=postgresql+psycopg://trader:trader_password@database:5432/trading_system
       - DRAGONFLY_URL=redis://dragonfly:6379/0
       - PYTHONPATH=/app
@@ -142,6 +148,7 @@ services:
       - VOLATILITY_FULL_REFRESH=${VOLATILITY_FULL_REFRESH:-false}
     volumes:
       - ./logs:/app/logs
+      - ./ml_models:/app/ml_models
     restart: unless-stopped
     networks:
       - trading_network
@@ -163,6 +170,7 @@ services:
       dragonfly:
         condition: service_healthy
     environment:
+      - TZ=Asia/Kolkata
       - DATABASE_URL=postgresql+psycopg://trader:trader_password@database:5432/trading_system
       - DRAGONFLY_URL=redis://dragonfly:6379/0
       - PYTHONPATH=/app
