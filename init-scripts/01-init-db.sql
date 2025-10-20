@@ -979,3 +979,88 @@ SELECT
     '["traditional", "raw_lstm", "kronos"]'
 FROM users
 ON CONFLICT (user_id) DO NOTHING;
+
+-- ============================================================================
+-- DAILY SUGGESTED STOCKS TABLE
+-- Stores ML predictions and stock picks from multiple models (traditional, raw_lstm, kronos)
+-- with dual strategy approach (DEFAULT_RISK, HIGH_RISK)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS daily_suggested_stocks (
+    id SERIAL PRIMARY KEY,
+    date DATE NOT NULL,
+    symbol VARCHAR(20) NOT NULL,
+    stock_name VARCHAR(100),
+    current_price DECIMAL(10, 2),
+    market_cap DECIMAL(20, 2),
+
+    -- Strategy and ranking
+    strategy VARCHAR(20) NOT NULL,  -- 'DEFAULT_RISK' or 'HIGH_RISK'
+    selection_score DECIMAL(10, 4),
+    rank INTEGER,
+
+    -- ML predictions (core fields)
+    ml_prediction_score DECIMAL(10, 4),
+    ml_price_target DECIMAL(10, 2),
+    ml_confidence DECIMAL(10, 4),
+    ml_risk_score DECIMAL(10, 4),
+
+    -- Technical indicators
+    rsi_14 DECIMAL(10, 4),
+    macd DECIMAL(10, 4),
+    sma_50 DECIMAL(10, 2),
+    sma_200 DECIMAL(10, 2),
+
+    -- Fundamental ratios
+    pe_ratio DECIMAL(10, 4),
+    pb_ratio DECIMAL(10, 4),
+    roe DECIMAL(10, 4),
+    eps DECIMAL(10, 4),
+    beta DECIMAL(10, 4),
+
+    -- Growth metrics
+    revenue_growth DECIMAL(10, 4),
+    earnings_growth DECIMAL(10, 4),
+    operating_margin DECIMAL(10, 4),
+
+    -- Trading signals
+    target_price DECIMAL(10, 2),
+    stop_loss DECIMAL(10, 2),
+    recommendation VARCHAR(20),
+    reason TEXT,
+
+    -- Additional metadata
+    sector VARCHAR(50),
+    market_cap_category VARCHAR(20),
+    model_type VARCHAR(20) DEFAULT 'traditional',  -- 'traditional', 'raw_lstm', 'kronos'
+
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    -- Unique constraint: one record per symbol per strategy per date per model
+    UNIQUE (date, symbol, strategy, model_type)
+);
+
+-- Daily Suggested Stocks Indexes
+CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_date ON daily_suggested_stocks(date);
+CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_symbol ON daily_suggested_stocks(symbol);
+CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_strategy ON daily_suggested_stocks(strategy);
+CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_model_type ON daily_suggested_stocks(model_type);
+CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_date_strategy ON daily_suggested_stocks(date, strategy);
+CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_date_model ON daily_suggested_stocks(date, model_type);
+CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_prediction_score ON daily_suggested_stocks(ml_prediction_score DESC);
+
+-- Add comment
+COMMENT ON TABLE daily_suggested_stocks IS 'Daily stock picks from ML models (traditional, raw_lstm, kronos) with dual strategy approach (DEFAULT_RISK, HIGH_RISK). Stores top 50 stocks per model per strategy updated daily via saga pipeline.';
+
+-- Trigger for daily_suggested_stocks
+DROP TRIGGER IF EXISTS update_daily_suggested_stocks_updated_at ON daily_suggested_stocks;
+CREATE TRIGGER update_daily_suggested_stocks_updated_at
+    BEFORE UPDATE ON daily_suggested_stocks
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Grant permissions
+GRANT ALL PRIVILEGES ON TABLE daily_suggested_stocks TO trader;
+GRANT USAGE, SELECT ON SEQUENCE daily_suggested_stocks_id_seq TO trader;

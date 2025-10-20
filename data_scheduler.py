@@ -271,7 +271,7 @@ def update_symbol_master():
         
         db_manager = get_database_manager()
         with db_manager.get_session() as session:
-            symbol_service = FyersSymbolService(session)
+            symbol_service = FyersSymbolService()
             
             # Refresh symbol master
             logger.info("Fetching latest NSE symbols from Fyers...")
