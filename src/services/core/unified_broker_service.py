@@ -386,7 +386,10 @@ class UnifiedBrokerService:
             
             # Calculate start and end dates based on period
             from datetime import datetime, timedelta
+            import re
             end_date = datetime.now()
+
+            # Parse period string - supports formats like "1d", "365d", "1w", "1m", "1y"
             if period == "1d":
                 start_date = end_date - timedelta(days=1)
             elif period == "1w":
@@ -395,8 +398,15 @@ class UnifiedBrokerService:
                 start_date = end_date - timedelta(days=30)
             elif period == "1y":
                 start_date = end_date - timedelta(days=365)
-            else: # Default to 1 day
-                start_date = end_date - timedelta(days=1)
+            else:
+                # Try to parse format like "365d", "500d", etc.
+                match = re.match(r'(\d+)d', period)
+                if match:
+                    days = int(match.group(1))
+                    start_date = end_date - timedelta(days=days)
+                else:
+                    # Default to 1 day if format not recognized
+                    start_date = end_date - timedelta(days=1)
             
             start_date_str = start_date.strftime('%Y-%m-%d')
             end_date_str = end_date.strftime('%Y-%m-%d')
