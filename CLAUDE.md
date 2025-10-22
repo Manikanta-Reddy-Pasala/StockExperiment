@@ -73,6 +73,25 @@ python3 fix_business_logic.py
 python3 tools/generate_daily_snapshot.py
 ```
 
+### Fyers Token Management
+
+```bash
+# Check token status in logs (auto-checked every 6 hours)
+docker compose logs -f ml_scheduler | grep -i "token"
+
+# Manual token refresh (when expired)
+# 1. Navigate to http://localhost:5001/brokers/fyers
+# 2. Click "Refresh Token" button
+# 3. Login to Fyers and authorize
+# 4. System will automatically save new token
+
+# Token monitoring features:
+# - Auto-refresh checks every 30 minutes (background thread)
+# - Status check every 6 hours (scheduler task)
+# - Warns when token expires within 12 hours
+# - Logs expiry time and re-auth URL
+```
+
 ### System Health Checks
 
 ```bash
@@ -87,6 +106,9 @@ cat logs/data_scheduler.log | grep -A 10 "Pipeline"
 
 # Check ML models status
 cat logs/scheduler.log | grep -A 5 "ML Training"
+
+# Check Fyers token status
+cat logs/scheduler.log | grep -A 5 "Token Status"
 ```
 
 ## Architecture Overview
@@ -121,6 +143,8 @@ cat logs/scheduler.log | grep -A 5 "ML Training"
 │  └─ Real-time data caching                                     │
 │                                                                 │
 │  ml_scheduler (Python scheduler.py)                            │
+│  ├─ Startup: Initialize token monitoring (auto-refresh)       │
+│  ├─ Every 6 hours: Check Fyers token status (warn if expiring)│
 │  ├─ 10:00 PM: Train ML models (RF + XGBoost)                  │
 │  ├─ 10:15 PM: Generate daily stock picks (DUAL MODEL + DUAL STRATEGY)│
 │  │   ├─ Traditional ML (Random Forest + XGBoost)              │

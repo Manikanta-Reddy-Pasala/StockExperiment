@@ -29,28 +29,75 @@ def fyers_page():
 @fyers_bp.route('/api/info', methods=['GET'])
 @login_required
 def api_get_fyers_info():
-    """Get FYERS broker information."""
+    """Get FYERS broker information with token expiry details."""
     try:
         fyers_service = get_fyers_service()
         config = fyers_service.get_broker_config(current_user.id)
-        
+
         if not config:
             return jsonify({
-                'success': True, 
-                'broker': 'fyers', 
-                'client_id': '', 
-                'access_token': False, 
-                'connected': False, 
+                'success': True,
+                'broker': 'fyers',
+                'client_id': '',
+                'access_token': False,
+                'connected': False,
                 'last_updated': '-',
-                'stats': {'total_orders': 0, 'successful_orders': 0, 'pending_orders': 0, 
+                'token_expiry': None,
+                'token_expires_in_hours': None,
+                'token_expiring_soon': False,
+                'stats': {'total_orders': 0, 'successful_orders': 0, 'pending_orders': 0,
                         'failed_orders': 0, 'last_order_time': '-', 'api_response_time': '-'}
             })
 
+        # Get token expiry information
+        token_expiry_info = {}
+        if config.get('access_token'):
+            try:
+                from src.services.utils.token_manager_service import get_token_manager
+                token_manager = get_token_manager()
+
+                # Get token status
+                token_status = token_manager.get_token_status(current_user.id, 'fyers')
+
+                if token_status.get('expires_at'):
+                    from datetime import datetime
+                    expiry_time = datetime.fromisoformat(token_status['expires_at'])
+                    time_until_expiry = expiry_time - datetime.now()
+                    hours_until_expiry = time_until_expiry.total_seconds() / 3600
+
+                    token_expiry_info = {
+                        'token_expiry': token_status['expires_at'],
+                        'token_expires_in_hours': round(hours_until_expiry, 1),
+                        'token_expiring_soon': hours_until_expiry < 12,
+                        'token_is_expired': token_status.get('is_expired', False)
+                    }
+                else:
+                    token_expiry_info = {
+                        'token_expiry': None,
+                        'token_expires_in_hours': None,
+                        'token_expiring_soon': False,
+                        'token_is_expired': False
+                    }
+            except Exception as e:
+                logger.warning(f"Could not get token expiry info: {e}")
+                token_expiry_info = {
+                    'token_expiry': None,
+                    'token_expires_in_hours': None,
+                    'token_expiring_soon': False,
+                    'token_is_expired': False
+                }
+
         stats = fyers_service.get_broker_stats(current_user.id)
         config['access_token'] = bool(config.get('access_token'))
-        
-        return jsonify({'success': True, 'broker': 'fyers', **config, 'stats': stats})
-        
+
+        return jsonify({
+            'success': True,
+            'broker': 'fyers',
+            **config,
+            **token_expiry_info,
+            'stats': stats
+        })
+
     except Exception as e:
         logger.error(f"Error getting FYERS broker info for user {current_user.id}: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': 'Internal server error'}), 500

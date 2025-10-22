@@ -1220,7 +1220,7 @@ class StockInitializationService:
             # Fetch 1+ year of data for up to 100 stocks initially (to avoid overwhelming system)
             result = historical_service.fetch_historical_data_bulk(
                 user_id=user_id,
-                days=500,  # ~2 years of trading days
+                days=365,  # 1 year max (Fyers API limit for daily resolution)
                 max_stocks=100  # Limit for initial setup
             )
 

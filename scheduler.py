@@ -702,6 +702,129 @@ def check_training_needed():
         train_all_ml_models()
 
 
+def check_broker_token_status():
+    """
+    Check Fyers broker token status and warn if expiring soon.
+    Runs every 6 hours to monitor token health.
+    """
+    logger.info("=" * 80)
+    logger.info("Checking Broker Token Status")
+    logger.info("=" * 80)
+
+    try:
+        from src.services.utils.token_manager_service import get_token_manager
+        from src.models.models import BrokerConfiguration
+
+        db_manager = get_database_manager()
+        token_manager = get_token_manager()
+
+        with db_manager.get_session() as session:
+            # Get all Fyers configurations
+            fyers_configs = session.query(BrokerConfiguration).filter_by(
+                broker_name='fyers'
+            ).all()
+
+            if not fyers_configs:
+                logger.info("  ℹ️  No Fyers broker configurations found")
+                return
+
+            for config in fyers_configs:
+                user_id = config.user_id or 1  # Default to user 1 if None
+
+                try:
+                    # Get token status
+                    status = token_manager.get_token_status(user_id, 'fyers')
+
+                    if not status['has_token']:
+                        logger.warning(f"  ⚠️  User {user_id}: No token found - re-authentication required")
+                        continue
+
+                    if status['is_expired']:
+                        logger.error(f"  ❌ User {user_id}: Token EXPIRED - re-authentication required!")
+                        logger.error(f"     Please login to Fyers at: http://localhost:5001/brokers/fyers")
+
+                        # Mark as disconnected
+                        config.is_connected = False
+                        config.connection_status = 'reauth_required'
+                        session.commit()
+                        continue
+
+                    # Check if expiring soon (within 12 hours)
+                    if status['expires_at']:
+                        expiry_time = datetime.fromisoformat(status['expires_at'])
+                        time_until_expiry = expiry_time - datetime.now()
+                        hours_until_expiry = time_until_expiry.total_seconds() / 3600
+
+                        if hours_until_expiry < 12:
+                            logger.warning(f"  ⚠️  User {user_id}: Token expires in {hours_until_expiry:.1f} hours!")
+                            logger.warning(f"     Expiry: {status['expires_at']}")
+                            logger.warning(f"     Please re-authenticate before expiry")
+                        else:
+                            logger.info(f"  ✅ User {user_id}: Token valid for {hours_until_expiry:.1f} hours")
+
+                        # Start auto-refresh if not already running
+                        if not status['auto_refresh_active']:
+                            logger.info(f"  🔄 User {user_id}: Starting auto-refresh monitoring...")
+                            token_manager.start_auto_refresh(user_id, 'fyers', check_interval_minutes=30)
+                    else:
+                        logger.info(f"  ✅ User {user_id}: Token valid (no expiry info)")
+
+                except Exception as e:
+                    logger.error(f"  ❌ User {user_id}: Error checking token - {e}")
+
+        logger.info("=" * 80)
+
+    except Exception as e:
+        logger.error(f"❌ Token status check failed: {e}", exc_info=True)
+
+
+def initialize_token_monitoring():
+    """
+    Initialize token monitoring for all Fyers users.
+    Runs once at startup to enable auto-refresh.
+    """
+    logger.info("=" * 80)
+    logger.info("Initializing Token Monitoring")
+    logger.info("=" * 80)
+
+    try:
+        from src.services.utils.token_manager_service import get_token_manager
+        from src.models.models import BrokerConfiguration
+
+        db_manager = get_database_manager()
+        token_manager = get_token_manager()
+
+        with db_manager.get_session() as session:
+            # Get all Fyers configurations
+            fyers_configs = session.query(BrokerConfiguration).filter_by(
+                broker_name='fyers'
+            ).all()
+
+            if not fyers_configs:
+                logger.info("  ℹ️  No Fyers broker configurations found")
+                return
+
+            for config in fyers_configs:
+                user_id = config.user_id or 1
+
+                if config.access_token and config.is_connected:
+                    try:
+                        # Start auto-refresh for this user
+                        logger.info(f"  🔄 Starting auto-refresh for user {user_id}...")
+                        token_manager.start_auto_refresh(user_id, 'fyers', check_interval_minutes=30)
+                        logger.info(f"  ✅ Auto-refresh started for user {user_id}")
+                    except Exception as e:
+                        logger.warning(f"  ⚠️  Could not start auto-refresh for user {user_id}: {e}")
+                else:
+                    logger.info(f"  ⏭️  User {user_id}: No active token, skipping auto-refresh")
+
+        logger.info("✅ Token monitoring initialization complete")
+        logger.info("=" * 80)
+
+    except Exception as e:
+        logger.error(f"❌ Token monitoring initialization failed: {e}", exc_info=True)
+
+
 def run_scheduler():
     """Main scheduler loop."""
     logger.info("=" * 80)
@@ -727,7 +850,11 @@ def run_scheduler():
     logger.info("    → Filtering: Stage 1 (tradeability) + Stage 2 (scoring) for all")
     logger.info("    → Data Check: Kronos pre-filters stocks with <200 days history")
     logger.info("  - Cleanup Old Snapshots:     Weekly (Sunday) at 03:00 AM")
+    logger.info("  - Token Status Check:        Every 6 hours (monitors Fyers token)")
     logger.info("=" * 80)
+
+    # Initialize token monitoring on startup
+    initialize_token_monitoring()
 
     # Check if training is needed today and train if necessary
     check_training_needed()
@@ -748,6 +875,9 @@ def run_scheduler():
 
     # Schedule weekly cleanup on Sunday at 3:00 AM
     schedule.every().sunday.at("03:00").do(cleanup_old_snapshots)
+
+    # Schedule token status check every 6 hours (monitoring Fyers token expiry)
+    schedule.every(6).hours.do(check_broker_token_status)
 
     # Keep scheduler running
     logger.info("Scheduler is now running. Press Ctrl+C to stop.")

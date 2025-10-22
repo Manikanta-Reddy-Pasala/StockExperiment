@@ -78,14 +78,14 @@ class HistoricalDataService:
                 else:
                     return yesterday
 
-    def fetch_historical_data_bulk(self, user_id: int = 1, days: int = 500,
+    def fetch_historical_data_bulk(self, user_id: int = 1, days: int = 365,
                                    max_stocks: int = 100) -> Dict[str, Any]:
         """
         Fetch historical data for multiple stocks efficiently.
 
         Args:
             user_id: User ID for API access
-            days: Number of historical days to fetch (500 = ~2 years of trading days)
+            days: Number of historical days to fetch (365 = 1 year, Fyers API max for daily resolution)
             max_stocks: Maximum number of stocks to process
 
         Returns:
@@ -153,7 +153,7 @@ class HistoricalDataService:
                 'processed': 0
             }
 
-    def fetch_single_stock_history(self, user_id: int, symbol: str, days: int = 500) -> Dict[str, Any]:
+    def fetch_single_stock_history(self, user_id: int, symbol: str, days: int = 365) -> Dict[str, Any]:
         """
         Fetch historical data for a single stock incrementally.
 
@@ -252,7 +252,7 @@ class HistoricalDataService:
                 'error': str(e)
             }
 
-    def fetch_market_benchmarks(self, user_id: int = 1, days: int = 500) -> Dict[str, Any]:
+    def fetch_market_benchmarks(self, user_id: int = 1, days: int = 365) -> Dict[str, Any]:
         """
         Fetch historical data for market benchmarks (NIFTY, SENSEX).
         Essential for beta calculations and relative performance analysis.

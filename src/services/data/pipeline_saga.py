@@ -446,11 +446,10 @@ class PipelineSaga:
             # Get stocks with historical data but no technical indicators
             with self.db_manager.get_session() as session:
                 stocks_needing_indicators = session.execute(text("""
-                    SELECT DISTINCT s.symbol FROM stocks s 
-                    JOIN historical_data h ON s.symbol = h.symbol 
-                    LEFT JOIN technical_indicators t ON s.symbol = t.symbol 
+                    SELECT DISTINCT s.symbol FROM stocks s
+                    JOIN historical_data h ON s.symbol = h.symbol
+                    LEFT JOIN technical_indicators t ON s.symbol = t.symbol
                     WHERE t.symbol IS NULL
-                    LIMIT 50
                 """)).fetchall()
                 
                 if not stocks_needing_indicators:
