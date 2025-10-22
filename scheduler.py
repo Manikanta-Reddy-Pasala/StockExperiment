@@ -8,6 +8,7 @@ import sys
 import logging
 import schedule
 import time
+import subprocess
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -229,6 +230,38 @@ def train_kronos_models():
 
     except Exception as e:
         logger.error(f"❌ Kronos training check failed: {e}", exc_info=True)
+
+
+def generate_all_ml_predictions():
+    """Generate ML predictions for ALL stocks (not just filtered subset)."""
+    logger.info("\n\n" + "█" * 80)
+    logger.info("GENERATING ML PREDICTIONS FOR ALL STOCKS")
+    logger.info("█" * 80)
+
+    try:
+        result = subprocess.run(
+            ['python3', 'tools/generate_ml_all_stocks.py'],
+            capture_output=True,
+            text=True,
+            timeout=1800  # 30 minutes
+        )
+
+        if result.returncode == 0:
+            logger.info("✅ ML predictions generated successfully for all stocks")
+            # Log summary (last 30 lines which contain the summary)
+            output_lines = result.stdout.split('\n')
+            summary_lines = output_lines[-30:]
+            for line in summary_lines:
+                if line.strip():
+                    logger.info(f"  {line}")
+        else:
+            logger.error(f"❌ ML prediction generation failed with return code {result.returncode}")
+            logger.error(f"Error:\n{result.stderr}")
+
+    except subprocess.TimeoutExpired:
+        logger.error("❌ ML prediction generation timeout after 30 minutes")
+    except Exception as e:
+        logger.error(f"❌ ML prediction generation error: {e}", exc_info=True)
 
 
 def train_all_ml_models():
@@ -841,6 +874,9 @@ def run_scheduler():
     logger.info("    → Model 1: Traditional ML (RF + XGBoost)")
     logger.info("    → Model 2: Raw LSTM (Deep Learning)")
     logger.info("    → Model 3: Kronos (K-line Tokenization - on-the-fly)")
+    logger.info("  - ML Predictions (ALL STOCKS): Daily at 06:30 AM IST")
+    logger.info("    → Predict ALL ~2,259 stocks with all 3 models")
+    logger.info("    → Saves to ml_predictions table")
     logger.info("  - Daily Snapshot Update:     Daily at 07:00 AM IST")
     logger.info("    → Ready 2+ hours before market open (9:15 AM IST)")
     logger.info("    → Models: TRADITIONAL + RAW_LSTM + KRONOS (all 3)")
@@ -869,7 +905,11 @@ def run_scheduler():
     # Container timezone is set to Asia/Kolkata, so times are in IST
     schedule.every().day.at("06:00").do(train_all_ml_models)
 
-    # Schedule daily snapshot update at 7:00 AM IST - after ML training
+    # Schedule ML predictions for ALL stocks at 6:30 AM IST - after training
+    # Generates predictions for all ~2,259 stocks with all 3 models
+    schedule.every().day.at("06:30").do(generate_all_ml_predictions)
+
+    # Schedule daily snapshot update at 7:00 AM IST - after ML predictions
     # This ensures predictions are ready 2+ hours before market open (9:15 AM IST)
     schedule.every().day.at("07:00").do(update_daily_snapshot)
 
