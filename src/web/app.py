@@ -167,37 +167,9 @@ def create_app():
                     saga = get_pipeline_saga()
                     status = saga.get_pipeline_status()
 
-                    # Train ML models after pipeline completes (if models don't exist)
-                    from pathlib import Path
-                    model_dir = Path('ml_models')
-                    models_exist = (
-                        model_dir.exists() and
-                        (model_dir / 'rf_price_model.pkl').exists() and
-                        (model_dir / 'rf_risk_model.pkl').exists() and
-                        (model_dir / 'metadata.pkl').exists()
-                    )
-
-                    if not models_exist:
-                        app.logger.info("🤖 Pipeline complete. Starting ML model training...")
-                        try:
-                            from src.services.ml.enhanced_stock_predictor import EnhancedStockPredictor
-                            db_mgr = get_database_manager()
-                            with db_mgr.get_session() as session:
-                                predictor = EnhancedStockPredictor(session, auto_load=False)
-                                app.logger.info("📊 Training enhanced models with 365 days + walk-forward CV...")
-                                stats = predictor.train_with_walk_forward(lookback_days=365, n_splits=5)
-
-                                app.logger.info("✅ ML Training Complete!")
-                                app.logger.info(f"   Training Samples: {stats['samples']:,}")
-                                app.logger.info(f"   Features Used: {stats['features']}")
-                                app.logger.info(f"   Price Model R²: {stats['price_r2']:.4f}")
-                                app.logger.info(f"   Risk Model R²: {stats['risk_r2']:.4f}")
-                                app.logger.info(f"   CV Price R²: {stats['cv_price_r2']:.4f}")
-                                app.logger.info(f"   CV Risk R²: {stats['cv_risk_r2']:.4f}")
-                        except Exception as ml_error:
-                            app.logger.error(f"❌ ML training failed: {ml_error}")
-                            import traceback
-                            app.logger.error(f"Stack trace: {traceback.format_exc()}")
+                    # ML training removed - now using technical indicators instead
+                    # Technical indicators are calculated by scheduler.py at 10:00 PM
+                    app.logger.info("✅ Pipeline complete. Technical indicators will be calculated by scheduler.")
                     
                     for step, info in status.items():
                         records = info.get('records_processed', 0)

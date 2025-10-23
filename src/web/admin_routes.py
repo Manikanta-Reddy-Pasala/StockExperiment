@@ -238,29 +238,11 @@ def trigger_pipeline():
 
 @admin_bp.route('/trigger/ml-training', methods=['POST'])
 def trigger_ml_training():
-    """Trigger ML model training."""
-    task_id = f"ml_training_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-
-    def run_ml_training():
-        from src.services.ml.enhanced_stock_predictor import EnhancedStockPredictor
-        from src.models.database import get_database_manager
-
-        db_manager = get_database_manager()
-        with db_manager.get_session() as session:
-            predictor = EnhancedStockPredictor(session)
-            stats = predictor.train_with_walk_forward(lookback_days=365, n_splits=5)
-            return f"Enhanced ML models trained successfully (R²: {stats['cv_price_r2']:.3f})"
-
-    thread = threading.Thread(
-        target=run_function_async,
-        args=(task_id, run_ml_training, 'ML Model Training')
-    )
-    thread.start()
-
+    """ML model training removed - using technical indicators instead."""
     return jsonify({
-        'success': True,
-        'task_id': task_id,
-        'message': 'ML training started'
+        'success': False,
+        'error': 'ML training removed. System now uses technical indicators (RS Rating, Waves, Signals).',
+        'message': 'Technical indicators are calculated automatically by scheduler at 10:00 PM.'
     })
 
 
@@ -272,7 +254,6 @@ def trigger_all():
     def run_all_tasks():
         """Run all tasks sequentially."""
         from src.services.data.pipeline_saga import PipelineSaga
-        from src.services.ml.enhanced_stock_predictor import EnhancedStockPredictor
         from src.models.database import get_database_manager
 
         overall_task_id = f"{base_task_id}_all"
@@ -315,21 +296,21 @@ def trigger_all():
             save_task_to_db(overall_task_id, running_tasks[overall_task_id])
             logger.error(f"Pipeline failed: {e}", exc_info=True)
 
-        # Step 2: ML Training
+        # Step 2: Technical Indicators Calculation (replaces ML Training)
         try:
             running_tasks[overall_task_id]['steps'].append({
-                'name': 'ml_training',
-                'description': 'ML Training',
+                'name': 'technical_indicators',
+                'description': 'Calculate Technical Indicators',
                 'status': 'running',
                 'start_time': datetime.now().isoformat()
             })
             save_task_to_db(overall_task_id, running_tasks[overall_task_id])
 
-            with db_manager.get_session() as session:
-                predictor = EnhancedStockPredictor(session)
-                predictor.train_with_walk_forward(lookback_days=365, n_splits=5)
+            # Technical indicators are calculated by scheduler, so we just log a message
+            logger.info("✅ Technical indicators will be calculated by scheduler at 10:00 PM")
+            running_tasks[overall_task_id]['output'] += "\n✅ Technical indicators scheduled (runs at 10:00 PM)"
 
-            running_tasks[overall_task_id]['steps'][-1]['status'] = 'completed'
+            running_tasks[overall_task_id]['steps'][-1]['status'] = 'skipped'
             running_tasks[overall_task_id]['steps'][-1]['end_time'] = datetime.now().isoformat()
             save_task_to_db(overall_task_id, running_tasks[overall_task_id])
 
@@ -337,9 +318,9 @@ def trigger_all():
             running_tasks[overall_task_id]['steps'][-1]['status'] = 'failed'
             running_tasks[overall_task_id]['steps'][-1]['error'] = str(e)
             running_tasks[overall_task_id]['steps'][-1]['end_time'] = datetime.now().isoformat()
-            running_tasks[overall_task_id]['error'] += f"\nML Training failed: {str(e)}"
+            running_tasks[overall_task_id]['error'] += f"\nTechnical Indicators check failed: {str(e)}"
             save_task_to_db(overall_task_id, running_tasks[overall_task_id])
-            logger.error(f"ML Training failed: {e}", exc_info=True)
+            logger.error(f"Technical Indicators check failed: {e}", exc_info=True)
 
         # Mark overall task as completed
         failed_count = len([s for s in running_tasks[overall_task_id]['steps'] if s['status'] == 'failed'])
