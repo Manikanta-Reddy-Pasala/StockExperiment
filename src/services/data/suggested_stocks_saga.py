@@ -1060,222 +1060,174 @@ class SuggestedStocksSagaOrchestrator:
         return reasons
 
     def _execute_step6_ml_prediction(self, saga: SuggestedStocksSaga) -> SuggestedStocksSaga:
-        """Step 6: Apply ML predictions to suggested stocks (supports all 3 model types)."""
-        model_type = saga.model_type
-        model_name = {
-            'traditional': 'Traditional ML (RF + XGBoost)',
-            'raw_lstm': 'Raw LSTM (Deep Learning)',
-            'kronos': 'Kronos (K-line Tokenization)'
-        }.get(model_type, model_type)
-
+        """Step 6: Apply technical indicators to suggested stocks."""
         step = SagaStep(
             step_id="step6_ml_prediction",
-            name=f"ML Prediction ({model_name})",
-            description=f"Apply {model_name} model to predict price targets and risk scores"
+            name="Technical Indicators",
+            description="Apply technical indicators (RS Rating, Wave Indicators, Buy/Sell Signals)"
         )
         saga.add_step(step)
         saga.update_step_status("step6_ml_prediction", SagaStepStatus.IN_PROGRESS)
 
-        print(f"\n⚙️  Step 6: ML Prediction ({model_name})")
-        print(f"   Applying {model_name} model to {len(saga.final_results)} stocks...")
+        print(f"\n📊 Step 6: Technical Indicators")
+        print(f"   Applying technical indicators to {len(saga.final_results)} stocks...")
 
         try:
             from src.models.database import get_database_manager
+            from sqlalchemy import text
 
             db_manager = get_database_manager()
-            ml_predictions = {}
 
-            if model_type == 'traditional':
-                # Traditional ML (RF + XGBoost)
-                from ..ml.enhanced_stock_predictor import EnhancedStockPredictor
+            with db_manager.get_session() as session:
+                # Get technical indicators for all stocks from database
+                symbols = [stock.get('symbol') for stock in saga.final_results]
 
-                with db_manager.get_session() as session:
-                    predictor = EnhancedStockPredictor(session, auto_load=True)
+                if not symbols:
+                    logger.warning("No symbols to get indicators for")
+                    return saga
 
-                    # Check if models are trained
-                    if predictor.rf_price_model is None:
-                        logger.warning("Traditional ML models not trained. Training now...")
-                        print(f"   ⚠️  Traditional ML models not found. Training with historical data...")
-                        print(f"   This will take 10-15 minutes (one-time training)...")
-                        predictor.train_with_walk_forward(lookback_days=365, n_splits=5)
-                        print(f"   ✅ Traditional ML models trained and saved successfully")
+                # Fetch indicators from stocks table (calculated by scheduler)
+                query = text("""
+                    SELECT symbol, rs_rating, fast_wave, slow_wave, delta, buy_signal, sell_signal
+                    FROM stocks
+                    WHERE symbol = ANY(:symbols)
+                    AND indicators_last_updated IS NOT NULL
+                """)
+
+                result = session.execute(query, {'symbols': symbols})
+                indicators_dict = {row[0]: {
+                    'rs_rating': float(row[1]) if row[1] is not None else 50.0,
+                    'fast_wave': float(row[2]) if row[2] is not None else 0.0,
+                    'slow_wave': float(row[3]) if row[3] is not None else 0.0,
+                    'delta': float(row[4]) if row[4] is not None else 0.0,
+                    'buy_signal': bool(row[5]) if row[5] is not None else False,
+                    'sell_signal': bool(row[6]) if row[6] is not None else False
+                } for row in result}
+
+                # Apply indicators to stocks and calculate composite score
+                stocks_with_indicators = 0
+                total_rs_rating = 0
+                total_delta = 0
+                buy_signals = 0
+                sell_signals = 0
+
+                for stock in saga.final_results:
+                    symbol = stock.get('symbol')
+
+                    if symbol in indicators_dict:
+                        indicators = indicators_dict[symbol]
+
+                        # Add technical indicator fields
+                        stock['rs_rating'] = indicators['rs_rating']
+                        stock['fast_wave'] = indicators['fast_wave']
+                        stock['slow_wave'] = indicators['slow_wave']
+                        stock['delta'] = indicators['delta']
+                        stock['buy_signal'] = indicators['buy_signal']
+                        stock['sell_signal'] = indicators['sell_signal']
+
+                        # Calculate composite technical score (0-100 scale)
+                        # Formula: (RS Rating * 0.6) + (Delta normalized * 40)
+                        # Positive Delta = bullish (add to score), Negative Delta = bearish (subtract)
+                        delta_contribution = min(40, max(-40, indicators['delta'] * 100))  # Scale delta to -40 to +40
+                        composite_score = (indicators['rs_rating'] * 0.6) + delta_contribution
+
+                        # Boost score if buy signal is present
+                        if indicators['buy_signal']:
+                            composite_score += 10
+                            buy_signals += 1
+
+                        # Reduce score if sell signal is present
+                        if indicators['sell_signal']:
+                            composite_score -= 10
+                            sell_signals += 1
+
+                        # Clamp to 0-100 range
+                        composite_score = max(0, min(100, composite_score))
+
+                        stock['selection_score'] = composite_score
+
+                        stocks_with_indicators += 1
+                        total_rs_rating += indicators['rs_rating']
+                        total_delta += indicators['delta']
+
                     else:
-                        print(f"   ✅ Using cached Traditional ML models (loaded from disk)")
+                        # No indicators available - use default values
+                        self._set_default_technical_values(stock)
 
-                    # Get ML predictions for all stocks
-                    for stock in saga.final_results:
-                        try:
-                            prediction = predictor.predict(stock)
-                            symbol = stock.get('symbol')
-                            ml_predictions[symbol] = prediction
+                print(f"   ✅ Technical indicators applied to {stocks_with_indicators}/{len(saga.final_results)} stocks")
 
-                            # Add ML fields to stock data
-                            stock['ml_prediction_score'] = prediction['ml_prediction_score']
-                            stock['ml_price_target'] = prediction['ml_price_target']
-                            stock['ml_confidence'] = prediction['ml_confidence']
-                            stock['ml_risk_score'] = prediction['ml_risk_score']
+                # ========================================
+                # SORT AND APPLY LIMIT BASED ON COMPOSITE SCORE
+                # ========================================
+                print(f"\n   📊 Sorting and selecting top stocks by technical score...")
 
-                        except Exception as e:
-                            logger.error(f"Traditional ML prediction failed for {stock.get('symbol')}: {e}")
-                            self._set_default_ml_values(stock)
+                # Sort by composite selection_score (descending order - best scores first)
+                saga.final_results.sort(key=lambda x: x.get('selection_score', 0), reverse=True)
 
-            elif model_type == 'raw_lstm':
-                # Raw LSTM (Deep Learning)
-                from ..ml.raw_lstm_prediction_service import get_raw_lstm_prediction_service
-                from pathlib import Path
-
-                lstm_service = get_raw_lstm_prediction_service()
-
-                # Get list of trained LSTM models
-                model_dir = Path('ml_models/raw_ohlcv_lstm')
-                if not model_dir.exists():
-                    logger.warning("Raw LSTM model directory not found")
-                    print(f"   ⚠️  No Raw LSTM models available - using default scores")
-                    for stock in saga.final_results:
-                        self._set_default_ml_values(stock)
+                # Apply limit: select top N stocks
+                stocks_before_limit = len(saga.final_results)
+                if saga.limit and saga.limit > 0:
+                    saga.final_results = saga.final_results[:saga.limit]
+                    print(f"   ✂️  Applied limit: Selected top {len(saga.final_results)} stocks (from {stocks_before_limit} total)")
                 else:
-                    trained_symbols = [d.name for d in model_dir.iterdir()
-                                     if d.is_dir() and ((d / 'lstm_model.h5').exists() or (d / 'model.h5').exists())]
+                    print(f"   ✅ No limit applied - keeping all {len(saga.final_results)} stocks")
 
-                    print(f"   ✅ Found {len(trained_symbols)} trained Raw LSTM models")
+                # Add ranks based on composite score (1 = highest score)
+                for rank, stock in enumerate(saga.final_results, 1):
+                    stock['rank'] = rank
 
-                    # Get predictions for stocks with trained models
-                    symbols_to_predict = [s['symbol'] for s in saga.final_results if s['symbol'] in trained_symbols]
+                print(f"   🏆 Final selection: {len(saga.final_results)} stocks ranked by technical score")
 
-                    if symbols_to_predict:
-                        predictions = lstm_service.batch_predict(symbols_to_predict, user_id=saga.user_id)
+                # Store metadata
+                avg_rs = total_rs_rating / stocks_with_indicators if stocks_with_indicators > 0 else 50.0
+                avg_delta = total_delta / stocks_with_indicators if stocks_with_indicators > 0 else 0.0
 
-                        # Map predictions to stocks
-                        pred_dict = {p['symbol']: p for p in predictions}
-                        for stock in saga.final_results:
-                            symbol = stock.get('symbol')
-                            if symbol in pred_dict:
-                                pred = pred_dict[symbol]
-                                stock['ml_prediction_score'] = pred['ml_prediction_score']
-                                stock['ml_price_target'] = pred['ml_price_target']
-                                stock['ml_confidence'] = pred['ml_confidence']
-                                stock['ml_risk_score'] = pred['ml_risk_score']
-                                ml_predictions[symbol] = pred
-                            else:
-                                # No trained model for this stock
-                                self._set_default_ml_values(stock)
-                    else:
-                        # No stocks have trained models
-                        for stock in saga.final_results:
-                            self._set_default_ml_values(stock)
-
-            elif model_type == 'kronos':
-                # Kronos (K-line Tokenization)
-                from ..ml.kronos_prediction_service import get_kronos_prediction_service
-
-                kronos_service = get_kronos_prediction_service()
-
-                # Get Kronos predictions for all stocks
-                symbols_to_predict = [s['symbol'] for s in saga.final_results]
-
-                if symbols_to_predict:
-                    print(f"   🔮 Generating Kronos predictions for {len(symbols_to_predict)} stocks...")
-                    predictions = kronos_service.batch_predict(symbols_to_predict, user_id=saga.user_id)
-
-                    # Map predictions to stocks
-                    pred_dict = {p['symbol']: p for p in predictions}
-                    for stock in saga.final_results:
-                        symbol = stock.get('symbol')
-                        if symbol in pred_dict:
-                            pred = pred_dict[symbol]
-                            stock['ml_prediction_score'] = pred['ml_prediction_score']
-                            stock['ml_price_target'] = pred['ml_price_target']
-                            stock['ml_confidence'] = pred['ml_confidence']
-                            stock['ml_risk_score'] = pred['ml_risk_score']
-                            ml_predictions[symbol] = pred
-                        else:
-                            self._set_default_ml_values(stock)
-                else:
-                    logger.warning("No stocks to predict for Kronos")
-
-            else:
-                raise ValueError(f"Unknown model_type: {model_type}")
-
-            # ========================================
-            # APPLY LIMIT BASED ON ML SCORES
-            # ========================================
-            # Now that all stocks have ML scores, sort by ML prediction score and apply limit
-
-            print(f"\n   📊 Sorting and selecting top stocks by ML prediction score...")
-
-            # Sort all stocks by ML prediction score (descending order - best scores first)
-            saga.final_results.sort(key=lambda x: x.get('ml_prediction_score', 0), reverse=True)
-
-            # Apply limit: select top N stocks by ML score
-            stocks_before_limit = len(saga.final_results)
-            if saga.limit and saga.limit > 0:
-                saga.final_results = saga.final_results[:saga.limit]
-                print(f"   ✂️  Applied limit: Selected top {len(saga.final_results)} stocks by ML score (from {stocks_before_limit} total)")
-            else:
-                print(f"   ✅ No limit applied - keeping all {len(saga.final_results)} stocks")
-
-            # Add ranks based on ML scores (1 = highest ML score)
-            for rank, stock in enumerate(saga.final_results, 1):
-                stock['rank'] = rank
-
-            print(f"   🏆 Final selection: {len(saga.final_results)} stocks ranked by ML prediction score")
-
-            # Store ML predictions in step metadata
-            if ml_predictions:
                 step.metadata = {
-                    'model_type': model_type,
-                    'predictions_count': len(ml_predictions),
-                    'avg_prediction_score': sum(p['ml_prediction_score'] for p in ml_predictions.values()) / len(ml_predictions),
-                    'avg_confidence': sum(p['ml_confidence'] for p in ml_predictions.values()) / len(ml_predictions),
-                    'avg_risk_score': sum(p['ml_risk_score'] for p in ml_predictions.values()) / len(ml_predictions),
-                    'stocks_before_limit': stocks_before_limit,
-                    'stocks_after_limit': len(saga.final_results),
-                    'limit_applied': saga.limit if saga.limit and saga.limit > 0 else 'none'
-                }
-            else:
-                step.metadata = {
-                    'model_type': model_type,
-                    'predictions_count': 0,
-                    'avg_prediction_score': 0.0,
-                    'avg_confidence': 0.0,
-                    'avg_risk_score': 0.5,
+                    'method': 'technical_indicators',
+                    'indicators_applied': stocks_with_indicators,
+                    'avg_rs_rating': avg_rs,
+                    'avg_delta': avg_delta,
+                    'buy_signals': buy_signals,
+                    'sell_signals': sell_signals,
                     'stocks_before_limit': stocks_before_limit,
                     'stocks_after_limit': len(saga.final_results),
                     'limit_applied': saga.limit if saga.limit and saga.limit > 0 else 'none'
                 }
 
-            step.input_count = stocks_before_limit  # Input was all stocks with ML scores
-            step.output_count = len(saga.final_results)  # Output is top N after limit
+                step.input_count = stocks_before_limit
+                step.output_count = len(saga.final_results)
 
-            saga.update_step_status("step6_ml_prediction", SagaStepStatus.COMPLETED,
-                                  metadata=step.metadata)
+                saga.update_step_status("step6_ml_prediction", SagaStepStatus.COMPLETED,
+                                      metadata=step.metadata)
 
-            print(f"   ✅ {model_name} predictions applied: {len(ml_predictions)} stocks scored")
-            if ml_predictions:
-                print(f"   📊 Avg ML Score: {step.metadata['avg_prediction_score']:.3f}, Avg Confidence: {step.metadata['avg_confidence']:.3f}")
+                print(f"   📈 Avg RS Rating: {avg_rs:.1f}, Avg Delta: {avg_delta:.4f}")
+                print(f"   🎯 Buy Signals: {buy_signals}, Sell Signals: {sell_signals}")
 
-            return saga
+                return saga
 
         except Exception as e:
-            error_msg = f"{model_name} prediction failed: {str(e)}"
-            logger.error(error_msg)
+            error_msg = f"Technical indicators application failed: {str(e)}"
+            logger.error(error_msg, exc_info=True)
             saga.update_step_status("step6_ml_prediction", SagaStepStatus.FAILED, error_msg)
-            # Don't fail the saga - continue without ML predictions
+            # Don't fail the saga - continue without indicators
             return saga
 
-    def _set_default_ml_values(self, stock: Dict[str, Any]) -> None:
-        """Set default ML values for a stock when model prediction is not available."""
-        stock['ml_prediction_score'] = 0.5
-        stock['ml_price_target'] = stock.get('current_price', 0)
-        stock['ml_confidence'] = 0.0
-        stock['ml_risk_score'] = 0.5
+    def _set_default_technical_values(self, stock: Dict[str, Any]) -> None:
+        """Set default technical indicator values when data is not available."""
+        stock['rs_rating'] = 50.0  # Neutral
+        stock['fast_wave'] = 0.0
+        stock['slow_wave'] = 0.0
+        stock['delta'] = 0.0
+        stock['buy_signal'] = False
+        stock['sell_signal'] = False
+        stock['selection_score'] = 50.0  # Neutral composite score
 
     def _execute_step7_daily_snapshot(self, saga: SuggestedStocksSaga) -> SuggestedStocksSaga:
-        """Step 7: Save daily snapshot with ML predictions."""
+        """Step 7: Save daily snapshot with technical indicators."""
         step = SagaStep(
             step_id="step7_daily_snapshot",
             name="Daily Snapshot",
-            description="Save daily snapshot of suggested stocks with ML predictions"
+            description="Save daily snapshot of suggested stocks with technical indicators"
         )
         saga.add_step(step)
         saga.update_step_status("step7_daily_snapshot", SagaStepStatus.IN_PROGRESS)
@@ -1293,26 +1245,25 @@ class SuggestedStocksSagaOrchestrator:
             with db_manager.get_session() as session:
                 snapshot_service = DailySnapshotService(session)
 
-                # Build ML predictions dict
-                ml_predictions = {}
+                # Build technical indicators dict (no ML predictions needed)
+                technical_indicators = {}
                 for stock in saga.final_results:
                     symbol = stock.get('symbol')
-                    ml_predictions[symbol] = {
-                        'ml_prediction_score': stock.get('ml_prediction_score'),
-                        'ml_price_target': stock.get('ml_price_target'),
-                        'ml_confidence': stock.get('ml_confidence'),
-                        'ml_risk_score': stock.get('ml_risk_score')
+                    technical_indicators[symbol] = {
+                        'rs_rating': stock.get('rs_rating', 50.0),
+                        'fast_wave': stock.get('fast_wave', 0.0),
+                        'slow_wave': stock.get('slow_wave', 0.0),
+                        'delta': stock.get('delta', 0.0),
+                        'buy_signal': stock.get('buy_signal', False),
+                        'sell_signal': stock.get('sell_signal', False)
                     }
 
-                # Add model_type to stocks (ranks already assigned in Step 6 based on ML scores)
-                for stock in saga.final_results:
-                    # Set model_type from saga (traditional, raw_lstm, or kronos)
-                    stock['model_type'] = saga.model_type
-
                 # Save snapshot (will replace same-day data)
+                # Note: We pass technical_indicators as ml_predictions for backward compatibility
+                # The daily_snapshot_service will need to be updated separately
                 stats = snapshot_service.save_daily_snapshot(
                     suggested_stocks=saga.final_results,
-                    ml_predictions=ml_predictions,
+                    ml_predictions={},  # Empty dict - no ML predictions
                     snapshot_date=date.today()
                 )
 

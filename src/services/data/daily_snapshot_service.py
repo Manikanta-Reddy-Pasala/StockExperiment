@@ -14,28 +14,28 @@ logger = logging.getLogger(__name__)
 
 class DailySnapshotService:
     """
-    Service to save daily snapshots of suggested stocks with ML predictions.
+    Service to save daily snapshots of suggested stocks with technical indicators.
     Implements upsert logic: replaces data for same date/symbol/strategy.
     """
-    
+
     def __init__(self, db_session):
         self.db = db_session
-    
+
     def save_daily_snapshot(
         self,
         suggested_stocks: List[Dict],
-        ml_predictions: Dict[str, Dict],
+        ml_predictions: Optional[Dict[str, Dict]] = None,  # Kept for backward compatibility
         snapshot_date: Optional[date] = None
     ) -> Dict:
         """
-        Save daily snapshot of suggested stocks with ML predictions.
+        Save daily snapshot of suggested stocks with technical indicators.
         Uses INSERT ON CONFLICT to replace same-day data.
-        
+
         Args:
-            suggested_stocks: List of suggested stock dictionaries
-            ml_predictions: Dictionary mapping symbol -> ML prediction dict
+            suggested_stocks: List of suggested stock dictionaries (must include technical indicators)
+            ml_predictions: Deprecated (kept for backward compatibility, not used)
             snapshot_date: Date for snapshot (defaults to today)
-            
+
         Returns:
             Dictionary with save statistics
         """
@@ -53,9 +53,6 @@ class DailySnapshotService:
                 symbol = stock.get('symbol')
                 strategy = stock.get('strategy', 'default_risk')
                 
-                # Get ML predictions for this stock
-                ml_pred = ml_predictions.get(symbol, {})
-                
                 # Prepare data for insert/update
                 data = {
                     'date': snapshot_date,
@@ -69,13 +66,15 @@ class DailySnapshotService:
                     'selection_score': stock.get('selection_score'),
                     'rank': stock.get('rank'),
 
-                    # ML Predictions
-                    'ml_prediction_score': ml_pred.get('ml_prediction_score'),
-                    'ml_price_target': ml_pred.get('ml_price_target'),
-                    'ml_confidence': ml_pred.get('ml_confidence'),
-                    'ml_risk_score': ml_pred.get('ml_risk_score'),
+                    # Technical Indicators (NEW - RS Rating and Waves)
+                    'rs_rating': stock.get('rs_rating'),
+                    'fast_wave': stock.get('fast_wave'),
+                    'slow_wave': stock.get('slow_wave'),
+                    'delta': stock.get('delta'),
+                    'buy_signal': stock.get('buy_signal', False),
+                    'sell_signal': stock.get('sell_signal', False),
 
-                    # Technical Indicators
+                    # Technical Indicators (OLD - Keep for backward compatibility)
                     'rsi_14': stock.get('rsi_14'),
                     'macd': stock.get('macd'),
                     'sma_50': stock.get('sma_50'),
@@ -101,10 +100,7 @@ class DailySnapshotService:
 
                     # Metadata
                     'sector': stock.get('sector'),
-                    'market_cap_category': stock.get('market_cap_category'),
-
-                    # Model type - default to 'traditional' if not provided
-                    'model_type': stock.get('model_type', 'traditional')
+                    'market_cap_category': stock.get('market_cap_category')
                 }
                 
                 # Insert with ON CONFLICT UPDATE (upsert)
@@ -112,33 +108,35 @@ class DailySnapshotService:
                     INSERT INTO daily_suggested_stocks (
                         date, symbol, stock_name, current_price, market_cap,
                         strategy, selection_score, rank,
-                        ml_prediction_score, ml_price_target, ml_confidence, ml_risk_score,
+                        rs_rating, fast_wave, slow_wave, delta, buy_signal, sell_signal,
                         rsi_14, macd, sma_50, sma_200,
                         pe_ratio, pb_ratio, roe, eps, beta,
                         revenue_growth, earnings_growth, operating_margin,
                         target_price, stop_loss, recommendation, reason,
-                        sector, market_cap_category, model_type, created_at
+                        sector, market_cap_category, created_at
                     ) VALUES (
                         :date, :symbol, :stock_name, :current_price, :market_cap,
                         :strategy, :selection_score, :rank,
-                        :ml_prediction_score, :ml_price_target, :ml_confidence, :ml_risk_score,
+                        :rs_rating, :fast_wave, :slow_wave, :delta, :buy_signal, :sell_signal,
                         :rsi_14, :macd, :sma_50, :sma_200,
                         :pe_ratio, :pb_ratio, :roe, :eps, :beta,
                         :revenue_growth, :earnings_growth, :operating_margin,
                         :target_price, :stop_loss, :recommendation, :reason,
-                        :sector, :market_cap_category, :model_type, CURRENT_TIMESTAMP
+                        :sector, :market_cap_category, CURRENT_TIMESTAMP
                     )
-                    ON CONFLICT (date, symbol, strategy, model_type)
+                    ON CONFLICT (date, symbol, strategy)
                     DO UPDATE SET
                         stock_name = EXCLUDED.stock_name,
                         current_price = EXCLUDED.current_price,
                         market_cap = EXCLUDED.market_cap,
                         selection_score = EXCLUDED.selection_score,
                         rank = EXCLUDED.rank,
-                        ml_prediction_score = EXCLUDED.ml_prediction_score,
-                        ml_price_target = EXCLUDED.ml_price_target,
-                        ml_confidence = EXCLUDED.ml_confidence,
-                        ml_risk_score = EXCLUDED.ml_risk_score,
+                        rs_rating = EXCLUDED.rs_rating,
+                        fast_wave = EXCLUDED.fast_wave,
+                        slow_wave = EXCLUDED.slow_wave,
+                        delta = EXCLUDED.delta,
+                        buy_signal = EXCLUDED.buy_signal,
+                        sell_signal = EXCLUDED.sell_signal,
                         rsi_14 = EXCLUDED.rsi_14,
                         macd = EXCLUDED.macd,
                         sma_50 = EXCLUDED.sma_50,
@@ -157,8 +155,7 @@ class DailySnapshotService:
                         reason = EXCLUDED.reason,
                         sector = EXCLUDED.sector,
                         market_cap_category = EXCLUDED.market_cap_category,
-                        model_type = EXCLUDED.model_type,
-                        created_at = CURRENT_TIMESTAMP
+                        updated_at = CURRENT_TIMESTAMP
                     RETURNING (xmax = 0) AS inserted
                 """)
                 
