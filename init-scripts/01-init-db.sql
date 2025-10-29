@@ -624,10 +624,13 @@ CREATE TABLE IF NOT EXISTS technical_indicators (
     sma_50 DOUBLE PRECISION,
     sma_100 DOUBLE PRECISION,
     sma_200 DOUBLE PRECISION,
+    ema_8 DOUBLE PRECISION,
     ema_12 DOUBLE PRECISION,
+    ema_21 DOUBLE PRECISION,
     ema_26 DOUBLE PRECISION,
     ema_50 DOUBLE PRECISION,
     -- Momentum Indicators
+    demarker DOUBLE PRECISION,
     rsi_14 DOUBLE PRECISION,
     macd DOUBLE PRECISION,
     macd_signal DOUBLE PRECISION,
@@ -1029,10 +1032,36 @@ CREATE TABLE IF NOT EXISTS daily_suggested_stocks (
     recommendation VARCHAR(20),
     reason TEXT,
 
+    -- Hybrid Strategy Indicators (RS Rating + Wave + 8-21 EMA)
+    rs_rating DECIMAL(10, 4),
+    fast_wave DECIMAL(10, 6),
+    slow_wave DECIMAL(10, 6),
+    delta DECIMAL(10, 6),
+    wave_momentum_score DECIMAL(10, 4),
+
+    -- 8-21 EMA Strategy
+    ema_8 DECIMAL(10, 2),
+    ema_21 DECIMAL(10, 2),
+    ema_trend_score DECIMAL(10, 4),
+    demarker DECIMAL(10, 4),
+
+    -- Fibonacci Targets
+    fib_target_1 DECIMAL(10, 2),  -- 127.2% extension
+    fib_target_2 DECIMAL(10, 2),  -- 161.8% extension (golden ratio)
+    fib_target_3 DECIMAL(10, 2),  -- 200-261.8% extension
+
+    -- Hybrid Composite Score
+    hybrid_composite_score DECIMAL(10, 4),
+
+    -- Enhanced Signals
+    buy_signal BOOLEAN DEFAULT FALSE,
+    sell_signal BOOLEAN DEFAULT FALSE,
+    signal_quality VARCHAR(20),  -- 'high', 'medium', 'low'
+
     -- Additional metadata
     sector VARCHAR(50),
     market_cap_category VARCHAR(20),
-    model_type VARCHAR(20) DEFAULT 'traditional',  -- 'traditional', 'raw_lstm', 'kronos'
+    model_type VARCHAR(20) DEFAULT 'hybrid',  -- 'traditional', 'raw_lstm', 'kronos', 'hybrid'
 
     -- Timestamps
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1051,8 +1080,27 @@ CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_date_strategy ON daily_sug
 CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_date_model ON daily_suggested_stocks(date, model_type);
 CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_prediction_score ON daily_suggested_stocks(ml_prediction_score DESC);
 
--- Add comment
-COMMENT ON TABLE daily_suggested_stocks IS 'Daily stock picks from ML models (traditional, raw_lstm, kronos) with dual strategy approach (DEFAULT_RISK, HIGH_RISK). Stores top 50 stocks per model per strategy updated daily via saga pipeline.';
+-- Add table comment
+COMMENT ON TABLE daily_suggested_stocks IS 'Daily stock picks using Hybrid Technical Strategy with dual risk approaches (DEFAULT_RISK, HIGH_RISK). Stores top 50 stocks per strategy updated daily at 10:15 PM IST.';
+
+-- Add column comments for Hybrid Strategy indicators
+COMMENT ON COLUMN daily_suggested_stocks.rs_rating IS 'RS Rating (1-99 percentile): FILTER only, not for ranking. Must be >70 to pass filter. Compares stock performance vs NIFTY 50 benchmark.';
+COMMENT ON COLUMN daily_suggested_stocks.fast_wave IS 'Fast Wave (9-day momentum): Used for BUY/SELL signals, not ranking.';
+COMMENT ON COLUMN daily_suggested_stocks.slow_wave IS 'Slow Wave (21-day trend): Used for BUY/SELL signals, not ranking.';
+COMMENT ON COLUMN daily_suggested_stocks.delta IS 'Delta (Fast - Slow): PRIMARY SIGNAL indicator. Delta > 0 = BUY, Delta < 0 = SELL.';
+COMMENT ON COLUMN daily_suggested_stocks.wave_momentum_score IS 'DEPRECATED: No longer used for ranking. Wave Delta is used for signals only.';
+COMMENT ON COLUMN daily_suggested_stocks.ema_8 IS '8-period EMA: Short-term momentum average for trend identification.';
+COMMENT ON COLUMN daily_suggested_stocks.ema_21 IS '21-period EMA: Institutional holding period average for trend confirmation.';
+COMMENT ON COLUMN daily_suggested_stocks.ema_trend_score IS 'EMA Trend Score (70-100): PRIMARY RANKING METRIC. Higher separation in Price > EMA8 > EMA21 = Higher score.';
+COMMENT ON COLUMN daily_suggested_stocks.demarker IS 'DeMarker Oscillator (0-1): Entry timing. <0.30 = oversold (HIGH quality), >0.70 = overbought (avoid).';
+COMMENT ON COLUMN daily_suggested_stocks.fib_target_1 IS 'Fibonacci Target 1 (127.2% extension): Conservative profit target.';
+COMMENT ON COLUMN daily_suggested_stocks.fib_target_2 IS 'Fibonacci Target 2 (161.8% golden ratio): Standard profit target.';
+COMMENT ON COLUMN daily_suggested_stocks.fib_target_3 IS 'Fibonacci Target 3 (200% extension): Aggressive profit target.';
+COMMENT ON COLUMN daily_suggested_stocks.hybrid_composite_score IS 'Ranking Score = EMA Trend Score (70-100). Used to rank stocks by trend strength. NOT a weighted composite.';
+COMMENT ON COLUMN daily_suggested_stocks.buy_signal IS 'BUY Signal: TRUE when Delta > 0. Quality depends on EMA confirmation + DeMarker.';
+COMMENT ON COLUMN daily_suggested_stocks.sell_signal IS 'SELL Signal: TRUE when Delta < 0 AND Price < EMA8 < EMA21 (downtrend confirmed).';
+COMMENT ON COLUMN daily_suggested_stocks.signal_quality IS 'Signal Quality: HIGH (Wave+EMA+DeMarker), MEDIUM (Wave+EMA), LOW (Wave only), NONE (no signal).';
+COMMENT ON COLUMN daily_suggested_stocks.model_type IS 'Model Type: Always "hybrid" (pure technical analysis). ML models removed.';
 
 -- Trigger for daily_suggested_stocks
 DROP TRIGGER IF EXISTS update_daily_suggested_stocks_updated_at ON daily_suggested_stocks;

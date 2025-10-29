@@ -222,7 +222,7 @@ def update_daily_snapshot():
         logger.info(f"✅ Daily snapshot update complete!")
         logger.info(f"  Total stocks stored: {total_stocks_stored}")
         logger.info(f"  Strategies: DEFAULT_RISK + HIGH_RISK")
-        logger.info(f"  Selection method: Technical indicators (RS Rating + Wave Signals)")
+        logger.info(f"  Selection method: Hybrid Strategy (RS Rating + Wave + 8-21 EMA + DeMarker + Fibonacci)")
         logger.info("=" * 80)
 
     except Exception as e:

@@ -66,13 +66,31 @@ class DailySnapshotService:
                     'selection_score': stock.get('selection_score'),
                     'rank': stock.get('rank'),
 
-                    # Technical Indicators (NEW - RS Rating and Waves)
+                    # Hybrid Strategy Indicators (RS Rating + Wave + 8-21 EMA)
                     'rs_rating': stock.get('rs_rating'),
                     'fast_wave': stock.get('fast_wave'),
                     'slow_wave': stock.get('slow_wave'),
                     'delta': stock.get('delta'),
+                    'wave_momentum_score': stock.get('wave_momentum_score'),
+
+                    # 8-21 EMA Strategy
+                    'ema_8': stock.get('ema_8'),
+                    'ema_21': stock.get('ema_21'),
+                    'ema_trend_score': stock.get('ema_trend_score'),
+                    'demarker': stock.get('demarker'),
+
+                    # Fibonacci Targets
+                    'fib_target_1': stock.get('fib_target_1'),
+                    'fib_target_2': stock.get('fib_target_2'),
+                    'fib_target_3': stock.get('fib_target_3'),
+
+                    # Hybrid Composite Score
+                    'hybrid_composite_score': stock.get('hybrid_composite_score'),
+
+                    # Enhanced Signals
                     'buy_signal': stock.get('buy_signal', False),
                     'sell_signal': stock.get('sell_signal', False),
+                    'signal_quality': stock.get('signal_quality', 'none'),
 
                     # Technical Indicators (OLD - Keep for backward compatibility)
                     'rsi_14': stock.get('rsi_14'),
@@ -100,7 +118,8 @@ class DailySnapshotService:
 
                     # Metadata
                     'sector': stock.get('sector'),
-                    'market_cap_category': stock.get('market_cap_category')
+                    'market_cap_category': stock.get('market_cap_category'),
+                    'model_type': 'hybrid'
                 }
                 
                 # Insert with ON CONFLICT UPDATE (upsert)
@@ -108,23 +127,31 @@ class DailySnapshotService:
                     INSERT INTO daily_suggested_stocks (
                         date, symbol, stock_name, current_price, market_cap,
                         strategy, selection_score, rank,
-                        rs_rating, fast_wave, slow_wave, delta, buy_signal, sell_signal,
+                        rs_rating, fast_wave, slow_wave, delta, wave_momentum_score,
+                        ema_8, ema_21, ema_trend_score, demarker,
+                        fib_target_1, fib_target_2, fib_target_3,
+                        hybrid_composite_score,
+                        buy_signal, sell_signal, signal_quality,
                         rsi_14, macd, sma_50, sma_200,
                         pe_ratio, pb_ratio, roe, eps, beta,
                         revenue_growth, earnings_growth, operating_margin,
                         target_price, stop_loss, recommendation, reason,
-                        sector, market_cap_category, created_at
+                        sector, market_cap_category, model_type, created_at
                     ) VALUES (
                         :date, :symbol, :stock_name, :current_price, :market_cap,
                         :strategy, :selection_score, :rank,
-                        :rs_rating, :fast_wave, :slow_wave, :delta, :buy_signal, :sell_signal,
+                        :rs_rating, :fast_wave, :slow_wave, :delta, :wave_momentum_score,
+                        :ema_8, :ema_21, :ema_trend_score, :demarker,
+                        :fib_target_1, :fib_target_2, :fib_target_3,
+                        :hybrid_composite_score,
+                        :buy_signal, :sell_signal, :signal_quality,
                         :rsi_14, :macd, :sma_50, :sma_200,
                         :pe_ratio, :pb_ratio, :roe, :eps, :beta,
                         :revenue_growth, :earnings_growth, :operating_margin,
                         :target_price, :stop_loss, :recommendation, :reason,
-                        :sector, :market_cap_category, CURRENT_TIMESTAMP
+                        :sector, :market_cap_category, :model_type, CURRENT_TIMESTAMP
                     )
-                    ON CONFLICT (date, symbol, strategy)
+                    ON CONFLICT (date, symbol, strategy, model_type)
                     DO UPDATE SET
                         stock_name = EXCLUDED.stock_name,
                         current_price = EXCLUDED.current_price,
@@ -135,8 +162,18 @@ class DailySnapshotService:
                         fast_wave = EXCLUDED.fast_wave,
                         slow_wave = EXCLUDED.slow_wave,
                         delta = EXCLUDED.delta,
+                        wave_momentum_score = EXCLUDED.wave_momentum_score,
+                        ema_8 = EXCLUDED.ema_8,
+                        ema_21 = EXCLUDED.ema_21,
+                        ema_trend_score = EXCLUDED.ema_trend_score,
+                        demarker = EXCLUDED.demarker,
+                        fib_target_1 = EXCLUDED.fib_target_1,
+                        fib_target_2 = EXCLUDED.fib_target_2,
+                        fib_target_3 = EXCLUDED.fib_target_3,
+                        hybrid_composite_score = EXCLUDED.hybrid_composite_score,
                         buy_signal = EXCLUDED.buy_signal,
                         sell_signal = EXCLUDED.sell_signal,
+                        signal_quality = EXCLUDED.signal_quality,
                         rsi_14 = EXCLUDED.rsi_14,
                         macd = EXCLUDED.macd,
                         sma_50 = EXCLUDED.sma_50,

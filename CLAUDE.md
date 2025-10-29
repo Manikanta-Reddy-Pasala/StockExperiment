@@ -4,16 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an **automated stock trading system** for NSE (National Stock Exchange) stocks with comprehensive machine learning capabilities. The system features:
+This is an **automated stock trading system** for NSE (National Stock Exchange) stocks using **pure technical analysis**. The system features:
 
 - **100% automated data pipeline** with scheduled tasks
 - **2,259+ NSE stocks** with fundamental and technical data
-- **Dual ML model architecture**: Traditional (RF + XGBoost) + Raw LSTM for predictions
+- **Hybrid Technical Strategy**: RS Rating (filter) + Wave Indicators (signals) + 8-21 EMA (ranking) + DeMarker (timing) + Fibonacci (targets)
 - **Two-strategy approach**: DEFAULT_RISK (conservative, large-cap) and HIGH_RISK (aggressive, small/mid-cap)
 - **Saga pattern** for reliable multi-step data processing with failure tracking and retry logic
 - **Multi-broker support**: Fyers API, Zerodha (future), with trading simulator
+- **NO ML MODELS** - Simple, interpretable technical indicators only
 
-The system is containerized with Docker Compose and runs three main services: Flask web app, ML scheduler, and data pipeline scheduler.
+The system is containerized with Docker Compose and runs three main services: Flask web app, technical indicators scheduler, and data pipeline scheduler.
 
 ## Key Commands
 
@@ -32,12 +33,12 @@ docker compose down
 # View logs (real-time)
 docker compose logs -f                    # All services
 docker compose logs -f trading_system      # Web app only
-docker compose logs -f ml_scheduler        # ML scheduler only
+docker compose logs -f technical_scheduler  # Technical indicators scheduler only
 docker compose logs -f data_scheduler      # Data pipeline only
 
 # Restart specific service
 docker compose restart trading_system
-docker compose restart ml_scheduler
+docker compose restart technical_scheduler
 docker compose restart data_scheduler
 ```
 
@@ -60,8 +61,18 @@ docker exec -it trading_system_db psql -U trader -d trading_system -c "SELECT pg
 # Run data pipeline manually (6-step saga: symbols → stocks → history → indicators → metrics → validation)
 python3 run_pipeline.py
 
-# Train ML models manually (RF + XGBoost with walk-forward CV)
-python3 tools/train_ml_model.py
+# Calculate hybrid strategy indicators manually
+docker exec trading_system python3 -c "
+from src.models.database import get_database_manager
+from src.services.technical.hybrid_strategy_calculator import get_hybrid_strategy_calculator
+
+db_manager = get_database_manager()
+with db_manager.get_session() as session:
+    calculator = get_hybrid_strategy_calculator(session)
+    symbols = ['NSE:RELIANCE-EQ', 'NSE:TCS-EQ']  # Example symbols
+    result = calculator.calculate_all_indicators(symbols, lookback_days=252)
+    print(f'Calculated hybrid indicators for {len(result)} stocks')
+"
 
 # Fill missing data fields (adj_close, volatility, liquidity, etc.)
 python3 fill_data_sql.py
@@ -69,7 +80,7 @@ python3 fill_data_sql.py
 # Calculate business logic metrics (EPS, ROE, margins, ratios, etc.)
 python3 fix_business_logic.py
 
-# Generate daily snapshot with ML predictions
+# Generate daily snapshot with technical indicators
 python3 tools/generate_daily_snapshot.py
 ```
 
@@ -77,7 +88,7 @@ python3 tools/generate_daily_snapshot.py
 
 ```bash
 # Check token status in logs (auto-checked every 6 hours)
-docker compose logs -f ml_scheduler | grep -i "token"
+docker compose logs -f technical_scheduler | grep -i "token"  # Note: technical_scheduler is the container name
 
 # Manual token refresh (when expired)
 # 1. Navigate to http://localhost:5001/brokers/fyers
@@ -98,14 +109,14 @@ docker compose logs -f ml_scheduler | grep -i "token"
 # Check all schedulers status
 ./tools/check_all_schedulers.sh
 
-# Check ML scheduler only
+# Check technical indicators scheduler
 ./tools/check_scheduler.sh
 
 # View pipeline status
 cat logs/data_scheduler.log | grep -A 10 "Pipeline"
 
-# Check ML models status
-cat logs/scheduler.log | grep -A 5 "ML Training"
+# Check technical indicators calculation status
+cat logs/scheduler.log | grep -A 5 "Technical Indicators"
 
 # Check Fyers token status
 cat logs/scheduler.log | grep -A 5 "Token Status"
@@ -120,14 +131,13 @@ cat logs/scheduler.log | grep -A 5 "Token Status"
 - SQLAlchemy 2.0 (ORM with PostgreSQL)
 - PostgreSQL 15 (primary database)
 - Dragonfly (Redis-compatible cache)
-- Scikit-learn (Random Forest models)
-- XGBoost (Gradient boosting models)
-- TensorFlow 2.16+ (LSTM models)
+- pandas + pandas-ta (technical indicator calculations)
 - Schedule (Python task scheduler)
+- **NO ML libraries** - Pure technical analysis
 
 **DevOps:**
 - Docker Compose (multi-service orchestration)
-- 4 containers: database, dragonfly, app, data_scheduler, ml_scheduler
+- 5 containers: database, dragonfly, app, data_scheduler, technical_scheduler
 
 ### Core Services Architecture
 
@@ -142,17 +152,16 @@ cat logs/scheduler.log | grep -A 5 "Token Status"
 │  ├─ Multi-broker integration (Fyers, Zerodha)                 │
 │  └─ Real-time data caching                                     │
 │                                                                 │
-│  ml_scheduler (Python scheduler.py)                            │
+│  technical_scheduler (Python scheduler.py - Technical Indicators)│
 │  ├─ Startup: Initialize token monitoring (auto-refresh)       │
 │  ├─ Every 6 hours: Check Fyers token status (warn if expiring)│
-│  ├─ 10:00 PM: Train ML models (RF + XGBoost)                  │
-│  ├─ 10:15 PM: Generate daily stock picks (DUAL MODEL + DUAL STRATEGY)│
-│  │   ├─ Traditional ML (Random Forest + XGBoost)              │
-│  │   │   ├─ DEFAULT_RISK strategy (conservative)              │
-│  │   │   └─ HIGH_RISK strategy (aggressive)                   │
-│  │   └─ Raw LSTM Model (deep learning)                        │
-│  │       ├─ DEFAULT_RISK strategy                             │
-│  │       └─ HIGH_RISK strategy                                │
+│  ├─ 10:00 PM: Calculate technical indicators for all stocks  │
+│  │   ├─ RS Rating (Relative Strength vs NIFTY 50)            │
+│  │   ├─ Wave Indicators (Fast Wave, Slow Wave, Delta)        │
+│  │   └─ Buy/Sell Signals (Wave crossovers)                   │
+│  ├─ 10:15 PM: Generate daily stock picks (DUAL STRATEGY)     │
+│  │   ├─ DEFAULT_RISK strategy (conservative, large-cap)      │
+│  │   └─ HIGH_RISK strategy (aggressive, small/mid-cap)       │
 │  └─ 03:00 AM (Sunday): Cleanup old snapshots (>90 days)       │
 │                                                                 │
 │  data_scheduler (Python data_scheduler.py)                     │
@@ -442,7 +451,7 @@ self.max_stocks = int(os.getenv('VOLATILITY_MAX_STOCKS', '500'))
 ### Entry Points
 - `app.py` - Flask app entry point
 - `run.py` - Application launcher
-- `scheduler.py` - ML scheduler (10 PM training, 10:15 PM snapshot, 3 AM cleanup)
+- `scheduler.py` - Technical indicators scheduler (10 PM calculations, 10:15 PM snapshot, 3 AM cleanup)
 - `data_scheduler.py` - Data pipeline scheduler (6 AM symbols, 9 PM pipeline, 9:30 PM calcs, 10 PM export)
 
 ### Core Services
@@ -630,7 +639,7 @@ LEFT JOIN technical_indicators ti ON s.symbol = ti.symbol;
 
 3. **Scheduler not running:**
    - Check process: `docker compose ps`
-   - Restart: `docker compose restart ml_scheduler data_scheduler`
+   - Restart: `docker compose restart technical_scheduler data_scheduler`
    - Check logs for errors
 
 ## Performance Considerations

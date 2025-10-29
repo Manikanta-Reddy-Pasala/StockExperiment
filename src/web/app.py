@@ -112,32 +112,8 @@ def create_app():
     except Exception as e:
         app.logger.warning(f"Could not register FYERS refresh callback: {e}")
 
-    # Check ML models on startup (training will happen after pipeline completes)
-    try:
-        app.logger.info("🤖 Checking ML models on startup...")
-        from pathlib import Path
-
-        model_dir = Path('ml_models')
-        models_exist = (
-            model_dir.exists() and
-            (model_dir / 'rf_price_model.pkl').exists() and
-            (model_dir / 'rf_risk_model.pkl').exists() and
-            (model_dir / 'metadata.pkl').exists()
-        )
-
-        if not models_exist:
-            app.logger.warning("⚠️  ML models not found. Will train after pipeline completes.")
-        else:
-            app.logger.info("✅ ML models found and ready to use")
-            import pickle
-            try:
-                with open(model_dir / 'metadata.pkl', 'rb') as f:
-                    metadata = pickle.load(f)
-                app.logger.info(f"   Last trained: {metadata.get('trained_at', 'Unknown')}")
-            except:
-                pass
-    except Exception as e:
-        app.logger.warning(f"⚠️  Could not check ML models: {e}")
+    # Technical indicators system - no ML models needed
+    app.logger.info("📊 Using technical indicator system (RS Rating + Wave Indicators)")
 
     # Initialize stock initialization service with complete flow
     try:
@@ -1356,25 +1332,6 @@ def create_app():
     app.register_blueprint(fyers_bp)
     app.register_blueprint(zerodha_bp)
 
-
-    # Register ML prediction blueprints
-    try:
-        from .routes.ml import ml_bp, ml_web_bp
-        app.register_blueprint(ml_bp)  # API routes
-        app.register_blueprint(ml_web_bp)  # Web routes
-        app.logger.info("ML prediction routes registered successfully")
-    except ImportError as e:
-        app.logger.warning(f"ML prediction routes not available: {e}")
-        app.logger.warning("ML functionality will be disabled")
-
-    # Register ML screening blueprints
-    try:
-        from .routes.ml.screening_routes import screening_bp
-        app.register_blueprint(screening_bp)
-        app.logger.info("ML screening routes registered successfully")
-    except ImportError as e:
-        app.logger.warning(f"ML screening routes not available: {e}")
-        app.logger.warning("ML screening functionality will be disabled")
 
     # Register strategy blueprints
     try:

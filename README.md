@@ -1,284 +1,671 @@
-# Automated Trading System
+# NSE Stock Trading System
 
-**High-performance automated trading system with triple ML models, dual strategies, and complete automation.**
-
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
-[![Docker](https://img.shields.io/badge/Docker-20.10+-blue.svg)](https://www.docker.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)](https://www.postgresql.org/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+**Automated stock trading system for NSE (National Stock Exchange) using pure technical analysis.**
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
-# 1. Start all services (Docker)
+# 1. Start all services
 ./run.sh dev
 
 # 2. Access web interface
 http://localhost:5001
 
-# 3. Access admin dashboard (admin users only)
-http://localhost:5001/admin
-
-# 4. Check system status
+# 3. Check system status
 ./tools/check_all_schedulers.sh
 ```
 
-**First run:** Initial pipeline takes ~30 minutes to populate data for 2,259 stocks.
-
-**Subsequent runs:** Fully automated - no manual intervention needed!
+**First run takes ~30 minutes** to collect data for 2,259 NSE stocks. After that, it runs fully automated with zero manual intervention!
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
-- [Features](#-features)
-- [System Overview](#-system-overview)
-- [Installation](#-installation)
-- [Architecture](#-architecture)
-- [Database Schema](#️-database-schema)
-- [API Endpoints](#-api-endpoints)
-- [Automation](#-automation)
-- [Machine Learning](#-machine-learning)
-- [Configuration](#️-configuration)
-- [Usage Examples](#-usage-examples)
-- [Monitoring](#-monitoring)
-- [Troubleshooting](#-troubleshooting)
-- [Performance](#-performance)
-- [Documentation](#-documentation)
-- [Contributing](#-contributing)
+- [System Overview](#system-overview)
+- [How It Works](#how-it-works)
+- [Hybrid Strategy Explained](#hybrid-strategy-explained)
+- [Daily Automation Schedule](#daily-automation-schedule)
+- [How Schedulers Work](#how-schedulers-work)
+- [How to Trade](#how-to-trade)
+- [Installation](#installation)
+- [System Commands](#system-commands)
+- [Database Tables](#database-tables)
+- [Troubleshooting](#troubleshooting)
 
 ---
 
-## ✨ Features
+## System Overview
 
-### 🤖 Complete Automation
-- **100% Automated Data Collection** - Runs daily at 9 PM after market close
-- **Automated ML Training** - Trains 3 models daily at 6 AM IST with fresh data
-- **Data Freshness Check** - Validates data before training (holiday/weekend aware)
-- **Automated Stock Selection** - Generates daily top 50 picks × 3 models × 2 strategies at 7 AM IST
-- **Automated Trading Execution** - Places orders at 9:20 AM with stop-loss/targets
-- **Automated CSV Exports** - Daily backups for analysis and reporting
-- **Self-Healing** - Saga pattern with retry logic (3 attempts, 60s delay)
-- **Zero Manual Intervention** - Set it and forget it!
+This is a **100% automated trading system** that:
 
-### 🧠 Triple Machine Learning Models
-- **Traditional ML** (Random Forest + XGBoost ensemble)
-  - Walk-forward cross-validation (5 splits)
-  - 25-30 features (technical + fundamental)
-  - Fast training (~1-2 minutes)
-- **Raw LSTM** (Deep learning)
-  - Per-symbol models with 60-day lookback
-  - Predicts 14 days ahead
-  - OHLCV sequence modeling
-- **Kronos** (K-line tokenization)
-  - Candlestick pattern recognition
-  - Advanced technical analysis
-  - Experimental cutting-edge model
+- Collects data for **2,259+ NSE stocks** daily
+- Analyzes using **5 technical indicators** (Hybrid Strategy)
+- Generates **daily stock picks** with buy/sell signals
+- Places **automatic orders** with stop-loss and targets
+- Tracks **performance** and manages positions
+- Runs **two strategies**: DEFAULT_RISK (conservative) and HIGH_RISK (aggressive)
 
-### 📊 Comprehensive Data Pipeline
-- **6-Step Saga Pattern** - Symbols → Stocks → History → Indicators → Metrics → Validation
-- **2,259+ NSE Stocks** - All NSE-listed stocks with complete data
-- **1-Year Historical Data** - 820K+ OHLCV records
-- **Technical Indicators** - RSI, MACD, SMA, EMA, ATR, Bollinger Bands
-- **Real-Time Updates** - Market data refresh during trading hours
-- **Robust Error Handling** - Retry logic with exponential backoff
-
-### 🎯 Dual Strategy System
-- **DEFAULT_RISK** (Conservative)
-  - Large-cap stocks (>20,000 Cr market cap)
-  - PE ratio 5-40, price ₹100-10,000
-  - Target gain: 7%, Stop loss: 5%
-  - Good liquidity requirements
-- **HIGH_RISK** (Aggressive)
-  - Small/Mid-cap stocks (1,000-20,000 Cr)
-  - Broader criteria, lower score threshold
-  - Target gain: 12%, Stop loss: 10%
-  - Higher volatility tolerance
-
-### 🌐 API & Interface
-- **REST API** - Fast, cached endpoints with ML predictions
-- **Admin Dashboard** - Manual task triggers with real-time monitoring
-- **Web Interface** - Portfolio management and trading controls
-- **Multi-Broker Support** - Unified broker service (Fyers, Zerodha, Simulator)
-- **Real-Time Status** - Live task monitoring and logs
-- **Auto-Trading** - Automated order placement with risk management
-
-### 📈 Analytics & Insights
-- **6 Model Combinations** - 3 models × 2 strategies = comprehensive coverage
-- **ML Prediction Scores** - 0-1 score for opportunity ranking
-- **Confidence Levels** - Model confidence in predictions
-- **Risk Scores** - Lower = safer investment
-- **Performance Tracking** - Daily P&L snapshots
-- **Ollama AI Enhancement** - Optional market intelligence layer
+**Key Features:**
+- Zero manual intervention required
+- Pure technical analysis (no fundamental analysis)
+- Multi-broker support (Fyers, Zerodha)
+- Paper trading simulator included
+- Complete automation with saga pattern
+- Self-healing with retry logic
 
 ---
 
-## 📊 System Overview
+## How It Works
 
-### Daily Automation Schedule
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    AUTOMATED DAILY SCHEDULE                   │
-└─────────────────────────────────────────────────────────────┘
-
-🌅 Morning:
-  06:00 AM → Symbol Master Update (Monday Only)
-             • Refresh NSE symbols from Fyers API
-             • ~2,300 stocks
-             • Duration: 1-2 minutes
-
-  09:20 AM → Auto-Trading Execution (Daily)
-             • Check AI market sentiment
-             • Apply weekly limits
-             • Place orders with stop-loss/targets
-             • Duration: 2-3 minutes
-
-🌆 Evening (Daily After Market Close):
-  06:00 PM → Performance Tracking
-             • Update order performance
-             • Create daily snapshots
-             • Check stop-loss/targets
-             • Close orders if needed
-             • Duration: 1-2 minutes
-
-  09:00 PM → Data Pipeline (6-step saga)
-             • Update all stock prices
-             • Fetch 1-year historical OHLCV
-             • Calculate technical indicators
-             • Compute volatility metrics
-             • Validate data quality
-             • Duration: 20-30 minutes
-             • Records: 2,259 stocks updated
-
-  09:30 PM → Fill Missing Data & Business Logic (Parallel)
-             • Populate adj_close, liquidity
-             • Calculate ATR, volatility
-             • EPS, Book Value, PEG Ratio, ROA
-             • Operating/Net/Profit Margins
-             • Current/Quick Ratios, Debt to Equity
-             • Duration: 5-10 minutes
-
-  10:00 PM → CSV Export & Data Validation (Parallel)
-             • Export 4 CSV files (stocks, history, indicators, picks)
-             • Validate data quality
-             • Duration: 2-3 minutes
-
-🌙 Night (After Midnight):
-  03:00 AM → Cleanup Old Data (Sunday Only)
-             • Remove snapshots > 90 days
-             • Remove CSV exports > 30 days
-             • Duration: < 1 minute
-
-🌅 Early Morning (Before Market Open):
-  06:00 AM → Data Freshness Check & ML Model Training (3 Models)
-             • STEP 1: Validate data freshness (holiday/weekend aware)
-             • STEP 2: If data is stale (>3 days), SKIP training
-             • STEP 3: If data is fresh, train all models:
-               → Model 1: Traditional ML (RF + XGBoost)
-               → Model 2: Raw LSTM (Deep Learning)
-               → Model 3: Kronos (K-line Tokenization)
-             • Duration: 5-10 minutes total
-             • Safety: Prevents training on stale data during holidays
-
-  07:00 AM → Daily Stock Selection (Triple Model × Dual Strategy)
-             ✅ READY 2+ HOURS BEFORE MARKET OPEN
-             • Run for all 3 models
-             • Apply both strategies (DEFAULT_RISK, HIGH_RISK)
-             • Generate 6 combinations total (300 stocks)
-             • Optional: Ollama AI enhancement
-             • Save to daily_suggested_stocks table
-             • Duration: 3-5 minutes
-             • Benefit: Traders have time to review predictions
-
-Total Daily Automation Time: ~45-60 minutes
-Total Manual Intervention: ZERO! 🎉
-```
-
-### Architecture Diagram
+### The Daily Cycle
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     SYSTEM ARCHITECTURE                       │
-└─────────────────────────────────────────────────────────────┘
+Morning (Before Market Open):
+└─ 06:00 AM → Update NSE symbols (Monday only)
 
-External APIs:
-┌──────────────┐
-│  Fyers API   │──┐
-└──────────────┘  │
-                  │
-┌──────────────┐  │
-│ Zerodha API  │──┤
-└──────────────┘  │
-                  ↓
-         ┌────────────────┐
-         │  Flask App     │ ← HTTP Requests
-         │  (Port 5001)   │
-         └────────────────┘
-                  ↓
-         ┌────────────────┐
-         │  Dragonfly     │
-         │  (Redis Cache) │
-         └────────────────┘
-                  ↓
-    ┌─────────────────────────────┐
-    │    PostgreSQL DB (15 tables)│
-    │  ┌──────────────────────┐   │
-    │  │ stocks (2,259)       │   │
-    │  │ historical_data      │   │
-    │  │ tech_indicators      │   │
-    │  │ daily_suggested      │   │
-    │  │ pipeline_tracking    │   │
-    │  │ orders, trades       │   │
-    │  │ auto_trading_settings│   │
-    │  └──────────────────────┘   │
-    └─────────────────────────────┘
-                  ↑
-    ┌─────────────┴─────────────┐
-    │                           │
-┌───────────────┐      ┌──────────────┐
-│ Data Scheduler│      │ ML Scheduler │
-│  (9 PM daily) │      │ (10 PM daily)│
-└───────────────┘      └──────────────┘
+Market Hours:
+└─ 09:20 AM → Auto-trading places orders (if enabled)
 
-ML Models Storage:
-┌────────────────────────────┐
-│ Traditional ML:            │
-│ ml_models/                 │
-│ ├── rf_price_model.pkl     │
-│ └── xgb_price_model.pkl    │
-│                            │
-│ Raw LSTM:                  │
-│ ml_models/raw_ohlcv_lstm/  │
-│ └── {symbol}/              │
-│     └── lstm_model.h5      │
-│                            │
-│ Kronos:                    │
-│ ml_models/kronos/          │
-│ └── kronos_model.pkl       │
-└────────────────────────────┘
+Evening (After Market Close):
+├─ 06:00 PM → Track performance, update P&L
+├─ 09:00 PM → Data pipeline (fetch prices, history)
+├─ 09:30 PM → Fill missing data + Calculate metrics
+├─ 10:00 PM → Calculate technical indicators (Hybrid Strategy)
+├─ 10:15 PM → Generate daily stock picks (50 per strategy)
+└─ 10:00 PM → Export CSV files (parallel)
 
-CSV Exports:
-┌────────────┐        ┌────────────┐
-│  /exports  │        │   /logs    │
-│ (CSV files)│        │ (App logs) │
-└────────────┘        └────────────┘
+Night:
+└─ 03:00 AM → Cleanup old data (Sunday only)
+```
+
+### Architecture
+
+```
+┌─────────────────────────────────────────┐
+│         Docker Services                  │
+├─────────────────────────────────────────┤
+│                                          │
+│  trading_system (Flask - Port 5001)    │
+│  ├─ Web Interface                       │
+│  ├─ REST API                            │
+│  └─ Broker Integration                  │
+│                                          │
+│  ml_scheduler (Technical Indicators)    │
+│  ├─ 10:00 PM: Calculate indicators     │
+│  ├─ 10:15 PM: Generate stock picks     │
+│  └─ 03:00 AM: Cleanup (Sunday)         │
+│                                          │
+│  data_scheduler (Data Pipeline)         │
+│  ├─ 06:00 AM: Symbol update (Monday)   │
+│  ├─ 09:00 PM: Data pipeline (daily)    │
+│  └─ 09:30 PM: Fill data + Metrics      │
+│                                          │
+│  database (PostgreSQL 15)               │
+│  └─ 11 tables with ~1.6M records       │
+│                                          │
+│  dragonfly (Redis Cache)                │
+│  └─ API response caching                │
+└─────────────────────────────────────────┘
 ```
 
 ---
 
-## 🔧 Installation
+## Hybrid Strategy Explained
+
+The system uses a **hybrid technical strategy** combining 5 indicators with specific roles:
+
+### The Complete Flow
+
+```
+STEP 1: FILTER (Remove weak stocks)
+├─ RS Rating > 70 ✓ (Top 30% momentum)
+├─ Price > EMA8 > EMA21 ✓ (Confirmed uptrend)
+└─ Basic liquidity ✓
+
+STEP 2: RANK (Order by strength)
+└─ EMA Trend Score (70-100 for strong uptrends)
+
+STEP 3: SIGNAL (When to buy)
+├─ Wave crossover: Delta > 0 (REQUIRED)
+├─ EMA confirmation: Price > EMA8 > EMA21 (REQUIRED)
+└─ DeMarker < 0.30 (OPTIONAL for "high" quality)
+
+STEP 4: TARGET (Where to exit)
+├─ Target 1: Fibonacci 127.2%
+├─ Target 2: Fibonacci 161.8%
+└─ Target 3: Fibonacci 200%
+```
+
+### 1. RS Rating (Relative Strength) - **FILTER**
+
+**Purpose:** Filter out weak momentum stocks
+
+**How it works:**
+- Compares each stock's performance vs NIFTY 50 benchmark
+- Scale: 1-99 (percentile ranking)
+- **Filter threshold: RS Rating > 70** (top 30% only)
+
+**Example:**
+- RS 95 = Stock beat 95% of all stocks ✓ PASS
+- RS 65 = Stock is below average ✗ REJECTED
+
+**NOT used for scoring** - Only for filtering!
+
+### 2. Wave Indicators - **BUY/SELL SIGNALS**
+
+**Purpose:** Tell you WHEN to enter or exit
+
+**Components:**
+- **Fast Wave**: 9-day momentum (short-term)
+- **Slow Wave**: 21-day trend (long-term)
+- **Delta**: Fast Wave - Slow Wave
+
+**Signals:**
+- **BUY**: Delta > 0 (fast crossed above slow)
+- **SELL**: Delta < 0 (fast crossed below slow)
+
+**Example:**
+```
+Day 1: Delta = -0.002 (no signal)
+Day 2: Delta = +0.001 (BUY SIGNAL! Fast crossed above slow)
+Day 3: Delta = +0.005 (still bullish, hold)
+```
+
+**NOT used for scoring** - Only for signals!
+
+### 3. 8-21 EMA Strategy - **RANKING & CONFIRMATION**
+
+**Purpose:** Primary ranking metric + trend confirmation
+
+**Components:**
+- **EMA 8**: Short-term momentum average
+- **EMA 21**: Institutional holding period
+- **Power Zone**: Price > EMA 8 > EMA 21 = Strong uptrend
+
+**How it works:**
+1. **Filter**: Price must be > EMA8 > EMA21 (uptrend required)
+2. **Rank**: Stronger separation = Higher score
+   - Strong Bull: 70-100 points (wide separation)
+   - Early Bull: 60-70 points (just crossed up)
+   - Weak/Bear: < 60 points (downtrend or flat)
+
+**Example:**
+```
+Stock A: Price ₹100, EMA8 ₹98, EMA21 ₹95 → Score: 85 (strong uptrend)
+Stock B: Price ₹100, EMA8 ₹99, EMA21 ₹98 → Score: 72 (early uptrend)
+Stock C: Price ₹100, EMA8 ₹101, EMA21 ₹99 → REJECTED (downtrend)
+```
+
+**This is the ONLY metric used for ranking!**
+
+### 4. DeMarker Oscillator - **ENTRY TIMING**
+
+**Purpose:** Find the best moment to enter within an uptrend
+
+**How it works:**
+- Range: 0.0 to 1.0
+- **< 0.30**: Oversold (good entry point)
+- **0.30-0.70**: Neutral
+- **> 0.70**: Overbought (avoid entry)
+
+**Signal Quality:**
+- **HIGH**: Wave + EMA + DeMarker < 0.30 (perfect timing)
+- **MEDIUM**: Wave + EMA (good timing)
+- **LOW**: Wave only (risky timing)
+
+**Example:**
+- DeMarker = 0.25 → "Oversold, great entry!" (HIGH quality)
+- DeMarker = 0.50 → "Neutral, okay entry" (MEDIUM quality)
+- DeMarker = 0.75 → "Overbought, wait!" (avoid)
+
+### 5. Fibonacci Extension Targets - **EXIT STRATEGY**
+
+**Purpose:** Dynamic profit targets based on price structure
+
+**Targets:**
+- **Target 1 (127.2%)**: Conservative exit (book 30% profit)
+- **Target 2 (161.8%)**: Golden ratio (book 40% more)
+- **Target 3 (200%)**: Aggressive target (let remainder ride)
+
+**How it's calculated:**
+1. Find recent swing low (bottom)
+2. Find recent swing high (top)
+3. Calculate extensions above current price
+
+**Example:**
+```
+Swing Low: ₹90
+Swing High: ₹110
+Current: ₹100
+
+Target 1: ₹115 (127.2% extension)
+Target 2: ₹122 (161.8% extension)
+Target 3: ₹130 (200% extension)
+```
+
+### The Ranking Formula
+
+**Ranking Score = EMA Trend Score (70-100)**
+
+That's it! No weighted composite. Just pure EMA trend strength.
+
+### Buy Signal Logic
+
+**BUY Signal Requirements:**
+
+**HIGH Quality (3/3 conditions):**
+1. Wave signal: Delta > 0 ✓ (REQUIRED)
+2. EMA confirmation: Price > EMA8 > EMA21 ✓ (REQUIRED)
+3. DeMarker timing: < 0.30 ✓ (perfect entry)
+
+**MEDIUM Quality (2/3 conditions):**
+1. Wave signal: Delta > 0 ✓ (REQUIRED)
+2. EMA confirmation: Price > EMA8 > EMA21 ✓ (REQUIRED)
+3. DeMarker timing: > 0.30 (not optimal, but okay)
+
+**LOW Quality (1/3 conditions):**
+1. Wave signal: Delta > 0 ✓ (REQUIRED)
+2. EMA: No uptrend ✗ (risky!)
+3. DeMarker: Not oversold ✗
+
+**NONE:**
+- No wave signal (Delta ≤ 0) = No buy
+
+### Sell Signal Logic
+
+**SELL Signal:**
+- Wave turns negative: Delta < 0
+- Downtrend confirmed: Price < EMA8 < EMA21
+
+**Stop Loss:**
+- Placed below EMA 21 (dynamic)
+- Protects against trend reversal
+- Typically 5-10% below entry
+
+---
+
+## Daily Automation Schedule
+
+### Morning Tasks
+
+**06:00 AM - Symbol Master Update (Monday Only)**
+- Fetches ~2,259 NSE symbols from Fyers API
+- Updates symbol_master table
+- Duration: 1-2 minutes
+
+**09:20 AM - Auto-Trading Execution (Daily, if enabled)**
+- Checks today's suggested stocks
+- Applies weekly trade limits
+- Places orders with stop-loss and targets
+- Duration: 2-3 minutes
+- **Configurable**: Enable/disable per user
+
+### Evening Tasks (After Market Close)
+
+**06:00 PM - Performance Tracking**
+- Updates order performance
+- Creates daily P&L snapshots
+- Checks stop-loss and target hits
+- Closes orders automatically if targets met
+- Duration: 1-2 minutes
+
+**09:00 PM - Data Pipeline (6-step saga)**
+1. Fetch current prices for all stocks
+2. Download 1-year historical OHLCV data
+3. Store data in database
+4. Validate data quality
+- Duration: 20-30 minutes
+- **Records processed:** 2,259 stocks, ~820K history records
+
+**09:30 PM - Data Processing (Parallel Tasks)**
+- Fill missing adjusted_close prices
+- Calculate ATR (Average True Range)
+- Calculate volatility metrics
+- Calculate liquidity scores
+- Compute fundamental ratios
+- Duration: 5-10 minutes
+
+**10:00 PM - Technical Indicators Calculation**
+- Calculate RS Rating for all stocks
+- Calculate Wave indicators (Fast, Slow, Delta)
+- Calculate 8-21 EMA values
+- Calculate DeMarker oscillator
+- Calculate Fibonacci targets
+- Compute hybrid composite scores
+- Generate buy/sell signals
+- Duration: 3-5 minutes
+
+**10:15 PM - Daily Stock Selection**
+- Filter stocks by strategy criteria
+- Rank by hybrid composite score
+- Select top 50 for DEFAULT_RISK strategy
+- Select top 50 for HIGH_RISK strategy
+- Store in daily_suggested_stocks table
+- Duration: 2-3 minutes
+- **Result:** 100 stocks ready for next day
+
+**10:00 PM - CSV Export (Parallel)**
+- Export stocks.csv
+- Export historical_data.csv
+- Export technical_indicators.csv
+- Export suggested_stocks.csv
+- Duration: 2-3 minutes
+
+### Night Tasks
+
+**03:00 AM - Cleanup (Sunday Only)**
+- Remove snapshots older than 90 days
+- Remove CSV exports older than 30 days
+- Duration: < 1 minute
+
+**Total automation time per day: ~45-60 minutes**
+**Manual intervention required: ZERO!**
+
+---
+
+## How Schedulers Work
+
+The system runs **two independent schedulers** as Docker containers:
+
+### 1. Data Scheduler (`data_scheduler.py`)
+
+**Purpose:** Collects and processes market data
+
+**Container:** `trading_system_data_scheduler`
+
+**Schedule:**
+```python
+schedule.every().monday.at("06:00").do(update_symbol_master)  # Weekly
+schedule.every().day.at("21:00").do(run_data_pipeline)        # 9 PM
+schedule.every().day.at("21:30").do(fill_missing_data)        # 9:30 PM (parallel)
+schedule.every().day.at("21:30").do(calculate_business_logic) # 9:30 PM (parallel)
+schedule.every().day.at("22:00").do(export_csv_files)         # 10 PM (parallel)
+schedule.every().day.at("22:00").do(validate_data_quality)    # 10 PM (parallel)
+```
+
+**Data Pipeline Steps (Saga Pattern):**
+1. **SYMBOL_MASTER**: Update NSE symbols from Fyers
+2. **STOCKS**: Create/update stock records with prices
+3. **HISTORICAL_DATA**: Download 1-year OHLCV data
+4. **TECHNICAL_INDICATORS**: Calculate base indicators
+5. **COMPREHENSIVE_METRICS**: Calculate volatility, ratios
+6. **PIPELINE_VALIDATION**: Verify data quality
+
+**Retry Logic:**
+- Each step retries up to 3 times on failure
+- 60-second delay between retries
+- Tracks failures in pipeline_tracking table
+- Stops after 10 consecutive failures
+
+**Logs:** `logs/data_scheduler.log`
+
+### 2. Technical Indicators Scheduler (`scheduler.py`)
+
+**Purpose:** Calculates hybrid strategy indicators and generates stock picks
+
+**Container:** `trading_system_ml_scheduler`
+
+**Schedule:**
+```python
+schedule.every().day.at("22:00").do(calculate_technical_indicators)  # 10 PM
+schedule.every().day.at("22:15").do(generate_daily_snapshot)         # 10:15 PM
+schedule.every().day.at("09:20").do(execute_auto_trading)            # 9:20 AM
+schedule.every().day.at("18:00").do(track_order_performance)         # 6 PM
+schedule.every().sunday.at("03:00").do(cleanup_old_snapshots)        # 3 AM Sunday
+```
+
+**Technical Indicators Calculation:**
+1. Fetch historical data for all stocks (252 days)
+2. Calculate RS Rating (vs NIFTY 50 benchmark)
+3. Calculate Wave indicators (Fast, Slow, Delta)
+4. Calculate 8-21 EMA values and trend scores
+5. Calculate DeMarker oscillator
+6. Calculate Fibonacci extension targets
+7. Compute hybrid composite scores
+8. Generate buy/sell signals with quality ratings
+
+**Stock Selection Process:**
+1. **Stage 1 - Market Data Filters:**
+   - Price: ₹50 - ₹10,000
+   - Minimum volume: 50,000 shares/day
+   - Minimum turnover: ₹5 crore/day
+
+2. **Stage 2 - Strategy-Specific Filters:**
+
+   **DEFAULT_RISK (Conservative):**
+   - Market cap: > ₹20,000 crore (large-cap)
+   - PE ratio: 5-40
+   - Good liquidity
+   - Target gain: 7%, Stop loss: 5%
+
+   **HIGH_RISK (Aggressive):**
+   - Market cap: ₹1,000-20,000 crore (small/mid-cap)
+   - Broader PE range
+   - Medium liquidity
+   - Target gain: 12%, Stop loss: 10%
+
+3. **Stage 3 - Technical Scoring:**
+   - Calculate hybrid composite score for each stock
+   - Rank by score (highest = best opportunity)
+   - Select top 50 stocks per strategy
+
+4. **Stage 4 - Save Results:**
+   - Store in daily_suggested_stocks table
+   - Include all indicator values and signals
+   - Ready for API queries and trading
+
+**Logs:** `logs/scheduler.log`
+
+### Monitoring Schedulers
+
+```bash
+# Check both schedulers
+./tools/check_all_schedulers.sh
+
+# View data scheduler logs
+docker compose logs -f data_scheduler
+
+# View technical indicators scheduler logs
+docker compose logs -f ml_scheduler
+
+# Check if schedulers are running
+docker compose ps
+
+# Restart schedulers if needed
+docker compose restart data_scheduler ml_scheduler
+```
+
+---
+
+## How to Trade
+
+The system supports **three trading modes**:
+
+### 1. Automatic Trading
+
+**Best for:** Set-it-and-forget-it investors
+
+**How it works:**
+- System automatically places orders at 9:20 AM daily
+- Uses today's suggested stocks (generated at 10:15 PM previous night)
+- Applies buy signals with "high" quality only
+- Sets stop-loss and target prices automatically
+- Tracks performance and closes orders when targets hit
+- Respects weekly trade limits (configurable per user)
+
+**Setup:**
+1. Configure broker API credentials (Fyers/Zerodha)
+2. Enable auto-trading in settings
+3. Set weekly trade limit (e.g., 5 trades/week)
+4. Set capital allocation per trade
+5. System handles the rest!
+
+**Configuration:**
+```sql
+-- Enable auto-trading for your user
+INSERT INTO auto_trading_settings (user_id, enabled, weekly_trade_limit, capital_per_trade)
+VALUES (1, TRUE, 5, 10000.00);
+```
+
+**Access:** `http://localhost:5001/settings/auto-trading`
+
+### 2. Manual Trading (Recommended for beginners)
+
+**Best for:** Traders who want control and oversight
+
+**How it works:**
+1. View today's suggested stocks on dashboard
+2. Review hybrid scores, indicators, and signals
+3. Check Fibonacci targets and stop-loss levels
+4. Manually place orders through broker platform
+5. Track performance in system (optional)
+
+**Daily workflow:**
+```bash
+# 1. Check system status
+./tools/check_all_schedulers.sh
+
+# 2. View suggested stocks via API
+curl "http://localhost:5001/api/suggested-stocks/?strategy=default_risk&limit=10"
+
+# 3. Or access web interface
+http://localhost:5001/dashboard
+
+# 4. Review indicators:
+#    - Hybrid Score (0-100): Higher = better opportunity
+#    - Signal Quality (high/medium/low): Only trade "high" quality
+#    - RS Rating (1-99): Prefer > 80
+#    - Wave Delta: Positive = momentum
+#    - DeMarker: < 0.30 = oversold (good entry)
+#    - Fibonacci Targets: Set your profit targets
+
+# 5. Place orders on your broker platform
+#    - Entry: Current price or near EMA 8
+#    - Stop Loss: Below EMA 21 (shown in data)
+#    - Target 1: Fibonacci 127.2%
+#    - Target 2: Fibonacci 161.8%
+#    - Target 3: Fibonacci 200%
+```
+
+**Dashboard Access:** `http://localhost:5001/dashboard`
+
+### 3. Paper Trading (Simulator)
+
+**Best for:** Testing strategies without risking real money
+
+**How it works:**
+- Simulates order placement and execution
+- Uses real market data
+- Tracks P&L as if trading real money
+- No risk, perfect for learning
+- Can run alongside automatic or manual trading
+
+**Setup:**
+```sql
+-- Add simulator broker configuration
+INSERT INTO broker_configurations (user_id, broker_name, is_default)
+VALUES (1, 'simulator', TRUE);
+```
+
+**Usage:**
+1. Enable simulator broker in settings
+2. Set virtual capital (e.g., ₹100,000)
+3. System simulates all trades
+4. Review performance in dashboard
+5. Adjust strategy based on results
+6. Switch to real broker when confident
+
+**Access:** `http://localhost:5001/settings/broker`
+
+### Strategy Comparison
+
+| Feature | DEFAULT_RISK | HIGH_RISK |
+|---------|--------------|-----------|
+| Market Cap | > ₹20,000 Cr | ₹1,000-20,000 Cr |
+| Stock Type | Large-cap | Small/Mid-cap |
+| PE Ratio | 5-40 | Flexible |
+| Price Range | ₹100-10,000 | Flexible |
+| Target Gain | 7% | 12% |
+| Stop Loss | 5% | 10% |
+| Risk Level | Low | High |
+| Typical Stocks | RELIANCE, TCS, HDFC | Growth stocks |
+
+### API Endpoints
+
+**Get suggested stocks:**
+```bash
+# Conservative picks
+curl "http://localhost:5001/api/suggested-stocks/?strategy=default_risk&limit=10"
+
+# Aggressive picks
+curl "http://localhost:5001/api/suggested-stocks/?strategy=high_risk&limit=20"
+
+# Search by sector
+curl "http://localhost:5001/api/suggested-stocks/?sector=Technology&limit=10"
+
+# Search by symbol
+curl "http://localhost:5001/api/suggested-stocks/?search=RELIANCE"
+```
+
+**Response format:**
+```json
+{
+  "success": true,
+  "count": 10,
+  "strategy": "default_risk",
+  "stocks": [
+    {
+      "symbol": "NSE:RELIANCE-EQ",
+      "stock_name": "Reliance Industries Ltd",
+      "rank": 1,
+      "current_price": 2450.50,
+      "market_cap": 16500000.0,
+
+      "hybrid_composite_score": 85.4,
+      "rs_rating": 92,
+      "wave_momentum_score": 78.2,
+      "ema_trend_score": 88.5,
+      "demarker": 0.25,
+
+      "ema_8": 2465.30,
+      "ema_21": 2420.10,
+
+      "fib_target_1": 2550.20,
+      "fib_target_2": 2625.80,
+      "fib_target_3": 2700.00,
+
+      "buy_signal": true,
+      "sell_signal": false,
+      "signal_quality": "high"
+    }
+  ]
+}
+```
+
+### Trading Best Practices
+
+1. **Always check signal quality** - Only trade "high" quality signals
+2. **Respect stop losses** - Exit immediately if price falls below stop loss
+3. **Take partial profits** - Book profits at Fibonacci targets progressively
+4. **Don't overtrade** - Stick to weekly limits (5-10 trades/week max)
+5. **Review performance** - Check P&L daily, adjust strategy as needed
+6. **Start with paper trading** - Test for 2-4 weeks before real money
+7. **Diversify** - Don't put all capital in one stock
+8. **Use both strategies** - Mix conservative and aggressive picks
+
+---
+
+## Installation
 
 ### Prerequisites
 
-- **Operating System:** Linux, macOS, or Windows (WSL2)
-- **Docker:** Version 20.10 or higher
-- **Docker Compose:** Version 2.0 or higher
-- **Python:** 3.10 or higher (for local scripts)
-- **Git:** For cloning the repository
-- **Fyers API Credentials:** Client ID and Access Token
+- **Docker & Docker Compose** (v20.10+)
+- **Python 3.10+** (for local scripts)
+- **Fyers API Credentials** (get from https://myapi.fyers.in)
+- **4GB RAM minimum**, 8GB recommended
+- **5GB free disk space**
 
 ### Step 1: Clone Repository
 
@@ -287,1049 +674,566 @@ git clone https://github.com/yourusername/StockExperiment.git
 cd StockExperiment
 ```
 
-### Step 2: Configure Fyers API
+### Step 2: Configure Environment
 
-Create `.env` file in root:
+Create `.env` file:
 
 ```bash
-# Fyers API Credentials
+# Fyers API Credentials (REQUIRED)
 FYERS_CLIENT_ID=your_client_id_here
 FYERS_ACCESS_TOKEN=your_access_token_here
 
-# Database Configuration (default - don't change unless needed)
+# Database (Default - don't change)
 DATABASE_URL=postgresql://trader:trader_password@database:5432/trading_system
 POSTGRES_USER=trader
 POSTGRES_PASSWORD=trader_password
 POSTGRES_DB=trading_system
 
-# Redis Configuration
+# Redis Cache
 REDIS_HOST=dragonfly
 REDIS_PORT=6379
 
-# Application Settings
+# Application
 FLASK_ENV=development
 FLASK_DEBUG=1
 LOG_LEVEL=INFO
+
+# Optional: Adjust rate limits if needed
+SCREENING_QUOTES_RATE_LIMIT_DELAY=0.2
+VOLATILITY_MAX_WORKERS=5
 ```
 
-### Step 3: Start Docker Services
+### Step 3: Start Services
 
 ```bash
-# Development mode (with auto-reload)
+# Start all Docker containers
 ./run.sh dev
 
-# Production mode
-./run.sh prod
+# Or use docker compose directly
+docker compose up -d
+
+# Monitor first-time setup (takes ~30 minutes)
+docker compose logs -f
 ```
 
-### Step 4: Wait for Initial Setup
+### Step 4: Verify Installation
 
 ```bash
-# Monitor initial pipeline (takes ~30 minutes)
-docker compose logs -f trading_system
+# Check all services are running
+docker compose ps
 
-# Check when ready
+# Should show 5 containers:
+# - trading_system_db (PostgreSQL)
+# - trading_system_redis (Dragonfly)
+# - trading_system_app (Flask)
+# - trading_system_data_scheduler
+# - trading_system_ml_scheduler
+
+# Check system status
 ./tools/check_all_schedulers.sh
-```
 
-### Step 5: Access Application
-
-```bash
-# Web Interface
+# Access web interface
 http://localhost:5001
+```
 
-# Admin Dashboard
-http://localhost:5001/admin
+### Step 5: Wait for Initial Data Collection
 
-# API Documentation
-http://localhost:5001/api/suggested-stocks/
+On first run, system needs to:
+1. Fetch NSE symbol list (~2,259 stocks)
+2. Download 1-year historical data
+3. Calculate technical indicators
+4. Generate first daily picks
 
-# Database (PostgreSQL)
+**This takes ~30 minutes.** After that, daily updates take 5-10 minutes.
+
+### Step 6: Configure Broker (Optional)
+
+For live trading:
+
+```bash
+# Access broker settings
+http://localhost:5001/settings/broker
+
+# Add Fyers credentials
+# Or use simulator for testing
+```
+
+---
+
+## System Commands
+
+### Docker Operations
+
+```bash
+# Start services (development mode)
+./run.sh dev
+
+# Start services (production mode)
+./run.sh prod
+
+# Stop all services
+docker compose down
+
+# Restart specific service
+docker compose restart trading_system
+docker compose restart data_scheduler
+docker compose restart ml_scheduler
+
+# View logs (real-time)
+docker compose logs -f                  # All services
+docker compose logs -f trading_system   # Web app only
+docker compose logs -f data_scheduler   # Data pipeline only
+docker compose logs -f ml_scheduler     # Technical indicators only
+
+# Check service status
+docker compose ps
+
+# Remove all data (WARNING: Deletes everything!)
+docker compose down -v
+```
+
+### Database Access
+
+```bash
+# Connect to PostgreSQL
 docker exec -it trading_system_db psql -U trader -d trading_system
+
+# Run SQL query
+docker exec -it trading_system_db psql -U trader -d trading_system -c "SELECT COUNT(*) FROM stocks;"
+
+# Check database size
+docker exec -it trading_system_db psql -U trader -d trading_system -c "SELECT pg_size_pretty(pg_database_size('trading_system'));"
+
+# Export data
+docker exec -it trading_system_db pg_dump -U trader trading_system > backup.sql
 ```
 
----
+### Manual Tasks
 
-## 🏗️ Architecture
-
-### Technology Stack
-
-**Backend:**
-- **Python 3.10+** - Core language
-- **Flask 3.0** - Web framework
-- **SQLAlchemy 2.0** - ORM for database
-- **PostgreSQL 15** - Primary database (11 tables)
-- **Dragonfly (Redis)** - Caching layer
-- **Scikit-learn** - Random Forest models
-- **XGBoost** - Gradient boosting
-- **TensorFlow 2.16+** - LSTM models
-- **Pandas/NumPy** - Data processing
-- **Schedule** - Task scheduling
-
-**Frontend:**
-- **Bootstrap 5** - UI framework
-- **Chart.js** - Data visualization
-- **JavaScript ES6** - Client-side logic
-- **Jinja2** - Template engine
-
-**DevOps:**
-- **Docker & Docker Compose** - 5 containers orchestration
-- **Git** - Version control
-- **GitHub Actions** - CI/CD (optional)
-
-### Directory Structure
-
-```
-/StockExperiment
-├── README.md                     # This file
-├── CLAUDE.md                     # AI assistant instructions
-├── .env                          # Environment variables (create this)
-├── .gitignore                    # Git ignore rules
-├── requirements.txt              # Python dependencies
-├── Dockerfile                    # Docker image definition
-├── docker-compose.yml            # Docker services config
-│
-├── app.py                        # Flask application entry
-├── run.py                        # Application launcher
-├── run.sh                        # Docker startup script
-├── config.py                     # Application configuration
-│
-├── run_pipeline.py               # Data pipeline orchestrator
-├── data_scheduler.py             # Data automation (9 PM)
-├── scheduler.py                  # ML automation (10 PM)
-│
-├── /src                          # Source code
-│   ├── __init__.py
-│   │
-│   ├── /models                   # Database models (SQLAlchemy ORM)
-│   │   ├── database.py           # DB connection, session management
-│   │   ├── models.py             # Core tables (users, orders, trades)
-│   │   ├── stock_models.py       # Stock, SymbolMaster models
-│   │   └── historical_models.py  # HistoricalData, TechnicalIndicators
-│   │
-│   ├── /services                 # Business logic
-│   │   ├── /data                 # Data pipeline services
-│   │   │   ├── pipeline_saga.py  # 6-step data saga
-│   │   │   ├── suggested_stocks_saga.py  # 7-step stock selection
-│   │   │   ├── historical_data_service.py # Smart data fetching
-│   │   │   └── fyers_symbol_service.py  # Symbol management
-│   │   │
-│   │   ├── /brokers              # Broker integrations
-│   │   │   └── /core
-│   │   │       └── unified_broker_service.py # Multi-broker abstraction
-│   │   │
-│   │   ├── /ml                   # Machine learning
-│   │   │   ├── enhanced_stock_predictor.py # Traditional ML (RF + XGBoost)
-│   │   │   ├── raw_lstm_prediction_service.py # Raw LSTM models
-│   │   │   ├── kronos_prediction_service.py # Kronos K-line model
-│   │   │   └── training_service.py # Model training orchestration
-│   │   │
-│   │   └── /trading              # Trading services
-│   │       ├── auto_trading_service.py # Automated trading
-│   │       └── order_performance_tracking_service.py # P&L tracking
-│   │
-│   ├── /web                      # Flask routes & templates
-│   │   ├── app.py                # Flask app factory
-│   │   ├── admin_routes.py       # Admin dashboard routes
-│   │   ├── /routes               # API routes
-│   │   │   └── suggested_stocks_routes.py
-│   │   └── /templates            # HTML templates
-│   │       ├── base.html         # Base template
-│   │       ├── dashboard.html    # Main dashboard
-│   │       └── /admin            # Admin templates
-│   │           └── dashboard.html
-│   │
-│   └── /utils                    # Helper utilities
-│       ├── logger.py             # Logging setup
-│       └── helpers.py            # Common utilities
-│
-├── /config                       # Configuration files
-│   ├── stock_filters.yaml        # Stock screening criteria
-│   ├── database.yaml             # Database settings
-│   └── broker_config.yaml        # Broker settings
-│
-├── /ml_models                    # Trained ML models
-│   ├── rf_price_model.pkl        # Random Forest price model
-│   ├── xgb_price_model.pkl       # XGBoost price model
-│   ├── /raw_ohlcv_lstm           # Per-symbol LSTM models
-│   │   └── {SYMBOL}/lstm_model.h5
-│   └── /kronos                   # Kronos models
-│       └── kronos_model.pkl
-│
-├── /tools                        # Utility scripts
-│   ├── README.md                 # Tools documentation
-│   ├── train_ml_model.py         # Manual ML training
-│   ├── batch_train_lstm_top_stocks.py # LSTM training for large-caps
-│   ├── batch_train_lstm_small_mid_cap.py # LSTM for small/mid-caps
-│   ├── generate_kronos_predictions.py # Kronos predictions
-│   └── check_all_schedulers.sh   # Complete system status
-│
-├── /logs                         # Application logs
-│   ├── data_scheduler.log        # Data pipeline logs
-│   ├── scheduler.log             # ML scheduler logs
-│   └── app.log                   # Flask app logs
-│
-└── /exports                      # CSV exports (daily)
-    ├── stocks_YYYY-MM-DD.csv
-    ├── historical_30d_YYYY-MM-DD.csv
-    ├── technical_indicators_YYYY-MM-DD.csv
-    └── suggested_stocks_YYYY-MM-DD.csv
-```
-
-### Docker Services
-
-```yaml
-services:
-  database:
-    image: postgres:15
-    container_name: trading_system_db
-    ports: ["5432:5432"]
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    environment:
-      POSTGRES_USER: trader
-      POSTGRES_PASSWORD: trader_password
-      POSTGRES_DB: trading_system
-
-  dragonfly:
-    image: docker.dragonflydb.io/dragonflydb/dragonfly
-    container_name: trading_system_redis
-    ports: ["6379:6379"]
-    volumes:
-      - dragonfly_data:/data
-
-  trading_system:
-    build: .
-    container_name: trading_system_app
-    ports: ["5001:5001"]
-    depends_on: [database, dragonfly]
-    volumes:
-      - .:/app
-      - ./logs:/app/logs
-      - ./exports:/app/exports
-      - ./ml_models:/app/ml_models
-    environment:
-      DATABASE_URL: postgresql://trader:trader_password@database:5432/trading_system
-      REDIS_HOST: dragonfly
-
-  data_scheduler:
-    build: .
-    container_name: trading_system_data_scheduler
-    command: python data_scheduler.py
-    depends_on: [database, dragonfly]
-    volumes:
-      - .:/app
-      - ./logs:/app/logs
-      - ./exports:/app/exports
-
-  ml_scheduler:
-    build: .
-    container_name: trading_system_ml_scheduler
-    command: python scheduler.py
-    depends_on: [database, dragonfly]
-    volumes:
-      - .:/app
-      - ./logs:/app/logs
-      - ./ml_models:/app/ml_models
-```
-
----
-
-## 🗄️ Database Schema
-
-### Table Overview (11+ Tables)
-
-| Table | Records | Description |
-|-------|---------|-------------|
-| **stocks** | 2,259 | Current prices, fundamentals, ratios |
-| **historical_data** | ~820,000 | 1-year OHLCV data |
-| **technical_indicators** | ~820,000 | RSI, MACD, SMA, EMA, ATR |
-| **daily_suggested_stocks** | Growing | Daily picks (3 models × 2 strategies) |
-| **pipeline_tracking** | Variable | Pipeline saga status |
-| **symbol_master** | ~2,259 | Complete NSE symbol list |
-| **users** | Variable | User accounts |
-| **strategies** | Variable | Trading strategies |
-| **orders** | Variable | Order history with model/strategy |
-| **trades** | Variable | Executed trades |
-| **positions** | Variable | Current positions |
-| **broker_configurations** | Variable | API credentials |
-| **auto_trading_settings** | Variable | Per-user trading preferences |
-
-### Core Tables Schema
-
-#### `stocks` Table
-```sql
-CREATE TABLE stocks (
-    id SERIAL PRIMARY KEY,
-    symbol VARCHAR(50) UNIQUE NOT NULL,
-    stock_name VARCHAR(200),
-
-    -- Price & Market Data
-    current_price DOUBLE PRECISION,
-    market_cap DOUBLE PRECISION,
-    volume BIGINT,
-    avg_volume_30d BIGINT,
-
-    -- Fundamental Ratios
-    pe_ratio DOUBLE PRECISION,
-    pb_ratio DOUBLE PRECISION,
-    roe DOUBLE PRECISION,
-    eps DOUBLE PRECISION,
-    beta DOUBLE PRECISION,
-    debt_to_equity DOUBLE PRECISION,
-
-    -- Growth & Profitability
-    revenue_growth DOUBLE PRECISION,
-    earnings_growth DOUBLE PRECISION,
-    operating_margin DOUBLE PRECISION,
-    net_margin DOUBLE PRECISION,
-    profit_margin DOUBLE PRECISION,
-
-    -- Valuation
-    book_value DOUBLE PRECISION,
-    peg_ratio DOUBLE PRECISION,
-    roa DOUBLE PRECISION,
-
-    -- Liquidity
-    current_ratio DOUBLE PRECISION,
-    quick_ratio DOUBLE PRECISION,
-
-    -- Volatility
-    historical_volatility_1y DOUBLE PRECISION,
-    atr_14 DOUBLE PRECISION,
-
-    -- Metadata
-    sector VARCHAR(100),
-    industry VARCHAR(100),
-    market_cap_category VARCHAR(20),
-    data_source VARCHAR(50), -- 'real' or 'estimated_enhanced'
-    last_updated TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-#### `daily_suggested_stocks` Table (Enhanced)
-```sql
-CREATE TABLE daily_suggested_stocks (
-    id SERIAL PRIMARY KEY,
-    date DATE NOT NULL,
-    symbol VARCHAR(50) NOT NULL,
-    stock_name VARCHAR(200),
-    current_price DOUBLE PRECISION,
-    market_cap DOUBLE PRECISION,
-
-    -- Model & Strategy
-    model_type VARCHAR(50),  -- 'traditional', 'raw_lstm', 'kronos'
-    strategy VARCHAR(50) NOT NULL, -- 'default_risk', 'high_risk'
-    selection_score DOUBLE PRECISION,
-    rank INTEGER,
-
-    -- ML Predictions
-    ml_prediction_score DOUBLE PRECISION,  -- 0-1 (higher = better)
-    ml_price_target DOUBLE PRECISION,      -- Predicted price
-    ml_confidence DOUBLE PRECISION,        -- Model confidence 0-1
-    ml_risk_score DOUBLE PRECISION,        -- Risk score 0-1 (lower = safer)
-
-    -- Technical Indicators (snapshot)
-    rsi_14 DOUBLE PRECISION,
-    macd DOUBLE PRECISION,
-    sma_50 DOUBLE PRECISION,
-    sma_200 DOUBLE PRECISION,
-
-    -- Fundamental Metrics (snapshot)
-    pe_ratio DOUBLE PRECISION,
-    pb_ratio DOUBLE PRECISION,
-    roe DOUBLE PRECISION,
-    eps DOUBLE PRECISION,
-    beta DOUBLE PRECISION,
-
-    -- Growth & Profitability
-    revenue_growth DOUBLE PRECISION,
-    earnings_growth DOUBLE PRECISION,
-    operating_margin DOUBLE PRECISION,
-
-    -- Trading Signals
-    target_price DOUBLE PRECISION,
-    stop_loss DOUBLE PRECISION,
-    recommendation VARCHAR(20),
-    reason TEXT,
-
-    -- Metadata
-    sector VARCHAR(100),
-    market_cap_category VARCHAR(20),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    UNIQUE(date, symbol, strategy, model_type)  -- Allows upsert
-);
-CREATE INDEX idx_daily_suggested_date ON daily_suggested_stocks(date DESC);
-CREATE INDEX idx_daily_suggested_ml_score ON daily_suggested_stocks(ml_prediction_score DESC);
-CREATE INDEX idx_daily_suggested_model ON daily_suggested_stocks(model_type);
-```
-
-#### `pipeline_tracking` Table
-```sql
-CREATE TABLE pipeline_tracking (
-    id SERIAL PRIMARY KEY,
-    pipeline_id VARCHAR(100) UNIQUE NOT NULL,
-    step VARCHAR(50) NOT NULL,
-    status VARCHAR(50) NOT NULL, -- 'pending', 'in_progress', 'completed', 'failed', 'retrying'
-    started_at TIMESTAMP,
-    completed_at TIMESTAMP,
-    retry_count INTEGER DEFAULT 0,
-    max_retries INTEGER DEFAULT 3,
-    error_message TEXT,
-    records_processed INTEGER,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
-
----
-
-## 🌐 API Endpoints
-
-### Main Endpoint: Suggested Stocks
-
-```http
-GET /api/suggested-stocks/
-```
-
-**Query Parameters:**
-- `strategy` - Trading strategy: `default_risk`, `high_risk` (default: `default_risk`)
-- `model_type` - ML model: `traditional`, `raw_lstm`, `kronos` (optional, returns all if not specified)
-- `limit` - Number of stocks to return (default: `50`, max: `100`)
-- `sector` - Filter by sector (optional)
-- `search` - Search by symbol or name (optional)
-- `sort_by` - Sort field: `ml_prediction_score`, `market_cap`, `pe_ratio` (default: `ml_prediction_score`)
-- `order` - Sort order: `asc`, `desc` (default: `desc`)
-
-**Example Request:**
 ```bash
-curl "http://localhost:5001/api/suggested-stocks/?strategy=default_risk&model_type=traditional&limit=10"
-```
-
-**Example Response:**
-```json
-{
-  "success": true,
-  "count": 10,
-  "strategy": "default_risk",
-  "model_type": "traditional",
-  "generated_at": "2025-10-14T22:15:00",
-  "stocks": [
-    {
-      "symbol": "RELIANCE",
-      "stock_name": "Reliance Industries Ltd",
-      "rank": 1,
-      "current_price": 2450.50,
-      "market_cap": 16500000.0,
-      "sector": "Energy",
-      "model_type": "traditional",
-
-      "ml_prediction_score": 0.78,
-      "ml_price_target": 2650.20,
-      "ml_confidence": 0.85,
-      "ml_risk_score": 0.12,
-
-      "technical_indicators": {
-        "rsi_14": 58.5,
-        "macd": 12.3,
-        "sma_50": 2400.0,
-        "sma_200": 2300.0
-      },
-
-      "fundamentals": {
-        "pe_ratio": 24.5,
-        "pb_ratio": 2.8,
-        "roe": 12.5,
-        "eps": 100.5,
-        "beta": 1.15,
-        "revenue_growth": 8.5,
-        "earnings_growth": 10.2,
-        "operating_margin": 15.3
-      },
-
-      "trading_signals": {
-        "target_price": 2625.0,
-        "stop_loss": 2328.0,
-        "recommendation": "BUY"
-      }
-    }
-  ]
-}
-```
-
-### Admin Dashboard Endpoints
-
-#### Get System Status
-```http
-GET /admin/system/status
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "status": {
-    "stocks": {
-      "total": 2259,
-      "with_price": 2250,
-      "with_market_cap": 2240,
-      "last_updated": "2025-10-14T21:30:00"
-    },
-    "historical_data": {
-      "symbols": 2259,
-      "records": 820574,
-      "latest_date": "2025-10-14"
-    },
-    "ml_models": {
-      "traditional": "trained",
-      "raw_lstm": "84 symbols trained",
-      "kronos": "trained"
-    },
-    "daily_snapshots": {
-      "total": 15000,
-      "unique_dates": 90,
-      "latest_date": "2025-10-14",
-      "model_combinations": 6
-    }
-  }
-}
-```
-
-#### Trigger Tasks
-```http
-POST /admin/trigger/pipeline           # Run data pipeline
-POST /admin/trigger/fill-data          # Fill missing data
-POST /admin/trigger/business-logic     # Calculate metrics
-POST /admin/trigger/ml-training        # Train all ML models
-POST /admin/trigger/csv-export         # Export CSV files
-POST /admin/trigger/all                # Run all tasks sequentially
-```
-
----
-
-## 🤖 Automation
-
-### Data Scheduler (`data_scheduler.py`)
-
-**Schedule:**
-- Symbol Master: Monday 6:00 AM
-- Data Pipeline: Daily 9:00 PM
-- Fill Data: Daily 9:30 PM (parallel)
-- Business Logic: Daily 9:30 PM (parallel)
-- CSV Export: Daily 10:00 PM (parallel)
-- Data Validation: Daily 10:00 PM (parallel)
-
-### ML Scheduler (`scheduler.py`)
-
-**Schedule:**
-- **ML Training (3 models):** Daily 6:00 AM IST (00:30 UTC)
-  - Data freshness check before training
-  - Skips training if data is stale (holidays/pipeline failures)
-  - Trains: Traditional ML, Raw LSTM, Kronos
-- **Daily Snapshot:** Daily 7:00 AM IST (01:30 UTC)
-  - Generates 6 combinations (3 models × 2 strategies)
-  - Ready 2+ hours before market open (9:15 AM IST)
-- **Auto-Trading:** Daily 9:20 AM IST (5 min after market opens)
-- **Performance Tracking:** Daily 6:00 PM IST (after market close)
-- **Cleanup:** Sunday 3:00 AM IST
-
-### Manual Task Execution
-
-**Via Admin Dashboard:**
-```
-http://localhost:5001/admin
-→ Click task buttons (Pipeline, ML Training, etc.)
-→ Monitor progress in real-time
-→ Retry failed steps
-```
-
-**Via Command Line:**
-```bash
-# Run data pipeline
+# Run data pipeline manually
 python3 run_pipeline.py
 
-# Train ML models
-python3 tools/train_ml_model.py
+# Calculate technical indicators manually
+docker exec trading_system python3 -c "
+from src.models.database import get_database_manager
+from src.services.technical.hybrid_strategy_calculator import get_hybrid_strategy_calculator
 
-# Train LSTM models
-python3 tools/batch_train_lstm_top_stocks.py
-python3 tools/batch_train_lstm_small_mid_cap.py
-
-# Generate Kronos predictions
-python3 tools/generate_kronos_predictions.py
+db_manager = get_database_manager()
+with db_manager.get_session() as session:
+    calculator = get_hybrid_strategy_calculator(session)
+    result = calculator.calculate_all_indicators(['NSE:RELIANCE-EQ'], lookback_days=252)
+    print(result)
+"
 
 # Fill missing data
 python3 fill_data_sql.py
+
+# Calculate business metrics
 python3 fix_business_logic.py
+
+# Export CSV files
+python3 tools/export_csv.py
 ```
 
----
-
-## 🧠 Machine Learning
-
-### Triple Model Architecture
-
-#### 1. Traditional ML (Enhanced)
-- **Algorithms:** Random Forest + XGBoost ensemble
-- **Features:** 25-30 (technical + fundamental + chaos features)
-- **Training:** Walk-forward cross-validation (5 splits)
-- **Output:** Price predictions, risk assessment
-- **Performance:** R² 0.15-0.35 (good for stocks)
-- **Training Time:** 1-2 minutes
-
-#### 2. Raw LSTM (Deep Learning)
-- **Architecture:** LSTM neural networks
-- **Input:** 60-day OHLCV sequences
-- **Prediction:** 14 days ahead
-- **Training:** Per-symbol models
-- **Coverage:** Top liquid stocks
-- **Training Time:** 5-10 minutes per batch
-
-#### 3. Kronos (K-line Tokenization)
-- **Approach:** Candlestick pattern recognition
-- **Features:** K-line tokens, technical patterns
-- **Innovation:** Experimental cutting-edge model
-- **Coverage:** Stocks with ≥200 days historical data (~92%)
-- **Optimization:** Pre-filters stocks before prediction (50% faster)
-- **Training Time:** 5-10 minutes (optimized from 12-25 min)
-
-### Dual Strategy System
-
-#### DEFAULT_RISK (Conservative)
-```yaml
-target_market_cap: "> 20,000 Cr"
-pe_ratio: "5-40"
-price_range: "₹100-10,000"
-liquidity: "High"
-target_gain: "7%"
-stop_loss: "5%"
-typical_stocks: "RELIANCE, TCS, HDFC, INFY"
-```
-
-#### HIGH_RISK (Aggressive)
-```yaml
-target_market_cap: "1,000-20,000 Cr"
-pe_ratio: "Broader range"
-price_range: "Flexible"
-liquidity: "Medium"
-target_gain: "12%"
-stop_loss: "10%"
-typical_stocks: "Mid/Small-cap growth stocks"
-```
-
-### Model Performance Metrics
-
-**Total Combinations:** 6 (3 models × 2 strategies)
-
-Each combination provides:
-- `ml_prediction_score` (0-1): Higher = better opportunity
-- `ml_price_target`: Expected price
-- `ml_confidence` (0-1): Model confidence
-- `ml_risk_score` (0-1): Lower = safer
-
-### Feature Engineering
-
-**Technical Features:**
-- Price momentum, volume patterns
-- RSI, MACD, Bollinger Bands
-- SMA/EMA crossovers
-- ATR volatility
-
-**Fundamental Features:**
-- PE, PB, ROE, ROA ratios
-- Growth metrics (revenue, earnings)
-- Profitability margins
-- Liquidity ratios
-
-**Engineered Features:**
-- Chaos features (fractal dimension)
-- Market regime indicators
-- Sector relative strength
-- Sentiment scores (optional)
-
----
-
-## ⚙️ Configuration
-
-### Environment Variables (`.env`)
-
-```bash
-# Fyers API (Required)
-FYERS_CLIENT_ID=your_fyers_client_id
-FYERS_ACCESS_TOKEN=your_fyers_access_token
-
-# Database (Default - don't change unless needed)
-DATABASE_URL=postgresql://trader:trader_password@database:5432/trading_system
-POSTGRES_USER=trader
-POSTGRES_PASSWORD=trader_password
-POSTGRES_DB=trading_system
-
-# Redis
-REDIS_HOST=dragonfly
-REDIS_PORT=6379
-
-# Flask
-FLASK_ENV=development
-FLASK_DEBUG=1
-SECRET_KEY=your_secret_key_here
-
-# Logging
-LOG_LEVEL=INFO
-
-# Screening Parameters (Optional)
-SCREENING_QUOTES_RATE_LIMIT_DELAY=0.2
-VOLATILITY_MAX_WORKERS=5
-VOLATILITY_MAX_STOCKS=500
-```
-
-### Stock Filters (`config/stock_filters.yaml`)
-
-```yaml
-stage_1_filters:  # Market data screening
-  tradeability:
-    minimum_price: 50.0
-    maximum_price: 10000.0
-    minimum_daily_volume: 50000
-    minimum_daily_turnover_inr: 50000000
-
-stage_2_filters:  # Business logic screening
-  filtering_thresholds:
-    minimum_total_score: 25
-  fundamental_ratios:
-    max_pe_ratio: 50.0
-    min_roe: 5.0
-    max_debt_equity: 2.0
-```
-
----
-
-## 💼 Usage Examples
-
-### Example 1: Get Top Conservative Picks (Traditional ML)
-
-```bash
-curl "http://localhost:5001/api/suggested-stocks/?strategy=default_risk&model_type=traditional&limit=10"
-```
-
-### Example 2: Get Aggressive LSTM Picks
-
-```bash
-curl "http://localhost:5001/api/suggested-stocks/?strategy=high_risk&model_type=raw_lstm&limit=20"
-```
-
-### Example 3: Get All Kronos Predictions
-
-```bash
-curl "http://localhost:5001/api/suggested-stocks/?model_type=kronos&limit=50"
-```
-
-### Example 4: Query Database for Model Comparison
-
-```sql
--- Connect to database
-docker exec -it trading_system_db psql -U trader -d trading_system
-
--- Compare model performance
-SELECT
-    model_type,
-    strategy,
-    COUNT(*) as stocks,
-    AVG(ml_prediction_score) as avg_score,
-    AVG(ml_confidence) as avg_confidence
-FROM daily_suggested_stocks
-WHERE date = CURRENT_DATE
-GROUP BY model_type, strategy
-ORDER BY avg_score DESC;
-```
-
----
-
-## 📊 Monitoring
-
-### System Status
+### System Health Checks
 
 ```bash
 # Complete system status
 ./tools/check_all_schedulers.sh
 
-# Docker containers
-docker compose ps
+# Check data pipeline status
+cat logs/data_scheduler.log | grep -A 10 "Pipeline"
 
-# View logs (real-time)
-docker compose logs -f
-docker compose logs -f data_scheduler
-docker compose logs -f ml_scheduler
-docker compose logs -f trading_system
-```
+# Check technical indicators status
+cat logs/scheduler.log | grep -A 5 "Technical Indicators"
 
-### Database Queries
-
-```sql
--- Model coverage
-SELECT
-    model_type,
-    COUNT(DISTINCT symbol) as unique_stocks,
-    COUNT(*) as total_records
+# Check today's stock picks
+docker exec -it trading_system_db psql -U trader -d trading_system -c "
+SELECT COUNT(*), strategy
 FROM daily_suggested_stocks
 WHERE date = CURRENT_DATE
-GROUP BY model_type;
+GROUP BY strategy;
+"
 
--- Today's top picks across all models
-SELECT
-    symbol,
-    stock_name,
-    model_type,
-    strategy,
-    ml_prediction_score,
-    ml_price_target,
-    rank
-FROM daily_suggested_stocks
-WHERE date = CURRENT_DATE
-ORDER BY ml_prediction_score DESC
-LIMIT 20;
-
--- Pipeline status
+# Check last pipeline run
+docker exec -it trading_system_db psql -U trader -d trading_system -c "
 SELECT * FROM pipeline_tracking
 ORDER BY updated_at DESC
-LIMIT 10;
+LIMIT 5;
+"
 ```
 
 ---
 
-## 🔧 Troubleshooting
+## Database Tables
+
+### Core Data Tables
+
+**1. stocks** (~2,259 records)
+- Current prices, market cap, volume
+- Fundamental ratios: PE, PB, ROE, EPS
+- Volatility: ATR, historical volatility
+- Sector, industry classification
+
+**2. historical_data** (~820,000 records)
+- 1-year OHLCV data per stock
+- Date, open, high, low, close, volume
+- Adjusted close, turnover
+
+**3. technical_indicators** (~820,000 records)
+- RSI (14-day), MACD, SMA, EMA
+- ATR, Bollinger Bands
+- **Hybrid Strategy Fields:**
+  - ema_8, ema_21 (8-21 EMA strategy)
+  - demarker (oscillator)
+
+**4. daily_suggested_stocks** (growing daily)
+- Top 50 stocks per strategy per day
+- Hybrid scores and indicators:
+  - hybrid_composite_score (0-100)
+  - rs_rating (1-99)
+  - wave_momentum_score (0-100)
+  - ema_trend_score (0-100)
+  - demarker (0-1)
+  - fib_target_1, fib_target_2, fib_target_3
+  - buy_signal, sell_signal, signal_quality
+- Strategy: DEFAULT_RISK or HIGH_RISK
+- Rank: 1-50 per strategy
+
+### Trading Tables
+
+**5. users**
+- User accounts and authentication
+
+**6. broker_configurations**
+- API credentials for brokers
+- Fyers, Zerodha, or Simulator
+
+**7. strategies**
+- Trading strategy definitions
+
+**8. orders**
+- Order history with signals
+- Entry price, stop loss, targets
+- Order status, fill status
+
+**9. trades**
+- Executed trades
+- Entry/exit prices, P&L
+
+**10. positions**
+- Current open positions
+- Unrealized P&L
+
+**11. auto_trading_settings**
+- Per-user trading preferences
+- Weekly limits, capital allocation
+
+### System Tables
+
+**12. pipeline_tracking**
+- Saga step status
+- Retry count, error messages
+- Records processed
+
+**13. symbol_master** (~2,259 records)
+- Complete NSE symbol list
+
+### Useful Queries
+
+```sql
+-- Today's top picks
+SELECT symbol, stock_name, strategy, rank,
+       hybrid_composite_score, signal_quality
+FROM daily_suggested_stocks
+WHERE date = CURRENT_DATE
+ORDER BY strategy, rank
+LIMIT 20;
+
+-- High quality buy signals
+SELECT symbol, stock_name,
+       hybrid_composite_score, rs_rating,
+       ema_trend_score, wave_momentum_score,
+       fib_target_1, fib_target_2, fib_target_3
+FROM daily_suggested_stocks
+WHERE date = CURRENT_DATE
+  AND buy_signal = TRUE
+  AND signal_quality = 'high'
+ORDER BY hybrid_composite_score DESC
+LIMIT 10;
+
+-- Pipeline status
+SELECT step, status, records_processed, error_message
+FROM pipeline_tracking
+ORDER BY updated_at DESC
+LIMIT 10;
+
+-- Trading performance today
+SELECT COUNT(*) as total_orders,
+       SUM(CASE WHEN status = 'filled' THEN 1 ELSE 0 END) as filled,
+       SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected
+FROM orders
+WHERE DATE(created_at) = CURRENT_DATE;
+```
+
+---
+
+## Troubleshooting
 
 ### Common Issues
 
-#### Pipeline Fails at HISTORICAL_DATA
+#### 1. Pipeline Fails at HISTORICAL_DATA Step
+
+**Symptoms:**
+- Logs show "Rate limit exceeded" or timeouts
+- Pipeline stuck in RETRYING status
+
+**Solution:**
 ```bash
-# Rate limiting issue - increase delay
+# Increase rate limit delay (default 0.2s → 0.5s)
 export SCREENING_QUOTES_RATE_LIMIT_DELAY=0.5
+
+# Reduce parallel workers (default 5 → 3)
+export VOLATILITY_MAX_WORKERS=3
+
+# Restart data scheduler
+docker compose restart data_scheduler
+```
+
+#### 2. No Stock Picks Generated
+
+**Symptoms:**
+- daily_suggested_stocks table is empty
+- Logs show "No stocks meet criteria"
+
+**Check:**
+```bash
+# 1. Verify historical data exists
+docker exec -it trading_system_db psql -U trader -d trading_system -c "
+SELECT COUNT(*) FROM historical_data
+WHERE date >= CURRENT_DATE - INTERVAL '252 days';
+"
+
+# 2. Check technical indicators calculated
+docker exec -it trading_system_db psql -U trader -d trading_system -c "
+SELECT COUNT(*) FROM technical_indicators
+WHERE ema_8 IS NOT NULL AND ema_21 IS NOT NULL;
+"
+
+# 3. Run manual calculation
+python3 test_hybrid_strategy.py
+```
+
+#### 3. Schedulers Not Running
+
+**Symptoms:**
+- Tasks not executing at scheduled times
+- Logs show no activity
+
+**Solution:**
+```bash
+# Check if schedulers are running
+docker compose ps
+
+# Restart schedulers
+docker compose restart data_scheduler ml_scheduler
+
+# Check logs for errors
+docker compose logs data_scheduler | tail -100
+docker compose logs ml_scheduler | tail -100
+
+# Verify schedule configuration
+docker exec ml_scheduler python3 -c "import schedule; print(schedule.jobs)"
+```
+
+#### 4. Database Connection Errors
+
+**Symptoms:**
+- Logs show "Connection refused" or "Could not connect"
+- API returns 500 errors
+
+**Solution:**
+```bash
+# Check database is running
+docker compose ps database
+
+# Check database logs
+docker compose logs database | tail -50
+
+# Restart database (WARNING: May cause data loss if not properly shut down)
+docker compose restart database
+
+# Wait 30 seconds for database to start
+sleep 30
+
+# Restart app and schedulers
+docker compose restart trading_system data_scheduler ml_scheduler
+```
+
+#### 5. Fyers API Token Expired
+
+**Symptoms:**
+- Logs show "Invalid token" or "Unauthorized"
+- Data pipeline fails at symbol fetch
+
+**Solution:**
+```bash
+# 1. Get new access token from Fyers
+#    Visit: https://myapi.fyers.in
+
+# 2. Update .env file
+nano .env
+# Update FYERS_ACCESS_TOKEN=new_token_here
+
+# 3. Restart services
+docker compose restart trading_system data_scheduler
+```
+
+#### 6. Disk Space Full
+
+**Symptoms:**
+- Logs show "No space left on device"
+- Database stops accepting writes
+
+**Solution:**
+```bash
+# Check disk usage
+df -h
+
+# Clean old CSV exports
+rm -rf exports/*.csv
+
+# Clean old logs
+rm -rf logs/*.log
+
+# Remove old Docker images
+docker system prune -a
+
+# Restart services
+docker compose up -d
+```
+
+#### 7. High Memory Usage
+
+**Symptoms:**
+- System slows down
+- Docker containers crash with OOM errors
+
+**Solution:**
+```bash
+# Check memory usage
+docker stats
 
 # Reduce parallel workers
 export VOLATILITY_MAX_WORKERS=3
 
-# Restart pipeline
-python3 run_pipeline.py
+# Restart services with more memory
+docker compose down
+docker compose up -d
+
+# Monitor memory
+watch -n 5 docker stats
 ```
-
-#### ML Training Fails
-```bash
-# Check data availability
-docker exec -it trading_system_db psql -U trader -d trading_system -c "SELECT COUNT(*) FROM historical_data;"
-
-# Check disk space for models
-df -h ml_models/
-
-# Manual training
-python3 tools/train_ml_model.py
-```
-
-#### Scheduler Not Running
-```bash
-# Check process
-docker compose ps
-
-# Restart schedulers
-docker compose restart ml_scheduler data_scheduler
-
-# Check logs
-docker compose logs ml_scheduler | tail -50
-```
-
----
-
-## 📈 Performance
-
-### Metrics
-
-- **Data Pipeline:** 20-30 minutes (2,259 stocks)
-- **Traditional ML Training:** 1-2 minutes
-- **LSTM Training:** 5-10 minutes (batch)
-- **Kronos Training:** 5-10 minutes (optimized from 12-25 min - 50% faster!)
-- **Daily Snapshot:** 3-5 minutes (6 combinations)
-- **Data Freshness Check:** < 1 second
-- **API Response:** < 100ms (with cache)
-- **Database Size:** ~1.6M records, ~500MB
-- **Memory Usage:** ~500MB (Flask), ~1GB (PostgreSQL)
-
-### Optimization Tips
-
-1. **Saga Pattern:** Automatic retry prevents failures
-2. **Parallel Processing:** Data tasks run in parallel
-3. **Model Caching:** Models loaded once, cached in memory
-4. **Database Indexes:** Optimized for common queries
-5. **Redis Caching:** API responses cached
-
----
-
-## 🎯 Recent Improvements (October 2025)
-
-### 1. Kronos Data Availability Pre-Filter (Oct 15)
-**Problem:** Kronos was wasting ~11 minutes per run attempting predictions on stocks with insufficient data (<200 days).
-
-**Solution:** Added database check in Stage 3 filtering to verify data availability BEFORE passing stocks to Kronos.
-
-**Impact:**
-- ⏱️ **50% faster** predictions (12-25 min → 5-10 min)
-- ✅ **90% success rate** (up from 42%)
-- 🚀 **Zero wasted API calls** (eliminated 435 rejected predictions)
-
-### 2. Scheduler Timing Update to 7 AM IST (Oct 15)
-**Problem:** ML predictions were ready at 10:15 PM, requiring traders to check late at night or wake up rushed before market open.
-
-**Solution:** Changed ML training to 6:00 AM IST and predictions to 7:00 AM IST.
-
-**Impact:**
-- ⏰ **2+ hours prep time** before market open (9:15 AM IST)
-- 😌 **Less stress** for traders - review predictions at leisure
-- 🎯 **Better timing** - predictions ready when traders need them
-
-### 3. Data Freshness Check Before ML Training (Oct 16)
-**Problem:** ML training was running even during market holidays and data pipeline failures, resulting in predictions based on stale data.
-
-**Solution:** Added automated data freshness check that validates data age before training.
-
-**Features:**
-- 📅 **Weekend-aware** - Automatically handles Friday → Monday gap
-- 🏖️ **Holiday detection** - Skips training if data is >3 days old
-- 🔍 **Pipeline monitoring** - Detects data pipeline failures automatically
-- 📊 **Clear logging** - Shows data status and skip reasons
-
-**Impact:**
-- ✅ **Prevents bad predictions** - No training on stale market data
-- 🛡️ **Safety net** - Automatic detection of holidays and failures
-- 📈 **Better quality** - Only trains with fresh, current data
-
-### Documentation
-Complete documentation available in:
-- **[SCHEDULER_UPDATES.md](SCHEDULER_UPDATES.md)** - All three improvements detailed
-- **[KRONOS_INTEGRATION_COMPLETE.md](KRONOS_INTEGRATION_COMPLETE.md)** - Kronos model integration
-
----
-
-## 📚 Documentation
-
-| Document | Description |
-|----------|-------------|
-| **[README.md](README.md)** | This file - comprehensive overview |
-| **[CLAUDE.md](CLAUDE.md)** | AI assistant instructions & codebase guide |
-| **[AUTOMATION.md](docs/AUTOMATION.md)** | Complete automation guide |
-| **[ML_GUIDE.md](docs/ML_GUIDE.md)** | Machine learning models documentation |
-| **[STRUCTURE.md](docs/STRUCTURE.md)** | Project structure & data flow |
-| **[tools/README.md](tools/README.md)** | Utility scripts documentation |
-
----
-
-## 🤝 Contributing
-
-### Development Setup
-
-```bash
-# Clone repository
-git clone https://github.com/yourusername/StockExperiment.git
-cd StockExperiment
-
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Start development server
-./run.sh dev
-```
-
-### Code Style
-
-- **Python:** PEP 8, type hints preferred
-- **SQL:** Uppercase keywords, snake_case tables
-- **Saga Pattern:** Use for multi-step operations
-- **Sessions:** Always use context managers
-- **Models:** Lazy loading with caching
-
----
-
-## 📄 License
-
-MIT License - See [LICENSE](LICENSE) file for details.
-
----
-
-## 🎉 Summary
-
-✅ **100% Automated** - Data collection, ML training, stock selection, trading execution
-✅ **Triple ML Models** - Traditional (RF+XGBoost), Raw LSTM, Kronos (optimized!)
-✅ **Dual Strategies** - Conservative (DEFAULT_RISK) and Aggressive (HIGH_RISK)
-✅ **6 Combinations Daily** - 3 models × 2 strategies = comprehensive coverage
-✅ **2,259+ NSE Stocks** - Complete fundamental and technical data
-✅ **Data Freshness Check** - Holiday/weekend aware, prevents stale data training
-✅ **Optimal Timing** - Predictions ready at 7 AM IST (2+ hours before market open)
-✅ **Saga Pattern** - Reliable multi-step operations with retry logic
-✅ **Auto-Trading** - Automated order placement with risk management
-✅ **Performance Tracking** - Daily P&L snapshots and order monitoring
-✅ **Multi-Broker Support** - Unified service for Fyers, Zerodha, Simulator
-✅ **Production-Ready** - Docker, logging, error handling, monitoring
-✅ **Optimized Performance** - Kronos 50% faster, intelligent pre-filtering
-
-**Zero manual intervention required!** 🚀
-
----
-
-## 📞 Support
 
 ### Getting Help
 
-1. Check documentation in `/docs` folder
-2. Review logs: `docker compose logs -f`
-3. Check system status: `./tools/check_all_schedulers.sh`
-4. Search issues on GitHub
-5. Create new issue with logs and details
+1. **Check logs first:**
+   ```bash
+   docker compose logs -f | grep ERROR
+   ```
 
-### Common Commands
+2. **Check system status:**
+   ```bash
+   ./tools/check_all_schedulers.sh
+   ```
 
+3. **Review pipeline tracking:**
+   ```bash
+   docker exec -it trading_system_db psql -U trader -d trading_system -c "
+   SELECT * FROM pipeline_tracking
+   ORDER BY updated_at DESC
+   LIMIT 10;
+   "
+   ```
+
+4. **Test hybrid strategy:**
+   ```bash
+   python3 test_hybrid_strategy.py
+   ```
+
+5. **Contact support:**
+   - Check CLAUDE.md for detailed technical documentation
+   - Review init-scripts/01-init-db.sql for database schema
+   - Check config/stock_filters.yaml for screening criteria
+
+---
+
+## Performance Metrics
+
+**Daily Processing:**
+- Data pipeline: 20-30 minutes
+- Technical indicators: 3-5 minutes
+- Stock selection: 2-3 minutes
+- CSV export: 2-3 minutes
+- **Total: ~30-45 minutes per day**
+
+**Database Size:**
+- Records: ~1.6 million
+- Storage: ~500 MB
+- Query speed: < 100ms (with indexes)
+
+**API Performance:**
+- Response time: < 100ms (with cache)
+- Cache hit rate: > 90%
+- Concurrent users: 50+
+
+**System Requirements:**
+- RAM: 4GB minimum, 8GB recommended
+- Disk: 5GB minimum (10GB with logs)
+- CPU: 2 cores minimum, 4 cores recommended
+
+---
+
+## Summary
+
+✅ **100% Automated** - Zero manual intervention
+✅ **2,259+ NSE Stocks** - Complete market coverage
+✅ **Hybrid Strategy** - 5 technical indicators combined
+✅ **Dual Strategies** - Conservative + Aggressive
+✅ **Daily Stock Picks** - Top 50 per strategy
+✅ **Multi-Broker Support** - Fyers, Zerodha, Simulator
+✅ **Auto-Trading** - Automated order placement
+✅ **Performance Tracking** - Daily P&L and analytics
+✅ **Saga Pattern** - Reliable with retry logic
+✅ **Production-Ready** - Docker, logging, monitoring
+
+**Set it up once, let it run forever!** 🚀
+
+---
+
+## Support
+
+**Documentation:**
+- Technical details: CLAUDE.md
+- Database schema: init-scripts/01-init-db.sql
+- Screening criteria: config/stock_filters.yaml
+
+**Commands:**
 ```bash
-# Start system
-./run.sh dev
-
-# Stop system
-docker compose down
-
-# Restart services
-docker compose restart data_scheduler ml_scheduler trading_system
-
-# View logs
-docker compose logs -f [service_name]
-
-# Check status
-./tools/check_all_schedulers.sh
-
-# Manual tasks
-python3 run_pipeline.py
-python3 tools/train_ml_model.py
-
-# Database access
-docker exec -it trading_system_db psql -U trader -d trading_system
+./run.sh dev                    # Start system
+docker compose logs -f          # View logs
+./tools/check_all_schedulers.sh # Check status
+python3 test_hybrid_strategy.py # Test strategy
 ```
 
+**Web Interface:**
+- Dashboard: http://localhost:5001
+- Settings: http://localhost:5001/settings
+- Broker: http://localhost:5001/settings/broker
+
 ---
 
-**Built with ❤️ for automated stock trading and analysis**
+**Built for automated technical analysis trading** ❤️
 
----
-
-## 🔄 Recent Updates
-
-**October 16, 2025:**
-- ✅ Added data freshness check before ML training (holiday/weekend aware)
-- ✅ Prevents training on stale data during holidays and pipeline failures
-- ✅ Automatic detection with clear logging and skip messages
-
-**October 15, 2025:**
-- ✅ Optimized Kronos predictions (50% faster with pre-filtering)
-- ✅ Updated scheduler to 7 AM IST (predictions ready before market open)
-- ✅ Improved trader workflow with 2+ hours preparation time
-
-Last Updated: October 16, 2025
+Last Updated: October 29, 2025

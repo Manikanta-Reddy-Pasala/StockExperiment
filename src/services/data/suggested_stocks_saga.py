@@ -189,7 +189,7 @@ class SuggestedStocksSagaOrchestrator:
     def execute_suggested_stocks_saga(self, user_id: int, strategies: List[str] = None,
                                    limit: int = 50, search: str = None, sort_by: str = None,
                                    sort_order: str = 'desc', sector: str = None,
-                                   model_type: str = 'traditional') -> Dict[str, Any]:
+                                   model_type: str = 'hybrid') -> Dict[str, Any]:
         """
         Execute the complete suggested stocks saga with step-by-step updates.
 
@@ -201,7 +201,7 @@ class SuggestedStocksSagaOrchestrator:
             sort_by: Field to sort results by
             sort_order: Sort order ('asc' or 'desc')
             sector: Filter by specific sector
-            model_type: ML model type to use ('traditional', 'raw_lstm', 'kronos')
+            model_type: Model type (default: 'hybrid' - pure technical analysis)
 
         Returns:
             Complete saga results with step-by-step information
@@ -665,7 +665,16 @@ class SuggestedStocksSagaOrchestrator:
             market_cap = stock_data.get('market_cap', 0.0)
             pe_ratio = stock_data.get('pe_ratio')
             volume = stock_data.get('volume', 0)
-            
+            rs_rating = stock_data.get('rs_rating', 50.0)
+
+            # ========================================
+            # HYBRID STRATEGY: RS RATING FILTER
+            # ========================================
+            # RS Rating is a FILTER, not a score
+            # Only consider stocks with RS Rating > 70 (top 30% relative strength)
+            if rs_rating <= 70:
+                return None  # Reject weak momentum stocks
+
             # Get filtering thresholds from configuration
             stage2_filters = self.stock_filters_config.get('stage_2_filters', {})
             filtering_thresholds = stage2_filters.get('filtering_thresholds', {})
@@ -677,75 +686,12 @@ class SuggestedStocksSagaOrchestrator:
             mid_cap_min = market_cap_categories.get('mid_cap', {}).get('minimum', 5000)
 
             # ========================================
-            # MODEL-SPECIFIC FILTERING
+            # REMOVED: MODEL-SPECIFIC FILTERING
             # ========================================
+            # All ML models removed. System now uses pure technical analysis only.
+            # No model-specific filtering needed - just strategy filters below.
 
-            # Kronos Model: K-line pattern analysis requires clear price action and patterns
-            if model_type == 'kronos':
-                # Kronos focuses on candlestick patterns - needs clear price movements
-                # CRITICAL: Check data availability FIRST (avoid wasting time on insufficient data)
 
-                # Check if stock has ≥200 days of historical data
-                # This prevents Kronos from attempting predictions that will fail
-                symbol = stock_data.get('symbol')
-                try:
-                    from ...models.database import get_database_manager
-                    from sqlalchemy import text
-
-                    db_manager = get_database_manager()
-                    with db_manager.get_session() as session:
-                        data_count_query = text("""
-                            SELECT COUNT(*)
-                            FROM historical_data
-                            WHERE symbol = :symbol
-                        """)
-                        data_days = session.execute(data_count_query, {'symbol': symbol}).scalar()
-
-                        if data_days < 200:  # Kronos requires 200 days minimum
-                            logger.debug(f"Kronos filter: {symbol} rejected (only {data_days} days, need 200)")
-                            return None
-                except Exception as e:
-                    logger.warning(f"Failed to check data availability for {symbol}: {e}")
-                    return None  # Better safe than sorry - reject if we can't verify
-
-                # Filter stocks with insufficient volatility (flat price action = no patterns)
-                # Check if stock has sufficient volatility for pattern detection
-                if current_price > 0:
-                    # Stocks with good patterns typically have consistent volume
-                    if volume < 30000:  # Need decent volume for pattern reliability
-                        return None
-
-                # Kronos works best with trending stocks (not flat or erratic)
-                # Check if stock is in a reasonable price range for K-line analysis
-                if current_price < 20 or current_price > 5000:
-                    # Too cheap = erratic patterns, too expensive = less retail participation
-                    return None
-
-                # Additional quality check: avoid penny stocks and illiquid stocks
-                daily_turnover = current_price * volume
-                if daily_turnover < 1_00_00_000:  # Minimum ₹1 Cr daily turnover
-                    return None
-
-            # Raw LSTM Model: Deep learning requires consistent data quality
-            elif model_type == 'raw_lstm':
-                # LSTM works best with stocks that have consistent trading history
-                # Need good liquidity for reliable OHLCV sequences
-
-                if volume < 50000:  # Minimum volume for LSTM data quality
-                    return None
-
-                # LSTM trained on specific price ranges - filter accordingly
-                if current_price < 10 or current_price > 10000:
-                    return None
-
-                # Check daily turnover for data consistency
-                daily_turnover = current_price * volume
-                if daily_turnover < 5_00_00_000:  # Minimum ₹5 Cr daily turnover
-                    return None
-
-            # Traditional ML: Uses fundamental + technical features
-            # No additional model-specific filters needed (already comprehensive)
-            
             # Strategy-specific filtering and scoring (case-insensitive)
             strategy_upper = strategy.upper()
 
@@ -1060,56 +1006,47 @@ class SuggestedStocksSagaOrchestrator:
         return reasons
 
     def _execute_step6_ml_prediction(self, saga: SuggestedStocksSaga) -> SuggestedStocksSaga:
-        """Step 6: Apply technical indicators to suggested stocks."""
+        """Step 6: Apply HYBRID strategy technical indicators to suggested stocks."""
         step = SagaStep(
             step_id="step6_ml_prediction",
-            name="Technical Indicators",
-            description="Apply technical indicators (RS Rating, Wave Indicators, Buy/Sell Signals)"
+            name="Hybrid Technical Indicators",
+            description="Apply Hybrid Strategy (RS Rating + Wave + 8-21 EMA + DeMarker + Fibonacci)"
         )
         saga.add_step(step)
         saga.update_step_status("step6_ml_prediction", SagaStepStatus.IN_PROGRESS)
 
-        print(f"\n📊 Step 6: Technical Indicators")
-        print(f"   Applying technical indicators to {len(saga.final_results)} stocks...")
+        print(f"\n📊 Step 6: Hybrid Technical Indicators")
+        print(f"   Applying hybrid strategy to {len(saga.final_results)} stocks...")
 
         try:
             from src.models.database import get_database_manager
-            from sqlalchemy import text
+            from src.services.technical.hybrid_strategy_calculator import get_hybrid_strategy_calculator
 
             db_manager = get_database_manager()
 
             with db_manager.get_session() as session:
-                # Get technical indicators for all stocks from database
+                # Get symbols
                 symbols = [stock.get('symbol') for stock in saga.final_results]
 
                 if not symbols:
                     logger.warning("No symbols to get indicators for")
                     return saga
 
-                # Fetch indicators from stocks table (calculated by scheduler)
-                query = text("""
-                    SELECT symbol, rs_rating, fast_wave, slow_wave, delta, buy_signal, sell_signal
-                    FROM stocks
-                    WHERE symbol = ANY(:symbols)
-                    AND indicators_last_updated IS NOT NULL
-                """)
+                # Initialize hybrid strategy calculator
+                print(f"   🔧 Calculating hybrid indicators for {len(symbols)} stocks...")
+                hybrid_calc = get_hybrid_strategy_calculator(session)
 
-                result = session.execute(query, {'symbols': symbols})
-                indicators_dict = {row[0]: {
-                    'rs_rating': float(row[1]) if row[1] is not None else 50.0,
-                    'fast_wave': float(row[2]) if row[2] is not None else 0.0,
-                    'slow_wave': float(row[3]) if row[3] is not None else 0.0,
-                    'delta': float(row[4]) if row[4] is not None else 0.0,
-                    'buy_signal': bool(row[5]) if row[5] is not None else False,
-                    'sell_signal': bool(row[6]) if row[6] is not None else False
-                } for row in result}
+                # Calculate all indicators (RS Rating + Wave + 8-21 EMA + DeMarker + Fibonacci)
+                indicators_dict = hybrid_calc.calculate_all_indicators(symbols, lookback_days=252)
 
-                # Apply indicators to stocks and calculate composite score
+                # Apply indicators to stocks
                 stocks_with_indicators = 0
                 total_rs_rating = 0
-                total_delta = 0
+                total_ema_score = 0
+                total_wave_score = 0
                 buy_signals = 0
                 sell_signals = 0
+                high_quality_signals = 0
 
                 for stock in saga.final_results:
                     symbol = stock.get('symbol')
@@ -1117,51 +1054,58 @@ class SuggestedStocksSagaOrchestrator:
                     if symbol in indicators_dict:
                         indicators = indicators_dict[symbol]
 
-                        # Add technical indicator fields
-                        stock['rs_rating'] = indicators['rs_rating']
-                        stock['fast_wave'] = indicators['fast_wave']
-                        stock['slow_wave'] = indicators['slow_wave']
-                        stock['delta'] = indicators['delta']
-                        stock['buy_signal'] = indicators['buy_signal']
-                        stock['sell_signal'] = indicators['sell_signal']
+                        # Add all technical indicator fields
+                        stock['rs_rating'] = indicators.get('rs_rating', 50.0)
+                        stock['fast_wave'] = indicators.get('fast_wave', 0.0)
+                        stock['slow_wave'] = indicators.get('slow_wave', 0.0)
+                        stock['delta'] = indicators.get('delta', 0.0)
+                        stock['wave_momentum_score'] = indicators.get('wave_momentum_score', 50.0)
 
-                        # Calculate composite technical score (0-100 scale)
-                        # Formula: (RS Rating * 0.6) + (Delta normalized * 40)
-                        # Positive Delta = bullish (add to score), Negative Delta = bearish (subtract)
-                        delta_contribution = min(40, max(-40, indicators['delta'] * 100))  # Scale delta to -40 to +40
-                        composite_score = (indicators['rs_rating'] * 0.6) + delta_contribution
+                        # 8-21 EMA indicators
+                        stock['ema_8'] = indicators.get('ema_8', 0.0)
+                        stock['ema_21'] = indicators.get('ema_21', 0.0)
+                        stock['ema_trend_score'] = indicators.get('ema_trend_score', 50.0)
+                        stock['demarker'] = indicators.get('demarker', 0.5)
 
-                        # Boost score if buy signal is present
-                        if indicators['buy_signal']:
-                            composite_score += 10
-                            buy_signals += 1
+                        # Fibonacci targets
+                        stock['fib_target_1'] = indicators.get('fib_target_1', 0.0)
+                        stock['fib_target_2'] = indicators.get('fib_target_2', 0.0)
+                        stock['fib_target_3'] = indicators.get('fib_target_3', 0.0)
 
-                        # Reduce score if sell signal is present
-                        if indicators['sell_signal']:
-                            composite_score -= 10
-                            sell_signals += 1
+                        # Hybrid composite score
+                        stock['hybrid_composite_score'] = indicators.get('hybrid_composite_score', 50.0)
+                        stock['selection_score'] = stock['hybrid_composite_score']  # Use hybrid score for sorting
 
-                        # Clamp to 0-100 range
-                        composite_score = max(0, min(100, composite_score))
+                        # Signals
+                        stock['buy_signal'] = indicators.get('buy_signal', False)
+                        stock['sell_signal'] = indicators.get('sell_signal', False)
+                        stock['signal_quality'] = indicators.get('signal_quality', 'none')
 
-                        stock['selection_score'] = composite_score
-
+                        # Count statistics
                         stocks_with_indicators += 1
-                        total_rs_rating += indicators['rs_rating']
-                        total_delta += indicators['delta']
+                        total_rs_rating += stock['rs_rating']
+                        total_ema_score += stock['ema_trend_score']
+                        total_wave_score += stock['wave_momentum_score']
+
+                        if stock['buy_signal']:
+                            buy_signals += 1
+                            if stock['signal_quality'] == 'high':
+                                high_quality_signals += 1
+                        if stock['sell_signal']:
+                            sell_signals += 1
 
                     else:
                         # No indicators available - use default values
                         self._set_default_technical_values(stock)
 
-                print(f"   ✅ Technical indicators applied to {stocks_with_indicators}/{len(saga.final_results)} stocks")
+                print(f"   ✅ Hybrid indicators applied to {stocks_with_indicators}/{len(saga.final_results)} stocks")
 
                 # ========================================
-                # SORT AND APPLY LIMIT BASED ON COMPOSITE SCORE
+                # SORT AND APPLY LIMIT BASED ON HYBRID COMPOSITE SCORE
                 # ========================================
-                print(f"\n   📊 Sorting and selecting top stocks by technical score...")
+                print(f"\n   📊 Sorting and selecting top stocks by hybrid composite score...")
 
-                # Sort by composite selection_score (descending order - best scores first)
+                # Sort by hybrid composite score (descending order - best scores first)
                 saga.final_results.sort(key=lambda x: x.get('selection_score', 0), reverse=True)
 
                 # Apply limit: select top N stocks
@@ -1176,19 +1120,22 @@ class SuggestedStocksSagaOrchestrator:
                 for rank, stock in enumerate(saga.final_results, 1):
                     stock['rank'] = rank
 
-                print(f"   🏆 Final selection: {len(saga.final_results)} stocks ranked by technical score")
+                print(f"   🏆 Final selection: {len(saga.final_results)} stocks ranked by hybrid score")
 
                 # Store metadata
                 avg_rs = total_rs_rating / stocks_with_indicators if stocks_with_indicators > 0 else 50.0
-                avg_delta = total_delta / stocks_with_indicators if stocks_with_indicators > 0 else 0.0
+                avg_ema = total_ema_score / stocks_with_indicators if stocks_with_indicators > 0 else 50.0
+                avg_wave = total_wave_score / stocks_with_indicators if stocks_with_indicators > 0 else 50.0
 
                 step.metadata = {
-                    'method': 'technical_indicators',
+                    'method': 'hybrid_strategy',
                     'indicators_applied': stocks_with_indicators,
                     'avg_rs_rating': avg_rs,
-                    'avg_delta': avg_delta,
+                    'avg_ema_trend_score': avg_ema,
+                    'avg_wave_momentum_score': avg_wave,
                     'buy_signals': buy_signals,
                     'sell_signals': sell_signals,
+                    'high_quality_signals': high_quality_signals,
                     'stocks_before_limit': stocks_before_limit,
                     'stocks_after_limit': len(saga.final_results),
                     'limit_applied': saga.limit if saga.limit and saga.limit > 0 else 'none'
@@ -1200,8 +1147,8 @@ class SuggestedStocksSagaOrchestrator:
                 saga.update_step_status("step6_ml_prediction", SagaStepStatus.COMPLETED,
                                       metadata=step.metadata)
 
-                print(f"   📈 Avg RS Rating: {avg_rs:.1f}, Avg Delta: {avg_delta:.4f}")
-                print(f"   🎯 Buy Signals: {buy_signals}, Sell Signals: {sell_signals}")
+                print(f"   📈 Avg Scores - RS: {avg_rs:.1f}, EMA: {avg_ema:.1f}, Wave: {avg_wave:.1f}")
+                print(f"   🎯 Buy Signals: {buy_signals} (High Quality: {high_quality_signals}), Sell Signals: {sell_signals}")
 
                 return saga
 
@@ -1214,13 +1161,32 @@ class SuggestedStocksSagaOrchestrator:
 
     def _set_default_technical_values(self, stock: Dict[str, Any]) -> None:
         """Set default technical indicator values when data is not available."""
+        # Wave indicators
         stock['rs_rating'] = 50.0  # Neutral
         stock['fast_wave'] = 0.0
         stock['slow_wave'] = 0.0
         stock['delta'] = 0.0
+        stock['wave_momentum_score'] = 50.0
+
+        # 8-21 EMA indicators
+        stock['ema_8'] = 0.0
+        stock['ema_21'] = 0.0
+        stock['ema_trend_score'] = 50.0
+        stock['demarker'] = 0.5
+
+        # Fibonacci targets
+        stock['fib_target_1'] = 0.0
+        stock['fib_target_2'] = 0.0
+        stock['fib_target_3'] = 0.0
+
+        # Hybrid composite
+        stock['hybrid_composite_score'] = 50.0
+        stock['selection_score'] = 50.0  # Neutral composite score
+
+        # Signals
         stock['buy_signal'] = False
         stock['sell_signal'] = False
-        stock['selection_score'] = 50.0  # Neutral composite score
+        stock['signal_quality'] = 'none'
 
     def _execute_step7_daily_snapshot(self, saga: SuggestedStocksSaga) -> SuggestedStocksSaga:
         """Step 7: Save daily snapshot with technical indicators."""
