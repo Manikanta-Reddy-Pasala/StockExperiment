@@ -25,8 +25,7 @@ class MockTradingService:
         self,
         user_id: int,
         symbol: str,
-        quantity: int,
-        strategy: str
+        quantity: int
     ) -> Dict:
         """
         Place a mock order for evaluation purposes.
@@ -35,7 +34,6 @@ class MockTradingService:
             user_id: User ID
             symbol: Stock symbol (e.g., 'RELIANCE-EQ')
             quantity: Number of shares
-            strategy: '8-21 EMA strategy: 'default_risk' or 'high_risk'
 
         Returns:
             Dict with order details and status
@@ -81,15 +79,13 @@ class MockTradingService:
                 status='COMPLETED',  # Mock orders are instantly "completed"
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
-                is_mock_order=True,
-                strategy=strategy
+                is_mock_order=True
             )
 
             self.session.add(order)
             self.session.commit()
 
-            logger.info(f"Mock order placed: {symbol} x{quantity} @ ₹{current_price:.2f} "
-                       f"(Strategy: {strategy})")
+            logger.info(f"Mock order placed: {symbol} x{quantity} @ ₹{current_price:.2f}")
 
             return {
                 'success': True,
@@ -98,7 +94,6 @@ class MockTradingService:
                 'quantity': quantity,
                 'price': current_price,
                 'total_value': total_value,
-                'strategy': strategy,
                 'created_at': order.created_at.isoformat()
             }
 
@@ -113,7 +108,6 @@ class MockTradingService:
     def get_mock_orders(
         self,
         user_id: int,
-        strategy: Optional[str] = None,
         limit: int = 50
     ) -> List[Dict]:
         """
@@ -121,7 +115,6 @@ class MockTradingService:
 
         Args:
             user_id: User ID
-            strategy: Filter by strategy ('default_risk' or 'high_risk')
             limit: Maximum number of orders to return
 
         Returns:
@@ -134,9 +127,6 @@ class MockTradingService:
                     Order.is_mock_order == True
                 )
             )
-
-            if strategy:
-                query = query.filter(Order.strategy == strategy)
 
             orders = query.order_by(desc(Order.created_at)).limit(limit).all()
 
@@ -161,7 +151,6 @@ class MockTradingService:
                     'current_price': current_price,
                     'pnl': pnl,
                     'pnl_percent': pnl_percent,
-                    'strategy': order.strategy,
                     'created_at': order.created_at.isoformat() if order.created_at else None
                 })
 
@@ -171,15 +160,15 @@ class MockTradingService:
             logger.error(f"Failed to retrieve mock orders: {e}", exc_info=True)
             return []
 
-    def calculate_strategy_performance(self, user_id: int) -> Dict:
+    def calculate_performance(self, user_id: int) -> Dict:
         """
-        Calculate performance metrics for each strategy.
+        Calculate overall performance metrics.
 
         Args:
             user_id: User ID
 
         Returns:
-            Dict with performance metrics for each strategy
+            Dict with performance metrics
         """
         try:
             orders = self.get_mock_orders(user_id, limit=1000)
@@ -190,56 +179,32 @@ class MockTradingService:
                     'error': 'No mock orders found'
                 }
 
-            # Group by strategy
-            performance = {}
+            # Calculate overall metrics
+            total_orders = len(orders)
+            total_invested = sum(o['entry_price'] * o['quantity'] for o in orders)
 
-            for strategy in ['default_risk', 'high_risk']:
-                # Filter orders for this strategy
-                strategy_orders = [
-                    o for o in orders
-                    if o['strategy'] == strategy
-                ]
+            valid_pnl_orders = [o for o in orders if o['pnl'] is not None]
+            total_pnl = sum(o['pnl'] for o in valid_pnl_orders)
 
-                if not strategy_orders:
-                    performance[strategy] = {
-                        'strategy': strategy,
-                        'total_orders': 0,
-                        'total_invested': 0,
-                        'total_pnl': 0,
-                        'avg_pnl_percent': 0,
-                        'winning_orders': 0,
-                        'losing_orders': 0,
-                        'win_rate': 0
-                    }
-                    continue
+            valid_pnl_percent_orders = [o for o in orders if o['pnl_percent'] is not None]
+            avg_pnl_percent = (
+                sum(o['pnl_percent'] for o in valid_pnl_percent_orders) / len(valid_pnl_percent_orders)
+                if valid_pnl_percent_orders else 0
+            )
 
-                # Calculate metrics
-                total_orders = len(strategy_orders)
-                total_invested = sum(o['entry_price'] * o['quantity'] for o in strategy_orders)
+            winning_orders = sum(1 for o in valid_pnl_orders if o['pnl'] > 0)
+            losing_orders = sum(1 for o in valid_pnl_orders if o['pnl'] < 0)
+            win_rate = (winning_orders / len(valid_pnl_orders) * 100) if valid_pnl_orders else 0
 
-                valid_pnl_orders = [o for o in strategy_orders if o['pnl'] is not None]
-                total_pnl = sum(o['pnl'] for o in valid_pnl_orders)
-
-                valid_pnl_percent_orders = [o for o in strategy_orders if o['pnl_percent'] is not None]
-                avg_pnl_percent = (
-                    sum(o['pnl_percent'] for o in valid_pnl_percent_orders) / len(valid_pnl_percent_orders)
-                    if valid_pnl_percent_orders else 0
-                )
-
-                winning_orders = sum(1 for o in valid_pnl_orders if o['pnl'] > 0)
-                losing_orders = sum(1 for o in valid_pnl_orders if o['pnl'] < 0)
-                win_rate = (winning_orders / len(valid_pnl_orders) * 100) if valid_pnl_orders else 0
-
-                performance[strategy] = {
-                    'strategy': strategy,
-                    'total_orders': total_orders,
-                    'total_invested': round(total_invested, 2),
-                    'total_pnl': round(total_pnl, 2),
-                    'avg_pnl_percent': round(avg_pnl_percent, 2),
-                    'winning_orders': winning_orders,
-                    'losing_orders': losing_orders,
-                    'win_rate': round(win_rate, 2)
-                }
+            performance = {
+                'total_orders': total_orders,
+                'total_invested': round(total_invested, 2),
+                'total_pnl': round(total_pnl, 2),
+                'avg_pnl_percent': round(avg_pnl_percent, 2),
+                'winning_orders': winning_orders,
+                'losing_orders': losing_orders,
+                'win_rate': round(win_rate, 2)
+            }
 
             return {
                 'success': True,
@@ -247,29 +212,25 @@ class MockTradingService:
             }
 
         except Exception as e:
-            logger.error(f"Failed to calculate strategy performance: {e}", exc_info=True)
+            logger.error(f"Failed to calculate performance: {e}", exc_info=True)
             return {
                 'success': False,
                 'error': str(e)
             }
 
-    def get_suggested_stock_details(self, symbol: str, strategy: str) -> Optional[Dict]:
+    def get_suggested_stock_details(self, symbol: str) -> Optional[Dict]:
         """
         Get EMA strategy details for a suggested stock.
 
         Args:
             symbol: Stock symbol
-            strategy: Strategy name
 
         Returns:
             Dict with EMA strategy details or None
         """
         try:
             suggested = self.session.query(DailySuggestedStock).filter(
-                and_(
-                    DailySuggestedStock.symbol == symbol,
-                    DailySuggestedStock.strategy == strategy
-                )
+                DailySuggestedStock.symbol == symbol
             ).order_by(desc(DailySuggestedStock.date)).first()
 
             if not suggested:

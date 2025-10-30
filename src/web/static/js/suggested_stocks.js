@@ -168,7 +168,7 @@ function populateTable(modelType, strategy, stocks) {
     }
 
     stocks.forEach((stock, index) => {
-        const row = createStockRow(stock, index + 1, modelType, strategy);
+        const row = createStockRow(stock, index + 1);
         tbody.appendChild(row);
     });
 
@@ -178,73 +178,29 @@ function populateTable(modelType, strategy, stocks) {
 /**
  * Create a table row for a stock
  */
-function createStockRow(stock, rank, modelType, strategy) {
+function createStockRow(stock, rank) {
     const tr = document.createElement('tr');
 
     // Clean symbol (remove NSE: prefix)
     const cleanSymbol = stock.symbol.replace('NSE:', '').replace('-EQ', '');
 
     // Format values
-    const score = (stock.ml_prediction_score * 100).toFixed(1);
-    const target = stock.ml_price_target ? `₹${stock.ml_price_target.toFixed(2)}` : '-';
+    const score = stock.selection_score ? stock.selection_score.toFixed(1) : '0.0';
+    const target = stock.target_price ? `₹${stock.target_price.toFixed(2)}` : '-';
     const rec = stock.recommendation || 'HOLD';
 
     // Recommendation badge color
     const recColor = rec === 'BUY' ? 'success' : rec === 'SELL' ? 'danger' : 'secondary';
 
-    // Ollama enhancement (if available)
-    let ollamaHtml = '';
-    if (stock.ollama_enhancement) {
-        const enhancement = stock.ollama_enhancement;
-        const marketIntel = enhancement.market_intelligence || {};
-        const sentiment = marketIntel.sentiment_score || 0;
-        const confidence = enhancement.strategy_confidence || 'N/A';
-
-        // Sentiment badge
-        let sentimentBadge = '';
-        let sentimentIcon = '';
-        if (sentiment > 0.3) {
-            sentimentBadge = '<span class="badge bg-success" title="Bullish sentiment">📈</span>';
-            sentimentIcon = '📈';
-        } else if (sentiment < -0.3) {
-            sentimentBadge = '<span class="badge bg-danger" title="Bearish sentiment">📉</span>';
-            sentimentIcon = '📉';
-        } else {
-            sentimentBadge = '<span class="badge bg-secondary" title="Neutral sentiment">➖</span>';
-            sentimentIcon = '➖';
-        }
-
-        // Confidence badge
-        let confidenceBadge = '';
-        if (confidence === 'HIGH') {
-            confidenceBadge = '<span class="badge bg-success" title="High AI confidence">🔥</span>';
-        } else if (confidence === 'MODERATE') {
-            confidenceBadge = '<span class="badge bg-warning" title="Moderate AI confidence">⚡</span>';
-        } else if (confidence === 'LOW') {
-            confidenceBadge = '<span class="badge bg-secondary" title="Low AI confidence">💤</span>';
-        }
-
-        // Sources count
-        const sourcesCount = marketIntel.sources?.length || 0;
-        const sourcesHtml = sourcesCount > 0
-            ? `<span class="badge bg-info" title="${sourcesCount} news sources">📰 ${sourcesCount}</span>`
-            : '';
-
-        ollamaHtml = `<div class="small">${sentimentBadge} ${confidenceBadge} ${sourcesHtml}</div>`;
-    }
-
     tr.innerHTML = `
         <td>${rank}</td>
         <td><span class="badge bg-light text-dark">${cleanSymbol}</span></td>
-        <td class="small">
-            ${stock.stock_name || cleanSymbol}
-            ${ollamaHtml}
-        </td>
-        <td><span class="badge bg-primary">${score}%</span></td>
+        <td class="small">${stock.stock_name || cleanSymbol}</td>
+        <td><span class="badge bg-primary">${score}</span></td>
         <td class="text-success fw-bold">${target}</td>
         <td><span class="badge bg-${recColor}">${rec}</span></td>
         <td>
-            <button class="btn btn-sm btn-success" onclick="buyStock('${stock.symbol}', '${modelType}', '${strategy}', ${stock.ml_prediction_score}, ${stock.ml_price_target || 0})">
+            <button class="btn btn-sm btn-success" onclick="buyStock('${stock.symbol}')">
                 <i class="bi bi-cart-plus"></i> Buy
             </button>
         </td>
@@ -256,16 +212,14 @@ function createStockRow(stock, rank, modelType, strategy) {
 /**
  * Buy a single stock
  */
-function buyStock(symbol, modelType, strategy, mlScore, priceTarget) {
-    console.log(`🛒 Buying stock: ${symbol} (${modelType}/${strategy})`);
+function buyStock(symbol) {
+    console.log(`🛒 Buying stock: ${symbol}`);
 
     // Store current selection
     currentSymbol = symbol;
-    currentModelType = modelType;
-    currentStrategy = strategy;
 
     // Find stock details
-    const stocks = currentData[modelType]?.[strategy] || [];
+    const stocks = currentData || [];
     const stock = stocks.find(s => s.symbol === symbol);
 
     if (!stock) {
@@ -275,10 +229,8 @@ function buyStock(symbol, modelType, strategy, mlScore, priceTarget) {
 
     // Update modal
     document.getElementById('modal-stock-name').textContent = stock.stock_name || symbol;
-    document.getElementById('modal-model').textContent = modelType.toUpperCase().replace('_', ' ');
-    document.getElementById('modal-strategy').textContent = strategy.replace('_', ' ').toUpperCase();
-    document.getElementById('modal-score').textContent = `${(mlScore * 100).toFixed(1)}%`;
-    document.getElementById('modal-target').textContent = `₹${priceTarget.toFixed(2)}`;
+    document.getElementById('modal-score').textContent = stock.selection_score ? `${stock.selection_score.toFixed(1)}` : 'N/A';
+    document.getElementById('modal-target').textContent = stock.target_price ? `₹${stock.target_price.toFixed(2)}` : 'N/A';
     document.getElementById('order-quantity').value = 1;
 
     // Show modal
@@ -293,7 +245,7 @@ document.getElementById('confirm-buy-btn')?.addEventListener('click', async func
     const quantity = parseInt(document.getElementById('order-quantity').value) || 1;
 
     try {
-        const stocks = currentData[currentModelType]?.[currentStrategy] || [];
+        const stocks = currentData || [];
         const stock = stocks.find(s => s.symbol === currentSymbol);
 
         if (!stock) {
@@ -305,11 +257,7 @@ document.getElementById('confirm-buy-btn')?.addEventListener('click', async func
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 symbol: currentSymbol,
-                quantity: quantity,
-                model_type: currentModelType,
-                strategy: currentStrategy,
-                ml_prediction_score: stock.ml_prediction_score,
-                ml_price_target: stock.ml_price_target
+                quantity: quantity
             })
         });
 
@@ -329,25 +277,19 @@ document.getElementById('confirm-buy-btn')?.addEventListener('click', async func
 });
 
 /**
- * Buy all stocks in a strategy
+ * Buy all stocks
  */
-function buyAllStocks(modelType, strategy) {
-    console.log(`🛒 Buying all stocks: ${modelType}/${strategy}`);
+function buyAllStocks() {
+    console.log(`🛒 Buying all stocks`);
 
-    const stocks = currentData[modelType]?.[strategy] || [];
+    const stocks = currentData || [];
 
     if (stocks.length === 0) {
-        showError('No stocks available in this strategy');
+        showError('No stocks available');
         return;
     }
 
-    // Store current selection
-    currentModelType = modelType;
-    currentStrategy = strategy;
-
     // Update modal
-    document.getElementById('bulk-model-type').textContent = modelType.toUpperCase().replace('_', ' ');
-    document.getElementById('bulk-strategy').textContent = strategy.replace('_', ' ').toUpperCase();
     document.getElementById('bulk-total-stocks').textContent = stocks.length;
     document.getElementById('bulk-investment-amount').value = '';
 
@@ -368,21 +310,21 @@ document.getElementById('confirm-bulk-buy-btn')?.addEventListener('click', async
     }
 
     try {
-        const stocks = currentData[currentModelType]?.[currentStrategy] || [];
+        const stocks = currentData || [];
 
         if (stocks.length === 0) {
             throw new Error('No stocks to buy');
         }
 
-        // Calculate total ML score
-        const totalScore = stocks.reduce((sum, s) => sum + (s.ml_prediction_score || 0), 0);
+        // Calculate total selection score
+        const totalScore = stocks.reduce((sum, s) => sum + (s.selection_score || 0), 0);
 
         // Place orders
         let successCount = 0;
 
         for (const stock of stocks) {
-            // Allocate investment proportionally by ML score
-            const allocation = (stock.ml_prediction_score / totalScore) * investmentAmount;
+            // Allocate investment proportionally by selection score
+            const allocation = (stock.selection_score / totalScore) * investmentAmount;
             const quantity = Math.floor(allocation / stock.current_price);
 
             if (quantity < 1) continue;
@@ -392,11 +334,7 @@ document.getElementById('confirm-bulk-buy-btn')?.addEventListener('click', async
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     symbol: stock.symbol,
-                    quantity: quantity,
-                    model_type: currentModelType,
-                    strategy: currentStrategy,
-                    ml_prediction_score: stock.ml_prediction_score,
-                    ml_price_target: stock.ml_price_target
+                    quantity: quantity
                 })
             });
 

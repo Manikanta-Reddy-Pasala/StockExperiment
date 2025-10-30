@@ -199,53 +199,21 @@ class AutoTradingService:
 
     def _check_market_sentiment(self, settings: AutoTradingSettings,
                                 execution: AutoTradingExecution) -> Dict[str, Any]:
-        """Check market sentiment from Ollama AI."""
-        try:
-            from src.services.data.strategy_ollama_enhancement_service import get_strategy_ollama_enhancement_service
+        """Market sentiment check (simplified - no AI)."""
+        # Simplified version without AI/Ollama
+        # Always proceed with neutral sentiment
+        execution.market_sentiment_type = 'neutral'
+        execution.market_sentiment_score = 0.5
+        execution.ai_confidence = 0.0
 
-            ollama_service = get_strategy_ollama_enhancement_service()
-            sentiment = ollama_service.get_market_sentiment()
-
-            if not sentiment.get('success'):
-                return {
-                    'proceed': False,
-                    'message': 'Failed to fetch market sentiment'
-                }
-
-            # Store sentiment in execution log
-            execution.market_sentiment_type = sentiment['sentiment_type']
-            execution.market_sentiment_score = sentiment['sentiment_score']
-            execution.ai_confidence = sentiment.get('confidence_score', 0.0)
-
-            # Check if sentiment meets minimum threshold
-            sentiment_score = sentiment['sentiment_score']
-            min_sentiment = settings.minimum_market_sentiment
-
-            if sentiment_score < min_sentiment:
-                return {
-                    'proceed': False,
-                    'message': f"Market sentiment ({sentiment_score:.2f}) below minimum ({min_sentiment:.2f})"
-                }
-
-            # Check if sentiment is 'greedy' (overvalued market)
-            if sentiment['sentiment_type'] == 'greedy':
-                return {
-                    'proceed': False,
-                    'message': "Market is GREEDY - not a good time to invest"
-                }
-
-            logger.info(f"✅ Market sentiment OK: {sentiment['sentiment_type']} ({sentiment_score:.2f})")
-            return {
-                'proceed': True,
-                'sentiment': sentiment
+        logger.info("✅ Market sentiment check: Proceeding (AI disabled)")
+        return {
+            'proceed': True,
+            'sentiment': {
+                'sentiment_type': 'neutral',
+                'sentiment_score': 0.5
             }
-
-        except Exception as e:
-            logger.error(f"Error checking market sentiment: {e}")
-            return {
-                'proceed': False,
-                'message': f'Error checking market sentiment: {str(e)}'
-            }
+        }
 
     def _check_weekly_limits(self, user_id: int, settings: AutoTradingSettings,
                             execution: AutoTradingExecution) -> Dict[str, Any]:

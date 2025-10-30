@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Suggested Stocks - Triple Model View{% endblock %}
+{% block title %}Suggested Stocks - 8-21 EMA Strategy{% endblock %}
 
 {% block content %}
 <!-- Header Section -->
@@ -9,9 +9,9 @@
         <div class="d-flex justify-content-between align-items-center">
             <div>
                 <h5 class="card-title mb-0 text-white">
-                    <i class="bi bi-graph-up-arrow me-2"></i>Stock Suggestions - Triple Model Comparison
+                    <i class="bi bi-graph-up-arrow me-2"></i>Stock Suggestions - 8-21 EMA Swing Trading
                 </h5>
-                <small class="opacity-75">Traditional ML vs Raw LSTM vs Kronos Foundation Model + AI-Enhanced with Ollama</small>
+                <small class="opacity-75">Technical analysis using 8 & 21 EMA crossovers, DeMarker oscillator, and Fibonacci extensions</small>
                 <div class="mt-1">
                     <small class="badge bg-light text-dark" id="data-date-badge">Loading...</small>
                 </div>
@@ -25,54 +25,39 @@
     </div>
     <div class="card-body bg-light">
         <div class="row text-center">
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <div class="card border-primary h-100">
                     <div class="card-body">
-                        <h6 class="text-primary mb-2">🏛️ Traditional ML</h6>
-                        <small class="text-muted">RF + XGBoost<br>70+ Features</small>
-                        <h4 class="mt-2 mb-0" id="trad-count">-</h4>
+                        <h6 class="text-primary mb-2">🛡️ Default Risk</h6>
+                        <small class="text-muted">Conservative Strategy<br>Large-cap Focus</small>
+                        <h4 class="mt-2 mb-0" id="default-count">-</h4>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card border-success h-100">
+            <div class="col-md-6">
+                <div class="card border-danger h-100">
                     <div class="card-body">
-                        <h6 class="text-success mb-2">🤖 Raw LSTM</h6>
-                        <small class="text-muted">Deep Learning<br>OHLCV Only</small>
-                        <h4 class="mt-2 mb-0" id="lstm-count">-</h4>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card border-warning h-100">
-                    <div class="card-body">
-                        <h6 class="text-warning mb-2">⚡ Kronos Model</h6>
-                        <small class="text-muted">Foundation Model<br>K-line Tokenization</small>
-                        <h4 class="mt-2 mb-0" id="kronos-count">-</h4>
+                        <h6 class="text-danger mb-2">⚡ High Risk</h6>
+                        <small class="text-muted">Aggressive Strategy<br>Small/Mid-cap Focus</small>
+                        <h4 class="mt-2 mb-0" id="high-risk-count">-</h4>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Ollama AI Enhancement Legend -->
+        <!-- Strategy Information -->
         <div class="alert alert-info mt-3 mb-0 small">
             <div class="d-flex align-items-start">
                 <div class="me-2">
                     <i class="bi bi-info-circle-fill"></i>
                 </div>
                 <div>
-                    <strong>🤖 AI Enhancement Indicators:</strong>
-                    <span class="ms-2">
-                        📈 Bullish | 📉 Bearish | ➖ Neutral
-                    </span>
+                    <strong>📊 Strategy Indicators:</strong>
+                    <span class="ms-2">Selection Score: 0-100 (EMA signal strength)</span>
                     <span class="ms-2">•</span>
-                    <span class="ms-2">
-                        🔥 High Confidence | ⚡ Moderate | 💤 Low
-                    </span>
+                    <span class="ms-2">Target: Fibonacci extension levels</span>
                     <span class="ms-2">•</span>
-                    <span class="ms-2">
-                        📰 News Sources
-                    </span>
+                    <span class="ms-2">Stop Loss: DeMarker-based</span>
                 </div>
             </div>
         </div>

@@ -437,58 +437,25 @@ def get_dual_model_view():
 @login_required
 def get_market_sentiment():
     """
-    Get overall Indian market sentiment using Ollama AI.
+    Get market sentiment (simplified - AI disabled).
 
-    Returns market sentiment analysis including:
-    - sentiment_type: 'greedy', 'fear', or 'neutral'
-    - recommendation: investment advice
-    - analysis: detailed market analysis
-    - sources: news sources used
+    Returns neutral market sentiment without AI analysis.
     """
     try:
-        logger.info("📊 Market sentiment request received")
+        logger.info("📊 Market sentiment request received (AI disabled)")
 
-        # Default fallback response (returned immediately if Ollama times out)
-        default_response = {
+        # Simple neutral response (AI/Ollama removed)
+        response = {
             'success': True,
             'sentiment_type': 'neutral',
             'recommendation': 'Markets are stable. Consider balanced approach.',
-            'analysis': 'Real-time market sentiment temporarily unavailable. Using default neutral sentiment.',
+            'analysis': 'AI-based market sentiment analysis is disabled. Using neutral sentiment.',
             'emoji': '📊',
             'color': 'info',
             'sources': []
         }
 
-        try:
-            # Use threading to enforce fast timeout
-            import signal
-            from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
-
-            def get_sentiment():
-                from ...services.data.strategy_ollama_enhancement_service import get_strategy_ollama_enhancement_service
-                ollama_service = get_strategy_ollama_enhancement_service()
-                return ollama_service.get_market_sentiment()
-
-            # Try to get sentiment with 5-second timeout
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(get_sentiment)
-                try:
-                    sentiment_result = future.result(timeout=5.0)  # 5 second timeout
-
-                    if sentiment_result and sentiment_result.get('success'):
-                        logger.info(f"✅ Market sentiment: {sentiment_result['sentiment_type'].upper()}")
-                        return jsonify(sentiment_result), 200
-                    else:
-                        logger.warning("⚠️ Ollama returned unsuccessful result, using default")
-                        return jsonify(default_response), 200
-
-                except FuturesTimeoutError:
-                    logger.warning("⏱️ Market sentiment timeout (5s), using default neutral sentiment")
-                    return jsonify(default_response), 200
-
-        except Exception as inner_e:
-            logger.warning(f"⚠️ Ollama service unavailable: {str(inner_e)}, using default sentiment")
-            return jsonify(default_response), 200
+        return jsonify(response), 200
 
     except Exception as e:
         logger.error(f"❌ Error getting market sentiment: {e}", exc_info=True)

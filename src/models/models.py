@@ -8,7 +8,7 @@ from flask_login import UserMixin
 
 # Import enhanced stock models and use their Base
 from .stock_models import (
-    Stock, StrategyType, StrategyStockSelection, MLPrediction,
+    Stock, StrategyType, StrategyStockSelection,
     PortfolioStrategy, PortfolioPosition, MarketDataSnapshot, MarketCapCategory,
     SymbolMaster, Base
 )
@@ -488,56 +488,6 @@ class BrokerConfiguration(Base):
     __table_args__ = (
         UniqueConstraint('user_id', 'broker_name', name='_user_broker_uc'),
     )
-
-
-class MLTrainingJob(Base):
-    """ML training job tracking."""
-    __tablename__ = 'ml_training_jobs'
-
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    symbol = Column(String(50), nullable=False)
-    model_type = Column(String(50), nullable=False)  # 'ensemble', 'random_forest', 'xgboost', 'lstm'
-    start_date = Column(DateTime, nullable=False)  # Training data start date
-    end_date = Column(DateTime, nullable=False)    # Training data end date
-    duration = Column(String(10), nullable=False)   # '1M', '3M', '6M', '1Y', etc.
-    use_technical_indicators = Column(Boolean, default=True)
-    status = Column(String(20), default='pending')  # 'pending', 'running', 'completed', 'failed'
-    progress = Column(Float, default=0.0)  # 0.0 to 100.0
-    accuracy = Column(Float)  # Model accuracy after training
-    error_message = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    started_at = Column(DateTime)
-    completed_at = Column(DateTime)
-
-    # Relationships
-    user = relationship("User")
-
-
-class MLTrainedModel(Base):
-    """Trained ML model metadata."""
-    __tablename__ = 'ml_trained_models'
-
-    id = Column(Integer, primary_key=True)
-    training_job_id = Column(Integer, ForeignKey('ml_training_jobs.id'), nullable=False)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    symbol = Column(String(50), nullable=False)
-    model_type = Column(String(50), nullable=False)
-    model_file_path = Column(Text)  # Path to saved model file
-    scaler_file_path = Column(Text)  # Path to saved scaler file
-    feature_columns = Column(Text)  # JSON array of feature columns (matches DB)
-    target_column = Column(String(50))  # Target column name
-    model_version = Column(String(50))  # Model version
-    accuracy = Column(Float)
-    training_start_date = Column(DateTime, nullable=False)  # Matches DB
-    training_end_date = Column(DateTime, nullable=False)    # Matches DB
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # Relationships
-    training_job = relationship("MLTrainingJob")
-    user = relationship("User")
 
 
 class AutoTradingSettings(Base):

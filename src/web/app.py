@@ -1201,7 +1201,6 @@ def create_app():
             data = request.get_json()
             symbol = data.get('symbol')
             quantity = data.get('quantity', 1)
-            strategy = data.get('strategy', 'default_risk')
 
             if not symbol:
                 return jsonify({'success': False, 'error': 'Symbol is required'}), 400
@@ -1212,8 +1211,7 @@ def create_app():
                 result = mock_trading_service.place_mock_order(
                     user_id=current_user.id,
                     symbol=symbol,
-                    quantity=quantity,
-                    strategy=strategy
+                    quantity=quantity
                 )
 
             if result['success']:
@@ -1230,7 +1228,6 @@ def create_app():
     def api_get_mock_orders():
         """Get mock orders for a user."""
         try:
-            strategy = request.args.get('strategy')
             limit = int(request.args.get('limit', 50))
 
             from ..services.trading.mock_trading_service import get_mock_trading_service
@@ -1238,7 +1235,6 @@ def create_app():
                 mock_trading_service = get_mock_trading_service(session)
                 orders = mock_trading_service.get_mock_orders(
                     user_id=current_user.id,
-                    strategy=strategy,
                     limit=limit
                 )
 
