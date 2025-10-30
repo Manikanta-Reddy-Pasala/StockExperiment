@@ -29,7 +29,6 @@ def get_suggested_stocks():
     """
     try:
         # Get parameters
-        strategy = request.args.get('strategy', 'default_risk')
         limit = int(request.args.get('limit', 50))
         search = request.args.get('search')
         sort_by = request.args.get('sort_by', 'current_price')
@@ -38,25 +37,10 @@ def get_suggested_stocks():
 
         user_id = current_user.id
 
-        logger.info(f"🎯 Suggested stocks request: strategy={strategy}, limit={limit}, user={user_id}")
+        logger.info(f"🎯 Suggested stocks request: limit={limit}, user={user_id}")
 
         # Use unified broker service to get the appropriate provider
         from ...services.core.unified_broker_service import get_unified_broker_service
-        from ...services.interfaces.suggested_stocks_interface import StrategyType
-
-        # Map strategy type to enum
-        strategy_map = {
-            'default_risk': StrategyType.DEFAULT_RISK,
-            'high_risk': StrategyType.HIGH_RISK
-        }
-
-        if strategy not in strategy_map:
-            return jsonify({
-                'success': False,
-                'error': f'Invalid strategy. Must be one of: {list(strategy_map.keys())}'
-            }), 400
-
-        strategy_enum = strategy_map[strategy]
 
         # Get the unified broker service
         unified_service = get_unified_broker_service()
@@ -69,10 +53,10 @@ def get_suggested_stocks():
                 'error': 'No suggested stocks provider available for your configured broker'
             }), 503
 
-        # Use the provider directly for full feature support
+        # Use the provider directly for full feature support (single unified EMA strategy)
         result = provider.get_suggested_stocks(
             user_id=user_id,
-            strategies=[strategy_enum],
+            strategies=None,  # No strategy filtering - single unified strategy
             limit=limit,
             search=search,
             sort_by=sort_by,
@@ -81,7 +65,7 @@ def get_suggested_stocks():
         )
 
         if result.get('success'):
-            logger.info(f"✅ Returned {len(result.get('data', []))} suggested stocks for {strategy}")
+            logger.info(f"✅ Returned {len(result.get('data', []))} suggested stocks")
             return jsonify(result), 200
         else:
             logger.warning(f"❌ Suggested stocks failed: {result.get('error')}")

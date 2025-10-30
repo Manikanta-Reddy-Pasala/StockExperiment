@@ -17,7 +17,6 @@ try:
     from ..services.core.broker_service import get_broker_service
     from ..services.core.dashboard_service import get_dashboard_service
     from ..services.portfolio.portfolio_service import get_portfolio_service
-    from ..services.market.stock_screening_service import get_stock_screening_service, StrategyType
     from ..utils.api_logger import APILogger, log_flask_route
 except ImportError:
     # Fall back to absolute imports (for testing)
@@ -29,7 +28,6 @@ except ImportError:
     from services.core.broker_service import get_broker_service
     from services.core.dashboard_service import get_dashboard_service
     from services.portfolio.portfolio_service import get_portfolio_service
-    from services.market.stock_screening_service import get_stock_screening_service, StrategyType
     from utils.api_logger import APILogger, log_flask_route
 from datetime import datetime
 import secrets
@@ -91,7 +89,6 @@ def create_app():
     broker_service = get_broker_service()
     dashboard_service = get_dashboard_service()
     portfolio_service = get_portfolio_service()
-    stock_screening_service = get_stock_screening_service(broker_service)
     
     # Initialize new services
     from ..services.utils.cache_service import get_cache_service
@@ -1082,40 +1079,6 @@ def create_app():
             app.logger.error(f"Error getting suggested stocks for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
-    @app.route('/api/suggested-stocks/refresh', methods=['POST'])
-    @login_required
-    def api_refresh_suggested_stocks():
-        """Refresh suggested stocks by running screening again."""
-        try:
-            app.logger.info(f"Refreshing suggested stocks for user {current_user.id}")
-            data = request.get_json() or {}
-            strategies = data.get('strategies', [])
-            
-            strategy_types = [StrategyType(s) for s in strategies if s in StrategyType._value2member_map_]
-            if not strategy_types:
-                strategy_types = [StrategyType.DEFAULT_RISK, StrategyType.HIGH_RISK]
-
-            suggested_stocks = stock_screening_service.screen_stocks(strategy_types, current_user.id)
-            
-            stocks_data = [
-                {
-                    'symbol': stock.symbol, 'name': stock.name, 'selection_date': datetime.now().strftime('%Y-%m-%d'),
-                    'selection_price': round(stock.current_price, 2), 'current_price': round(stock.current_price, 2),
-                    'quantity': 10, 'investment': round(stock.current_price * 10, 2),
-                    'current_value': round(stock.current_price * 10, 2), 'strategy': stock.strategy, 'status': 'Active',
-                    'recommendation': stock.recommendation, 'target_price': round(stock.target_price, 2) if stock.target_price else None,
-                    'stop_loss': round(stock.stop_loss, 2) if stock.stop_loss else None, 'reason': stock.reason,
-                    'market_cap': round(stock.market_cap, 2), 'pe_ratio': round(stock.pe_ratio, 2) if stock.pe_ratio else None,
-                    'pb_ratio': round(stock.pb_ratio, 2) if stock.pb_ratio else None, 'roe': round(stock.roe * 100, 2) if stock.roe else None,
-                    'sales_growth': round(stock.sales_growth, 2) if stock.sales_growth else None
-                } for stock in suggested_stocks
-            ]
-            
-            return jsonify({'success': True, 'data': stocks_data, 'total': len(stocks_data), 'strategies': [s.value for s in strategy_types], 'refreshed_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')})
-        except Exception as e:
-            app.logger.error(f"Error refreshing suggested stocks for user {current_user.id}: {str(e)}")
-            return jsonify({'success': False, 'error': 'Internal server error'}), 500
-    
     # Settings API Routes
     @app.route('/api/settings', methods=['GET'])
     @login_required

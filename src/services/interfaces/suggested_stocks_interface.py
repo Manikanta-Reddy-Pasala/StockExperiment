@@ -8,13 +8,6 @@ Each broker implementation must provide these methods.
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Any
 from datetime import datetime
-from enum import Enum
-
-
-class StrategyType(Enum):
-    """Risk-based strategy types for swing trading business domain."""
-    DEFAULT_RISK = "default_risk"
-    HIGH_RISK = "high_risk"
 
 
 class ISuggestedStocksProvider(ABC):
@@ -64,7 +57,7 @@ class ISuggestedStocksProvider(ABC):
         pass
 
     @abstractmethod
-    def get_suggested_stocks(self, user_id: int, strategies: List[StrategyType] = None,
+    def get_suggested_stocks(self, user_id: int, strategies: Optional[List[str]] = None,
                            limit: int = 50) -> Dict[str, Any]:
         """
         Get suggested stocks based on screening strategies.
@@ -100,7 +93,7 @@ class ISuggestedStocksProvider(ABC):
         """
         pass
     @abstractmethod
-    def get_strategy_performance(self, user_id: int, strategy: StrategyType, 
+    def get_strategy_performance(self, user_id: int, strategy: Optional[str] = None,
                                period: str = '1M') -> Dict[str, Any]:
         """
         Get performance metrics for a specific strategy.
@@ -172,8 +165,8 @@ class ISuggestedStocksProvider(ABC):
 class SuggestedStock:
     """Data class for suggested stock information."""
     
-    def __init__(self, symbol: str, name: str, strategy: StrategyType, 
-                 current_price: float, recommendation: str):
+    def __init__(self, symbol: str, name: str, strategy: Optional[str] = None,
+                 current_price: float = 0.0, recommendation: str = ''):
         self.symbol = symbol
         self.name = name
         self.strategy = strategy
