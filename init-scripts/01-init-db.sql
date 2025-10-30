@@ -478,11 +478,6 @@ CREATE TABLE IF NOT EXISTS data_quality_metrics (
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_stocks_symbol ON stocks(symbol);
 CREATE INDEX IF NOT EXISTS idx_stocks_market_cap_category ON stocks(market_cap_category);
-CREATE INDEX IF NOT EXISTS idx_strategy_stock_selections_strategy ON strategy_stock_selections(strategy_type_id);
-CREATE INDEX IF NOT EXISTS idx_portfolio_strategies_user ON portfolio_strategies(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_strategy_settings_user ON user_strategy_settings(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_strategy_settings_active ON user_strategy_settings(user_id, is_active, is_enabled);
-CREATE INDEX IF NOT EXISTS idx_portfolio_positions_portfolio ON portfolio_positions(portfolio_strategy_id);
 CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_user_broker_date ON portfolio_snapshots(user_id, broker_name, snapshot_date);
 CREATE INDEX IF NOT EXISTS idx_portfolio_performance_user_broker_date ON portfolio_performance_history(user_id, broker_name, date);
 CREATE INDEX IF NOT EXISTS idx_ml_trained_models_user_symbol ON ml_trained_models(user_id, symbol);
@@ -647,9 +642,6 @@ CREATE TABLE IF NOT EXISTS order_performance (
     quantity INTEGER NOT NULL,
     stop_loss FLOAT,
     target_price FLOAT,
-    strategy VARCHAR(50),
-
-    -- ML predictions
 
     -- Current status
     current_price FLOAT,
@@ -770,8 +762,7 @@ CREATE TABLE IF NOT EXISTS daily_suggested_stocks (
     current_price DECIMAL(10, 2),
     market_cap DECIMAL(20, 2),
 
-    -- Strategy and ranking
-    strategy VARCHAR(20) NOT NULL,  -- 'DEFAULT_RISK' or 'HIGH_RISK'
+    -- Strategy and ranking (8-21 EMA unified strategy)
     selection_score DECIMAL(10, 4),
     rank INTEGER,
 
