@@ -306,16 +306,10 @@ def create_app():
         """Strategies page."""
         return render_template('strategies.html')
     
-    @app.route('/ml-prediction')
-    @login_required
-    def ml_prediction():
-        """ML Prediction page."""
-        return render_template('ml_prediction.html')
-    
     @app.route('/suggested_stocks')
     @login_required
     def suggested_stocks():
-        """Suggested stocks page - Triple Model View (Traditional ML + Raw LSTM + Kronos)."""
+        """Suggested stocks page - 8-21 EMA Swing Trading Strategy."""
         return render_template('suggested_stocks.html')
     
     @app.route('/reports')
@@ -1207,10 +1201,7 @@ def create_app():
             data = request.get_json()
             symbol = data.get('symbol')
             quantity = data.get('quantity', 1)
-            model_type = data.get('model_type', 'traditional')
             strategy = data.get('strategy', 'default_risk')
-            ml_prediction_score = data.get('ml_prediction_score')
-            ml_price_target = data.get('ml_price_target')
 
             if not symbol:
                 return jsonify({'success': False, 'error': 'Symbol is required'}), 400
@@ -1222,10 +1213,7 @@ def create_app():
                     user_id=current_user.id,
                     symbol=symbol,
                     quantity=quantity,
-                    model_type=model_type,
-                    strategy=strategy,
-                    ml_prediction_score=ml_prediction_score,
-                    ml_price_target=ml_price_target
+                    strategy=strategy
                 )
 
             if result['success']:
@@ -1242,7 +1230,6 @@ def create_app():
     def api_get_mock_orders():
         """Get mock orders for a user."""
         try:
-            model_type = request.args.get('model_type')
             strategy = request.args.get('strategy')
             limit = int(request.args.get('limit', 50))
 
@@ -1251,7 +1238,6 @@ def create_app():
                 mock_trading_service = get_mock_trading_service(session)
                 orders = mock_trading_service.get_mock_orders(
                     user_id=current_user.id,
-                    model_type=model_type,
                     strategy=strategy,
                     limit=limit
                 )

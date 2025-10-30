@@ -44,7 +44,6 @@ def get_settings():
                         'preferred_strategies': ['default_risk'],
                         'minimum_confidence_score': 0.7,
                         'minimum_market_sentiment': 0.0,
-                        'preferred_model_types': ['traditional', 'raw_lstm', 'kronos'],
                         'auto_stop_loss_enabled': True,
                         'auto_target_price_enabled': True,
                         'execution_time': '09:20'
@@ -60,7 +59,6 @@ def get_settings():
                     'preferred_strategies': json.loads(settings.preferred_strategies or '["default_risk"]'),
                     'minimum_confidence_score': settings.minimum_confidence_score,
                     'minimum_market_sentiment': settings.minimum_market_sentiment,
-                    'preferred_model_types': json.loads(settings.preferred_model_types or '["traditional"]'),
                     'auto_stop_loss_enabled': settings.auto_stop_loss_enabled,
                     'auto_target_price_enabled': settings.auto_target_price_enabled,
                     'execution_time': settings.execution_time,
@@ -91,7 +89,6 @@ def update_settings():
             "preferred_strategies": list,
             "minimum_confidence_score": float,
             "minimum_market_sentiment": float,
-            "preferred_model_types": list,
             "auto_stop_loss_enabled": bool,
             "auto_target_price_enabled": bool,
             "execution_time": string
@@ -146,8 +143,6 @@ def update_settings():
                 settings.minimum_confidence_score = data['minimum_confidence_score']
             if 'minimum_market_sentiment' in data:
                 settings.minimum_market_sentiment = data['minimum_market_sentiment']
-            if 'preferred_model_types' in data:
-                settings.preferred_model_types = json.dumps(data['preferred_model_types'])
             if 'auto_stop_loss_enabled' in data:
                 settings.auto_stop_loss_enabled = data['auto_stop_loss_enabled']
             if 'auto_target_price_enabled' in data:
@@ -299,10 +294,7 @@ def get_orders():
                     'quantity': order.quantity,
                     'stop_loss': order.stop_loss,
                     'target_price': order.target_price,
-                    'model_type': order.model_type,
                     'strategy': order.strategy,
-                    'ml_prediction_score': order.ml_prediction_score,
-                    'ml_confidence': order.ml_confidence,
                     'current_price': order.current_price,
                     'unrealized_pnl': order.unrealized_pnl,
                     'unrealized_pnl_pct': order.unrealized_pnl_pct,

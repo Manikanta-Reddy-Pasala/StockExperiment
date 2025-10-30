@@ -38,12 +38,11 @@ class StrategyConfig:
 
 
 class StockRecommendation:
-    """Stock recommendation with ML predictions and rationale."""
-    def __init__(self, stock_data: StockData, ml_prediction: Dict, selection_score: float,
+    """Stock recommendation with 8-21 EMA strategy and rationale."""
+    def __init__(self, stock_data: StockData, selection_score: float,
                  recommended_allocation: float, recommended_quantity: int,
                  exit_rules: Dict):
         self.stock_data = stock_data
-        self.ml_prediction = ml_prediction
         self.selection_score = selection_score
         self.recommended_allocation = recommended_allocation
         self.recommended_quantity = recommended_quantity
@@ -152,10 +151,9 @@ class AdvancedStrategyService:
                 if not self._passes_entry_rules(stock_data, user_id, current_broker):
                     continue
 
-                ml_prediction = self._get_ml_prediction(stock_data.symbol, user_id)
                 selection_score = 85.0 - (i * 2.5)
                 recommendation = self._create_recommendation(
-                    stock_data, ml_prediction, selection_score, config, capital, i
+                    stock_data, selection_score, config, capital, i
                 )
                 recommendations.append(recommendation)
             
@@ -268,23 +266,8 @@ class AdvancedStrategyService:
         logger.info(f"Found {len(candidates)} stock candidates for {config.name} strategy.")
         return candidates
 
-    def _get_ml_prediction(self, symbol: str, user_id: int = 1) -> Dict:
-        try:
-            from .ml.prediction_service import get_prediction
-            prediction = get_prediction(symbol, user_id)
-            if prediction: return prediction
-            return self._get_mock_ml_prediction(symbol)
-        except Exception as e:
-            logger.error(f"Error getting ML prediction for {symbol}: {e}")
-            return self._get_mock_ml_prediction(symbol)
-
-    def _get_mock_ml_prediction(self, symbol: str) -> Dict:
-        import random
-        predicted_change = random.uniform(5, 20)
-        return {"predicted_change_percent": predicted_change, "signal": "BUY" if predicted_change > 8 else "HOLD", "confidence": random.uniform(0.6, 0.85)}
-
-    def _create_recommendation(self, stock_data: StockData, ml_prediction: Dict,
-                                  selection_score: float, config: StrategyConfig, 
+    def _create_recommendation(self, stock_data: StockData,
+                                  selection_score: float, config: StrategyConfig,
                                   total_capital: float, index: int) -> StockRecommendation:
         entry_price = stock_data.current_price
         recommended_allocation = 1.0 / config.max_stocks
@@ -300,7 +283,6 @@ class AdvancedStrategyService:
         
         return StockRecommendation(
             stock_data=stock_data,
-            ml_prediction=ml_prediction,
             selection_score=selection_score,
             recommended_allocation=recommended_allocation,
             recommended_quantity=recommended_quantity,
@@ -319,7 +301,6 @@ class AdvancedStrategyService:
             "selection_score": rec.selection_score,
             "recommended_quantity": rec.recommended_quantity,
             "investment_amount": rec.recommended_quantity * stock_data.current_price,
-            "ml_prediction": rec.ml_prediction,
             "exit_rules": rec.exit_rules,
             "fundamental_metrics": {
                 "pe_ratio": stock_data.pe_ratio,
