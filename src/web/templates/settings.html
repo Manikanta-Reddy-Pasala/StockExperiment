@@ -31,42 +31,6 @@
                         </div>
 
                         <div class="col-md-12">
-                            <h5 class="mt-4">Active Strategies</h5>
-                            <hr>
-                        </div>
-                        
-                        <div class="col-md-12 mb-4">
-                            <div class="card border-0 bg-light">
-                                <div class="card-body">
-                                    <h6 class="card-title">
-                                        <i class="bi bi-cpu me-2"></i>Strategy Selection
-                                    </h6>
-                                    <p class="card-text text-muted mb-3">
-                                        Select which trading strategies are active for your account. You can enable/disable strategies and set their priority.
-                                    </p>
-                                    
-                                    <div id="strategy-settings-container">
-                                        <div class="text-center py-4">
-                                            <div class="spinner-border text-primary" role="status">
-                                                <span class="visually-hidden">Loading strategies...</span>
-                                            </div>
-                                            <p class="mt-2 text-muted">Loading strategy settings...</p>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="mt-3">
-                                        <button type="button" class="btn btn-primary" id="save-strategy-settings" disabled>
-                                            <i class="bi bi-check-circle me-2"></i>Save Strategy Settings
-                                        </button>
-                                        <button type="button" class="btn btn-outline-secondary ms-2" id="reset-strategy-settings">
-                                            <i class="bi bi-arrow-clockwise me-2"></i>Reset to Defaults
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="col-md-12">
                             <h5 class="mt-4">Account & Auto-Trading</h5>
                             <hr>
                         </div>
@@ -107,7 +71,7 @@
 
                                     <div class="alert alert-info mb-3">
                                         <i class="bi bi-info-circle me-2"></i>
-                                        <strong>How it works:</strong> Every day at 9:20 AM (5 min after market opens), the system checks AI market sentiment, validates weekly limits, and automatically places orders based on your configuration.
+                                        <strong>How it works:</strong> Every day at 9:20 AM (5 min after market opens), the system validates weekly limits and automatically places orders based on 8-21 EMA technical strategy.
                                     </div>
 
                                     <div id="auto-trading-config" style="display: none;">
@@ -124,71 +88,6 @@
                                                 <input type="number" class="form-control" id="max-buys-per-week"
                                                        min="1" max="20" value="5">
                                                 <div class="form-text">Maximum number of buy orders per week (1-20)</div>
-                                            </div>
-                                        </div>
-
-                                        <!-- AI Confidence & Market Sentiment -->
-                                        <div class="row mb-3">
-                                            <div class="col-md-6">
-                                                <label for="min-confidence-score" class="form-label">
-                                                    Minimum AI Confidence: <span id="confidence-value">0.70</span>
-                                                </label>
-                                                <input type="range" class="form-range" id="min-confidence-score"
-                                                       min="0.5" max="0.95" step="0.05" value="0.70">
-                                                <div class="form-text">Only execute if AI confidence is above this threshold</div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label for="min-market-sentiment" class="form-label">
-                                                    Minimum Market Sentiment: <span id="sentiment-value">0.0</span>
-                                                </label>
-                                                <input type="range" class="form-range" id="min-market-sentiment"
-                                                       min="-1.0" max="1.0" step="0.1" value="0.0">
-                                                <div class="form-text">Reject if market is GREEDY (sentiment > 0.7)</div>
-                                            </div>
-                                        </div>
-
-                                        <!-- Strategy Selection -->
-                                        <div class="row mb-3">
-                                            <div class="col-md-6">
-                                                <label class="form-label">Preferred Strategies</label>
-                                                <div class="form-check">
-                                                    <input class="form-check-input auto-trading-strategy" type="checkbox"
-                                                           value="default_risk" id="strategy-default-risk" checked>
-                                                    <label class="form-check-label" for="strategy-default-risk">
-                                                        Default Risk (Conservative)
-                                                    </label>
-                                                </div>
-                                                <div class="form-check">
-                                                    <input class="form-check-input auto-trading-strategy" type="checkbox"
-                                                           value="high_risk" id="strategy-high-risk">
-                                                    <label class="form-check-label" for="strategy-high-risk">
-                                                        High Risk (Aggressive)
-                                                    </label>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">Preferred ML Models</label>
-                                                <div class="form-check">
-                                                    <input class="form-check-input auto-trading-model" type="checkbox"
-                                                           value="traditional" id="model-traditional" checked>
-                                                    <label class="form-check-label" for="model-traditional">
-                                                        Traditional ML (RF + XGBoost)
-                                                    </label>
-                                                </div>
-                                                <div class="form-check">
-                                                    <input class="form-check-input auto-trading-model" type="checkbox"
-                                                           value="raw_lstm" id="model-raw-lstm" checked>
-                                                    <label class="form-check-label" for="model-raw-lstm">
-                                                        Raw LSTM (Deep Learning)
-                                                    </label>
-                                                </div>
-                                                <div class="form-check">
-                                                    <input class="form-check-input auto-trading-model" type="checkbox"
-                                                           value="kronos" id="model-kronos" checked>
-                                                    <label class="form-check-label" for="model-kronos">
-                                                        Kronos (Hybrid Model)
-                                                    </label>
-                                                </div>
                                             </div>
                                         </div>
 
@@ -596,168 +495,6 @@
         await updateBrokerStatus(brokerProvider);
     }
     
-    // Strategy Settings Functions
-    let strategySettings = {};
-    let originalStrategySettings = {};
-    
-    async function loadStrategySettings() {
-        try {
-            const response = await fetch('/api/strategy-settings/');
-            const data = await response.json();
-            
-            if (data.success) {
-                strategySettings = data.data;
-                originalStrategySettings = JSON.parse(JSON.stringify(data.data));
-                renderStrategySettings();
-            } else {
-                showNotification('Failed to load strategy settings', 'error');
-            }
-        } catch (error) {
-            console.error('Error loading strategy settings:', error);
-            showNotification('Error loading strategy settings', 'error');
-        }
-    }
-    
-    function renderStrategySettings() {
-        const container = document.getElementById('strategy-settings-container');
-        const strategies = strategySettings.strategies || {};
-        
-        let html = '<div class="row">';
-        
-        Object.entries(strategies).forEach(([strategyName, strategy]) => {
-            const metadata = strategy.metadata || {};
-            const isActive = strategy.is_active;
-            const isEnabled = strategy.is_enabled;
-            const priority = strategy.priority || 1;
-            
-            html += `
-                <div class="col-md-6 mb-3">
-                    <div class="card border ${isActive ? 'border-success' : 'border-secondary'}">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <h6 class="card-title mb-0">${metadata.name || strategyName}</h6>
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input strategy-toggle" type="checkbox" 
-                                           id="strategy-${strategyName}" 
-                                           ${isActive ? 'checked' : ''}
-                                           data-strategy="${strategyName}">
-                                    <label class="form-check-label" for="strategy-${strategyName}">
-                                        Active
-                                    </label>
-                                </div>
-                            </div>
-                            
-                            <p class="card-text text-muted small mb-2">
-                                ${metadata.description || 'No description available'}
-                            </p>
-                            
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span class="badge bg-${metadata.risk_level === 'High' ? 'danger' : metadata.risk_level === 'Medium' ? 'warning' : 'success'}">
-                                    ${metadata.risk_level || 'Unknown'} Risk
-                                </span>
-                                
-                                <div class="input-group input-group-sm" style="width: 80px;">
-                                    <span class="input-group-text">Priority</span>
-                                    <input type="number" class="form-control strategy-priority" 
-                                           value="${priority}" min="1" max="10"
-                                           data-strategy="${strategyName}">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-        
-        html += '</div>';
-        container.innerHTML = html;
-        
-        // Add event listeners
-        document.querySelectorAll('.strategy-toggle').forEach(toggle => {
-            toggle.addEventListener('change', function() {
-                const strategyName = this.dataset.strategy;
-                strategySettings.strategies[strategyName].is_active = this.checked;
-                updateSaveButton();
-            });
-        });
-        
-        document.querySelectorAll('.strategy-priority').forEach(input => {
-            input.addEventListener('change', function() {
-                const strategyName = this.dataset.strategy;
-                strategySettings.strategies[strategyName].priority = parseInt(this.value) || 1;
-                updateSaveButton();
-            });
-        });
-        
-        updateSaveButton();
-    }
-    
-    function updateSaveButton() {
-        const saveButton = document.getElementById('save-strategy-settings');
-        const hasChanges = JSON.stringify(strategySettings) !== JSON.stringify(originalStrategySettings);
-        saveButton.disabled = !hasChanges;
-    }
-    
-    async function saveStrategySettings() {
-        const saveButton = document.getElementById('save-strategy-settings');
-        const originalText = saveButton.innerHTML;
-        
-        saveButton.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
-        saveButton.disabled = true;
-        
-        try {
-            const settings = {};
-            Object.entries(strategySettings.strategies).forEach(([strategyName, strategy]) => {
-                settings[strategyName] = {
-                    is_active: strategy.is_active,
-                    is_enabled: strategy.is_enabled,
-                    priority: strategy.priority
-                };
-            });
-            
-            const response = await fetch('/api/strategy-settings/bulk-update', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ settings })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                originalStrategySettings = JSON.parse(JSON.stringify(strategySettings));
-                updateSaveButton();
-                showNotification('Strategy settings saved successfully!', 'success');
-                
-                // Update dashboard if it's open
-                if (typeof updateDashboardMetrics === 'function') {
-                    updateDashboardMetrics();
-                }
-            } else {
-                showNotification('Failed to save strategy settings: ' + (data.error || 'Unknown error'), 'error');
-            }
-        } catch (error) {
-            console.error('Error saving strategy settings:', error);
-            showNotification('Error saving strategy settings: ' + error.message, 'error');
-        } finally {
-            saveButton.innerHTML = originalText;
-            updateSaveButton();
-        }
-    }
-    
-    function resetStrategySettings() {
-        if (confirm('Are you sure you want to reset all strategy settings to defaults?')) {
-            strategySettings = JSON.parse(JSON.stringify(originalStrategySettings));
-            renderStrategySettings();
-            showNotification('Strategy settings reset to defaults', 'info');
-        }
-    }
-    
-    // Event listeners for strategy settings
-    document.getElementById('save-strategy-settings').addEventListener('click', saveStrategySettings);
-    document.getElementById('reset-strategy-settings').addEventListener('click', resetStrategySettings);
-
     // Event listener for refresh balance button
     document.getElementById('refresh-balance-btn').addEventListener('click', fetchAccountBalance);
 
@@ -777,17 +514,6 @@
         }
     }
 
-    // Update slider value displays
-    function updateSliderValues() {
-        const confidenceSlider = document.getElementById('min-confidence-score');
-        const confidenceValue = document.getElementById('confidence-value');
-        confidenceValue.textContent = parseFloat(confidenceSlider.value).toFixed(2);
-
-        const sentimentSlider = document.getElementById('min-market-sentiment');
-        const sentimentValue = document.getElementById('sentiment-value');
-        sentimentValue.textContent = parseFloat(sentimentSlider.value).toFixed(1);
-    }
-
     // Fetch auto-trading settings
     async function fetchAutoTradingSettings() {
         try {
@@ -801,26 +527,9 @@
                 document.getElementById('auto-trading-enabled').checked = settings.is_enabled || false;
                 document.getElementById('max-amount-per-week').value = settings.max_amount_per_week || 10000;
                 document.getElementById('max-buys-per-week').value = settings.max_buys_per_week || 5;
-                document.getElementById('min-confidence-score').value = settings.minimum_confidence_score || 0.7;
-                document.getElementById('min-market-sentiment').value = settings.minimum_market_sentiment || 0.0;
                 document.getElementById('auto-stop-loss').checked = settings.auto_stop_loss_enabled !== false;
                 document.getElementById('auto-target-price').checked = settings.auto_target_price_enabled !== false;
                 document.getElementById('execution-time').value = settings.execution_time || '09:20';
-
-                // Update slider displays
-                updateSliderValues();
-
-                // Populate strategies
-                const preferredStrategies = settings.preferred_strategies || ['default_risk'];
-                document.querySelectorAll('.auto-trading-strategy').forEach(checkbox => {
-                    checkbox.checked = preferredStrategies.includes(checkbox.value);
-                });
-
-                // Populate models
-                const preferredModels = settings.preferred_model_types || ['traditional', 'raw_lstm', 'kronos'];
-                document.querySelectorAll('.auto-trading-model').forEach(checkbox => {
-                    checkbox.checked = preferredModels.includes(checkbox.value);
-                });
 
                 // Toggle config visibility
                 toggleAutoTradingConfig();
@@ -839,35 +548,11 @@
         saveButton.disabled = true;
 
         try {
-            // Get selected strategies
-            const selectedStrategies = Array.from(document.querySelectorAll('.auto-trading-strategy:checked'))
-                .map(cb => cb.value);
-
-            // Get selected models
-            const selectedModels = Array.from(document.querySelectorAll('.auto-trading-model:checked'))
-                .map(cb => cb.value);
-
-            // Validate
-            if (document.getElementById('auto-trading-enabled').checked) {
-                if (selectedStrategies.length === 0) {
-                    showNotification('Please select at least one strategy', 'error');
-                    return;
-                }
-                if (selectedModels.length === 0) {
-                    showNotification('Please select at least one ML model', 'error');
-                    return;
-                }
-            }
-
             // Collect settings
             const settings = {
                 is_enabled: document.getElementById('auto-trading-enabled').checked,
                 max_amount_per_week: parseFloat(document.getElementById('max-amount-per-week').value),
                 max_buys_per_week: parseInt(document.getElementById('max-buys-per-week').value),
-                preferred_strategies: selectedStrategies,
-                minimum_confidence_score: parseFloat(document.getElementById('min-confidence-score').value),
-                minimum_market_sentiment: parseFloat(document.getElementById('min-market-sentiment').value),
-                preferred_model_types: selectedModels,
                 auto_stop_loss_enabled: document.getElementById('auto-stop-loss').checked,
                 auto_target_price_enabled: document.getElementById('auto-target-price').checked,
                 execution_time: document.getElementById('execution-time').value
@@ -1033,8 +718,6 @@
 
     // Event listeners for auto-trading
     document.getElementById('auto-trading-enabled').addEventListener('change', toggleAutoTradingConfig);
-    document.getElementById('min-confidence-score').addEventListener('input', updateSliderValues);
-    document.getElementById('min-market-sentiment').addEventListener('input', updateSliderValues);
     document.getElementById('save-auto-trading-settings').addEventListener('click', saveAutoTradingSettings);
     document.getElementById('refresh-weekly-status').addEventListener('click', fetchWeeklyStatus);
     document.getElementById('test-auto-trading').addEventListener('click', testAutoTrading);
@@ -1043,7 +726,6 @@
     document.addEventListener('DOMContentLoaded', function() {
         fetchSettings();
         fetchBrokerStatus();
-        loadStrategySettings();
         fetchAccountBalance(); // Fetch balance from broker API
         fetchAutoTradingSettings(); // Fetch auto-trading settings
     });
