@@ -310,34 +310,6 @@ CREATE TABLE IF NOT EXISTS strategy_stock_selections (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS ml_predictions (
-    id SERIAL PRIMARY KEY,
-    stock_id INTEGER REFERENCES stocks(id),
-    user_id INTEGER REFERENCES users(id),
-    prediction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    prediction_horizon_days INTEGER DEFAULT 30,
-    current_price DECIMAL(10,2) NOT NULL,
-    rf_predicted_price DECIMAL(10,2),
-    xgb_predicted_price DECIMAL(10,2),
-    lstm_predicted_price DECIMAL(10,2),
-    ensemble_predicted_price DECIMAL(10,2),
-    prediction_confidence DECIMAL(10,4),
-    model_accuracy DECIMAL(10,4),
-    prediction_std DECIMAL(10,4),
-    signal VARCHAR(10),
-    signal_strength DECIMAL(10,4),
-    expected_return DECIMAL(10,4),
-    risk_reward_ratio DECIMAL(10,4),
-    model_version VARCHAR(50),
-    features_used TEXT,
-    training_data_period VARCHAR(20),
-    actual_price DECIMAL(10,2),
-    prediction_error DECIMAL(10,4),
-    is_validated BOOLEAN DEFAULT FALSE,
-    validation_date TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(stock_id, prediction_date, prediction_horizon_days)
-);
 
 CREATE TABLE IF NOT EXISTS portfolio_strategies (
     id SERIAL PRIMARY KEY,
@@ -456,7 +428,6 @@ INSERT INTO strategy_types (
     'default_risk',
     'Default Risk (Balanced)',
     'Balanced portfolio with 60% large cap, 30% mid cap, and 10% small cap allocation. Suitable for moderate risk investors.',
-    '{"approach": "balanced", "rebalance_frequency": 30, "ml_confidence_threshold": 0.65}',
     0.60, 0.30, 0.10,
     'medium', 0.05, 0.20, TRUE
 ),
@@ -464,7 +435,6 @@ INSERT INTO strategy_types (
     'high_risk',
     'High Risk (Small Cap Focus)',
     'Aggressive portfolio with 80% small cap and 20% mid cap allocation. Suitable for high risk investors seeking higher returns.',
-    '{"approach": "aggressive", "rebalance_frequency": 15, "ml_confidence_threshold": 0.60}',
     0.00, 0.20, 0.80,
     'high', 0.08, 0.30, TRUE
 ) ON CONFLICT (name) DO NOTHING;
@@ -531,43 +501,7 @@ CREATE TABLE IF NOT EXISTS portfolio_performance_history (
 );
 
 -- ML Training and Model Management Tables
-CREATE TABLE IF NOT EXISTS ml_training_jobs (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) NOT NULL,
-    symbol VARCHAR(50) NOT NULL,
-    model_type VARCHAR(50) NOT NULL,
-    start_date TIMESTAMP NOT NULL,
-    end_date TIMESTAMP NOT NULL,
-    duration VARCHAR(10) NOT NULL DEFAULT '1y',
-    status VARCHAR(20) DEFAULT 'pending' NOT NULL,
-    progress DECIMAL(5,2) DEFAULT 0.0,
-    accuracy DECIMAL(5,4),
-    use_technical_indicators BOOLEAN DEFAULT TRUE,
-    error_message TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    started_at TIMESTAMP,
-    completed_at TIMESTAMP
-);
 
-CREATE TABLE IF NOT EXISTS ml_trained_models (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) NOT NULL,
-    training_job_id INTEGER REFERENCES ml_training_jobs(id),
-    symbol VARCHAR(50) NOT NULL,
-    model_type VARCHAR(50) NOT NULL,
-    accuracy DECIMAL(5,4),
-    model_version VARCHAR(50),
-    model_file_path TEXT,
-    scaler_file_path TEXT,
-    feature_columns TEXT,
-    target_column VARCHAR(100),
-    training_start_date TIMESTAMP,
-    training_end_date TIMESTAMP,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id, symbol, model_type, is_active)
-);
 
 -- Historical Data Tables for Enhanced Technical Analysis
 -- Historical OHLCV data for comprehensive technical indicator calculations
@@ -697,15 +631,12 @@ CREATE TABLE IF NOT EXISTS data_quality_metrics (
 CREATE INDEX IF NOT EXISTS idx_stocks_symbol ON stocks(symbol);
 CREATE INDEX IF NOT EXISTS idx_stocks_market_cap_category ON stocks(market_cap_category);
 CREATE INDEX IF NOT EXISTS idx_strategy_stock_selections_strategy ON strategy_stock_selections(strategy_type_id);
-CREATE INDEX IF NOT EXISTS idx_ml_predictions_stock_date ON ml_predictions(stock_id, prediction_date);
 CREATE INDEX IF NOT EXISTS idx_portfolio_strategies_user ON portfolio_strategies(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_strategy_settings_user ON user_strategy_settings(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_strategy_settings_active ON user_strategy_settings(user_id, is_active, is_enabled);
 CREATE INDEX IF NOT EXISTS idx_portfolio_positions_portfolio ON portfolio_positions(portfolio_strategy_id);
 CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_user_broker_date ON portfolio_snapshots(user_id, broker_name, snapshot_date);
 CREATE INDEX IF NOT EXISTS idx_portfolio_performance_user_broker_date ON portfolio_performance_history(user_id, broker_name, date);
-CREATE INDEX IF NOT EXISTS idx_ml_training_jobs_user_status ON ml_training_jobs(user_id, status);
-CREATE INDEX IF NOT EXISTS idx_ml_training_jobs_symbol ON ml_training_jobs(symbol);
 CREATE INDEX IF NOT EXISTS idx_ml_trained_models_user_symbol ON ml_trained_models(user_id, symbol);
 CREATE INDEX IF NOT EXISTS idx_ml_trained_models_active ON ml_trained_models(user_id, is_active);
 CREATE INDEX IF NOT EXISTS idx_symbol_master_symbol ON symbol_master(symbol);
@@ -807,7 +738,6 @@ CREATE TABLE IF NOT EXISTS auto_trading_settings (
     preferred_strategies TEXT,  -- JSON array
     minimum_confidence_score FLOAT DEFAULT 0.7,
     minimum_market_sentiment FLOAT DEFAULT 0.0,
-    preferred_model_types TEXT,  -- JSON array
     auto_stop_loss_enabled BOOLEAN DEFAULT TRUE,
     auto_target_price_enabled BOOLEAN DEFAULT TRUE,
     execution_time VARCHAR(10) DEFAULT '09:20',  -- Market opens at 9:15 AM, execute 5 min later
@@ -869,14 +799,9 @@ CREATE TABLE IF NOT EXISTS order_performance (
     quantity INTEGER NOT NULL,
     stop_loss FLOAT,
     target_price FLOAT,
-    model_type VARCHAR(20),
     strategy VARCHAR(50),
 
     -- ML predictions
-    ml_prediction_score FLOAT,
-    ml_price_target FLOAT,
-    ml_confidence FLOAT,
-    ml_risk_score FLOAT,
 
     -- Current status
     current_price FLOAT,
@@ -974,7 +899,7 @@ GRANT USAGE, SELECT ON SEQUENCE order_performance_id_seq TO trader;
 GRANT USAGE, SELECT ON SEQUENCE order_performance_snapshots_id_seq TO trader;
 
 -- Insert default auto-trading settings for existing users
-INSERT INTO auto_trading_settings (user_id, is_enabled, preferred_strategies, preferred_model_types)
+INSERT INTO auto_trading_settings (user_id, is_enabled, preferred_strategies)
 SELECT
     id,
     FALSE,
@@ -1002,12 +927,6 @@ CREATE TABLE IF NOT EXISTS daily_suggested_stocks (
     selection_score DECIMAL(10, 4),
     rank INTEGER,
 
-    -- ML predictions (core fields)
-    ml_prediction_score DECIMAL(10, 4),
-    ml_price_target DECIMAL(10, 2),
-    ml_confidence DECIMAL(10, 4),
-    ml_risk_score DECIMAL(10, 4),
-
     -- Technical indicators
     rsi_14 DECIMAL(10, 4),
     macd DECIMAL(10, 4),
@@ -1032,12 +951,6 @@ CREATE TABLE IF NOT EXISTS daily_suggested_stocks (
     recommendation VARCHAR(20),
     reason TEXT,
 
-    -- Hybrid Strategy Indicators (RS Rating + Wave + 8-21 EMA)
-    rs_rating DECIMAL(10, 4),
-    fast_wave DECIMAL(10, 6),
-    slow_wave DECIMAL(10, 6),
-    delta DECIMAL(10, 6),
-    wave_momentum_score DECIMAL(10, 4),
 
     -- 8-21 EMA Strategy
     ema_8 DECIMAL(10, 2),
@@ -1050,8 +963,6 @@ CREATE TABLE IF NOT EXISTS daily_suggested_stocks (
     fib_target_2 DECIMAL(10, 2),  -- 161.8% extension (golden ratio)
     fib_target_3 DECIMAL(10, 2),  -- 200-261.8% extension
 
-    -- Hybrid Composite Score
-    hybrid_composite_score DECIMAL(10, 4),
 
     -- Enhanced Signals
     buy_signal BOOLEAN DEFAULT FALSE,
@@ -1061,46 +972,35 @@ CREATE TABLE IF NOT EXISTS daily_suggested_stocks (
     -- Additional metadata
     sector VARCHAR(50),
     market_cap_category VARCHAR(20),
-    model_type VARCHAR(20) DEFAULT 'hybrid',  -- 'traditional', 'raw_lstm', 'kronos', 'hybrid'
 
     -- Timestamps
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    -- Unique constraint: one record per symbol per strategy per date per model
-    UNIQUE (date, symbol, strategy, model_type)
+    -- Unique constraint: one record per symbol per strategy per date
+    UNIQUE (date, symbol, strategy)
 );
 
 -- Daily Suggested Stocks Indexes
 CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_date ON daily_suggested_stocks(date);
 CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_symbol ON daily_suggested_stocks(symbol);
 CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_strategy ON daily_suggested_stocks(strategy);
-CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_model_type ON daily_suggested_stocks(model_type);
 CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_date_strategy ON daily_suggested_stocks(date, strategy);
-CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_date_model ON daily_suggested_stocks(date, model_type);
-CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_prediction_score ON daily_suggested_stocks(ml_prediction_score DESC);
 
 -- Add table comment
-COMMENT ON TABLE daily_suggested_stocks IS 'Daily stock picks using Hybrid Technical Strategy with dual risk approaches (DEFAULT_RISK, HIGH_RISK). Stores top 50 stocks per strategy updated daily at 10:15 PM IST.';
+COMMENT ON TABLE daily_suggested_stocks IS 'Daily stock picks using PURE 8-21 EMA Swing Trading Strategy with dual risk approaches (DEFAULT_RISK, HIGH_RISK). Stores top 50 stocks per strategy updated daily at 10:15 PM IST.';
 
--- Add column comments for Hybrid Strategy indicators
-COMMENT ON COLUMN daily_suggested_stocks.rs_rating IS 'RS Rating (1-99 percentile): FILTER only, not for ranking. Must be >70 to pass filter. Compares stock performance vs NIFTY 50 benchmark.';
-COMMENT ON COLUMN daily_suggested_stocks.fast_wave IS 'Fast Wave (9-day momentum): Used for BUY/SELL signals, not ranking.';
-COMMENT ON COLUMN daily_suggested_stocks.slow_wave IS 'Slow Wave (21-day trend): Used for BUY/SELL signals, not ranking.';
-COMMENT ON COLUMN daily_suggested_stocks.delta IS 'Delta (Fast - Slow): PRIMARY SIGNAL indicator. Delta > 0 = BUY, Delta < 0 = SELL.';
-COMMENT ON COLUMN daily_suggested_stocks.wave_momentum_score IS 'DEPRECATED: No longer used for ranking. Wave Delta is used for signals only.';
+-- Add column comments for 8-21 EMA Strategy indicators
 COMMENT ON COLUMN daily_suggested_stocks.ema_8 IS '8-period EMA: Short-term momentum average for trend identification.';
 COMMENT ON COLUMN daily_suggested_stocks.ema_21 IS '21-period EMA: Institutional holding period average for trend confirmation.';
-COMMENT ON COLUMN daily_suggested_stocks.ema_trend_score IS 'EMA Trend Score (70-100): PRIMARY RANKING METRIC. Higher separation in Price > EMA8 > EMA21 = Higher score.';
+COMMENT ON COLUMN daily_suggested_stocks.ema_trend_score IS 'EMA Trend Score (0-100): PRIMARY RANKING METRIC. Higher separation in Price > 8 EMA > 21 EMA = Higher score.';
 COMMENT ON COLUMN daily_suggested_stocks.demarker IS 'DeMarker Oscillator (0-1): Entry timing. <0.30 = oversold (HIGH quality), >0.70 = overbought (avoid).';
 COMMENT ON COLUMN daily_suggested_stocks.fib_target_1 IS 'Fibonacci Target 1 (127.2% extension): Conservative profit target.';
 COMMENT ON COLUMN daily_suggested_stocks.fib_target_2 IS 'Fibonacci Target 2 (161.8% golden ratio): Standard profit target.';
 COMMENT ON COLUMN daily_suggested_stocks.fib_target_3 IS 'Fibonacci Target 3 (200% extension): Aggressive profit target.';
-COMMENT ON COLUMN daily_suggested_stocks.hybrid_composite_score IS 'Ranking Score = EMA Trend Score (70-100). Used to rank stocks by trend strength. NOT a weighted composite.';
-COMMENT ON COLUMN daily_suggested_stocks.buy_signal IS 'BUY Signal: TRUE when Delta > 0. Quality depends on EMA confirmation + DeMarker.';
-COMMENT ON COLUMN daily_suggested_stocks.sell_signal IS 'SELL Signal: TRUE when Delta < 0 AND Price < EMA8 < EMA21 (downtrend confirmed).';
-COMMENT ON COLUMN daily_suggested_stocks.signal_quality IS 'Signal Quality: HIGH (Wave+EMA+DeMarker), MEDIUM (Wave+EMA), LOW (Wave only), NONE (no signal).';
-COMMENT ON COLUMN daily_suggested_stocks.model_type IS 'Model Type: Always "hybrid" (pure technical analysis). ML models removed.';
+COMMENT ON COLUMN daily_suggested_stocks.buy_signal IS 'BUY Signal: TRUE when Price > 8 EMA > 21 EMA (power zone active).';
+COMMENT ON COLUMN daily_suggested_stocks.sell_signal IS 'SELL Signal: TRUE when Price < 8 EMA < 21 EMA (bearish trend).';
+COMMENT ON COLUMN daily_suggested_stocks.signal_quality IS 'Signal Quality: HIGH (power zone + DeMarker oversold), MEDIUM (power zone + mild pullback), LOW (power zone only).';
 
 -- Trigger for daily_suggested_stocks
 DROP TRIGGER IF EXISTS update_daily_suggested_stocks_updated_at ON daily_suggested_stocks;

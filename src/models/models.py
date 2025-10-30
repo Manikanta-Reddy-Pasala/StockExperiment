@@ -119,10 +119,7 @@ class Order(Base):
     placed_by = Column(String(50))
     variety = Column(String(20))
     is_mock_order = Column(Boolean, default=False)  # Mock order flag
-    model_type = Column(String(20))  # 'traditional' or 'raw_lstm'
-    strategy = Column(String(50))  # 'default_risk' or 'high_risk'
-    ml_prediction_score = Column(Float)  # ML prediction at time of order
-    ml_price_target = Column(Float)  # Price target from ML
+    strategy = Column(String(50))  # 'default_risk' or 'high_risk' (8-21 EMA strategy)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -552,10 +549,9 @@ class AutoTradingSettings(Base):
     is_enabled = Column(Boolean, default=False)  # Auto-trading enabled/disabled
     max_amount_per_week = Column(Float, default=10000.0)  # Max investment per week (₹)
     max_buys_per_week = Column(Integer, default=5)  # Max number of trades per week
-    preferred_strategies = Column(Text)  # JSON array of preferred strategies
-    minimum_confidence_score = Column(Float, default=0.7)  # Minimum AI confidence to trade
+    preferred_strategies = Column(Text)  # JSON array of preferred strategies: ['default_risk', 'high_risk']
+    minimum_confidence_score = Column(Float, default=0.7)  # Minimum signal quality score (8-21 EMA)
     minimum_market_sentiment = Column(Float, default=0.0)  # Minimum market sentiment (-1 to 1)
-    preferred_model_types = Column(Text)  # JSON array: ['traditional', 'raw_lstm', 'kronos']
     auto_stop_loss_enabled = Column(Boolean, default=True)  # Auto set stop-loss
     auto_target_price_enabled = Column(Boolean, default=True)  # Auto set target price
     execution_time = Column(String(10), default='09:20')  # Time to execute (HH:MM format, market opens 9:15 AM)
@@ -628,14 +624,7 @@ class OrderPerformance(Base):
     quantity = Column(Integer, nullable=False)
     stop_loss = Column(Float)
     target_price = Column(Float)
-    model_type = Column(String(20))
-    strategy = Column(String(50))
-
-    # ML predictions at order time
-    ml_prediction_score = Column(Float)
-    ml_price_target = Column(Float)
-    ml_confidence = Column(Float)
-    ml_risk_score = Column(Float)
+    strategy = Column(String(50))  # 8-21 EMA strategy: 'default_risk' or 'high_risk'
 
     # Current status
     current_price = Column(Float)

@@ -121,13 +121,13 @@ def check_data_freshness(max_age_days: int = 3) -> dict:
 
 
 def calculate_technical_indicators():
-    """Calculate technical indicators for all stocks (RS Rating, Waves, Signals)."""
+    """Calculate 8-21 EMA strategy indicators for all stocks."""
     logger.info("\n" + "=" * 80)
-    logger.info("CALCULATING TECHNICAL INDICATORS")
+    logger.info("CALCULATING 8-21 EMA STRATEGY INDICATORS")
     logger.info("=" * 80)
 
     try:
-        from src.services.technical.indicators_calculator import get_indicators_calculator
+        from src.services.technical.ema_strategy_calculator import get_ema_strategy_calculator
         from sqlalchemy import text
 
         db_manager = get_database_manager()
@@ -146,9 +146,9 @@ def calculate_technical_indicators():
 
             logger.info(f"Found {len(symbols)} tradeable stocks")
 
-            # Calculate indicators
-            calculator = get_indicators_calculator(session)
-            indicators_results = calculator.calculate_indicators_bulk(symbols, lookback_days=252)
+            # Calculate EMA strategy indicators
+            calculator = get_ema_strategy_calculator(session)
+            indicators_results = calculator.calculate_all_indicators(symbols, lookback_days=252)
 
             # Update stocks table with calculated indicators
             update_count = 0
@@ -156,10 +156,9 @@ def calculate_technical_indicators():
                 update_query = text("""
                     UPDATE stocks
                     SET
-                        rs_rating = :rs_rating,
-                        fast_wave = :fast_wave,
-                        slow_wave = :slow_wave,
-                        delta = :delta,
+                        ema_8 = :ema_8,
+                        ema_21 = :ema_21,
+                        demarker = :demarker,
                         buy_signal = :buy_signal,
                         sell_signal = :sell_signal,
                         indicators_last_updated = CURRENT_TIMESTAMP
@@ -168,19 +167,24 @@ def calculate_technical_indicators():
 
                 session.execute(update_query, {
                     'symbol': symbol,
-                    **indicators
+                    'ema_8': indicators.get('ema_8'),
+                    'ema_21': indicators.get('ema_21'),
+                    'demarker': indicators.get('demarker'),
+                    'buy_signal': indicators.get('buy_signal'),
+                    'sell_signal': indicators.get('sell_signal')
                 })
                 update_count += 1
 
             session.commit()
 
-            logger.info(f"✅ Technical indicators calculated and saved for {update_count} stocks")
-            logger.info(f"  RS Rating: Relative strength vs NIFTY 50")
-            logger.info(f"  Wave Indicators: Fast Wave, Slow Wave, Delta")
-            logger.info(f"  Signals: Buy/Sell signals based on wave crossovers")
+            logger.info(f"✅ 8-21 EMA strategy indicators calculated and saved for {update_count} stocks")
+            logger.info(f"  8 & 21 EMA: Trend identification and power zones")
+            logger.info(f"  DeMarker: Pullback timing (< 0.30 = oversold entry)")
+            logger.info(f"  Fibonacci: Extension targets (127.2%, 161.8%, 200%)")
+            logger.info(f"  Signals: Buy when Price > 8 EMA > 21 EMA + DeMarker oversold")
 
     except Exception as e:
-        logger.error(f"❌ Technical indicator calculation failed: {e}", exc_info=True)
+        logger.error(f"❌ EMA strategy indicator calculation failed: {e}", exc_info=True)
 
 
 def update_daily_snapshot():
@@ -222,7 +226,10 @@ def update_daily_snapshot():
         logger.info(f"✅ Daily snapshot update complete!")
         logger.info(f"  Total stocks stored: {total_stocks_stored}")
         logger.info(f"  Strategies: DEFAULT_RISK + HIGH_RISK")
-        logger.info(f"  Selection method: Hybrid Strategy (RS Rating + Wave + 8-21 EMA + DeMarker + Fibonacci)")
+        logger.info(f"  Selection method: 8-21 EMA Swing Trading Strategy")
+        logger.info(f"    - Power Zone: Price > 8 EMA > 21 EMA")
+        logger.info(f"    - Entry Timing: DeMarker < 0.30 (oversold)")
+        logger.info(f"    - Profit Targets: Fibonacci 127.2%, 161.8%, 200%")
         logger.info("=" * 80)
 
     except Exception as e:
@@ -414,7 +421,7 @@ def initialize_token_monitoring():
 def run_scheduler():
     """Main scheduler loop."""
     logger.info("=" * 80)
-    logger.info("📊 SIMPLIFIED TRADING SYSTEM SCHEDULER STARTED")
+    logger.info("📊 8-21 EMA SWING TRADING SYSTEM SCHEDULER")
     logger.info("=" * 80)
     logger.info("Scheduled Tasks:")
     logger.info("  - Auto-Trading Execution:      Daily at 09:20 AM (5 min after market opens)")
@@ -424,10 +431,12 @@ def run_scheduler():
     logger.info("  - Cleanup Old Snapshots:       Weekly (Sunday) at 03:00 AM")
     logger.info("  - Token Status Check:          Every 6 hours")
     logger.info("")
-    logger.info("📈 SELECTION METHOD: Technical Indicators Only")
-    logger.info("  - RS Rating: Relative strength vs NIFTY 50")
-    logger.info("  - Wave Indicators: Fast/Slow wave momentum")
-    logger.info("  - Buy/Sell Signals: Wave crossovers")
+    logger.info("📈 PURE 8-21 EMA SWING TRADING STRATEGY")
+    logger.info("  1. Power Zone: 8 EMA > 21 EMA (trend identification)")
+    logger.info("  2. DeMarker Oscillator: < 0.30 (pullback timing)")
+    logger.info("  3. Fibonacci Extensions: 127.2%, 161.8%, 200% (profit targets)")
+    logger.info("  - Entry: Price > 8 EMA > 21 EMA + DeMarker oversold")
+    logger.info("  - Stop: Below 21 EMA or recent swing low")
     logger.info("  - NO ML MODELS - Pure technical analysis")
     logger.info("=" * 80)
 

@@ -353,24 +353,24 @@ class AutoTradingService:
 
     def _select_top_strategies(self, settings: AutoTradingSettings,
                                max_stocks: int) -> Dict[str, Any]:
-        """Select top strategies with maximum confidence."""
+        """Select top 8-21 EMA strategy stocks with best signals."""
         try:
             # Parse preferred settings
             preferred_strategies = json.loads(settings.preferred_strategies or '["default_risk"]')
-            preferred_models = json.loads(settings.preferred_model_types or '["traditional"]')
 
-            # Query latest daily suggested stocks
+            # Query latest daily suggested stocks (8-21 EMA strategy)
             query = text("""
                 SELECT
                     d.symbol,
                     d.stock_name,
                     d.current_price,
-                    d.model_type,
                     d.strategy,
-                    d.ml_prediction_score,
-                    d.ml_price_target,
-                    d.ml_confidence,
-                    d.ml_risk_score,
+                    d.selection_score,
+                    d.ema_8,
+                    d.ema_21,
+                    d.ema_trend_score,
+                    d.demarker,
+                    d.signal_quality,
                     d.target_price,
                     d.stop_loss,
                     d.recommendation,
@@ -378,43 +378,38 @@ class AutoTradingService:
                 FROM daily_suggested_stocks d
                 WHERE d.date = (SELECT MAX(date) FROM daily_suggested_stocks)
                   AND d.strategy = ANY(:strategies)
-                  AND d.model_type = ANY(:models)
-                  AND d.ml_confidence >= :min_confidence
+                  AND d.buy_signal = TRUE
                   AND d.recommendation = 'BUY'
-                  AND d.ml_price_target > d.current_price
-                ORDER BY d.ml_confidence DESC, d.ml_prediction_score DESC
+                  AND d.target_price > d.current_price
+                  AND d.signal_quality IN ('high', 'medium')
+                ORDER BY d.selection_score DESC, d.ema_trend_score DESC
                 LIMIT :limit
             """)
 
             result = self.session.execute(query, {
                 'strategies': preferred_strategies,
-                'models': preferred_models,
-                'min_confidence': settings.minimum_confidence_score,
                 'limit': max_stocks
             })
 
             stocks = [dict(row._mapping) for row in result]
 
             if not stocks:
-                logger.warning("⚠️  No stocks found matching criteria")
+                logger.warning("⚠️  No stocks found matching 8-21 EMA criteria")
 
             strategies_used = list(set([s['strategy'] for s in stocks]))
-            models_used = list(set([s['model_type'] for s in stocks]))
 
-            logger.info(f"✅ Selected {len(stocks)} stocks from strategies: {strategies_used}, models: {models_used}")
+            logger.info(f"✅ Selected {len(stocks)} stocks from 8-21 EMA strategies: {strategies_used}")
 
             return {
                 'stocks': stocks,
-                'strategies_used': strategies_used,
-                'models_used': models_used
+                'strategies_used': strategies_used
             }
 
         except Exception as e:
-            logger.error(f"Error selecting strategies: {e}")
+            logger.error(f"Error selecting 8-21 EMA strategies: {e}")
             return {
                 'stocks': [],
-                'strategies_used': [],
-                'models_used': []
+                'strategies_used': []
             }
 
     def _create_buy_orders(self, user: User, settings: AutoTradingSettings,
@@ -444,8 +439,8 @@ class AutoTradingService:
 
                     investment = quantity * current_price
 
-                    # Calculate stop-loss and target from ML predictions
-                    target_price = stock['target_price'] or stock['ml_price_target']
+                    # Calculate stop-loss and target from EMA strategy
+                    target_price = stock['target_price']
                     stop_loss = stock['stop_loss'] or (current_price * 0.95)  # 5% default
 
                     # Create order (paper or real based on user mode)
@@ -529,10 +524,7 @@ class AutoTradingService:
                 order_status='COMPLETE',
                 placed_at=datetime.now(),
                 is_mock_order=True,
-                model_type=stock_data.get('model_type'),
-                strategy=stock_data.get('strategy'),
-                ml_prediction_score=stock_data.get('ml_prediction_score'),
-                ml_price_target=target_price
+                strategy=stock_data.get('strategy')
             )
 
             self.session.add(order)
@@ -567,12 +559,7 @@ class AutoTradingService:
                 quantity=quantity,
                 stop_loss=stop_loss,
                 target_price=target_price,
-                model_type=stock_data.get('model_type'),
                 strategy=stock_data.get('strategy'),
-                ml_prediction_score=stock_data.get('ml_prediction_score'),
-                ml_price_target=stock_data.get('ml_price_target'),
-                ml_confidence=stock_data.get('ml_confidence'),
-                ml_risk_score=stock_data.get('ml_risk_score'),
                 current_price=entry_price,
                 current_value=entry_price * quantity,
                 unrealized_pnl=0.0,

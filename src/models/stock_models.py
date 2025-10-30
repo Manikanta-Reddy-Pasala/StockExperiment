@@ -79,8 +79,7 @@ class Stock(Base):
     
     # Relationships
     strategy_selections = relationship("StrategyStockSelection", back_populates="stock")
-    ml_predictions = relationship("MLPrediction", back_populates="stock")
-    
+
     def __repr__(self):
         return f'<Stock {self.symbol}: {self.name}>'
 
@@ -161,60 +160,6 @@ class StrategyStockSelection(Base):
     user = relationship("User", foreign_keys=[user_id])
     strategy_type = relationship("StrategyType", back_populates="stock_selections")
     stock = relationship("Stock", back_populates="strategy_selections")
-
-
-class MLPrediction(Base):
-    """Machine Learning predictions for stocks."""
-    __tablename__ = 'ml_predictions'
-    
-    id = Column(Integer, primary_key=True)
-    stock_id = Column(Integer, ForeignKey('stocks.id'), nullable=False)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=True)
-    
-    # Prediction details
-    prediction_date = Column(DateTime, default=datetime.utcnow)
-    prediction_horizon_days = Column(Integer, default=30)  # Prediction horizon
-    
-    # Price predictions from different models
-    current_price = Column(Float, nullable=False)
-    rf_predicted_price = Column(Float)  # Random Forest
-    xgb_predicted_price = Column(Float)  # XGBoost
-    lstm_predicted_price = Column(Float)  # LSTM
-    ensemble_predicted_price = Column(Float)  # Final ensemble prediction
-    
-    # Prediction confidence and metrics
-    prediction_confidence = Column(Float)  # 0.0 to 1.0
-    model_accuracy = Column(Float)  # Historical accuracy %
-    prediction_std = Column(Float)  # Standard deviation of prediction
-    
-    # Trading signals
-    signal = Column(String(10))  # BUY, SELL, HOLD
-    signal_strength = Column(Float)  # 0.0 to 1.0
-    expected_return = Column(Float)  # % expected return
-    risk_reward_ratio = Column(Float)
-    
-    # Model metadata
-    model_version = Column(String(50))
-    features_used = Column(Text)  # JSON array of features
-    training_data_period = Column(String(20))  # e.g., "1y", "2y"
-    
-    # Validation tracking
-    actual_price = Column(Float)  # Actual price after prediction horizon
-    prediction_error = Column(Float)  # % error vs actual
-    is_validated = Column(Boolean, default=False)
-    validation_date = Column(DateTime)
-    
-    # Metadata
-    created_at = Column(DateTime, default=datetime.utcnow)
-    
-    # Relationships
-    stock = relationship("Stock", back_populates="ml_predictions")
-    user = relationship("User", foreign_keys=[user_id])
-    
-    # Index for efficient querying
-    __table_args__ = (
-        UniqueConstraint('stock_id', 'prediction_date', 'prediction_horizon_days', name='_stock_prediction_uc'),
-    )
 
 
 class PortfolioStrategy(Base):

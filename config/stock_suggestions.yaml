@@ -1,4 +1,8 @@
 # Stock Suggestions Display Configuration
+# DEPRECATED: This config is no longer used after migration to pure 8-21 EMA strategy.
+# The system now uses EMA-based filtering directly without ML model types.
+# Kept for historical reference only.
+#
 # Industry-standard thresholds for displaying suggested stocks to users in the UI
 # This is separate from stock_filters.yaml which is used during the discovery pipeline
 # All parameters are configurable - adjust based on market conditions and strategy

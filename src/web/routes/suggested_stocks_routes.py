@@ -269,31 +269,24 @@ def get_available_strategies():
 @login_required
 def get_triple_model_view():
     """
-    Get suggested stocks from ALL THREE models (traditional + raw_lstm + kronos) and BOTH risk levels.
+    Get suggested stocks using 8-21 EMA Swing Trading Strategy for BOTH risk levels.
 
-    Returns a comprehensive view showing:
-    - Traditional Model + Default Risk / High Risk
-    - Raw LSTM Model + Default Risk / High Risk
-    - Kronos Model + Default Risk / High Risk
+    Returns a view showing:
+    - Default Risk Strategy (conservative, large-cap)
+    - High Risk Strategy (aggressive, small/mid-cap)
 
     Query parameters:
-    - limit: Number of stocks per model/strategy combination (default: from config)
+    - limit: Number of stocks per strategy (default: 10)
     - date: Date to fetch (default: most recent data)
-
-    Filtering is configuration-driven via config/stock_suggestions.yaml
     """
     try:
         from datetime import datetime, date as dt_date
         from sqlalchemy import text
         from ...models.database import get_database_manager
-        from ...services.config.stock_suggestions_config import get_stock_suggestions_config
 
-        # Load configuration
-        config = get_stock_suggestions_config()
-
-        # Get parameters (with config-driven defaults)
-        limit = int(request.args.get('limit', config.get_default_limit()))
-        max_limit = config.get_maximum_limit()
+        # Get parameters
+        limit = int(request.args.get('limit', 10))
+        max_limit = 50
         if limit > max_limit:
             limit = max_limit
 
@@ -321,55 +314,34 @@ def get_triple_model_view():
 
         user_id = current_user.id
 
-        logger.info(f"🎯 Triple model view request: limit={limit}, date={query_date}, user={user_id}")
-        logger.info(f"📊 Config-driven filters: "
-                   f"recommendations={config.get_allowed_recommendations()}, "
-                   f"upside={config.get_minimum_upside_pct()}-{config.get_maximum_upside_pct()}%, "
-                   f"max_risk={config.get_maximum_risk_score()}, "
-                   f"model_scores=(trad:{config.get_minimum_score('traditional')}, "
-                   f"lstm:{config.get_minimum_score('raw_lstm')}, "
-                   f"kronos:{config.get_minimum_score('kronos')})")
+        logger.info(f"🎯 8-21 EMA Strategy view request: limit={limit}, date={query_date}, user={user_id}")
 
         db = get_database_manager()
 
         with db.get_session() as session:
-            # Build dynamic SQL query based on configuration
-            # Get allowed recommendations from config
-            allowed_recs = config.get_allowed_recommendations()
-            allowed_recs_str = "', '".join(allowed_recs)
-
-            # Get upside thresholds
-            min_upside = config.get_minimum_upside_pct()
-            max_upside = config.get_maximum_upside_pct()
-
-            # Get risk threshold
-            max_risk = config.get_maximum_risk_score()
-
-            # Get PE ratio range
-            pe_range = config.get_pe_ratio_range()
-
-            # Get PB ratio range
-            pb_range = config.get_pb_ratio_range()
-
-            # Get ROE range
-            roe_range = config.get_roe_range()
-
-            # Build WHERE clause with config-driven filters
-            query = text(f"""
+            # Query 8-21 EMA strategy stocks
+            query = text("""
                 SELECT
                     d.symbol,
                     COALESCE(d.stock_name, s.name) as stock_name,
                     d.current_price,
-                    d.model_type,
                     d.strategy,
-                    d.ml_prediction_score,
-                    d.ml_price_target,
-                    d.ml_confidence,
-                    d.ml_risk_score,
+                    d.selection_score,
+                    d.ema_8,
+                    d.ema_21,
+                    d.ema_trend_score,
+                    d.demarker,
+                    d.fib_target_1,
+                    d.fib_target_2,
+                    d.fib_target_3,
+                    d.buy_signal,
+                    d.sell_signal,
+                    d.signal_quality,
                     d.recommendation,
                     d.target_price,
                     d.stop_loss,
                     d.rank,
+                    d.reason,
                     d.pe_ratio,
                     d.pb_ratio,
                     d.roe,
@@ -379,50 +351,24 @@ def get_triple_model_view():
                 FROM daily_suggested_stocks d
                 LEFT JOIN stocks s ON d.symbol = s.symbol
                 WHERE d.date = :date
-                  AND d.recommendation IN ('{allowed_recs_str}')
-                  AND d.ml_price_target > d.current_price
-                  AND ((d.ml_price_target - d.current_price) / d.current_price * 100) >= :min_upside
-                  AND ((d.ml_price_target - d.current_price) / d.current_price * 100) <= :max_upside
-                  AND (d.ml_risk_score IS NULL OR d.ml_risk_score <= :max_risk)
-                  AND (d.pe_ratio IS NULL OR (d.pe_ratio >= :pe_min AND d.pe_ratio <= :pe_max))
-                  AND (d.pb_ratio IS NULL OR (d.pb_ratio >= :pb_min AND d.pb_ratio <= :pb_max))
-                  AND (d.roe IS NULL OR (d.roe >= :roe_min AND d.roe <= :roe_max))
-                ORDER BY d.model_type, d.strategy, d.ml_prediction_score DESC
+                  AND d.buy_signal = TRUE
+                  AND d.target_price > d.current_price
+                ORDER BY d.strategy, d.selection_score DESC, d.ema_trend_score DESC
             """)
 
-            result = session.execute(query, {
-                'date': query_date,
-                'min_upside': min_upside,
-                'max_upside': max_upside,
-                'max_risk': max_risk,
-                'pe_min': pe_range['minimum'],
-                'pe_max': pe_range['maximum'],
-                'pb_min': pb_range['minimum'],
-                'pb_max': pb_range['maximum'],
-                'roe_min': roe_range['minimum'],
-                'roe_max': roe_range['maximum']
-            })
+            result = session.execute(query, {'date': query_date})
             all_stocks = [dict(row._mapping) for row in result]
 
-        # Group results by model_type and strategy
+        # Group results by strategy only
         grouped_results = {
-            'traditional': {
-                'default_risk': [],
-                'high_risk': []
-            },
-            'raw_lstm': {
-                'default_risk': [],
-                'high_risk': []
-            },
-            'kronos': {
+            'ema_strategy': {
                 'default_risk': [],
                 'high_risk': []
             }
         }
 
-        # Filter stocks by model-specific and strategy-specific thresholds
+        # Filter stocks by strategy
         for stock in all_stocks:
-            model_type = stock['model_type']
             strategy = stock['strategy']
 
             # Map strategy names (handle case variations)
@@ -431,82 +377,28 @@ def get_triple_model_view():
             elif 'high' in strategy.lower() or strategy.upper() == 'HIGH_RISK':
                 risk_level = 'high_risk'
             else:
-                # Fallback
-                risk_level = 'default_risk'
-
-            # Apply model-specific score threshold from config
-            min_score = config.get_minimum_score(model_type)
-            if stock['ml_prediction_score'] < min_score:
-                logger.debug(f"🚫 Filtered {stock['symbol']} ({model_type}): score {stock['ml_prediction_score']} < {min_score}")
+                # Skip unknown strategies
                 continue
-
-            # Apply strategy-specific confidence threshold
-            min_confidence = config.get_minimum_confidence(risk_level)
-            if stock['ml_confidence'] and stock['ml_confidence'] < min_confidence:
-                logger.debug(f"🚫 Filtered {stock['symbol']} ({model_type}/{risk_level}): confidence {stock['ml_confidence']} < {min_confidence}")
-                continue
-
-            # Initialize if model_type doesn't exist
-            if model_type not in grouped_results:
-                grouped_results[model_type] = {'default_risk': [], 'high_risk': []}
 
             # Add to appropriate group
-            if risk_level in grouped_results[model_type]:
-                grouped_results[model_type][risk_level].append(stock)
+            grouped_results['ema_strategy'][risk_level].append(stock)
 
         # Apply limit to each group
-        for model_type in grouped_results:
-            for risk_level in grouped_results[model_type]:
-                grouped_results[model_type][risk_level] = grouped_results[model_type][risk_level][:limit]
-
-        # ============================================================
-        # Apply Ollama Enhancement (Real-time)
-        # ============================================================
-        try:
-            from src.config.ollama_config import get_ollama_config
-            from src.services.data.strategy_ollama_enhancement_service import get_strategy_ollama_enhancement_service
-
-            ollama_config = get_ollama_config()
-            daily_pred_config = ollama_config._config.get('daily_predictions', {})
-
-            if daily_pred_config.get('enabled', False):
-                logger.info("🔍 Applying Ollama enhancement to UI results...")
-                ollama_service = get_strategy_ollama_enhancement_service()
-                enhancement_level = 'fast'  # Use fast mode for real-time UI
-
-                enhanced_count = 0
-                for model_type in grouped_results:
-                    for risk_level in grouped_results[model_type]:
-                        stocks = grouped_results[model_type][risk_level]
-                        if stocks:
-                            try:
-                                # Enhance stocks with Ollama
-                                enhanced_stocks = ollama_service.enhance_strategy_recommendations(
-                                    stocks, risk_level, enhancement_level
-                                )
-                                grouped_results[model_type][risk_level] = enhanced_stocks
-                                enhanced_count += len(enhanced_stocks)
-                            except Exception as e:
-                                logger.warning(f"⚠️  Ollama enhancement failed for {model_type}/{risk_level}: {e}")
-
-                if enhanced_count > 0:
-                    logger.info(f"✅ Ollama enhanced {enhanced_count} stocks for UI")
-
-        except Exception as e:
-            logger.warning(f"⚠️  Ollama enhancement unavailable: {e}")
-            logger.info("   Continuing without Ollama enhancement...")
+        for risk_level in grouped_results['ema_strategy']:
+            grouped_results['ema_strategy'][risk_level] = grouped_results['ema_strategy'][risk_level][:limit]
 
         # Calculate statistics
-        stats = {}
-        for model_type in grouped_results:
-            stats[model_type] = {}
-            for risk_level in grouped_results[model_type]:
-                stocks_in_group = grouped_results[model_type][risk_level]
-                stats[model_type][risk_level] = {
-                    'count': len(stocks_in_group),
-                    'avg_score': sum(s['ml_prediction_score'] or 0 for s in stocks_in_group) / len(stocks_in_group) if stocks_in_group else 0,
-                    'avg_confidence': sum(s['ml_confidence'] or 0 for s in stocks_in_group) / len(stocks_in_group) if stocks_in_group else 0,
-                }
+        stats = {
+            'ema_strategy': {}
+        }
+        for risk_level in grouped_results['ema_strategy']:
+            stocks_in_group = grouped_results['ema_strategy'][risk_level]
+            stats['ema_strategy'][risk_level] = {
+                'count': len(stocks_in_group),
+                'avg_selection_score': sum(s.get('selection_score', 0) or 0 for s in stocks_in_group) / len(stocks_in_group) if stocks_in_group else 0,
+                'avg_ema_trend_score': sum(s.get('ema_trend_score', 0) or 0 for s in stocks_in_group) / len(stocks_in_group) if stocks_in_group else 0,
+                'high_quality_signals': sum(1 for s in stocks_in_group if s.get('signal_quality') == 'high')
+            }
 
         response = {
             'success': True,
@@ -514,15 +406,16 @@ def get_triple_model_view():
             'limit_per_group': limit,
             'data': grouped_results,
             'statistics': stats,
-            'total_stocks': sum(len(grouped_results[mt][rl]) for mt in grouped_results for rl in grouped_results[mt])
+            'total_stocks': sum(len(grouped_results['ema_strategy'][rl]) for rl in grouped_results['ema_strategy']),
+            'strategy_type': '8-21 EMA Swing Trading'
         }
 
-        logger.info(f"✅ Triple model view: {response['total_stocks']} total stocks across all groups")
+        logger.info(f"✅ 8-21 EMA Strategy view: {response['total_stocks']} total stocks across both risk levels")
 
         return jsonify(response), 200
 
     except Exception as e:
-        logger.error(f"Error getting triple model view: {e}", exc_info=True)
+        logger.error(f"Error getting EMA strategy view: {e}", exc_info=True)
         return jsonify({
             'success': False,
             'error': f'Internal server error: {str(e)}'

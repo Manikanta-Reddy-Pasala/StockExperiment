@@ -1,6 +1,10 @@
 """
 Stock Suggestions Configuration Loader
 Loads and validates stock_suggestions.yaml configuration
+
+DEPRECATED: This config is no longer used after migration to pure 8-21 EMA strategy.
+The system now uses EMA-based filtering directly in queries without ML model types.
+Kept for reference purposes only.
 """
 
 import yaml

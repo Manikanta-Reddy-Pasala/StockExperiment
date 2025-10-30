@@ -4,15 +4,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an **automated stock trading system** for NSE (National Stock Exchange) stocks using **pure technical analysis**. The system features:
+This is an **automated swing trading system** for NSE (National Stock Exchange) stocks using **pure 8-21 EMA technical analysis**. The system features:
+
+**⏱️ Trading Style: SWING TRADING (2-4 week holding period)**
+- NOT for day trading or scalping
+- Positions held for 2-4 weeks (10-20 trading days)
+- Target gains: 10-15% to Fibonacci targets
+- Multi-day trend following with power zone methodology
 
 - **100% automated data pipeline** with scheduled tasks
 - **2,259+ NSE stocks** with fundamental and technical data
-- **Hybrid Technical Strategy**: RS Rating (filter) + Wave Indicators (signals) + 8-21 EMA (ranking) + DeMarker (timing) + Fibonacci (targets)
+- **Pure 8-21 EMA Strategy**: Power Zone (8 EMA > 21 EMA) + DeMarker (timing) + Fibonacci (targets)
 - **Two-strategy approach**: DEFAULT_RISK (conservative, large-cap) and HIGH_RISK (aggressive, small/mid-cap)
 - **Saga pattern** for reliable multi-step data processing with failure tracking and retry logic
 - **Multi-broker support**: Fyers API, Zerodha (future), with trading simulator
-- **NO ML MODELS** - Simple, interpretable technical indicators only
+- **NO ML MODELS** - Simple, battle-tested technical indicators only
 
 The system is containerized with Docker Compose and runs three main services: Flask web app, technical indicators scheduler, and data pipeline scheduler.
 
@@ -61,17 +67,19 @@ docker exec -it trading_system_db psql -U trader -d trading_system -c "SELECT pg
 # Run data pipeline manually (6-step saga: symbols → stocks → history → indicators → metrics → validation)
 python3 run_pipeline.py
 
-# Calculate hybrid strategy indicators manually
+# Calculate 8-21 EMA strategy indicators manually
 docker exec trading_system python3 -c "
 from src.models.database import get_database_manager
-from src.services.technical.hybrid_strategy_calculator import get_hybrid_strategy_calculator
+from src.services.technical.ema_strategy_calculator import get_ema_strategy_calculator
 
 db_manager = get_database_manager()
 with db_manager.get_session() as session:
-    calculator = get_hybrid_strategy_calculator(session)
+    calculator = get_ema_strategy_calculator(session)
     symbols = ['NSE:RELIANCE-EQ', 'NSE:TCS-EQ']  # Example symbols
     result = calculator.calculate_all_indicators(symbols, lookback_days=252)
-    print(f'Calculated hybrid indicators for {len(result)} stocks')
+    print(f'Calculated 8-21 EMA indicators for {len(result)} stocks')
+    for symbol, indicators in result.items():
+        print(f'{symbol}: Power Zone={indicators[\"power_zone_status\"]}, DeMarker={indicators[\"demarker\"]:.2f}')
 "
 
 # Fill missing data fields (adj_close, volatility, liquidity, etc.)
@@ -152,13 +160,13 @@ cat logs/scheduler.log | grep -A 5 "Token Status"
 │  ├─ Multi-broker integration (Fyers, Zerodha)                 │
 │  └─ Real-time data caching                                     │
 │                                                                 │
-│  technical_scheduler (Python scheduler.py - Technical Indicators)│
+│  technical_scheduler (Python scheduler.py - 8-21 EMA Strategy)│
 │  ├─ Startup: Initialize token monitoring (auto-refresh)       │
 │  ├─ Every 6 hours: Check Fyers token status (warn if expiring)│
-│  ├─ 10:00 PM: Calculate technical indicators for all stocks  │
-│  │   ├─ RS Rating (Relative Strength vs NIFTY 50)            │
-│  │   ├─ Wave Indicators (Fast Wave, Slow Wave, Delta)        │
-│  │   └─ Buy/Sell Signals (Wave crossovers)                   │
+│  ├─ 10:00 PM: Calculate 8-21 EMA indicators for all stocks   │
+│  │   ├─ 8 & 21 EMA (power zone identification)               │
+│  │   ├─ DeMarker Oscillator (pullback timing, 0-1 range)     │
+│  │   └─ Fibonacci Extensions (127.2%, 161.8%, 200% targets)  │
 │  ├─ 10:15 PM: Generate daily stock picks (DUAL STRATEGY)     │
 │  │   ├─ DEFAULT_RISK strategy (conservative, large-cap)      │
 │  │   └─ HIGH_RISK strategy (aggressive, small/mid-cap)       │
@@ -234,39 +242,27 @@ Step 6: PIPELINE_VALIDATION
 - Stops after 10 consecutive failures to prevent infinite loops
 - Tracks failures in `pipeline_tracking` table
 
-### ML Model Architecture
+### Dual Strategy System
 
-**Dual Model System:**
-
-1. **Traditional ML Models** (src/services/ml/enhanced_stock_predictor.py):
-   - Random Forest + XGBoost ensemble
-   - Walk-forward cross-validation (5 splits)
-   - 25-30 features (technical + fundamental)
-   - Trained daily at 10:00 PM
-   - Output: ml_prediction_score (0-1), ml_price_target, ml_confidence, ml_risk_score
-
-2. **Raw LSTM Models** (src/services/ml/raw_lstm_prediction_service.py):
-   - Deep learning with OHLCV sequences
-   - Per-symbol models (trained individually)
-   - 60-day lookback window
-   - Predicts next 14 days
-   - Output: Same format as Traditional ML
-
-**Dual Strategy System:**
+The 8-21 EMA strategy runs with two risk profiles:
 
 1. **DEFAULT_RISK (Conservative)**:
    - Target: Large-cap stocks (>20,000 Cr market cap)
    - Focus: Stability, established companies
    - Filtering: PE 5-40, price 100-10000, good liquidity
-   - Target gain: 7%, Stop loss: 5%
+   - Signal Quality: HIGH or MEDIUM only (strict)
+   - Target gain: 10-15% (Fibonacci targets)
+   - Stop loss: Below 21 EMA (typically 8-10%)
 
 2. **HIGH_RISK (Aggressive)**:
    - Target: Small/Mid-cap stocks (1,000-20,000 Cr)
-   - Focus: Growth potential, volatility
-   - Filtering: Broader criteria, lower score threshold
-   - Target gain: 12%, Stop loss: 10%
+   - Focus: Growth potential, momentum
+   - Filtering: Broader criteria, accepts more volatility
+   - Signal Quality: MEDIUM or LOW accepted
+   - Target gain: 12-18% (extended Fibonacci targets)
+   - Stop loss: Below 21 EMA (typically 10-12%)
 
-**Result:** 4 combinations stored daily (2 models × 2 strategies)
+**Result:** 2 daily stock lists (50 stocks per strategy)
 
 ## Critical Code Patterns
 
@@ -324,33 +320,46 @@ with db_manager.get_session() as session:
 - Forget to commit transactions
 - Keep sessions open longer than necessary
 
-### 3. ML Model Loading (Lazy + Caching)
+### 3. Technical Indicator Caching
 
-ML models use lazy loading with disk caching:
+The EMA strategy calculator efficiently calculates indicators in bulk:
 
 ```python
-# Example from enhanced_stock_predictor.py
-class EnhancedStockPredictor:
-    def __init__(self, session, auto_load=True):
+# Example from ema_strategy_calculator.py
+class EMAStrategyCalculator:
+    def __init__(self, session: Session):
         self.session = session
-        self.rf_price_model = None  # Lazy loaded
-        self.xgb_price_model = None
 
-        if auto_load:
-            self._load_models()  # Load from ml_models/ directory
+    def calculate_all_indicators(self, symbols: List[str], lookback_days: int = 252):
+        """Calculate 8-21 EMA + DeMarker + Fibonacci for all stocks"""
+        results = {}
 
-    def _load_models(self):
-        """Load models from disk (cached)"""
-        model_dir = Path('ml_models')
-        if (model_dir / 'rf_price_model.pkl').exists():
-            with open(model_dir / 'rf_price_model.pkl', 'rb') as f:
-                self.rf_price_model = pickle.load(f)
+        for symbol in symbols:
+            # Get historical data
+            stock_data = self._get_historical_data(symbol, lookback_days)
+
+            # Calculate EMAs
+            df['ema_8'] = df['close'].ewm(span=8, adjust=False).mean()
+            df['ema_21'] = df['close'].ewm(span=21, adjust=False).mean()
+
+            # Calculate DeMarker
+            demarker = self._calculate_demarker(df, period=14)
+
+            # Calculate Fibonacci targets
+            fib_targets = self._calculate_fibonacci_extensions(df)
+
+            results[symbol] = {
+                'ema_8': ema_8,
+                'ema_21': ema_21,
+                'demarker': demarker,
+                'fib_targets': fib_targets,
+                'power_zone_status': 'bullish' if price > ema_8 > ema_21 else 'bearish'
+            }
+
+        return results
 ```
 
-**Model Storage:**
-- Traditional ML: `ml_models/rf_price_model.pkl`, `ml_models/xgb_price_model.pkl`
-- Raw LSTM: `ml_models/raw_ohlcv_lstm/{symbol}/lstm_model.h5`
-- Metadata: `ml_models/metadata.pkl`
+**No Model Storage Required:** Pure mathematical indicators calculated on-demand from price data.
 
 ### 4. Last Trading Day Logic
 
@@ -458,14 +467,14 @@ self.max_stocks = int(os.getenv('VOLATILITY_MAX_STOCKS', '500'))
 
 **Data Pipeline:**
 - `src/services/data/pipeline_saga.py` - 6-step saga for data collection
-- `src/services/data/suggested_stocks_saga.py` - 7-step saga for stock selection
+- `src/services/data/suggested_stocks_saga.py` - 7-step saga for stock selection (8-21 EMA strategy)
 - `src/services/data/historical_data_service.py` - Smart historical data fetching
 - `src/services/data/fyers_symbol_service.py` - Symbol master management
 
-**ML Services:**
-- `src/services/ml/enhanced_stock_predictor.py` - Traditional ML (RF + XGBoost)
-- `src/services/ml/raw_lstm_prediction_service.py` - Deep learning LSTM
-- `src/services/ml/training_service.py` - Model training orchestration
+**Technical Analysis Services:**
+- `src/services/technical/ema_strategy_calculator.py` - Pure 8-21 EMA strategy calculator
+- `src/services/technical/hybrid_strategy_calculator.py` - (DEPRECATED) Old hybrid strategy
+- `src/services/technical/indicators_calculator.py` - (DEPRECATED) Old indicators
 
 **Broker Integration:**
 - `src/services/brokers/fyers_service.py` - Fyers API wrapper (DEPRECATED, use unified)
@@ -483,45 +492,6 @@ self.max_stocks = int(os.getenv('VOLATILITY_MAX_STOCKS', '500'))
 - `requirements.txt` - Python dependencies
 
 ## Common Development Tasks
-
-### Adding a New ML Model
-
-1. Create model service in `src/services/ml/`:
-```python
-class NewMLPredictor:
-    def __init__(self, session):
-        self.session = session
-        self.model = None
-
-    def train(self, lookback_days=365):
-        # Training logic
-        pass
-
-    def predict(self, stock_data):
-        # Prediction logic
-        return {
-            'ml_prediction_score': 0.75,
-            'ml_price_target': 1500.0,
-            'ml_confidence': 0.82,
-            'ml_risk_score': 0.15
-        }
-```
-
-2. Update `scheduler.py` to train the new model:
-```python
-def train_ml_models():
-    new_predictor = NewMLPredictor(session)
-    new_predictor.train(lookback_days=365)
-```
-
-3. Update `suggested_stocks_saga.py` to use predictions:
-```python
-def _execute_step6_ml_prediction(self, saga):
-    new_predictor = NewMLPredictor(session)
-    for stock in saga.final_results:
-        prediction = new_predictor.predict(stock)
-        stock.update(prediction)
-```
 
 ### Adding a New Pipeline Step
 
@@ -585,8 +555,17 @@ Modify these values to adjust screening strictness.
 # Test data pipeline (all steps)
 python3 run_pipeline.py
 
-# Test ML training
-python3 tools/train_ml_model.py
+# Test EMA strategy indicators
+python3 -c "
+from src.models.database import get_database_manager
+from src.services.technical.ema_strategy_calculator import get_ema_strategy_calculator
+
+db_manager = get_database_manager()
+with db_manager.get_session() as session:
+    calc = get_ema_strategy_calculator(session)
+    result = calc.calculate_all_indicators(['NSE:RELIANCE-EQ'], lookback_days=252)
+    print(result)
+"
 
 # Test stock selection saga
 python3 -c "
@@ -632,10 +611,10 @@ LEFT JOIN technical_indicators ti ON s.symbol = ti.symbol;
    - Check `SCREENING_QUOTES_RATE_LIMIT_DELAY` (default 0.2s, increase to 0.5s)
    - Reduce `VOLATILITY_MAX_WORKERS` (default 5, try 3)
 
-2. **ML training fails:**
+2. **EMA indicator calculation fails:**
    - Check historical data exists: `SELECT COUNT(*) FROM historical_data;`
-   - Ensure at least 20 days of data per stock
-   - Check disk space for model files
+   - Ensure at least 60 days of data per stock (minimum for reliable EMAs)
+   - Check database connectivity
 
 3. **Scheduler not running:**
    - Check process: `docker compose ps`
@@ -645,8 +624,8 @@ LEFT JOIN technical_indicators ti ON s.symbol = ti.symbol;
 ## Performance Considerations
 
 - **Data pipeline:** ~20-30 minutes for 2,259 stocks
-- **ML training:** ~1-2 minutes (600K+ samples, 100 trees)
-- **API response time:** <100ms (with Redis cache)
+- **EMA indicator calculation:** ~2-5 minutes for all stocks
+- **API response time:** <100ms (with Dragonfly cache)
 - **Database size:** ~1.6M records, ~500MB
 
 **Optimization tips:**
@@ -688,5 +667,5 @@ LEFT JOIN technical_indicators ti ON s.symbol = ti.symbol;
 
 - **API Documentation:** Check `src/services/brokers/fyers/api.py` for Fyers API methods
 - **Database Schema:** See `init-scripts/01-init-db.sql` for complete DDL
-- **ML Features:** See `src/services/ml/enhanced_stock_predictor.py` for full feature list
+- **EMA Strategy:** See `src/services/technical/ema_strategy_calculator.py` for implementation
 - **Stock Filtering:** See `config/stock_filters.yaml` for screening criteria
