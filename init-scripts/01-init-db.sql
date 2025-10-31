@@ -399,41 +399,16 @@ CREATE TABLE IF NOT EXISTS technical_indicators (
     id SERIAL PRIMARY KEY,
     symbol VARCHAR(50) NOT NULL,
     date DATE NOT NULL,
-    -- Moving Averages
-    sma_5 DOUBLE PRECISION,
-    sma_10 DOUBLE PRECISION,
-    sma_20 DOUBLE PRECISION,
-    sma_50 DOUBLE PRECISION,
-    sma_100 DOUBLE PRECISION,
-    sma_200 DOUBLE PRECISION,
-    ema_8 DOUBLE PRECISION,
-    ema_12 DOUBLE PRECISION,
-    ema_21 DOUBLE PRECISION,
-    ema_26 DOUBLE PRECISION,
-    ema_50 DOUBLE PRECISION,
-    -- Momentum Indicators
-    demarker DOUBLE PRECISION,
-    rsi_14 DOUBLE PRECISION,
-    macd DOUBLE PRECISION,
-    macd_signal DOUBLE PRECISION,
-    macd_histogram DOUBLE PRECISION,
-    -- Volatility Indicators
-    atr_14 DOUBLE PRECISION,
-    atr_percentage DOUBLE PRECISION,
-    bb_upper DOUBLE PRECISION,
-    bb_middle DOUBLE PRECISION,
-    bb_lower DOUBLE PRECISION,
-    bb_width DOUBLE PRECISION,
-    -- Trend Indicators
-    adx_14 DOUBLE PRECISION,
-    -- Volume Indicators
-    obv DOUBLE PRECISION,
-    volume_sma_20 DOUBLE PRECISION,
-    volume_ratio DOUBLE PRECISION,
-    -- Custom indicators
-    price_momentum_5d DOUBLE PRECISION,
-    price_momentum_20d DOUBLE PRECISION,
-    volatility_rank DOUBLE PRECISION,
+
+    -- 8-21 EMA Strategy Indicators (Core)
+    ema_8 DOUBLE PRECISION,        -- Fast EMA (8-day) - REQUIRED for power zone
+    ema_21 DOUBLE PRECISION,       -- Slow EMA (21-day) - REQUIRED for power zone
+    demarker DOUBLE PRECISION,     -- DeMarker oscillator (0-1) - REQUIRED for entry timing
+
+    -- Context Indicators (Optional but useful)
+    sma_50 DOUBLE PRECISION,       -- Medium-term trend confirmation
+    sma_200 DOUBLE PRECISION,      -- Major trend identification (bull/bear market)
+
     -- Metadata
     calculation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     data_points_used INTEGER,
@@ -511,6 +486,20 @@ CREATE INDEX IF NOT EXISTS idx_technical_symbol ON technical_indicators(symbol);
 CREATE INDEX IF NOT EXISTS idx_technical_date ON technical_indicators(date);
 CREATE INDEX IF NOT EXISTS idx_technical_symbol_date ON technical_indicators(symbol, date);
 CREATE INDEX IF NOT EXISTS idx_technical_symbol_date_desc ON technical_indicators(symbol, date DESC);
+
+-- 8-21 EMA Strategy Indexes (for optimized querying)
+CREATE INDEX IF NOT EXISTS idx_technical_ema8 ON technical_indicators(ema_8) WHERE ema_8 IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_technical_ema21 ON technical_indicators(ema_21) WHERE ema_21 IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_technical_demarker ON technical_indicators(demarker) WHERE demarker IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_technical_ema_strategy ON technical_indicators(symbol, date, ema_8, ema_21, demarker) WHERE ema_8 IS NOT NULL AND ema_21 IS NOT NULL;
+
+-- Technical Indicators Table Comments
+COMMENT ON TABLE technical_indicators IS 'Historical technical indicators calculated from OHLCV data. Includes moving averages, momentum, volatility, and volume indicators. Primary columns for 8-21 EMA strategy: ema_8, ema_21, demarker.';
+
+-- 8-21 EMA Strategy Column Comments
+COMMENT ON COLUMN technical_indicators.ema_8 IS '8-day Exponential Moving Average (fast EMA). Used to identify short-term trend. Part of 8-21 EMA strategy power zone (Price > EMA8 > EMA21 = bullish).';
+COMMENT ON COLUMN technical_indicators.ema_21 IS '21-day Exponential Moving Average (slow EMA). Represents institutional holding period. Acts as dynamic support/resistance in 8-21 EMA strategy.';
+COMMENT ON COLUMN technical_indicators.demarker IS 'DeMarker Oscillator (0-1 range, 14-period). Measures buying/selling pressure. <0.30 = oversold (ideal buy), >0.70 = overbought (avoid). Used for entry timing in pullbacks.';
 
 -- Market Benchmarks Indexes
 CREATE INDEX IF NOT EXISTS idx_benchmark_name ON market_benchmarks(benchmark);
