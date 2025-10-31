@@ -400,12 +400,8 @@ class TechnicalIndicatorsService:
                         ).first()
 
                         if existing:
-                            # Update existing record
-                            for column in ['sma_5', 'sma_10', 'sma_20', 'sma_50', 'sma_100', 'sma_200',
-                                         'ema_12', 'ema_26', 'ema_50', 'rsi_14', 'macd', 'macd_signal',
-                                         'macd_histogram', 'atr_14', 'atr_percentage', 'bb_upper', 'bb_middle',
-                                         'bb_lower', 'bb_width', 'adx_14', 'obv', 'volume_sma_20', 'volume_ratio',
-                                         'price_momentum_5d', 'price_momentum_20d', 'volatility_rank']:
+                            # Update existing record with 8-21 EMA strategy indicators
+                            for column in ['ema_8', 'ema_21', 'demarker', 'sma_50', 'sma_200']:
                                 if column in row and pd.notna(row[column]):
                                     setattr(existing, column, float(row[column]))
 
@@ -420,45 +416,14 @@ class TechnicalIndicatorsService:
                                     symbol=symbol,
                                     date=row['date'],
 
-                                    # Moving Averages
-                                    sma_5=float(row['sma_5']) if pd.notna(row['sma_5']) else None,
-                                    sma_10=float(row['sma_10']) if pd.notna(row['sma_10']) else None,
-                                    sma_20=float(row['sma_20']) if pd.notna(row['sma_20']) else None,
-                                    sma_50=float(row['sma_50']) if pd.notna(row['sma_50']) else None,
-                                    sma_100=float(row['sma_100']) if pd.notna(row['sma_100']) else None,
-                                    sma_200=float(row['sma_200']) if pd.notna(row['sma_200']) else None,
+                                    # 8-21 EMA Strategy Indicators (Core)
+                                    ema_8=float(row['ema_8']) if 'ema_8' in row and pd.notna(row['ema_8']) else None,
+                                    ema_21=float(row['ema_21']) if 'ema_21' in row and pd.notna(row['ema_21']) else None,
+                                    demarker=float(row['demarker']) if 'demarker' in row and pd.notna(row['demarker']) else None,
 
-                                    # Exponential Moving Averages
-                                    ema_12=float(row['ema_12']) if pd.notna(row['ema_12']) else None,
-                                    ema_26=float(row['ema_26']) if pd.notna(row['ema_26']) else None,
-                                    ema_50=float(row['ema_50']) if pd.notna(row['ema_50']) else None,
-
-                                    # Momentum Indicators
-                                    rsi_14=float(row['rsi_14']) if pd.notna(row['rsi_14']) else None,
-                                    macd=float(row['macd']) if pd.notna(row['macd']) else None,
-                                    macd_signal=float(row['macd_signal']) if pd.notna(row['macd_signal']) else None,
-                                    macd_histogram=float(row['macd_histogram']) if pd.notna(row['macd_histogram']) else None,
-
-                                    # Volatility Indicators
-                                    atr_14=float(row['atr_14']) if pd.notna(row['atr_14']) else None,
-                                    atr_percentage=float(row['atr_percentage']) if pd.notna(row['atr_percentage']) else None,
-                                    bb_upper=float(row['bb_upper']) if pd.notna(row['bb_upper']) else None,
-                                    bb_middle=float(row['bb_middle']) if pd.notna(row['bb_middle']) else None,
-                                    bb_lower=float(row['bb_lower']) if pd.notna(row['bb_lower']) else None,
-                                    bb_width=float(row['bb_width']) if pd.notna(row['bb_width']) else None,
-
-                                    # Trend Indicators
-                                    adx_14=float(row['adx_14']) if pd.notna(row['adx_14']) else None,
-
-                                    # Volume Indicators
-                                    obv=float(row['obv']) if pd.notna(row['obv']) else None,
-                                    volume_sma_20=float(row['volume_sma_20']) if pd.notna(row['volume_sma_20']) else None,
-                                    volume_ratio=float(row['volume_ratio']) if pd.notna(row['volume_ratio']) else None,
-
-                                    # Custom Indicators
-                                    price_momentum_5d=float(row['price_momentum_5d']) if pd.notna(row['price_momentum_5d']) else None,
-                                    price_momentum_20d=float(row['price_momentum_20d']) if pd.notna(row['price_momentum_20d']) else None,
-                                    volatility_rank=float(row['volatility_rank']) if pd.notna(row['volatility_rank']) else None,
+                                    # Context Indicators (Optional)
+                                    sma_50=float(row['sma_50']) if 'sma_50' in row and pd.notna(row['sma_50']) else None,
+                                    sma_200=float(row['sma_200']) if 'sma_200' in row and pd.notna(row['sma_200']) else None,
 
                                     # Metadata
                                     data_points_used=int(row['data_points_used']),
