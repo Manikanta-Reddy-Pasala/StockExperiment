@@ -169,8 +169,7 @@ class DailySnapshotService:
                         recommendation = EXCLUDED.recommendation,
                         reason = EXCLUDED.reason,
                         sector = EXCLUDED.sector,
-                        market_cap_category = EXCLUDED.market_cap_category,
-                        updated_at = CURRENT_TIMESTAMP
+                        market_cap_category = EXCLUDED.market_cap_category
                     RETURNING (xmax = 0) AS inserted
                 """)
                 
