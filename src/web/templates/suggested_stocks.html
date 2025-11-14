@@ -26,39 +26,57 @@
     <div class="card-body bg-light">
         <!-- Summary Stats -->
         <div class="row text-center mb-3">
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="card border-success h-100">
-                    <div class="card-body">
-                        <h6 class="text-success mb-2">💎 Strong Buy</h6>
-                        <small class="text-muted">DeMarker < 0.30</small>
-                        <h4 class="mt-2 mb-0 text-success" id="strong-buy-count">-</h4>
+                    <div class="card-body p-2">
+                        <h6 class="text-success mb-1 small">💎 Strong Buy</h6>
+                        <small class="text-muted" style="font-size: 0.7rem;">DeMarker < 0.30</small>
+                        <h4 class="mt-1 mb-0 text-success" id="strong-buy-count">-</h4>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="card border-primary h-100">
-                    <div class="card-body">
-                        <h6 class="text-primary mb-2">📈 Buy</h6>
-                        <small class="text-muted">DeMarker 0.30-0.50</small>
-                        <h4 class="mt-2 mb-0 text-primary" id="buy-count">-</h4>
+                    <div class="card-body p-2">
+                        <h6 class="text-primary mb-1 small">📈 Buy</h6>
+                        <small class="text-muted" style="font-size: 0.7rem;">DeMarker 0.30-0.50</small>
+                        <h4 class="mt-1 mb-0 text-primary" id="buy-count">-</h4>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="card border-warning h-100">
-                    <div class="card-body">
-                        <h6 class="text-warning mb-2">⚠️ Hold</h6>
-                        <small class="text-muted">Overbought Zone</small>
-                        <h4 class="mt-2 mb-0 text-warning" id="hold-count">-</h4>
+                    <div class="card-body p-2">
+                        <h6 class="text-warning mb-1 small">⚠️ Hold</h6>
+                        <small class="text-muted" style="font-size: 0.7rem;">Neutral</small>
+                        <h4 class="mt-1 mb-0 text-warning" id="hold-count">-</h4>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
+                <div class="card border-danger h-100">
+                    <div class="card-body p-2">
+                        <h6 class="text-danger mb-1 small">📉 Sell</h6>
+                        <small class="text-muted" style="font-size: 0.7rem;">Exit Signal</small>
+                        <h4 class="mt-1 mb-0 text-danger" id="sell-count">-</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card border-danger h-100">
+                    <div class="card-body p-2">
+                        <h6 class="text-danger mb-1 small">🔴 Strong Sell</h6>
+                        <small class="text-muted" style="font-size: 0.7rem;">Strong Exit</small>
+                        <h4 class="mt-1 mb-0 text-danger" id="strong-sell-count">-</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
                 <div class="card border-info h-100">
-                    <div class="card-body">
-                        <h6 class="text-info mb-2">📊 Total Stocks</h6>
-                        <small class="text-muted">All Signals</small>
-                        <h4 class="mt-2 mb-0 text-info" id="total-count">-</h4>
+                    <div class="card-body p-2">
+                        <h6 class="text-info mb-1 small">📊 Total</h6>
+                        <small class="text-muted" style="font-size: 0.7rem;">All Signals</small>
+                        <h4 class="mt-1 mb-0 text-info" id="total-count">-</h4>
                     </div>
                 </div>
             </div>
@@ -357,6 +375,9 @@ function getSignalStrength(stock) {
     const demarker = parseFloat(stock.demarker) || 0.5;
     const buySignal = stock.buy_signal;
     const sellSignal = stock.sell_signal;
+    const ema8 = parseFloat(stock.ema_8) || 0;
+    const ema21 = parseFloat(stock.ema_21) || 0;
+    const price = parseFloat(stock.current_price) || 0;
 
     if (buySignal) {
         if (demarker < 0.30) {
@@ -382,12 +403,22 @@ function getSignalStrength(stock) {
             };
         }
     } else if (sellSignal) {
-        return {
-            label: 'SELL',
-            class: 'signal-sell',
-            icon: '📉',
-            description: 'Exit signal - Bearish trend'
-        };
+        // Strong sell: Price significantly below both EMAs
+        if (price < ema21 && ema8 < ema21 && demarker > 0.70) {
+            return {
+                label: 'STRONG SELL',
+                class: 'signal-sell',
+                icon: '🔴',
+                description: 'Strong exit signal - Deep bearish trend'
+            };
+        } else {
+            return {
+                label: 'SELL',
+                class: 'signal-sell',
+                icon: '📉',
+                description: 'Exit signal - Bearish trend'
+            };
+        }
     } else {
         return {
             label: 'NEUTRAL',
@@ -453,17 +484,23 @@ function updateSummaryStats(stocks) {
     let strongBuyCount = 0;
     let buyCount = 0;
     let holdCount = 0;
+    let sellCount = 0;
+    let strongSellCount = 0;
 
     stocks.forEach(stock => {
         const signal = getSignalStrength(stock);
         if (signal.label === 'STRONG BUY') strongBuyCount++;
         else if (signal.label === 'BUY') buyCount++;
-        else if (signal.label === 'HOLD') holdCount++;
+        else if (signal.label === 'HOLD' || signal.label === 'NEUTRAL') holdCount++;
+        else if (signal.label === 'SELL') sellCount++;
+        else if (signal.label === 'STRONG SELL') strongSellCount++;
     });
 
     document.getElementById('strong-buy-count').textContent = strongBuyCount;
     document.getElementById('buy-count').textContent = buyCount;
     document.getElementById('hold-count').textContent = holdCount;
+    document.getElementById('sell-count').textContent = sellCount;
+    document.getElementById('strong-sell-count').textContent = strongSellCount;
     document.getElementById('total-count').textContent = stocks.length;
 }
 
@@ -482,63 +519,158 @@ function displayStocks(stocks) {
         return;
     }
 
-    tbody.innerHTML = stocks.map((stock, index) => {
-        const signal = getSignalStrength(stock);
-        const price = parseFloat(stock.current_price) || 0;
-        const ema8 = parseFloat(stock.ema_8) || 0;
-        const ema21 = parseFloat(stock.ema_21) || 0;
-        const demarker = parseFloat(stock.demarker) || 0;
-        const score = parseFloat(stock.selection_score) || 0;
-        const target1 = parseFloat(stock.fib_target_1) || 0;
-        const target2 = parseFloat(stock.fib_target_2) || 0;
-        const target3 = parseFloat(stock.fib_target_3) || 0;
-        const stopLoss = parseFloat(stock.stop_loss) || 0;
-        const marketCap = parseFloat(stock.market_cap) || 0;
+    // Group stocks by signal strength
+    const grouped = {
+        strongBuy: [],
+        buy: [],
+        sell: [],
+        strongSell: [],
+        neutral: []
+    };
 
-        return `
-            <tr class="animate-fade-in">
-                <td class="text-muted">${index + 1}</td>
-                <td>
-                    <span class="signal-badge ${signal.class}" title="${signal.description}">
-                        ${signal.icon} ${signal.label}
-                    </span>
-                </td>
-                <td>
-                    <strong>${stock.symbol}</strong><br>
-                    <small class="text-muted">${stock.stock_name || ''}</small>
-                </td>
-                <td class="fw-bold">₹${price.toFixed(2)}</td>
-                <td>₹${ema8.toFixed(2)}</td>
-                <td>₹${ema21.toFixed(2)}</td>
-                <td>
-                    <span class="badge ${demarker < 0.30 ? 'bg-success' : demarker < 0.50 ? 'bg-primary' : 'bg-warning'}">
-                        ${demarker.toFixed(3)}
-                    </span>
-                </td>
-                <td>${score.toFixed(2)}</td>
-                <td class="text-success">₹${target1.toFixed(2)}</td>
-                <td class="text-success">₹${target2.toFixed(2)}</td>
-                <td class="text-success">₹${target3.toFixed(2)}</td>
-                <td class="text-danger">₹${stopLoss.toFixed(2)}</td>
-                <td>
-                    <small class="text-muted">
-                        ${marketCap >= 20000 ? 'Large' : marketCap >= 5000 ? 'Mid' : 'Small'} Cap<br>
-                        ₹${(marketCap).toFixed(0)} Cr
-                    </small>
-                </td>
-                <td>
-                    <div class="btn-group btn-group-sm">
-                        <button class="btn btn-outline-primary" onclick='showStockDetails(${JSON.stringify(stock).replace(/'/g, "&apos;")})' title="View Details">
-                            <i class="bi bi-eye"></i>
-                        </button>
-                        <button class="btn btn-outline-success" onclick='buyStock(${JSON.stringify(stock).replace(/'/g, "&apos;")})' title="Place Order">
-                            <i class="bi bi-cart-plus"></i>
-                        </button>
-                    </div>
+    stocks.forEach(stock => {
+        const signal = getSignalStrength(stock);
+        if (signal.label === 'STRONG BUY') {
+            grouped.strongBuy.push(stock);
+        } else if (signal.label === 'BUY') {
+            grouped.buy.push(stock);
+        } else if (signal.label === 'SELL') {
+            grouped.sell.push(stock);
+        } else if (signal.label === 'STRONG SELL') {
+            grouped.strongSell.push(stock);
+        } else {
+            grouped.neutral.push(stock);
+        }
+    });
+
+    // Build HTML with sections
+    let html = '';
+    let globalIndex = 0;
+
+    // Strong Buy Section
+    if (grouped.strongBuy.length > 0) {
+        html += `
+            <tr class="table-success">
+                <td colspan="14" class="fw-bold py-3">
+                    <i class="bi bi-gem me-2"></i>💎 STRONG BUY SIGNALS (${grouped.strongBuy.length})
+                    <small class="ms-3 text-muted fw-normal">DeMarker < 0.30 - Best Entry Points</small>
                 </td>
             </tr>
         `;
-    }).join('');
+        html += grouped.strongBuy.map(stock => createStockRow(stock, ++globalIndex)).join('');
+    }
+
+    // Buy Section
+    if (grouped.buy.length > 0) {
+        html += `
+            <tr class="table-primary">
+                <td colspan="14" class="fw-bold py-3">
+                    <i class="bi bi-arrow-up-circle me-2"></i>📈 BUY SIGNALS (${grouped.buy.length})
+                    <small class="ms-3 text-muted fw-normal">DeMarker 0.30-0.50 - Good Entry Points</small>
+                </td>
+            </tr>
+        `;
+        html += grouped.buy.map(stock => createStockRow(stock, ++globalIndex)).join('');
+    }
+
+    // Sell Section
+    if (grouped.sell.length > 0) {
+        html += `
+            <tr class="table-danger">
+                <td colspan="14" class="fw-bold py-3">
+                    <i class="bi bi-arrow-down-circle me-2"></i>📉 SELL SIGNALS (${grouped.sell.length})
+                    <small class="ms-3 text-muted fw-normal">Exit or Avoid These Stocks</small>
+                </td>
+            </tr>
+        `;
+        html += grouped.sell.map(stock => createStockRow(stock, ++globalIndex)).join('');
+    }
+
+    // Strong Sell Section
+    if (grouped.strongSell.length > 0) {
+        html += `
+            <tr class="table-danger">
+                <td colspan="14" class="fw-bold py-3">
+                    <i class="bi bi-exclamation-triangle me-2"></i>⚠️ STRONG SELL SIGNALS (${grouped.strongSell.length})
+                    <small class="ms-3 text-muted fw-normal">Strong Exit Signals</small>
+                </td>
+            </tr>
+        `;
+        html += grouped.strongSell.map(stock => createStockRow(stock, ++globalIndex)).join('');
+    }
+
+    // Neutral Section (if any)
+    if (grouped.neutral.length > 0) {
+        html += `
+            <tr class="table-warning">
+                <td colspan="14" class="fw-bold py-3">
+                    <i class="bi bi-dash-circle me-2"></i>⚠️ HOLD / NEUTRAL (${grouped.neutral.length})
+                    <small class="ms-3 text-muted fw-normal">No Clear Signal</small>
+                </td>
+            </tr>
+        `;
+        html += grouped.neutral.map(stock => createStockRow(stock, ++globalIndex)).join('');
+    }
+
+    tbody.innerHTML = html;
+}
+
+function createStockRow(stock, index) {
+    const signal = getSignalStrength(stock);
+    const price = parseFloat(stock.current_price) || 0;
+    const ema8 = parseFloat(stock.ema_8) || 0;
+    const ema21 = parseFloat(stock.ema_21) || 0;
+    const demarker = parseFloat(stock.demarker) || 0;
+    const score = parseFloat(stock.selection_score) || 0;
+    const target1 = parseFloat(stock.fib_target_1) || 0;
+    const target2 = parseFloat(stock.fib_target_2) || 0;
+    const target3 = parseFloat(stock.fib_target_3) || 0;
+    const stopLoss = parseFloat(stock.stop_loss) || 0;
+    const marketCap = parseFloat(stock.market_cap) || 0;
+
+    return `
+        <tr class="animate-fade-in">
+            <td class="text-muted">${index}</td>
+            <td>
+                <span class="signal-badge ${signal.class}" title="${signal.description}">
+                    ${signal.icon} ${signal.label}
+                </span>
+            </td>
+            <td>
+                <strong>${stock.symbol}</strong><br>
+                <small class="text-muted">${stock.stock_name || ''}</small>
+            </td>
+            <td class="fw-bold">₹${price.toFixed(2)}</td>
+            <td>₹${ema8.toFixed(2)}</td>
+            <td>₹${ema21.toFixed(2)}</td>
+            <td>
+                <span class="badge ${demarker < 0.30 ? 'bg-success' : demarker < 0.50 ? 'bg-primary' : 'bg-warning'}">
+                    ${demarker.toFixed(3)}
+                </span>
+            </td>
+            <td>${score.toFixed(2)}</td>
+            <td class="text-success">₹${target1.toFixed(2)}</td>
+            <td class="text-success">₹${target2.toFixed(2)}</td>
+            <td class="text-success">₹${target3.toFixed(2)}</td>
+            <td class="text-danger">₹${stopLoss.toFixed(2)}</td>
+            <td>
+                <small class="text-muted">
+                    ${marketCap >= 20000 ? 'Large' : marketCap >= 5000 ? 'Mid' : 'Small'} Cap<br>
+                    ₹${(marketCap).toFixed(0)} Cr
+                </small>
+            </td>
+            <td>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary" onclick='showStockDetails(${JSON.stringify(stock).replace(/'/g, "&apos;")})' title="View Details">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="btn btn-outline-success" onclick='buyStock(${JSON.stringify(stock).replace(/'/g, "&apos;")})' title="Place Order">
+                        <i class="bi bi-cart-plus"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `;
 }
 
 function showStockDetails(stock) {
