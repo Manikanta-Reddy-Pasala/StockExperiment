@@ -752,51 +752,58 @@ ON CONFLICT (user_id) DO NOTHING;
 CREATE TABLE IF NOT EXISTS daily_suggested_stocks (
     id SERIAL PRIMARY KEY,
     date DATE NOT NULL,
-    symbol VARCHAR(20) NOT NULL,
-    stock_name VARCHAR(100),
-    current_price DECIMAL(10, 2),
-    market_cap DECIMAL(20, 2),
+    symbol VARCHAR(50) NOT NULL,
+    strategy VARCHAR(50) NOT NULL DEFAULT 'ema_8_21',
+    model_type VARCHAR(20) NOT NULL DEFAULT 'traditional',
+    stock_name VARCHAR(200),
+    current_price DOUBLE PRECISION,
+    market_cap DOUBLE PRECISION,
 
     -- Ranking (8-21 EMA unified strategy)
-    selection_score DECIMAL(10, 4),
+    selection_score DOUBLE PRECISION,
     rank INTEGER,
 
+    -- ML/AI Fields (optional, for future use)
+    ml_prediction_score DOUBLE PRECISION,
+    ml_price_target DOUBLE PRECISION,
+    ml_confidence DOUBLE PRECISION,
+    ml_risk_score DOUBLE PRECISION,
+
     -- Technical indicators
-    rsi_14 DECIMAL(10, 4),
-    macd DECIMAL(10, 4),
-    sma_50 DECIMAL(10, 2),
-    sma_200 DECIMAL(10, 2),
+    rsi_14 DOUBLE PRECISION,
+    macd DOUBLE PRECISION,
+    sma_50 DOUBLE PRECISION,
+    sma_200 DOUBLE PRECISION,
 
     -- Fundamental ratios
-    pe_ratio DECIMAL(10, 4),
-    pb_ratio DECIMAL(10, 4),
-    roe DECIMAL(10, 4),
-    eps DECIMAL(10, 4),
-    beta DECIMAL(10, 4),
+    pe_ratio DOUBLE PRECISION,
+    pb_ratio DOUBLE PRECISION,
+    roe DOUBLE PRECISION,
+    eps DOUBLE PRECISION,
+    beta DOUBLE PRECISION,
 
     -- Growth metrics
-    revenue_growth DECIMAL(10, 4),
-    earnings_growth DECIMAL(10, 4),
-    operating_margin DECIMAL(10, 4),
+    revenue_growth DOUBLE PRECISION,
+    earnings_growth DOUBLE PRECISION,
+    operating_margin DOUBLE PRECISION,
 
     -- Trading signals
-    target_price DECIMAL(10, 2),
-    stop_loss DECIMAL(10, 2),
+    target_price DOUBLE PRECISION,
+    stop_loss DOUBLE PRECISION,
     recommendation VARCHAR(20),
     reason TEXT,
 
-
-    -- 8-21 EMA Strategy
-    ema_8 DECIMAL(10, 2),
-    ema_21 DECIMAL(10, 2),
-    ema_trend_score DECIMAL(10, 4),
-    demarker DECIMAL(10, 4),
+    -- 8-21 EMA Strategy Indicators
+    ema_8 DOUBLE PRECISION,
+    ema_21 DOUBLE PRECISION,
+    ema_trend_score DOUBLE PRECISION,
+    ema_score DOUBLE PRECISION,
+    demarker DOUBLE PRECISION,
 
     -- Fibonacci Targets
-    fib_target_1 DECIMAL(10, 2),  -- 127.2% extension
-    fib_target_2 DECIMAL(10, 2),  -- 161.8% extension (golden ratio)
-    fib_target_3 DECIMAL(10, 2),  -- 200-261.8% extension
-
+    fib_target_1 DOUBLE PRECISION,  -- 127.2% extension
+    fib_target_2 DOUBLE PRECISION,  -- 161.8% extension (golden ratio)
+    fib_target_3 DOUBLE PRECISION,  -- 200-261.8% extension
 
     -- Enhanced Signals
     buy_signal BOOLEAN DEFAULT FALSE,
@@ -804,28 +811,32 @@ CREATE TABLE IF NOT EXISTS daily_suggested_stocks (
     signal_quality VARCHAR(20),  -- 'high', 'medium', 'low'
 
     -- Additional metadata
-    sector VARCHAR(50),
+    sector VARCHAR(100),
     market_cap_category VARCHAR(20),
 
     -- Timestamps
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    -- Unique constraint: one record per symbol per date
-    UNIQUE (date, symbol)
+    -- Unique constraint: one record per symbol per date per strategy per model_type
+    UNIQUE (date, symbol, strategy, model_type)
 );
 
 -- Daily Suggested Stocks Indexes
-CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_date ON daily_suggested_stocks(date);
-CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_symbol ON daily_suggested_stocks(symbol);
+CREATE INDEX IF NOT EXISTS idx_daily_suggested_date ON daily_suggested_stocks(date DESC);
+CREATE INDEX IF NOT EXISTS idx_daily_suggested_symbol ON daily_suggested_stocks(symbol);
+CREATE INDEX IF NOT EXISTS idx_daily_suggested_date_strategy ON daily_suggested_stocks(date, strategy);
+CREATE INDEX IF NOT EXISTS idx_daily_suggested_ml_score ON daily_suggested_stocks(ml_prediction_score DESC);
 
 -- Add table comment
 COMMENT ON TABLE daily_suggested_stocks IS 'Daily stock picks using unified 8-21 EMA Swing Trading Strategy. Stores top 50 stocks updated daily at 10:15 PM IST.';
 
 -- Add column comments for 8-21 EMA Strategy indicators
+COMMENT ON COLUMN daily_suggested_stocks.strategy IS 'Strategy name: ema_8_21 for unified 8-21 EMA swing trading strategy.';
+COMMENT ON COLUMN daily_suggested_stocks.model_type IS 'Model type: traditional for pure technical analysis, ml for machine learning models.';
 COMMENT ON COLUMN daily_suggested_stocks.ema_8 IS '8-period EMA: Short-term momentum average for trend identification.';
 COMMENT ON COLUMN daily_suggested_stocks.ema_21 IS '21-period EMA: Institutional holding period average for trend confirmation.';
-COMMENT ON COLUMN daily_suggested_stocks.ema_trend_score IS 'EMA Trend Score (0-100): PRIMARY RANKING METRIC. Higher separation in Price > 8 EMA > 21 EMA = Higher score.';
+COMMENT ON COLUMN daily_suggested_stocks.ema_trend_score IS 'EMA Trend Score (0-100): Measures strength of uptrend based on EMA separation.';
+COMMENT ON COLUMN daily_suggested_stocks.ema_score IS 'EMA Score: PRIMARY RANKING METRIC for stock selection. Higher = better opportunity.';
 COMMENT ON COLUMN daily_suggested_stocks.demarker IS 'DeMarker Oscillator (0-1): Entry timing. <0.30 = oversold (HIGH quality), >0.70 = overbought (avoid).';
 COMMENT ON COLUMN daily_suggested_stocks.fib_target_1 IS 'Fibonacci Target 1 (127.2% extension): Conservative profit target.';
 COMMENT ON COLUMN daily_suggested_stocks.fib_target_2 IS 'Fibonacci Target 2 (161.8% golden ratio): Standard profit target.';
@@ -833,13 +844,6 @@ COMMENT ON COLUMN daily_suggested_stocks.fib_target_3 IS 'Fibonacci Target 3 (20
 COMMENT ON COLUMN daily_suggested_stocks.buy_signal IS 'BUY Signal: TRUE when Price > 8 EMA > 21 EMA (power zone active).';
 COMMENT ON COLUMN daily_suggested_stocks.sell_signal IS 'SELL Signal: TRUE when Price < 8 EMA < 21 EMA (bearish trend).';
 COMMENT ON COLUMN daily_suggested_stocks.signal_quality IS 'Signal Quality: HIGH (power zone + DeMarker oversold), MEDIUM (power zone + mild pullback), LOW (power zone only).';
-
--- Trigger for daily_suggested_stocks
-DROP TRIGGER IF EXISTS update_daily_suggested_stocks_updated_at ON daily_suggested_stocks;
-CREATE TRIGGER update_daily_suggested_stocks_updated_at
-    BEFORE UPDATE ON daily_suggested_stocks
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
 
 -- Grant permissions
 GRANT ALL PRIVILEGES ON TABLE daily_suggested_stocks TO trader;

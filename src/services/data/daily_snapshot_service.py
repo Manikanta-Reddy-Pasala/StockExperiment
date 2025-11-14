@@ -54,6 +54,8 @@ class DailySnapshotService:
                 data = {
                     'date': snapshot_date,
                     'symbol': symbol,
+                    'strategy': stock.get('strategy', 'ema_8_21'),  # Required for unique constraint
+                    'model_type': stock.get('model_type', 'traditional'),  # Required for unique constraint
                     'stock_name': stock.get('name'),
                     'current_price': stock.get('current_price'),
                     'market_cap': stock.get('market_cap'),
@@ -108,10 +110,10 @@ class DailySnapshotService:
                 }
 
                 # Insert with ON CONFLICT UPDATE (upsert)
-                # Unified strategy - no strategy column needed
+                # Includes strategy and model_type to match unique constraint
                 upsert_query = text("""
                     INSERT INTO daily_suggested_stocks (
-                        date, symbol, stock_name, current_price, market_cap,
+                        date, symbol, strategy, model_type, stock_name, current_price, market_cap,
                         selection_score, rank,
                         ema_8, ema_21, ema_trend_score, demarker,
                         fib_target_1, fib_target_2, fib_target_3,
@@ -122,7 +124,7 @@ class DailySnapshotService:
                         target_price, stop_loss, recommendation, reason,
                         sector, market_cap_category, created_at
                     ) VALUES (
-                        :date, :symbol, :stock_name, :current_price, :market_cap,
+                        :date, :symbol, :strategy, :model_type, :stock_name, :current_price, :market_cap,
                         :selection_score, :rank,
                         :ema_8, :ema_21, :ema_trend_score, :demarker,
                         :fib_target_1, :fib_target_2, :fib_target_3,
@@ -133,7 +135,7 @@ class DailySnapshotService:
                         :target_price, :stop_loss, :recommendation, :reason,
                         :sector, :market_cap_category, CURRENT_TIMESTAMP
                     )
-                    ON CONFLICT (date, symbol)
+                    ON CONFLICT (date, symbol, strategy, model_type)
                     DO UPDATE SET
                         stock_name = EXCLUDED.stock_name,
                         current_price = EXCLUDED.current_price,
