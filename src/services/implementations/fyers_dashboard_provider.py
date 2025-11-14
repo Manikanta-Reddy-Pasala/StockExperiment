@@ -470,8 +470,50 @@ class FyersDashboardProvider(IDashboardProvider):
 
             period_days = period_days_map.get(period, 30)
 
-            # Always use enhanced fallback for now until broker integration is complete
-            # This provides working portfolio performance visualization with proper period filters
+            # Try to get current portfolio data
+            portfolio_summary = self.get_portfolio_summary(user_id)
+
+            if portfolio_summary.get('success'):
+                summary_data = portfolio_summary.get('data', {})
+
+                # DashboardMetrics uses 'total_portfolio_value', 'total_pnl', 'daily_pnl'
+                portfolio_value = float(summary_data.get('total_portfolio_value', 0))
+                total_pnl = float(summary_data.get('total_pnl', 0))
+                daily_pnl = float(summary_data.get('daily_pnl', 0))
+
+                # Always return portfolio value, even if it's 0
+                return_percent = (total_pnl / portfolio_value * 100) if portfolio_value > 0 else 0.0
+                day_return_percent = (daily_pnl / portfolio_value * 100) if portfolio_value > 0 else 0.0
+
+                performance_data = {
+                    'return_percent': round(return_percent, 2),
+                    'annualized_return': 0.0,  # Would need historical snapshots
+                    'total_pnl': round(total_pnl, 2),
+                    'portfolio_value': round(portfolio_value, 2),
+                    'period': period,
+                    'period_days': period_days,
+                    'win_rate': 0.0,
+                    'sharpe_ratio': 0.0,
+                    'max_drawdown': 0.0,
+                    'volatility': 0.0,
+                    'best_day': 0.0,
+                    'worst_day': 0.0,
+                    'total_trading_days': 0,
+                    'chart_data': []
+                }
+
+                note = 'Showing current portfolio metrics. Historical performance tracking requires daily snapshots.'
+                if portfolio_value == 0:
+                    note = 'No portfolio data available. Add positions or holdings to track performance.'
+
+                return {
+                    'success': True,
+                    'data': performance_data,
+                    'note': note,
+                    'last_updated': datetime.now().isoformat()
+                }
+
+            # Fallback to empty metrics if no portfolio data
             return self._get_enhanced_fallback_metrics(user_id, period, period_days)
 
         except Exception as e:
