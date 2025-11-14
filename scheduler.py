@@ -198,34 +198,27 @@ def update_daily_snapshot():
 
         orchestrator = SuggestedStocksSagaOrchestrator()
 
-        # Run for both strategies
-        strategies = ['default_risk', 'high_risk']
-        total_stocks_stored = 0
+        # Run unified 8-21 EMA strategy
+        logger.info(f"\n📊 Running unified 8-21 EMA swing trading strategy...")
 
-        for strategy in strategies:
-            logger.info(f"\n📊 Running {strategy.upper()} strategy...")
+        try:
+            result = orchestrator.execute_suggested_stocks_saga(
+                user_id=1,
+                strategies=['unified'],  # Single unified strategy
+                limit=50  # Top 50 stocks
+            )
 
-            try:
-                result = orchestrator.execute_suggested_stocks_saga(
-                    user_id=1,
-                    strategies=[strategy],
-                    limit=50  # Top 50 stocks per strategy
-                )
+            if result['status'] == 'completed':
+                stocks_count = result['summary'].get('final_result_count', 0)
+                logger.info(f"✅ Strategy completed: {stocks_count} stocks selected")
+            else:
+                logger.error(f"❌ Strategy failed: {result.get('errors', [])}")
 
-                if result['status'] == 'completed':
-                    stocks_count = result['summary'].get('final_result_count', 0)
-                    total_stocks_stored += stocks_count
-                    logger.info(f"✅ {strategy} strategy completed: {stocks_count} stocks selected")
-                else:
-                    logger.error(f"❌ {strategy} strategy failed: {result.get('errors', [])}")
-
-            except Exception as e:
-                logger.error(f"❌ {strategy} strategy error: {e}", exc_info=True)
+        except Exception as e:
+            logger.error(f"❌ Strategy error: {e}", exc_info=True)
 
         logger.info("\n" + "=" * 80)
         logger.info(f"✅ Daily snapshot update complete!")
-        logger.info(f"  Total stocks stored: {total_stocks_stored}")
-        logger.info(f"  Strategies: DEFAULT_RISK + HIGH_RISK")
         logger.info(f"  Selection method: 8-21 EMA Swing Trading Strategy")
         logger.info(f"    - Power Zone: Price > 8 EMA > 21 EMA")
         logger.info(f"    - Entry Timing: DeMarker < 0.30 (oversold)")

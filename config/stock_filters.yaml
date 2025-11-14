@@ -1,0 +1,84 @@
+# Simplified Stock Filters Configuration for 8-21 EMA Swing Trading Strategy
+# Focus on identifying stocks in the "Power Zone" (8 EMA > 21 EMA) with pullback opportunities
+
+stage_1_filters:
+  # Tradeability criteria - ensure liquid, tradeable stocks
+  tradeability:
+    minimum_price: 50.0              # Min ₹50 (avoid penny stocks)
+    maximum_price: 10000.0           # Max ₹10,000
+    fallback_minimum_volume: 50000    # Min 50K volume for liquidity
+
+  # Market cap categories (in crores)
+  market_cap_categories:
+    large_cap:
+      minimum: 20000                 # ₹20,000 Cr+
+      description: "Large cap stocks (lower risk, stable)"
+    mid_cap:
+      minimum: 5000                  # ₹5,000 - ₹20,000 Cr
+      description: "Mid cap stocks (balanced risk/reward)"
+    small_cap:
+      minimum: 500                   # ₹500 - ₹5,000 Cr
+      description: "Small cap stocks (higher risk, higher potential)"
+
+stage_2_filters:
+  # 8-21 EMA Strategy Thresholds
+  filtering_thresholds:
+    # Power Zone Requirements
+    ema_bullish_trend: true          # 8 EMA > 21 EMA required
+    min_demarker: 0.0                # Allow all (filter later with < 0.30 for entry)
+    max_demarker: 1.0                # Full range
+
+    # Risk Management
+    max_beta: 1.5                    # Max volatility vs market
+    min_avg_volume: 100000           # Min average volume
+
+  # Fundamental Ratios (relaxed for swing trading)
+  fundamental_ratios:
+    max_pe_ratio: 100.0              # P/E < 100
+    min_roe: 0.0                     # No minimum ROE requirement
+    max_debt_equity: 5.0             # Debt/Equity < 5
+    min_dividend_yield: 0.0          # No dividend requirement
+
+  # Scoring Weights (for ranking stocks)
+  scoring_weights:
+    technical_score: 0.50            # 50% weight - EMA alignment, DeMarker
+    fundamental_score: 0.10          # 10% weight - PE, ROE (less important)
+    risk_score: 0.20                 # 20% weight - Beta, volatility
+    momentum_score: 0.15             # 15% weight - Price action
+    volume_score: 0.05               # 5% weight - Liquidity
+
+# Strategy Definition
+strategy:
+  unified:
+    name: "8-21 EMA Swing Trading"
+    description: "Unified 8-21 EMA swing trading strategy across all market caps"
+    market_cap_categories:
+      - large_cap
+      - mid_cap
+      - small_cap
+    max_position_size_percent: 5.0   # 5% max per position
+    target_stocks: 50                # Top 50 stocks
+
+# 8-21 EMA Swing Trading Rules
+trading_rules:
+  entry:
+    # Power Zone Entry
+    power_zone_required: true        # Price > 8 EMA > 21 EMA
+    demarker_oversold: 0.30          # DeMarker < 0.30 (pullback opportunity)
+    above_sma_50: false              # Optional: prefer above SMA 50
+    above_sma_200: false             # Optional: prefer above SMA 200
+
+  exit:
+    # Fibonacci Extension Targets
+    take_profit_targets:
+      - 1.272                        # 127.2% Fibonacci extension
+      - 1.618                        # 161.8% Fibonacci extension (golden ratio)
+      - 2.000                        # 200% extension
+
+    # Stop Loss
+    stop_loss_below_21ema: true      # Stop below 21 EMA
+    trailing_stop_percent: 5.0       # 5% trailing stop
+
+  position_sizing:
+    risk_per_trade_percent: 2.0      # Risk 2% of capital per trade
+    max_total_exposure_percent: 40.0 # Max 40% total capital at risk

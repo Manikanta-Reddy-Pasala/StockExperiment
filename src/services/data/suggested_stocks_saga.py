@@ -397,7 +397,17 @@ class SuggestedStocksSagaOrchestrator:
                         'dividend_yield': float(stock.dividend_yield) if stock.dividend_yield else None,
                         'volume': int(stock.volume) if stock.volume else 0,
                         'sector': stock.sector,
-                        'market_cap_category': stock.market_cap_category
+                        'market_cap_category': stock.market_cap_category,
+                        # 8-21 EMA Strategy Indicators
+                        'ema_8': float(stock.ema_8) if stock.ema_8 else None,
+                        'ema_21': float(stock.ema_21) if stock.ema_21 else None,
+                        'demarker': float(stock.demarker) if stock.demarker else None,
+                        'buy_signal': bool(stock.buy_signal) if stock.buy_signal is not None else False,
+                        'sell_signal': bool(stock.sell_signal) if stock.sell_signal is not None else False,
+                        # Derived indicators for strategy filtering
+                        'is_bullish': bool(stock.ema_8 and stock.ema_21 and stock.ema_8 > stock.ema_21),
+                        'signal_quality': 'high' if (stock.demarker and stock.demarker < 0.30) else 'medium' if (stock.demarker and stock.demarker < 0.50) else 'low',
+                        'ema_strategy_score': 75.0 if (stock.ema_8 and stock.ema_21 and stock.demarker and stock.ema_8 > stock.ema_21 and stock.demarker < 0.30) else 50.0
                     }
                     stock_data_list.append(stock_data)
                 
@@ -695,48 +705,33 @@ class SuggestedStocksSagaOrchestrator:
             mid_cap_min = market_cap_categories.get('mid_cap', {}).get('minimum', 5000)
 
 
-            # Strategy-specific filtering and scoring (case-insensitive)
-            strategy_upper = strategy.upper()
+            # Unified 8-21 EMA strategy filtering (ALL market caps)
+            # Apply balanced filtering criteria for all stocks
 
-            if strategy_upper == 'DEFAULT_RISK':
-                # Conservative strategy - focus on stability (LARGE CAP ONLY)
-                # STRICT FILTERING: Large cap (>20000 Cr), stable price range, good liquidity
-                if (market_cap <= large_cap_min or  # MUST be large cap (>20000 Cr)
-                    current_price < 100 or current_price > 10000 or  # Stable price range
-                    (pe_ratio and (pe_ratio < 5 or pe_ratio > 40)) or  # Reasonable PE ratio
-                    volume < 50000):  # Good liquidity
-                    return None
+            # Price range: ₹50 - ₹10,000 (exclude penny stocks and overly expensive stocks)
+            if current_price < 50 or current_price > 10000:
+                return None
 
-                # Use EMA strategy score for ranking
-                score = ema_strategy_score / 100.0  # Convert to 0-1 range
-                min_score = 0.50  # Require top 50% of EMA scores for conservative
-                if score < min_score:
-                    return None
+            # Minimum volume for liquidity
+            if volume < 50000:
+                return None
 
-                # Prefer HIGH quality signals for conservative strategy
-                if signal_quality not in ['high', 'medium']:
-                    return None
+            # Market cap: minimum ₹500 Cr (exclude micro-cap stocks)
+            if market_cap < 500:
+                return None
 
-            elif strategy_upper == 'HIGH_RISK':
-                # Aggressive strategy - focus on growth potential (SMALL/MID CAP ONLY)
-                # STRICT FILTERING: Small/Mid cap (1000-20000 Cr), volatile price, high volume
-                if (market_cap < 1000 or market_cap >= large_cap_min or  # MUST be small/mid cap
-                    current_price > 5000 or  # Exclude very expensive stocks
-                    volume < 10000):  # Minimum volume
-                    return None
+            # PE ratio: if available, should be reasonable (5-100)
+            if pe_ratio and (pe_ratio < 5 or pe_ratio > 100):
+                return None
 
-                # Use EMA strategy score for ranking
-                score = ema_strategy_score / 100.0  # Convert to 0-1 range
-                min_score = 0.40  # Lower threshold for high risk (top 60%)
-                if score < min_score:
-                    return None
+            # EMA strategy score threshold
+            score = ema_strategy_score / 100.0  # Convert to 0-1 range
+            min_score = 0.45  # Require top 55% of EMA scores
+            if score < min_score:
+                return None
 
-                # Accept MEDIUM and LOW quality signals for aggressive strategy
-                if signal_quality == 'none':
-                    return None
-
-            else:
-                # Unknown strategy
+            # Signal quality: Accept high and medium quality signals
+            if signal_quality == 'none':
                 return None
             
             # Create suggested stock with 8-21 EMA strategy fields
@@ -1275,7 +1270,6 @@ class SuggestedStocksSagaOrchestrator:
                 # Save snapshot (will replace same-day data)
                 stats = snapshot_service.save_daily_snapshot(
                     suggested_stocks=saga.final_results,
-                    ml_predictions={},  # Empty dict - no ML predictions
                     snapshot_date=date.today()
                 )
 

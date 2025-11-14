@@ -67,6 +67,14 @@ class Stock(Base):
     trades_per_day = Column(Integer)  # Average trades per day
     liquidity_score = Column(Float)  # Liquidity score (0-1 scale)
 
+    # 8-21 EMA Strategy Indicators (Simplified Model)
+    ema_8 = Column(Float)  # 8-day EMA (fast moving average)
+    ema_21 = Column(Float)  # 21-day EMA (slow moving average)
+    demarker = Column(Float)  # DeMarker oscillator (0-1, <0.30 = oversold)
+    buy_signal = Column(Boolean, default=False)  # Buy signal active
+    sell_signal = Column(Boolean, default=False)  # Sell signal active
+    indicators_last_updated = Column(DateTime)  # Last indicator calculation time
+
     # Status and metadata
     is_active = Column(Boolean, default=True, index=True)
     is_tradeable = Column(Boolean, default=True)

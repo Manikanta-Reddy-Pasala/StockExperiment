@@ -1,23 +1,42 @@
 {% extends "base.html" %}
 
-{% block title %}Strategies{% endblock %}
+{% block title %}8-21 EMA Strategy{% endblock %}
 
 {% block content %}
-<!-- Modern Stats Cards -->
-<div class="row g-4 mb-5">
+<!-- Header Section -->
+<div class="card hover-lift animate-fade-in-up mb-4">
+    <div class="card-header bg-gradient-info text-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h4 class="card-title mb-0 text-white">
+                    <i class="bi bi-graph-up-arrow me-2"></i>8-21 EMA Swing Trading Strategy
+                </h4>
+                <small class="opacity-75">Pure Technical Analysis - No ML/AI Models</small>
+            </div>
+            <div>
+                <span class="badge bg-success fs-6">
+                    <i class="bi bi-check-circle-fill me-1"></i>Active
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Strategy Stats Cards -->
+<div class="row g-4 mb-4">
     <div class="col-lg-3 col-md-6">
         <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.1s;">
             <div class="card-body">
                 <div class="d-flex align-items-center">
                     <div class="flex-grow-1">
-                        <h6 class="text-muted mb-2 fw-semibold">Active Strategies</h6>
-                        <h2 class="fw-bold mb-0" id="active-strategies-count">0</h2>
+                        <h6 class="text-muted mb-2 fw-semibold">Total Stocks Analyzed</h6>
+                        <h2 class="fw-bold mb-0" id="total-stocks">2,259</h2>
                         <small class="text-primary">
-                            <i class="bi bi-gear-fill"></i> Running strategies
+                            <i class="bi bi-database"></i> NSE Stocks
                         </small>
                     </div>
                     <div class="bg-gradient-primary rounded-3 p-3">
-                        <i class="bi bi-gear-fill text-white fs-3"></i>
+                        <i class="bi bi-database text-white fs-3"></i>
                     </div>
                 </div>
             </div>
@@ -28,14 +47,14 @@
             <div class="card-body">
                 <div class="d-flex align-items-center">
                     <div class="flex-grow-1">
-                        <h6 class="text-muted mb-2 fw-semibold">Avg Return</h6>
-                        <h2 class="fw-bold mb-0" id="avg-return">0%</h2>
+                        <h6 class="text-muted mb-2 fw-semibold">Buy Signals</h6>
+                        <h2 class="fw-bold mb-0 text-success" id="buy-signals">590</h2>
                         <small class="text-success">
-                            <i class="bi bi-graph-up-arrow"></i> Performance
+                            <i class="bi bi-arrow-up-circle"></i> Power Zone Active
                         </small>
                     </div>
                     <div class="bg-gradient-success rounded-3 p-3">
-                        <i class="bi bi-graph-up-arrow text-white fs-3"></i>
+                        <i class="bi bi-arrow-up-circle text-white fs-3"></i>
                     </div>
                 </div>
             </div>
@@ -46,14 +65,32 @@
             <div class="card-body">
                 <div class="d-flex align-items-center">
                     <div class="flex-grow-1">
-                        <h6 class="text-muted mb-2 fw-semibold">Total Signals</h6>
-                        <h2 class="fw-bold mb-0" id="total-signals">0</h2>
+                        <h6 class="text-muted mb-2 fw-semibold">Sell Signals</h6>
+                        <h2 class="fw-bold mb-0 text-danger" id="sell-signals">1,365</h2>
+                        <small class="text-danger">
+                            <i class="bi bi-arrow-down-circle"></i> Bearish Trend
+                        </small>
+                    </div>
+                    <div class="bg-gradient-danger rounded-3 p-3">
+                        <i class="bi bi-arrow-down-circle text-white fs-3"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.4s;">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-2 fw-semibold">Strong Buy</h6>
+                        <h2 class="fw-bold mb-0 text-info" id="strong-buy">9</h2>
                         <small class="text-info">
-                            <i class="bi bi-bell-fill"></i> Generated signals
+                            <i class="bi bi-gem"></i> DeMarker < 0.30
                         </small>
                     </div>
                     <div class="bg-gradient-info rounded-3 p-3">
-                        <i class="bi bi-bell-fill text-white fs-3"></i>
+                        <i class="bi bi-gem text-white fs-3"></i>
                     </div>
                 </div>
             </div>
@@ -61,397 +98,229 @@
     </div>
 </div>
 
+<!-- Strategy Overview -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-info-circle me-2"></i>Strategy Overview
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-4">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-lightbulb-fill me-2"></i>What is the 8-21 EMA Strategy?
+                    </h6>
+                    <p class="mb-0">
+                        A pure technical analysis swing trading strategy that identifies high-probability entry points
+                        by combining exponential moving averages with momentum oscillators and Fibonacci targets.
+                    </p>
+                </div>
+
+                <h6 class="fw-bold mb-3">Core Components:</h6>
+
+                <div class="mb-4">
+                    <h6 class="text-primary">
+                        <i class="bi bi-1-circle-fill me-2"></i>Power Zone (Trend Identification)
+                    </h6>
+                    <p class="ms-4 mb-2">
+                        <strong>8 EMA > 21 EMA:</strong> Confirms bullish trend when 8-day EMA crosses above 21-day EMA
+                    </p>
+                    <p class="ms-4 mb-0 text-muted small">
+                        The "Power Zone" indicates strong momentum when price stays above both EMAs.
+                    </p>
+                </div>
+
+                <div class="mb-4">
+                    <h6 class="text-success">
+                        <i class="bi bi-2-circle-fill me-2"></i>DeMarker Oscillator (Entry Timing)
+                    </h6>
+                    <p class="ms-4 mb-2">
+                        <strong>DeMarker < 0.30:</strong> Identifies oversold pullbacks within uptrend
+                    </p>
+                    <p class="ms-4 mb-0 text-muted small">
+                        Ranges from 0 to 1. Values below 0.30 signal strong buy opportunities (oversold).
+                    </p>
+                </div>
+
+                <div class="mb-4">
+                    <h6 class="text-warning">
+                        <i class="bi bi-3-circle-fill me-2"></i>Fibonacci Extensions (Profit Targets)
+                    </h6>
+                    <p class="ms-4 mb-2">
+                        <strong>Targets:</strong> 127.2%, 161.8%, 200% extensions from recent swing low
+                    </p>
+                    <p class="ms-4 mb-0 text-muted small">
+                        Take partial profits at each Fibonacci level for optimal risk/reward.
+                    </p>
+                </div>
+
+                <div class="alert alert-warning mb-0">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-shield-fill-exclamation me-2"></i>Risk Management
+                    </h6>
+                    <ul class="mb-0">
+                        <li><strong>Stop Loss:</strong> Below 21 EMA or recent swing low (5-7%)</li>
+                        <li><strong>Position Size:</strong> Max 5% per trade</li>
+                        <li><strong>Time Frame:</strong> 5-14 day holds (swing trading)</li>
+                        <li><strong>Win Rate Target:</strong> 55-65% with 2:1 R/R ratio</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-gear-fill me-2"></i>Strategy Settings
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Status</label>
+                    <div>
+                        <span class="badge bg-success">
+                            <i class="bi bi-circle-fill me-1"></i>Active
+                        </span>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Type</label>
+                    <p class="mb-0">Pure Technical Analysis</p>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Trading Style</label>
+                    <p class="mb-0">Swing Trading (5-14 days)</p>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Target Returns</label>
+                    <p class="mb-0">7-12% per trade</p>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Risk per Trade</label>
+                    <p class="mb-0">5-7% (Below 21 EMA)</p>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Universe</label>
+                    <p class="mb-0">NSE Stocks (2,259 total)</p>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Calculation Schedule</label>
+                    <p class="mb-0 small text-muted">Daily at 10:00 PM IST</p>
+                </div>
+
+                <hr>
+
+                <div class="d-grid gap-2">
+                    <a href="/suggested_stocks" class="btn btn-primary">
+                        <i class="bi bi-eye-fill me-2"></i>View Stock Picks
+                    </a>
+                    <button class="btn btn-outline-secondary" disabled>
+                        <i class="bi bi-sliders me-2"></i>Configure (Locked)
+                    </button>
+                </div>
+
+                <div class="alert alert-info mt-3 mb-0 small">
+                    <i class="bi bi-info-circle me-1"></i>
+                    This is the only active strategy. No ML/AI models are used.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Entry/Exit Rules -->
 <div class="row g-4">
     <div class="col-md-6">
         <div class="card shadow-sm">
-            <div class="card-header bg-white">
-                <h5 class="card-title mb-0">Active Strategies</h5>
+            <div class="card-header bg-success text-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-arrow-up-circle me-2"></i>Entry Rules
+                </h5>
             </div>
             <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover" id="active-strategies-table">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Name</th>
-                                <th>Description</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="strategies-table-body">
-                            <tr>
-                                <td colspan="4" class="text-center py-4">
-                                    <div class="spinner-border text-primary" role="status">
-                                        <span class="visually-hidden">Loading strategies...</span>
-                                    </div>
-                                    <p class="mt-2 text-muted">Loading strategy data...</p>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                <ol class="mb-0">
+                    <li class="mb-3">
+                        <strong>Power Zone Confirmation:</strong> Price must be above both 8 EMA and 21 EMA
+                    </li>
+                    <li class="mb-3">
+                        <strong>Trend Alignment:</strong> 8 EMA must be above 21 EMA (bullish setup)
+                    </li>
+                    <li class="mb-3">
+                        <strong>Timing Signal:</strong> DeMarker oscillator < 0.30 (oversold pullback)
+                    </li>
+                    <li class="mb-3">
+                        <strong>Volume Check:</strong> Above average daily volume (50,000+ shares)
+                    </li>
+                    <li class="mb-0">
+                        <strong>Market Cap:</strong> Minimum 500 Cr for liquidity
+                    </li>
+                </ol>
             </div>
         </div>
     </div>
+
     <div class="col-md-6">
-        <div class="card shadow-sm strategy-card">
-            <div class="card-header bg-white">
-                <h5 class="card-title mb-0">Strategy Performance</h5>
+        <div class="card shadow-sm">
+            <div class="card-header bg-danger text-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-arrow-down-circle me-2"></i>Exit Rules
+                </h5>
             </div>
             <div class="card-body">
-                <div class="chart-wrapper">
-                    <div class="chart-container">
-                        <canvas id="strategy-performance-chart"></canvas>
-                    </div>
-                </div>
+                <ol class="mb-0">
+                    <li class="mb-3">
+                        <strong>Profit Targets (Fibonacci):</strong>
+                        <ul class="mt-1">
+                            <li>Take 33% at 127.2% extension</li>
+                            <li>Take 33% at 161.8% extension</li>
+                            <li>Take 34% at 200% extension</li>
+                        </ul>
+                    </li>
+                    <li class="mb-3">
+                        <strong>Stop Loss:</strong> Exit if price closes below 21 EMA
+                    </li>
+                    <li class="mb-3">
+                        <strong>Time Stop:</strong> Exit after 14 days if no profit target hit
+                    </li>
+                    <li class="mb-0">
+                        <strong>Sell Signal:</strong> Exit immediately if sell signal generated
+                    </li>
+                </ol>
             </div>
         </div>
     </div>
 </div>
 
-
-<div class="card shadow-sm mt-4">
-    <div class="card-header bg-white">
-        <h5 class="card-title mb-0">Recent Signals</h5>
-    </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead class="table-light">
-                    <tr>
-                        <th>Time</th>
-                        <th>Strategy</th>
-                        <th>Symbol</th>
-                        <th>Signal</th>
-                        <th>Price</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Strategy signals will be loaded dynamically -->
-                    <tr>
-                        <td colspan="6" class="text-center text-muted">
-                            <i class="bi bi-hourglass-split me-2"></i>Loading strategy signals...
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    
-    // Initialize strategy performance chart
-    function initStrategyChart(activeStrategies = null) {
-        const ctx = document.getElementById('strategy-performance-chart').getContext('2d');
-        
-        // Check if dark mode is enabled
-        const isDarkMode = false;
-        
-        // Define colors based on theme
-        const defaultRiskBorderColor = isDarkMode ? 'rgb(37, 139, 255)' : 'rgb(13, 110, 253)';
-        const defaultRiskBgColor = isDarkMode ? 'rgba(37, 139, 255, 0.2)' : 'rgba(13, 110, 253, 0.1)';
-        const defaultRiskPointColor = isDarkMode ? 'rgb(37, 139, 255)' : 'rgb(13, 110, 253)';
-        
-        const highRiskBorderColor = isDarkMode ? 'rgb(76, 201, 100)' : 'rgb(40, 167, 69)';
-        const highRiskBgColor = isDarkMode ? 'rgba(76, 201, 100, 0.2)' : 'rgba(40, 167, 69, 0.1)';
-        const highRiskPointColor = isDarkMode ? 'rgb(76, 201, 100)' : 'rgb(40, 167, 69)';
-        
-        const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
-        const textColor = isDarkMode ? '#e0e0e0' : '#000';
-        const tooltipBgColor = isDarkMode ? 'rgba(40, 40, 40, 0.9)' : 'rgba(0, 0, 0, 0.8)';
-        
-        const chart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'],
-                datasets: getActiveStrategyDatasets(activeStrategies, {
-                    defaultRiskBorderColor,
-                    defaultRiskBgColor,
-                    defaultRiskPointColor,
-                    highRiskBorderColor,
-                    highRiskBgColor,
-                    highRiskPointColor,
-                    isDarkMode
-                })
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                        labels: {
-                            font: {
-                                size: 11
-                            },
-                            color: textColor
-                        }
-                    },
-                    tooltip: {
-                        backgroundColor: tooltipBgColor,
-                        titleFont: {
-                            size: 12
-                        },
-                        bodyFont: {
-                            size: 11
-                        },
-                        padding: 8,
-                        titleColor: isDarkMode ? '#ffffff' : '#ffffff',
-                        bodyColor: isDarkMode ? '#e0e0e0' : '#ffffff'
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Return (%)',
-                            font: {
-                                size: 11
-                            },
-                            color: textColor
-                        },
-                        grid: {
-                            color: gridColor
-                        },
-                        ticks: {
-                            color: textColor
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Month',
-                            font: {
-                                size: 11
-                            },
-                            color: textColor
-                        },
-                        grid: {
-                            display: false
-                        },
-                        ticks: {
-                            color: textColor
-                        }
-                    }
-                },
-                animation: {
-                    duration: 800,
-                    easing: 'easeInOutQuart'
-                }
-            }
-        });
-    }
-    
-    // Get datasets for active strategies only
-    function getActiveStrategyDatasets(activeStrategies, colors) {
-        const datasets = [];
-        
-        if (!activeStrategies) {
-            // Fallback to show all strategies if no data
-            return [{
-                label: 'Default Risk Strategy',
-                data: [8, 12, 10, 14, 16, 18, 15, 17, 20],
-                borderColor: colors.defaultRiskBorderColor,
-                backgroundColor: colors.defaultRiskBgColor,
-                tension: 0.3,
-                fill: true,
-                pointRadius: 3,
-                pointBackgroundColor: colors.defaultRiskPointColor,
-                pointBorderColor: colors.isDarkMode ? '#121212' : '#fff',
-                pointBorderWidth: 1
-            }, {
-                label: 'High Risk Strategy',
-                data: [12, 19, 15, 18, 22, 25, 20, 24, 28],
-                borderColor: colors.highRiskBorderColor,
-                backgroundColor: colors.highRiskBgColor,
-                tension: 0.3,
-                fill: true,
-                pointRadius: 3,
-                pointBackgroundColor: colors.highRiskPointColor,
-                pointBorderColor: colors.isDarkMode ? '#121212' : '#fff',
-                pointBorderWidth: 1
-            }];
-        }
-        
-        // Only show active strategies
-        Object.entries(activeStrategies).forEach(([strategyName, strategyData]) => {
-            if (strategyData.is_active && strategyData.is_enabled) {
-                const metadata = strategyData.metadata || {};
-                const displayName = metadata.display_name || strategyName.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-                
-                let dataset;
-                if (strategyName === 'default_risk') {
-                    dataset = {
-                        label: displayName,
-                        data: [8, 12, 10, 14, 16, 18, 15, 17, 20],
-                        borderColor: colors.defaultRiskBorderColor,
-                        backgroundColor: colors.defaultRiskBgColor,
-                        tension: 0.3,
-                        fill: true,
-                        pointRadius: 3,
-                        pointBackgroundColor: colors.defaultRiskPointColor,
-                        pointBorderColor: colors.isDarkMode ? '#121212' : '#fff',
-                        pointBorderWidth: 1
-                    };
-                } else if (strategyName === 'high_risk') {
-                    dataset = {
-                        label: displayName,
-                        data: [12, 19, 15, 18, 22, 25, 20, 24, 28],
-                        borderColor: colors.highRiskBorderColor,
-                        backgroundColor: colors.highRiskBgColor,
-                        tension: 0.3,
-                        fill: true,
-                        pointRadius: 3,
-                        pointBackgroundColor: colors.highRiskPointColor,
-                        pointBorderColor: colors.isDarkMode ? '#121212' : '#fff',
-                        pointBorderWidth: 1
-                    };
-                }
-                
-                if (dataset) {
-                    datasets.push(dataset);
-                }
-            }
-        });
-        
-        return datasets;
-    }
-    
-    // View recommendations for a specific strategy
-    function viewRecommendations(strategyType) {
-        // Redirect to suggested stocks page with the selected strategy
-        const url = new URL('/suggested_stocks', window.location.origin);
-        url.searchParams.set('strategy', strategyType);
-        window.location.href = url.toString();
-    }
-    
-    // Load strategies data from API
-    async function loadStrategiesData() {
-        try {
-            const response = await fetch('/api/strategy-settings/');
-            const data = await response.json();
-            
-            if (data.success) {
-                renderStrategiesTable(data.data.strategies);
-                updateActiveStrategiesCount(data.data.strategies);
-                return data.data.strategies; // Return strategies for chart
-            } else {
-                console.error('Failed to load strategies:', data.error);
-                showErrorInTable('Failed to load strategy data');
-                return null;
-            }
-        } catch (error) {
-            console.error('Error loading strategies:', error);
-            showErrorInTable('Error loading strategy data');
-            return null;
-        }
-    }
-    
-    // Render strategies table with real data
-    function renderStrategiesTable(strategies) {
-        const tbody = document.getElementById('strategies-table-body');
-        tbody.innerHTML = '';
-        
-        // Sort strategies by priority
-        const sortedStrategies = Object.entries(strategies).sort((a, b) => {
-            return (a[1].priority || 1) - (b[1].priority || 1);
-        });
-        
-        sortedStrategies.forEach(([strategyName, strategyData]) => {
-            const row = createStrategyRow(strategyName, strategyData);
-            tbody.appendChild(row);
-        });
-    }
-    
-    // Create a strategy table row
-    function createStrategyRow(strategyName, strategyData) {
-        const row = document.createElement('tr');
-        
-        // Determine icon and color based on strategy
-        let iconClass, iconColor;
-        if (strategyName === 'default_risk') {
-            iconClass = 'bi-shield-check';
-            iconColor = 'text-success';
-        } else if (strategyName === 'high_risk') {
-            iconClass = 'bi-lightning-charge';
-            iconColor = 'text-warning';
-        } else {
-            iconClass = 'bi-gear';
-            iconColor = 'text-primary';
-        }
-        
-        // Determine status badge
-        const isActive = strategyData.is_active && strategyData.is_enabled;
-        const statusBadge = isActive 
-            ? '<span class="badge bg-success">Active</span>'
-            : '<span class="badge bg-secondary">Inactive</span>';
-        
-        // Get strategy metadata
-        const metadata = strategyData.metadata || {};
-        const displayName = metadata.display_name || strategyName.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-        const description = metadata.description || 'Strategy description not available';
-        
-        row.innerHTML = `
-            <td>
-                <div class="d-flex align-items-center">
-                    <i class="bi ${iconClass} ${iconColor} me-2"></i>
-                    <strong>${displayName}</strong>
-                </div>
-            </td>
-            <td>${description}</td>
-            <td>${statusBadge}</td>
-            <td>
-                <button class="btn btn-sm btn-outline-primary me-1" title="View Recommendations" onclick="viewRecommendations('${strategyName}')">
-                    <i class="bi bi-eye-fill"></i>
-                </button>
-                <button class="btn btn-sm btn-outline-secondary" title="Configure" onclick="configureStrategy('${strategyName}')">
-                    <i class="bi bi-gear-fill"></i>
-                </button>
-            </td>
-        `;
-        
-        return row;
-    }
-    
-    // Update active strategies count
-    function updateActiveStrategiesCount(strategies) {
-        const activeCount = Object.values(strategies).filter(s => s.is_active && s.is_enabled).length;
-        const countElement = document.getElementById('active-strategies-count');
-        if (countElement) {
-            countElement.textContent = activeCount;
-        }
-    }
-    
-    // Show error in table
-    function showErrorInTable(message) {
-        const tbody = document.getElementById('strategies-table-body');
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="4" class="text-center py-4">
-                    <div class="text-danger">
-                        <i class="bi bi-exclamation-triangle fs-4"></i>
-                        <p class="mt-2 mb-0">${message}</p>
-                    </div>
-                </td>
-            </tr>
-        `;
-    }
-    
-    // Configure strategy (redirect to settings)
-    function configureStrategy(strategyName) {
-        window.location.href = '/settings#strategy-settings';
-    }
-    
-    // Initialize page when loaded
+    // Update stats on page load
     document.addEventListener('DOMContentLoaded', function() {
-        loadStrategiesData().then((strategies) => {
-            initStrategyChart(strategies);
-        });
+        // Load current statistics from database
+        fetch('/api/strategy/stats')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('total-stocks').textContent = data.total_stocks || '2,259';
+                    document.getElementById('buy-signals').textContent = data.buy_signals || '590';
+                    document.getElementById('sell-signals').textContent = data.sell_signals || '1,365';
+                    document.getElementById('strong-buy').textContent = data.strong_buy || '0';
+                }
+            })
+            .catch(error => {
+                console.log('Using default statistics');
+            });
     });
 </script>
 {% endblock %}

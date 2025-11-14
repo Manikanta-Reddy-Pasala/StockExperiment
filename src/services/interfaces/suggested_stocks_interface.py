@@ -8,6 +8,15 @@ Each broker implementation must provide these methods.
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Any
 from datetime import datetime
+from enum import Enum
+
+
+class StrategyType(Enum):
+    """Strategy types for stock screening."""
+    DEFAULT_RISK = "default_risk"
+    HIGH_RISK = "high_risk"
+    CONSERVATIVE = "conservative"
+    AGGRESSIVE = "aggressive"
 
 
 class ISuggestedStocksProvider(ABC):

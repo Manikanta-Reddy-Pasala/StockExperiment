@@ -49,8 +49,7 @@ class DailySnapshotService:
         for stock in suggested_stocks:
             try:
                 symbol = stock.get('symbol')
-                strategy = stock.get('strategy', 'default_risk')
-                
+
                 # Prepare data for insert/update
                 data = {
                     'date': snapshot_date,
@@ -59,8 +58,7 @@ class DailySnapshotService:
                     'current_price': stock.get('current_price'),
                     'market_cap': stock.get('market_cap'),
 
-                    # Strategy & Selection
-                    'strategy': strategy,
+                    # Selection
                     'selection_score': stock.get('selection_score'),  # EMA strategy score
                     'rank': stock.get('rank'),
 
@@ -110,11 +108,11 @@ class DailySnapshotService:
                 }
 
                 # Insert with ON CONFLICT UPDATE (upsert)
-                # Note: After running migration, hybrid/ML columns will be removed
+                # Unified strategy - no strategy column needed
                 upsert_query = text("""
                     INSERT INTO daily_suggested_stocks (
                         date, symbol, stock_name, current_price, market_cap,
-                        strategy, selection_score, rank,
+                        selection_score, rank,
                         ema_8, ema_21, ema_trend_score, demarker,
                         fib_target_1, fib_target_2, fib_target_3,
                         buy_signal, sell_signal, signal_quality,
@@ -125,7 +123,7 @@ class DailySnapshotService:
                         sector, market_cap_category, created_at
                     ) VALUES (
                         :date, :symbol, :stock_name, :current_price, :market_cap,
-                        :strategy, :selection_score, :rank,
+                        :selection_score, :rank,
                         :ema_8, :ema_21, :ema_trend_score, :demarker,
                         :fib_target_1, :fib_target_2, :fib_target_3,
                         :buy_signal, :sell_signal, :signal_quality,
@@ -135,7 +133,7 @@ class DailySnapshotService:
                         :target_price, :stop_loss, :recommendation, :reason,
                         :sector, :market_cap_category, CURRENT_TIMESTAMP
                     )
-                    ON CONFLICT (date, symbol, strategy)
+                    ON CONFLICT (date, symbol)
                     DO UPDATE SET
                         stock_name = EXCLUDED.stock_name,
                         current_price = EXCLUDED.current_price,

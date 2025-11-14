@@ -452,15 +452,15 @@ class EMAStrategyCalculator:
     def _get_historical_data(self, symbol: str, lookback_days: int) -> Optional[pd.DataFrame]:
         """Fetch historical OHLCV data from database."""
         try:
-            query = text("""
+            query = text(f"""
                 SELECT date, open, high, low, close, volume
                 FROM historical_data
                 WHERE symbol = :symbol
-                AND date >= CURRENT_DATE - INTERVAL ':lookback_days days'
+                AND date >= CURRENT_DATE - INTERVAL '{lookback_days} days'
                 ORDER BY date ASC
             """)
 
-            result = self.session.execute(query, {'symbol': symbol, 'lookback_days': lookback_days})
+            result = self.session.execute(query, {'symbol': symbol})
             data = result.fetchall()
 
             if not data:

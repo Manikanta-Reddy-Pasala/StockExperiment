@@ -238,6 +238,13 @@ CREATE TABLE IF NOT EXISTS stocks (
     liquidity_score DOUBLE PRECISION,  -- Liquidity score (0-1 scale) for Stage 1 filtering
     volatility_last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- For tracking volatility updates
     volatility DECIMAL(10,6),  -- Calculated volatility for the stock
+    -- 8-21 EMA Strategy Indicators
+    ema_8 DOUBLE PRECISION,  -- 8-day Exponential Moving Average
+    ema_21 DOUBLE PRECISION,  -- 21-day Exponential Moving Average
+    demarker DOUBLE PRECISION,  -- DeMarker oscillator (0-1 scale)
+    buy_signal BOOLEAN DEFAULT FALSE,  -- Buy signal based on 8-21 EMA strategy
+    sell_signal BOOLEAN DEFAULT FALSE,  -- Sell signal based on 8-21 EMA strategy
+    indicators_last_updated TIMESTAMP,  -- Last time technical indicators were calculated
     is_active BOOLEAN DEFAULT TRUE,
     is_tradeable BOOLEAN DEFAULT TRUE,
     is_suspended BOOLEAN DEFAULT FALSE,
@@ -732,15 +739,14 @@ INSERT INTO auto_trading_settings (user_id, is_enabled, preferred_strategies)
 SELECT
     id,
     FALSE,
-    '["default_risk"]',
-    '["traditional", "raw_lstm", "kronos"]'
+    '["unified"]'
 FROM users
 ON CONFLICT (user_id) DO NOTHING;
 
 -- ============================================================================
 -- DAILY SUGGESTED STOCKS TABLE
--- Stores ML predictions and stock picks from multiple models (traditional, raw_lstm, kronos)
--- with dual strategy approach (DEFAULT_RISK, HIGH_RISK)
+-- Stores daily stock picks using unified 8-21 EMA Swing Trading Strategy
+-- Single strategy approach across all market caps
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS daily_suggested_stocks (
@@ -751,7 +757,7 @@ CREATE TABLE IF NOT EXISTS daily_suggested_stocks (
     current_price DECIMAL(10, 2),
     market_cap DECIMAL(20, 2),
 
-    -- Strategy and ranking (8-21 EMA unified strategy)
+    -- Ranking (8-21 EMA unified strategy)
     selection_score DECIMAL(10, 4),
     rank INTEGER,
 
@@ -805,18 +811,16 @@ CREATE TABLE IF NOT EXISTS daily_suggested_stocks (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    -- Unique constraint: one record per symbol per strategy per date
-    UNIQUE (date, symbol, strategy)
+    -- Unique constraint: one record per symbol per date
+    UNIQUE (date, symbol)
 );
 
 -- Daily Suggested Stocks Indexes
 CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_date ON daily_suggested_stocks(date);
 CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_symbol ON daily_suggested_stocks(symbol);
-CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_strategy ON daily_suggested_stocks(strategy);
-CREATE INDEX IF NOT EXISTS idx_daily_suggested_stocks_date_strategy ON daily_suggested_stocks(date, strategy);
 
 -- Add table comment
-COMMENT ON TABLE daily_suggested_stocks IS 'Daily stock picks using PURE 8-21 EMA Swing Trading Strategy with dual risk approaches (DEFAULT_RISK, HIGH_RISK). Stores top 50 stocks per strategy updated daily at 10:15 PM IST.';
+COMMENT ON TABLE daily_suggested_stocks IS 'Daily stock picks using unified 8-21 EMA Swing Trading Strategy. Stores top 50 stocks updated daily at 10:15 PM IST.';
 
 -- Add column comments for 8-21 EMA Strategy indicators
 COMMENT ON COLUMN daily_suggested_stocks.ema_8 IS '8-period EMA: Short-term momentum average for trend identification.';

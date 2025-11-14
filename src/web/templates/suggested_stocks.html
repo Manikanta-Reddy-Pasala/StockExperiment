@@ -9,9 +9,9 @@
         <div class="d-flex justify-content-between align-items-center">
             <div>
                 <h5 class="card-title mb-0 text-white">
-                    <i class="bi bi-graph-up-arrow me-2"></i>Stock Suggestions - 8-21 EMA Swing Trading
+                    <i class="bi bi-graph-up-arrow me-2"></i>Daily Stock Picks - 8-21 EMA Swing Trading
                 </h5>
-                <small class="opacity-75">Technical analysis using 8 & 21 EMA crossovers, DeMarker oscillator, and Fibonacci extensions</small>
+                <small class="opacity-75">Power Zone entries with DeMarker timing & Fibonacci targets</small>
                 <div class="mt-1">
                     <small class="badge bg-light text-dark" id="data-date-badge">Loading...</small>
                 </div>
@@ -24,461 +24,620 @@
         </div>
     </div>
     <div class="card-body bg-light">
-        <div class="row text-center">
-            <div class="col-md-6">
-                <div class="card border-primary h-100">
+        <!-- Summary Stats -->
+        <div class="row text-center mb-3">
+            <div class="col-md-3">
+                <div class="card border-success h-100">
                     <div class="card-body">
-                        <h6 class="text-primary mb-2">🛡️ Default Risk</h6>
-                        <small class="text-muted">Conservative Strategy<br>Large-cap Focus</small>
-                        <h4 class="mt-2 mb-0" id="default-count">-</h4>
+                        <h6 class="text-success mb-2">💎 Strong Buy</h6>
+                        <small class="text-muted">DeMarker < 0.30</small>
+                        <h4 class="mt-2 mb-0 text-success" id="strong-buy-count">-</h4>
                     </div>
                 </div>
             </div>
-            <div class="col-md-6">
-                <div class="card border-danger h-100">
+            <div class="col-md-3">
+                <div class="card border-primary h-100">
                     <div class="card-body">
-                        <h6 class="text-danger mb-2">⚡ High Risk</h6>
-                        <small class="text-muted">Aggressive Strategy<br>Small/Mid-cap Focus</small>
-                        <h4 class="mt-2 mb-0" id="high-risk-count">-</h4>
+                        <h6 class="text-primary mb-2">📈 Buy</h6>
+                        <small class="text-muted">DeMarker 0.30-0.50</small>
+                        <h4 class="mt-2 mb-0 text-primary" id="buy-count">-</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-warning h-100">
+                    <div class="card-body">
+                        <h6 class="text-warning mb-2">⚠️ Hold</h6>
+                        <small class="text-muted">Overbought Zone</small>
+                        <h4 class="mt-2 mb-0 text-warning" id="hold-count">-</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-info h-100">
+                    <div class="card-body">
+                        <h6 class="text-info mb-2">📊 Total Stocks</h6>
+                        <small class="text-muted">All Signals</small>
+                        <h4 class="mt-2 mb-0 text-info" id="total-count">-</h4>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Strategy Information -->
-        <div class="alert alert-info mt-3 mb-0 small">
+        <div class="alert alert-info mb-0 small">
             <div class="d-flex align-items-start">
                 <div class="me-2">
                     <i class="bi bi-info-circle-fill"></i>
                 </div>
                 <div>
-                    <strong>📊 Strategy Indicators:</strong>
-                    <span class="ms-2">Selection Score: 0-100 (EMA signal strength)</span>
+                    <strong>📊 8-21 EMA Strategy:</strong>
+                    <span class="ms-2"><strong>Entry:</strong> Price > 8 EMA > 21 EMA (Power Zone)</span>
                     <span class="ms-2">•</span>
-                    <span class="ms-2">Target: Fibonacci extension levels</span>
+                    <span class="ms-2"><strong>Timing:</strong> DeMarker < 0.30 = Strong Buy (oversold)</span>
                     <span class="ms-2">•</span>
-                    <span class="ms-2">Stop Loss: DeMarker-based</span>
+                    <span class="ms-2"><strong>Targets:</strong> Fibonacci 127.2%, 161.8%, 200%</span>
+                    <span class="ms-2">•</span>
+                    <span class="ms-2"><strong>Stop Loss:</strong> Below 21 EMA</span>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Triple Model Tabs -->
+<!-- Stocks Table -->
 <div class="card hover-lift animate-fade-in-up">
-    <div class="card-header bg-gradient-dark text-white">
-        <h5 class="card-title mb-0 text-white">
-            <i class="bi bi-stars me-2"></i>Model Predictions
-        </h5>
+    <div class="card-header bg-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">
+                <i class="bi bi-list-ul me-2"></i>Top 50 Stock Picks
+            </h6>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-success" onclick="buyAllStocks()">
+                    <i class="bi bi-cart-plus-fill"></i> Buy All
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" id="export-btn">
+                    <i class="bi bi-download"></i> Export CSV
+                </button>
+            </div>
+        </div>
     </div>
-    <div class="card-body">
-        <!-- Main Model Tabs -->
-        <ul class="nav nav-pills mb-4 justify-content-center" id="model-tabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="traditional-tab" data-bs-toggle="tab" data-bs-target="#traditional-panel" type="button">
-                    <i class="bi bi-layers me-2"></i>Traditional ML
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="raw-lstm-tab" data-bs-toggle="tab" data-bs-target="#raw-lstm-panel" type="button">
-                    <i class="bi bi-robot me-2"></i>Raw LSTM
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="kronos-tab" data-bs-toggle="tab" data-bs-target="#kronos-panel" type="button">
-                    <i class="bi bi-lightning-charge me-2"></i>Kronos Foundation
-                </button>
-            </li>
-        </ul>
-
-        <!-- Tab Content -->
-        <div class="tab-content" id="model-tabs-content">
-            <!-- Traditional ML Panel -->
-            <div class="tab-pane fade show active" id="traditional-panel" role="tabpanel">
-                <div class="card border-primary">
-                    <div class="card-header bg-primary text-white">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-0">Traditional ML Model</h6>
-                                <small>Feature-engineered ensemble (Random Forest + XGBoost)</small>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="stocks-table">
+                <thead class="table-light sticky-top">
+                    <tr>
+                        <th style="width: 40px;">#</th>
+                        <th>Signal</th>
+                        <th>Symbol</th>
+                        <th>Price</th>
+                        <th>8 EMA</th>
+                        <th>21 EMA</th>
+                        <th>DeMarker</th>
+                        <th>Score</th>
+                        <th>Target 1</th>
+                        <th>Target 2</th>
+                        <th>Target 3</th>
+                        <th>Stop Loss</th>
+                        <th>Market Cap</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="stocks-tbody">
+                    <tr>
+                        <td colspan="14" class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
                             </div>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <!-- Risk Strategy Sub-tabs -->
-                        <ul class="nav nav-tabs mb-3" role="tablist">
-                            <li class="nav-item">
-                                <a class="nav-link active" data-bs-toggle="tab" href="#trad-default">
-                                    <i class="bi bi-shield-check text-success"></i> Default Risk
-                                    <span class="badge bg-secondary ms-2" id="trad-default-badge">0</span>
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" data-bs-toggle="tab" href="#trad-high">
-                                    <i class="bi bi-lightning-charge text-warning"></i> High Risk
-                                    <span class="badge bg-secondary ms-2" id="trad-high-badge">0</span>
-                                </a>
-                            </li>
-                        </ul>
-
-                        <div class="tab-content">
-                            <!-- Default Risk -->
-                            <div class="tab-pane fade show active" id="trad-default">
-                                <div class="d-flex justify-content-between mb-3">
-                                    <div>
-                                        <small class="text-muted">Conservative strategy | Large-cap focus</small>
-                                    </div>
-                                    <button class="btn btn-sm btn-primary" onclick="buyAllStocks('traditional', 'default_risk')">
-                                        <i class="bi bi-cart-plus-fill"></i> Buy All
-                                    </button>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-hover table-sm" id="traditional-default-table">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>#</th>
-                                                <th>Symbol</th>
-                                                <th>Company</th>
-                                                <th>Score</th>
-                                                <th>Target</th>
-                                                <th>Rec</th>
-                                                <th>Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody></tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                            <!-- High Risk -->
-                            <div class="tab-pane fade" id="trad-high">
-                                <div class="d-flex justify-content-between mb-3">
-                                    <div>
-                                        <small class="text-muted">Aggressive strategy | Small/Mid-cap focus</small>
-                                    </div>
-                                    <button class="btn btn-sm btn-primary" onclick="buyAllStocks('traditional', 'high_risk')">
-                                        <i class="bi bi-cart-plus-fill"></i> Buy All
-                                    </button>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-hover table-sm" id="traditional-high-table">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>#</th>
-                                                <th>Symbol</th>
-                                                <th>Company</th>
-                                                <th>Score</th>
-                                                <th>Target</th>
-                                                <th>Rec</th>
-                                                <th>Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody></tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Raw LSTM Panel -->
-            <div class="tab-pane fade" id="raw-lstm-panel" role="tabpanel">
-                <div class="card border-success">
-                    <div class="card-header bg-success text-white">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-0">Raw LSTM Model</h6>
-                                <small>Research-based deep learning (OHLCV sequences only)</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <!-- Risk Strategy Sub-tabs -->
-                        <ul class="nav nav-tabs mb-3" role="tablist">
-                            <li class="nav-item">
-                                <a class="nav-link active" data-bs-toggle="tab" href="#lstm-default">
-                                    <i class="bi bi-shield-check text-success"></i> Default Risk
-                                    <span class="badge bg-secondary ms-2" id="lstm-default-badge">0</span>
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" data-bs-toggle="tab" href="#lstm-high">
-                                    <i class="bi bi-lightning-charge text-warning"></i> High Risk
-                                    <span class="badge bg-secondary ms-2" id="lstm-high-badge">0</span>
-                                </a>
-                            </li>
-                        </ul>
-
-                        <div class="tab-content">
-                            <!-- Default Risk -->
-                            <div class="tab-pane fade show active" id="lstm-default">
-                                <div class="d-flex justify-content-between mb-3">
-                                    <div>
-                                        <small class="text-muted">Conservative strategy | Large-cap focus</small>
-                                    </div>
-                                    <button class="btn btn-sm btn-success" onclick="buyAllStocks('raw_lstm', 'default_risk')">
-                                        <i class="bi bi-cart-plus-fill"></i> Buy All
-                                    </button>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-hover table-sm" id="lstm-default-table">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>#</th>
-                                                <th>Symbol</th>
-                                                <th>Company</th>
-                                                <th>Score</th>
-                                                <th>Target</th>
-                                                <th>Rec</th>
-                                                <th>Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody></tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                            <!-- High Risk -->
-                            <div class="tab-pane fade" id="lstm-high">
-                                <div class="d-flex justify-content-between mb-3">
-                                    <div>
-                                        <small class="text-muted">Aggressive strategy | Small/Mid-cap focus</small>
-                                    </div>
-                                    <button class="btn btn-sm btn-success" onclick="buyAllStocks('raw_lstm', 'high_risk')">
-                                        <i class="bi bi-cart-plus-fill"></i> Buy All
-                                    </button>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-hover table-sm" id="lstm-high-table">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>#</th>
-                                                <th>Symbol</th>
-                                                <th>Company</th>
-                                                <th>Score</th>
-                                                <th>Target</th>
-                                                <th>Rec</th>
-                                                <th>Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody></tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Kronos Panel -->
-            <div class="tab-pane fade" id="kronos-panel" role="tabpanel">
-                <div class="card border-warning">
-                    <div class="card-header bg-warning text-dark">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-0">Kronos Foundation Model</h6>
-                                <small>K-line tokenization with hierarchical autoregressive forecasting</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <!-- Risk Strategy Sub-tabs -->
-                        <ul class="nav nav-tabs mb-3" role="tablist">
-                            <li class="nav-item">
-                                <a class="nav-link active" data-bs-toggle="tab" href="#kronos-default">
-                                    <i class="bi bi-shield-check text-success"></i> Default Risk
-                                    <span class="badge bg-secondary ms-2" id="kronos-default-badge">0</span>
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" data-bs-toggle="tab" href="#kronos-high">
-                                    <i class="bi bi-lightning-charge text-warning"></i> High Risk
-                                    <span class="badge bg-secondary ms-2" id="kronos-high-badge">0</span>
-                                </a>
-                            </li>
-                        </ul>
-
-                        <div class="tab-content">
-                            <!-- Default Risk -->
-                            <div class="tab-pane fade show active" id="kronos-default">
-                                <div class="d-flex justify-content-between mb-3">
-                                    <div>
-                                        <small class="text-muted">Conservative strategy | Large-cap focus</small>
-                                    </div>
-                                    <button class="btn btn-sm btn-warning" onclick="buyAllStocks('kronos', 'default_risk')">
-                                        <i class="bi bi-cart-plus-fill"></i> Buy All
-                                    </button>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-hover table-sm" id="kronos-default-table">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>#</th>
-                                                <th>Symbol</th>
-                                                <th>Company</th>
-                                                <th>Score</th>
-                                                <th>Target</th>
-                                                <th>Rec</th>
-                                                <th>Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody></tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                            <!-- High Risk -->
-                            <div class="tab-pane fade" id="kronos-high">
-                                <div class="d-flex justify-content-between mb-3">
-                                    <div>
-                                        <small class="text-muted">Aggressive strategy | Small/Mid-cap focus</small>
-                                    </div>
-                                    <button class="btn btn-sm btn-warning" onclick="buyAllStocks('kronos', 'high_risk')">
-                                        <i class="bi bi-cart-plus-fill"></i> Buy All
-                                    </button>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-hover table-sm" id="kronos-high-table">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>#</th>
-                                                <th>Symbol</th>
-                                                <th>Company</th>
-                                                <th>Score</th>
-                                                <th>Target</th>
-                                                <th>Rec</th>
-                                                <th>Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody></tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+                            <p class="mt-3 text-muted">Loading stock suggestions...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
 
-<!-- Buy Order Modal (same as before) -->
-<div class="modal fade" id="buyOrderModal" tabindex="-1">
-    <div class="modal-dialog">
+<!-- Stock Details Modal -->
+<div class="modal fade" id="stockModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="bi bi-cart-plus me-2"></i>Place Mock Order
+                    <i class="bi bi-graph-up me-2"></i><span id="modal-symbol"></span> - Stock Details
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="mb-3">
-                    <h6 class="text-primary mb-3" id="modal-stock-name">Stock Name</h6>
+                <!-- Signal Strength -->
+                <div class="alert mb-3" id="modal-signal-alert">
+                    <h6 class="mb-2"><i class="bi bi-lightning-fill me-2"></i>Signal Strength</h6>
+                    <h4 class="mb-0" id="modal-signal-strength"></h4>
                 </div>
 
+                <!-- Key Metrics -->
                 <div class="row mb-3">
                     <div class="col-6">
-                        <label class="form-label fw-bold">Model</label>
-                        <p class="mb-0" id="modal-model"></p>
+                        <label class="form-label fw-bold">Current Price</label>
+                        <p class="mb-0 fs-5" id="modal-price"></p>
                     </div>
                     <div class="col-6">
-                        <label class="form-label fw-bold">Strategy</label>
-                        <p class="mb-0" id="modal-strategy"></p>
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <div class="col-6">
-                        <label class="form-label fw-bold">ML Score</label>
+                        <label class="form-label fw-bold">Selection Score</label>
                         <p class="mb-0" id="modal-score"></p>
                     </div>
-                    <div class="col-6">
-                        <label class="form-label fw-bold">Price Target</label>
-                        <p class="mb-0 text-success" id="modal-target"></p>
+                </div>
+
+                <!-- EMA Indicators -->
+                <div class="row mb-3">
+                    <div class="col-4">
+                        <label class="form-label fw-bold">8 EMA</label>
+                        <p class="mb-0" id="modal-ema8"></p>
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label fw-bold">21 EMA</label>
+                        <p class="mb-0" id="modal-ema21"></p>
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label fw-bold">DeMarker</label>
+                        <p class="mb-0" id="modal-demarker"></p>
                     </div>
                 </div>
 
-                <hr>
-
-                <div class="mb-3">
-                    <label for="order-quantity" class="form-label fw-bold">Quantity</label>
-                    <input type="number" class="form-control" id="order-quantity" min="1" value="1" step="1">
-                    <div class="form-text">Number of shares to buy</div>
+                <!-- Fibonacci Targets -->
+                <h6 class="fw-bold mb-2"><i class="bi bi-bullseye me-2"></i>Fibonacci Profit Targets</h6>
+                <div class="row mb-3">
+                    <div class="col-4">
+                        <label class="form-label">Target 1 (127.2%)</label>
+                        <p class="mb-0 text-success fw-bold" id="modal-target1"></p>
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label">Target 2 (161.8%)</label>
+                        <p class="mb-0 text-success fw-bold" id="modal-target2"></p>
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label">Target 3 (200%)</label>
+                        <p class="mb-0 text-success fw-bold" id="modal-target3"></p>
+                    </div>
                 </div>
 
-                <div class="alert alert-info mb-0">
-                    <i class="bi bi-info-circle me-2"></i>
-                    <strong>Development Mode:</strong> This will be a mock order saved to database only (no real money).
+                <!-- Stop Loss -->
+                <div class="row mb-3">
+                    <div class="col-6">
+                        <label class="form-label fw-bold">Stop Loss</label>
+                        <p class="mb-0 text-danger fw-bold" id="modal-stoploss"></p>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold">Market Cap</label>
+                        <p class="mb-0" id="modal-marketcap"></p>
+                    </div>
+                </div>
+
+                <!-- Fundamentals -->
+                <h6 class="fw-bold mb-2"><i class="bi bi-calculator me-2"></i>Fundamental Metrics</h6>
+                <div class="row">
+                    <div class="col-3">
+                        <label class="form-label">P/E Ratio</label>
+                        <p class="mb-0" id="modal-pe"></p>
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label">ROE</label>
+                        <p class="mb-0" id="modal-roe"></p>
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label">Beta</label>
+                        <p class="mb-0" id="modal-beta"></p>
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label">Sector</label>
+                        <p class="mb-0" id="modal-sector"></p>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success" id="confirm-buy-btn">
-                    <i class="bi bi-check-circle me-2"></i>Confirm Purchase
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="buyStock()">
+                    <i class="bi bi-cart-plus me-2"></i>Place Order
                 </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Bulk Buy Modal (simplified version of the original) -->
+<!-- Bulk Buy Modal -->
 <div class="modal fade" id="bulkBuyModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="bi bi-cart-plus-fill me-2"></i>Buy All Stocks from Strategy
+                    <i class="bi bi-cart-plus-fill me-2"></i>Buy All Stocks
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="alert alert-info mb-3">
                     <i class="bi bi-info-circle me-2"></i>
-                    <strong>Bulk Order:</strong> You are about to place mock orders for all stocks in this strategy.
+                    <strong>Bulk Order:</strong> You are about to place orders for all suggested stocks.
                 </div>
 
                 <div class="row mb-3">
                     <div class="col-6">
-                        <label class="form-label fw-bold">Model Type</label>
-                        <p class="mb-0" id="bulk-model-type"></p>
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label fw-bold">Strategy</label>
-                        <p class="mb-0" id="bulk-strategy"></p>
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <div class="col-4">
                         <label class="form-label fw-bold">Total Stocks</label>
-                        <p class="mb-0 text-primary" id="bulk-total-stocks">0</p>
+                        <p class="mb-0" id="bulk-total-stocks">0</p>
                     </div>
-                    <div class="col-8">
-                        <label class="form-label fw-bold">Investment Amount (₹)</label>
-                        <input type="number" class="form-control" id="bulk-investment-amount" min="1000" step="1000" placeholder="e.g., 50000">
-                        <small class="text-muted">Total to invest (will be allocated by ML score)</small>
+                    <div class="col-6">
+                        <label class="form-label fw-bold">Order Type</label>
+                        <p class="mb-0">Market Order</p>
                     </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Investment per Stock</label>
+                    <div class="input-group">
+                        <span class="input-group-text">₹</span>
+                        <input type="number" class="form-control" id="bulk-investment" value="10000" min="1000" step="1000">
+                    </div>
+                    <small class="text-muted">Amount to invest in each stock</small>
                 </div>
 
                 <div class="alert alert-warning mb-0">
                     <i class="bi bi-exclamation-triangle me-2"></i>
-                    <strong>Development Mode:</strong> These will be mock orders saved to database only (no real money).
+                    <strong>Note:</strong> This will place individual orders for each stock. Review carefully before confirming.
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success" id="confirm-bulk-buy-btn">
-                    <i class="bi bi-check-circle me-2"></i>Confirm Bulk Purchase
+                <button type="button" class="btn btn-success" onclick="confirmBulkBuy()">
+                    <i class="bi bi-check-circle me-2"></i>Confirm Orders
                 </button>
             </div>
         </div>
     </div>
 </div>
 
-{% endblock %}
+<style>
+.signal-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.35rem 0.65rem;
+    border-radius: 0.25rem;
+    display: inline-block;
+    min-width: 90px;
+    text-align: center;
+}
 
-{% block scripts %}
-<script src="{{ url_for('static', filename='js/suggested_stocks.js') }}"></script>
+.signal-strong-buy {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+}
+
+.signal-buy {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+.signal-hold {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+}
+
+.signal-sell {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+}
+
+.sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+</style>
+
+<script>
+let currentStockData = null;
+let allStocks = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadSuggestedStocks();
+
+    document.getElementById('refresh-btn').addEventListener('click', function() {
+        loadSuggestedStocks();
+    });
+
+    document.getElementById('export-btn').addEventListener('click', function() {
+        exportToCSV();
+    });
+});
+
+function getSignalStrength(stock) {
+    // Determine signal strength based on indicators
+    const demarker = parseFloat(stock.demarker) || 0.5;
+    const buySignal = stock.buy_signal;
+    const sellSignal = stock.sell_signal;
+
+    if (buySignal) {
+        if (demarker < 0.30) {
+            return {
+                label: 'STRONG BUY',
+                class: 'signal-strong-buy',
+                icon: '💎',
+                description: 'Perfect entry - Oversold in power zone'
+            };
+        } else if (demarker < 0.50) {
+            return {
+                label: 'BUY',
+                class: 'signal-buy',
+                icon: '📈',
+                description: 'Good entry - Mild pullback in power zone'
+            };
+        } else {
+            return {
+                label: 'HOLD',
+                class: 'signal-hold',
+                icon: '⚠️',
+                description: 'Caution - Overbought conditions'
+            };
+        }
+    } else if (sellSignal) {
+        return {
+            label: 'SELL',
+            class: 'signal-sell',
+            icon: '📉',
+            description: 'Exit signal - Bearish trend'
+        };
+    } else {
+        return {
+            label: 'NEUTRAL',
+            class: 'signal-hold',
+            icon: '➖',
+            description: 'No clear signal'
+        };
+    }
+}
+
+function loadSuggestedStocks() {
+    const tbody = document.getElementById('stocks-tbody');
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="14" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-3 text-muted">Loading stock suggestions...</p>
+            </td>
+        </tr>
+    `;
+
+    fetch('/api/suggested-stocks')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                allStocks = data.stocks || [];
+                displayStocks(allStocks);
+                updateSummaryStats(allStocks);
+
+                // Update date badge
+                const dateBadge = document.getElementById('data-date-badge');
+                if (data.date) {
+                    dateBadge.textContent = `Data as of: ${data.date}`;
+                }
+            } else {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="14" class="text-center py-5">
+                            <i class="bi bi-exclamation-triangle text-warning" style="font-size: 3rem;"></i>
+                            <p class="mt-3 text-muted">${data.error || 'Failed to load stock suggestions'}</p>
+                        </td>
+                    </tr>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading stocks:', error);
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="14" class="text-center py-5">
+                        <i class="bi bi-x-circle text-danger" style="font-size: 3rem;"></i>
+                        <p class="mt-3 text-muted">Error loading stock suggestions</p>
+                    </td>
+                </tr>
+            `;
+        });
+}
+
+function updateSummaryStats(stocks) {
+    let strongBuyCount = 0;
+    let buyCount = 0;
+    let holdCount = 0;
+
+    stocks.forEach(stock => {
+        const signal = getSignalStrength(stock);
+        if (signal.label === 'STRONG BUY') strongBuyCount++;
+        else if (signal.label === 'BUY') buyCount++;
+        else if (signal.label === 'HOLD') holdCount++;
+    });
+
+    document.getElementById('strong-buy-count').textContent = strongBuyCount;
+    document.getElementById('buy-count').textContent = buyCount;
+    document.getElementById('hold-count').textContent = holdCount;
+    document.getElementById('total-count').textContent = stocks.length;
+}
+
+function displayStocks(stocks) {
+    const tbody = document.getElementById('stocks-tbody');
+
+    if (!stocks || stocks.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="14" class="text-center py-5">
+                    <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+                    <p class="mt-3 text-muted">No stock suggestions available for today</p>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = stocks.map((stock, index) => {
+        const signal = getSignalStrength(stock);
+        const price = parseFloat(stock.current_price) || 0;
+        const ema8 = parseFloat(stock.ema_8) || 0;
+        const ema21 = parseFloat(stock.ema_21) || 0;
+        const demarker = parseFloat(stock.demarker) || 0;
+        const score = parseFloat(stock.selection_score) || 0;
+        const target1 = parseFloat(stock.fib_target_1) || 0;
+        const target2 = parseFloat(stock.fib_target_2) || 0;
+        const target3 = parseFloat(stock.fib_target_3) || 0;
+        const stopLoss = parseFloat(stock.stop_loss) || 0;
+        const marketCap = parseFloat(stock.market_cap) || 0;
+
+        return `
+            <tr class="animate-fade-in">
+                <td class="text-muted">${index + 1}</td>
+                <td>
+                    <span class="signal-badge ${signal.class}" title="${signal.description}">
+                        ${signal.icon} ${signal.label}
+                    </span>
+                </td>
+                <td>
+                    <strong>${stock.symbol}</strong><br>
+                    <small class="text-muted">${stock.stock_name || ''}</small>
+                </td>
+                <td class="fw-bold">₹${price.toFixed(2)}</td>
+                <td>₹${ema8.toFixed(2)}</td>
+                <td>₹${ema21.toFixed(2)}</td>
+                <td>
+                    <span class="badge ${demarker < 0.30 ? 'bg-success' : demarker < 0.50 ? 'bg-primary' : 'bg-warning'}">
+                        ${demarker.toFixed(3)}
+                    </span>
+                </td>
+                <td>${score.toFixed(2)}</td>
+                <td class="text-success">₹${target1.toFixed(2)}</td>
+                <td class="text-success">₹${target2.toFixed(2)}</td>
+                <td class="text-success">₹${target3.toFixed(2)}</td>
+                <td class="text-danger">₹${stopLoss.toFixed(2)}</td>
+                <td>
+                    <small class="text-muted">
+                        ${marketCap >= 20000 ? 'Large' : marketCap >= 5000 ? 'Mid' : 'Small'} Cap<br>
+                        ₹${(marketCap).toFixed(0)} Cr
+                    </small>
+                </td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-primary" onclick='showStockDetails(${JSON.stringify(stock).replace(/'/g, "&apos;")})' title="View Details">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn btn-outline-success" onclick='buyStock(${JSON.stringify(stock).replace(/'/g, "&apos;")})' title="Place Order">
+                            <i class="bi bi-cart-plus"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function showStockDetails(stock) {
+    currentStockData = stock;
+    const signal = getSignalStrength(stock);
+
+    document.getElementById('modal-symbol').textContent = stock.symbol;
+    document.getElementById('modal-signal-strength').innerHTML = `
+        <span class="signal-badge ${signal.class} fs-5">${signal.icon} ${signal.label}</span>
+        <p class="mb-0 mt-2 small">${signal.description}</p>
+    `;
+
+    const signalAlert = document.getElementById('modal-signal-alert');
+    signalAlert.className = `alert mb-3 ${
+        signal.label === 'STRONG BUY' ? 'alert-success' :
+        signal.label === 'BUY' ? 'alert-primary' :
+        signal.label === 'HOLD' ? 'alert-warning' : 'alert-danger'
+    }`;
+
+    document.getElementById('modal-price').textContent = `₹${parseFloat(stock.current_price || 0).toFixed(2)}`;
+    document.getElementById('modal-score').textContent = parseFloat(stock.selection_score || 0).toFixed(2);
+    document.getElementById('modal-ema8').textContent = `₹${parseFloat(stock.ema_8 || 0).toFixed(2)}`;
+    document.getElementById('modal-ema21').textContent = `₹${parseFloat(stock.ema_21 || 0).toFixed(2)}`;
+    document.getElementById('modal-demarker').textContent = parseFloat(stock.demarker || 0).toFixed(3);
+
+    document.getElementById('modal-target1').textContent = `₹${parseFloat(stock.fib_target_1 || 0).toFixed(2)}`;
+    document.getElementById('modal-target2').textContent = `₹${parseFloat(stock.fib_target_2 || 0).toFixed(2)}`;
+    document.getElementById('modal-target3').textContent = `₹${parseFloat(stock.fib_target_3 || 0).toFixed(2)}`;
+    document.getElementById('modal-stoploss').textContent = `₹${parseFloat(stock.stop_loss || 0).toFixed(2)}`;
+
+    const marketCap = parseFloat(stock.market_cap || 0);
+    document.getElementById('modal-marketcap').textContent = `₹${marketCap.toFixed(0)} Cr (${marketCap >= 20000 ? 'Large' : marketCap >= 5000 ? 'Mid' : 'Small'} Cap)`;
+
+    document.getElementById('modal-pe').textContent = stock.pe_ratio ? parseFloat(stock.pe_ratio).toFixed(2) : 'N/A';
+    document.getElementById('modal-roe').textContent = stock.roe ? parseFloat(stock.roe).toFixed(2) + '%' : 'N/A';
+    document.getElementById('modal-beta').textContent = stock.beta ? parseFloat(stock.beta).toFixed(2) : 'N/A';
+    document.getElementById('modal-sector').textContent = stock.sector || 'N/A';
+
+    new bootstrap.Modal(document.getElementById('stockModal')).show();
+}
+
+function buyStock(stock = null) {
+    const stockData = stock || currentStockData;
+    if (!stockData) return;
+
+    alert(`Placing order for ${stockData.symbol} at ₹${parseFloat(stockData.current_price).toFixed(2)}`);
+    // Implement actual order placement logic here
+}
+
+function buyAllStocks() {
+    document.getElementById('bulk-total-stocks').textContent = allStocks.length;
+    new bootstrap.Modal(document.getElementById('bulkBuyModal')).show();
+}
+
+function confirmBulkBuy() {
+    const investment = document.getElementById('bulk-investment').value;
+    alert(`Placing orders for ${allStocks.length} stocks with ₹${investment} each`);
+    // Implement bulk order placement logic here
+    bootstrap.Modal.getInstance(document.getElementById('bulkBuyModal')).hide();
+}
+
+function exportToCSV() {
+    if (!allStocks || allStocks.length === 0) {
+        alert('No data to export');
+        return;
+    }
+
+    const headers = ['Rank', 'Signal', 'Symbol', 'Name', 'Price', '8 EMA', '21 EMA', 'DeMarker', 'Score', 'Target 1', 'Target 2', 'Target 3', 'Stop Loss', 'Market Cap', 'Sector'];
+    const rows = allStocks.map((stock, index) => {
+        const signal = getSignalStrength(stock);
+        return [
+            index + 1,
+            signal.label,
+            stock.symbol,
+            stock.stock_name || '',
+            parseFloat(stock.current_price || 0).toFixed(2),
+            parseFloat(stock.ema_8 || 0).toFixed(2),
+            parseFloat(stock.ema_21 || 0).toFixed(2),
+            parseFloat(stock.demarker || 0).toFixed(3),
+            parseFloat(stock.selection_score || 0).toFixed(2),
+            parseFloat(stock.fib_target_1 || 0).toFixed(2),
+            parseFloat(stock.fib_target_2 || 0).toFixed(2),
+            parseFloat(stock.fib_target_3 || 0).toFixed(2),
+            parseFloat(stock.stop_loss || 0).toFixed(2),
+            parseFloat(stock.market_cap || 0).toFixed(0),
+            stock.sector || ''
+        ];
+    });
+
+    const csvContent = [headers, ...rows]
+        .map(row => row.map(cell => `"${cell}"`).join(','))
+        .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `suggested_stocks_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+</script>
 {% endblock %}

@@ -973,12 +973,12 @@
     function updatePortfolioChart(data) {
         const ctx = document.getElementById('portfolioChart');
         if (!ctx) return;
-        
-        // Destroy existing chart if it exists
-        if (window.portfolioChart) {
+
+        // Destroy existing chart if it exists and has destroy method
+        if (window.portfolioChart && typeof window.portfolioChart.destroy === 'function') {
             window.portfolioChart.destroy();
         }
-        
+
         window.portfolioChart = new Chart(ctx, {
             type: 'line',
             data: data,
