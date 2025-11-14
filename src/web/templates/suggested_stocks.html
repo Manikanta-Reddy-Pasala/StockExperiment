@@ -415,14 +415,15 @@ function loadSuggestedStocks() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                allStocks = data.stocks || [];
+                allStocks = data.data || [];
                 displayStocks(allStocks);
                 updateSummaryStats(allStocks);
 
                 // Update date badge
                 const dateBadge = document.getElementById('data-date-badge');
-                if (data.date) {
-                    dateBadge.textContent = `Data as of: ${data.date}`;
+                if (data.last_updated) {
+                    const dateStr = new Date(data.last_updated).toLocaleDateString();
+                    dateBadge.textContent = `Data as of: ${dateStr}`;
                 }
             } else {
                 tbody.innerHTML = `
