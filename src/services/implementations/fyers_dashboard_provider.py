@@ -123,16 +123,13 @@ class FyersDashboardProvider(IDashboardProvider):
 
                 for stock in latest_stocks:
                     symbol, stock_name, current_price, selection_score = stock
-                    # Calculate mock change based on selection score (higher score = positive trend)
-                    change_percent = min(5.0, max(0.5, (selection_score or 50) / 20))
-                    change = (current_price or 0) * change_percent / 100
-
+                    # No historical data available - show current price only
                     market_indices.append({
                         'symbol': symbol,
                         'name': stock_name or symbol.replace('NSE:', '').replace('-EQ', ''),
                         'price': float(current_price or 0),
-                        'change': float(change),
-                        'change_percent': float(change_percent)
+                        'change': 0.0,
+                        'change_percent': 0.0
                     })
 
             return {
@@ -439,30 +436,13 @@ class FyersDashboardProvider(IDashboardProvider):
                     'last_updated': datetime.now().isoformat()
                 }
             
-            holdings = holdings_response.get('data', [])
+            # No historical P&L data available - requires daily portfolio snapshots
             chart_data = []
-            
-            # For each day, calculate approximate P&L
-            # Note: This is a simplified calculation. For accurate historical P&L,
-            # you would need to track daily portfolio snapshots
-            for i in range(days):
-                date = datetime.now() - timedelta(days=days-i-1)
-                
-                # Calculate approximate daily P&L based on current holdings
-                daily_pnl = 0
-                for holding in holdings:
-                    # Simplified calculation - in reality you'd need historical prices
-                    daily_pnl += holding.get('pnl', 0) * (0.8 + (i / days) * 0.4)  # Simulated progression
-                
-                chart_data.append({
-                    'date': date.strftime('%Y-%m-%d'),
-                    'pnl': round(daily_pnl, 2)
-                })
-            
+
             return {
                 'success': True,
                 'data': chart_data,
-                'note': 'P&L data is approximated based on current holdings',
+                'note': 'Historical P&L data not available. Requires daily portfolio snapshots.',
                 'last_updated': datetime.now().isoformat()
             }
             
@@ -532,33 +512,14 @@ class FyersDashboardProvider(IDashboardProvider):
 
     def _get_enhanced_fallback_metrics(self, user_id: int, period: str, period_days: int) -> Dict[str, Any]:
         """Get enhanced fallback metrics when no historical data is available."""
-        from datetime import datetime, timedelta
+        from datetime import datetime
 
-        # Create sample data for new users to show working functionality
-        base_value = 100000  # Base portfolio value
-
-        # Generate sample chart data based on period
-        chart_data = []
-        current_date = datetime.now()
-
-        for i in range(max(1, period_days)):
-            date = current_date - timedelta(days=period_days - i - 1)
-            # Create sample progressive data
-            daily_return = 0.001 * i  # Small progressive returns
-            value = base_value * (1 + daily_return)
-
-            chart_data.append({
-                'date': date.strftime('%Y-%m-%d'),
-                'value': round(value, 2),
-                'return': round(daily_return * 100, 2),
-                'drawdown': 0.0
-            })
-
+        # Return empty data - no mock/sample data
         performance_data = {
-            'return_percent': 0.1 * period_days,  # Small positive return based on period
-            'annualized_return': 1.2,  # 1.2% annualized
-            'total_pnl': base_value * 0.001 * period_days,  # Small positive PnL
-            'portfolio_value': base_value,
+            'return_percent': 0.0,
+            'annualized_return': 0.0,
+            'total_pnl': 0.0,
+            'portfolio_value': 0.0,
             'period': period,
             'period_days': period_days,
             'win_rate': 0.0,
@@ -568,13 +529,13 @@ class FyersDashboardProvider(IDashboardProvider):
             'best_day': 0.0,
             'worst_day': 0.0,
             'total_trading_days': 0,
-            'chart_data': chart_data
+            'chart_data': []
         }
 
         return {
             'success': True,
             'data': performance_data,
-            'note': f'Sample data for {period} period - Connect broker to see real performance',
+            'note': 'No portfolio data available. Add positions or holdings to track performance.',
             'last_updated': datetime.now().isoformat()
         }
 
