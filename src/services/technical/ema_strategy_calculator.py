@@ -348,10 +348,8 @@ class EMAStrategyCalculator:
                     # Decent setup: Bullish + Mild pullback
                     buy_signal = True
                     signal_quality = 'medium'
-                else:
-                    # Basic setup: Just bullish power zone
-                    buy_signal = True
-                    signal_quality = 'low'
+                # Don't give buy signal if overbought (demarker > 0.70)
+                # Only recommend stocks with good entry timing
 
             # SELL SIGNAL LOGIC
             sell_signal = is_bearish or (price < ema_21)
