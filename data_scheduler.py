@@ -189,9 +189,8 @@ def export_daily_csv():
             # Export technical indicators (latest)
             logger.info("Exporting latest technical indicators...")
             tech_query = """
-                SELECT DISTINCT ON (symbol) 
-                    symbol, date, rsi_14, macd, signal_line, macd_histogram,
-                    sma_50, sma_200, ema_12, ema_26, atr_14, atr_percentage
+                SELECT DISTINCT ON (symbol)
+                    symbol, date, ema_8, ema_21, demarker, sma_50, sma_200
                 FROM technical_indicators
                 ORDER BY symbol, date DESC
             """
@@ -292,15 +291,16 @@ def validate_data_quality():
     logger.info("=" * 80)
     logger.info("Validating Data Quality")
     logger.info("=" * 80)
-    
+
     try:
         from src.models.database import get_database_manager
-        
+        from sqlalchemy import text
+
         db_manager = get_database_manager()
         with db_manager.get_session() as session:
             # Check stocks table
-            stocks_stats = session.execute("""
-                SELECT 
+            stocks_stats = session.execute(text("""
+                SELECT
                     COUNT(*) as total_stocks,
                     COUNT(current_price) as with_price,
                     COUNT(market_cap) as with_market_cap,
@@ -308,49 +308,56 @@ def validate_data_quality():
                     COUNT(eps) as with_eps,
                     COUNT(sector) as with_sector
                 FROM stocks
-            """).fetchone()
-            
+            """)).fetchone()
+
+            total_stocks = stocks_stats.total_stocks if stocks_stats else 0
+
             logger.info("Stocks Table:")
-            logger.info(f"  Total stocks: {stocks_stats.total_stocks}")
-            logger.info(f"  With price: {stocks_stats.with_price} ({stocks_stats.with_price/stocks_stats.total_stocks*100:.1f}%)")
-            logger.info(f"  With market cap: {stocks_stats.with_market_cap} ({stocks_stats.with_market_cap/stocks_stats.total_stocks*100:.1f}%)")
-            logger.info(f"  With PE ratio: {stocks_stats.with_pe} ({stocks_stats.with_pe/stocks_stats.total_stocks*100:.1f}%)")
-            logger.info(f"  With EPS: {stocks_stats.with_eps} ({stocks_stats.with_eps/stocks_stats.total_stocks*100:.1f}%)")
-            logger.info(f"  With sector: {stocks_stats.with_sector} ({stocks_stats.with_sector/stocks_stats.total_stocks*100:.1f}%)")
-            
+            logger.info(f"  Total stocks: {total_stocks}")
+            if total_stocks > 0:
+                logger.info(f"  With price: {stocks_stats.with_price} ({stocks_stats.with_price/total_stocks*100:.1f}%)")
+                logger.info(f"  With market cap: {stocks_stats.with_market_cap} ({stocks_stats.with_market_cap/total_stocks*100:.1f}%)")
+                logger.info(f"  With PE ratio: {stocks_stats.with_pe} ({stocks_stats.with_pe/total_stocks*100:.1f}%)")
+                logger.info(f"  With EPS: {stocks_stats.with_eps} ({stocks_stats.with_eps/total_stocks*100:.1f}%)")
+                logger.info(f"  With sector: {stocks_stats.with_sector} ({stocks_stats.with_sector/total_stocks*100:.1f}%)")
+            else:
+                logger.warning("  ⚠️ No stocks data available")
+
             # Check historical data
-            history_stats = session.execute("""
-                SELECT 
+            history_stats = session.execute(text("""
+                SELECT
                     COUNT(DISTINCT symbol) as symbols_with_history,
                     COUNT(*) as total_records,
                     MAX(date) as latest_date,
                     MIN(date) as earliest_date
                 FROM historical_data
-            """).fetchone()
-            
+            """)).fetchone()
+
             logger.info("\nHistorical Data:")
             logger.info(f"  Symbols with history: {history_stats.symbols_with_history}")
             logger.info(f"  Total records: {history_stats.total_records:,}")
             logger.info(f"  Date range: {history_stats.earliest_date} to {history_stats.latest_date}")
-            
-            # Check technical indicators
-            tech_stats = session.execute("""
-                SELECT 
+
+            # Check technical indicators (updated columns)
+            tech_stats = session.execute(text("""
+                SELECT
                     COUNT(DISTINCT symbol) as symbols_with_tech,
                     COUNT(*) as total_records,
-                    COUNT(rsi_14) as with_rsi,
-                    COUNT(macd) as with_macd
+                    COUNT(ema_8) as with_ema8,
+                    COUNT(ema_21) as with_ema21,
+                    COUNT(demarker) as with_demarker
                 FROM technical_indicators
-            """).fetchone()
-            
+            """)).fetchone()
+
             logger.info("\nTechnical Indicators:")
             logger.info(f"  Symbols with indicators: {tech_stats.symbols_with_tech}")
             logger.info(f"  Total records: {tech_stats.total_records:,}")
-            logger.info(f"  With RSI: {tech_stats.with_rsi:,}")
-            logger.info(f"  With MACD: {tech_stats.with_macd:,}")
-            
+            logger.info(f"  With EMA-8: {tech_stats.with_ema8:,}")
+            logger.info(f"  With EMA-21: {tech_stats.with_ema21:,}")
+            logger.info(f"  With DeMarker: {tech_stats.with_demarker:,}")
+
             logger.info("\n✅ Data quality validation completed at 10:30 PM")
-            
+
     except Exception as e:
         logger.error(f"❌ Data quality validation failed: {e}", exc_info=True)
 
