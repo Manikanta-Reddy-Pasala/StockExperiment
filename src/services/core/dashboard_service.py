@@ -5,7 +5,6 @@ Now uses the new DashboardIntegrationService for broker-agnostic integration.
 from datetime import datetime
 from .broker_service import get_broker_service
 from .dashboard_integration_service import get_dashboard_integration_service
-from ..utils.user_strategy_settings_service import get_user_strategy_settings_service
 
 class DashboardService:
     def __init__(self, broker_service):
@@ -15,18 +14,11 @@ class DashboardService:
     def get_dashboard_metrics(self, user_id: int):
         """Get dashboard metrics using broker-specific APIs."""
         metrics = self.integration_service.get_dashboard_metrics(user_id)
-        
-        # Add active strategies count
-        try:
-            strategy_service = get_user_strategy_settings_service()
-            active_strategies = strategy_service.get_active_strategies(user_id)
-            metrics['active_strategies_count'] = len(active_strategies)
-            metrics['active_strategies'] = active_strategies
-        except Exception as e:
-            # Fallback to default if strategy service fails
-            metrics['active_strategies_count'] = 0
-            metrics['active_strategies'] = []
-        
+
+        # Single unified 8-21 EMA strategy - no strategy count needed
+        metrics['active_strategies_count'] = 1
+        metrics['active_strategies'] = ['8-21 EMA Strategy']
+
         return metrics
     
     def get_portfolio_holdings(self, user_id: int):

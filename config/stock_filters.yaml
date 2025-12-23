@@ -1,382 +1,84 @@
-# Stock Discovery Service Configuration (rechecked + completed)
-# Focus: short-term swing + risk control, max 10 final picks
+# Simplified Stock Filters Configuration for 8-21 EMA Swing Trading Strategy
+# Focus on identifying stocks in the "Power Zone" (8 EMA > 21 EMA) with pullback opportunities
 
-# -------------------------
-# DATA / UNIVERSE CONTROLS
-# -------------------------
-universe:
-  exchanges: ["NSE"]                 # ["NSE","BSE"] if you support both
-  instrument_types: ["EQ"]           # Cash equities; exclude illiquid series
-  symbol_mapping:
-    enforce_unique_symbols: true     # De-dup cross-listings / symbols
-  corporate_actions:
-    adjust_for_splits: true
-    adjust_for_dividends: true
-    adjust_for_bonuses: true
-  calendars:
-    exchange_holidays_handling: "skip"     # skip | forward_fill | back_fill
-  history_requirements:
-    min_history_days: 220            # Need ~200DMA + buffer
-    min_non_null_ratio: 0.98         # Data completeness requirement
-  data_quality:
-    max_price_gap_pct: 20.0          # Drop days with impossible gaps
-    max_spread_pct_hard: 5.0         # Hard filter if spread too wide
-    stale_quote_max_minutes: 15      # Reject quotes older than this
-  fundamentals_source:
-    frequency: "quarterly"
-    require_last_report_within_days: 180
-  outliers:
-    winsorize_returns_pct: 0.5       # clamp top/bottom 0.5% of returns
-    winsorize_volumes_pct: 0.5
-
-# -------------------------
-# Stage 1: Basic Stock Filtering Criteria
-# -------------------------
 stage_1_filters:
+  # Tradeability criteria - ensure liquid, tradeable stocks
   tradeability:
-    minimum_price: 5.0
-    maximum_price: 10000.0
-    minimum_daily_turnover_inr: 50000000      # ₹5 Cr/day
-    fallback_minimum_volume: 50000
-    minimum_liquidity_score: 0.3
-    minimum_trades_per_day: 200
+    minimum_price: 50.0              # Min ₹50 (avoid penny stocks)
+    maximum_price: 10000.0           # Max ₹10,000
+    fallback_minimum_volume: 50000    # Min 50K volume for liquidity
 
+  # Market cap categories (in crores)
   market_cap_categories:
     large_cap:
-      minimum: 20000
-      label: "large_cap"
+      minimum: 20000                 # ₹20,000 Cr+
+      description: "Large cap stocks (lower risk, stable)"
     mid_cap:
-      minimum: 5000
-      maximum: 20000
-      label: "mid_cap"
+      minimum: 5000                  # ₹5,000 - ₹20,000 Cr
+      description: "Mid cap stocks (balanced risk/reward)"
     small_cap:
-      maximum: 5000
-      label: "small_cap"
+      minimum: 500                   # ₹500 - ₹5,000 Cr
+      description: "Small cap stocks (higher risk, higher potential)"
 
-  price_volume_thresholds:
-    analysis:
-      minimum_price: 1.0
-      minimum_volume: 1000
-
-  trading_status:
-    exclude_suspended: true
-    exclude_delisted: true
-    exclude_stage_listed: true
-    min_listing_days: 180
-
-  liquidity:
-    max_bid_ask_spread_pct: 1.0
-    maximum_bid_ask_spread_pct_hard: 5.0
-    minimum_market_depth_shares: 1000
-
-  baseline_volatility:
-    atr_period: 14
-    min_atr_pct_of_price: 1.0
-    max_atr_pct_of_price: 7.0
-
-# -------------------------
-# Stage 2: Advanced Analysis Filters
-# -------------------------
 stage_2_filters:
-  technical_indicators:
-    rsi:
-      enabled: true
-      use_trend_confirmation: true
-      trend_min_value: 50
-      trend_lookback: 5
-      oversold_threshold: 30
-      overbought_threshold: 70
-      neutral_range_min: 45
-      neutral_range_max: 60
-      period: 14
-    macd:
-      enabled: true
-      fast_period: 12
-      slow_period: 26
-      signal_period: 9
-      histogram_threshold: 0.01
-      require_histogram_rising: true
-    bollinger_bands:
-      enabled: true
-      period: 20
-      std_dev: 2
-      squeeze_threshold: 0.05
-      enable_squeeze_breakout: true
-      breakout_confirm_ma_period: 20
-    moving_averages:
-      enabled: true
-      sma_periods: [5, 10, 20, 50, 100, 200]
-      ema_periods: [12, 26, 50]
-      price_above_ma200: true
-      golden_cross_days: 5
-      death_cross_days: 5
-    stochastic:
-      enabled: false
-      k_period: 14
-      d_period: 3
-      oversold_threshold: 20
-      overbought_threshold: 80
-    williams_r:
-      enabled: false
-      period: 14
-      oversold_threshold: -80
-      overbought_threshold: -20
-    atr:
-      enabled: true
-      period: 14
-      volatility_threshold_low: 0.01
-      volatility_threshold_high: 0.05
-
-  volume_analysis:
-    volume_surge:
-      enabled: true
-      surge_multiplier: 1.5
-      lookback_period: 20
-    obv:
-      enabled: true
-      trend_period: 10
-      divergence_detection: true
-    vpt:
-      enabled: false
-      signal_period: 10
-    mfi:
-      enabled: true
-      period: 14
-      oversold_threshold: 20
-      overbought_threshold: 80
-
-  fundamental_ratios:
-    pe_ratio:
-      enabled: true
-      minimum: 0
-      maximum: 50
-      sector_relative: true
-      sector_percentile_max: 80
-    pb_ratio:
-      enabled: true
-      minimum: 0.5
-      maximum: 5
-      sector_relative: true
-    peg_ratio:
-      enabled: true
-      maximum: 2.0
-    roe:
-      enabled: true
-      minimum: 12
-    roa:
-      enabled: true
-      minimum: 5
-    profit_margin:
-      enabled: true
-      minimum: 8
-    debt_to_equity:
-      enabled: true
-      maximum: 1.5
-    current_ratio:
-      enabled: true
-      minimum: 1.2
-    quick_ratio:
-      enabled: true
-      minimum: 0.9
-    revenue_growth:
-      enabled: true
-      minimum: 5
-      period: "yearly"
-    earnings_growth:
-      enabled: true
-      minimum: 5
-      period: "yearly"
-
-  risk_metrics:
-    beta:
-      enabled: true
-      minimum: 0.7
-      maximum: 1.6
-      market_index: "NIFTY50"
-    volatility:
-      enabled: true
-      period: 20
-      maximum_daily: 4.0
-      maximum_annual: 45.0
-    sharpe_ratio:
-      enabled: true
-      minimum: 0.5
-      risk_free_rate: 6.5
-    max_drawdown:
-      enabled: true
-      period: 90
-      maximum: 25.0
-    var:
-      enabled: false
-      confidence_level: 95
-      period: 20
-      maximum: 5.0
-
-  momentum:
-    price_momentum:
-      enabled: true
-      periods: [5, 10, 20, 60]
-      minimum_1d: -3.0
-      maximum_1d: 10.0
-    roc:
-      enabled: true
-      period: 20
-      minimum: -10.0
-      maximum: 30.0
-    relative_strength:
-      enabled: true
-      comparison_index: "NIFTY50"
-      period: 20
-      minimum: 1.0
-      sector_relative_strength_min: 1.0
-
-  trend_analysis:
-    trend_direction:
-      enabled: true
-      method: "moving_average"
-      period: 20
-      required_direction: "up"
-    support_resistance:
-      enabled: true
-      lookback_period: 50
-      proximity_threshold: 2.0
-      avoid_buying_near_resistance: true
-    chart_patterns:
-      enabled: false
-      patterns: ["head_shoulders", "triangle", "flag", "wedge"]
-    adx:
-      enabled: true
-      period: 14
-      strong_trend_threshold: 20
-      weak_trend_threshold: 15
-
-  market_factors:
-    sector_performance:
-      enabled: true
-      relative_strength_min: 0.95
-    market_regime:
-      enabled: true
-      bull_market_filter: false
-      volatility_regime: "all"
-    seasonality:
-      enabled: false
-      favorable_months: [1, 2, 10, 11, 12]
-
-  # Score weights for ranking (sum = 1.0)
-  scoring_weights:
-    technical_score: 0.30
-    fundamental_score: 0.20
-    risk_score: 0.20
-    momentum_score: 0.25
-    volume_score: 0.05
-
+  # 8-21 EMA Strategy Thresholds
   filtering_thresholds:
-    minimum_total_score: 25           # Lowered from 60 to 25 (stocks scoring 30-70)
-    minimum_technical_score: 15       # Lowered from 50 to 15 (stocks scoring 1-40)
-    minimum_fundamental_score: 5      # Lowered from 40 to 5 (many scoring exactly 10)
-    minimum_risk_score: 20            # Lowered from 50 to 20 (varies widely)
-    require_all_categories: false
+    # Power Zone Requirements
+    ema_bullish_trend: true          # 8 EMA > 21 EMA required
+    min_demarker: 0.0                # Allow all (filter later with < 0.30 for entry)
+    max_demarker: 1.0                # Full range
 
-# -------------------------
-# LIQUIDITY SCORING
-# -------------------------
-liquidity_scoring:
-  volume_normalization: 1000000
-  weights:
-    volume: 0.7
-    spread: 0.3
-  spread_multiplier: 10
-  database_scoring:
-    volume_weight: 0.8
-    price_stability_weight: 0.2
-    stable_price_range:
-      minimum: 100
-      maximum: 1000
-    stable_price_score: 0.8
-    unstable_price_score: 0.6
+    # Risk Management
+    max_beta: 1.5                    # Max volatility vs market
+    min_avg_volume: 100000           # Min average volume
 
-# -------------------------
-# SELECTION / PORTFOLIO GUARDRAILS
-# -------------------------
-selection:
-  max_suggested_stocks: 500           # Generate more stocks for display filtering
-  tie_breaker_priority: ["momentum_score", "risk_score", "technical_score"]
-  sector_concentration_limit_pct: 40   # avoid >40% of picks in one sector
-  market_cap_mix:
-    min_large_mid_pct: 60              # enforce stability
-  blacklist_symbols: []                # optional hard excludes
-  whitelist_symbols: []                # optional hard includes (post-filter)
-  min_distance_from_resistance_pct: 2.0  # avoid buys too near resistance
-  require_price_above_vwap: true       # intraday sanity check if intraday used
+  # Fundamental Ratios (relaxed for swing trading)
+  fundamental_ratios:
+    max_pe_ratio: 100.0              # P/E < 100
+    min_roe: 0.0                     # No minimum ROE requirement
+    max_debt_equity: 5.0             # Debt/Equity < 5
+    min_dividend_yield: 0.0          # No dividend requirement
 
-# -------------------------
-# SHARES OUTSTANDING (heuristic, optional)
-# -------------------------
-shares_estimation:
-  high_price_stocks:
-    price_threshold: 1500
-    shares_range_min: 50000000
-    shares_range_max: 300000000
-  mid_high_price_stocks:
-    price_threshold: 500
-    shares_range_min: 100000000
-    shares_range_max: 800000000
-  medium_price_stocks:
-    price_threshold: 100
-    shares_range_min: 200000000
-    shares_range_max: 1500000000
-  low_price_stocks:
-    shares_range_min: 500000000
-    shares_range_max: 5000000000
-  volume_adjustments:
-    high_volume_threshold: 200000
-    high_volume_multiplier_min: 0.8
-    high_volume_multiplier_max: 1.2
-    medium_volume_threshold: 50000
-    medium_volume_multiplier_min: 0.9
-    medium_volume_multiplier_max: 1.3
-    low_volume_multiplier_min: 1.0
-    low_volume_multiplier_max: 2.0
+  # Scoring Weights (for ranking stocks)
+  scoring_weights:
+    technical_score: 0.50            # 50% weight - EMA alignment, DeMarker
+    fundamental_score: 0.10          # 10% weight - PE, ROE (less important)
+    risk_score: 0.20                 # 20% weight - Beta, volatility
+    momentum_score: 0.15             # 15% weight - Price action
+    volume_score: 0.05               # 5% weight - Liquidity
 
-# -------------------------
-# DB / CACHE / API
-# -------------------------
-database:
-  screening_limit: 1000
+# Strategy Definition
+strategy:
+  unified:
+    name: "8-21 EMA Swing Trading"
+    description: "Unified 8-21 EMA swing trading strategy across all market caps"
+    market_cap_categories:
+      - large_cap
+      - mid_cap
+      - small_cap
+    max_position_size_percent: 5.0   # 5% max per position
+    target_stocks: 50                # Top 50 stocks
 
-cache:
-  duration_seconds: 3600
-  indicator_cache_seconds: 86400        # cache TA computations for a day
+# 8-21 EMA Swing Trading Rules
+trading_rules:
+  entry:
+    # Power Zone Entry
+    power_zone_required: true        # Price > 8 EMA > 21 EMA
+    demarker_oversold: 0.30          # DeMarker < 0.30 (pullback opportunity)
+    above_sma_50: false              # Optional: prefer above SMA 50
+    above_sma_200: false             # Optional: prefer above SMA 200
 
-api_processing:
-  quote_batch_size: 20
-  quote_rate_limit_delay: 0.5
-  historical_batch_size: 50             # pull candles in moderate chunks
-  fail_fast_on_rate_limit: false        # backoff instead of abort
-  backoff:
-    initial_delay_ms: 250
-    max_delay_ms: 5000
-    multiplier: 2.0
+  exit:
+    # Fibonacci Extension Targets
+    take_profit_targets:
+      - 1.272                        # 127.2% Fibonacci extension
+      - 1.618                        # 161.8% Fibonacci extension (golden ratio)
+      - 2.000                        # 200% extension
 
-# -------------------------
-# SECTOR KEYWORDS (unchanged)
-# -------------------------
-sector_keywords:
-  Banking: ["BANK","FINANCE","FINANCIAL","LENDING","CREDIT"]
-  Technology: ["IT","TECH","SOFTWARE","SYSTEM","COMPUTER","DIGITAL"]
-  Pharmaceutical: ["PHARMA","DRUG","MEDICINE","HEALTHCARE","BIO","LABORATORY"]
-  Automobile: ["AUTO","MOTOR","VEHICLE","TRANSPORT","LOGISTICS"]
-  FMCG: ["FMCG","CONSUMER","FOOD","BEVERAGE","RETAIL"]
-  Metals: ["METAL","STEEL","IRON","COAL","MINING","ALUMINIUM"]
-  Energy: ["ENERGY","POWER","OIL","GAS","PETROLEUM","SOLAR","ELECTRIC"]
-  Infrastructure: ["INFRA","CEMENT","CONSTRUCTION","BUILDING","ENGINEERING"]
-  Telecommunications: ["TELECOM","COMMUNICATION","WIRELESS","NETWORK"]
-  Textiles: ["TEXTILE","COTTON","FABRIC","GARMENT","APPAREL"]
+    # Stop Loss
+    stop_loss_below_21ema: true      # Stop below 21 EMA
+    trailing_stop_percent: 5.0       # 5% trailing stop
 
-# -------------------------
-# LOGGING
-# -------------------------
-logging:
-  enable_discovery_summary: true
-  top_stocks_per_category: 5
-  include_reject_reasons: true         # helps audit why names failed
+  position_sizing:
+    risk_per_trade_percent: 2.0      # Risk 2% of capital per trade
+    max_total_exposure_percent: 40.0 # Max 40% total capital at risk

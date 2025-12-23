@@ -351,27 +351,10 @@ class FyersPortfolioProvider(IPortfolioProvider):
                     'last_updated': datetime.now().isoformat()
                 }
             
-            holdings = holdings_response.get('data', [])
-            
-            # Placeholder dividend data - in reality, this would come from external sources
+            # No dividend data available - requires external data source
             dividend_records = []
             total_dividends = 0
-            
-            for holding in holdings:
-                # Estimate dividend based on holding (simplified)
-                if holding.get('market_value', 0) > 10000:  # Larger holdings
-                    estimated_dividend = holding.get('market_value', 0) * 0.02  # 2% yield estimate
-                    dividend_records.append({
-                        'symbol': holding.get('symbol', ''),
-                        'symbol_name': holding.get('symbol_name', ''),
-                        'dividend_amount': round(estimated_dividend, 2),
-                        'dividend_yield': 2.0,  # Estimated
-                        'ex_date': (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'),
-                        'pay_date': (datetime.now() - timedelta(days=15)).strftime('%Y-%m-%d'),
-                        'quantity_held': holding.get('quantity', 0)
-                    })
-                    total_dividends += estimated_dividend
-            
+
             return {
                 'success': True,
                 'data': dividend_records,
@@ -380,7 +363,7 @@ class FyersPortfolioProvider(IPortfolioProvider):
                     'start_date': start_date.strftime('%Y-%m-%d') if start_date else None,
                     'end_date': end_date.strftime('%Y-%m-%d') if end_date else None
                 },
-                'note': 'Dividend data is estimated. Actual dividend history requires external data source.',
+                'note': 'Dividend data not available. Requires external data source.',
                 'last_updated': datetime.now().isoformat()
             }
             
@@ -634,11 +617,11 @@ class FyersPortfolioProvider(IPortfolioProvider):
         return {
             'return_percent': round(estimated_return, 2),
             'annualized_return': round(annualized_return, 2),
-            'volatility': 15.0,  # Placeholder
-            'sharpe_ratio': round(annualized_return / 15.0, 2) if annualized_return != 0 else 0,
-            'max_drawdown': -5.0,  # Placeholder
-            'win_rate': 65.0,  # Placeholder
-            'risk_adjusted_return': round(estimated_return / 15.0, 2) if estimated_return != 0 else 0
+            'volatility': 0.0,
+            'sharpe_ratio': 0.0,
+            'max_drawdown': 0.0,
+            'win_rate': 0.0,
+            'risk_adjusted_return': 0.0
         }
     
     def _get_benchmark_comparison(self, user_id: int, period: str) -> Dict[str, Any]:
@@ -655,20 +638,20 @@ class FyersPortfolioProvider(IPortfolioProvider):
             return {
                 'benchmark_name': 'NIFTY 50',
                 'benchmark_return': benchmark_return,
-                'relative_performance': 0,  # Portfolio return - benchmark return
-                'beta': 1.0,  # Placeholder
-                'alpha': 0,  # Placeholder
-                'correlation': 0.85  # Placeholder
+                'relative_performance': 0,
+                'beta': 0.0,
+                'alpha': 0.0,
+                'correlation': 0.0
             }
-            
+
         except Exception:
             return {
                 'benchmark_name': 'NIFTY 50',
                 'benchmark_return': 0,
                 'relative_performance': 0,
-                'beta': 1.0,
-                'alpha': 0,
-                'correlation': 0.85
+                'beta': 0.0,
+                'alpha': 0.0,
+                'correlation': 0.0
             }
     
     # Risk Calculation Methods

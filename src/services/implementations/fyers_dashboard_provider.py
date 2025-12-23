@@ -21,12 +21,16 @@ class FyersDashboardProvider(IDashboardProvider):
         self.broker_name = 'fyers'
     
     def get_market_overview(self, user_id: int) -> Dict[str, Any]:
-        """Get market overview data using real Fyers API data only."""
-        # Debug print removed for clean console output
+        """Get market overview data using real Fyers API data or fallback to DB data."""
         try:
-            # Get real positions data to show as market overview
+            # Try to get real positions data
             positions_response = self.fyers_service.positions(user_id)
             market_indices = []
+
+            # Check if API authentication failed
+            if positions_response.get('status') == 'error' and positions_response.get('error_code') == -16:
+                # Fallback: Show top suggested stocks from database as market overview
+                return self._get_market_overview_from_db(user_id)
 
             if positions_response.get('status') == 'success':
                 net_positions = positions_response.get('data', [])
@@ -94,12 +98,82 @@ class FyersDashboardProvider(IDashboardProvider):
                 'data': [],
                 'last_updated': datetime.now().isoformat()
             }
-    
+
+    def _get_market_overview_from_db(self, user_id: int) -> Dict[str, Any]:
+        """Fallback method to get market overview from suggested stocks in database."""
+        try:
+            from ...models.database import get_database_manager
+            from sqlalchemy import text
+
+            db_manager = get_database_manager()
+            market_indices = []
+
+            with db_manager.get_session() as session:
+                # Get top 5 suggested stocks from latest date using raw SQL
+                query = text("""
+                    SELECT symbol, stock_name, current_price, selection_score
+                    FROM daily_suggested_stocks
+                    WHERE date = (SELECT MAX(date) FROM daily_suggested_stocks)
+                    AND current_price IS NOT NULL
+                    ORDER BY selection_score DESC
+                    LIMIT 5
+                """)
+                result = session.execute(query)
+                latest_stocks = result.fetchall()
+
+                for stock in latest_stocks:
+                    symbol, stock_name, current_price, selection_score = stock
+                    # No historical data available - show current price only
+                    market_indices.append({
+                        'symbol': symbol,
+                        'name': stock_name or symbol.replace('NSE:', '').replace('-EQ', ''),
+                        'price': float(current_price or 0),
+                        'change': 0.0,
+                        'change_percent': 0.0
+                    })
+
+            return {
+                'success': True,
+                'data': market_indices,
+                'message': 'Showing top suggested stocks (Fyers API not authenticated)',
+                'last_updated': datetime.now().isoformat()
+            }
+
+        except Exception as e:
+            logger.error(f"Error fetching market overview from DB: {str(e)}")
+            return {
+                'success': True,
+                'data': [],
+                'message': 'No market data available. Please configure Fyers API credentials.',
+                'last_updated': datetime.now().isoformat()
+            }
+
     def get_portfolio_summary(self, user_id: int) -> Dict[str, Any]:
-        """Get portfolio summary metrics using real FYERS API data."""
+        """Get portfolio summary metrics using real FYERS API data or fallback."""
         try:
             # Get real data from multiple API endpoints
             funds_response = self.fyers_service.funds(user_id)
+
+            # Check if API authentication failed
+            if funds_response.get('status') == 'error' and funds_response.get('error_code') == -16:
+                # Return empty portfolio with message
+                return {
+                    'success': True,
+                    'data': {
+                        'total_value': 0.0,
+                        'available_cash': 0.0,
+                        'invested_amount': 0.0,
+                        'total_pnl': 0.0,
+                        'total_pnl_percent': 0.0,
+                        'day_pnl': 0.0,
+                        'day_pnl_percent': 0.0,
+                        'positions_count': 0,
+                        'holdings_count': 0
+                    },
+                    'message': 'Portfolio data unavailable. Please configure Fyers API credentials in .env file.',
+                    'last_updated': datetime.now().isoformat()
+                }
+
             positions_response = self.fyers_service.positions(user_id)
             holdings_response = self.fyers_service.holdings(user_id)
 
@@ -362,30 +436,13 @@ class FyersDashboardProvider(IDashboardProvider):
                     'last_updated': datetime.now().isoformat()
                 }
             
-            holdings = holdings_response.get('data', [])
+            # No historical P&L data available - requires daily portfolio snapshots
             chart_data = []
-            
-            # For each day, calculate approximate P&L
-            # Note: This is a simplified calculation. For accurate historical P&L,
-            # you would need to track daily portfolio snapshots
-            for i in range(days):
-                date = datetime.now() - timedelta(days=days-i-1)
-                
-                # Calculate approximate daily P&L based on current holdings
-                daily_pnl = 0
-                for holding in holdings:
-                    # Simplified calculation - in reality you'd need historical prices
-                    daily_pnl += holding.get('pnl', 0) * (0.8 + (i / days) * 0.4)  # Simulated progression
-                
-                chart_data.append({
-                    'date': date.strftime('%Y-%m-%d'),
-                    'pnl': round(daily_pnl, 2)
-                })
-            
+
             return {
                 'success': True,
                 'data': chart_data,
-                'note': 'P&L data is approximated based on current holdings',
+                'note': 'Historical P&L data not available. Requires daily portfolio snapshots.',
                 'last_updated': datetime.now().isoformat()
             }
             
@@ -413,8 +470,50 @@ class FyersDashboardProvider(IDashboardProvider):
 
             period_days = period_days_map.get(period, 30)
 
-            # Always use enhanced fallback for now until broker integration is complete
-            # This provides working portfolio performance visualization with proper period filters
+            # Try to get current portfolio data
+            portfolio_summary = self.get_portfolio_summary(user_id)
+
+            if portfolio_summary.get('success'):
+                summary_data = portfolio_summary.get('data', {})
+
+                # DashboardMetrics uses 'total_portfolio_value', 'total_pnl', 'daily_pnl'
+                portfolio_value = float(summary_data.get('total_portfolio_value', 0))
+                total_pnl = float(summary_data.get('total_pnl', 0))
+                daily_pnl = float(summary_data.get('daily_pnl', 0))
+
+                # Always return portfolio value, even if it's 0
+                return_percent = (total_pnl / portfolio_value * 100) if portfolio_value > 0 else 0.0
+                day_return_percent = (daily_pnl / portfolio_value * 100) if portfolio_value > 0 else 0.0
+
+                performance_data = {
+                    'return_percent': round(return_percent, 2),
+                    'annualized_return': 0.0,  # Would need historical snapshots
+                    'total_pnl': round(total_pnl, 2),
+                    'portfolio_value': round(portfolio_value, 2),
+                    'period': period,
+                    'period_days': period_days,
+                    'win_rate': 0.0,
+                    'sharpe_ratio': 0.0,
+                    'max_drawdown': 0.0,
+                    'volatility': 0.0,
+                    'best_day': 0.0,
+                    'worst_day': 0.0,
+                    'total_trading_days': 0,
+                    'chart_data': []
+                }
+
+                note = 'Showing current portfolio metrics. Historical performance tracking requires daily snapshots.'
+                if portfolio_value == 0:
+                    note = 'No portfolio data available. Add positions or holdings to track performance.'
+
+                return {
+                    'success': True,
+                    'data': performance_data,
+                    'note': note,
+                    'last_updated': datetime.now().isoformat()
+                }
+
+            # Fallback to empty metrics if no portfolio data
             return self._get_enhanced_fallback_metrics(user_id, period, period_days)
 
         except Exception as e:
@@ -455,33 +554,14 @@ class FyersDashboardProvider(IDashboardProvider):
 
     def _get_enhanced_fallback_metrics(self, user_id: int, period: str, period_days: int) -> Dict[str, Any]:
         """Get enhanced fallback metrics when no historical data is available."""
-        from datetime import datetime, timedelta
+        from datetime import datetime
 
-        # Create sample data for new users to show working functionality
-        base_value = 100000  # Base portfolio value
-
-        # Generate sample chart data based on period
-        chart_data = []
-        current_date = datetime.now()
-
-        for i in range(max(1, period_days)):
-            date = current_date - timedelta(days=period_days - i - 1)
-            # Create sample progressive data
-            daily_return = 0.001 * i  # Small progressive returns
-            value = base_value * (1 + daily_return)
-
-            chart_data.append({
-                'date': date.strftime('%Y-%m-%d'),
-                'value': round(value, 2),
-                'return': round(daily_return * 100, 2),
-                'drawdown': 0.0
-            })
-
+        # Return empty data - no mock/sample data
         performance_data = {
-            'return_percent': 0.1 * period_days,  # Small positive return based on period
-            'annualized_return': 1.2,  # 1.2% annualized
-            'total_pnl': base_value * 0.001 * period_days,  # Small positive PnL
-            'portfolio_value': base_value,
+            'return_percent': 0.0,
+            'annualized_return': 0.0,
+            'total_pnl': 0.0,
+            'portfolio_value': 0.0,
             'period': period,
             'period_days': period_days,
             'win_rate': 0.0,
@@ -491,13 +571,13 @@ class FyersDashboardProvider(IDashboardProvider):
             'best_day': 0.0,
             'worst_day': 0.0,
             'total_trading_days': 0,
-            'chart_data': chart_data
+            'chart_data': []
         }
 
         return {
             'success': True,
             'data': performance_data,
-            'note': f'Sample data for {period} period - Connect broker to see real performance',
+            'note': 'No portfolio data available. Add positions or holdings to track performance.',
             'last_updated': datetime.now().isoformat()
         }
 

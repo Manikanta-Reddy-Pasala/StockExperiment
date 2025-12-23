@@ -201,10 +201,13 @@ class TechnicalIndicatorsService:
 
     def _calculate_all_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Calculate comprehensive set of 20+ technical indicators for stock analysis.
+        Calculate 8-21 EMA strategy indicators.
 
-        This method computes trend, momentum, volatility, and volume indicators that are
-        essential for technical analysis and algorithmic trading strategies.
+        This simplified method calculates only the indicators needed for the
+        pure 8-21 EMA swing trading strategy:
+        - EMA 8 & 21 (core strategy)
+        - DeMarker oscillator (entry timing)
+        - SMA 50 & 200 (context)
 
         Args:
             df: DataFrame with columns ['date', 'open', 'high', 'low', 'close', 'volume']
@@ -216,104 +219,76 @@ class TechnicalIndicatorsService:
         # Create a copy to avoid modifying original data
         indicators = df.copy()
 
-        # ===== TREND INDICATORS - Moving Averages =====
-        # Simple Moving Average (SMA): Average price over N periods
-        # Formula: SMA = Sum(Close prices for N periods) / N
-        # Usage: Identifies trend direction; price above SMA = bullish, below = bearish
-        indicators['sma_5'] = df['close'].rolling(window=5).mean()    # Very short-term trend
-        indicators['sma_10'] = df['close'].rolling(window=10).mean()  # Short-term trend
-        indicators['sma_20'] = df['close'].rolling(window=20).mean()  # Medium-term trend
-        indicators['sma_50'] = df['close'].rolling(window=50).mean()  # Intermediate trend
-        indicators['sma_100'] = df['close'].rolling(window=100).mean() # Long-term trend
-        indicators['sma_200'] = df['close'].rolling(window=200).mean() # Major trend (bull/bear market)
+        # ===== 8-21 EMA STRATEGY - CORE INDICATORS =====
 
-        # Exponential Moving Average (EMA): Weighted average giving more weight to recent prices
-        # Formula: EMA = (Close × α) + (Previous_EMA × (1 - α)), where α = 2/(span+1)
-        # Usage: More responsive to recent price changes than SMA
-        indicators['ema_12'] = df['close'].ewm(span=12, adjust=False).mean()  # Fast EMA for MACD
-        indicators['ema_26'] = df['close'].ewm(span=26, adjust=False).mean()  # Slow EMA for MACD
-        indicators['ema_50'] = df['close'].ewm(span=50, adjust=False).mean()  # Medium-term trend
+        # EMA 8: Fast exponential moving average (8-day)
+        # Used to identify short-term momentum
+        indicators['ema_8'] = df['close'].ewm(span=8, adjust=False).mean()
 
-        # ===== MOMENTUM INDICATORS =====
+        # EMA 21: Slow exponential moving average (21-day)
+        # Represents institutional holding period, acts as dynamic support/resistance
+        indicators['ema_21'] = df['close'].ewm(span=21, adjust=False).mean()
 
-        # RSI (Relative Strength Index): Measures speed and magnitude of price changes
-        # Range: 0-100; >70 = overbought, <30 = oversold
-        indicators['rsi_14'] = self._calculate_rsi(df['close'], 14)
+        # DeMarker Oscillator: Measures buying/selling pressure (14-period)
+        # Range: 0-1; <0.30 = oversold (buy opportunity), >0.70 = overbought (avoid)
+        indicators['demarker'] = self._calculate_demarker(df, period=14)
 
-        # MACD (Moving Average Convergence Divergence): Trend-following momentum indicator
-        # MACD Line = EMA(12) - EMA(26)
-        # Signal Line = EMA(9) of MACD
-        # Histogram = MACD - Signal (shows momentum strength)
-        macd_data = self._calculate_macd(df['close'])
-        indicators['macd'] = macd_data['macd']              # Difference between fast and slow EMA
-        indicators['macd_signal'] = macd_data['signal']     # 9-period EMA of MACD (trigger line)
-        indicators['macd_histogram'] = macd_data['histogram'] # MACD - Signal (momentum strength)
+        # ===== CONTEXT INDICATORS (OPTIONAL) =====
 
-        # ===== VOLATILITY INDICATORS =====
+        # SMA 50: Medium-term trend confirmation
+        # Price above SMA 50 confirms uptrend
+        indicators['sma_50'] = df['close'].rolling(window=50).mean()
 
-        # ATR (Average True Range): Measures market volatility
-        # True Range = max(High-Low, |High-PrevClose|, |Low-PrevClose|)
-        # ATR = Average of True Range over N periods
-        atr_data = self._calculate_atr(df, 14)
-        indicators['atr_14'] = atr_data['atr']  # Absolute volatility measure
-        # ATR Percentage: ATR relative to price (normalized across different price levels)
-        # Formula: (ATR / Close) × 100
-        indicators['atr_percentage'] = (atr_data['atr'] / df['close']) * 100
-
-        # Bollinger Bands: Volatility bands around moving average
-        # Middle Band = SMA(20)
-        # Upper Band = SMA(20) + (2 × StdDev)
-        # Lower Band = SMA(20) - (2 × StdDev)
-        # Usage: Price near upper band = overbought, near lower = oversold
-        bb_data = self._calculate_bollinger_bands(df['close'], 20, 2)
-        indicators['bb_upper'] = bb_data['upper']   # Upper volatility band
-        indicators['bb_middle'] = bb_data['middle'] # 20-period SMA (baseline)
-        indicators['bb_lower'] = bb_data['lower']   # Lower volatility band
-        # BB Width: Measures band expansion/contraction
-        # Formula: ((Upper - Lower) / Middle) × 100
-        # High width = high volatility, Low width = low volatility (squeeze)
-        indicators['bb_width'] = ((bb_data['upper'] - bb_data['lower']) / bb_data['middle']) * 100
-
-        # ===== TREND STRENGTH INDICATORS =====
-
-        # ADX (Average Directional Index): Measures trend strength (not direction)
-        # Range: 0-100; >25 = trending, <20 = ranging/choppy
-        indicators['adx_14'] = self._calculate_adx(df, 14)
-
-        # ===== VOLUME INDICATORS =====
-
-        # OBV (On Balance Volume): Cumulative volume-based momentum indicator
-        # If Close > Prev_Close: OBV += Volume
-        # If Close < Prev_Close: OBV -= Volume
-        # If Close = Prev_Close: OBV unchanged
-        # Usage: Rising OBV = buying pressure, Falling OBV = selling pressure
-        indicators['obv'] = self._calculate_obv(df['close'], df['volume'])
-
-        # Volume SMA: Average volume over 20 periods
-        indicators['volume_sma_20'] = df['volume'].rolling(window=20).mean()
-
-        # Volume Ratio: Current volume relative to average
-        # Formula: Current_Volume / SMA_Volume(20)
-        # >1 = above average volume, <1 = below average
-        indicators['volume_ratio'] = df['volume'] / indicators['volume_sma_20']
-
-        # ===== CUSTOM MOMENTUM INDICATORS =====
-
-        # Price Momentum: Percentage change over N periods
-        # Formula: ((Close / Close_N_periods_ago) - 1) × 100
-        # Positive = upward momentum, Negative = downward momentum
-        indicators['price_momentum_5d'] = ((df['close'] / df['close'].shift(5)) - 1) * 100   # 1-week momentum
-        indicators['price_momentum_20d'] = ((df['close'] / df['close'].shift(20)) - 1) * 100 # 1-month momentum
-
-        # Volatility Rank: Percentile rank of current ATR vs last 252 days (1 year)
-        # Formula: Percentile_Rank(ATR_14, 252 periods) × 100
-        # Range: 0-100; High rank = current volatility is high relative to past year
-        indicators['volatility_rank'] = indicators['atr_14'].rolling(window=252).rank(pct=True) * 100
+        # SMA 200: Major trend identification (bull/bear market)
+        # Price above SMA 200 = bull market context
+        indicators['sma_200'] = df['close'].rolling(window=200).mean()
 
         # Metadata: Track how many data points were used for calculation
         indicators['data_points_used'] = len(df)
 
         return indicators
+
+    def _calculate_demarker(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
+        """
+        Calculate DeMarker oscillator (0-1 range).
+
+        DeMarker measures buying and selling pressure:
+        - < 0.30: Oversold (good buy opportunity during pullbacks)
+        - > 0.70: Overbought (potential pullback coming)
+        - 0.30-0.70: Neutral zone
+
+        Args:
+            df: DataFrame with high and low columns
+            period: Lookback period (default 14)
+
+        Returns:
+            Series with DeMarker values (0-1)
+        """
+        try:
+            # Calculate DeMax and DeMin
+            high_diff = df['high'].diff()
+            low_diff = df['low'].diff()
+
+            demax = high_diff.where(high_diff > 0, 0)
+            demin = (-low_diff).where(low_diff < 0, 0)
+
+            # Calculate SMA of DeMax and DeMin
+            demax_sma = demax.rolling(window=period).mean()
+            demin_sma = demin.rolling(window=period).mean()
+
+            # Calculate DeMarker
+            demarker = demax_sma / (demax_sma + demin_sma)
+
+            # Handle NaN and clamp to 0-1
+            demarker = demarker.fillna(0.5)  # Neutral if calculation fails
+            demarker = demarker.clip(0, 1)   # Ensure 0-1 range
+
+            return demarker
+
+        except Exception as e:
+            logger.error(f"Error calculating DeMarker: {e}")
+            # Return neutral values (0.5) on error
+            return pd.Series([0.5] * len(df), index=df.index)
 
     def _calculate_rsi(self, prices: pd.Series, period: int = 14) -> pd.Series:
         """Calculate Relative Strength Index."""
@@ -425,12 +400,8 @@ class TechnicalIndicatorsService:
                         ).first()
 
                         if existing:
-                            # Update existing record
-                            for column in ['sma_5', 'sma_10', 'sma_20', 'sma_50', 'sma_100', 'sma_200',
-                                         'ema_12', 'ema_26', 'ema_50', 'rsi_14', 'macd', 'macd_signal',
-                                         'macd_histogram', 'atr_14', 'atr_percentage', 'bb_upper', 'bb_middle',
-                                         'bb_lower', 'bb_width', 'adx_14', 'obv', 'volume_sma_20', 'volume_ratio',
-                                         'price_momentum_5d', 'price_momentum_20d', 'volatility_rank']:
+                            # Update existing record with 8-21 EMA strategy indicators
+                            for column in ['ema_8', 'ema_21', 'demarker', 'sma_50', 'sma_200']:
                                 if column in row and pd.notna(row[column]):
                                     setattr(existing, column, float(row[column]))
 
@@ -445,45 +416,14 @@ class TechnicalIndicatorsService:
                                     symbol=symbol,
                                     date=row['date'],
 
-                                    # Moving Averages
-                                    sma_5=float(row['sma_5']) if pd.notna(row['sma_5']) else None,
-                                    sma_10=float(row['sma_10']) if pd.notna(row['sma_10']) else None,
-                                    sma_20=float(row['sma_20']) if pd.notna(row['sma_20']) else None,
-                                    sma_50=float(row['sma_50']) if pd.notna(row['sma_50']) else None,
-                                    sma_100=float(row['sma_100']) if pd.notna(row['sma_100']) else None,
-                                    sma_200=float(row['sma_200']) if pd.notna(row['sma_200']) else None,
+                                    # 8-21 EMA Strategy Indicators (Core)
+                                    ema_8=float(row['ema_8']) if 'ema_8' in row and pd.notna(row['ema_8']) else None,
+                                    ema_21=float(row['ema_21']) if 'ema_21' in row and pd.notna(row['ema_21']) else None,
+                                    demarker=float(row['demarker']) if 'demarker' in row and pd.notna(row['demarker']) else None,
 
-                                    # Exponential Moving Averages
-                                    ema_12=float(row['ema_12']) if pd.notna(row['ema_12']) else None,
-                                    ema_26=float(row['ema_26']) if pd.notna(row['ema_26']) else None,
-                                    ema_50=float(row['ema_50']) if pd.notna(row['ema_50']) else None,
-
-                                    # Momentum Indicators
-                                    rsi_14=float(row['rsi_14']) if pd.notna(row['rsi_14']) else None,
-                                    macd=float(row['macd']) if pd.notna(row['macd']) else None,
-                                    macd_signal=float(row['macd_signal']) if pd.notna(row['macd_signal']) else None,
-                                    macd_histogram=float(row['macd_histogram']) if pd.notna(row['macd_histogram']) else None,
-
-                                    # Volatility Indicators
-                                    atr_14=float(row['atr_14']) if pd.notna(row['atr_14']) else None,
-                                    atr_percentage=float(row['atr_percentage']) if pd.notna(row['atr_percentage']) else None,
-                                    bb_upper=float(row['bb_upper']) if pd.notna(row['bb_upper']) else None,
-                                    bb_middle=float(row['bb_middle']) if pd.notna(row['bb_middle']) else None,
-                                    bb_lower=float(row['bb_lower']) if pd.notna(row['bb_lower']) else None,
-                                    bb_width=float(row['bb_width']) if pd.notna(row['bb_width']) else None,
-
-                                    # Trend Indicators
-                                    adx_14=float(row['adx_14']) if pd.notna(row['adx_14']) else None,
-
-                                    # Volume Indicators
-                                    obv=float(row['obv']) if pd.notna(row['obv']) else None,
-                                    volume_sma_20=float(row['volume_sma_20']) if pd.notna(row['volume_sma_20']) else None,
-                                    volume_ratio=float(row['volume_ratio']) if pd.notna(row['volume_ratio']) else None,
-
-                                    # Custom Indicators
-                                    price_momentum_5d=float(row['price_momentum_5d']) if pd.notna(row['price_momentum_5d']) else None,
-                                    price_momentum_20d=float(row['price_momentum_20d']) if pd.notna(row['price_momentum_20d']) else None,
-                                    volatility_rank=float(row['volatility_rank']) if pd.notna(row['volatility_rank']) else None,
+                                    # Context Indicators (Optional)
+                                    sma_50=float(row['sma_50']) if 'sma_50' in row and pd.notna(row['sma_50']) else None,
+                                    sma_200=float(row['sma_200']) if 'sma_200' in row and pd.notna(row['sma_200']) else None,
 
                                     # Metadata
                                     data_points_used=int(row['data_points_used']),

@@ -78,44 +78,14 @@ class TechnicalIndicators(Base):
     symbol = Column(String(50), nullable=False, index=True)
     date = Column(Date, nullable=False, index=True)
 
-    # Moving Averages
-    sma_5 = Column(Float)
-    sma_10 = Column(Float)
-    sma_20 = Column(Float)
-    sma_50 = Column(Float)
-    sma_100 = Column(Float)
-    sma_200 = Column(Float)
+    # 8-21 EMA Strategy Indicators (Core)
+    ema_8 = Column(Float)      # Fast EMA (8-day) - REQUIRED for power zone
+    ema_21 = Column(Float)     # Slow EMA (21-day) - REQUIRED for power zone
+    demarker = Column(Float)   # DeMarker oscillator (0-1) - REQUIRED for entry timing
 
-    ema_12 = Column(Float)
-    ema_26 = Column(Float)
-    ema_50 = Column(Float)
-
-    # Momentum Indicators
-    rsi_14 = Column(Float)
-    macd = Column(Float)
-    macd_signal = Column(Float)
-    macd_histogram = Column(Float)
-
-    # Volatility Indicators
-    atr_14 = Column(Float)
-    atr_percentage = Column(Float)
-    bb_upper = Column(Float)  # Bollinger Bands
-    bb_middle = Column(Float)
-    bb_lower = Column(Float)
-    bb_width = Column(Float)
-
-    # Trend Indicators
-    adx_14 = Column(Float)
-
-    # Volume Indicators
-    obv = Column(Float)  # On Balance Volume
-    volume_sma_20 = Column(Float)
-    volume_ratio = Column(Float)  # Current volume vs 20-day average
-
-    # Custom indicators
-    price_momentum_5d = Column(Float)
-    price_momentum_20d = Column(Float)
-    volatility_rank = Column(Float)  # Percentile rank of volatility
+    # Context Indicators (Optional but useful)
+    sma_50 = Column(Float)     # Medium-term trend confirmation
+    sma_200 = Column(Float)    # Major trend identification (bull/bear market)
 
     # Calculation metadata
     calculation_date = Column(DateTime, default=datetime.utcnow)

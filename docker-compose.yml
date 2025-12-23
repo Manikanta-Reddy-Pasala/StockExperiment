@@ -75,7 +75,6 @@ services:
       - "5001:5001"
     volumes:
       - ./logs:/app/src/data/logs
-      - ./ml_models:/app/ml_models
     restart: unless-stopped
     networks:
       - trading_network
@@ -98,10 +97,10 @@ services:
       timeout: 5s
       retries: 5
 
-  # ML Scheduler for ML training and daily snapshots
-  ml_scheduler:
+  # Technical Indicators Scheduler for technical analysis and daily stock picks
+  technical_scheduler:
     build: .
-    container_name: trading_system_ml_scheduler
+    container_name: trading_system_technical_scheduler
     depends_on:
       database:
         condition: service_healthy
@@ -148,7 +147,6 @@ services:
       - VOLATILITY_FULL_REFRESH=${VOLATILITY_FULL_REFRESH:-false}
     volumes:
       - ./logs:/app/logs
-      - ./ml_models:/app/ml_models
     restart: unless-stopped
     networks:
       - trading_network

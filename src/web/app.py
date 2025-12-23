@@ -17,7 +17,6 @@ try:
     from ..services.core.broker_service import get_broker_service
     from ..services.core.dashboard_service import get_dashboard_service
     from ..services.portfolio.portfolio_service import get_portfolio_service
-    from ..services.market.stock_screening_service import get_stock_screening_service, StrategyType
     from ..utils.api_logger import APILogger, log_flask_route
 except ImportError:
     # Fall back to absolute imports (for testing)
@@ -29,7 +28,6 @@ except ImportError:
     from services.core.broker_service import get_broker_service
     from services.core.dashboard_service import get_dashboard_service
     from services.portfolio.portfolio_service import get_portfolio_service
-    from services.market.stock_screening_service import get_stock_screening_service, StrategyType
     from utils.api_logger import APILogger, log_flask_route
 from datetime import datetime
 import secrets
@@ -91,7 +89,6 @@ def create_app():
     broker_service = get_broker_service()
     dashboard_service = get_dashboard_service()
     portfolio_service = get_portfolio_service()
-    stock_screening_service = get_stock_screening_service(broker_service)
     
     # Initialize new services
     from ..services.utils.cache_service import get_cache_service
@@ -112,32 +109,8 @@ def create_app():
     except Exception as e:
         app.logger.warning(f"Could not register FYERS refresh callback: {e}")
 
-    # Check ML models on startup (training will happen after pipeline completes)
-    try:
-        app.logger.info("🤖 Checking ML models on startup...")
-        from pathlib import Path
-
-        model_dir = Path('ml_models')
-        models_exist = (
-            model_dir.exists() and
-            (model_dir / 'rf_price_model.pkl').exists() and
-            (model_dir / 'rf_risk_model.pkl').exists() and
-            (model_dir / 'metadata.pkl').exists()
-        )
-
-        if not models_exist:
-            app.logger.warning("⚠️  ML models not found. Will train after pipeline completes.")
-        else:
-            app.logger.info("✅ ML models found and ready to use")
-            import pickle
-            try:
-                with open(model_dir / 'metadata.pkl', 'rb') as f:
-                    metadata = pickle.load(f)
-                app.logger.info(f"   Last trained: {metadata.get('trained_at', 'Unknown')}")
-            except:
-                pass
-    except Exception as e:
-        app.logger.warning(f"⚠️  Could not check ML models: {e}")
+    # Technical indicators system - no ML models needed
+    app.logger.info("📊 Using technical indicator system (RS Rating + Wave Indicators)")
 
     # Initialize stock initialization service with complete flow
     try:
@@ -167,37 +140,9 @@ def create_app():
                     saga = get_pipeline_saga()
                     status = saga.get_pipeline_status()
 
-                    # Train ML models after pipeline completes (if models don't exist)
-                    from pathlib import Path
-                    model_dir = Path('ml_models')
-                    models_exist = (
-                        model_dir.exists() and
-                        (model_dir / 'rf_price_model.pkl').exists() and
-                        (model_dir / 'rf_risk_model.pkl').exists() and
-                        (model_dir / 'metadata.pkl').exists()
-                    )
-
-                    if not models_exist:
-                        app.logger.info("🤖 Pipeline complete. Starting ML model training...")
-                        try:
-                            from src.services.ml.enhanced_stock_predictor import EnhancedStockPredictor
-                            db_mgr = get_database_manager()
-                            with db_mgr.get_session() as session:
-                                predictor = EnhancedStockPredictor(session, auto_load=False)
-                                app.logger.info("📊 Training enhanced models with 365 days + walk-forward CV...")
-                                stats = predictor.train_with_walk_forward(lookback_days=365, n_splits=5)
-
-                                app.logger.info("✅ ML Training Complete!")
-                                app.logger.info(f"   Training Samples: {stats['samples']:,}")
-                                app.logger.info(f"   Features Used: {stats['features']}")
-                                app.logger.info(f"   Price Model R²: {stats['price_r2']:.4f}")
-                                app.logger.info(f"   Risk Model R²: {stats['risk_r2']:.4f}")
-                                app.logger.info(f"   CV Price R²: {stats['cv_price_r2']:.4f}")
-                                app.logger.info(f"   CV Risk R²: {stats['cv_risk_r2']:.4f}")
-                        except Exception as ml_error:
-                            app.logger.error(f"❌ ML training failed: {ml_error}")
-                            import traceback
-                            app.logger.error(f"Stack trace: {traceback.format_exc()}")
+                    # ML training removed - now using technical indicators instead
+                    # Technical indicators are calculated by scheduler.py at 10:00 PM
+                    app.logger.info("✅ Pipeline complete. Technical indicators will be calculated by scheduler.")
                     
                     for step, info in status.items():
                         records = info.get('records_processed', 0)
@@ -358,16 +303,10 @@ def create_app():
         """Strategies page."""
         return render_template('strategies.html')
     
-    @app.route('/ml-prediction')
-    @login_required
-    def ml_prediction():
-        """ML Prediction page."""
-        return render_template('ml_prediction.html')
-    
     @app.route('/suggested_stocks')
     @login_required
     def suggested_stocks():
-        """Suggested stocks page - Triple Model View (Traditional ML + Raw LSTM + Kronos)."""
+        """Suggested stocks page - 8-21 EMA Swing Trading Strategy."""
         return render_template('suggested_stocks.html')
     
     @app.route('/reports')
@@ -1140,40 +1079,6 @@ def create_app():
             app.logger.error(f"Error getting suggested stocks for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
-    @app.route('/api/suggested-stocks/refresh', methods=['POST'])
-    @login_required
-    def api_refresh_suggested_stocks():
-        """Refresh suggested stocks by running screening again."""
-        try:
-            app.logger.info(f"Refreshing suggested stocks for user {current_user.id}")
-            data = request.get_json() or {}
-            strategies = data.get('strategies', [])
-            
-            strategy_types = [StrategyType(s) for s in strategies if s in StrategyType._value2member_map_]
-            if not strategy_types:
-                strategy_types = [StrategyType.DEFAULT_RISK, StrategyType.HIGH_RISK]
-
-            suggested_stocks = stock_screening_service.screen_stocks(strategy_types, current_user.id)
-            
-            stocks_data = [
-                {
-                    'symbol': stock.symbol, 'name': stock.name, 'selection_date': datetime.now().strftime('%Y-%m-%d'),
-                    'selection_price': round(stock.current_price, 2), 'current_price': round(stock.current_price, 2),
-                    'quantity': 10, 'investment': round(stock.current_price * 10, 2),
-                    'current_value': round(stock.current_price * 10, 2), 'strategy': stock.strategy, 'status': 'Active',
-                    'recommendation': stock.recommendation, 'target_price': round(stock.target_price, 2) if stock.target_price else None,
-                    'stop_loss': round(stock.stop_loss, 2) if stock.stop_loss else None, 'reason': stock.reason,
-                    'market_cap': round(stock.market_cap, 2), 'pe_ratio': round(stock.pe_ratio, 2) if stock.pe_ratio else None,
-                    'pb_ratio': round(stock.pb_ratio, 2) if stock.pb_ratio else None, 'roe': round(stock.roe * 100, 2) if stock.roe else None,
-                    'sales_growth': round(stock.sales_growth, 2) if stock.sales_growth else None
-                } for stock in suggested_stocks
-            ]
-            
-            return jsonify({'success': True, 'data': stocks_data, 'total': len(stocks_data), 'strategies': [s.value for s in strategy_types], 'refreshed_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')})
-        except Exception as e:
-            app.logger.error(f"Error refreshing suggested stocks for user {current_user.id}: {str(e)}")
-            return jsonify({'success': False, 'error': 'Internal server error'}), 500
-    
     # Settings API Routes
     @app.route('/api/settings', methods=['GET'])
     @login_required
@@ -1259,10 +1164,6 @@ def create_app():
             data = request.get_json()
             symbol = data.get('symbol')
             quantity = data.get('quantity', 1)
-            model_type = data.get('model_type', 'traditional')
-            strategy = data.get('strategy', 'default_risk')
-            ml_prediction_score = data.get('ml_prediction_score')
-            ml_price_target = data.get('ml_price_target')
 
             if not symbol:
                 return jsonify({'success': False, 'error': 'Symbol is required'}), 400
@@ -1273,11 +1174,7 @@ def create_app():
                 result = mock_trading_service.place_mock_order(
                     user_id=current_user.id,
                     symbol=symbol,
-                    quantity=quantity,
-                    model_type=model_type,
-                    strategy=strategy,
-                    ml_prediction_score=ml_prediction_score,
-                    ml_price_target=ml_price_target
+                    quantity=quantity
                 )
 
             if result['success']:
@@ -1294,8 +1191,6 @@ def create_app():
     def api_get_mock_orders():
         """Get mock orders for a user."""
         try:
-            model_type = request.args.get('model_type')
-            strategy = request.args.get('strategy')
             limit = int(request.args.get('limit', 50))
 
             from ..services.trading.mock_trading_service import get_mock_trading_service
@@ -1303,8 +1198,6 @@ def create_app():
                 mock_trading_service = get_mock_trading_service(session)
                 orders = mock_trading_service.get_mock_orders(
                     user_id=current_user.id,
-                    model_type=model_type,
-                    strategy=strategy,
                     limit=limit
                 )
 
@@ -1384,25 +1277,6 @@ def create_app():
     app.register_blueprint(fyers_bp)
     app.register_blueprint(zerodha_bp)
 
-
-    # Register ML prediction blueprints
-    try:
-        from .routes.ml import ml_bp, ml_web_bp
-        app.register_blueprint(ml_bp)  # API routes
-        app.register_blueprint(ml_web_bp)  # Web routes
-        app.logger.info("ML prediction routes registered successfully")
-    except ImportError as e:
-        app.logger.warning(f"ML prediction routes not available: {e}")
-        app.logger.warning("ML functionality will be disabled")
-
-    # Register ML screening blueprints
-    try:
-        from .routes.ml.screening_routes import screening_bp
-        app.register_blueprint(screening_bp)
-        app.logger.info("ML screening routes registered successfully")
-    except ImportError as e:
-        app.logger.warning(f"ML screening routes not available: {e}")
-        app.logger.warning("ML screening functionality will be disabled")
 
     # Register strategy blueprints
     try:

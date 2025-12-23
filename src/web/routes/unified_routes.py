@@ -17,12 +17,10 @@ logger = logging.getLogger(__name__)
 
 try:
     from ...services.interfaces.broker_feature_factory import get_broker_feature_factory
-    from ...services.interfaces.suggested_stocks_interface import StrategyType
     from ...services.interfaces.orders_interface import OrderType, OrderSide
     from ...services.interfaces.reports_interface import ReportType, ReportFormat
 except ImportError:
     from services.interfaces.broker_feature_factory import get_broker_feature_factory
-    from services.interfaces.suggested_stocks_interface import StrategyType
     from services.interfaces.orders_interface import OrderType, OrderSide
     from services.interfaces.reports_interface import ReportType, ReportFormat
 
@@ -248,34 +246,21 @@ def api_get_watchlist_quotes():
 @unified_bp.route('/suggested-stocks', methods=['GET'])
 @login_required
 def api_get_suggested_stocks():
-    """Get suggested stocks using user's selected broker."""
+    """Get suggested stocks using user's selected broker (single 8-21 EMA strategy)."""
     try:
-        strategies_list = request.args.getlist('strategies')
-        strategies = []
-        if strategies_list:
-            for s in strategies_list:
-                try:
-                    strategies.append(StrategyType(s))
-                except ValueError:
-                    logger.warning(f"Invalid strategy type: {s}")
-                    continue
-        
-        if not strategies:
-            strategies = None
-            
         limit = request.args.get('limit', 50, type=int)
-        time_filter = request.args.get('time_filter', 'week')  # For future use
-        
+
         factory = get_broker_feature_factory()
         provider = factory.get_suggested_stocks_provider(current_user.id)
-        
+
         if not provider:
             return jsonify({
                 'success': False,
                 'error': 'No suggested stocks provider available for your selected broker'
             }), 400
-        
-        result = provider.get_suggested_stocks(current_user.id, strategies, limit)
+
+        # Single unified strategy - no strategy filtering
+        result = provider.get_suggested_stocks(current_user.id, None, limit)
         return jsonify(result)
         
     except Exception as e:
@@ -314,28 +299,21 @@ def api_get_stock_analysis(symbol):
 @unified_bp.route('/suggested-stocks/strategy-performance', methods=['GET'])
 @login_required
 def api_get_strategy_performance():
-    """Get strategy performance using user's selected broker."""
+    """Get 8-21 EMA strategy performance."""
     try:
-        strategy_param = request.args.get('strategy')
         period = request.args.get('period', '1M')
-        
-        if not strategy_param:
-            return jsonify({
-                'success': False,
-                'error': 'Strategy parameter is required'
-            }), 400
-        
-        strategy = StrategyType(strategy_param)
+
         factory = get_broker_feature_factory()
         provider = factory.get_suggested_stocks_provider(current_user.id)
-        
+
         if not provider:
             return jsonify({
                 'success': False,
                 'error': 'No suggested stocks provider available for your selected broker'
             }), 400
-        
-        result = provider.get_strategy_performance(current_user.id, strategy, period)
+
+        # Single unified strategy - no strategy filtering
+        result = provider.get_strategy_performance(current_user.id, None, period)
         return jsonify(result)
         
     except Exception as e:

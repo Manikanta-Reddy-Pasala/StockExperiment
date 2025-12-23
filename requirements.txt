@@ -7,34 +7,33 @@ flask-restx==1.3.0
 flask-cors==4.0.0
 requests==2.31.0
 pyyaml==6.0.1
+
+# Data analysis for technical indicators
 pandas>=2.2.3
 numpy>=2.2.6
 pandas-ta>=0.4.71b0
+
+# Database
 sqlalchemy>=2.0.30
 psycopg[binary]>=3.1.0
+
+# Scheduling and utilities
 websocket-client==1.6.1
 schedule==1.2.0
 python-dateutil==2.8.2
 email-validator==2.0.0
+
+# Visualization (for backtesting reports)
 matplotlib>=3.8.3
 seaborn==0.12.2
-openai==1.3.0
-# Use latest compatible versions
+
+# Fyers API for NSE data
 fyers-apiv3==3.1.7
+protobuf>=5.29.3  # Required by fyers-apiv3
 PyJWT==2.8.0
 
-# ML dependencies for stock prediction - updated for Python 3.13
-scikit-learn>=1.4.2
-xgboost>=2.0.3
-optuna>=3.6.1
-tensorflow>=2.16.1
-protobuf>=5.29.3   # aligns TensorFlow (>=5.28.0) and fyers-apiv3 (==5.29.3)
-
-# Kronos foundation model dependencies
-torch>=2.0.0
-einops==0.8.1
-huggingface_hub>=0.33.1
-safetensors>=0.6.2
+# Optional: AI analysis (can be removed if not using OpenAI)
+openai==1.3.0
 
 # Testing
 pytest==7.4.0

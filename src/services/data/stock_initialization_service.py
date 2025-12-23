@@ -26,7 +26,6 @@ try:
     from ..data.fyers_symbol_service import get_fyers_symbol_service
     from ..data.volatility_calculation_service import get_volatility_calculation_service
     from ..data.fundamental_data_service import get_fundamental_data_service
-    from ..ml.stock_master_service import get_stock_master_service
 except ImportError:
     from src.services.core.unified_broker_service import get_unified_broker_service
     from src.models.database import get_database_manager
@@ -34,7 +33,6 @@ except ImportError:
     from src.services.data.fyers_symbol_service import get_fyers_symbol_service
     from src.services.data.volatility_calculation_service import get_volatility_calculation_service
     from src.services.data.fundamental_data_service import get_fundamental_data_service
-    from src.services.ml.stock_master_service import get_stock_master_service
 
 
 class StockInitializationService:
@@ -46,7 +44,6 @@ class StockInitializationService:
         self.fyers_service = get_fyers_symbol_service()
         self.volatility_service = get_volatility_calculation_service()
         self.fundamental_service = get_fundamental_data_service()
-        self.stock_master_service = get_stock_master_service()
         self.rate_limit_delay = 0.1  # 100ms between API calls (fast mode)
         self.batch_size = 50  # Process in medium batches for better success rate
 
@@ -812,8 +809,32 @@ class StockInitializationService:
                     'stocks_updated': 0
                 }
 
-            # Use stock master service to identify stocks needing volatility updates
-            stock_symbols_needing_update = self.stock_master_service._identify_stocks_needing_volatility_update("NSE")
+            # Identify stocks needing volatility updates
+            # Get stocks that don't have recent volatility data
+            with self.db_manager.get_session() as session:
+                from datetime import timedelta
+                cutoff_date = datetime.now().date() - timedelta(days=7)
+
+                # Get all NSE stocks
+                all_stocks = session.query(Stock.symbol).filter(
+                    Stock.exchange == 'NSE',
+                    Stock.is_active == True
+                ).all()
+                stock_symbols_needing_update = [s[0] for s in all_stocks]
+
+                # Filter out stocks that have recent volatility data
+                stocks_with_volatility = session.query(Stock.symbol).filter(
+                    Stock.exchange == 'NSE',
+                    Stock.is_active == True,
+                    Stock.last_updated >= cutoff_date,
+                    Stock.volatility.isnot(None)
+                ).all()
+                stocks_with_recent_volatility = set(s[0] for s in stocks_with_volatility)
+
+                stock_symbols_needing_update = [
+                    s for s in stock_symbols_needing_update
+                    if s not in stocks_with_recent_volatility
+                ]
 
             if not stock_symbols_needing_update:
                 logger.info("✅ All stocks have up-to-date volatility data")

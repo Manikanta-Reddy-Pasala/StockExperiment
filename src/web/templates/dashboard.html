@@ -68,31 +68,6 @@
     </div>
 </div>
 
-<!-- Market Sentiment Section (AI-Powered) -->
-<div class="row mb-5">
-    <div class="col-12">
-        <div class="card hover-lift animate-fade-in-up">
-            <div class="card-header bg-gradient-info text-white">
-                <h5 class="card-title mb-0 text-white">
-                    <i class="bi bi-lightbulb me-2"></i>Market Sentiment Analysis (AI-Powered)
-                </h5>
-            </div>
-            <div class="card-body" id="market-sentiment-container">
-                <div class="row">
-                    <div class="col-md-3">
-                        <div class="text-center">
-                            <div class="spinner-border text-primary mb-3" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <p class="text-muted">Analyzing market sentiment...</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Auto-Trading Performance Section -->
 <div class="row mb-5" id="auto-trading-section">
     <div class="col-12">
@@ -170,24 +145,6 @@
                     </div>
                     <div class="bg-gradient-warning rounded-3 p-3">
                         <i class="bi bi-hourglass-split text-white fs-3"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6">
-        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.4s;">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="flex-grow-1">
-                        <h6 class="text-muted mb-2 fw-semibold">Active Strategies</h6>
-                        <h2 class="fw-bold mb-0" id="active-strategies">0</h2>
-                        <small class="text-muted">
-                            <i class="bi bi-hourglass-split"></i> Loading...
-                        </small>
-                    </div>
-                    <div class="bg-gradient-success rounded-3 p-3">
-                        <i class="bi bi-cpu text-white fs-3"></i>
                     </div>
                 </div>
             </div>
@@ -361,24 +318,6 @@
             const portfolioValueElement = document.getElementById('portfolio-value');
             if (portfolioValueElement) {
                 portfolioValueElement.textContent = '₹' + data.total_portfolio_value.toFixed(2);
-            }
-
-            // Update active strategies
-            const activeStrategiesElement = document.getElementById('active-strategies');
-            if (activeStrategiesElement && data.active_strategies_count !== undefined) {
-                activeStrategiesElement.textContent = data.active_strategies_count;
-                
-                // Update the status text
-                const statusElement = activeStrategiesElement.parentElement.querySelector('small');
-                if (statusElement) {
-                    if (data.active_strategies_count > 0) {
-                        statusElement.innerHTML = '<i class="bi bi-lightning-fill"></i> Running strategies';
-                        statusElement.className = 'text-success';
-                    } else {
-                        statusElement.innerHTML = '<i class="bi bi-pause-circle"></i> No active strategies';
-                        statusElement.className = 'text-warning';
-                    }
-                }
             }
 
             // Update market data
@@ -1034,12 +973,12 @@
     function updatePortfolioChart(data) {
         const ctx = document.getElementById('portfolioChart');
         if (!ctx) return;
-        
-        // Destroy existing chart if it exists
-        if (window.portfolioChart) {
+
+        // Destroy existing chart if it exists and has destroy method
+        if (window.portfolioChart && typeof window.portfolioChart.destroy === 'function') {
             window.portfolioChart.destroy();
         }
-        
+
         window.portfolioChart = new Chart(ctx, {
             type: 'line',
             data: data,
@@ -1069,116 +1008,6 @@
         });
     }
     
-    // Fetch market sentiment
-    async function fetchMarketSentiment() {
-        try {
-            const response = await fetch('/api/suggested-stocks/market-sentiment');
-            const result = await response.json();
-
-            if (result.success) {
-                updateMarketSentimentUI(result);
-            } else {
-                showMarketSentimentError(result.error || 'Failed to load market sentiment');
-            }
-        } catch (error) {
-            console.error('Error fetching market sentiment:', error);
-            showMarketSentimentError('Network error loading market sentiment');
-        }
-    }
-
-    // Update market sentiment UI
-    function updateMarketSentimentUI(data) {
-        const container = document.getElementById('market-sentiment-container');
-        if (!container) return;
-
-        const sentimentIcon = data.emoji || '📊';
-        const sentimentType = data.sentiment_type || 'unknown';
-        const sentimentScore = data.sentiment_score || 0;
-        const confidence = data.confidence || 'low';
-        const recommendation = data.recommendation || 'No recommendation available';
-        const analysis = data.analysis || 'No analysis available';
-        const sourcesCount = data.sources_count || 0;
-        const color = data.color || 'secondary';
-
-        // Determine sentiment label
-        let sentimentLabel = 'Unknown';
-        if (sentimentType === 'greedy') {
-            sentimentLabel = 'GREEDY (Be Cautious)';
-        } else if (sentimentType === 'fear') {
-            sentimentLabel = 'FEAR (Opportunity)';
-        } else if (sentimentType === 'neutral') {
-            sentimentLabel = 'NEUTRAL (Balanced)';
-        }
-
-        container.innerHTML = `
-            <div class="row g-4">
-                <!-- Sentiment Indicator -->
-                <div class="col-md-3 text-center">
-                    <div class="sentiment-indicator mb-3" style="font-size: 4rem;">${sentimentIcon}</div>
-                    <h4 class="text-${color} fw-bold mb-2">${sentimentLabel}</h4>
-                    <div class="mb-2">
-                        <small class="text-muted">Confidence: </small>
-                        <span class="badge bg-${confidence === 'high' ? 'success' : confidence === 'medium' ? 'warning' : 'secondary'}">${confidence.toUpperCase()}</span>
-                    </div>
-                    <div>
-                        <small class="text-muted">Score: </small>
-                        <strong>${sentimentScore.toFixed(2)}</strong>
-                    </div>
-                    <div class="mt-2">
-                        <small class="text-muted"><i class="bi bi-newspaper me-1"></i>${sourcesCount} news sources</small>
-                    </div>
-                </div>
-
-                <!-- Recommendation -->
-                <div class="col-md-5">
-                    <h6 class="text-muted mb-3"><i class="bi bi-bookmark-star me-2"></i>AI Recommendation</h6>
-                    <div class="alert alert-${color} mb-3">
-                        <strong>${recommendation}</strong>
-                    </div>
-                    <h6 class="text-muted mb-2"><i class="bi bi-graph-up-arrow me-2"></i>Analysis</h6>
-                    <p class="small text-muted" style="white-space: pre-line;">${analysis}</p>
-                </div>
-
-                <!-- Quick Actions -->
-                <div class="col-md-4">
-                    <h6 class="text-muted mb-3"><i class="bi bi-lightning-charge me-2"></i>Quick Actions</h6>
-                    <div class="d-grid gap-2">
-                        <a href="/suggested-stocks" class="btn btn-primary btn-sm">
-                            <i class="bi bi-stars me-2"></i>View AI Stock Picks
-                        </a>
-                        <a href="/portfolio" class="btn btn-outline-primary btn-sm">
-                            <i class="bi bi-briefcase me-2"></i>Manage Portfolio
-                        </a>
-                        <button class="btn btn-outline-secondary btn-sm" onclick="fetchMarketSentiment()">
-                            <i class="bi bi-arrow-repeat me-2"></i>Refresh Sentiment
-                        </button>
-                    </div>
-                    <div class="mt-3 small text-muted">
-                        <i class="bi bi-info-circle me-1"></i>
-                        Powered by Ollama AI analyzing real-time market data from multiple sources.
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    // Show error state for market sentiment
-    function showMarketSentimentError(message) {
-        const container = document.getElementById('market-sentiment-container');
-        if (!container) return;
-
-        container.innerHTML = `
-            <div class="text-center text-warning py-4">
-                <i class="bi bi-exclamation-triangle fs-1 mb-3"></i>
-                <h5>Unable to Load Market Sentiment</h5>
-                <p class="text-muted">${message}</p>
-                <button class="btn btn-sm btn-outline-warning" onclick="fetchMarketSentiment()">
-                    <i class="bi bi-arrow-repeat me-2"></i>Try Again
-                </button>
-            </div>
-        `;
-    }
-
     // ============================================
     // AUTO-TRADING PERFORMANCE FUNCTIONS
     // ============================================
@@ -1405,7 +1234,6 @@
     document.addEventListener('DOMContentLoaded', function() {
         fetchDashboardMetrics();
         fetchMarketOverview();
-        fetchMarketSentiment();
         fetchPortfolioHoldings();
         fetchRecentOrders();
         fetchAutoTradingPerformance(); // Fetch auto-trading performance

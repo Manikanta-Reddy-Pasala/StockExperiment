@@ -25,11 +25,7 @@ class MockTradingService:
         self,
         user_id: int,
         symbol: str,
-        quantity: int,
-        model_type: str,
-        strategy: str,
-        ml_prediction_score: Optional[float] = None,
-        ml_price_target: Optional[float] = None
+        quantity: int
     ) -> Dict:
         """
         Place a mock order for evaluation purposes.
@@ -38,10 +34,6 @@ class MockTradingService:
             user_id: User ID
             symbol: Stock symbol (e.g., 'RELIANCE-EQ')
             quantity: Number of shares
-            model_type: 'traditional' or 'raw_lstm'
-            strategy: 'default_risk' or 'high_risk'
-            ml_prediction_score: ML prediction score at time of order
-            ml_price_target: Price target from ML model
 
         Returns:
             Dict with order details and status
@@ -87,18 +79,13 @@ class MockTradingService:
                 status='COMPLETED',  # Mock orders are instantly "completed"
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
-                is_mock_order=True,
-                model_type=model_type,
-                strategy=strategy,
-                ml_prediction_score=ml_prediction_score,
-                ml_price_target=ml_price_target
+                is_mock_order=True
             )
 
             self.session.add(order)
             self.session.commit()
 
-            logger.info(f"Mock order placed: {symbol} x{quantity} @ ₹{current_price:.2f} "
-                       f"(Model: {model_type}, Strategy: {strategy})")
+            logger.info(f"Mock order placed: {symbol} x{quantity} @ ₹{current_price:.2f}")
 
             return {
                 'success': True,
@@ -107,10 +94,6 @@ class MockTradingService:
                 'quantity': quantity,
                 'price': current_price,
                 'total_value': total_value,
-                'model_type': model_type,
-                'strategy': strategy,
-                'ml_prediction_score': ml_prediction_score,
-                'ml_price_target': ml_price_target,
                 'created_at': order.created_at.isoformat()
             }
 
@@ -125,8 +108,6 @@ class MockTradingService:
     def get_mock_orders(
         self,
         user_id: int,
-        model_type: Optional[str] = None,
-        strategy: Optional[str] = None,
         limit: int = 50
     ) -> List[Dict]:
         """
@@ -134,8 +115,6 @@ class MockTradingService:
 
         Args:
             user_id: User ID
-            model_type: Filter by model type ('traditional' or 'raw_lstm')
-            strategy: Filter by strategy ('default_risk' or 'high_risk')
             limit: Maximum number of orders to return
 
         Returns:
@@ -148,12 +127,6 @@ class MockTradingService:
                     Order.is_mock_order == True
                 )
             )
-
-            if model_type:
-                query = query.filter(Order.model_type == model_type)
-
-            if strategy:
-                query = query.filter(Order.strategy == strategy)
 
             orders = query.order_by(desc(Order.created_at)).limit(limit).all()
 
@@ -178,10 +151,6 @@ class MockTradingService:
                     'current_price': current_price,
                     'pnl': pnl,
                     'pnl_percent': pnl_percent,
-                    'model_type': order.model_type,
-                    'strategy': order.strategy,
-                    'ml_prediction_score': order.ml_prediction_score,
-                    'ml_price_target': order.ml_price_target,
                     'created_at': order.created_at.isoformat() if order.created_at else None
                 })
 
@@ -191,15 +160,15 @@ class MockTradingService:
             logger.error(f"Failed to retrieve mock orders: {e}", exc_info=True)
             return []
 
-    def calculate_model_performance(self, user_id: int) -> Dict:
+    def calculate_performance(self, user_id: int) -> Dict:
         """
-        Calculate performance metrics for each model/strategy combination.
+        Calculate overall performance metrics.
 
         Args:
             user_id: User ID
 
         Returns:
-            Dict with performance metrics for each combination
+            Dict with performance metrics
         """
         try:
             orders = self.get_mock_orders(user_id, limit=1000)
@@ -210,66 +179,32 @@ class MockTradingService:
                     'error': 'No mock orders found'
                 }
 
-            # Group by model_type and strategy
-            performance = {}
+            # Calculate overall metrics
+            total_orders = len(orders)
+            total_invested = sum(o['entry_price'] * o['quantity'] for o in orders)
 
-            for combination in [
-                ('traditional', 'default_risk'),
-                ('traditional', 'high_risk'),
-                ('raw_lstm', 'default_risk'),
-                ('raw_lstm', 'high_risk')
-            ]:
-                model_type, strategy = combination
-                key = f"{model_type}_{strategy}"
+            valid_pnl_orders = [o for o in orders if o['pnl'] is not None]
+            total_pnl = sum(o['pnl'] for o in valid_pnl_orders)
 
-                # Filter orders for this combination
-                combo_orders = [
-                    o for o in orders
-                    if o['model_type'] == model_type and o['strategy'] == strategy
-                ]
+            valid_pnl_percent_orders = [o for o in orders if o['pnl_percent'] is not None]
+            avg_pnl_percent = (
+                sum(o['pnl_percent'] for o in valid_pnl_percent_orders) / len(valid_pnl_percent_orders)
+                if valid_pnl_percent_orders else 0
+            )
 
-                if not combo_orders:
-                    performance[key] = {
-                        'model_type': model_type,
-                        'strategy': strategy,
-                        'total_orders': 0,
-                        'total_invested': 0,
-                        'total_pnl': 0,
-                        'avg_pnl_percent': 0,
-                        'winning_orders': 0,
-                        'losing_orders': 0,
-                        'win_rate': 0
-                    }
-                    continue
+            winning_orders = sum(1 for o in valid_pnl_orders if o['pnl'] > 0)
+            losing_orders = sum(1 for o in valid_pnl_orders if o['pnl'] < 0)
+            win_rate = (winning_orders / len(valid_pnl_orders) * 100) if valid_pnl_orders else 0
 
-                # Calculate metrics
-                total_orders = len(combo_orders)
-                total_invested = sum(o['entry_price'] * o['quantity'] for o in combo_orders)
-
-                valid_pnl_orders = [o for o in combo_orders if o['pnl'] is not None]
-                total_pnl = sum(o['pnl'] for o in valid_pnl_orders)
-
-                valid_pnl_percent_orders = [o for o in combo_orders if o['pnl_percent'] is not None]
-                avg_pnl_percent = (
-                    sum(o['pnl_percent'] for o in valid_pnl_percent_orders) / len(valid_pnl_percent_orders)
-                    if valid_pnl_percent_orders else 0
-                )
-
-                winning_orders = sum(1 for o in valid_pnl_orders if o['pnl'] > 0)
-                losing_orders = sum(1 for o in valid_pnl_orders if o['pnl'] < 0)
-                win_rate = (winning_orders / len(valid_pnl_orders) * 100) if valid_pnl_orders else 0
-
-                performance[key] = {
-                    'model_type': model_type,
-                    'strategy': strategy,
-                    'total_orders': total_orders,
-                    'total_invested': round(total_invested, 2),
-                    'total_pnl': round(total_pnl, 2),
-                    'avg_pnl_percent': round(avg_pnl_percent, 2),
-                    'winning_orders': winning_orders,
-                    'losing_orders': losing_orders,
-                    'win_rate': round(win_rate, 2)
-                }
+            performance = {
+                'total_orders': total_orders,
+                'total_invested': round(total_invested, 2),
+                'total_pnl': round(total_pnl, 2),
+                'avg_pnl_percent': round(avg_pnl_percent, 2),
+                'winning_orders': winning_orders,
+                'losing_orders': losing_orders,
+                'win_rate': round(win_rate, 2)
+            }
 
             return {
                 'success': True,
@@ -277,29 +212,25 @@ class MockTradingService:
             }
 
         except Exception as e:
-            logger.error(f"Failed to calculate model performance: {e}", exc_info=True)
+            logger.error(f"Failed to calculate performance: {e}", exc_info=True)
             return {
                 'success': False,
                 'error': str(e)
             }
 
-    def get_suggested_stock_details(self, symbol: str, strategy: str) -> Optional[Dict]:
+    def get_suggested_stock_details(self, symbol: str) -> Optional[Dict]:
         """
-        Get ML prediction details for a suggested stock.
+        Get EMA strategy details for a suggested stock.
 
         Args:
             symbol: Stock symbol
-            strategy: Strategy name
 
         Returns:
-            Dict with ML prediction details or None
+            Dict with EMA strategy details or None
         """
         try:
             suggested = self.session.query(DailySuggestedStock).filter(
-                and_(
-                    DailySuggestedStock.symbol == symbol,
-                    DailySuggestedStock.strategy == strategy
-                )
+                DailySuggestedStock.symbol == symbol
             ).order_by(desc(DailySuggestedStock.date)).first()
 
             if not suggested:
@@ -307,10 +238,11 @@ class MockTradingService:
 
             return {
                 'symbol': suggested.symbol,
-                'model_type': suggested.model_type,
                 'strategy': suggested.strategy,
-                'ml_prediction_score': suggested.ml_prediction_score,
-                'ml_price_target': suggested.ml_price_target,
+                'rank': suggested.rank,
+                'selection_score': suggested.selection_score,
+                'target_price': suggested.target_price,
+                'stop_loss': suggested.stop_loss,
                 'date': suggested.date.isoformat() if suggested.date else None
             }
 

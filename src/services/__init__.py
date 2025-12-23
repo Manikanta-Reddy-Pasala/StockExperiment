@@ -5,7 +5,7 @@ This package contains all business logic services organized into logical modules
 
 - core/       : Core business services (users, orders, strategies, brokers)
 - brokers/    : Broker integration services (Fyers, Zerodha)
-- ml/         : Machine learning and AI services
+- technical/  : Technical indicator calculation services
 - data/       : Data management and synchronization services
 - portfolio/  : Portfolio management and tracking services
 - market/     : Market data and stock screening services
@@ -37,9 +37,6 @@ from .utils import (
     get_cache_service
 )
 
-# ML services (imported directly due to their specific nature)
-from .ml.stock_discovery_service import get_stock_discovery_service
-
 __all__ = [
     # Core services
     'get_user_service',
@@ -54,11 +51,6 @@ __all__ = [
     # Portfolio services
     'get_portfolio_service',
 
-    # Market services removed - not used
-
     # Utility services
     'get_cache_service',
-
-    # ML services
-    'get_stock_discovery_service'
 ]

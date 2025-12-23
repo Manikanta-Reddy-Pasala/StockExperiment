@@ -10,7 +10,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     FLASK_ENV=production \
     PYTHONPATH=/app
 
-# System dependencies (needed by numpy/pandas/scipy/TF, etc.)
+# System dependencies (needed by numpy/pandas and visualization libraries)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
@@ -19,10 +19,8 @@ RUN apt-get update \
         g++ \
         curl \
         pkg-config \
-        libhdf5-dev \
         libblas-dev \
         liblapack-dev \
-        gfortran \
         libfreetype6-dev \
         libpng-dev \
         libjpeg-dev \
@@ -37,20 +35,7 @@ COPY requirements.txt .
 # Upgrade pip tooling
 RUN pip install --upgrade pip setuptools wheel
 
-# Pre-install core numeric stack with versions that satisfy TensorFlow
-RUN pip install --no-cache-dir \
-    numpy>=2.2.6 \
-    pandas>=2.2.3
-
-# Pre-install ML stack to avoid resolver backtracking later
-RUN pip install --no-cache-dir \
-    scikit-learn>=1.4.2 \
-    xgboost>=2.0.3 \
-    optuna>=3.6.1 \
-    protobuf>=5.29.3 \
-    tensorflow>=2.16.1
-
-# Install remaining dependencies (app + tooling)
+# Install all dependencies from requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code

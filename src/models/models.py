@@ -8,8 +8,7 @@ from flask_login import UserMixin
 
 # Import enhanced stock models and use their Base
 from .stock_models import (
-    Stock, StrategyType, StrategyStockSelection, MLPrediction,
-    PortfolioStrategy, PortfolioPosition, MarketDataSnapshot, MarketCapCategory,
+    Stock, MarketDataSnapshot, MarketCapCategory,
     SymbolMaster, Base
 )
 
@@ -119,10 +118,7 @@ class Order(Base):
     placed_by = Column(String(50))
     variety = Column(String(20))
     is_mock_order = Column(Boolean, default=False)  # Mock order flag
-    model_type = Column(String(20))  # 'traditional' or 'raw_lstm'
-    strategy = Column(String(50))  # 'default_risk' or 'high_risk'
-    ml_prediction_score = Column(Float)  # ML prediction at time of order
-    ml_price_target = Column(Float)  # Price target from ML
+    strategy = Column(String(50))  # 'default_risk' or 'high_risk' (8-21 EMA strategy)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -493,56 +489,6 @@ class BrokerConfiguration(Base):
     )
 
 
-class MLTrainingJob(Base):
-    """ML training job tracking."""
-    __tablename__ = 'ml_training_jobs'
-
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    symbol = Column(String(50), nullable=False)
-    model_type = Column(String(50), nullable=False)  # 'ensemble', 'random_forest', 'xgboost', 'lstm'
-    start_date = Column(DateTime, nullable=False)  # Training data start date
-    end_date = Column(DateTime, nullable=False)    # Training data end date
-    duration = Column(String(10), nullable=False)   # '1M', '3M', '6M', '1Y', etc.
-    use_technical_indicators = Column(Boolean, default=True)
-    status = Column(String(20), default='pending')  # 'pending', 'running', 'completed', 'failed'
-    progress = Column(Float, default=0.0)  # 0.0 to 100.0
-    accuracy = Column(Float)  # Model accuracy after training
-    error_message = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    started_at = Column(DateTime)
-    completed_at = Column(DateTime)
-
-    # Relationships
-    user = relationship("User")
-
-
-class MLTrainedModel(Base):
-    """Trained ML model metadata."""
-    __tablename__ = 'ml_trained_models'
-
-    id = Column(Integer, primary_key=True)
-    training_job_id = Column(Integer, ForeignKey('ml_training_jobs.id'), nullable=False)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    symbol = Column(String(50), nullable=False)
-    model_type = Column(String(50), nullable=False)
-    model_file_path = Column(Text)  # Path to saved model file
-    scaler_file_path = Column(Text)  # Path to saved scaler file
-    feature_columns = Column(Text)  # JSON array of feature columns (matches DB)
-    target_column = Column(String(50))  # Target column name
-    model_version = Column(String(50))  # Model version
-    accuracy = Column(Float)
-    training_start_date = Column(DateTime, nullable=False)  # Matches DB
-    training_end_date = Column(DateTime, nullable=False)    # Matches DB
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # Relationships
-    training_job = relationship("MLTrainingJob")
-    user = relationship("User")
-
-
 class AutoTradingSettings(Base):
     """Auto-trading settings and weekly limits."""
     __tablename__ = 'auto_trading_settings'
@@ -552,10 +498,9 @@ class AutoTradingSettings(Base):
     is_enabled = Column(Boolean, default=False)  # Auto-trading enabled/disabled
     max_amount_per_week = Column(Float, default=10000.0)  # Max investment per week (₹)
     max_buys_per_week = Column(Integer, default=5)  # Max number of trades per week
-    preferred_strategies = Column(Text)  # JSON array of preferred strategies
-    minimum_confidence_score = Column(Float, default=0.7)  # Minimum AI confidence to trade
+    preferred_strategies = Column(Text)  # JSON array of preferred strategies: ['default_risk', 'high_risk']
+    minimum_confidence_score = Column(Float, default=0.7)  # Minimum signal quality score (8-21 EMA)
     minimum_market_sentiment = Column(Float, default=0.0)  # Minimum market sentiment (-1 to 1)
-    preferred_model_types = Column(Text)  # JSON array: ['traditional', 'raw_lstm', 'kronos']
     auto_stop_loss_enabled = Column(Boolean, default=True)  # Auto set stop-loss
     auto_target_price_enabled = Column(Boolean, default=True)  # Auto set target price
     execution_time = Column(String(10), default='09:20')  # Time to execute (HH:MM format, market opens 9:15 AM)
@@ -628,14 +573,7 @@ class OrderPerformance(Base):
     quantity = Column(Integer, nullable=False)
     stop_loss = Column(Float)
     target_price = Column(Float)
-    model_type = Column(String(20))
-    strategy = Column(String(50))
-
-    # ML predictions at order time
-    ml_prediction_score = Column(Float)
-    ml_price_target = Column(Float)
-    ml_confidence = Column(Float)
-    ml_risk_score = Column(Float)
+    strategy = Column(String(50))  # 8-21 EMA strategy: 'default_risk' or 'high_risk'
 
     # Current status
     current_price = Column(Float)

@@ -162,25 +162,22 @@ class SuggestedStocksSagaOrchestrator:
     
     def __init__(self):
         self.fyers_service = None
-        self.config = None
         self.stock_filters_config = None
     
     def initialize_services(self, user_id: int) -> None:
         """Initialize required services."""
         try:
             from ..brokers.fyers_service import get_fyers_service
-            from ..stock_filtering.enhanced_config_loader import get_enhanced_filtering_config
             import yaml
             import os
-            
+
             self.fyers_service = get_fyers_service()
-            self.config = get_enhanced_filtering_config()
-            
+
             # Load stock filters configuration
             config_path = os.path.join(os.path.dirname(__file__), '../../../config/stock_filters.yaml')
             with open(config_path, 'r') as f:
                 self.stock_filters_config = yaml.safe_load(f)
-            
+
             logger.info("Services and stock filters configuration initialized successfully for saga orchestrator")
         except Exception as e:
             logger.error(f"Failed to initialize services: {e}")
@@ -189,7 +186,7 @@ class SuggestedStocksSagaOrchestrator:
     def execute_suggested_stocks_saga(self, user_id: int, strategies: List[str] = None,
                                    limit: int = 50, search: str = None, sort_by: str = None,
                                    sort_order: str = 'desc', sector: str = None,
-                                   model_type: str = 'traditional') -> Dict[str, Any]:
+                                   model_type: str = 'hybrid') -> Dict[str, Any]:
         """
         Execute the complete suggested stocks saga with step-by-step updates.
 
@@ -201,7 +198,7 @@ class SuggestedStocksSagaOrchestrator:
             sort_by: Field to sort results by
             sort_order: Sort order ('asc' or 'desc')
             sector: Filter by specific sector
-            model_type: ML model type to use ('traditional', 'raw_lstm', 'kronos')
+            model_type: Model type (default: 'hybrid' - pure technical analysis)
 
         Returns:
             Complete saga results with step-by-step information
@@ -400,7 +397,17 @@ class SuggestedStocksSagaOrchestrator:
                         'dividend_yield': float(stock.dividend_yield) if stock.dividend_yield else None,
                         'volume': int(stock.volume) if stock.volume else 0,
                         'sector': stock.sector,
-                        'market_cap_category': stock.market_cap_category
+                        'market_cap_category': stock.market_cap_category,
+                        # 8-21 EMA Strategy Indicators
+                        'ema_8': float(stock.ema_8) if stock.ema_8 else None,
+                        'ema_21': float(stock.ema_21) if stock.ema_21 else None,
+                        'demarker': float(stock.demarker) if stock.demarker else None,
+                        'buy_signal': bool(stock.buy_signal) if stock.buy_signal is not None else False,
+                        'sell_signal': bool(stock.sell_signal) if stock.sell_signal is not None else False,
+                        # Derived indicators for strategy filtering
+                        'is_bullish': bool(stock.ema_8 and stock.ema_21 and stock.ema_8 > stock.ema_21),
+                        'signal_quality': 'high' if (stock.demarker and stock.demarker < 0.30) else 'medium' if (stock.demarker and stock.demarker < 0.50) else 'low',
+                        'ema_strategy_score': 75.0 if (stock.ema_8 and stock.ema_21 and stock.demarker and stock.ema_8 > stock.ema_21 and stock.demarker < 0.30) else 50.0
                     }
                     stock_data_list.append(stock_data)
                 
@@ -655,17 +662,38 @@ class SuggestedStocksSagaOrchestrator:
             saga.update_step_status("step5_final_selection", SagaStepStatus.FAILED, error_msg)
             return saga
     
-    def _apply_strategy_logic(self, stock_data: Dict[str, Any], strategy: str, model_type: str = 'traditional') -> Optional[Dict[str, Any]]:
+    def _apply_strategy_logic(self, stock_data: Dict[str, Any], strategy: str, model_type: str = 'ema') -> Optional[Dict[str, Any]]:
         """
-        Apply strategy-specific logic to a stock using stock_filters.yaml configuration.
-        Includes model-specific filtering for Traditional ML, LSTM, and Kronos.
+        Apply 8-21 EMA swing trading strategy logic to a stock.
+
+        Pure technical analysis based on:
+        1. Power Zone: Price > 8 EMA > 21 EMA (bullish trend)
+        2. DeMarker: < 0.30 for high-quality entries (oversold pullback)
+        3. Fibonacci: Extension targets for profit-taking
         """
         try:
             current_price = stock_data.get('current_price', 0.0)
             market_cap = stock_data.get('market_cap', 0.0)
             pe_ratio = stock_data.get('pe_ratio')
             volume = stock_data.get('volume', 0)
-            
+
+            # Get EMA strategy indicators
+            ema_8 = stock_data.get('ema_8', 0.0)
+            ema_21 = stock_data.get('ema_21', 0.0)
+            demarker = stock_data.get('demarker', 0.5)
+            is_bullish = stock_data.get('is_bullish', False)
+            buy_signal = stock_data.get('buy_signal', False)
+            signal_quality = stock_data.get('signal_quality', 'none')
+            ema_strategy_score = stock_data.get('ema_strategy_score', 0.0)
+
+            # ========================================
+            # 8-21 EMA STRATEGY: POWER ZONE FILTER
+            # ========================================
+            # CRITICAL FILTER: Only trade bullish power zones
+            # Price > 8 EMA > 21 EMA = Institutional money in control
+            if not is_bullish or not buy_signal:
+                return None  # Skip stocks not in bullish power zone
+
             # Get filtering thresholds from configuration
             stage2_filters = self.stock_filters_config.get('stage_2_filters', {})
             filtering_thresholds = stage2_filters.get('filtering_thresholds', {})
@@ -676,112 +704,37 @@ class SuggestedStocksSagaOrchestrator:
             large_cap_min = market_cap_categories.get('large_cap', {}).get('minimum', 20000)
             mid_cap_min = market_cap_categories.get('mid_cap', {}).get('minimum', 5000)
 
-            # ========================================
-            # MODEL-SPECIFIC FILTERING
-            # ========================================
 
-            # Kronos Model: K-line pattern analysis requires clear price action and patterns
-            if model_type == 'kronos':
-                # Kronos focuses on candlestick patterns - needs clear price movements
-                # CRITICAL: Check data availability FIRST (avoid wasting time on insufficient data)
+            # Unified 8-21 EMA strategy filtering (ALL market caps)
+            # Apply balanced filtering criteria for all stocks
 
-                # Check if stock has ≥200 days of historical data
-                # This prevents Kronos from attempting predictions that will fail
-                symbol = stock_data.get('symbol')
-                try:
-                    from ...models.database import get_database_manager
-                    from sqlalchemy import text
+            # Price range: ₹50 - ₹10,000 (exclude penny stocks and overly expensive stocks)
+            if current_price < 50 or current_price > 10000:
+                return None
 
-                    db_manager = get_database_manager()
-                    with db_manager.get_session() as session:
-                        data_count_query = text("""
-                            SELECT COUNT(*)
-                            FROM historical_data
-                            WHERE symbol = :symbol
-                        """)
-                        data_days = session.execute(data_count_query, {'symbol': symbol}).scalar()
+            # Minimum volume for liquidity
+            if volume < 50000:
+                return None
 
-                        if data_days < 200:  # Kronos requires 200 days minimum
-                            logger.debug(f"Kronos filter: {symbol} rejected (only {data_days} days, need 200)")
-                            return None
-                except Exception as e:
-                    logger.warning(f"Failed to check data availability for {symbol}: {e}")
-                    return None  # Better safe than sorry - reject if we can't verify
+            # Market cap: minimum ₹500 Cr (exclude micro-cap stocks)
+            if market_cap < 500:
+                return None
 
-                # Filter stocks with insufficient volatility (flat price action = no patterns)
-                # Check if stock has sufficient volatility for pattern detection
-                if current_price > 0:
-                    # Stocks with good patterns typically have consistent volume
-                    if volume < 30000:  # Need decent volume for pattern reliability
-                        return None
+            # PE ratio: if available, should be reasonable (5-100)
+            if pe_ratio and (pe_ratio < 5 or pe_ratio > 100):
+                return None
 
-                # Kronos works best with trending stocks (not flat or erratic)
-                # Check if stock is in a reasonable price range for K-line analysis
-                if current_price < 20 or current_price > 5000:
-                    # Too cheap = erratic patterns, too expensive = less retail participation
-                    return None
+            # EMA strategy score threshold
+            score = ema_strategy_score / 100.0  # Convert to 0-1 range
+            min_score = 0.45  # Require top 55% of EMA scores
+            if score < min_score:
+                return None
 
-                # Additional quality check: avoid penny stocks and illiquid stocks
-                daily_turnover = current_price * volume
-                if daily_turnover < 1_00_00_000:  # Minimum ₹1 Cr daily turnover
-                    return None
-
-            # Raw LSTM Model: Deep learning requires consistent data quality
-            elif model_type == 'raw_lstm':
-                # LSTM works best with stocks that have consistent trading history
-                # Need good liquidity for reliable OHLCV sequences
-
-                if volume < 50000:  # Minimum volume for LSTM data quality
-                    return None
-
-                # LSTM trained on specific price ranges - filter accordingly
-                if current_price < 10 or current_price > 10000:
-                    return None
-
-                # Check daily turnover for data consistency
-                daily_turnover = current_price * volume
-                if daily_turnover < 5_00_00_000:  # Minimum ₹5 Cr daily turnover
-                    return None
-
-            # Traditional ML: Uses fundamental + technical features
-            # No additional model-specific filters needed (already comprehensive)
-            
-            # Strategy-specific filtering and scoring (case-insensitive)
-            strategy_upper = strategy.upper()
-
-            if strategy_upper == 'DEFAULT_RISK':
-                # Conservative strategy - focus on stability (LARGE CAP ONLY)
-                # STRICT FILTERING: Large cap (>20000 Cr), stable price range, good fundamentals
-                if (market_cap <= large_cap_min or  # MUST be large cap (>20000 Cr) - FIXED: use <= to require >
-                    current_price < 100 or current_price > 10000 or  # Stable price range
-                    (pe_ratio and (pe_ratio < 5 or pe_ratio > 40)) or  # Reasonable PE ratio
-                    volume < 50000):  # Good liquidity
-                    return None
-
-                # Calculate conservative score using config weights
-                score = self._calculate_conservative_score_with_config(stock_data)
-                min_score = filtering_thresholds.get('minimum_total_score', 25) / 100.0
-                if score < min_score:
-                    return None
-
-            elif strategy_upper == 'HIGH_RISK':
-                # Aggressive strategy - focus on growth potential (SMALL/MID CAP ONLY)
-                # STRICT FILTERING: Small/Mid cap (1000-20000 Cr), volatile price, high volume
-                if (market_cap < 1000 or market_cap >= large_cap_min or  # MUST be small/mid cap (exclude large cap)
-                    current_price > 5000 or  # Exclude very expensive stocks
-                    volume < 10000):  # Minimum volume for growth stocks
-                    return None
-
-                # Calculate aggressive score using config weights
-                score = self._calculate_aggressive_score_with_config(stock_data)
-                min_score = filtering_thresholds.get('minimum_total_score', 25) / 100.0 * 0.7  # Lower threshold for high risk
-                if score < min_score:
-                    return None
-            else:
-                # Unknown strategy
+            # Signal quality: Accept high and medium quality signals
+            if signal_quality == 'none':
                 return None
             
-            # Create suggested stock with strategy-specific targets and all calculated fields
+            # Create suggested stock with 8-21 EMA strategy fields
             suggested_stock = {
                 'symbol': stock_data.get('symbol', ''),
                 'name': stock_data.get('name', ''),
@@ -808,10 +761,29 @@ class SuggestedStocksSagaOrchestrator:
                 'market_cap_category': stock_data.get('market_cap_category', ''),
                 'strategy': strategy,
                 'selection_score': score,
-                'target_price': self._calculate_target_price(current_price, strategy),
-                'stop_loss': self._calculate_stop_loss(current_price, strategy),
+
+                # 8-21 EMA Strategy fields
+                'ema_8': ema_8,
+                'ema_21': ema_21,
+                'ema_trend_score': ema_strategy_score,
+                'demarker': demarker,
+                'signal_quality': signal_quality,
+
+                # Fibonacci targets
+                'fib_target_1': stock_data.get('fib_target_127', current_price * 1.05),  # 127.2% - Take 25%
+                'fib_target_2': stock_data.get('fib_target_162', current_price * 1.10),  # 161.8% - Take 50%
+                'fib_target_3': stock_data.get('fib_target_200', current_price * 1.15),  # 200% - Let 25% run
+
+                # Use Fibonacci target 2 (161.8%) as primary target
+                'target_price': stock_data.get('fib_target_162', current_price * 1.10),
+
+                # Use EMA-based stop loss (below 21 EMA or swing low)
+                'stop_loss': stock_data.get('suggested_stop', ema_21 * 0.98),
+
+                'buy_signal': buy_signal,
+                'sell_signal': stock_data.get('sell_signal', False),
                 'recommendation': 'BUY',
-                'reason': self._generate_reason(stock_data, strategy, score),
+                'reason': self._generate_ema_reason(stock_data, strategy, score, signal_quality),
                 'selection_timestamp': datetime.now().isoformat()
             }
             
@@ -1043,12 +1015,42 @@ class SuggestedStocksSagaOrchestrator:
         return current_price * 0.95  # Default 5%
     
     def _generate_reason(self, stock_data: Dict[str, Any], strategy: str, score: float) -> str:
-        """Generate reason for stock selection."""
+        """Generate reason for stock selection (legacy method)."""
         if strategy == 'DEFAULT_RISK':
             return f"Conservative swing trading opportunity (Score: {score:.2f}, 2-week hold)"
         elif strategy == 'HIGH_RISK':
             return f"Aggressive growth potential (Score: {score:.2f}, 2-week hold)"
         return f"Stock selection (Score: {score:.2f})"
+
+    def _generate_ema_reason(self, stock_data: Dict[str, Any], strategy: str, score: float, signal_quality: str) -> str:
+        """
+        Generate reason for 8-21 EMA strategy stock selection.
+
+        Explains the power zone status, DeMarker timing, and signal quality.
+        """
+        ema_8 = stock_data.get('ema_8', 0)
+        ema_21 = stock_data.get('ema_21', 0)
+        current_price = stock_data.get('current_price', 0)
+        demarker = stock_data.get('demarker', 0.5)
+
+        # Calculate EMA separation
+        ema_sep_pct = ((ema_8 - ema_21) / ema_21 * 100) if ema_21 > 0 else 0
+
+        # Build reason based on signal quality
+        if signal_quality == 'high':
+            timing = f"PERFECT ENTRY: Oversold pullback (DeMarker: {demarker:.2f})"
+        elif signal_quality == 'medium':
+            timing = f"GOOD ENTRY: Mild pullback (DeMarker: {demarker:.2f})"
+        else:
+            timing = f"BASIC ENTRY: Power zone active (DeMarker: {demarker:.2f})"
+
+        # Strategy-specific message
+        if strategy.upper() == 'DEFAULT_RISK':
+            return f"{timing}. Bullish trend: Price > 8 EMA > 21 EMA ({ema_sep_pct:+.1f}% separation). Large-cap stability. Score: {score:.2f}"
+        elif strategy.upper() == 'HIGH_RISK':
+            return f"{timing}. Strong momentum: Price > 8 EMA > 21 EMA ({ema_sep_pct:+.1f}% separation). Small/mid-cap growth. Score: {score:.2f}"
+
+        return f"{timing}. Bullish power zone (Score: {score:.2f})"
     
     def _extract_rejection_reasons(self, rejected_stocks: List[Any]) -> Dict[str, int]:
         """Extract rejection reasons from rejected stocks."""
@@ -1060,222 +1062,180 @@ class SuggestedStocksSagaOrchestrator:
         return reasons
 
     def _execute_step6_ml_prediction(self, saga: SuggestedStocksSaga) -> SuggestedStocksSaga:
-        """Step 6: Apply ML predictions to suggested stocks (supports all 3 model types)."""
-        model_type = saga.model_type
-        model_name = {
-            'traditional': 'Traditional ML (RF + XGBoost)',
-            'raw_lstm': 'Raw LSTM (Deep Learning)',
-            'kronos': 'Kronos (K-line Tokenization)'
-        }.get(model_type, model_type)
-
+        """Step 6: Apply 8-21 EMA strategy technical indicators to suggested stocks."""
         step = SagaStep(
             step_id="step6_ml_prediction",
-            name=f"ML Prediction ({model_name})",
-            description=f"Apply {model_name} model to predict price targets and risk scores"
+            name="8-21 EMA Technical Indicators",
+            description="Apply 8-21 EMA Strategy (Power Zone + DeMarker + Fibonacci)"
         )
         saga.add_step(step)
         saga.update_step_status("step6_ml_prediction", SagaStepStatus.IN_PROGRESS)
 
-        print(f"\n⚙️  Step 6: ML Prediction ({model_name})")
-        print(f"   Applying {model_name} model to {len(saga.final_results)} stocks...")
+        print(f"\n📊 Step 6: 8-21 EMA Technical Indicators")
+        print(f"   Applying EMA strategy to {len(saga.final_results)} stocks...")
 
         try:
             from src.models.database import get_database_manager
+            from src.services.technical.ema_strategy_calculator import get_ema_strategy_calculator
 
             db_manager = get_database_manager()
-            ml_predictions = {}
 
-            if model_type == 'traditional':
-                # Traditional ML (RF + XGBoost)
-                from ..ml.enhanced_stock_predictor import EnhancedStockPredictor
+            with db_manager.get_session() as session:
+                # Get symbols
+                symbols = [stock.get('symbol') for stock in saga.final_results]
 
-                with db_manager.get_session() as session:
-                    predictor = EnhancedStockPredictor(session, auto_load=True)
+                if not symbols:
+                    logger.warning("No symbols to get indicators for")
+                    return saga
 
-                    # Check if models are trained
-                    if predictor.rf_price_model is None:
-                        logger.warning("Traditional ML models not trained. Training now...")
-                        print(f"   ⚠️  Traditional ML models not found. Training with historical data...")
-                        print(f"   This will take 10-15 minutes (one-time training)...")
-                        predictor.train_with_walk_forward(lookback_days=365, n_splits=5)
-                        print(f"   ✅ Traditional ML models trained and saved successfully")
+                # Initialize EMA strategy calculator
+                print(f"   🔧 Calculating EMA indicators for {len(symbols)} stocks...")
+                ema_calc = get_ema_strategy_calculator(session)
+
+                # Calculate all indicators (8 & 21 EMA + DeMarker + Fibonacci)
+                indicators_dict = ema_calc.calculate_all_indicators(symbols, lookback_days=252)
+
+                # Apply indicators to stocks
+                stocks_with_indicators = 0
+                total_ema_score = 0
+                total_demarker = 0
+                buy_signals = 0
+                sell_signals = 0
+                high_quality_signals = 0
+                medium_quality_signals = 0
+
+                for stock in saga.final_results:
+                    symbol = stock.get('symbol')
+
+                    if symbol in indicators_dict:
+                        indicators = indicators_dict[symbol]
+
+                        # 8-21 EMA Strategy indicators
+                        stock['ema_8'] = indicators.get('ema_8', 0.0)
+                        stock['ema_21'] = indicators.get('ema_21', 0.0)
+                        stock['ema_trend_score'] = indicators.get('ema_strategy_score', 50.0)
+                        stock['demarker'] = indicators.get('demarker', 0.5)
+                        stock['power_zone_status'] = indicators.get('power_zone_status', 'neutral')
+                        stock['is_bullish'] = indicators.get('is_bullish', False)
+
+                        # Fibonacci targets
+                        stock['fib_target_1'] = indicators.get('fib_target_127', 0.0)
+                        stock['fib_target_2'] = indicators.get('fib_target_162', 0.0)
+                        stock['fib_target_3'] = indicators.get('fib_target_200', 0.0)
+
+                        # EMA strategy score = selection score
+                        stock['selection_score'] = indicators.get('ema_strategy_score', 50.0)
+
+                        # Signals
+                        stock['buy_signal'] = indicators.get('buy_signal', False)
+                        stock['sell_signal'] = indicators.get('sell_signal', False)
+                        stock['signal_quality'] = indicators.get('signal_quality', 'none')
+
+                        # Count statistics
+                        stocks_with_indicators += 1
+                        total_ema_score += stock['ema_trend_score']
+                        total_demarker += stock['demarker']
+
+                        if stock['buy_signal']:
+                            buy_signals += 1
+                            if stock['signal_quality'] == 'high':
+                                high_quality_signals += 1
+                            elif stock['signal_quality'] == 'medium':
+                                medium_quality_signals += 1
+                        if stock['sell_signal']:
+                            sell_signals += 1
+
                     else:
-                        print(f"   ✅ Using cached Traditional ML models (loaded from disk)")
+                        # No indicators available - use default values
+                        self._set_default_technical_values(stock)
 
-                    # Get ML predictions for all stocks
-                    for stock in saga.final_results:
-                        try:
-                            prediction = predictor.predict(stock)
-                            symbol = stock.get('symbol')
-                            ml_predictions[symbol] = prediction
+                print(f"   ✅ EMA indicators applied to {stocks_with_indicators}/{len(saga.final_results)} stocks")
 
-                            # Add ML fields to stock data
-                            stock['ml_prediction_score'] = prediction['ml_prediction_score']
-                            stock['ml_price_target'] = prediction['ml_price_target']
-                            stock['ml_confidence'] = prediction['ml_confidence']
-                            stock['ml_risk_score'] = prediction['ml_risk_score']
+                # ========================================
+                # SORT AND APPLY LIMIT BASED ON EMA STRATEGY SCORE
+                # ========================================
+                print(f"\n   📊 Sorting and selecting top stocks by EMA strategy score...")
 
-                        except Exception as e:
-                            logger.error(f"Traditional ML prediction failed for {stock.get('symbol')}: {e}")
-                            self._set_default_ml_values(stock)
+                # Sort by EMA strategy score (descending order - best scores first)
+                saga.final_results.sort(key=lambda x: x.get('selection_score', 0), reverse=True)
 
-            elif model_type == 'raw_lstm':
-                # Raw LSTM (Deep Learning)
-                from ..ml.raw_lstm_prediction_service import get_raw_lstm_prediction_service
-                from pathlib import Path
-
-                lstm_service = get_raw_lstm_prediction_service()
-
-                # Get list of trained LSTM models
-                model_dir = Path('ml_models/raw_ohlcv_lstm')
-                if not model_dir.exists():
-                    logger.warning("Raw LSTM model directory not found")
-                    print(f"   ⚠️  No Raw LSTM models available - using default scores")
-                    for stock in saga.final_results:
-                        self._set_default_ml_values(stock)
+                # Apply limit: select top N stocks
+                stocks_before_limit = len(saga.final_results)
+                if saga.limit and saga.limit > 0:
+                    saga.final_results = saga.final_results[:saga.limit]
+                    print(f"   ✂️  Applied limit: Selected top {len(saga.final_results)} stocks (from {stocks_before_limit} total)")
                 else:
-                    trained_symbols = [d.name for d in model_dir.iterdir()
-                                     if d.is_dir() and ((d / 'lstm_model.h5').exists() or (d / 'model.h5').exists())]
+                    print(f"   ✅ No limit applied - keeping all {len(saga.final_results)} stocks")
 
-                    print(f"   ✅ Found {len(trained_symbols)} trained Raw LSTM models")
+                # Add ranks based on EMA score (1 = highest score)
+                for rank, stock in enumerate(saga.final_results, 1):
+                    stock['rank'] = rank
 
-                    # Get predictions for stocks with trained models
-                    symbols_to_predict = [s['symbol'] for s in saga.final_results if s['symbol'] in trained_symbols]
+                print(f"   🏆 Final selection: {len(saga.final_results)} stocks ranked by EMA strategy score")
 
-                    if symbols_to_predict:
-                        predictions = lstm_service.batch_predict(symbols_to_predict, user_id=saga.user_id)
+                # Store metadata
+                avg_ema = total_ema_score / stocks_with_indicators if stocks_with_indicators > 0 else 50.0
+                avg_demarker = total_demarker / stocks_with_indicators if stocks_with_indicators > 0 else 0.5
 
-                        # Map predictions to stocks
-                        pred_dict = {p['symbol']: p for p in predictions}
-                        for stock in saga.final_results:
-                            symbol = stock.get('symbol')
-                            if symbol in pred_dict:
-                                pred = pred_dict[symbol]
-                                stock['ml_prediction_score'] = pred['ml_prediction_score']
-                                stock['ml_price_target'] = pred['ml_price_target']
-                                stock['ml_confidence'] = pred['ml_confidence']
-                                stock['ml_risk_score'] = pred['ml_risk_score']
-                                ml_predictions[symbol] = pred
-                            else:
-                                # No trained model for this stock
-                                self._set_default_ml_values(stock)
-                    else:
-                        # No stocks have trained models
-                        for stock in saga.final_results:
-                            self._set_default_ml_values(stock)
-
-            elif model_type == 'kronos':
-                # Kronos (K-line Tokenization)
-                from ..ml.kronos_prediction_service import get_kronos_prediction_service
-
-                kronos_service = get_kronos_prediction_service()
-
-                # Get Kronos predictions for all stocks
-                symbols_to_predict = [s['symbol'] for s in saga.final_results]
-
-                if symbols_to_predict:
-                    print(f"   🔮 Generating Kronos predictions for {len(symbols_to_predict)} stocks...")
-                    predictions = kronos_service.batch_predict(symbols_to_predict, user_id=saga.user_id)
-
-                    # Map predictions to stocks
-                    pred_dict = {p['symbol']: p for p in predictions}
-                    for stock in saga.final_results:
-                        symbol = stock.get('symbol')
-                        if symbol in pred_dict:
-                            pred = pred_dict[symbol]
-                            stock['ml_prediction_score'] = pred['ml_prediction_score']
-                            stock['ml_price_target'] = pred['ml_price_target']
-                            stock['ml_confidence'] = pred['ml_confidence']
-                            stock['ml_risk_score'] = pred['ml_risk_score']
-                            ml_predictions[symbol] = pred
-                        else:
-                            self._set_default_ml_values(stock)
-                else:
-                    logger.warning("No stocks to predict for Kronos")
-
-            else:
-                raise ValueError(f"Unknown model_type: {model_type}")
-
-            # ========================================
-            # APPLY LIMIT BASED ON ML SCORES
-            # ========================================
-            # Now that all stocks have ML scores, sort by ML prediction score and apply limit
-
-            print(f"\n   📊 Sorting and selecting top stocks by ML prediction score...")
-
-            # Sort all stocks by ML prediction score (descending order - best scores first)
-            saga.final_results.sort(key=lambda x: x.get('ml_prediction_score', 0), reverse=True)
-
-            # Apply limit: select top N stocks by ML score
-            stocks_before_limit = len(saga.final_results)
-            if saga.limit and saga.limit > 0:
-                saga.final_results = saga.final_results[:saga.limit]
-                print(f"   ✂️  Applied limit: Selected top {len(saga.final_results)} stocks by ML score (from {stocks_before_limit} total)")
-            else:
-                print(f"   ✅ No limit applied - keeping all {len(saga.final_results)} stocks")
-
-            # Add ranks based on ML scores (1 = highest ML score)
-            for rank, stock in enumerate(saga.final_results, 1):
-                stock['rank'] = rank
-
-            print(f"   🏆 Final selection: {len(saga.final_results)} stocks ranked by ML prediction score")
-
-            # Store ML predictions in step metadata
-            if ml_predictions:
                 step.metadata = {
-                    'model_type': model_type,
-                    'predictions_count': len(ml_predictions),
-                    'avg_prediction_score': sum(p['ml_prediction_score'] for p in ml_predictions.values()) / len(ml_predictions),
-                    'avg_confidence': sum(p['ml_confidence'] for p in ml_predictions.values()) / len(ml_predictions),
-                    'avg_risk_score': sum(p['ml_risk_score'] for p in ml_predictions.values()) / len(ml_predictions),
-                    'stocks_before_limit': stocks_before_limit,
-                    'stocks_after_limit': len(saga.final_results),
-                    'limit_applied': saga.limit if saga.limit and saga.limit > 0 else 'none'
-                }
-            else:
-                step.metadata = {
-                    'model_type': model_type,
-                    'predictions_count': 0,
-                    'avg_prediction_score': 0.0,
-                    'avg_confidence': 0.0,
-                    'avg_risk_score': 0.5,
+                    'method': '8_21_ema_strategy',
+                    'indicators_applied': stocks_with_indicators,
+                    'avg_ema_strategy_score': avg_ema,
+                    'avg_demarker': avg_demarker,
+                    'buy_signals': buy_signals,
+                    'sell_signals': sell_signals,
+                    'high_quality_signals': high_quality_signals,
+                    'medium_quality_signals': medium_quality_signals,
                     'stocks_before_limit': stocks_before_limit,
                     'stocks_after_limit': len(saga.final_results),
                     'limit_applied': saga.limit if saga.limit and saga.limit > 0 else 'none'
                 }
 
-            step.input_count = stocks_before_limit  # Input was all stocks with ML scores
-            step.output_count = len(saga.final_results)  # Output is top N after limit
+                step.input_count = stocks_before_limit
+                step.output_count = len(saga.final_results)
 
-            saga.update_step_status("step6_ml_prediction", SagaStepStatus.COMPLETED,
-                                  metadata=step.metadata)
+                saga.update_step_status("step6_ml_prediction", SagaStepStatus.COMPLETED,
+                                      metadata=step.metadata)
 
-            print(f"   ✅ {model_name} predictions applied: {len(ml_predictions)} stocks scored")
-            if ml_predictions:
-                print(f"   📊 Avg ML Score: {step.metadata['avg_prediction_score']:.3f}, Avg Confidence: {step.metadata['avg_confidence']:.3f}")
+                print(f"   📈 Avg Scores - RS: {avg_rs:.1f}, EMA: {avg_ema:.1f}, Wave: {avg_wave:.1f}")
+                print(f"   🎯 Buy Signals: {buy_signals} (High Quality: {high_quality_signals}), Sell Signals: {sell_signals}")
 
-            return saga
+                return saga
 
         except Exception as e:
-            error_msg = f"{model_name} prediction failed: {str(e)}"
-            logger.error(error_msg)
+            error_msg = f"Technical indicators application failed: {str(e)}"
+            logger.error(error_msg, exc_info=True)
             saga.update_step_status("step6_ml_prediction", SagaStepStatus.FAILED, error_msg)
-            # Don't fail the saga - continue without ML predictions
+            # Don't fail the saga - continue without indicators
             return saga
 
-    def _set_default_ml_values(self, stock: Dict[str, Any]) -> None:
-        """Set default ML values for a stock when model prediction is not available."""
-        stock['ml_prediction_score'] = 0.5
-        stock['ml_price_target'] = stock.get('current_price', 0)
-        stock['ml_confidence'] = 0.0
-        stock['ml_risk_score'] = 0.5
+    def _set_default_technical_values(self, stock: Dict[str, Any]) -> None:
+        """Set default 8-21 EMA technical indicator values when data is not available."""
+        # 8-21 EMA indicators
+        stock['ema_8'] = 0.0
+        stock['ema_21'] = 0.0
+        stock['ema_trend_score'] = 50.0
+        stock['demarker'] = 0.5
+
+        # Fibonacci targets
+        stock['fib_target_1'] = 0.0
+        stock['fib_target_2'] = 0.0
+        stock['fib_target_3'] = 0.0
+
+        # EMA strategy score
+        stock['selection_score'] = 50.0  # Neutral composite score
+
+        # Signals
+        stock['buy_signal'] = False
+        stock['sell_signal'] = False
+        stock['signal_quality'] = 'none'
 
     def _execute_step7_daily_snapshot(self, saga: SuggestedStocksSaga) -> SuggestedStocksSaga:
-        """Step 7: Save daily snapshot with ML predictions."""
+        """Step 7: Save daily snapshot with technical indicators."""
         step = SagaStep(
             step_id="step7_daily_snapshot",
             name="Daily Snapshot",
-            description="Save daily snapshot of suggested stocks with ML predictions"
+            description="Save daily snapshot of suggested stocks with technical indicators"
         )
         saga.add_step(step)
         saga.update_step_status("step7_daily_snapshot", SagaStepStatus.IN_PROGRESS)
@@ -1293,26 +1253,23 @@ class SuggestedStocksSagaOrchestrator:
             with db_manager.get_session() as session:
                 snapshot_service = DailySnapshotService(session)
 
-                # Build ML predictions dict
-                ml_predictions = {}
+                # Build 8-21 EMA technical indicators dict
+                technical_indicators = {}
                 for stock in saga.final_results:
                     symbol = stock.get('symbol')
-                    ml_predictions[symbol] = {
-                        'ml_prediction_score': stock.get('ml_prediction_score'),
-                        'ml_price_target': stock.get('ml_price_target'),
-                        'ml_confidence': stock.get('ml_confidence'),
-                        'ml_risk_score': stock.get('ml_risk_score')
+                    technical_indicators[symbol] = {
+                        'ema_8': stock.get('ema_8', 0.0),
+                        'ema_21': stock.get('ema_21', 0.0),
+                        'ema_trend_score': stock.get('ema_trend_score', 50.0),
+                        'demarker': stock.get('demarker', 0.5),
+                        'buy_signal': stock.get('buy_signal', False),
+                        'sell_signal': stock.get('sell_signal', False),
+                        'signal_quality': stock.get('signal_quality', 'none')
                     }
-
-                # Add model_type to stocks (ranks already assigned in Step 6 based on ML scores)
-                for stock in saga.final_results:
-                    # Set model_type from saga (traditional, raw_lstm, or kronos)
-                    stock['model_type'] = saga.model_type
 
                 # Save snapshot (will replace same-day data)
                 stats = snapshot_service.save_daily_snapshot(
                     suggested_stocks=saga.final_results,
-                    ml_predictions=ml_predictions,
                     snapshot_date=date.today()
                 )
 

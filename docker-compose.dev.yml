@@ -25,6 +25,7 @@ services:
   dragonfly:
     image: docker.dragonflydb.io/dragonflydb/dragonfly
     container_name: trading_system_dragonfly_dev
+    command: ["dragonfly", "--proactor_threads=2", "--maxmemory=512mb"]
     ports:
       - "6379:6379"
     restart: unless-stopped
