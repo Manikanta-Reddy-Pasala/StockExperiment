@@ -1197,9 +1197,6 @@ class SuggestedStocksSagaOrchestrator:
                 saga.update_step_status("step6_ml_prediction", SagaStepStatus.COMPLETED,
                                       metadata=step.metadata)
 
-                print(f"   📈 Avg Scores - RS: {avg_rs:.1f}, EMA: {avg_ema:.1f}, Wave: {avg_wave:.1f}")
-                print(f"   🎯 Buy Signals: {buy_signals} (High Quality: {high_quality_signals}), Sell Signals: {sell_signals}")
-
                 return saga
 
         except Exception as e:
