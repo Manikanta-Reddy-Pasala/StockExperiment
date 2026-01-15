@@ -324,7 +324,7 @@ class AutoTradingService:
         """Select top 8-21 EMA strategy stocks with best signals."""
         try:
             # Parse preferred settings
-            preferred_strategies = json.loads(settings.preferred_strategies or '["default_risk"]')
+            preferred_strategies = json.loads(settings.preferred_strategies or '["unified"]')
 
             # Query latest daily suggested stocks (8-21 EMA strategy)
             query = text("""

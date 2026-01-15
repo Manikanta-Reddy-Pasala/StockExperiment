@@ -208,7 +208,7 @@ class SuggestedStocksSagaOrchestrator:
         saga = SuggestedStocksSaga(
             saga_id=saga_id,
             user_id=user_id,
-            strategies=strategies or ['DEFAULT_RISK', 'HIGH_RISK'],
+            strategies=strategies or ['unified'],  # Single unified EMA strategy
             limit=limit,
             search_query=search,
             sort_by=sort_by,

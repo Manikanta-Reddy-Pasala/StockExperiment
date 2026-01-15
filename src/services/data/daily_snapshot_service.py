@@ -199,7 +199,7 @@ class DailySnapshotService:
         logger.info(f"Snapshot saved: {stats}")
         return stats
     
-    def get_latest_snapshot(self, strategy: str = 'default_risk', limit: int = 50) -> List[Dict]:
+    def get_latest_snapshot(self, strategy: str = 'unified', limit: int = 50) -> List[Dict]:
         """
         Retrieve the latest daily snapshot.
         
@@ -290,7 +290,7 @@ class DailySnapshotService:
         
         return stocks
     
-    def get_snapshot_dates(self, strategy: str = 'default_risk') -> List[str]:
+    def get_snapshot_dates(self, strategy: str = 'unified') -> List[str]:
         """Get list of available snapshot dates for a strategy."""
         query = text("""
             SELECT DISTINCT date 

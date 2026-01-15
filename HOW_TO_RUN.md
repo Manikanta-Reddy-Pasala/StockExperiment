@@ -724,7 +724,43 @@ nano .env  # Edit with production values
 docker compose ps
 ```
 
-4. **Setup Nginx Reverse Proxy**:
+4. **Security Hardening - Bind Ports to Localhost**:
+
+⚠️ **CRITICAL**: By default, Docker exposes ports to `0.0.0.0` (all interfaces), making databases publicly accessible. This is a major security vulnerability.
+
+Update `docker-compose.yml` to bind sensitive services to localhost only:
+
+```yaml
+services:
+  database:
+    ports:
+      - "127.0.0.1:5432:5432"  # PostgreSQL - localhost only
+
+  dragonfly:
+    # REMOVE ports section entirely - only accessible within Docker network
+    # ports:
+    #   - "6379:6379"  # DANGEROUS - exposed to internet!
+
+  trading_system:
+    ports:
+      - "127.0.0.1:5001:5001"  # App - localhost only (nginx will proxy)
+```
+
+**Before (VULNERABLE)**:
+```
+0.0.0.0:6379 → Redis EXPOSED TO INTERNET ❌
+0.0.0.0:5432 → PostgreSQL EXPOSED TO INTERNET ❌
+0.0.0.0:5001 → App EXPOSED TO INTERNET ❌
+```
+
+**After (SECURE)**:
+```
+127.0.0.1:5432 → PostgreSQL (localhost only) ✅
+Internal only  → Redis/Dragonfly (Docker network) ✅
+127.0.0.1:5001 → App (localhost only, nginx proxies) ✅
+```
+
+5. **Setup Nginx Reverse Proxy**:
 ```bash
 # Install Nginx
 sudo apt install nginx
@@ -733,14 +769,14 @@ sudo apt install nginx
 sudo nano /etc/nginx/sites-available/trading
 ```
 
-Nginx configuration:
+Nginx configuration (HTTP only - for initial setup):
 ```nginx
 server {
     listen 80;
     server_name yourdomain.com;
 
     location / {
-        proxy_pass http://localhost:5001;
+        proxy_pass http://127.0.0.1:5001;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -752,11 +788,75 @@ server {
 ```bash
 # Enable site
 sudo ln -s /etc/nginx/sites-available/trading /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t
+sudo systemctl restart nginx
+sudo systemctl enable nginx
+```
+
+6. **Setup HTTPS with Self-Signed Certificate**:
+
+For internal/development servers without a domain:
+
+```bash
+# Create SSL directory
+sudo mkdir -p /etc/nginx/ssl
+
+# Generate self-signed certificate (valid for 365 days)
+sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout /etc/nginx/ssl/trading.key \
+  -out /etc/nginx/ssl/trading.crt \
+  -subj '/C=IN/ST=Karnataka/L=Bangalore/O=YourOrg/CN=your-server-ip'
+
+# Update Nginx config for HTTPS
+sudo nano /etc/nginx/sites-available/trading
+```
+
+**Full HTTPS Nginx configuration**:
+```nginx
+# Redirect HTTP to HTTPS
+server {
+    listen 80;
+    server_name your-server-ip;
+    return 301 https://$host$request_uri;
+}
+
+# HTTPS server
+server {
+    listen 443 ssl;
+    server_name your-server-ip;
+
+    # SSL certificates
+    ssl_certificate /etc/nginx/ssl/trading.crt;
+    ssl_certificate_key /etc/nginx/ssl/trading.key;
+
+    # SSL configuration (modern settings)
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+    location / {
+        proxy_pass http://127.0.0.1:5001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 90;
+    }
+}
+```
+
+```bash
+# Test and restart Nginx
 sudo nginx -t
 sudo systemctl restart nginx
 ```
 
-5. **Setup SSL with Let's Encrypt**:
+**Access**: https://your-server-ip (browser will show certificate warning for self-signed cert - this is expected)
+
+7. **Setup SSL with Let's Encrypt** (for domains with DNS):
 ```bash
 # Install Certbot
 sudo apt install certbot python3-certbot-nginx

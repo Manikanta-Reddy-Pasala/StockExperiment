@@ -17,21 +17,24 @@ suggested_stocks_bp = Blueprint('suggested_stocks', __name__, url_prefix='/api/s
 @login_required
 def get_suggested_stocks():
     """
-    Get suggested stocks based on swing trading strategies.
+    Get suggested stocks from pre-calculated daily recommendations.
 
     Query parameters:
-    - strategy: 'default_risk' or 'high_risk' (default: 'default_risk')
     - limit: Number of suggestions to return (default: 50)
     - search: Optional search term
-    - sort_by: Sort field (default: 'current_price')
+    - sort_by: Sort field (default: 'selection_score')
     - sort_order: 'asc' or 'desc' (default: 'desc')
     - sector: Optional sector filter
     """
     try:
+        from datetime import datetime, date as dt_date
+        from sqlalchemy import text
+        from ...models.database import get_database_manager
+
         # Get parameters
         limit = int(request.args.get('limit', 50))
         search = request.args.get('search')
-        sort_by = request.args.get('sort_by', 'current_price')
+        sort_by = request.args.get('sort_by', 'selection_score')
         sort_order = request.args.get('sort_order', 'desc')
         sector = request.args.get('sector')
 
@@ -39,37 +42,95 @@ def get_suggested_stocks():
 
         logger.info(f"🎯 Suggested stocks request: limit={limit}, user={user_id}")
 
-        # Use unified broker service to get the appropriate provider
-        from ...services.core.unified_broker_service import get_unified_broker_service
+        db = get_database_manager()
 
-        # Get the unified broker service
-        unified_service = get_unified_broker_service()
+        with db.get_session() as session:
+            # Get the most recent date with data
+            recent_date_result = session.execute(text("""
+                SELECT MAX(date) as max_date FROM daily_suggested_stocks
+            """)).first()
 
-        # Get the provider through the factory for advanced features
-        provider = unified_service.factory.get_suggested_stocks_provider(user_id)
-        if not provider:
-            return jsonify({
-                'success': False,
-                'error': 'No suggested stocks provider available for your configured broker'
-            }), 503
+            if recent_date_result and recent_date_result[0]:
+                query_date = recent_date_result[0]
+            else:
+                return jsonify({
+                    'success': True,
+                    'data': [],
+                    'total': 0,
+                    'message': 'No recommendations available yet'
+                }), 200
 
-        # Use the provider directly for full feature support (single unified EMA strategy)
-        result = provider.get_suggested_stocks(
-            user_id=user_id,
-            strategies=None,  # No strategy filtering - single unified strategy
-            limit=limit,
-            search=search,
-            sort_by=sort_by,
-            sort_order=sort_order,
-            sector=sector
-        )
+            # Build query with filters
+            query_parts = ["""
+                SELECT
+                    d.symbol,
+                    COALESCE(d.stock_name, s.name) as stock_name,
+                    d.current_price,
+                    d.strategy,
+                    d.selection_score,
+                    d.ema_8,
+                    d.ema_21,
+                    d.ema_trend_score,
+                    d.demarker,
+                    d.fib_target_1,
+                    d.fib_target_2,
+                    d.fib_target_3,
+                    d.buy_signal,
+                    d.sell_signal,
+                    d.signal_quality,
+                    d.recommendation,
+                    d.target_price,
+                    d.stop_loss,
+                    d.rank,
+                    d.reason,
+                    d.pe_ratio,
+                    d.pb_ratio,
+                    d.roe,
+                    d.market_cap,
+                    d.sector,
+                    d.market_cap_category
+                FROM daily_suggested_stocks d
+                LEFT JOIN stocks s ON d.symbol = s.symbol
+                WHERE d.date = :date
+                  AND d.buy_signal = TRUE
+            """]
 
-        if result.get('success'):
-            logger.info(f"✅ Returned {len(result.get('data', []))} suggested stocks")
-            return jsonify(result), 200
-        else:
-            logger.warning(f"❌ Suggested stocks failed: {result.get('error')}")
-            return jsonify(result), 500
+            params = {'date': query_date}
+
+            # Add search filter
+            if search:
+                query_parts.append("AND (d.symbol ILIKE :search OR d.stock_name ILIKE :search)")
+                params['search'] = f'%{search}%'
+
+            # Add sector filter
+            if sector:
+                query_parts.append("AND d.sector = :sector")
+                params['sector'] = sector
+
+            # Add sorting
+            valid_sort_fields = ['selection_score', 'current_price', 'ema_trend_score', 'demarker', 'market_cap']
+            if sort_by not in valid_sort_fields:
+                sort_by = 'selection_score'
+            order_dir = 'ASC' if sort_order.lower() == 'asc' else 'DESC'
+            query_parts.append(f"ORDER BY d.{sort_by} {order_dir}")
+
+            # Add limit
+            query_parts.append("LIMIT :limit")
+            params['limit'] = limit
+
+            query = text(' '.join(query_parts))
+            result = session.execute(query, params)
+            stocks = [dict(row._mapping) for row in result]
+
+        logger.info(f"✅ Returned {len(stocks)} suggested stocks from {query_date}")
+
+        return jsonify({
+            'success': True,
+            'data': stocks,
+            'total': len(stocks),
+            'date': str(query_date),
+            'last_updated': datetime.now().isoformat()
+        }), 200
 
     except ValueError as e:
         logger.error(f"Invalid parameter: {e}")
@@ -78,7 +139,7 @@ def get_suggested_stocks():
             'error': f'Invalid parameter: {str(e)}'
         }), 400
     except Exception as e:
-        logger.error(f"Error getting suggested stocks: {e}")
+        logger.error(f"Error getting suggested stocks: {e}", exc_info=True)
         return jsonify({
             'success': False,
             'error': 'Internal server error'
@@ -353,13 +414,22 @@ def get_triple_model_view():
 
         # Filter stocks by strategy
         for stock in all_stocks:
-            strategy = stock['strategy']
+            strategy = stock.get('strategy', '')
+            market_cap = stock.get('market_cap_category', '')
 
             # Map strategy names (handle case variations)
             if 'default' in strategy.lower() or strategy.upper() == 'DEFAULT_RISK':
                 risk_level = 'default_risk'
             elif 'high' in strategy.lower() or strategy.upper() == 'HIGH_RISK':
                 risk_level = 'high_risk'
+            elif strategy.lower() == 'unified':
+                # For unified strategy, categorize by market cap:
+                # large_cap -> default_risk (conservative)
+                # mid_cap, small_cap -> high_risk (aggressive)
+                if market_cap == 'large_cap':
+                    risk_level = 'default_risk'
+                else:
+                    risk_level = 'high_risk'
             else:
                 # Skip unknown strategies
                 continue

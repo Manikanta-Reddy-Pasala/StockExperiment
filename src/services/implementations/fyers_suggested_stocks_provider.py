@@ -199,7 +199,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
         """
         try:
             if not strategies:
-                strategies = [StrategyType.DEFAULT_RISK, StrategyType.HIGH_RISK]
+                strategies = [StrategyType.UNIFIED]  # Single unified EMA strategy
 
             # Convert StrategyType enum to string for saga
             strategy_strings = [s.value for s in strategies]
@@ -278,7 +278,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
             # Execute saga with technical focus
             saga_results = saga_orchestrator.execute_suggested_stocks_saga(
                 user_id=user_id,
-                strategies=['DEFAULT_RISK'],  # Use default risk for technical screening
+                strategies=['unified'],  # Unified 8-21 EMA strategy
                 limit=criteria.get('limit', 50),
                 search=criteria.get('search'),
                 sort_by=criteria.get('sort_by', 'current_price'),
@@ -338,7 +338,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
             # Execute saga with fundamental focus
             saga_results = saga_orchestrator.execute_suggested_stocks_saga(
                 user_id=user_id,
-                strategies=['DEFAULT_RISK'],  # Use default risk for fundamental screening
+                strategies=['unified'],  # Unified 8-21 EMA strategy
                 limit=criteria.get('limit', 50),
                 search=criteria.get('search'),
                 sort_by=criteria.get('sort_by', 'pe_ratio'),
