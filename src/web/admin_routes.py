@@ -236,9 +236,10 @@ def trigger_pipeline():
     })
 
 
-@admin_bp.route('/trigger/ml-training', methods=['POST'])
-def trigger_ml_training():
-    """Trigger technical indicators calculation (replaces ML training)."""
+@admin_bp.route('/trigger/technical-indicators', methods=['POST'])
+@admin_bp.route('/trigger/ml-training', methods=['POST'])  # Keep old route for backwards compatibility
+def trigger_technical_indicators():
+    """Trigger technical indicators calculation and daily snapshot update."""
     task_id = f"technical_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
     def run_technical_indicators():

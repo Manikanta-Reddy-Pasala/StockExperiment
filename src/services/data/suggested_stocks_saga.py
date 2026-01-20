@@ -487,16 +487,16 @@ class SuggestedStocksSagaOrchestrator:
             suggested_stocks = []
             strategy_counts = {strategy: 0 for strategy in saga.strategies}
             
-            # Apply strategy logic to each stock
+            # Apply strategy logic to each stock (ONE entry per stock - no duplicates)
             for stock_data in filtered_stocks:
                 try:
-                    # Apply each strategy to the stock (with model-specific filtering)
-                    for strategy in saga.strategies:
-                        strategy_result = self._apply_strategy_logic(stock_data, strategy, saga.model_type)
-                        if strategy_result:
-                            suggested_stocks.append(strategy_result)
-                            strategy_counts[strategy] += 1
-                            
+                    # Apply unified strategy only - no need to loop through multiple strategies
+                    strategy = 'unified'  # Always use unified strategy
+                    strategy_result = self._apply_strategy_logic(stock_data, strategy, saga.model_type)
+                    if strategy_result:
+                        suggested_stocks.append(strategy_result)
+                        strategy_counts[strategy] = strategy_counts.get(strategy, 0) + 1
+
                 except Exception as e:
                     logger.warning(f"Failed to apply strategy to stock {stock_data.get('symbol', 'Unknown')}: {e}")
                     continue

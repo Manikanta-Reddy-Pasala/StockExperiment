@@ -51,11 +51,12 @@ class DailySnapshotService:
                 symbol = stock.get('symbol')
 
                 # Prepare data for insert/update
+                # Always use 'unified' strategy to avoid duplicates (one row per symbol per day)
                 data = {
                     'date': snapshot_date,
                     'symbol': symbol,
-                    'strategy': stock.get('strategy', 'ema_8_21'),  # Required for unique constraint
-                    'model_type': stock.get('model_type', 'traditional'),  # Required for unique constraint
+                    'strategy': 'unified',  # Always unified - no duplicates
+                    'model_type': 'traditional',  # Always traditional - no duplicates
                     'stock_name': stock.get('name'),
                     'current_price': stock.get('current_price'),
                     'market_cap': stock.get('market_cap'),

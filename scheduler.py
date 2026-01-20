@@ -150,9 +150,10 @@ def calculate_technical_indicators():
             calculator = get_ema_strategy_calculator(session)
             indicators_results = calculator.calculate_all_indicators(symbols, lookback_days=252)
 
-            # Update stocks table with calculated indicators
+            # Update stocks table with calculated indicators AND current_price from latest historical data
             update_count = 0
             for symbol, indicators in indicators_results.items():
+                # Update indicators, current_price (from latest close), and last_updated timestamp
                 update_query = text("""
                     UPDATE stocks
                     SET
@@ -161,7 +162,9 @@ def calculate_technical_indicators():
                         demarker = :demarker,
                         buy_signal = :buy_signal,
                         sell_signal = :sell_signal,
-                        indicators_last_updated = CURRENT_TIMESTAMP
+                        current_price = COALESCE(:current_price, current_price),
+                        indicators_last_updated = CURRENT_TIMESTAMP,
+                        last_updated = CURRENT_TIMESTAMP
                     WHERE symbol = :symbol
                 """)
 
@@ -171,7 +174,8 @@ def calculate_technical_indicators():
                     'ema_21': indicators.get('ema_21'),
                     'demarker': indicators.get('demarker'),
                     'buy_signal': indicators.get('buy_signal'),
-                    'sell_signal': indicators.get('sell_signal')
+                    'sell_signal': indicators.get('sell_signal'),
+                    'current_price': indicators.get('current_price')  # Latest close price from historical data
                 })
                 update_count += 1
 
