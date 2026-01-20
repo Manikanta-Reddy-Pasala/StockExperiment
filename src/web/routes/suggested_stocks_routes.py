@@ -69,7 +69,9 @@ def get_suggested_stocks():
             order_dir = 'ASC' if sort_order.lower() == 'asc' else 'DESC'
 
             # Build where clause for inner query
-            where_clauses = ["d.date = :date", "(d.buy_signal = TRUE OR d.sell_signal = TRUE)"]
+            # Show ALL suggested stocks - they're in the snapshot for a reason
+            # Fresh signals come from stocks table via COALESCE
+            where_clauses = ["d.date = :date"]
             params = {'date': query_date, 'limit': limit}
 
             if search:
@@ -401,7 +403,6 @@ def get_triple_model_view():
                     FROM daily_suggested_stocks d
                     LEFT JOIN stocks s ON d.symbol = s.symbol
                     WHERE d.date = :date
-                      AND (d.buy_signal = TRUE OR d.sell_signal = TRUE OR s.buy_signal = TRUE OR s.sell_signal = TRUE)
                     ORDER BY d.symbol, d.selection_score DESC
                 ) AS unique_stocks
                 ORDER BY selection_score DESC, ema_trend_score DESC
