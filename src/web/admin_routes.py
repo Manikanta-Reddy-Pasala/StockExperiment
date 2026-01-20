@@ -238,11 +238,32 @@ def trigger_pipeline():
 
 @admin_bp.route('/trigger/ml-training', methods=['POST'])
 def trigger_ml_training():
-    """ML model training removed - using technical indicators instead."""
+    """Trigger technical indicators calculation (replaces ML training)."""
+    task_id = f"technical_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+    def run_technical_indicators():
+        from scheduler import calculate_technical_indicators, update_daily_snapshot
+
+        # Calculate technical indicators
+        logger.info("🔄 Running technical indicators calculation...")
+        calculate_technical_indicators()
+
+        # Update daily snapshot
+        logger.info("🔄 Updating daily snapshot...")
+        update_daily_snapshot()
+
+        return "Technical indicators calculated and daily snapshot updated"
+
+    thread = threading.Thread(
+        target=run_function_async,
+        args=(task_id, run_technical_indicators, 'Calculate Technical Indicators', 'technical_indicators')
+    )
+    thread.start()
+
     return jsonify({
-        'success': False,
-        'error': 'ML training removed. System now uses technical indicators (RS Rating, Waves, Signals).',
-        'message': 'Technical indicators are calculated automatically by scheduler at 10:00 PM.'
+        'success': True,
+        'task_id': task_id,
+        'message': 'Technical indicators calculation started'
     })
 
 
@@ -306,11 +327,19 @@ def trigger_all():
             })
             save_task_to_db(overall_task_id, running_tasks[overall_task_id])
 
-            # Technical indicators are calculated by scheduler, so we just log a message
-            logger.info("✅ Technical indicators will be calculated by scheduler at 10:00 PM")
-            running_tasks[overall_task_id]['output'] += "\n✅ Technical indicators scheduled (runs at 10:00 PM)"
+            # Actually run the technical indicators calculation
+            from scheduler import calculate_technical_indicators, update_daily_snapshot
 
-            running_tasks[overall_task_id]['steps'][-1]['status'] = 'skipped'
+            logger.info("🔄 Running technical indicators calculation...")
+            calculate_technical_indicators()
+            running_tasks[overall_task_id]['output'] += "\n✅ Technical indicators calculated successfully"
+
+            # Also update the daily snapshot with fresh indicators
+            logger.info("🔄 Updating daily snapshot with fresh indicators...")
+            update_daily_snapshot()
+            running_tasks[overall_task_id]['output'] += "\n✅ Daily snapshot updated with fresh indicators"
+
+            running_tasks[overall_task_id]['steps'][-1]['status'] = 'completed'
             running_tasks[overall_task_id]['steps'][-1]['end_time'] = datetime.now().isoformat()
             save_task_to_db(overall_task_id, running_tasks[overall_task_id])
 
@@ -318,9 +347,9 @@ def trigger_all():
             running_tasks[overall_task_id]['steps'][-1]['status'] = 'failed'
             running_tasks[overall_task_id]['steps'][-1]['error'] = str(e)
             running_tasks[overall_task_id]['steps'][-1]['end_time'] = datetime.now().isoformat()
-            running_tasks[overall_task_id]['error'] += f"\nTechnical Indicators check failed: {str(e)}"
+            running_tasks[overall_task_id]['error'] += f"\nTechnical Indicators calculation failed: {str(e)}"
             save_task_to_db(overall_task_id, running_tasks[overall_task_id])
-            logger.error(f"Technical Indicators check failed: {e}", exc_info=True)
+            logger.error(f"Technical Indicators calculation failed: {e}", exc_info=True)
 
         # Mark overall task as completed
         failed_count = len([s for s in running_tasks[overall_task_id]['steps'] if s['status'] == 'failed'])

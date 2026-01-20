@@ -60,65 +60,68 @@ def get_suggested_stocks():
                     'message': 'No recommendations available yet'
                 }), 200
 
-            # Build query with filters
-            query_parts = ["""
-                SELECT
-                    d.symbol,
-                    COALESCE(d.stock_name, s.name) as stock_name,
-                    d.current_price,
-                    d.strategy,
-                    d.selection_score,
-                    d.ema_8,
-                    d.ema_21,
-                    d.ema_trend_score,
-                    d.demarker,
-                    d.fib_target_1,
-                    d.fib_target_2,
-                    d.fib_target_3,
-                    d.buy_signal,
-                    d.sell_signal,
-                    d.signal_quality,
-                    d.recommendation,
-                    d.target_price,
-                    d.stop_loss,
-                    d.rank,
-                    d.reason,
-                    d.pe_ratio,
-                    d.pb_ratio,
-                    d.roe,
-                    d.market_cap,
-                    d.sector,
-                    d.market_cap_category
-                FROM daily_suggested_stocks d
-                LEFT JOIN stocks s ON d.symbol = s.symbol
-                WHERE d.date = :date
-                  AND d.buy_signal = TRUE
-            """]
-
-            params = {'date': query_date}
-
-            # Add search filter
-            if search:
-                query_parts.append("AND (d.symbol ILIKE :search OR d.stock_name ILIKE :search)")
-                params['search'] = f'%{search}%'
-
-            # Add sector filter
-            if sector:
-                query_parts.append("AND d.sector = :sector")
-                params['sector'] = sector
-
-            # Add sorting
+            # Build query with filters - use subquery with DISTINCT ON to avoid duplicates
+            # Then wrap in outer query to apply proper sorting
+            # Also show both buy AND sell signals (not just buy_signal = TRUE)
             valid_sort_fields = ['selection_score', 'current_price', 'ema_trend_score', 'demarker', 'market_cap']
             if sort_by not in valid_sort_fields:
                 sort_by = 'selection_score'
             order_dir = 'ASC' if sort_order.lower() == 'asc' else 'DESC'
-            query_parts.append(f"ORDER BY d.{sort_by} {order_dir}")
 
-            # Add limit
-            query_parts.append("LIMIT :limit")
-            params['limit'] = limit
+            # Build where clause for inner query
+            where_clauses = ["d.date = :date", "(d.buy_signal = TRUE OR d.sell_signal = TRUE)"]
+            params = {'date': query_date, 'limit': limit}
 
-            query = text(' '.join(query_parts))
+            if search:
+                where_clauses.append("(d.symbol ILIKE :search OR d.stock_name ILIKE :search)")
+                params['search'] = f'%{search}%'
+
+            if sector:
+                where_clauses.append("d.sector = :sector")
+                params['sector'] = sector
+
+            where_clause = " AND ".join(where_clauses)
+
+            # Use subquery to deduplicate, then sort in outer query
+            query_sql = f"""
+                SELECT * FROM (
+                    SELECT DISTINCT ON (d.symbol)
+                        d.symbol,
+                        COALESCE(d.stock_name, s.name) as stock_name,
+                        COALESCE(s.current_price, d.current_price) as current_price,
+                        d.strategy,
+                        d.selection_score,
+                        COALESCE(s.ema_8, d.ema_8) as ema_8,
+                        COALESCE(s.ema_21, d.ema_21) as ema_21,
+                        d.ema_trend_score,
+                        COALESCE(s.demarker, d.demarker) as demarker,
+                        d.fib_target_1,
+                        d.fib_target_2,
+                        d.fib_target_3,
+                        COALESCE(s.buy_signal, d.buy_signal) as buy_signal,
+                        COALESCE(s.sell_signal, d.sell_signal) as sell_signal,
+                        d.signal_quality,
+                        d.recommendation,
+                        d.target_price,
+                        d.stop_loss,
+                        d.rank,
+                        d.reason,
+                        d.pe_ratio,
+                        d.pb_ratio,
+                        d.roe,
+                        d.market_cap,
+                        d.sector,
+                        d.market_cap_category
+                    FROM daily_suggested_stocks d
+                    LEFT JOIN stocks s ON d.symbol = s.symbol
+                    WHERE {where_clause}
+                    ORDER BY d.symbol, d.selection_score DESC
+                ) AS unique_stocks
+                ORDER BY {sort_by} {order_dir}
+                LIMIT :limit
+            """
+
+            query = text(query_sql)
             result = session.execute(query, params)
             stocks = [dict(row._mapping) for row in result]
 
@@ -364,41 +367,44 @@ def get_triple_model_view():
         db = get_database_manager()
 
         with db.get_session() as session:
-            # Query 8-21 EMA strategy stocks
+            # Query 8-21 EMA strategy stocks with fresh data from stocks table
+            # Use DISTINCT ON to avoid duplicates from multiple strategies
             query = text("""
-                SELECT
-                    d.symbol,
-                    COALESCE(d.stock_name, s.name) as stock_name,
-                    d.current_price,
-                    d.strategy,
-                    d.selection_score,
-                    d.ema_8,
-                    d.ema_21,
-                    d.ema_trend_score,
-                    d.demarker,
-                    d.fib_target_1,
-                    d.fib_target_2,
-                    d.fib_target_3,
-                    d.buy_signal,
-                    d.sell_signal,
-                    d.signal_quality,
-                    d.recommendation,
-                    d.target_price,
-                    d.stop_loss,
-                    d.rank,
-                    d.reason,
-                    d.pe_ratio,
-                    d.pb_ratio,
-                    d.roe,
-                    d.market_cap,
-                    d.sector,
-                    d.market_cap_category
-                FROM daily_suggested_stocks d
-                LEFT JOIN stocks s ON d.symbol = s.symbol
-                WHERE d.date = :date
-                  AND d.buy_signal = TRUE
-                  AND d.target_price > d.current_price
-                ORDER BY d.strategy, d.selection_score DESC, d.ema_trend_score DESC
+                SELECT * FROM (
+                    SELECT DISTINCT ON (d.symbol)
+                        d.symbol,
+                        COALESCE(d.stock_name, s.name) as stock_name,
+                        COALESCE(s.current_price, d.current_price) as current_price,
+                        d.strategy,
+                        d.selection_score,
+                        COALESCE(s.ema_8, d.ema_8) as ema_8,
+                        COALESCE(s.ema_21, d.ema_21) as ema_21,
+                        d.ema_trend_score,
+                        COALESCE(s.demarker, d.demarker) as demarker,
+                        d.fib_target_1,
+                        d.fib_target_2,
+                        d.fib_target_3,
+                        COALESCE(s.buy_signal, d.buy_signal) as buy_signal,
+                        COALESCE(s.sell_signal, d.sell_signal) as sell_signal,
+                        d.signal_quality,
+                        d.recommendation,
+                        d.target_price,
+                        d.stop_loss,
+                        d.rank,
+                        d.reason,
+                        d.pe_ratio,
+                        d.pb_ratio,
+                        d.roe,
+                        d.market_cap,
+                        d.sector,
+                        d.market_cap_category
+                    FROM daily_suggested_stocks d
+                    LEFT JOIN stocks s ON d.symbol = s.symbol
+                    WHERE d.date = :date
+                      AND (d.buy_signal = TRUE OR d.sell_signal = TRUE OR s.buy_signal = TRUE OR s.sell_signal = TRUE)
+                    ORDER BY d.symbol, d.selection_score DESC
+                ) AS unique_stocks
+                ORDER BY selection_score DESC, ema_trend_score DESC
             """)
 
             result = session.execute(query, {'date': query_date})
