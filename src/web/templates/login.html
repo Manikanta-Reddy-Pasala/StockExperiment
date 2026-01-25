@@ -424,6 +424,11 @@
             const originalText = btn.innerHTML;
 
             try {
+                // Check secure context first
+                if (!window.isSecureContext) {
+                    throw new Error('This page must be accessed via HTTPS. Current protocol: ' + window.location.protocol);
+                }
+
                 btn.disabled = true;
                 btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Authenticating...';
 
@@ -496,7 +501,7 @@
                 if (error.name === 'NotAllowedError') {
                     showError('Authentication was cancelled or timed out');
                 } else if (error.name === 'SecurityError') {
-                    showError('Security error. Please ensure you are using HTTPS.');
+                    showError('Security error. Protocol: ' + window.location.protocol + ', Secure: ' + window.isSecureContext);
                 } else {
                     showError(error.message || 'Passkey authentication failed');
                 }
