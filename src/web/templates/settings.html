@@ -192,6 +192,44 @@
                         </div>
                         
                         <div class="col-md-12">
+                            <h5 class="mt-4">Security & Passkeys</h5>
+                            <hr>
+                        </div>
+
+                        <div class="col-md-12 mb-4">
+                            <div class="card border-0 bg-light">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h6 class="card-title mb-0">
+                                            <i class="bi bi-fingerprint me-2"></i>Passkey Authentication
+                                        </h6>
+                                    </div>
+
+                                    <div class="alert alert-info mb-3">
+                                        <i class="bi bi-info-circle me-2"></i>
+                                        <strong>What are Passkeys?</strong> Passkeys let you sign in using your fingerprint, face, or screen lock instead of a password. They're more secure and convenient.
+                                    </div>
+
+                                    <!-- Registered Passkeys List -->
+                                    <div id="passkeys-list" class="mb-3">
+                                        <div class="text-center py-3">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <p class="mt-2 text-muted small">Loading passkeys...</p>
+                                        </div>
+                                    </div>
+
+                                    <!-- Register New Passkey Button -->
+                                    <button type="button" class="btn btn-primary" id="register-passkey-btn">
+                                        <i class="bi bi-plus-circle me-2"></i>Register New Passkey
+                                    </button>
+                                    <small class="text-muted ms-2" id="passkey-support-status"></small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-12">
                             <h5 class="mt-4">Data Sources</h5>
                             <hr>
                         </div>
@@ -722,12 +760,281 @@
     document.getElementById('refresh-weekly-status').addEventListener('click', fetchWeeklyStatus);
     document.getElementById('test-auto-trading').addEventListener('click', testAutoTrading);
 
+    // ============================================
+    // PASSKEY MANAGEMENT FUNCTIONS
+    // ============================================
+
+    // Check if WebAuthn is supported
+    const isWebAuthnSupported = window.PublicKeyCredential !== undefined;
+
+    // Base64URL encoding/decoding helpers
+    function base64UrlToArrayBuffer(base64url) {
+        const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+        const padding = '='.repeat((4 - base64.length % 4) % 4);
+        const binary = atob(base64 + padding);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes.buffer;
+    }
+
+    function arrayBufferToBase64Url(buffer) {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        const base64 = btoa(binary);
+        return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    }
+
+    // Fetch and display registered passkeys
+    async function fetchPasskeys() {
+        const listContainer = document.getElementById('passkeys-list');
+
+        try {
+            const response = await fetch('/api/auth/webauthn/credentials');
+            const data = await response.json();
+
+            if (data.success && data.credentials) {
+                if (data.credentials.length === 0) {
+                    listContainer.innerHTML = `
+                        <div class="alert alert-secondary mb-0">
+                            <i class="bi bi-shield-x me-2"></i>
+                            No passkeys registered yet. Register one to enable fingerprint/Face ID login.
+                        </div>
+                    `;
+                } else {
+                    let html = '<div class="list-group">';
+                    for (const cred of data.credentials) {
+                        const lastUsed = cred.last_used_at ? new Date(cred.last_used_at).toLocaleDateString() : 'Never';
+                        const createdAt = new Date(cred.created_at).toLocaleDateString();
+                        html += `
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="bi bi-key-fill text-primary me-2"></i>
+                                    <strong>${cred.device_name || 'Passkey'}</strong>
+                                    <br>
+                                    <small class="text-muted">Created: ${createdAt} | Last used: ${lastUsed}</small>
+                                </div>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-secondary me-1" onclick="renamePasskey(${cred.id}, '${cred.device_name || 'Passkey'}')">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deletePasskey(${cred.id})">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    html += '</div>';
+                    listContainer.innerHTML = html;
+                }
+            } else {
+                throw new Error(data.error || 'Failed to fetch passkeys');
+            }
+        } catch (error) {
+            console.error('Error fetching passkeys:', error);
+            listContainer.innerHTML = `
+                <div class="alert alert-danger mb-0">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Error loading passkeys: ${error.message}
+                </div>
+            `;
+        }
+    }
+
+    // Register a new passkey
+    async function registerPasskey() {
+        const btn = document.getElementById('register-passkey-btn');
+        const originalText = btn.innerHTML;
+
+        try {
+            if (!window.isSecureContext) {
+                throw new Error('Passkeys require HTTPS. Please access via https://');
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Starting registration...';
+
+            // Get device name from user
+            const deviceName = prompt('Enter a name for this passkey (e.g., "MacBook Touch ID", "iPhone"):', 'My Passkey');
+            if (!deviceName) {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+                return;
+            }
+
+            // Step 1: Get registration options from server
+            const beginResponse = await fetch('/api/auth/webauthn/register/begin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ device_name: deviceName })
+            });
+
+            const beginData = await beginResponse.json();
+
+            if (!beginData.success) {
+                throw new Error(beginData.error || 'Failed to start registration');
+            }
+
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Touch your fingerprint sensor...';
+
+            const options = beginData.options;
+
+            // Convert base64url values to ArrayBuffer
+            options.challenge = base64UrlToArrayBuffer(options.challenge);
+            options.user.id = base64UrlToArrayBuffer(options.user.id);
+
+            if (options.excludeCredentials) {
+                options.excludeCredentials = options.excludeCredentials.map(cred => ({
+                    ...cred,
+                    id: base64UrlToArrayBuffer(cred.id)
+                }));
+            }
+
+            // Step 2: Create credential with authenticator (Touch ID, etc.)
+            const credential = await navigator.credentials.create({
+                publicKey: options
+            });
+
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Verifying...';
+
+            // Step 3: Prepare credential for server
+            const credentialJSON = {
+                id: credential.id,
+                rawId: arrayBufferToBase64Url(credential.rawId),
+                type: credential.type,
+                response: {
+                    attestationObject: arrayBufferToBase64Url(credential.response.attestationObject),
+                    clientDataJSON: arrayBufferToBase64Url(credential.response.clientDataJSON)
+                }
+            };
+
+            // Add transports if available
+            if (credential.response.getTransports) {
+                credentialJSON.response.transports = credential.response.getTransports();
+            }
+
+            // Step 4: Send to server for verification
+            const completeResponse = await fetch('/api/auth/webauthn/register/complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    credential: credentialJSON,
+                    device_name: deviceName
+                })
+            });
+
+            const completeData = await completeResponse.json();
+
+            if (completeData.success) {
+                showNotification('Passkey registered successfully! You can now use it to sign in.', 'success');
+                fetchPasskeys(); // Refresh the list
+            } else {
+                throw new Error(completeData.error || 'Failed to complete registration');
+            }
+
+        } catch (error) {
+            console.error('Passkey registration error:', error);
+
+            if (error.name === 'NotAllowedError') {
+                showNotification('Registration was cancelled or timed out', 'warning');
+            } else if (error.name === 'SecurityError') {
+                showNotification('Security error. Make sure you are using HTTPS.', 'error');
+            } else {
+                showNotification('Passkey registration failed: ' + error.message, 'error');
+            }
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    }
+
+    // Delete a passkey
+    async function deletePasskey(credentialId) {
+        if (!confirm('Are you sure you want to delete this passkey? You will no longer be able to use it to sign in.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/auth/webauthn/credentials/${credentialId}`, {
+                method: 'DELETE'
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showNotification('Passkey deleted successfully', 'success');
+                fetchPasskeys(); // Refresh the list
+            } else {
+                throw new Error(data.error || 'Failed to delete passkey');
+            }
+        } catch (error) {
+            console.error('Error deleting passkey:', error);
+            showNotification('Error deleting passkey: ' + error.message, 'error');
+        }
+    }
+
+    // Rename a passkey
+    async function renamePasskey(credentialId, currentName) {
+        const newName = prompt('Enter new name for this passkey:', currentName);
+        if (!newName || newName === currentName) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/auth/webauthn/credentials/${credentialId}/rename`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: newName })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showNotification('Passkey renamed successfully', 'success');
+                fetchPasskeys(); // Refresh the list
+            } else {
+                throw new Error(data.error || 'Failed to rename passkey');
+            }
+        } catch (error) {
+            console.error('Error renaming passkey:', error);
+            showNotification('Error renaming passkey: ' + error.message, 'error');
+        }
+    }
+
+    // Initialize passkey section
+    function initPasskeySection() {
+        const registerBtn = document.getElementById('register-passkey-btn');
+        const supportStatus = document.getElementById('passkey-support-status');
+
+        if (!isWebAuthnSupported) {
+            registerBtn.disabled = true;
+            supportStatus.textContent = 'Passkeys not supported in this browser';
+            supportStatus.classList.add('text-danger');
+        } else if (!window.isSecureContext) {
+            registerBtn.disabled = true;
+            supportStatus.textContent = 'HTTPS required for passkeys';
+            supportStatus.classList.add('text-warning');
+        } else {
+            supportStatus.textContent = 'Touch ID / Face ID supported';
+            supportStatus.classList.add('text-success');
+        }
+
+        registerBtn.addEventListener('click', registerPasskey);
+        fetchPasskeys();
+    }
+
     // Fetch data when page loads
     document.addEventListener('DOMContentLoaded', function() {
         fetchSettings();
         fetchBrokerStatus();
         fetchAccountBalance(); // Fetch balance from broker API
         fetchAutoTradingSettings(); // Fetch auto-trading settings
+        initPasskeySection(); // Initialize passkey management
     });
 </script>
 {% endblock %}
