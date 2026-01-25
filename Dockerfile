@@ -10,7 +10,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     FLASK_ENV=production \
     PYTHONPATH=/app
 
-# System dependencies (needed by numpy/pandas and visualization libraries)
+# System dependencies (needed by numpy/pandas, visualization libraries, and Playwright)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
@@ -18,6 +18,7 @@ RUN apt-get update \
         gcc \
         g++ \
         curl \
+        wget \
         pkg-config \
         libblas-dev \
         liblapack-dev \
@@ -26,6 +27,26 @@ RUN apt-get update \
         libjpeg-dev \
         libffi-dev \
         libssl-dev \
+        # Playwright dependencies
+        libnss3 \
+        libnspr4 \
+        libatk1.0-0 \
+        libatk-bridge2.0-0 \
+        libcups2 \
+        libdrm2 \
+        libdbus-1-3 \
+        libxkbcommon0 \
+        libxcomposite1 \
+        libxdamage1 \
+        libxfixes3 \
+        libxrandr2 \
+        libgbm1 \
+        libasound2 \
+        libpango-1.0-0 \
+        libcairo2 \
+        fonts-liberation \
+        fonts-noto-color-emoji \
+        fonts-unifont \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -37,6 +58,9 @@ RUN pip install --upgrade pip setuptools wheel
 
 # Install all dependencies from requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Install Playwright browsers (for automated token refresh)
+RUN pip install playwright && playwright install chromium
 
 # Copy application code
 COPY . .

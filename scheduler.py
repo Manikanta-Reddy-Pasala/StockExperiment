@@ -19,6 +19,7 @@ from src.models.database import get_database_manager
 from src.services.data.daily_snapshot_service import DailySnapshotService
 from src.services.trading.auto_trading_service import get_auto_trading_service
 from src.services.trading.order_performance_tracking_service import get_performance_tracking_service
+from src.services.brokers.fyers_playwright_refresh import refresh_all_user_tokens
 
 # Configure logging
 logging.basicConfig(
@@ -461,6 +462,9 @@ def run_scheduler():
 
     # Schedule token status check every 6 hours
     schedule.every(6).hours.do(check_broker_token_status)
+
+    # Schedule automated token refresh using Playwright every 5 hours
+    schedule.every(5).hours.do(refresh_all_user_tokens)
 
     # Keep scheduler running
     logger.info("✅ Scheduler is now running. Press Ctrl+C to stop.\n")

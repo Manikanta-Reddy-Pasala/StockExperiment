@@ -39,6 +39,13 @@ services:
       - PYTHONPATH=/app
       - FYERS_CLIENT_ID=${FYERS_CLIENT_ID:-your_client_id}
       - FYERS_ACCESS_TOKEN=${FYERS_ACCESS_TOKEN:-your_access_token}
+      - FYERS_PIN=${FYERS_PIN:-9884}
+      - FYERS_CLIENT_ID_LOGIN=${FYERS_CLIENT_ID_LOGIN:-}
+      # Data Provider Mode: 'broker' (only broker), 'yfinance' (only yfinance), 'auto' (broker with yfinance fallback)
+      # Use 'auto' for paper trading - yfinance is used ONLY for price validation, NOT bulk data
+      - DATA_PROVIDER_MODE=${DATA_PROVIDER_MODE:-auto}
+      # Enable yfinance for historical data (disabled by default to avoid rate limits)
+      - YFINANCE_HISTORICAL_ENABLED=${YFINANCE_HISTORICAL_ENABLED:-false}
       # Stock Screening Configuration - Stage 1: Market Data Screening
       - SCREENING_MIN_PRICE_THRESHOLD=${SCREENING_MIN_PRICE_THRESHOLD:-50.0}
       - SCREENING_MIN_DAILY_VOLUME=${SCREENING_MIN_DAILY_VOLUME:-50000}
@@ -113,6 +120,8 @@ services:
       - PYTHONPATH=/app
       - FYERS_CLIENT_ID=${FYERS_CLIENT_ID:-your_client_id}
       - FYERS_ACCESS_TOKEN=${FYERS_ACCESS_TOKEN:-your_access_token}
+      - FYERS_PIN=${FYERS_PIN:-9884}
+      - FYERS_CLIENT_ID_LOGIN=${FYERS_CLIENT_ID_LOGIN:-}
       # Stock Screening Configuration - Stage 1: Market Data Screening
       - SCREENING_MIN_PRICE_THRESHOLD=${SCREENING_MIN_PRICE_THRESHOLD:-50.0}
       - SCREENING_MIN_DAILY_VOLUME=${SCREENING_MIN_DAILY_VOLUME:-50000}
@@ -174,6 +183,8 @@ services:
       - PYTHONPATH=/app
       - FYERS_CLIENT_ID=${FYERS_CLIENT_ID:-your_client_id}
       - FYERS_ACCESS_TOKEN=${FYERS_ACCESS_TOKEN:-your_access_token}
+      - FYERS_PIN=${FYERS_PIN:-9884}
+      - FYERS_CLIENT_ID_LOGIN=${FYERS_CLIENT_ID_LOGIN:-}
       # Stock Screening Configuration - Stage 1: Market Data Screening
       - SCREENING_MIN_PRICE_THRESHOLD=${SCREENING_MIN_PRICE_THRESHOLD:-50.0}
       - SCREENING_MIN_DAILY_VOLUME=${SCREENING_MIN_DAILY_VOLUME:-50000}

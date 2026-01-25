@@ -433,3 +433,509 @@ def get_weekly_status():
             'success': False,
             'error': 'Internal server error'
         }), 500
+
+
+# ==========================================
+# PAPER TRADING ENDPOINTS
+# ==========================================
+
+@auto_trading_bp.route('/paper-trading/status', methods=['GET'])
+@login_required
+def get_paper_trading_status():
+    """
+    Get paper trading status and mode for current user.
+    """
+    try:
+        from src.models.database import get_database_manager
+        from src.models.models import User
+
+        user_id = current_user.id
+
+        with get_database_manager().get_session() as session:
+            user = session.query(User).filter_by(id=user_id).first()
+
+            if not user:
+                return jsonify({
+                    'success': False,
+                    'error': 'User not found'
+                }), 404
+
+            return jsonify({
+                'success': True,
+                'paper_trading_enabled': user.is_mock_trading_mode,
+                'mode': 'paper' if user.is_mock_trading_mode else 'live'
+            }), 200
+
+    except Exception as e:
+        logger.error(f"Error getting paper trading status: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
+
+@auto_trading_bp.route('/paper-trading/toggle', methods=['POST'])
+@login_required
+def toggle_paper_trading():
+    """
+    Toggle paper trading mode on/off.
+    """
+    try:
+        from src.models.database import get_database_manager
+        from src.models.models import User
+
+        user_id = current_user.id
+        data = request.get_json() or {}
+        enable = data.get('enable', True)
+
+        with get_database_manager().get_session() as session:
+            user = session.query(User).filter_by(id=user_id).first()
+
+            if not user:
+                return jsonify({
+                    'success': False,
+                    'error': 'User not found'
+                }), 404
+
+            user.is_mock_trading_mode = enable
+            session.commit()
+
+            return jsonify({
+                'success': True,
+                'paper_trading_enabled': user.is_mock_trading_mode,
+                'mode': 'paper' if user.is_mock_trading_mode else 'live',
+                'message': f"Paper trading {'enabled' if enable else 'disabled'}"
+            }), 200
+
+    except Exception as e:
+        logger.error(f"Error toggling paper trading: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
+
+@auto_trading_bp.route('/paper-trading/portfolio', methods=['GET'])
+@login_required
+def get_paper_portfolio():
+    """
+    Get paper trading portfolio summary with P&L.
+
+    Returns:
+        - Initial capital (configurable, default 100,000)
+        - Current capital (cash + positions value)
+        - Cash available
+        - Positions value
+        - Total P&L (realized + unrealized)
+        - Total P&L percentage
+        - Active positions count
+        - Win rate
+    """
+    try:
+        from src.models.database import get_database_manager
+        from src.models.models import OrderPerformance, Order, User
+        from sqlalchemy import func, and_
+
+        user_id = current_user.id
+
+        # Default initial capital for paper trading
+        INITIAL_CAPITAL = 100000.0
+
+        with get_database_manager().get_session() as session:
+            # Verify user is in paper trading mode
+            user = session.query(User).filter_by(id=user_id).first()
+            if not user or not user.is_mock_trading_mode:
+                return jsonify({
+                    'success': False,
+                    'error': 'Paper trading not enabled for this user'
+                }), 400
+
+            # Get all paper trading orders (is_mock_order = True)
+            mock_orders = session.query(Order).filter(
+                and_(
+                    Order.user_id == user_id,
+                    Order.is_mock_order == True,
+                    Order.transaction_type == 'BUY',
+                    Order.order_status.in_(['COMPLETE', 'EXECUTED'])
+                )
+            ).all()
+
+            order_ids = [o.id for o in mock_orders]
+
+            if not order_ids:
+                # No paper trades yet
+                return jsonify({
+                    'success': True,
+                    'initial_capital': INITIAL_CAPITAL,
+                    'current_capital': INITIAL_CAPITAL,
+                    'cash_available': INITIAL_CAPITAL,
+                    'positions_value': 0.0,
+                    'total_invested': 0.0,
+                    'total_pnl': 0.0,
+                    'total_pnl_pct': 0.0,
+                    'realized_pnl': 0.0,
+                    'unrealized_pnl': 0.0,
+                    'active_positions': 0,
+                    'closed_positions': 0,
+                    'profitable_trades': 0,
+                    'loss_trades': 0,
+                    'win_rate': 0.0
+                }), 200
+
+            # Get performance data for paper orders
+            performances = session.query(OrderPerformance).filter(
+                OrderPerformance.order_id.in_(order_ids)
+            ).all()
+
+            # Calculate portfolio metrics
+            active_positions = [p for p in performances if p.is_active]
+            closed_positions = [p for p in performances if not p.is_active]
+
+            # Calculate values
+            total_invested = sum((p.entry_price or 0) * (p.quantity or 0) for p in performances)
+            positions_value = sum((p.current_price or p.entry_price or 0) * (p.quantity or 0) for p in active_positions)
+
+            realized_pnl = sum(p.realized_pnl or 0 for p in closed_positions)
+            unrealized_pnl = sum(p.unrealized_pnl or 0 for p in active_positions)
+            total_pnl = realized_pnl + unrealized_pnl
+
+            # Calculate cash: initial capital - invested in active positions + realized gains/losses
+            active_invested = sum((p.entry_price or 0) * (p.quantity or 0) for p in active_positions)
+            cash_available = INITIAL_CAPITAL - active_invested + realized_pnl
+
+            current_capital = cash_available + positions_value
+
+            # Calculate win rate
+            profitable_trades = len([p for p in closed_positions if (p.realized_pnl or 0) > 0])
+            loss_trades = len([p for p in closed_positions if (p.realized_pnl or 0) < 0])
+            total_closed = len(closed_positions)
+            win_rate = (profitable_trades / total_closed * 100) if total_closed > 0 else 0.0
+
+            # Calculate P&L percentage
+            total_pnl_pct = (total_pnl / INITIAL_CAPITAL * 100) if INITIAL_CAPITAL > 0 else 0.0
+
+            return jsonify({
+                'success': True,
+                'initial_capital': INITIAL_CAPITAL,
+                'current_capital': round(current_capital, 2),
+                'cash_available': round(cash_available, 2),
+                'positions_value': round(positions_value, 2),
+                'total_invested': round(total_invested, 2),
+                'total_pnl': round(total_pnl, 2),
+                'total_pnl_pct': round(total_pnl_pct, 2),
+                'realized_pnl': round(realized_pnl, 2),
+                'unrealized_pnl': round(unrealized_pnl, 2),
+                'active_positions': len(active_positions),
+                'closed_positions': len(closed_positions),
+                'profitable_trades': profitable_trades,
+                'loss_trades': loss_trades,
+                'win_rate': round(win_rate, 2)
+            }), 200
+
+    except Exception as e:
+        logger.error(f"Error getting paper portfolio: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
+
+@auto_trading_bp.route('/paper-trading/daily-pnl', methods=['GET'])
+@login_required
+def get_paper_daily_pnl():
+    """
+    Get daily P&L history for paper trading portfolio.
+
+    Query parameters:
+        - days: Number of days to retrieve (default: 30)
+
+    Returns:
+        Array of daily P&L data points for charting.
+    """
+    try:
+        from src.models.database import get_database_manager
+        from src.models.models import OrderPerformance, OrderPerformanceSnapshot, Order, User
+        from sqlalchemy import func, and_
+        from datetime import date
+
+        user_id = current_user.id
+        days = int(request.args.get('days', 30))
+
+        INITIAL_CAPITAL = 100000.0
+        start_date = date.today() - timedelta(days=days)
+
+        with get_database_manager().get_session() as session:
+            # Verify user is in paper trading mode
+            user = session.query(User).filter_by(id=user_id).first()
+            if not user or not user.is_mock_trading_mode:
+                return jsonify({
+                    'success': False,
+                    'error': 'Paper trading not enabled for this user'
+                }), 400
+
+            # Get paper trading order IDs
+            mock_orders = session.query(Order).filter(
+                and_(
+                    Order.user_id == user_id,
+                    Order.is_mock_order == True,
+                    Order.transaction_type == 'BUY',
+                    Order.order_status.in_(['COMPLETE', 'EXECUTED'])
+                )
+            ).all()
+
+            order_ids = [o.id for o in mock_orders]
+
+            if not order_ids:
+                # Return empty chart data
+                return jsonify({
+                    'success': True,
+                    'daily_pnl': [],
+                    'total_days': 0
+                }), 200
+
+            # Get performance IDs for these orders
+            perf_ids = session.query(OrderPerformance.id).filter(
+                OrderPerformance.order_id.in_(order_ids)
+            ).all()
+            perf_ids = [p[0] for p in perf_ids]
+
+            if not perf_ids:
+                return jsonify({
+                    'success': True,
+                    'daily_pnl': [],
+                    'total_days': 0
+                }), 200
+
+            # Query daily snapshots grouped by date
+            daily_data = session.query(
+                OrderPerformanceSnapshot.snapshot_date,
+                func.sum(OrderPerformanceSnapshot.unrealized_pnl).label('total_pnl'),
+                func.sum(OrderPerformanceSnapshot.value).label('total_value'),
+                func.count(OrderPerformanceSnapshot.id).label('positions_count')
+            ).filter(
+                and_(
+                    OrderPerformanceSnapshot.order_performance_id.in_(perf_ids),
+                    OrderPerformanceSnapshot.snapshot_date >= start_date
+                )
+            ).group_by(OrderPerformanceSnapshot.snapshot_date).order_by(
+                OrderPerformanceSnapshot.snapshot_date
+            ).all()
+
+            # Format response
+            daily_pnl = []
+            for row in daily_data:
+                pnl = float(row.total_pnl or 0)
+                pnl_pct = (pnl / INITIAL_CAPITAL * 100) if INITIAL_CAPITAL > 0 else 0
+
+                daily_pnl.append({
+                    'date': row.snapshot_date.isoformat() if row.snapshot_date else None,
+                    'pnl': round(pnl, 2),
+                    'pnl_pct': round(pnl_pct, 2),
+                    'portfolio_value': round(float(row.total_value or 0), 2),
+                    'positions_count': row.positions_count
+                })
+
+            return jsonify({
+                'success': True,
+                'daily_pnl': daily_pnl,
+                'total_days': len(daily_pnl),
+                'initial_capital': INITIAL_CAPITAL
+            }), 200
+
+    except Exception as e:
+        logger.error(f"Error getting daily P&L: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
+
+@auto_trading_bp.route('/paper-trading/positions', methods=['GET'])
+@login_required
+def get_paper_positions():
+    """
+    Get paper trading positions (active and/or closed).
+
+    Query parameters:
+        - status: 'active', 'closed', or 'all' (default: 'all')
+
+    Returns:
+        List of positions with entry price, current price, P&L, etc.
+    """
+    try:
+        from src.models.database import get_database_manager
+        from src.models.models import OrderPerformance, Order, User
+        from sqlalchemy import and_
+
+        user_id = current_user.id
+        status = request.args.get('status', 'all')
+
+        with get_database_manager().get_session() as session:
+            # Verify user is in paper trading mode
+            user = session.query(User).filter_by(id=user_id).first()
+            if not user or not user.is_mock_trading_mode:
+                return jsonify({
+                    'success': False,
+                    'error': 'Paper trading not enabled for this user'
+                }), 400
+
+            # Get paper trading order IDs
+            mock_orders = session.query(Order).filter(
+                and_(
+                    Order.user_id == user_id,
+                    Order.is_mock_order == True,
+                    Order.transaction_type == 'BUY',
+                    Order.order_status.in_(['COMPLETE', 'EXECUTED'])
+                )
+            ).all()
+
+            order_ids = [o.id for o in mock_orders]
+
+            if not order_ids:
+                return jsonify({
+                    'success': True,
+                    'positions': [],
+                    'total': 0
+                }), 200
+
+            # Query positions
+            query = session.query(OrderPerformance).filter(
+                OrderPerformance.order_id.in_(order_ids)
+            )
+
+            if status == 'active':
+                query = query.filter(OrderPerformance.is_active == True)
+            elif status == 'closed':
+                query = query.filter(OrderPerformance.is_active == False)
+
+            performances = query.order_by(OrderPerformance.created_at.desc()).all()
+
+            # Format positions
+            positions = []
+            for p in performances:
+                position = {
+                    'id': p.id,
+                    'symbol': p.symbol,
+                    'quantity': p.quantity,
+                    'entry_price': float(p.entry_price) if p.entry_price else None,
+                    'current_price': float(p.current_price) if p.current_price else None,
+                    'entry_date': p.created_at.isoformat() if p.created_at else None,
+                    'strategy': p.strategy,
+                    'is_active': p.is_active,
+                    'days_held': p.days_held,
+
+                    # P&L
+                    'unrealized_pnl': float(p.unrealized_pnl) if p.unrealized_pnl else 0,
+                    'unrealized_pnl_pct': float(p.unrealized_pnl_pct) if p.unrealized_pnl_pct else 0,
+                    'realized_pnl': float(p.realized_pnl) if p.realized_pnl else 0,
+                    'realized_pnl_pct': float(p.realized_pnl_pct) if p.realized_pnl_pct else 0,
+
+                    # Targets
+                    'stop_loss': float(p.stop_loss) if p.stop_loss else None,
+                    'target_price': float(p.target_price) if p.target_price else None,
+
+                    # Performance
+                    'is_profitable': p.is_profitable,
+                    'performance_rating': p.performance_rating,
+                    'max_profit_reached': float(p.max_profit_reached) if p.max_profit_reached else None,
+                    'max_loss_reached': float(p.max_loss_reached) if p.max_loss_reached else None,
+
+                    # Exit info (for closed positions)
+                    'exit_price': float(p.exit_price) if p.exit_price else None,
+                    'exit_date': p.exit_date.isoformat() if p.exit_date else None,
+                    'exit_reason': p.exit_reason
+                }
+                positions.append(position)
+
+            return jsonify({
+                'success': True,
+                'positions': positions,
+                'total': len(positions),
+                'active_count': len([p for p in positions if p['is_active']]),
+                'closed_count': len([p for p in positions if not p['is_active']])
+            }), 200
+
+    except Exception as e:
+        logger.error(f"Error getting paper positions: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
+
+@auto_trading_bp.route('/paper-trading/reset', methods=['POST'])
+@login_required
+def reset_paper_portfolio():
+    """
+    Reset paper trading portfolio - closes all positions and resets capital.
+
+    This will:
+    - Close all active paper positions
+    - Delete all paper trading orders and performance data
+    - Reset to initial capital
+    """
+    try:
+        from src.models.database import get_database_manager
+        from src.models.models import OrderPerformance, OrderPerformanceSnapshot, Order, User
+        from sqlalchemy import and_
+
+        user_id = current_user.id
+
+        with get_database_manager().get_session() as session:
+            # Verify user is in paper trading mode
+            user = session.query(User).filter_by(id=user_id).first()
+            if not user or not user.is_mock_trading_mode:
+                return jsonify({
+                    'success': False,
+                    'error': 'Paper trading not enabled for this user'
+                }), 400
+
+            # Get paper trading orders
+            mock_orders = session.query(Order).filter(
+                and_(
+                    Order.user_id == user_id,
+                    Order.is_mock_order == True
+                )
+            ).all()
+
+            order_ids = [o.id for o in mock_orders]
+            deleted_orders = len(order_ids)
+
+            if order_ids:
+                # Get performance IDs
+                perf_ids = session.query(OrderPerformance.id).filter(
+                    OrderPerformance.order_id.in_(order_ids)
+                ).all()
+                perf_ids = [p[0] for p in perf_ids]
+
+                # Delete snapshots
+                if perf_ids:
+                    session.query(OrderPerformanceSnapshot).filter(
+                        OrderPerformanceSnapshot.order_performance_id.in_(perf_ids)
+                    ).delete(synchronize_session=False)
+
+                # Delete performance records
+                session.query(OrderPerformance).filter(
+                    OrderPerformance.order_id.in_(order_ids)
+                ).delete(synchronize_session=False)
+
+                # Delete orders
+                session.query(Order).filter(
+                    Order.id.in_(order_ids)
+                ).delete(synchronize_session=False)
+
+            session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': 'Paper trading portfolio reset successfully',
+                'deleted_orders': deleted_orders,
+                'initial_capital': 100000.0
+            }), 200
+
+    except Exception as e:
+        logger.error(f"Error resetting paper portfolio: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500

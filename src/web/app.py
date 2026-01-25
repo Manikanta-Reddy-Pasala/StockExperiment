@@ -1067,14 +1067,14 @@ def create_app():
                 'error': str(e)
             }), 500
 
-    # Suggested Stocks API Routes - Updated to use unified multi-broker system
+    # Suggested Stocks API Routes - Read from daily snapshot table (not live saga)
     @app.route('/api/suggested-stocks', methods=['GET'])
     @login_required
     def api_get_suggested_stocks():
-        """Get suggested stocks using unified multi-broker system."""
+        """Get suggested stocks from pre-calculated daily recommendations."""
         try:
-            from .routes.unified_routes import api_get_suggested_stocks as unified_suggested_stocks
-            return unified_suggested_stocks()
+            from .routes.suggested_stocks_routes import get_suggested_stocks as get_suggested_stocks_from_db
+            return get_suggested_stocks_from_db()
         except Exception as e:
             app.logger.error(f"Error getting suggested stocks for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
@@ -1322,6 +1322,13 @@ def create_app():
         app.logger.warning(f"Admin routes not available: {e}")
         app.logger.warning("Admin dashboard functionality will be disabled")
 
+    # Register data management routes (yfinance, data population)
+    try:
+        from .routes.data_management_routes import data_management_bp
+        app.register_blueprint(data_management_bp)
+        app.logger.info("Data management routes registered successfully")
+    except ImportError as e:
+        app.logger.warning(f"Data management routes not available: {e}")
 
     # Individual broker page routes
     @app.route('/brokers/fyers')

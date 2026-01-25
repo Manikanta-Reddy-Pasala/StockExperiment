@@ -277,8 +277,44 @@ class AutoTradingService:
             }
 
     def _check_account_balance(self, user_id: int, execution: AutoTradingExecution) -> Dict[str, Any]:
-        """Check account balance from broker."""
+        """Check account balance from broker or use virtual capital for paper trading."""
         try:
+            from src.models.models import User, Order
+            from sqlalchemy import func
+
+            # Check if user is in paper trading mode (use self.session to avoid detaching)
+            user = self.session.query(User).filter(User.id == user_id).first()
+            is_paper_trading = user.is_mock_trading_mode if user else False
+
+            if is_paper_trading:
+                # Paper trading: use virtual capital of ₹100,000
+                virtual_capital = 100000.0
+
+                # Calculate used capital from existing paper orders (price * quantity)
+                used_capital = self.session.query(
+                    func.coalesce(func.sum(Order.price * Order.quantity), 0)
+                ).filter(
+                    Order.user_id == user_id,
+                    Order.is_mock_order == True,
+                    Order.order_status.in_(['open', 'pending', 'partial', 'PENDING', 'OPEN'])
+                ).scalar() or 0.0
+                used_capital = float(used_capital)
+
+                available_balance = virtual_capital - used_capital
+                total_balance = virtual_capital
+
+                # Store in execution log
+                execution.account_balance = total_balance
+                execution.available_to_invest = available_balance
+
+                logger.info(f"📝 Paper trading mode: Virtual balance ₹{available_balance:.2f} available (₹{used_capital:.2f} in use)")
+                return {
+                    'proceed': True,
+                    'available_balance': available_balance,
+                    'is_paper_trading': True
+                }
+
+            # Live trading: check actual broker balance
             from src.services.core.unified_broker_service import get_unified_broker_service
 
             unified_service = get_unified_broker_service()
@@ -295,6 +331,10 @@ class AutoTradingService:
             balance_data = balance_result.get('data', {})
             available_balance = balance_data.get('available_cash', 0.0)
             total_balance = balance_data.get('total_balance', 0.0)
+
+            # Convert to float if string (broker API sometimes returns strings)
+            available_balance = float(available_balance) if available_balance else 0.0
+            total_balance = float(total_balance) if total_balance else 0.0
 
             # Store in execution log
             execution.account_balance = total_balance
