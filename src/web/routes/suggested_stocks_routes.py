@@ -494,6 +494,69 @@ def get_dual_model_view():
     return get_triple_model_view()
 
 
+@suggested_stocks_bp.route('/recalculate', methods=['POST'])
+@login_required
+def recalculate_suggestions():
+    """
+    Trigger on-demand recalculation of suggested stocks.
+
+    This runs the full 8-21 EMA strategy pipeline and updates
+    the daily_suggested_stocks table with fresh recommendations.
+    """
+    try:
+        import threading
+        from datetime import datetime
+
+        user_id = current_user.id
+        logger.info(f"🔄 Manual recalculation requested by user {user_id}")
+
+        # Check if user is admin (optional - you can remove this check)
+        # if not current_user.is_admin:
+        #     return jsonify({
+        #         'success': False,
+        #         'error': 'Admin privileges required for recalculation'
+        #     }), 403
+
+        def run_recalculation():
+            """Background task to run recalculation."""
+            try:
+                from ...services.data.suggested_stocks_saga import SuggestedStocksSagaOrchestrator
+
+                logger.info("📊 Starting suggested stocks recalculation...")
+
+                orchestrator = SuggestedStocksSagaOrchestrator()
+                result = orchestrator.execute_suggested_stocks_saga(
+                    user_id=1,  # System user
+                    strategies=['unified'],
+                    limit=50
+                )
+
+                if result.get('success'):
+                    logger.info(f"✅ Recalculation completed: {result.get('total_stocks', 0)} stocks")
+                else:
+                    logger.error(f"❌ Recalculation failed: {result.get('error')}")
+
+            except Exception as e:
+                logger.error(f"❌ Recalculation error: {e}", exc_info=True)
+
+        # Run in background thread to avoid timeout
+        thread = threading.Thread(target=run_recalculation, daemon=True)
+        thread.start()
+
+        return jsonify({
+            'success': True,
+            'message': 'Recalculation started in background. Refresh the page in a few moments to see updated results.',
+            'started_at': datetime.now().isoformat()
+        }), 202  # 202 Accepted
+
+    except Exception as e:
+        logger.error(f"Error starting recalculation: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'Failed to start recalculation: {str(e)}'
+        }), 500
+
+
 @suggested_stocks_bp.route('/market-sentiment', methods=['GET'])
 @login_required
 def get_market_sentiment():

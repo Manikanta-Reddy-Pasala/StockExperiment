@@ -17,6 +17,9 @@
                 </div>
             </div>
             <div class="d-flex gap-2">
+                <button class="btn btn-warning btn-sm" id="recalculate-btn" title="Recalculate stock picks using latest data">
+                    <i class="bi bi-calculator"></i> Recalculate Now
+                </button>
                 <button class="btn btn-light btn-sm" id="refresh-btn">
                     <i class="bi bi-arrow-repeat"></i> Refresh
                 </button>
@@ -363,6 +366,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.getElementById('refresh-btn').addEventListener('click', function() {
         loadSuggestedStocks();
+    });
+
+    document.getElementById('recalculate-btn').addEventListener('click', function() {
+        recalculateSuggestions();
     });
 
     document.getElementById('export-btn').addEventListener('click', function() {
@@ -730,6 +737,77 @@ function confirmBulkBuy() {
     alert(`Placing orders for ${allStocks.length} stocks with ₹${investment} each`);
     // Implement bulk order placement logic here
     bootstrap.Modal.getInstance(document.getElementById('bulkBuyModal')).hide();
+}
+
+async function recalculateSuggestions() {
+    const btn = document.getElementById('recalculate-btn');
+    const originalText = btn.innerHTML;
+
+    // Confirm action
+    if (!confirm('This will recalculate stock picks using the latest data. This may take a few minutes. Continue?')) {
+        return;
+    }
+
+    try {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Calculating...';
+
+        const response = await fetch('/api/suggested-stocks/recalculate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Show success message
+            showNotification('success', 'Recalculation started! The page will refresh in 30 seconds with updated results.');
+
+            // Change button to show waiting state
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Processing...';
+
+            // Auto-refresh after 30 seconds
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+                loadSuggestedStocks();
+                showNotification('info', 'Data refreshed! Check for updated stock picks.');
+            }, 30000);
+
+        } else {
+            showNotification('danger', 'Recalculation failed: ' + (data.error || 'Unknown error'));
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+
+    } catch (error) {
+        console.error('Recalculation error:', error);
+        showNotification('danger', 'Error starting recalculation: ' + error.message);
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
+
+function showNotification(type, message) {
+    // Create notification element
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 80px; right: 20px; z-index: 9999; max-width: 400px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+
+    document.body.appendChild(alertDiv);
+
+    // Auto-remove after 10 seconds
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 10000);
 }
 
 function exportToCSV() {
