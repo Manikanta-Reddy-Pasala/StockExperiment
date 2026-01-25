@@ -1330,6 +1330,14 @@ def create_app():
     except ImportError as e:
         app.logger.warning(f"Data management routes not available: {e}")
 
+    # Register WebAuthn/Passkey authentication routes
+    try:
+        from .routes.auth_routes import auth_bp
+        app.register_blueprint(auth_bp)
+        app.logger.info("WebAuthn authentication routes registered successfully")
+    except ImportError as e:
+        app.logger.warning(f"WebAuthn routes not available: {e}")
+
     # Individual broker page routes
     @app.route('/brokers/fyers')
     @login_required

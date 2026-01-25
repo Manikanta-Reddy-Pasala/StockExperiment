@@ -46,6 +46,10 @@ services:
       - DATA_PROVIDER_MODE=${DATA_PROVIDER_MODE:-auto}
       # Enable yfinance for historical data (disabled by default to avoid rate limits)
       - YFINANCE_HISTORICAL_ENABLED=${YFINANCE_HISTORICAL_ENABLED:-false}
+      # WebAuthn/Passkey Configuration (update for production domain)
+      - WEBAUTHN_RP_ID=${WEBAUTHN_RP_ID:-77.42.45.12}
+      - WEBAUTHN_RP_NAME=${WEBAUTHN_RP_NAME:-Trading System}
+      - WEBAUTHN_RP_ORIGIN=${WEBAUTHN_RP_ORIGIN:-http://77.42.45.12:5001}
       # Stock Screening Configuration - Stage 1: Market Data Screening
       - SCREENING_MIN_PRICE_THRESHOLD=${SCREENING_MIN_PRICE_THRESHOLD:-50.0}
       - SCREENING_MIN_DAILY_VOLUME=${SCREENING_MIN_DAILY_VOLUME:-50000}

@@ -1,7 +1,7 @@
 """
 Data Models for the Automated Trading System
 """
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text, ForeignKey, UniqueConstraint, LargeBinary
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from flask_login import UserMixin
@@ -44,9 +44,33 @@ class User(UserMixin, Base):
     auto_trading_settings = relationship("AutoTradingSettings", back_populates="user", uselist=False)
     auto_trading_executions = relationship("AutoTradingExecution", back_populates="user")
     order_performances = relationship("OrderPerformance", back_populates="user")
-    
+    webauthn_credentials = relationship("WebAuthnCredential", back_populates="user", cascade="all, delete-orphan")
+
     def __repr__(self):
         return f'<User {self.username}>'
+
+
+class WebAuthnCredential(Base):
+    """WebAuthn/Passkey credential storage for passwordless authentication."""
+    __tablename__ = 'webauthn_credentials'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    credential_id = Column(LargeBinary, unique=True, nullable=False)  # Raw credential ID bytes
+    public_key = Column(LargeBinary, nullable=False)  # COSE public key bytes
+    sign_count = Column(Integer, default=0)  # Signature counter for clone detection
+    device_name = Column(String(255), default='Passkey')  # User-friendly device name
+    transports = Column(Text)  # JSON array of transports: ["usb", "ble", "nfc", "internal"]
+    aaguid = Column(String(36))  # Authenticator AAGUID for device identification
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_used_at = Column(DateTime)
+
+    # Relationship
+    user = relationship("User", back_populates="webauthn_credentials")
+
+    def __repr__(self):
+        return f'<WebAuthnCredential {self.device_name} for user {self.user_id}>'
 
 
 class Instrument(Base):
