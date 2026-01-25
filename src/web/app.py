@@ -267,6 +267,7 @@ def create_app():
 
     
     @app.route('/')
+    @app.route('/dashboard')
     @login_required
     def dashboard():
         """Dashboard page."""
