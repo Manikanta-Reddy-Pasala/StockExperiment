@@ -21,12 +21,13 @@ from src.services.trading.auto_trading_service import get_auto_trading_service
 from src.services.trading.order_performance_tracking_service import get_performance_tracking_service
 from src.services.brokers.fyers_token_refresh import FyersTokenRefreshService
 
-# Configure logging
+# Configure logging with rotation (max 50MB per file, keep 5 backups)
+from logging.handlers import RotatingFileHandler
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('logs/scheduler.log'),
+        RotatingFileHandler('logs/scheduler.log', maxBytes=50*1024*1024, backupCount=5),
         logging.StreamHandler()
     ]
 )

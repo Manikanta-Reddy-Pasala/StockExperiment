@@ -15,122 +15,82 @@ import subprocess
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-# Configure logging
+# Configure logging with rotation (max 50MB per file, keep 5 backups)
+from logging.handlers import RotatingFileHandler
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('logs/data_scheduler.log'),
+        RotatingFileHandler('logs/data_scheduler.log', maxBytes=50*1024*1024, backupCount=5),
         logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
 
 
+def _run_subprocess_with_retry(cmd: list, label: str, timeout: int = 3600, max_retries: int = 2):
+    """Run a subprocess with retry logic."""
+    for attempt in range(1, max_retries + 1):
+        try:
+            logger.info(f"Running {label} (attempt {attempt}/{max_retries})...")
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout
+            )
+
+            if result.returncode == 0:
+                logger.info(f"  {label} completed successfully")
+                if result.stdout:
+                    # Log last 20 lines to avoid flooding
+                    lines = result.stdout.strip().split('\n')
+                    if len(lines) > 20:
+                        logger.info(f"  Output (last 20 lines):\n{''.join(lines[-20:])}")
+                    else:
+                        logger.info(f"  Output:\n{result.stdout}")
+                return True
+            else:
+                logger.error(f"  {label} failed (return code {result.returncode})")
+                if result.stderr:
+                    logger.error(f"  Error:\n{result.stderr[-500:]}")
+                if attempt < max_retries:
+                    import time as _time
+                    wait = 30 * attempt
+                    logger.info(f"  Retrying in {wait}s...")
+                    _time.sleep(wait)
+
+        except subprocess.TimeoutExpired:
+            logger.error(f"  {label} timeout after {timeout}s")
+        except Exception as e:
+            logger.error(f"  {label} error: {e}", exc_info=True)
+
+    logger.error(f"  {label} failed after {max_retries} attempts")
+    return False
+
+
 def run_data_pipeline():
-    """
-    Run complete data pipeline (Daily at 9:00 PM after market close).
-    Steps:
-    1. SYMBOL_MASTER - Fetch NSE symbols
-    2. STOCKS - Update stock prices and market cap
-    3. HISTORICAL_DATA - Fetch 1-year OHLCV data
-    4. TECHNICAL_INDICATORS - Calculate RSI, MACD, SMA, EMA, ATR
-    5. COMPREHENSIVE_METRICS - Calculate volatility metrics
-    6. PIPELINE_VALIDATION - Validate data quality
-    """
+    """Run complete data pipeline (Daily at 9:00 PM after market close)."""
     logger.info("=" * 80)
     logger.info("Starting Data Pipeline (6-Step Saga)")
     logger.info("=" * 80)
-    
-    try:
-        # Run the main pipeline
-        result = subprocess.run(
-            ['python3', 'run_pipeline.py'],
-            capture_output=True,
-            text=True,
-            timeout=3600  # 1 hour timeout
-        )
-        
-        if result.returncode == 0:
-            logger.info("✅ Data pipeline completed successfully at 9:00 PM")
-            logger.info(f"Output:\n{result.stdout}")
-        else:
-            logger.error(f"❌ Data pipeline failed with return code {result.returncode}")
-            logger.error(f"Error:\n{result.stderr}")
-            
-    except subprocess.TimeoutExpired:
-        logger.error("❌ Data pipeline timeout after 1 hour")
-    except Exception as e:
-        logger.error(f"❌ Data pipeline error: {e}", exc_info=True)
+    _run_subprocess_with_retry(['python3', 'run_pipeline.py'], 'Data Pipeline', timeout=3600, max_retries=2)
 
 
 def fill_missing_data():
-    """
-    Fill missing data fields (Daily at 9:30 PM after pipeline).
-    - adj_close
-    - liquidity_score
-    - atr_14, atr_percentage
-    - avg_daily_volume_20d
-    - historical_volatility_1y
-    """
+    """Fill missing data fields (Daily at 9:30 PM after pipeline)."""
     logger.info("=" * 80)
     logger.info("Filling Missing Data Fields")
     logger.info("=" * 80)
-    
-    try:
-        result = subprocess.run(
-            ['python3', 'fill_data_sql.py'],
-            capture_output=True,
-            text=True,
-            timeout=600  # 10 minutes
-        )
-        
-        if result.returncode == 0:
-            logger.info("✅ Missing data filled successfully at 9:30 PM")
-            logger.info(f"Output:\n{result.stdout}")
-        else:
-            logger.error(f"❌ Fill data failed with return code {result.returncode}")
-            logger.error(f"Error:\n{result.stderr}")
-            
-    except subprocess.TimeoutExpired:
-        logger.error("❌ Fill data timeout after 10 minutes")
-    except Exception as e:
-        logger.error(f"❌ Fill data error: {e}", exc_info=True)
+    _run_subprocess_with_retry(['python3', 'fill_data_sql.py'], 'Fill Missing Data', timeout=600)
 
 
 def calculate_business_logic():
-    """
-    Calculate derived financial metrics (Daily at 9:45 PM).
-    - EPS, Book Value, PEG Ratio, ROA
-    - Operating Margin, Net Margin, Profit Margin
-    - Current Ratio, Quick Ratio
-    - Revenue Growth, Earnings Growth
-    - Bid-Ask Spread, Trades Per Day
-    - Beta
-    """
+    """Calculate derived financial metrics (Daily at 9:45 PM)."""
     logger.info("=" * 80)
     logger.info("Calculating Business Logic & Derived Metrics")
     logger.info("=" * 80)
-    
-    try:
-        result = subprocess.run(
-            ['python3', 'fix_business_logic.py'],
-            capture_output=True,
-            text=True,
-            timeout=600  # 10 minutes
-        )
-        
-        if result.returncode == 0:
-            logger.info("✅ Business logic calculated successfully at 9:45 PM")
-            logger.info(f"Output:\n{result.stdout}")
-        else:
-            logger.error(f"❌ Business logic calculation failed with return code {result.returncode}")
-            logger.error(f"Error:\n{result.stderr}")
-            
-    except subprocess.TimeoutExpired:
-        logger.error("❌ Business logic calculation timeout after 10 minutes")
-    except Exception as e:
-        logger.error(f"❌ Business logic calculation error: {e}", exc_info=True)
+    _run_subprocess_with_retry(['python3', 'fix_business_logic.py'], 'Business Logic', timeout=600)
 
 
 def export_daily_csv():
@@ -204,7 +164,9 @@ def export_daily_csv():
             suggested_query = """
                 SELECT date, symbol, stock_name, current_price, market_cap,
                        strategy, selection_score, rank,
-                       ml_prediction_score, ml_price_target, ml_confidence, ml_risk_score,
+                       ema_8, ema_21, ema_trend_score, demarker,
+                       fib_target_1, fib_target_2, fib_target_3,
+                       buy_signal, sell_signal, signal_quality,
                        rsi_14, macd, sma_50, sma_200,
                        pe_ratio, pb_ratio, roe, eps, beta,
                        revenue_growth, earnings_growth, operating_margin,
@@ -224,9 +186,9 @@ def export_daily_csv():
         
         logger.info("✅ CSV export completed successfully at 10:00 PM")
         
-        # Cleanup old CSV files (keep last 30 days)
-        logger.info("Cleaning up old CSV files (>30 days)...")
-        cleanup_old_csv_files(export_dir, keep_days=30)
+        # Cleanup old CSV files (keep last 90 days for extended testing)
+        logger.info("Cleaning up old CSV files (>90 days)...")
+        cleanup_old_csv_files(export_dir, keep_days=90)
         
     except Exception as e:
         logger.error(f"❌ CSV export failed: {e}", exc_info=True)
