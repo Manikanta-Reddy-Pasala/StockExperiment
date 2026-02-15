@@ -113,24 +113,27 @@ class OrderPerformanceTrackingService:
             }
 
     def _get_current_price(self, symbol: str) -> Optional[float]:
-        """Get current price for a symbol."""
+        """Get current price for a symbol from stocks table or broker API."""
         try:
-            from src.services.core.unified_broker_service import get_unified_broker_service
-
-            unified_service = get_unified_broker_service()
-
-            # Use broker API to get quote
-            # Note: Since this is symbol-specific, we'll use user_id=1 (admin)
-            quote_result = unified_service.get_quote(1, symbol)
-
-            if quote_result.get('success'):
-                return quote_result.get('ltp') or quote_result.get('last_price')
-
-            # Fallback: Query from stocks table
+            # Primary: Use stocks table (always has latest data from pipeline)
             from src.models.stock_models import Stock
             stock = self.session.query(Stock).filter_by(symbol=symbol).first()
-            if stock:
-                return stock.current_price
+            if stock and stock.current_price and stock.current_price > 0:
+                return float(stock.current_price)
+
+            # Fallback: Try broker API
+            try:
+                from src.services.brokers.fyers_service import get_fyers_service
+                fyers_service = get_fyers_service()
+                result = fyers_service.quotes(1, symbol)
+                if result.get('status') == 'success' and result.get('data'):
+                    data = result['data']
+                    if isinstance(data, dict):
+                        return data.get('ltp') or data.get('v', {}).get('lp')
+                    elif isinstance(data, list) and len(data) > 0:
+                        return data[0].get('v', {}).get('lp')
+            except Exception as e:
+                logger.debug(f"Broker quote fallback failed for {symbol}: {e}")
 
             return None
 
