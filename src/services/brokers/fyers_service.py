@@ -146,15 +146,20 @@ class FyersService:
         
         if token_response.get('status') == 'success':
             access_token = token_response.get('access_token')
-            
-            # Save the new token
-            self.save_broker_config({
+            refresh_token = token_response.get('refresh_token', '')
+
+            # Save the new token including refresh_token
+            save_data = {
                 'access_token': access_token,
                 'is_connected': True,
                 'connection_status': 'connected'
-            }, user_id)
-            
-            return {'success': True, 'access_token': access_token}
+            }
+            if refresh_token:
+                save_data['refresh_token'] = refresh_token
+
+            self.save_broker_config(save_data, user_id)
+
+            return {'success': True, 'access_token': access_token, 'refresh_token': refresh_token}
         else:
             raise ValueError(token_response.get('message', 'Failed to obtain access token'))
     

@@ -19,7 +19,7 @@ from src.models.database import get_database_manager
 from src.services.data.daily_snapshot_service import DailySnapshotService
 from src.services.trading.auto_trading_service import get_auto_trading_service
 from src.services.trading.order_performance_tracking_service import get_performance_tracking_service
-from src.services.brokers.fyers_playwright_refresh import refresh_all_user_tokens
+from src.services.brokers.fyers_token_refresh import FyersTokenRefreshService
 
 # Configure logging
 logging.basicConfig(
@@ -416,6 +416,69 @@ def initialize_token_monitoring():
         logger.error(f"❌ Token monitoring initialization failed: {e}", exc_info=True)
 
 
+def refresh_all_fyers_tokens():
+    """Refresh FYERS tokens for all users using the v3 API (no browser needed)."""
+    logger.info("=" * 80)
+    logger.info("Starting API-based FYERS Token Refresh")
+    logger.info("=" * 80)
+
+    try:
+        from src.models.models import BrokerConfiguration
+        from src.services.utils.token_manager_service import get_token_manager
+
+        db_manager = get_database_manager()
+        refresh_service = FyersTokenRefreshService()
+        token_manager = get_token_manager()
+
+        with db_manager.get_session() as session:
+            fyers_configs = session.query(BrokerConfiguration).filter_by(
+                broker_name='fyers'
+            ).all()
+
+            if not fyers_configs:
+                logger.info("  No Fyers configurations found")
+                return
+
+            for config in fyers_configs:
+                user_id = config.user_id or 1
+
+                try:
+                    # Check if token needs refresh
+                    status = token_manager.get_token_status(user_id, 'fyers')
+
+                    if not status.get('has_token'):
+                        logger.warning(f"  User {user_id}: No token - needs initial OAuth login")
+                        continue
+
+                    needs_refresh = False
+                    if status.get('is_expired'):
+                        logger.info(f"  User {user_id}: Token expired, refreshing...")
+                        needs_refresh = True
+                    elif status.get('expires_at'):
+                        expiry_time = datetime.fromisoformat(status['expires_at'])
+                        hours_until_expiry = (expiry_time - datetime.now()).total_seconds() / 3600
+                        if hours_until_expiry < 6:
+                            logger.info(f"  User {user_id}: Token expiring in {hours_until_expiry:.1f}h, refreshing...")
+                            needs_refresh = True
+                        else:
+                            logger.info(f"  User {user_id}: Token valid for {hours_until_expiry:.1f}h, skipping")
+
+                    if needs_refresh:
+                        result = refresh_service.refresh_fyers_token(user_id, config.refresh_token)
+                        if result:
+                            logger.info(f"  User {user_id}: Token refreshed successfully via API")
+                        else:
+                            logger.error(f"  User {user_id}: API refresh failed - may need manual re-auth")
+
+                except Exception as e:
+                    logger.error(f"  User {user_id}: Error during refresh - {e}")
+
+    except Exception as e:
+        logger.error(f"Token refresh failed: {e}", exc_info=True)
+
+    logger.info("=" * 80)
+
+
 def run_scheduler():
     """Main scheduler loop."""
     logger.info("=" * 80)
@@ -463,8 +526,8 @@ def run_scheduler():
     # Schedule token status check every 6 hours
     schedule.every(6).hours.do(check_broker_token_status)
 
-    # Schedule automated token refresh using Playwright every 5 hours
-    schedule.every(5).hours.do(refresh_all_user_tokens)
+    # Schedule API-based token refresh every 5 hours
+    schedule.every(5).hours.do(refresh_all_fyers_tokens)
 
     # Keep scheduler running
     logger.info("✅ Scheduler is now running. Press Ctrl+C to stop.\n")

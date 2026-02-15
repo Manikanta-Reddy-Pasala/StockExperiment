@@ -152,17 +152,40 @@ def api_save_fyers_config():
 @fyers_bp.route('/api/refresh-token', methods=['POST'])
 @login_required
 def api_refresh_fyers_token():
-    """Refresh FYERS access token."""
+    """Refresh FYERS access token using v3 API (no browser needed)."""
     try:
+        from src.services.brokers.fyers_token_refresh import FyersTokenRefreshService
+
         fyers_service = get_fyers_service()
-        auth_url = fyers_service.generate_auth_url(current_user.id)
-        
-        return jsonify({
-            'success': True, 
-            'message': 'Auth URL generated',
-            'auth_url': auth_url
-        })
-        
+        config = fyers_service.get_broker_config(current_user.id)
+
+        if not config or not config.get('refresh_token'):
+            # No refresh token - fall back to generating auth URL for manual login
+            auth_url = fyers_service.generate_auth_url(current_user.id)
+            return jsonify({
+                'success': False,
+                'message': 'No refresh token stored. Please complete OAuth login first.',
+                'auth_url': auth_url
+            })
+
+        refresh_service = FyersTokenRefreshService()
+        result = refresh_service.refresh_fyers_token(current_user.id, config['refresh_token'])
+
+        if result:
+            return jsonify({
+                'success': True,
+                'message': 'Token refreshed successfully via API',
+                'refreshed_at': result.get('refreshed_at')
+            })
+        else:
+            # API refresh failed - fall back to auth URL
+            auth_url = fyers_service.generate_auth_url(current_user.id)
+            return jsonify({
+                'success': False,
+                'message': 'API refresh failed. Refresh token may be expired. Please re-authenticate.',
+                'auth_url': auth_url
+            })
+
     except Exception as e:
         logger.error(f"Error refreshing FYERS token for user {current_user.id}: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
