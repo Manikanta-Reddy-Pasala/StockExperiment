@@ -165,11 +165,11 @@ services:
       - trading_network
     command: python scheduler.py
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f scheduler.py || exit 1"]
+      test: ["CMD-SHELL", "python -c 'import os; os.kill(1, 0)' || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 30s
 
   # Data Pipeline Scheduler for data updates and calculations
   data_scheduler:
@@ -229,11 +229,11 @@ services:
       - trading_network
     command: python data_scheduler.py
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f data_scheduler.py || exit 1"]
+      test: ["CMD-SHELL", "python -c 'import os; os.kill(1, 0)' || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 30s
 
 volumes:
   postgres_data:

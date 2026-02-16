@@ -236,10 +236,10 @@ def update_symbol_master():
             
             # Refresh symbol master
             logger.info("Fetching latest NSE symbols from Fyers...")
-            symbols = symbol_service.refresh_symbol_database()
-            
-            logger.info(f"✅ Symbol master updated successfully at 6:00 AM (Monday)")
-            logger.info(f"  Total symbols: {len(symbols)}")
+            result = symbol_service.refresh_all_symbols(sync_to_database=True)
+
+            logger.info(f"Symbol master updated successfully")
+            logger.info(f"  Result: {result}")
             
     except Exception as e:
         logger.error(f"❌ Symbol master update failed: {e}", exc_info=True)
