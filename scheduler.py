@@ -211,7 +211,7 @@ def update_daily_snapshot():
             result = orchestrator.execute_suggested_stocks_saga(
                 user_id=1,
                 strategies=['unified'],  # Single unified strategy
-                limit=50  # Top 50 stocks
+                limit=5  # Top 5 stocks (13mo backtest-optimized)
             )
 
             if result['status'] == 'completed':

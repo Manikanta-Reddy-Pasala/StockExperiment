@@ -20,7 +20,7 @@ def get_suggested_stocks():
     Get suggested stocks from pre-calculated daily recommendations.
 
     Query parameters:
-    - limit: Number of suggestions to return (default: 50)
+    - limit: Number of suggestions to return (default: 5)
     - search: Optional search term
     - sort_by: Sort field (default: 'selection_score')
     - sort_order: 'asc' or 'desc' (default: 'desc')
@@ -32,7 +32,7 @@ def get_suggested_stocks():
         from ...models.database import get_database_manager
 
         # Get parameters
-        limit = int(request.args.get('limit', 50))
+        limit = int(request.args.get('limit', 5))
         search = request.args.get('search')
         sort_by = request.args.get('sort_by', 'selection_score')
         sort_order = request.args.get('sort_order', 'desc')
