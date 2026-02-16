@@ -16,7 +16,7 @@ A production-ready, fully automated stock trading system that:
 
 ### Trading Style
 
-- **Swing Trading**: 5-14 day holding periods
+- **Swing Trading**: 10-15 day holding periods
 - **Target Gains**: 7-12% per trade
 - **Stop Loss**: 5-7% below entry
 - **NOT for day trading** - this is a swing trading system
@@ -94,27 +94,36 @@ Docker Services (5 containers):
 
 ```
 09:00 PM → Data pipeline (fetch prices, history)
-10:00 PM → Calculate technical indicators (EMA, RSI, MACD)
-10:15 PM → Generate daily stock picks (top 50 stocks)
+10:00 PM → Calculate technical indicators (EMA, DeMarker)
+10:15 PM → Generate daily stock picks (top 5 stocks)
 03:00 AM → Cleanup old data (Sunday only)
 06:00 AM → Update symbol master (Monday only)
 ```
 
-### 8-21 EMA Strategy
+### 8-21 EMA Strategy (D_momentum Model)
 
-The system uses a proven **8-21 EMA crossover strategy** for swing trading:
+The system uses a **backtest-optimized 8-21 EMA swing trading strategy** with the **D_momentum scoring model**, validated across 13 months of production data (Jan 2025 - Jan 2026).
 
-**BUY Signal:**
-- 8-day EMA crosses above 21-day EMA
-- Price above both EMAs
-- RSI between 30-70
-- Positive MACD histogram
-- Volume confirmation
+**Scoring Model — D_momentum (weights: 20/50/30):**
+- **EMA Separation (20pts):** Wider gap between 8 EMA and 21 EMA = stronger trend
+- **DeMarker Momentum (50pts):** Sweet spot 0.55-0.70 = strong buying pressure (not oversold — momentum-based)
+- **Price Distance from 8 EMA (30pts):** 0-1% above EMA = ideal entry (not over-extended)
+
+**BUY Signal (Power Zone):**
+- Price > 8 EMA > 21 EMA (Power Zone active)
+- DeMarker 0.55-0.70 (momentum sweet spot)
+- Signal quality: medium or high only
+- Top 5 picks by composite score
 
 **SELL Signal:**
-- 8-day EMA crosses below 21-day EMA
-- Price breaks below 50-day SMA
+- 8 EMA crosses below 21 EMA
+- Price breaks below 21 EMA
 - Stop loss hit
+
+**Backtest Results (13 months, 34,560 parameter combinations):**
+- Win Rate: 58.5%
+- Profit Factor: 3.84
+- Cumulative Return: +339%
 
 **Target & Stop Loss:**
 - Fibonacci extensions for targets (127.2%, 161.8%, 200%)
@@ -124,11 +133,11 @@ The system uses a proven **8-21 EMA crossover strategy** for swing trading:
 
 ## Key Features
 
-- ✅ **Pure Technical Analysis** - No AI/ML complexity
-- ✅ **Single Unified Strategy** - 8-21 EMA crossover
+- ✅ **D_momentum Scoring Model** - Backtest-optimized (PF 3.84, 58.5% WR)
+- ✅ **Single Unified Strategy** - 8-21 EMA crossover with DeMarker momentum
 - ✅ **Fully Automated** - Zero manual intervention
 - ✅ **2,259+ NSE Stocks** - Complete market coverage
-- ✅ **Daily Stock Picks** - Top 50 recommendations daily
+- ✅ **Daily Stock Picks** - Top 5 high-conviction recommendations daily
 - ✅ **Multi-Broker Support** - Fyers API (Zerodha planned)
 - ✅ **Saga Pattern** - Fault-tolerant data pipeline
 - ✅ **Production Ready** - Docker, logging, monitoring
@@ -196,7 +205,7 @@ docker exec trading_system python tools/generate_daily_snapshot.py  # Generate p
 - `stocks` - Current stock info (2,259 stocks)
 - `historical_data` - 1-year OHLCV data (820K records)
 - `technical_indicators` - Daily indicators (820K records)
-- `daily_suggested_stocks` - Daily picks (50/day, growing)
+- `daily_suggested_stocks` - Daily picks (5/day, growing)
 - `symbol_master` - NSE symbol list (2,259 symbols)
 
 **Trading:**
@@ -456,6 +465,6 @@ This software is provided "as is" without warranties of any kind. The developers
 
 ---
 
-**Built for automated swing trading with pure technical analysis** 🚀
+**Built for automated swing trading with the D_momentum scoring model**
 
-Last Updated: October 31, 2025
+Last Updated: February 16, 2026

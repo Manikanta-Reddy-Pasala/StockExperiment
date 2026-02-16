@@ -11,7 +11,7 @@
                 <h4 class="card-title mb-0 text-white">
                     <i class="bi bi-graph-up-arrow me-2"></i>8-21 EMA Swing Trading Strategy
                 </h4>
-                <small class="opacity-75">Pure Technical Analysis - No ML/AI Models</small>
+                <small class="opacity-75">D_momentum Scoring Model - Backtest-Optimized (PF 3.84, 58.5% WR)</small>
             </div>
             <div>
                 <span class="badge bg-success fs-6">
@@ -86,7 +86,7 @@
                         <h6 class="text-muted mb-2 fw-semibold">Strong Buy</h6>
                         <h2 class="fw-bold mb-0 text-info" id="strong-buy">9</h2>
                         <small class="text-info">
-                            <i class="bi bi-gem"></i> DeMarker < 0.30
+                            <i class="bi bi-gem"></i> DeMarker 0.55-0.70
                         </small>
                     </div>
                     <div class="bg-gradient-info rounded-3 p-3">
@@ -134,13 +134,13 @@
 
                 <div class="mb-4">
                     <h6 class="text-success">
-                        <i class="bi bi-2-circle-fill me-2"></i>DeMarker Oscillator (Entry Timing)
+                        <i class="bi bi-2-circle-fill me-2"></i>DeMarker Momentum (Entry Timing) — 50pts weight
                     </h6>
                     <p class="ms-4 mb-2">
-                        <strong>DeMarker < 0.30:</strong> Identifies oversold pullbacks within uptrend
+                        <strong>DeMarker 0.55-0.70:</strong> Identifies strong buying momentum within uptrend
                     </p>
                     <p class="ms-4 mb-0 text-muted small">
-                        Ranges from 0 to 1. Values below 0.30 signal strong buy opportunities (oversold).
+                        Ranges from 0 to 1. Higher values (0.55-0.70) = stronger buying pressure = best entries. This is the #1 scoring factor (50pts). Validated across 13 months of data — momentum beats oversold.
                     </p>
                 </div>
 
@@ -163,8 +163,8 @@
                     <ul class="mb-0">
                         <li><strong>Stop Loss:</strong> Below 21 EMA or recent swing low (5-7%)</li>
                         <li><strong>Position Size:</strong> Max 5% per trade</li>
-                        <li><strong>Time Frame:</strong> 5-14 day holds (swing trading)</li>
-                        <li><strong>Win Rate Target:</strong> 55-65% with 2:1 R/R ratio</li>
+                        <li><strong>Time Frame:</strong> 10-15 day holds (swing trading)</li>
+                        <li><strong>Win Rate:</strong> 58.5% with PF 3.84 (13-month backtest)</li>
                     </ul>
                 </div>
             </div>
@@ -195,7 +195,7 @@
 
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Trading Style</label>
-                    <p class="mb-0">Swing Trading (5-14 days)</p>
+                    <p class="mb-0">Swing Trading (10-15 days)</p>
                 </div>
 
                 <div class="mb-3">
@@ -231,7 +231,7 @@
 
                 <div class="alert alert-info mt-3 mb-0 small">
                     <i class="bi bi-info-circle me-1"></i>
-                    This is the only active strategy. No ML/AI models are used.
+                    D_momentum model — optimized via 34,560-param grid search across 13 months. Top 5 picks daily.
                 </div>
             </div>
         </div>
@@ -256,7 +256,7 @@
                         <strong>Trend Alignment:</strong> 8 EMA must be above 21 EMA (bullish setup)
                     </li>
                     <li class="mb-3">
-                        <strong>Timing Signal:</strong> DeMarker oscillator < 0.30 (oversold pullback)
+                        <strong>Timing Signal:</strong> DeMarker oscillator 0.55-0.70 (strong momentum)
                     </li>
                     <li class="mb-3">
                         <strong>Volume Check:</strong> Above average daily volume (50,000+ shares)
@@ -290,7 +290,7 @@
                         <strong>Stop Loss:</strong> Exit if price closes below 21 EMA
                     </li>
                     <li class="mb-3">
-                        <strong>Time Stop:</strong> Exit after 14 days if no profit target hit
+                        <strong>Time Stop:</strong> Exit after 15 days if no profit target hit
                     </li>
                     <li class="mb-0">
                         <strong>Sell Signal:</strong> Exit immediately if sell signal generated

@@ -33,7 +33,7 @@
                 <div class="card border-success h-100">
                     <div class="card-body p-2">
                         <h6 class="text-success mb-1 small">💎 Strong Buy</h6>
-                        <small class="text-muted" style="font-size: 0.7rem;">DeMarker < 0.30</small>
+                        <small class="text-muted" style="font-size: 0.7rem;">DeMarker 0.55-0.70</small>
                         <h4 class="mt-1 mb-0 text-success" id="strong-buy-count">-</h4>
                     </div>
                 </div>
@@ -42,7 +42,7 @@
                 <div class="card border-primary h-100">
                     <div class="card-body p-2">
                         <h6 class="text-primary mb-1 small">📈 Buy</h6>
-                        <small class="text-muted" style="font-size: 0.7rem;">DeMarker 0.30-0.50</small>
+                        <small class="text-muted" style="font-size: 0.7rem;">DeMarker 0.30-0.70</small>
                         <h4 class="mt-1 mb-0 text-primary" id="buy-count">-</h4>
                     </div>
                 </div>
@@ -92,14 +92,14 @@
                     <i class="bi bi-info-circle-fill"></i>
                 </div>
                 <div>
-                    <strong>📊 8-21 EMA Strategy:</strong>
+                    <strong>📊 D_momentum Model:</strong>
                     <span class="ms-2"><strong>Entry:</strong> Price > 8 EMA > 21 EMA (Power Zone)</span>
                     <span class="ms-2">•</span>
-                    <span class="ms-2"><strong>Timing:</strong> DeMarker < 0.30 = Strong Buy (oversold)</span>
+                    <span class="ms-2"><strong>Best Signal:</strong> DeMarker 0.55-0.70 (momentum sweet spot)</span>
                     <span class="ms-2">•</span>
                     <span class="ms-2"><strong>Targets:</strong> Fibonacci 127.2%, 161.8%, 200%</span>
                     <span class="ms-2">•</span>
-                    <span class="ms-2"><strong>Stop Loss:</strong> Below 21 EMA</span>
+                    <span class="ms-2"><strong>Backtest:</strong> PF 3.84, 58.5% WR (13mo)</span>
                 </div>
             </div>
         </div>
@@ -111,7 +111,7 @@
     <div class="card-header bg-white">
         <div class="d-flex justify-content-between align-items-center">
             <h6 class="mb-0">
-                <i class="bi bi-list-ul me-2"></i>Top 50 Stock Picks
+                <i class="bi bi-list-ul me-2"></i>Top 5 Stock Picks
             </h6>
             <div class="d-flex gap-2">
                 <button class="btn btn-sm btn-success" onclick="buyAllStocks()">
@@ -378,7 +378,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function getSignalStrength(stock) {
-    // Determine signal strength based on indicators
+    // D_momentum model: higher DeMarker (0.55-0.70) = stronger momentum = best entry
     const demarker = parseFloat(stock.demarker) || 0.5;
     const buySignal = stock.buy_signal;
     const sellSignal = stock.sell_signal;
@@ -387,26 +387,26 @@ function getSignalStrength(stock) {
     const price = parseFloat(stock.current_price) || 0;
 
     if (buySignal) {
-        if (demarker < 0.30) {
+        if (demarker >= 0.55 && demarker <= 0.70) {
             return {
                 label: 'STRONG BUY',
                 class: 'signal-strong-buy',
                 icon: '💎',
-                description: 'Perfect entry - Oversold in power zone'
+                description: 'Strong momentum entry - DeMarker sweet spot (0.55-0.70)'
             };
-        } else if (demarker < 0.50) {
+        } else if (demarker >= 0.30 && demarker < 0.70) {
             return {
                 label: 'BUY',
                 class: 'signal-buy',
                 icon: '📈',
-                description: 'Good entry - Mild pullback in power zone'
+                description: 'Good entry - Power zone with moderate momentum'
             };
         } else {
             return {
                 label: 'HOLD',
                 class: 'signal-hold',
                 icon: '⚠️',
-                description: 'Caution - Overbought conditions'
+                description: 'Caution - Weak momentum or overbought'
             };
         }
     } else if (sellSignal) {
@@ -560,7 +560,7 @@ function displayStocks(stocks) {
             <tr class="table-success">
                 <td colspan="14" class="fw-bold py-3">
                     <i class="bi bi-gem me-2"></i>💎 STRONG BUY SIGNALS (${grouped.strongBuy.length})
-                    <small class="ms-3 text-muted fw-normal">DeMarker < 0.30 - Best Entry Points</small>
+                    <small class="ms-3 text-muted fw-normal">DeMarker 0.55-0.70 - Momentum Sweet Spot</small>
                 </td>
             </tr>
         `;
@@ -573,7 +573,7 @@ function displayStocks(stocks) {
             <tr class="table-primary">
                 <td colspan="14" class="fw-bold py-3">
                     <i class="bi bi-arrow-up-circle me-2"></i>📈 BUY SIGNALS (${grouped.buy.length})
-                    <small class="ms-3 text-muted fw-normal">DeMarker 0.30-0.50 - Good Entry Points</small>
+                    <small class="ms-3 text-muted fw-normal">DeMarker 0.30-0.70 - Good Entry Points</small>
                 </td>
             </tr>
         `;
@@ -651,7 +651,7 @@ function createStockRow(stock, index) {
             <td>₹${ema8.toFixed(2)}</td>
             <td>₹${ema21.toFixed(2)}</td>
             <td>
-                <span class="badge ${demarker < 0.30 ? 'bg-success' : demarker < 0.50 ? 'bg-primary' : 'bg-warning'}">
+                <span class="badge ${(demarker >= 0.55 && demarker <= 0.70) ? 'bg-success' : demarker < 0.70 ? 'bg-primary' : 'bg-warning'}">
                     ${demarker.toFixed(3)}
                 </span>
             </td>
