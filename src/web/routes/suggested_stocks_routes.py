@@ -127,14 +127,31 @@ def get_suggested_stocks():
             result = session.execute(query, params)
             stocks = [dict(row._mapping) for row in result]
 
-        logger.info(f"✅ Returned {len(stocks)} suggested stocks from {query_date}")
+        # Enrich stocks with signal_direction and short_signal from recommendation
+        for stock in stocks:
+            rec = (stock.get('recommendation') or '').upper()
+            stock['signal_direction'] = 'SHORT' if rec == 'SHORT' else 'LONG'
+            stock['short_signal'] = rec == 'SHORT'
+
+        # Detect current market regime
+        market_regime = 'neutral'
+        try:
+            from src.services.data.suggested_stocks_saga import SuggestedStocksSagaOrchestrator
+            orchestrator = SuggestedStocksSagaOrchestrator()
+            regime_info = orchestrator.detect_market_regime()
+            market_regime = regime_info.get('regime', 'neutral')
+        except Exception as e:
+            logger.warning(f"Could not detect market regime: {e}")
+
+        logger.info(f"✅ Returned {len(stocks)} suggested stocks from {query_date} | Regime: {market_regime}")
 
         return jsonify({
             'success': True,
             'data': stocks,
             'total': len(stocks),
             'date': str(query_date),
-            'last_updated': datetime.now().isoformat()
+            'last_updated': datetime.now().isoformat(),
+            'market_regime': market_regime
         }), 200
 
     except ValueError as e:

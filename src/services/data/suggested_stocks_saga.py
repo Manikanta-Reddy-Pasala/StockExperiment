@@ -196,7 +196,105 @@ class SuggestedStocksSagaOrchestrator:
         except Exception as e:
             logger.error(f"Failed to initialize services: {e}")
             raise
-    
+
+    def detect_market_regime(self) -> Dict[str, Any]:
+        """
+        Detect market regime using Nifty 50 EMA analysis.
+        Uses historical_data table for NSE:NIFTY50-INDEX or falls back to
+        computing from the broad market (% of stocks in bullish power zone).
+
+        Returns:
+            {
+                'regime': 'bullish' | 'bearish' | 'neutral',
+                'nifty_above_ema21': bool,
+                'nifty_ema8_above_ema21': bool,
+                'bullish_pct': float,  # % of stocks in bullish power zone
+                'method': str
+            }
+        """
+        try:
+            from src.models.database import get_database_manager
+            from sqlalchemy import text
+
+            db_manager = get_database_manager()
+            with db_manager.get_session() as session:
+                # Method 1: Try Nifty 50 from market_benchmarks table
+                nifty_query = text("""
+                    SELECT close FROM market_benchmarks
+                    WHERE benchmark = 'NIFTY50'
+                    ORDER BY date DESC LIMIT 30
+                """)
+                nifty_rows = session.execute(nifty_query).fetchall()
+
+                if len(nifty_rows) >= 21:
+                    closes = [float(r[0]) for r in reversed(nifty_rows)]
+                    # Calculate 8 and 21 EMA
+                    import pandas as pd
+                    s = pd.Series(closes)
+                    ema_8 = float(s.ewm(span=8, adjust=False).mean().iloc[-1])
+                    ema_21 = float(s.ewm(span=21, adjust=False).mean().iloc[-1])
+                    nifty_price = closes[-1]
+
+                    nifty_bullish = nifty_price > ema_8 > ema_21
+                    nifty_bearish = nifty_price < ema_8 < ema_21
+
+                    regime = 'bullish' if nifty_bullish else ('bearish' if nifty_bearish else 'neutral')
+                    logger.info(f"Market regime (Nifty 50): {regime} | Price={nifty_price:.0f} EMA8={ema_8:.0f} EMA21={ema_21:.0f}")
+                    return {
+                        'regime': regime,
+                        'nifty_above_ema21': nifty_price > ema_21,
+                        'nifty_ema8_above_ema21': ema_8 > ema_21,
+                        'bullish_pct': 0.0,
+                        'method': 'nifty50_ema'
+                    }
+
+                # Method 2: Fallback — compute from broad market
+                # Count % of stocks in bullish vs bearish power zone from technical_indicators
+                regime_query = text("""
+                    SELECT
+                        COUNT(*) FILTER (WHERE ti.ema_8 > ti.ema_21) as bullish_count,
+                        COUNT(*) FILTER (WHERE ti.ema_8 < ti.ema_21) as bearish_count,
+                        COUNT(*) as total
+                    FROM technical_indicators ti
+                    INNER JOIN (
+                        SELECT symbol, MAX(date) as max_date
+                        FROM technical_indicators
+                        WHERE date >= CURRENT_DATE - 5
+                        GROUP BY symbol
+                    ) latest ON ti.symbol = latest.symbol AND ti.date = latest.max_date
+                    WHERE ti.ema_8 IS NOT NULL AND ti.ema_21 IS NOT NULL
+                """)
+                row = session.execute(regime_query).fetchone()
+
+                if row and row[2] > 0:
+                    bullish_count = row[0]
+                    bearish_count = row[1]
+                    total = row[2]
+                    bullish_pct = (bullish_count / total) * 100
+
+                    if bullish_pct >= 55:
+                        regime = 'bullish'
+                    elif bullish_pct <= 35:
+                        regime = 'bearish'
+                    else:
+                        regime = 'neutral'
+
+                    logger.info(f"Market regime (breadth): {regime} | {bullish_pct:.1f}% bullish ({bullish_count}/{total})")
+                    return {
+                        'regime': regime,
+                        'nifty_above_ema21': bullish_pct > 50,
+                        'nifty_ema8_above_ema21': bullish_pct > 50,
+                        'bullish_pct': bullish_pct,
+                        'method': 'market_breadth'
+                    }
+
+                logger.warning("Could not determine market regime — defaulting to neutral")
+                return {'regime': 'neutral', 'nifty_above_ema21': True, 'nifty_ema8_above_ema21': True, 'bullish_pct': 50.0, 'method': 'default'}
+
+        except Exception as e:
+            logger.error(f"Market regime detection failed: {e}")
+            return {'regime': 'neutral', 'nifty_above_ema21': True, 'nifty_ema8_above_ema21': True, 'bullish_pct': 50.0, 'method': 'error'}
+
     def execute_suggested_stocks_saga(self, user_id: int, strategies: List[str] = None,
                                    limit: int = 5, search: str = None, sort_by: str = None,
                                    sort_order: str = 'desc', sector: str = None,
@@ -232,11 +330,16 @@ class SuggestedStocksSagaOrchestrator:
 
         # Store model_type in saga metadata
         saga.model_type = model_type
-        
+
         try:
             # Initialize services
             self.initialize_services(user_id)
-            
+
+            # Detect market regime BEFORE stock selection
+            market_regime = self.detect_market_regime()
+            saga.market_regime = market_regime
+            print(f"\n🌍 Market Regime: {market_regime['regime'].upper()} (method: {market_regime['method']})")
+
             # Step 1: Stock Discovery
             saga = self._execute_step1_stock_discovery(saga)
             if saga.status == SagaStatus.FAILED:
@@ -529,7 +632,8 @@ class SuggestedStocksSagaOrchestrator:
 
                     # Apply unified strategy only - no need to loop through multiple strategies
                     strategy = 'unified'  # Always use unified strategy
-                    strategy_result = self._apply_strategy_logic(stock_data, strategy, saga.model_type)
+                    strategy_result = self._apply_strategy_logic(stock_data, strategy, saga.model_type,
+                                                                   market_regime=getattr(saga, 'market_regime', None))
                     if strategy_result:
                         suggested_stocks.append(strategy_result)
                         strategy_counts[strategy] = strategy_counts.get(strategy, 0) + 1
@@ -702,14 +806,13 @@ class SuggestedStocksSagaOrchestrator:
             saga.update_step_status("step5_final_selection", SagaStepStatus.FAILED, error_msg)
             return saga
     
-    def _apply_strategy_logic(self, stock_data: Dict[str, Any], strategy: str, model_type: str = 'ema') -> Optional[Dict[str, Any]]:
+    def _apply_strategy_logic(self, stock_data: Dict[str, Any], strategy: str, model_type: str = 'ema',
+                              market_regime: Dict = None) -> Optional[Dict[str, Any]]:
         """
         Apply 8-21 EMA swing trading strategy logic to a stock.
 
-        Pure technical analysis based on:
-        1. Power Zone: Price > 8 EMA > 21 EMA (bullish trend)
-        2. DeMarker: < 0.30 for high-quality entries (oversold pullback)
-        3. Fibonacci: Extension targets for profit-taking
+        Bullish regime: Price > 8 EMA > 21 EMA (long entries)
+        Bearish regime: Price < 8 EMA < 21 EMA (short entries)
         """
         try:
             current_price = stock_data.get('current_price', 0.0)
@@ -723,16 +826,36 @@ class SuggestedStocksSagaOrchestrator:
             demarker = stock_data.get('demarker', 0.5)
             is_bullish = stock_data.get('is_bullish', False)
             buy_signal = stock_data.get('buy_signal', False)
+            sell_signal = stock_data.get('sell_signal', False)
             signal_quality = stock_data.get('signal_quality', 'none')
             ema_strategy_score = stock_data.get('ema_strategy_score', 0.0)
 
+            regime = (market_regime or {}).get('regime', 'neutral')
+
             # ========================================
-            # 8-21 EMA STRATEGY: POWER ZONE FILTER
+            # 8-21 EMA STRATEGY: REGIME-AWARE FILTER
             # ========================================
-            # CRITICAL FILTER: Only trade bullish power zones
-            # Price > 8 EMA > 21 EMA = Institutional money in control
-            if not is_bullish or not buy_signal:
-                return None  # Skip stocks not in bullish power zone
+            # Bearish power zone: Price < 8 EMA < 21 EMA
+            is_bearish_pz = current_price < ema_8 < ema_21 if (ema_8 and ema_21 and current_price) else False
+
+            if regime == 'bearish' and is_bearish_pz and sell_signal:
+                # BEARISH REGIME: accept short candidates
+                signal_quality = stock_data.get('signal_quality', 'none')
+                # For shorts, accept medium+ quality from short_quality
+                short_quality = stock_data.get('short_quality', signal_quality)
+                if short_quality not in ('high', 'medium'):
+                    # In bearish regime, also accept bearish power zone stocks with medium+ demarker
+                    if 0.30 <= demarker <= 0.65:
+                        short_quality = 'medium'
+                    else:
+                        return None
+                signal_quality = short_quality
+                # signal_direction will be set to SHORT below
+            elif is_bullish and buy_signal:
+                # BULLISH or NEUTRAL: keep existing long logic
+                pass
+            else:
+                return None  # Skip stocks not matching any power zone
 
             # Get filtering thresholds from configuration
             stage2_filters = self.stock_filters_config.get('stage_2_filters', {})
@@ -773,8 +896,28 @@ class SuggestedStocksSagaOrchestrator:
             # Signal quality: Accept ONLY high and medium quality signals
             if signal_quality not in ('high', 'medium'):
                 return None
-            
+
+            # Determine direction: LONG or SHORT
+            is_short = regime == 'bearish' and is_bearish_pz
+
             # Create suggested stock with 8-21 EMA strategy fields
+            if is_short:
+                # SHORT entry: Fibonacci support targets (downside), stop above 21 EMA
+                target_1 = current_price * 0.95  # 5% drop
+                target_2 = current_price * 0.90  # 10% drop
+                target_3 = current_price * 0.85  # 15% drop
+                stop_loss = ema_21 * 1.02  # 2% above 21 EMA
+                recommendation = 'SHORT'
+                reason_text = f"Bearish Power Zone: Price < 8EMA < 21EMA | DeMarker={demarker:.2f}"
+            else:
+                # LONG entry (existing logic)
+                target_1 = stock_data.get('fib_target_127', current_price * 1.05)
+                target_2 = stock_data.get('fib_target_162', current_price * 1.10)
+                target_3 = stock_data.get('fib_target_200', current_price * 1.15)
+                stop_loss = stock_data.get('suggested_stop', ema_21 * 0.98)
+                recommendation = 'BUY'
+                reason_text = self._generate_ema_reason(stock_data, strategy, score, signal_quality)
+
             suggested_stock = {
                 'symbol': stock_data.get('symbol', ''),
                 'name': stock_data.get('name', ''),
@@ -809,21 +952,20 @@ class SuggestedStocksSagaOrchestrator:
                 'demarker': demarker,
                 'signal_quality': signal_quality,
 
-                # Fibonacci targets
-                'fib_target_1': stock_data.get('fib_target_127', current_price * 1.05),  # 127.2% - Take 25%
-                'fib_target_2': stock_data.get('fib_target_162', current_price * 1.10),  # 161.8% - Take 50%
-                'fib_target_3': stock_data.get('fib_target_200', current_price * 1.15),  # 200% - Let 25% run
+                # Targets and stops
+                'fib_target_1': target_1,
+                'fib_target_2': target_2,
+                'fib_target_3': target_3,
+                'target_price': target_2,
+                'stop_loss': stop_loss,
 
-                # Use Fibonacci target 2 (161.8%) as primary target
-                'target_price': stock_data.get('fib_target_162', current_price * 1.10),
-
-                # Use EMA-based stop loss (below 21 EMA or swing low)
-                'stop_loss': stock_data.get('suggested_stop', ema_21 * 0.98),
-
-                'buy_signal': buy_signal,
-                'sell_signal': stock_data.get('sell_signal', False),
-                'recommendation': 'BUY',
-                'reason': self._generate_ema_reason(stock_data, strategy, score, signal_quality),
+                'buy_signal': buy_signal and not is_short,
+                'sell_signal': sell_signal or is_short,
+                'short_signal': is_short,
+                'signal_direction': 'SHORT' if is_short else 'LONG',
+                'recommendation': recommendation,
+                'reason': reason_text,
+                'market_regime': regime,
                 'selection_timestamp': datetime.now().isoformat()
             }
             
@@ -1170,6 +1312,10 @@ class SuggestedStocksSagaOrchestrator:
                         stock['buy_signal'] = indicators.get('buy_signal', False)
                         stock['sell_signal'] = indicators.get('sell_signal', False)
                         stock['signal_quality'] = indicators.get('signal_quality', 'none')
+                        stock['short_signal'] = indicators.get('short_signal', False) or stock.get('short_signal', False)
+                        stock['is_bearish_power_zone'] = indicators.get('is_bearish_power_zone', False)
+                        if stock.get('signal_direction') == 'SHORT':
+                            stock['short_quality'] = indicators.get('short_quality', stock.get('signal_quality', 'none'))
 
                         # Count statistics
                         stocks_with_indicators += 1
@@ -1197,11 +1343,18 @@ class SuggestedStocksSagaOrchestrator:
                 # Stocks may now have buy_signal=false or weak signal_quality.
                 # ========================================
                 pre_filter_count = len(saga.final_results)
+                regime = getattr(saga, 'market_regime', {}).get('regime', 'neutral')
                 saga.final_results = [
                     stock for stock in saga.final_results
-                    if stock.get('buy_signal', False)
-                    and not stock.get('sell_signal', False)
-                    and stock.get('signal_quality') in ('high', 'medium')
+                    if (
+                        # Long signals: buy_signal + no sell + medium+
+                        (stock.get('buy_signal', False) and not stock.get('sell_signal', False)
+                         and stock.get('signal_quality') in ('high', 'medium'))
+                        or
+                        # Short signals in bearish regime
+                        (stock.get('signal_direction') == 'SHORT'
+                         and stock.get('signal_quality') in ('high', 'medium'))
+                    )
                 ]
                 post_filter_removed = pre_filter_count - len(saga.final_results)
                 if post_filter_removed > 0:
@@ -1345,15 +1498,13 @@ class SuggestedStocksSagaOrchestrator:
             # Don't fail the saga - snapshot is optional
             return saga
 
-    def _compute_db_ema_score(self, stock) -> float:
+    def _compute_db_ema_score(self, stock, direction: str = 'LONG') -> float:
         """
-        Compute EMA strategy score using D_momentum model.
+        Compute EMA strategy score for both LONG and SHORT directions.
         Returns 0-100 score based on EMA separation, DeMarker, and price position.
 
-        13-month backtest optimization (Jan 2025 → Jan 2026, 34,560 combos):
-        Best model: D_momentum — rewards buying momentum (higher DeMarker = better)
-        Weights: (20, 50, 30) — DeMarker is #1 factor, Price distance #2, EMA sep #3
-        Result: 58.5% WR, PF 3.84, +5.22% avg return, 9/13 months positive
+        LONG (D_momentum): Higher DeMarker = stronger buying pressure = better
+        SHORT (D_momentum inverted): Lower DeMarker = stronger selling pressure = better
         """
         try:
             ema_8 = float(stock.ema_8) if stock.ema_8 else 0.0
@@ -1364,42 +1515,72 @@ class SuggestedStocksSagaOrchestrator:
             if not ema_21 or ema_21 <= 0 or not price or price <= 0:
                 return 0.0
 
-            # Not in bullish power zone = score 0
-            if not (price > ema_8 > ema_21):
-                return 0.0
+            if direction == 'SHORT':
+                # === BEARISH SCORING ===
+                # Bearish power zone: Price < 8 EMA < 21 EMA
+                if not (price < ema_8 < ema_21):
+                    return 0.0
 
-            # Component 1: EMA separation strength (0-20 points)
-            # 13mo data: >5% sep = 71.4% WR, 3-5% = 60%, 1-2% = 44.4%
-            ema_sep_pct = ((ema_8 - ema_21) / ema_21) * 100
-            sep_score = min(ema_sep_pct / 5.0, 1.0) * 20.0
+                # Component 1: Bearish EMA separation (0-20 points)
+                bear_sep_pct = ((ema_21 - ema_8) / ema_21) * 100
+                sep_score = min(bear_sep_pct / 5.0, 1.0) * 20.0
 
-            # Component 2: DeMarker momentum (0-50 points)
-            # D_momentum model: higher DeMarker = stronger buying pressure = better
-            # 13mo data: DeMarker 0.60-0.70 = 61.8% WR, +5.47% avg
-            if 0.55 <= demarker <= 0.70:
-                dm_score = 50.0   # Strong momentum - best zone
-            elif 0.45 <= demarker < 0.55:
-                dm_score = 40.0   # Moderate momentum
-            elif 0.35 <= demarker < 0.45:
-                dm_score = 25.0   # Mild momentum
-            elif demarker < 0.35:
-                dm_score = 12.5   # Weak/oversold
+                # Component 2: DeMarker selling pressure (0-50 points)
+                # For shorts: lower DeMarker = stronger selling = better
+                if 0.30 <= demarker <= 0.45:
+                    dm_score = 50.0   # Strong selling pressure
+                elif 0.45 < demarker <= 0.55:
+                    dm_score = 40.0   # Moderate selling
+                elif 0.55 < demarker <= 0.65:
+                    dm_score = 25.0   # Mild
+                elif demarker > 0.65:
+                    dm_score = 12.5   # Weak selling
+                else:
+                    dm_score = 0.0    # Deeply oversold — bounce likely
+
+                # Component 3: Price distance below 8 EMA (0-30 points)
+                price_below_pct = ((ema_8 - price) / ema_8) * 100
+                if 0 <= price_below_pct <= 1.0:
+                    dist_score = 30.0
+                elif price_below_pct <= 2.0:
+                    dist_score = 24.9
+                elif price_below_pct <= 3.0:
+                    dist_score = 18.0
+                elif price_below_pct <= 5.0:
+                    dist_score = 9.9
+                else:
+                    dist_score = 3.0
+
             else:
-                dm_score = 0.0    # Overbought (>0.70) - avoid
+                # === BULLISH SCORING (existing D_momentum) ===
+                if not (price > ema_8 > ema_21):
+                    return 0.0
 
-            # Component 3: Price distance from 8 EMA (0-30 points)
-            # 13mo data: 3-5% dist = 70% WR, 0-1% = 48.1%
-            price_dist_pct = ((price - ema_8) / ema_8) * 100
-            if 0 <= price_dist_pct <= 1.0:
-                dist_score = 30.0  # Tight to EMA
-            elif price_dist_pct <= 2.0:
-                dist_score = 24.9  # Close
-            elif price_dist_pct <= 3.0:
-                dist_score = 18.0  # Moderate
-            elif price_dist_pct <= 5.0:
-                dist_score = 9.9   # Extended
-            else:
-                dist_score = 3.0   # Over-extended
+                ema_sep_pct = ((ema_8 - ema_21) / ema_21) * 100
+                sep_score = min(ema_sep_pct / 5.0, 1.0) * 20.0
+
+                if 0.55 <= demarker <= 0.70:
+                    dm_score = 50.0
+                elif 0.45 <= demarker < 0.55:
+                    dm_score = 40.0
+                elif 0.35 <= demarker < 0.45:
+                    dm_score = 25.0
+                elif demarker < 0.35:
+                    dm_score = 12.5
+                else:
+                    dm_score = 0.0
+
+                price_dist_pct = ((price - ema_8) / ema_8) * 100
+                if 0 <= price_dist_pct <= 1.0:
+                    dist_score = 30.0
+                elif price_dist_pct <= 2.0:
+                    dist_score = 24.9
+                elif price_dist_pct <= 3.0:
+                    dist_score = 18.0
+                elif price_dist_pct <= 5.0:
+                    dist_score = 9.9
+                else:
+                    dist_score = 3.0
 
             total = sep_score + dm_score + dist_score
             return round(max(0.0, min(100.0, total)), 2)

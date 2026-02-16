@@ -11,9 +11,10 @@
                 <h5 class="card-title mb-0 text-white">
                     <i class="bi bi-graph-up-arrow me-2"></i>Daily Stock Picks - 8-21 EMA Swing Trading
                 </h5>
-                <small class="opacity-75">Power Zone entries with DeMarker timing & Fibonacci targets</small>
+                <small class="opacity-75">Bull/Bear regime-aware | LONG & SHORT signals</small>
                 <div class="mt-1">
                     <small class="badge bg-light text-dark" id="data-date-badge">Loading...</small>
+                    <small class="badge" id="regime-badge" style="display:none;">Loading...</small>
                 </div>
             </div>
             <div class="d-flex gap-2">
@@ -350,6 +351,18 @@
     box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
 }
 
+.signal-strong-short {
+    background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+    color: white;
+    box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
+}
+
+.signal-short {
+    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+    color: white;
+    box-shadow: 0 2px 4px rgba(249, 115, 22, 0.3);
+}
+
 .sticky-top {
     position: sticky;
     top: 0;
@@ -378,14 +391,37 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function getSignalStrength(stock) {
-    // D_momentum model: higher DeMarker (0.55-0.70) = stronger momentum = best entry
+    // D_momentum model: supports LONG and SHORT signals
     const demarker = parseFloat(stock.demarker) || 0.5;
     const buySignal = stock.buy_signal;
     const sellSignal = stock.sell_signal;
+    const shortSignal = stock.short_signal;
+    const direction = stock.signal_direction || (shortSignal ? 'SHORT' : 'LONG');
+    const recommendation = stock.recommendation || '';
     const ema8 = parseFloat(stock.ema_8) || 0;
     const ema21 = parseFloat(stock.ema_21) || 0;
     const price = parseFloat(stock.current_price) || 0;
 
+    // SHORT signals (bearish regime)
+    if (direction === 'SHORT' || recommendation === 'SHORT' || shortSignal) {
+        if (demarker >= 0.30 && demarker <= 0.45) {
+            return {
+                label: 'STRONG SHORT',
+                class: 'signal-strong-short',
+                icon: '🔻',
+                description: 'Strong short entry - Bearish power zone + selling pressure'
+            };
+        } else {
+            return {
+                label: 'SHORT',
+                class: 'signal-short',
+                icon: '📉',
+                description: 'Short entry - Bearish power zone'
+            };
+        }
+    }
+
+    // LONG signals (bullish regime)
     if (buySignal) {
         if (demarker >= 0.55 && demarker <= 0.70) {
             return {
@@ -410,7 +446,6 @@ function getSignalStrength(stock) {
             };
         }
     } else if (sellSignal) {
-        // Strong sell: Price significantly below both EMAs
         if (price < ema21 && ema8 < ema21 && demarker > 0.70) {
             return {
                 label: 'STRONG SELL',
@@ -463,6 +498,23 @@ function loadSuggestedStocks() {
                     const dateStr = new Date(data.last_updated).toLocaleDateString();
                     dateBadge.textContent = `Data as of: ${dateStr}`;
                 }
+
+                // Update regime badge
+                const regimeBadge = document.getElementById('regime-badge');
+                if (data.market_regime) {
+                    const regime = data.market_regime;
+                    regimeBadge.style.display = 'inline-block';
+                    if (regime === 'bullish') {
+                        regimeBadge.className = 'badge bg-success';
+                        regimeBadge.textContent = '🟢 BULLISH';
+                    } else if (regime === 'bearish') {
+                        regimeBadge.className = 'badge bg-danger';
+                        regimeBadge.textContent = '🔴 BEARISH';
+                    } else {
+                        regimeBadge.className = 'badge bg-warning text-dark';
+                        regimeBadge.textContent = '🟡 NEUTRAL';
+                    }
+                }
             } else {
                 tbody.innerHTML = `
                     <tr>
@@ -494,6 +546,8 @@ function updateSummaryStats(stocks) {
     let sellCount = 0;
     let strongSellCount = 0;
 
+    let shortCount = 0;
+
     stocks.forEach(stock => {
         const signal = getSignalStrength(stock);
         if (signal.label === 'STRONG BUY') strongBuyCount++;
@@ -501,6 +555,7 @@ function updateSummaryStats(stocks) {
         else if (signal.label === 'HOLD' || signal.label === 'NEUTRAL') holdCount++;
         else if (signal.label === 'SELL') sellCount++;
         else if (signal.label === 'STRONG SELL') strongSellCount++;
+        else if (signal.label === 'SHORT' || signal.label === 'STRONG SHORT') shortCount++;
     });
 
     document.getElementById('strong-buy-count').textContent = strongBuyCount;
@@ -530,6 +585,7 @@ function displayStocks(stocks) {
     const grouped = {
         strongBuy: [],
         buy: [],
+        shortSignals: [],
         sell: [],
         strongSell: [],
         neutral: []
@@ -541,6 +597,8 @@ function displayStocks(stocks) {
             grouped.strongBuy.push(stock);
         } else if (signal.label === 'BUY') {
             grouped.buy.push(stock);
+        } else if (signal.label === 'SHORT' || signal.label === 'STRONG SHORT') {
+            grouped.shortSignals.push(stock);
         } else if (signal.label === 'SELL') {
             grouped.sell.push(stock);
         } else if (signal.label === 'STRONG SELL') {
@@ -578,6 +636,19 @@ function displayStocks(stocks) {
             </tr>
         `;
         html += grouped.buy.map(stock => createStockRow(stock, ++globalIndex)).join('');
+    }
+
+    // Short Section (Bearish regime)
+    if (grouped.shortSignals.length > 0) {
+        html += `
+            <tr style="background: linear-gradient(135deg, #fef3c7, #fde68a);">
+                <td colspan="14" class="fw-bold py-3">
+                    <i class="bi bi-arrow-down-short me-2"></i>🔻 SHORT SIGNALS (${grouped.shortSignals.length})
+                    <small class="ms-3 text-muted fw-normal">Bearish Power Zone — Short Entry Points</small>
+                </td>
+            </tr>
+        `;
+        html += grouped.shortSignals.map(stock => createStockRow(stock, ++globalIndex)).join('');
     }
 
     // Sell Section

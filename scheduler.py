@@ -225,9 +225,9 @@ def update_daily_snapshot():
 
         logger.info("\n" + "=" * 80)
         logger.info(f"✅ Daily snapshot update complete!")
-        logger.info(f"  Selection method: 8-21 EMA Swing Trading Strategy")
-        logger.info(f"    - Power Zone: Price > 8 EMA > 21 EMA")
-        logger.info(f"    - Entry Timing: DeMarker < 0.30 (oversold)")
+        logger.info(f"  Selection method: 8-21 EMA Swing Trading (Bull/Bear regime-aware)")
+        logger.info(f"    - Bullish: Price > 8 EMA > 21 EMA → LONG (D_momentum)")
+        logger.info(f"    - Bearish: Price < 8 EMA < 21 EMA → SHORT (D_momentum inverted)")
         logger.info(f"    - Profit Targets: Fibonacci 127.2%, 161.8%, 200%")
         logger.info("=" * 80)
 

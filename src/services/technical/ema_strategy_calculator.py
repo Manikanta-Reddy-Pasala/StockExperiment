@@ -149,9 +149,13 @@ class EMAStrategyCalculator:
                 'buy_signal': signals['buy_signal'],
                 'sell_signal': signals['sell_signal'],
                 'signal_quality': signals['signal_quality'],
+                'short_signal': signals.get('short_signal', False),
+                'short_quality': signals.get('short_quality', 'none'),
+                'is_bearish_power_zone': signals.get('is_bearish_power_zone', False),
 
                 # Stop loss (below 21 EMA or recent swing low)
                 'suggested_stop': signals['stop_loss'],
+                'short_cover': signals.get('short_cover', 0.0),
 
                 # Raw data for further processing
                 '_df': df
@@ -299,73 +303,89 @@ class EMAStrategyCalculator:
     def _generate_signals(self, df: pd.DataFrame, price: float, ema_8: float,
                          ema_21: float, demarker: float) -> Dict:
         """
-        Generate buy/sell signals based on 8-21 EMA strategy rules.
+        Generate buy/sell/short signals based on 8-21 EMA strategy rules.
 
-        Perfect Buy Setup (HIGH quality):
-        ✅ Price > 8 EMA > 21 EMA (power zone active)
-        ✅ DeMarker < 0.30 (oversold pullback)
-        ✅ Price holding EMA support
+        LONG Signals (Bullish Power Zone: Price > 8 EMA > 21 EMA):
+        - HIGH quality: Bullish + Oversold + At EMA support
+        - MEDIUM quality: Bullish + DeMarker 0.30-0.70
 
-        Good Buy Setup (MEDIUM quality):
-        ✅ Price > 8 EMA > 21 EMA (power zone active)
-        ✅ DeMarker 0.30-0.70 (mild pullback / neutral)
-
-        Weak Buy Setup (LOW quality):
-        ✅ Price > 8 EMA > 21 EMA (power zone active only)
-
-        Sell Signal:
-        ❌ Price breaks below 8 EMA and 21 EMA
-        ❌ 8 EMA crosses below 21 EMA
+        SHORT Signals (Bearish Power Zone: Price < 8 EMA < 21 EMA):
+        - HIGH quality: Bearish + Overbought (DeMarker > 0.70) + Near EMA resistance
+        - MEDIUM quality: Bearish + DeMarker 0.30-0.70
         """
         try:
             # Check power zone status
             is_bullish_power_zone = price > ema_8 > ema_21
-            is_bearish = price < ema_8 < ema_21
+            is_bearish_power_zone = price < ema_8 < ema_21
 
             # DeMarker conditions
             is_oversold = demarker < 0.30
+            is_overbought = demarker > 0.70
             is_mild_pullback = 0.30 <= demarker <= 0.70
 
-            # Check if price is holding EMA support (within 2% of EMA)
-            holding_ema8_support = abs(price - ema_8) / price < 0.02 if price > 0 else False
-            holding_ema21_support = abs(price - ema_21) / price < 0.02 if price > 0 else False
-            holding_support = holding_ema8_support or holding_ema21_support
+            # Check if price is holding EMA support/resistance (within 2% of EMA)
+            holding_ema8 = abs(price - ema_8) / price < 0.02 if price > 0 else False
+            holding_ema21 = abs(price - ema_21) / price < 0.02 if price > 0 else False
+            holding_support = holding_ema8 or holding_ema21
 
-            # BUY SIGNAL LOGIC
+            # BUY SIGNAL LOGIC (Long)
             buy_signal = False
             signal_quality = 'none'
 
             if is_bullish_power_zone:
                 if is_oversold and (price >= ema_21):
-                    # Perfect setup: Bullish + Oversold + At/near support
                     buy_signal = True
                     signal_quality = 'high'
                 elif is_oversold:
-                    # Good setup: Bullish + Oversold
                     buy_signal = True
                     signal_quality = 'medium'
                 elif is_mild_pullback:
-                    # Decent setup: Bullish + Mild pullback
                     buy_signal = True
                     signal_quality = 'medium'
-                # Don't give buy signal if overbought (demarker > 0.70)
-                # Only recommend stocks with good entry timing
 
-            # SELL SIGNAL LOGIC
-            sell_signal = is_bearish or (price < ema_21)
+            # SHORT SIGNAL LOGIC (Bearish Power Zone)
+            short_signal = False
+            short_quality = 'none'
 
-            # Calculate stop loss (below 21 EMA or recent swing low)
+            if is_bearish_power_zone:
+                if is_overbought and (price <= ema_21):
+                    # Perfect short: Bearish + Overbought + At/near EMA resistance
+                    short_signal = True
+                    short_quality = 'high'
+                elif is_overbought:
+                    # Good short: Bearish + Overbought
+                    short_signal = True
+                    short_quality = 'medium'
+                elif is_mild_pullback:
+                    # Decent short: Bearish + mild bounce (not yet oversold)
+                    short_signal = True
+                    short_quality = 'medium'
+
+            # SELL SIGNAL LOGIC (exit long)
+            sell_signal = is_bearish_power_zone or (price < ema_21)
+
+            # Calculate stop loss / cover price
             recent_low = float(df['low'].tail(20).min())
+            recent_high = float(df['high'].tail(20).max())
             stop_below_ema21 = ema_21 * 0.98  # 2% below 21 EMA
             stop_loss = min(stop_below_ema21, recent_low)
+
+            # Short cover (stop for shorts) = above 21 EMA or recent swing high
+            cover_above_ema21 = ema_21 * 1.02  # 2% above 21 EMA
+            short_cover = max(cover_above_ema21, recent_high)
 
             return {
                 'buy_signal': buy_signal,
                 'sell_signal': sell_signal,
+                'short_signal': short_signal,
+                'short_quality': short_quality,
                 'signal_quality': signal_quality,
                 'stop_loss': round(stop_loss, 2),
+                'short_cover': round(short_cover, 2),
                 'is_bullish_power_zone': is_bullish_power_zone,
+                'is_bearish_power_zone': is_bearish_power_zone,
                 'is_oversold': is_oversold,
+                'is_overbought': is_overbought,
                 'holding_support': holding_support
             }
 
@@ -374,68 +394,113 @@ class EMAStrategyCalculator:
             return {
                 'buy_signal': False,
                 'sell_signal': False,
+                'short_signal': False,
+                'short_quality': 'none',
                 'signal_quality': 'none',
                 'stop_loss': 0.0,
+                'short_cover': 0.0,
                 'is_bullish_power_zone': False,
+                'is_bearish_power_zone': False,
                 'is_oversold': False,
+                'is_overbought': False,
                 'holding_support': False
             }
 
     def _calculate_ranking_scores(self, results: Dict[str, Dict]) -> None:
         """
-        Calculate ranking scores using D_momentum model (13-month backtest optimized).
+        Calculate ranking scores for both bullish (D_momentum) and bearish models.
 
-        13-month grid search (Jan 2025 → Jan 2026, 34,560 combos):
-        Best model: D_momentum — rewards buying momentum (higher DeMarker = better)
+        Bullish D_momentum (13-month backtest optimized):
         Weights: (20, 50, 30) — DeMarker #1, Price distance #2, EMA sep #3
-        Result: 58.5% WR, PF 3.84, +5.22% avg return, 9/13 months positive
+        Result: 58.5% WR, PF 3.84, +5.22% avg return
 
+        Bearish D_momentum (inverted):
+        Same weight structure but for short entries in bearish power zone.
         Score range: 0-100
         """
         try:
             for symbol, result in results.items():
                 try:
-                    if not result.get('is_bullish', False):
-                        result['ema_strategy_score'] = 0.0
-                        continue
-
-                    separation = result.get('ema_separation_pct', 0)
-                    price_dist = result.get('price_above_ema8_pct', 0)
+                    is_bullish = result.get('is_bullish', False)
+                    is_bearish = result.get('is_bearish_power_zone', False)
                     demarker = result.get('demarker', 0.5)
 
-                    # Component 1: EMA separation (0-20 points)
-                    # 13mo: >5% sep = 71.4% WR, 3-5% = 60%
-                    sep_score = min(separation / 5.0, 1.0) * 20.0
+                    # === BULLISH SCORING (Long) ===
+                    if is_bullish:
+                        separation = result.get('ema_separation_pct', 0)
+                        price_dist = result.get('price_above_ema8_pct', 0)
 
-                    # Component 2: DeMarker momentum (0-50 points)
-                    # D_momentum: higher DeMarker = stronger buying pressure = better
-                    # 13mo: 0.60-0.70 = 61.8% WR, +5.47% avg
-                    if 0.55 <= demarker <= 0.70:
-                        dm_score = 50.0   # Strong momentum - best
-                    elif 0.45 <= demarker < 0.55:
-                        dm_score = 40.0   # Moderate momentum
-                    elif 0.35 <= demarker < 0.45:
-                        dm_score = 25.0   # Mild
-                    elif demarker < 0.35:
-                        dm_score = 12.5   # Weak/oversold
+                        sep_score = min(separation / 5.0, 1.0) * 20.0
+
+                        if 0.55 <= demarker <= 0.70:
+                            dm_score = 50.0
+                        elif 0.45 <= demarker < 0.55:
+                            dm_score = 40.0
+                        elif 0.35 <= demarker < 0.45:
+                            dm_score = 25.0
+                        elif demarker < 0.35:
+                            dm_score = 12.5
+                        else:
+                            dm_score = 0.0
+
+                        if 0 <= price_dist <= 1.0:
+                            dist_score = 30.0
+                        elif price_dist <= 2.0:
+                            dist_score = 24.9
+                        elif price_dist <= 3.0:
+                            dist_score = 18.0
+                        elif price_dist <= 5.0:
+                            dist_score = 9.9
+                        else:
+                            dist_score = 3.0
+
+                        result['ema_strategy_score'] = round(max(0.0, min(100.0, sep_score + dm_score + dist_score)), 2)
+
+                    # === BEARISH SCORING (Short) ===
+                    elif is_bearish:
+                        # Inverted: EMA separation below (21 EMA > 8 EMA), price below both
+                        ema_8 = result.get('ema_8', 0)
+                        ema_21 = result.get('ema_21', 0)
+                        price = result.get('current_price', 0)
+
+                        # Component 1: Bearish EMA separation (0-20 points)
+                        # Wider gap (21 EMA >> 8 EMA) = stronger downtrend
+                        bear_sep_pct = ((ema_21 - ema_8) / ema_21) * 100 if ema_21 > 0 else 0
+                        sep_score = min(bear_sep_pct / 5.0, 1.0) * 20.0
+
+                        # Component 2: DeMarker selling pressure (0-50 points)
+                        # For shorts: lower DeMarker = stronger selling = better short entry
+                        # Inverted logic from bullish model
+                        if 0.30 <= demarker <= 0.45:
+                            dm_score = 50.0   # Strong selling pressure
+                        elif 0.45 < demarker <= 0.55:
+                            dm_score = 40.0   # Moderate selling
+                        elif 0.55 < demarker <= 0.65:
+                            dm_score = 25.0   # Mild
+                        elif demarker > 0.65:
+                            dm_score = 12.5   # Weak selling / overbought bounce
+                        else:
+                            dm_score = 0.0    # Deeply oversold (<0.30) — bounce likely
+
+                        # Component 3: Price distance below 8 EMA (0-30 points)
+                        # Tight to EMA = better short entry (not already crashed)
+                        price_below_ema8_pct = ((ema_8 - price) / ema_8) * 100 if ema_8 > 0 else 0
+                        if 0 <= price_below_ema8_pct <= 1.0:
+                            dist_score = 30.0
+                        elif price_below_ema8_pct <= 2.0:
+                            dist_score = 24.9
+                        elif price_below_ema8_pct <= 3.0:
+                            dist_score = 18.0
+                        elif price_below_ema8_pct <= 5.0:
+                            dist_score = 9.9
+                        else:
+                            dist_score = 3.0
+
+                        result['ema_strategy_score'] = round(max(0.0, min(100.0, sep_score + dm_score + dist_score)), 2)
+                        result['signal_direction'] = 'SHORT'
+
                     else:
-                        dm_score = 0.0    # Overbought (>0.70)
-
-                    # Component 3: Price distance from EMA8 (0-30 points)
-                    # 13mo: 3-5% dist = 70% WR
-                    if 0 <= price_dist <= 1.0:
-                        dist_score = 30.0
-                    elif price_dist <= 2.0:
-                        dist_score = 24.9
-                    elif price_dist <= 3.0:
-                        dist_score = 18.0
-                    elif price_dist <= 5.0:
-                        dist_score = 9.9
-                    else:
-                        dist_score = 3.0
-
-                    composite_score = sep_score + dm_score + dist_score
-                    result['ema_strategy_score'] = round(max(0.0, min(100.0, composite_score)), 2)
+                        result['ema_strategy_score'] = 0.0
 
                 except Exception as e:
                     logger.error(f"Error calculating score for {symbol}: {e}")
