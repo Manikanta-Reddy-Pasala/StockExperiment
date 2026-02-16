@@ -13,6 +13,20 @@ import time
 
 logger = logging.getLogger(__name__)
 
+# ETFs and index funds unsuitable for EMA swing trading (near-zero volatility or index-tracking)
+ETF_EXCLUSION_SYMBOLS = {
+    'LIQUIDBEES', 'NIFTYBEES', 'BANKBEES', 'MON100', 'GOLDBEES',
+    'SILVERBEES', 'JUNIORBEES', 'ITBEES', 'PSUBNKBEES', 'SETFNIF50',
+    'SETFNIFBK', 'NETFIT', 'HABOREES', 'HNGSNGBEES', 'SHARIABEES',
+    'DIVOPPBEES', 'INFRABEES', 'CPSEETF', 'CONSUMBEES', 'HEALTHY',
+    'MOM100', 'MOM50', 'PHARMABEES', 'AUTOBEES', 'COMMOETF',
+}
+
+# Stop-loss cooldown: 30 days after any SL hit, exclude if 2+ SL hits in 90 days
+STOP_LOSS_COOLDOWN_DAYS = 30
+STOP_LOSS_MAX_HITS_PERIOD_DAYS = 90
+STOP_LOSS_MAX_HITS = 2
+
 
 class SagaStepStatus(Enum):
     """Status of each saga step."""
@@ -405,9 +419,10 @@ class SuggestedStocksSagaOrchestrator:
                         'buy_signal': bool(stock.buy_signal) if stock.buy_signal is not None else False,
                         'sell_signal': bool(stock.sell_signal) if stock.sell_signal is not None else False,
                         # Derived indicators for strategy filtering
-                        'is_bullish': bool(stock.ema_8 and stock.ema_21 and stock.ema_8 > stock.ema_21),
+                        'is_bullish': bool(stock.ema_8 and stock.ema_21 and stock.current_price and
+                                          stock.current_price > stock.ema_8 > stock.ema_21),
                         'signal_quality': 'high' if (stock.demarker and stock.demarker < 0.30) else 'medium' if (stock.demarker and stock.demarker < 0.50) else 'low',
-                        'ema_strategy_score': 75.0 if (stock.ema_8 and stock.ema_21 and stock.demarker and stock.ema_8 > stock.ema_21 and stock.demarker < 0.30) else 50.0
+                        'ema_strategy_score': self._compute_db_ema_score(stock)
                     }
                     stock_data_list.append(stock_data)
                 
@@ -425,10 +440,19 @@ class SuggestedStocksSagaOrchestrator:
                     current_price = stock_data['current_price']
                     volume = stock_data['volume']
                     market_cap = stock_data['market_cap']
-                    
+
+                    # Exclude ETFs - not suitable for EMA swing trading
+                    stock_name = (stock_data.get('name') or '').upper()
+                    raw_symbol = (stock_data.get('symbol') or '').upper()
+                    # Extract clean symbol (e.g. "NSE:LIQUIDBEES-EQ" -> "LIQUIDBEES")
+                    clean_symbol = raw_symbol.replace('NSE:', '').replace('BSE:', '').replace('-EQ', '').strip()
+                    if ('ETF' in stock_name or 'ETF' in clean_symbol or
+                        'BEES' in clean_symbol or clean_symbol in ETF_EXCLUSION_SYMBOLS):
+                        continue
+
                     # Calculate daily turnover (price * volume)
                     daily_turnover = current_price * volume
-                    
+
                     # Apply stage 1 filtering criteria from config
                     if (min_price <= current_price <= max_price and
                         volume >= min_volume and
@@ -487,9 +511,22 @@ class SuggestedStocksSagaOrchestrator:
             suggested_stocks = []
             strategy_counts = {strategy: 0 for strategy in saga.strategies}
             
+            # Get stop-loss blacklist to avoid re-recommending repeated losers
+            stop_loss_blacklist = self._get_stop_loss_blacklist()
+            if stop_loss_blacklist:
+                logger.info(f"Stop-loss blacklist: {len(stop_loss_blacklist)} symbols excluded")
+
             # Apply strategy logic to each stock (ONE entry per stock - no duplicates)
+            sl_rejected = 0
             for stock_data in filtered_stocks:
                 try:
+                    # Check stop-loss blacklist
+                    raw_sym = (stock_data.get('symbol') or '').upper()
+                    clean_sym = raw_sym.replace('NSE:', '').replace('BSE:', '').replace('-EQ', '').strip()
+                    if clean_sym in stop_loss_blacklist or raw_sym in stop_loss_blacklist:
+                        sl_rejected += 1
+                        continue
+
                     # Apply unified strategy only - no need to loop through multiple strategies
                     strategy = 'unified'  # Always use unified strategy
                     strategy_result = self._apply_strategy_logic(stock_data, strategy, saga.model_type)
@@ -500,6 +537,9 @@ class SuggestedStocksSagaOrchestrator:
                 except Exception as e:
                     logger.warning(f"Failed to apply strategy to stock {stock_data.get('symbol', 'Unknown')}: {e}")
                     continue
+
+            if sl_rejected:
+                logger.info(f"Rejected {sl_rejected} stocks due to stop-loss history")
             
             step.input_count = len(filtered_stocks)
             step.output_count = len(suggested_stocks)
@@ -724,14 +764,14 @@ class SuggestedStocksSagaOrchestrator:
             if pe_ratio and (pe_ratio < 5 or pe_ratio > 100):
                 return None
 
-            # EMA strategy score threshold
+            # EMA strategy score threshold (backtest-optimized)
             score = ema_strategy_score / 100.0  # Convert to 0-1 range
-            min_score = 0.45  # Require top 55% of EMA scores
+            min_score = 0.25  # Require score >= 25/100 (backtest optimal: filters toxic setups)
             if score < min_score:
                 return None
 
-            # Signal quality: Accept high and medium quality signals
-            if signal_quality == 'none':
+            # Signal quality: Accept ONLY high and medium quality signals
+            if signal_quality not in ('high', 'medium'):
                 return None
             
             # Create suggested stock with 8-21 EMA strategy fields
@@ -1152,6 +1192,23 @@ class SuggestedStocksSagaOrchestrator:
                 print(f"   ✅ EMA indicators applied to {stocks_with_indicators}/{len(saga.final_results)} stocks")
 
                 # ========================================
+                # POST-CALCULATION RE-FILTER: Remove stocks that no longer qualify
+                # Step 3 filtered on stale DB values; Step 6 recalculated fresh indicators.
+                # Stocks may now have buy_signal=false or weak signal_quality.
+                # ========================================
+                pre_filter_count = len(saga.final_results)
+                saga.final_results = [
+                    stock for stock in saga.final_results
+                    if stock.get('buy_signal', False)
+                    and not stock.get('sell_signal', False)
+                    and stock.get('signal_quality') in ('high', 'medium')
+                ]
+                post_filter_removed = pre_filter_count - len(saga.final_results)
+                if post_filter_removed > 0:
+                    print(f"   🚫 Post-calculation filter removed {post_filter_removed} stocks (buy_signal=false or weak quality)")
+                    logger.info(f"Post-Step6 re-filter: removed {post_filter_removed} stocks that no longer qualify")
+
+                # ========================================
                 # SORT AND APPLY LIMIT BASED ON EMA STRATEGY SCORE
                 # ========================================
                 print(f"\n   📊 Sorting and selecting top stocks by EMA strategy score...")
@@ -1287,6 +1344,133 @@ class SuggestedStocksSagaOrchestrator:
             saga.update_step_status("step7_daily_snapshot", SagaStepStatus.FAILED, error_msg)
             # Don't fail the saga - snapshot is optional
             return saga
+
+    def _compute_db_ema_score(self, stock) -> float:
+        """
+        Compute a differentiated EMA strategy score from database stock fields.
+        Returns 0-100 score based on EMA separation, DeMarker, and price position.
+
+        Weights derived from backtest optimization (Oct-Nov 2025 data):
+        - EMA separation: 50 pts (highest predictor, but penalize >5% over-extension)
+        - DeMarker timing: 25 pts (0.40-0.50 sweet spot: 71% WR in backtest)
+        - Price distance:  25 pts (0-2% from EMA8 optimal: 59-64% WR)
+        """
+        try:
+            ema_8 = float(stock.ema_8) if stock.ema_8 else 0.0
+            ema_21 = float(stock.ema_21) if stock.ema_21 else 0.0
+            price = float(stock.current_price) if stock.current_price else 0.0
+            demarker = float(stock.demarker) if stock.demarker else 0.5
+
+            if not ema_21 or ema_21 <= 0 or not price or price <= 0:
+                return 0.0
+
+            # Not in bullish power zone = score 0
+            if not (price > ema_8 > ema_21):
+                return 0.0
+
+            # Component 1: EMA separation strength (0-50 points)
+            # Backtest: <0.5% = 65% WR, 1-2% = 60% WR, >5% = 37% WR (toxic)
+            # Sweet spot is moderate separation (1-3%), penalize over-extension
+            ema_sep_pct = ((ema_8 - ema_21) / ema_21) * 100
+            if ema_sep_pct <= 0.5:
+                sep_score = 40.0   # Tight but bullish - good
+            elif ema_sep_pct <= 1.0:
+                sep_score = 45.0   # Moderate - good
+            elif ema_sep_pct <= 2.0:
+                sep_score = 50.0   # Strong trend - best zone
+            elif ema_sep_pct <= 3.0:
+                sep_score = 40.0   # Extended - decent
+            elif ema_sep_pct <= 5.0:
+                sep_score = 25.0   # Over-extended - weaker
+            else:
+                sep_score = 10.0   # Extremely extended - toxic (37% WR)
+
+            # Component 2: DeMarker timing (0-25 points)
+            # Backtest: 0.40-0.50 = 71% WR (best), 0.30-0.40 = 46% WR
+            # Contrary to theory, deeply oversold underperformed in this market
+            if demarker < 0.20:
+                dm_score = 15.0   # Deeply oversold - may continue falling
+            elif demarker < 0.30:
+                dm_score = 20.0   # Oversold - decent
+            elif demarker < 0.40:
+                dm_score = 22.0   # Mild pullback - good
+            elif demarker < 0.50:
+                dm_score = 25.0   # Sweet spot - best WR (71%)
+            elif demarker < 0.70:
+                dm_score = 10.0   # Neutral-high - weaker
+            else:
+                dm_score = 0.0    # Overbought - avoid
+
+            # Component 3: Price distance from 8 EMA (0-25 points)
+            # Backtest: 0-1% = 59% WR, 1-2% = 64% WR (best), >5% = 33% WR (toxic)
+            price_dist_pct = ((price - ema_8) / ema_8) * 100
+            if 0 <= price_dist_pct <= 1.0:
+                dist_score = 23.0  # Tight to EMA - great
+            elif price_dist_pct <= 2.0:
+                dist_score = 25.0  # Optimal zone (64% WR)
+            elif price_dist_pct <= 3.0:
+                dist_score = 18.0  # Moderate - decent
+            elif price_dist_pct <= 5.0:
+                dist_score = 8.0   # Extended - weak (44% WR)
+            else:
+                dist_score = 2.0   # Over-extended - toxic (33% WR)
+
+            total = sep_score + dm_score + dist_score
+            return round(max(0.0, min(100.0, total)), 2)
+
+        except Exception as e:
+            logger.warning(f"Error computing DB EMA score: {e}")
+            return 0.0
+
+    def _get_stop_loss_blacklist(self) -> set:
+        """
+        Get set of symbols that should be excluded due to recent stop-loss exits.
+        - Any symbol with a stop-loss exit in the last 30 days (cooldown)
+        - Any symbol with 2+ stop-loss exits in the last 90 days (repeated failure)
+        """
+        blacklist = set()
+        try:
+            from src.models.database import get_database_manager
+            from sqlalchemy import text
+
+            db_manager = get_database_manager()
+            with db_manager.get_session() as session:
+                # Recent stop-loss cooldown (30 days)
+                recent_sl = session.execute(text("""
+                    SELECT DISTINCT symbol FROM order_performance
+                    WHERE exit_reason = 'stop_loss'
+                      AND closed_at >= CURRENT_DATE - INTERVAL :cooldown_days
+                """), {'cooldown_days': f'{STOP_LOSS_COOLDOWN_DAYS} days'}).fetchall()
+
+                for row in recent_sl:
+                    sym = (row[0] or '').upper().replace('NSE:', '').replace('-EQ', '').strip()
+                    if sym:
+                        blacklist.add(sym)
+
+                # Repeated stop-loss failures (2+ in 90 days)
+                repeated_sl = session.execute(text("""
+                    SELECT symbol, COUNT(*) as sl_count FROM order_performance
+                    WHERE exit_reason = 'stop_loss'
+                      AND closed_at >= CURRENT_DATE - INTERVAL :period_days
+                    GROUP BY symbol
+                    HAVING COUNT(*) >= :max_hits
+                """), {
+                    'period_days': f'{STOP_LOSS_MAX_HITS_PERIOD_DAYS} days',
+                    'max_hits': STOP_LOSS_MAX_HITS
+                }).fetchall()
+
+                for row in repeated_sl:
+                    sym = (row[0] or '').upper().replace('NSE:', '').replace('-EQ', '').strip()
+                    if sym:
+                        blacklist.add(sym)
+
+                if blacklist:
+                    logger.info(f"Stop-loss blacklist ({len(blacklist)} symbols): {sorted(blacklist)[:10]}...")
+
+        except Exception as e:
+            logger.warning(f"Could not query stop-loss history (table may not exist yet): {e}")
+
+        return blacklist
 
     def _generate_saga_summary(self, saga: SuggestedStocksSaga) -> Dict[str, Any]:
         """Generate comprehensive saga summary."""

@@ -383,34 +383,16 @@ class EMAStrategyCalculator:
 
     def _calculate_ranking_scores(self, results: Dict[str, Dict]) -> None:
         """
-        Calculate ranking scores for all stocks.
+        Calculate ranking scores for all stocks using backtest-optimized scoring.
 
-        Ranking based on:
-        1. EMA separation (stronger trends ranked higher)
-        2. Price position above 8 EMA (momentum)
-        3. DeMarker oversold level (better entry timing)
+        Weights derived from Oct-Nov 2025 backtest optimization:
+        - EMA separation: 50 pts (penalize >5% over-extension: 37% WR toxic zone)
+        - DeMarker timing: 25 pts (0.40-0.50 sweet spot: 71% WR)
+        - Price distance:  25 pts (0-2% from EMA8 optimal: 59-64% WR)
 
         Score range: 0-100
         """
         try:
-            # Extract metrics for normalization
-            separations = []
-            price_distances = []
-            demarkers = []
-
-            for symbol, result in results.items():
-                if result.get('is_bullish', False):  # Only rank bullish stocks
-                    separations.append(result.get('ema_separation_pct', 0))
-                    price_distances.append(result.get('price_above_ema8_pct', 0))
-                    demarkers.append(result.get('demarker', 0.5))
-
-            if not separations:
-                return
-
-            # Calculate percentile ranks
-            separations_sorted = sorted(separations)
-            price_distances_sorted = sorted(price_distances)
-
             for symbol, result in results.items():
                 try:
                     if not result.get('is_bullish', False):
@@ -421,24 +403,51 @@ class EMAStrategyCalculator:
                     price_dist = result.get('price_above_ema8_pct', 0)
                     demarker = result.get('demarker', 0.5)
 
-                    # Calculate percentile scores
-                    sep_percentile = (separations_sorted.index(separation) / len(separations_sorted)) * 100 if separations_sorted else 50
-                    dist_percentile = (price_distances_sorted.index(price_dist) / len(price_distances_sorted)) * 100 if price_distances_sorted else 50
+                    # Component 1: EMA separation (0-50 points)
+                    # Moderate separation (1-2%) is optimal, >5% is toxic
+                    if separation <= 0.5:
+                        sep_score = 40.0
+                    elif separation <= 1.0:
+                        sep_score = 45.0
+                    elif separation <= 2.0:
+                        sep_score = 50.0   # Best zone
+                    elif separation <= 3.0:
+                        sep_score = 40.0
+                    elif separation <= 5.0:
+                        sep_score = 25.0
+                    else:
+                        sep_score = 10.0   # Toxic: 37% WR
 
-                    # DeMarker score (lower is better for entries)
-                    demarker_score = 100 if demarker < 0.30 else (100 - (demarker * 100))
+                    # Component 2: DeMarker timing (0-25 points)
+                    # 0.40-0.50 is the backtest sweet spot (71% WR)
+                    if demarker < 0.20:
+                        dm_score = 15.0
+                    elif demarker < 0.30:
+                        dm_score = 20.0
+                    elif demarker < 0.40:
+                        dm_score = 22.0
+                    elif demarker < 0.50:
+                        dm_score = 25.0    # Best zone: 71% WR
+                    elif demarker < 0.70:
+                        dm_score = 10.0
+                    else:
+                        dm_score = 0.0
 
-                    # Weighted composite score
-                    # 40% EMA separation (trend strength)
-                    # 30% Price distance (momentum)
-                    # 30% DeMarker timing
-                    composite_score = (
-                        sep_percentile * 0.40 +
-                        dist_percentile * 0.30 +
-                        demarker_score * 0.30
-                    )
+                    # Component 3: Price distance from EMA8 (0-25 points)
+                    # 1-2% is optimal (64% WR), >5% is toxic (33% WR)
+                    if 0 <= price_dist <= 1.0:
+                        dist_score = 23.0
+                    elif price_dist <= 2.0:
+                        dist_score = 25.0  # Best zone: 64% WR
+                    elif price_dist <= 3.0:
+                        dist_score = 18.0
+                    elif price_dist <= 5.0:
+                        dist_score = 8.0
+                    else:
+                        dist_score = 2.0   # Toxic: 33% WR
 
-                    result['ema_strategy_score'] = round(composite_score, 2)
+                    composite_score = sep_score + dm_score + dist_score
+                    result['ema_strategy_score'] = round(max(0.0, min(100.0, composite_score)), 2)
 
                 except Exception as e:
                     logger.error(f"Error calculating score for {symbol}: {e}")
