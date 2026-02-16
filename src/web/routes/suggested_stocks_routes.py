@@ -528,7 +528,7 @@ def recalculate_suggestions():
                 result = orchestrator.execute_suggested_stocks_saga(
                     user_id=1,  # System user
                     strategies=['unified'],
-                    limit=50
+                    limit=5  # 13mo backtest-optimized: top 5 picks for PF 3.84
                 )
 
                 if result.get('success'):

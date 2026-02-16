@@ -308,7 +308,7 @@ class EMAStrategyCalculator:
 
         Good Buy Setup (MEDIUM quality):
         ✅ Price > 8 EMA > 21 EMA (power zone active)
-        ✅ DeMarker 0.30-0.50 (mild pullback)
+        ✅ DeMarker 0.30-0.70 (mild pullback / neutral)
 
         Weak Buy Setup (LOW quality):
         ✅ Price > 8 EMA > 21 EMA (power zone active only)
@@ -324,7 +324,7 @@ class EMAStrategyCalculator:
 
             # DeMarker conditions
             is_oversold = demarker < 0.30
-            is_mild_pullback = 0.30 <= demarker <= 0.50
+            is_mild_pullback = 0.30 <= demarker <= 0.70
 
             # Check if price is holding EMA support (within 2% of EMA)
             holding_ema8_support = abs(price - ema_8) / price < 0.02 if price > 0 else False
@@ -383,12 +383,12 @@ class EMAStrategyCalculator:
 
     def _calculate_ranking_scores(self, results: Dict[str, Dict]) -> None:
         """
-        Calculate ranking scores for all stocks using backtest-optimized scoring.
+        Calculate ranking scores using D_momentum model (13-month backtest optimized).
 
-        Weights derived from Oct-Nov 2025 backtest optimization:
-        - EMA separation: 50 pts (penalize >5% over-extension: 37% WR toxic zone)
-        - DeMarker timing: 25 pts (0.40-0.50 sweet spot: 71% WR)
-        - Price distance:  25 pts (0-2% from EMA8 optimal: 59-64% WR)
+        13-month grid search (Jan 2025 → Jan 2026, 34,560 combos):
+        Best model: D_momentum — rewards buying momentum (higher DeMarker = better)
+        Weights: (20, 50, 30) — DeMarker #1, Price distance #2, EMA sep #3
+        Result: 58.5% WR, PF 3.84, +5.22% avg return, 9/13 months positive
 
         Score range: 0-100
         """
@@ -403,48 +403,36 @@ class EMAStrategyCalculator:
                     price_dist = result.get('price_above_ema8_pct', 0)
                     demarker = result.get('demarker', 0.5)
 
-                    # Component 1: EMA separation (0-50 points)
-                    # Moderate separation (1-2%) is optimal, >5% is toxic
-                    if separation <= 0.5:
-                        sep_score = 40.0
-                    elif separation <= 1.0:
-                        sep_score = 45.0
-                    elif separation <= 2.0:
-                        sep_score = 50.0   # Best zone
-                    elif separation <= 3.0:
-                        sep_score = 40.0
-                    elif separation <= 5.0:
-                        sep_score = 25.0
-                    else:
-                        sep_score = 10.0   # Toxic: 37% WR
+                    # Component 1: EMA separation (0-20 points)
+                    # 13mo: >5% sep = 71.4% WR, 3-5% = 60%
+                    sep_score = min(separation / 5.0, 1.0) * 20.0
 
-                    # Component 2: DeMarker timing (0-25 points)
-                    # 0.40-0.50 is the backtest sweet spot (71% WR)
-                    if demarker < 0.20:
-                        dm_score = 15.0
-                    elif demarker < 0.30:
-                        dm_score = 20.0
-                    elif demarker < 0.40:
-                        dm_score = 22.0
-                    elif demarker < 0.50:
-                        dm_score = 25.0    # Best zone: 71% WR
-                    elif demarker < 0.70:
-                        dm_score = 10.0
+                    # Component 2: DeMarker momentum (0-50 points)
+                    # D_momentum: higher DeMarker = stronger buying pressure = better
+                    # 13mo: 0.60-0.70 = 61.8% WR, +5.47% avg
+                    if 0.55 <= demarker <= 0.70:
+                        dm_score = 50.0   # Strong momentum - best
+                    elif 0.45 <= demarker < 0.55:
+                        dm_score = 40.0   # Moderate momentum
+                    elif 0.35 <= demarker < 0.45:
+                        dm_score = 25.0   # Mild
+                    elif demarker < 0.35:
+                        dm_score = 12.5   # Weak/oversold
                     else:
-                        dm_score = 0.0
+                        dm_score = 0.0    # Overbought (>0.70)
 
-                    # Component 3: Price distance from EMA8 (0-25 points)
-                    # 1-2% is optimal (64% WR), >5% is toxic (33% WR)
+                    # Component 3: Price distance from EMA8 (0-30 points)
+                    # 13mo: 3-5% dist = 70% WR
                     if 0 <= price_dist <= 1.0:
-                        dist_score = 23.0
+                        dist_score = 30.0
                     elif price_dist <= 2.0:
-                        dist_score = 25.0  # Best zone: 64% WR
+                        dist_score = 24.9
                     elif price_dist <= 3.0:
                         dist_score = 18.0
                     elif price_dist <= 5.0:
-                        dist_score = 8.0
+                        dist_score = 9.9
                     else:
-                        dist_score = 2.0   # Toxic: 33% WR
+                        dist_score = 3.0
 
                     composite_score = sep_score + dm_score + dist_score
                     result['ema_strategy_score'] = round(max(0.0, min(100.0, composite_score)), 2)

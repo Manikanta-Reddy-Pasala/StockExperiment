@@ -198,7 +198,7 @@ class SuggestedStocksSagaOrchestrator:
             raise
     
     def execute_suggested_stocks_saga(self, user_id: int, strategies: List[str] = None,
-                                   limit: int = 50, search: str = None, sort_by: str = None,
+                                   limit: int = 5, search: str = None, sort_by: str = None,
                                    sort_order: str = 'desc', sector: str = None,
                                    model_type: str = 'hybrid') -> Dict[str, Any]:
         """
@@ -421,7 +421,7 @@ class SuggestedStocksSagaOrchestrator:
                         # Derived indicators for strategy filtering
                         'is_bullish': bool(stock.ema_8 and stock.ema_21 and stock.current_price and
                                           stock.current_price > stock.ema_8 > stock.ema_21),
-                        'signal_quality': 'high' if (stock.demarker and stock.demarker < 0.30) else 'medium' if (stock.demarker and stock.demarker < 0.50) else 'low',
+                        'signal_quality': 'high' if (stock.demarker and stock.demarker < 0.30) else 'medium' if (stock.demarker and stock.demarker < 0.70) else 'low',
                         'ema_strategy_score': self._compute_db_ema_score(stock)
                     }
                     stock_data_list.append(stock_data)
@@ -1347,13 +1347,13 @@ class SuggestedStocksSagaOrchestrator:
 
     def _compute_db_ema_score(self, stock) -> float:
         """
-        Compute a differentiated EMA strategy score from database stock fields.
+        Compute EMA strategy score using D_momentum model.
         Returns 0-100 score based on EMA separation, DeMarker, and price position.
 
-        Weights derived from backtest optimization (Oct-Nov 2025 data):
-        - EMA separation: 50 pts (highest predictor, but penalize >5% over-extension)
-        - DeMarker timing: 25 pts (0.40-0.50 sweet spot: 71% WR in backtest)
-        - Price distance:  25 pts (0-2% from EMA8 optimal: 59-64% WR)
+        13-month backtest optimization (Jan 2025 → Jan 2026, 34,560 combos):
+        Best model: D_momentum — rewards buying momentum (higher DeMarker = better)
+        Weights: (20, 50, 30) — DeMarker is #1 factor, Price distance #2, EMA sep #3
+        Result: 58.5% WR, PF 3.84, +5.22% avg return, 9/13 months positive
         """
         try:
             ema_8 = float(stock.ema_8) if stock.ema_8 else 0.0
@@ -1368,52 +1368,38 @@ class SuggestedStocksSagaOrchestrator:
             if not (price > ema_8 > ema_21):
                 return 0.0
 
-            # Component 1: EMA separation strength (0-50 points)
-            # Backtest: <0.5% = 65% WR, 1-2% = 60% WR, >5% = 37% WR (toxic)
-            # Sweet spot is moderate separation (1-3%), penalize over-extension
+            # Component 1: EMA separation strength (0-20 points)
+            # 13mo data: >5% sep = 71.4% WR, 3-5% = 60%, 1-2% = 44.4%
             ema_sep_pct = ((ema_8 - ema_21) / ema_21) * 100
-            if ema_sep_pct <= 0.5:
-                sep_score = 40.0   # Tight but bullish - good
-            elif ema_sep_pct <= 1.0:
-                sep_score = 45.0   # Moderate - good
-            elif ema_sep_pct <= 2.0:
-                sep_score = 50.0   # Strong trend - best zone
-            elif ema_sep_pct <= 3.0:
-                sep_score = 40.0   # Extended - decent
-            elif ema_sep_pct <= 5.0:
-                sep_score = 25.0   # Over-extended - weaker
-            else:
-                sep_score = 10.0   # Extremely extended - toxic (37% WR)
+            sep_score = min(ema_sep_pct / 5.0, 1.0) * 20.0
 
-            # Component 2: DeMarker timing (0-25 points)
-            # Backtest: 0.40-0.50 = 71% WR (best), 0.30-0.40 = 46% WR
-            # Contrary to theory, deeply oversold underperformed in this market
-            if demarker < 0.20:
-                dm_score = 15.0   # Deeply oversold - may continue falling
-            elif demarker < 0.30:
-                dm_score = 20.0   # Oversold - decent
-            elif demarker < 0.40:
-                dm_score = 22.0   # Mild pullback - good
-            elif demarker < 0.50:
-                dm_score = 25.0   # Sweet spot - best WR (71%)
-            elif demarker < 0.70:
-                dm_score = 10.0   # Neutral-high - weaker
+            # Component 2: DeMarker momentum (0-50 points)
+            # D_momentum model: higher DeMarker = stronger buying pressure = better
+            # 13mo data: DeMarker 0.60-0.70 = 61.8% WR, +5.47% avg
+            if 0.55 <= demarker <= 0.70:
+                dm_score = 50.0   # Strong momentum - best zone
+            elif 0.45 <= demarker < 0.55:
+                dm_score = 40.0   # Moderate momentum
+            elif 0.35 <= demarker < 0.45:
+                dm_score = 25.0   # Mild momentum
+            elif demarker < 0.35:
+                dm_score = 12.5   # Weak/oversold
             else:
-                dm_score = 0.0    # Overbought - avoid
+                dm_score = 0.0    # Overbought (>0.70) - avoid
 
-            # Component 3: Price distance from 8 EMA (0-25 points)
-            # Backtest: 0-1% = 59% WR, 1-2% = 64% WR (best), >5% = 33% WR (toxic)
+            # Component 3: Price distance from 8 EMA (0-30 points)
+            # 13mo data: 3-5% dist = 70% WR, 0-1% = 48.1%
             price_dist_pct = ((price - ema_8) / ema_8) * 100
             if 0 <= price_dist_pct <= 1.0:
-                dist_score = 23.0  # Tight to EMA - great
+                dist_score = 30.0  # Tight to EMA
             elif price_dist_pct <= 2.0:
-                dist_score = 25.0  # Optimal zone (64% WR)
+                dist_score = 24.9  # Close
             elif price_dist_pct <= 3.0:
-                dist_score = 18.0  # Moderate - decent
+                dist_score = 18.0  # Moderate
             elif price_dist_pct <= 5.0:
-                dist_score = 8.0   # Extended - weak (44% WR)
+                dist_score = 9.9   # Extended
             else:
-                dist_score = 2.0   # Over-extended - toxic (33% WR)
+                dist_score = 3.0   # Over-extended
 
             total = sep_score + dm_score + dist_score
             return round(max(0.0, min(100.0, total)), 2)
