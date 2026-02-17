@@ -2,14 +2,14 @@
 
 ################################################################################
 # Production Deployment Script for Stock Trading System
-# Server: 135.181.34.74 (Germany)
+# Server: 77.42.45.12
 # Timezone: Asia/Kolkata (IST)
 ################################################################################
 
 set -e  # Exit on error
 
 # Configuration
-SERVER_IP="135.181.34.74"
+SERVER_IP="77.42.45.12"
 SERVER_USER="root"
 REMOTE_DIR="/opt/trading_system"
 IMAGE_NAME="stockexperiment-trading_system"
@@ -25,7 +25,7 @@ NC='\033[0m' # No Color
 # Print banner
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║   Stock Trading System - Production Deployment            ║${NC}"
-echo -e "${BLUE}║   Server: $SERVER_IP (Germany)                      ║${NC}"
+echo -e "${BLUE}║   Server: $SERVER_IP                                ║${NC}"
 echo -e "${BLUE}║   Timezone: Asia/Kolkata (IST)                            ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""

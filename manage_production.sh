@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Production Management Script for Germany Server
+# Production Management Script for Trading System Server
 # Quick commands to manage the production deployment
 
-SERVER_IP="135.181.34.74"
+SERVER_IP="77.42.45.12"
 SERVER_USER="root"
 REMOTE_DIR="/opt/trading_system"
 
@@ -17,7 +17,7 @@ NC='\033[0m'
 # Function to show usage
 show_usage() {
     echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║     Production Management - Germany Server                ║${NC}"
+    echo -e "${BLUE}║     Production Management - Trading System Server         ║${NC}"
     echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
     echo ""
     echo "Usage: $0 [command]"
@@ -123,7 +123,7 @@ case $COMMAND in
     time)
         echo -e "${BLUE}Checking container timezone...${NC}"
         echo ""
-        echo -e "${YELLOW}Server time (Germany):${NC}"
+        echo -e "${YELLOW}Server time:${NC}"
         ssh $SERVER_USER@$SERVER_IP "date"
         echo ""
         echo -e "${YELLOW}Container time (should be IST):${NC}"

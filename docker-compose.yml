@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: trader_password
       TZ: Asia/Kolkata
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d
@@ -83,7 +83,7 @@ services:
       - VOLATILITY_VOLUME_AVERAGE_PERIOD=${VOLATILITY_VOLUME_AVERAGE_PERIOD:-20}
       - VOLATILITY_FULL_REFRESH=${VOLATILITY_FULL_REFRESH:-false}
     ports:
-      - "5001:5001"
+      - "127.0.0.1:5001:5001"
     volumes:
       - ./logs:/app/src/data/logs
     restart: unless-stopped
@@ -98,7 +98,7 @@ services:
     environment:
       - TZ=Asia/Kolkata
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     restart: unless-stopped
     networks:
       - trading_network
