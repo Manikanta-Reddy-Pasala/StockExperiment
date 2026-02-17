@@ -94,10 +94,29 @@ class BrokerFeatureFactory:
     
     # Factory methods
     def get_dashboard_provider(self, user_id: int) -> Optional[IDashboardProvider]:
-        """Get dashboard provider based on user's broker selection."""
+        """Get dashboard provider based on user's broker selection.
+
+        Returns PaperTradingDashboardProvider if user is in mock trading mode,
+        otherwise returns the broker-specific provider.
+        """
+        if self._is_mock_trading_mode(user_id):
+            from ..implementations.paper_trading_dashboard_provider import PaperTradingDashboardProvider
+            return PaperTradingDashboardProvider()
         broker = self.user_settings_service.get_broker_provider(user_id)
         provider_class = self._dashboard_providers.get(broker)
         return provider_class() if provider_class else None
+
+    def _is_mock_trading_mode(self, user_id: int) -> bool:
+        """Check if user is in mock trading mode."""
+        try:
+            from src.models.database import get_database_manager
+            from src.models.models import User
+            db_manager = get_database_manager()
+            with db_manager.get_session() as session:
+                user = session.query(User).filter(User.id == user_id).first()
+                return user.is_mock_trading_mode if user else False
+        except Exception:
+            return False
     
     def get_suggested_stocks_provider(self, user_id: int) -> Optional[ISuggestedStocksProvider]:
         """Get suggested stocks provider based on user's broker selection."""

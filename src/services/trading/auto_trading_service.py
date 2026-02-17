@@ -267,16 +267,24 @@ class AutoTradingService:
             if is_paper_trading:
                 virtual_capital = 100000.0
 
-                used_capital = session.query(
-                    func.coalesce(func.sum(Order.price * Order.quantity), 0)
-                ).filter(
-                    Order.user_id == user_id,
-                    Order.is_mock_order == True,
-                    Order.order_status.in_(['open', 'pending', 'partial', 'PENDING', 'OPEN'])
-                ).scalar() or 0.0
+                # Query active positions from order_performance (mock orders have status COMPLETE,
+                # so querying Order.order_status for open/pending would always return 0)
+                used_capital = session.execute(text("""
+                    SELECT COALESCE(SUM(entry_price * quantity), 0)
+                    FROM order_performance
+                    WHERE user_id = :user_id AND is_active = true
+                """), {'user_id': user_id}).scalar() or 0.0
                 used_capital = float(used_capital)
 
-                available_balance = virtual_capital - used_capital
+                # Include realized P&L from closed positions
+                realized_pnl = session.execute(text("""
+                    SELECT COALESCE(SUM(realized_pnl), 0)
+                    FROM order_performance
+                    WHERE user_id = :user_id AND is_active = false AND realized_pnl IS NOT NULL
+                """), {'user_id': user_id}).scalar() or 0.0
+                realized_pnl = float(realized_pnl)
+
+                available_balance = virtual_capital - used_capital + realized_pnl
                 total_balance = virtual_capital
 
                 execution.account_balance = total_balance
@@ -401,18 +409,30 @@ class AutoTradingService:
             order_details = []
 
             amount_per_stock = available_amount / len(stocks) if stocks else 0
+            remaining_capital = available_amount
 
             for stock in stocks:
                 try:
                     symbol = stock['symbol']
                     current_price = stock['current_price']
-                    quantity = int(amount_per_stock / current_price)
+
+                    # Cap per-stock allocation to remaining capital
+                    allocation = min(amount_per_stock, remaining_capital)
+                    quantity = int(allocation / current_price)
 
                     if quantity < 1:
-                        logger.warning(f"Skipping {symbol}: quantity < 1")
+                        logger.warning(f"Skipping {symbol}: quantity < 1 (remaining capital: {remaining_capital:.2f})")
                         continue
 
                     investment = quantity * current_price
+
+                    # Check if this order would exceed remaining capital
+                    if investment > remaining_capital:
+                        quantity = int(remaining_capital / current_price)
+                        if quantity < 1:
+                            logger.warning(f"Skipping {symbol}: insufficient remaining capital ({remaining_capital:.2f})")
+                            continue
+                        investment = quantity * current_price
 
                     target_price = stock['target_price']
                     stop_loss = stock['stop_loss'] or (current_price * 0.95)
@@ -435,6 +455,7 @@ class AutoTradingService:
                     if order_result.get('success'):
                         orders_created += 1
                         total_invested += investment
+                        remaining_capital -= investment
 
                         order_id = order_result['order_id']
                         self._create_performance_tracking(
