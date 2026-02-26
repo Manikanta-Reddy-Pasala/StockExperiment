@@ -616,12 +616,26 @@ def get_paper_portfolio():
             active_positions = [p for p in performances if p.is_active]
             closed_positions = [p for p in performances if not p.is_active]
 
-            # Calculate values
+            # Fetch live prices from stocks table for active positions
+            from src.models.stock_models import Stock
+            active_symbols = list(set(p.symbol for p in active_positions if p.symbol))
+            live_prices = {}
+            if active_symbols:
+                stocks = session.query(Stock).filter(Stock.symbol.in_(active_symbols)).all()
+                live_prices = {s.symbol: float(s.current_price) for s in stocks if s.current_price and s.current_price > 0}
+
+            # Calculate values using live prices
             total_invested = sum((p.entry_price or 0) * (p.quantity or 0) for p in performances)
-            positions_value = sum((p.current_price or p.entry_price or 0) * (p.quantity or 0) for p in active_positions)
+            positions_value = 0.0
+            unrealized_pnl = 0.0
+            for p in active_positions:
+                live_price = live_prices.get(p.symbol, float(p.current_price or p.entry_price or 0))
+                remaining_qty = p.remaining_quantity or p.quantity or 0
+                positions_value += live_price * remaining_qty
+                entry_value = (p.entry_price or 0) * remaining_qty
+                unrealized_pnl += (live_price * remaining_qty - entry_value) + (p.partial_pnl_realized or 0)
 
             realized_pnl = sum(p.realized_pnl or 0 for p in closed_positions)
-            unrealized_pnl = sum(p.unrealized_pnl or 0 for p in active_positions)
             total_pnl = realized_pnl + unrealized_pnl
 
             # Calculate cash: initial capital - invested in active positions + realized gains/losses
@@ -822,9 +836,30 @@ def get_paper_positions():
 
             performances = query.order_by(OrderPerformance.created_at.desc()).all()
 
+            # Fetch live prices from stocks table for active positions
+            from src.models.stock_models import Stock
+            active_symbols = list(set(p.symbol for p in performances if p.symbol and p.is_active))
+            live_prices = {}
+            if active_symbols:
+                stocks = session.query(Stock).filter(Stock.symbol.in_(active_symbols)).all()
+                live_prices = {s.symbol: float(s.current_price) for s in stocks if s.current_price and s.current_price > 0}
+
             # Format positions
             positions = []
             for p in performances:
+                # Use live price for active positions, stored price for closed
+                if p.is_active and p.symbol in live_prices:
+                    current_price = live_prices[p.symbol]
+                    remaining_qty = p.remaining_quantity or p.quantity or 0
+                    entry_price = float(p.entry_price) if p.entry_price else 0
+                    entry_value = entry_price * (p.original_quantity or p.quantity or 0)
+                    unrealized = (current_price - entry_price) * remaining_qty + (p.partial_pnl_realized or 0)
+                    unrealized_pct = (unrealized / entry_value * 100) if entry_value > 0 else 0
+                else:
+                    current_price = float(p.current_price) if p.current_price else None
+                    unrealized = float(p.unrealized_pnl) if p.unrealized_pnl else 0
+                    unrealized_pct = float(p.unrealized_pnl_pct) if p.unrealized_pnl_pct else 0
+
                 position = {
                     'id': p.id,
                     'symbol': p.symbol,
@@ -832,7 +867,7 @@ def get_paper_positions():
                     'original_quantity': p.original_quantity,
                     'remaining_quantity': p.remaining_quantity,
                     'entry_price': float(p.entry_price) if p.entry_price else None,
-                    'current_price': float(p.current_price) if p.current_price else None,
+                    'current_price': current_price,
                     'entry_date': p.created_at.isoformat() if p.created_at else None,
                     'strategy': p.strategy,
                     'trading_type': p.trading_type or 'swing',
@@ -840,8 +875,8 @@ def get_paper_positions():
                     'days_held': p.days_held,
 
                     # P&L
-                    'unrealized_pnl': float(p.unrealized_pnl) if p.unrealized_pnl else 0,
-                    'unrealized_pnl_pct': float(p.unrealized_pnl_pct) if p.unrealized_pnl_pct else 0,
+                    'unrealized_pnl': round(unrealized, 2),
+                    'unrealized_pnl_pct': round(unrealized_pct, 2),
                     'realized_pnl': float(p.realized_pnl) if p.realized_pnl else 0,
                     'realized_pnl_pct': float(p.realized_pnl_pct) if p.realized_pnl_pct else 0,
                     'partial_pnl_realized': float(p.partial_pnl_realized) if p.partial_pnl_realized else 0,
@@ -1010,9 +1045,17 @@ def get_paper_alerts():
                 )
             ).all()
 
+            # Fetch live prices from stocks table
+            from src.models.stock_models import Stock as AlertStock
+            alert_symbols = list(set(p.symbol for p in active if p.symbol))
+            alert_live_prices = {}
+            if alert_symbols:
+                alert_stocks = session.query(AlertStock).filter(AlertStock.symbol.in_(alert_symbols)).all()
+                alert_live_prices = {s.symbol: float(s.current_price) for s in alert_stocks if s.current_price and s.current_price > 0}
+
             alerts = []
             for p in active:
-                current = float(p.current_price or p.entry_price or 0)
+                current = alert_live_prices.get(p.symbol, float(p.current_price or p.entry_price or 0))
                 entry = float(p.entry_price or 0)
                 if not current or not entry:
                     continue
