@@ -860,6 +860,29 @@ def get_paper_positions():
                     unrealized = float(p.unrealized_pnl) if p.unrealized_pnl else 0
                     unrealized_pct = float(p.unrealized_pnl_pct) if p.unrealized_pnl_pct else 0
 
+                # Compute days_held live for active positions
+                if p.is_active and p.created_at:
+                    days_held = (datetime.utcnow() - p.created_at).days
+                else:
+                    days_held = p.days_held or 0
+
+                # Compute is_profitable and performance_rating live
+                is_profitable = unrealized > 0 if p.is_active else p.is_profitable
+                if p.is_active:
+                    pnl_pct = unrealized_pct
+                    if pnl_pct >= 10.0:
+                        perf_rating = 'excellent'
+                    elif pnl_pct >= 5.0:
+                        perf_rating = 'good'
+                    elif pnl_pct >= 0.0:
+                        perf_rating = 'neutral'
+                    elif pnl_pct >= -3.0:
+                        perf_rating = 'poor'
+                    else:
+                        perf_rating = 'loss'
+                else:
+                    perf_rating = p.performance_rating
+
                 position = {
                     'id': p.id,
                     'symbol': p.symbol,
@@ -872,7 +895,7 @@ def get_paper_positions():
                     'strategy': p.strategy,
                     'trading_type': p.trading_type or 'swing',
                     'is_active': p.is_active,
-                    'days_held': p.days_held,
+                    'days_held': days_held,
 
                     # P&L
                     'unrealized_pnl': round(unrealized, 2),
@@ -894,8 +917,8 @@ def get_paper_positions():
                     'partial_exit_3_done': p.partial_exit_3_done,
 
                     # Performance
-                    'is_profitable': p.is_profitable,
-                    'performance_rating': p.performance_rating,
+                    'is_profitable': is_profitable,
+                    'performance_rating': perf_rating,
                     'max_profit_reached': float(p.max_profit_reached) if p.max_profit_reached else None,
                     'max_loss_reached': float(p.max_loss_reached) if p.max_loss_reached else None,
 

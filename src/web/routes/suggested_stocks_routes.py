@@ -32,7 +32,7 @@ def get_suggested_stocks():
         from ...models.database import get_database_manager
 
         # Get parameters
-        limit = int(request.args.get('limit', 5))
+        limit = int(request.args.get('limit', 50))
         search = request.args.get('search')
         sort_by = request.args.get('sort_by', 'selection_score')
         sort_order = request.args.get('sort_order', 'desc')
