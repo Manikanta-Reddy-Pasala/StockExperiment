@@ -1,6 +1,8 @@
-{% extends "base.html" %}
+{% extends "v2/base.html" %}
 
 {% block title %}Admin Triggers{% endblock %}
+
+{% block page_title %}Admin Triggers{% endblock %}
 
 {% block content %}
 <style>
@@ -494,7 +496,7 @@
                 <h5 class="mb-0"><i class="bi bi-lightning-charge-fill me-2"></i>Execute Complete Pipeline</h5>
             </div>
             <div class="card-body">
-                <p class="mb-3">Execute complete pipeline: Data Pipeline (6-step saga) → ML Training</p>
+                <p class="mb-3">Execute complete pipeline: Data Pipeline (6-step saga) → Technical Indicators</p>
                 <button class="btn btn-danger-trigger w-100" id="runAllBtn" onclick="triggerAll()">
                     <i class="bi bi-play-fill me-2"></i>Run Complete Pipeline (25-35 min)
                 </button>
@@ -529,7 +531,7 @@
             </div>
             <div class="card-body p-0">
                 <div class="task-log" id="taskLog">
-                    <div class="log-entry info">[${new Date().toLocaleTimeString()}] Ready to execute tasks...</div>
+                    <div class="log-entry info">Ready to execute tasks...</div>
                 </div>
             </div>
         </div>
@@ -675,9 +677,7 @@ async function retryFailedSteps(taskId) {
 async function retrySingleStep(stepType, stepDescription) {
     const taskTypeMap = {
         'pipeline': 'pipeline',
-        'fill_data': 'fill-data',
-        'business_logic': 'business-logic',
-        'ml_training': 'ml-training',
+        'technical_indicators': 'technical-indicators',
         'csv_export': 'csv-export'
     };
 

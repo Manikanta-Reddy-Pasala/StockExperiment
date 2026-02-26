@@ -78,19 +78,19 @@ def run_data_pipeline():
 
 
 def fill_missing_data():
-    """Fill missing data fields (Daily at 9:30 PM after pipeline)."""
-    logger.info("=" * 80)
-    logger.info("Filling Missing Data Fields")
-    logger.info("=" * 80)
-    _run_subprocess_with_retry(['python3', 'fill_data_sql.py'], 'Fill Missing Data', timeout=600)
+    """Fill missing data fields (Daily at 9:30 PM after pipeline).
+    Now handled inline via the pipeline saga's fundamental data step.
+    Kept as no-op for scheduler compatibility.
+    """
+    logger.info("fill_missing_data: Skipped (handled by pipeline saga)")
 
 
 def calculate_business_logic():
-    """Calculate derived financial metrics (Daily at 9:45 PM)."""
-    logger.info("=" * 80)
-    logger.info("Calculating Business Logic & Derived Metrics")
-    logger.info("=" * 80)
-    _run_subprocess_with_retry(['python3', 'fix_business_logic.py'], 'Business Logic', timeout=600)
+    """Calculate derived financial metrics (Daily at 9:45 PM).
+    Now handled inline via the pipeline saga's volatility/metrics step.
+    Kept as no-op for scheduler compatibility.
+    """
+    logger.info("calculate_business_logic: Skipped (handled by pipeline saga)")
 
 
 def export_daily_csv():

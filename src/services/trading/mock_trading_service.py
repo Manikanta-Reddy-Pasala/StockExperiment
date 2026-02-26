@@ -4,12 +4,14 @@ Handles mock order placement and tracking for model evaluation without real mone
 """
 
 import logging
+import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc
 
-from src.models.models import Order, User, Stock, DailySuggestedStock
+from src.models.models import Order, User, OrderPerformance
+from src.models.stock_models import Stock, DailySuggestedStock
 from src.models.database import get_database_manager
 
 logger = logging.getLogger(__name__)
@@ -59,7 +61,7 @@ class MockTradingService:
                 }
 
             # Get current price (use close price from latest data)
-            current_price = stock.close_price
+            current_price = stock.current_price
             if not current_price or current_price <= 0:
                 return {
                     'success': False,
@@ -69,20 +71,90 @@ class MockTradingService:
             # Calculate order value
             total_value = current_price * quantity
 
+            # Check virtual capital
+            from src.models.models import AutoTradingSettings, OrderPerformance
+            settings = self.session.query(AutoTradingSettings).filter_by(user_id=user_id).first()
+            virtual_capital = float(settings.virtual_capital) if settings and settings.virtual_capital else 100000.0
+
+            # Calculate invested amount in active positions
+            active_positions = self.session.query(OrderPerformance).filter(
+                OrderPerformance.user_id == user_id,
+                OrderPerformance.is_active == True
+            ).all()
+            invested = sum(
+                float(p.entry_price or 0) * (p.remaining_quantity or p.quantity or 0)
+                for p in active_positions
+            )
+            # Add realized P&L from closed trades
+            from sqlalchemy import func
+            realized_pnl = self.session.query(
+                func.coalesce(func.sum(OrderPerformance.realized_pnl), 0)
+            ).filter(
+                OrderPerformance.user_id == user_id,
+                OrderPerformance.is_active == False
+            ).scalar() or 0
+
+            available_capital = virtual_capital - invested + float(realized_pnl)
+
+            if total_value > available_capital:
+                return {
+                    'success': False,
+                    'error': f'Insufficient capital. Available: \u20B9{available_capital:,.2f}, Required: \u20B9{total_value:,.2f}'
+                }
+
+            # Get suggested stock details for targets/stop loss
+            suggested = self.session.query(DailySuggestedStock).filter(
+                DailySuggestedStock.symbol == symbol
+            ).order_by(desc(DailySuggestedStock.date)).first()
+
             # Create mock order
+            mock_order_id = f"MOCK-{uuid.uuid4().hex[:12].upper()}"
             order = Order(
                 user_id=user_id,
-                symbol=symbol,
-                order_type='BUY',
+                order_id=mock_order_id,
+                tradingsymbol=symbol,
+                transaction_type='BUY',
+                order_type='MARKET',
                 quantity=quantity,
                 price=current_price,
-                status='COMPLETED',  # Mock orders are instantly "completed"
+                average_price=current_price,
+                filled_quantity=quantity,
+                pending_quantity=0,
+                order_status='COMPLETE',
                 created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-                is_mock_order=True
+                is_mock_order=True,
+                strategy=suggested.strategy if suggested else 'ema_8_21'
             )
 
             self.session.add(order)
+            self.session.flush()  # Get order.id before creating performance record
+
+            # Create OrderPerformance record for portfolio tracking
+            perf = OrderPerformance(
+                order_id=mock_order_id,
+                user_id=user_id,
+                symbol=symbol,
+                entry_price=current_price,
+                quantity=quantity,
+                original_quantity=quantity,
+                remaining_quantity=quantity,
+                current_price=current_price,
+                current_value=total_value,
+                unrealized_pnl=0.0,
+                unrealized_pnl_pct=0.0,
+                stop_loss=suggested.stop_loss if suggested else None,
+                target_price=suggested.target_price if suggested else None,
+                target_price_1=suggested.fib_target_1 if suggested else None,
+                target_price_2=suggested.fib_target_2 if suggested else None,
+                target_price_3=suggested.fib_target_3 if suggested else None,
+                strategy=suggested.strategy if suggested else 'ema_8_21',
+                trading_type='swing',
+                is_active=True,
+                days_held=0,
+                created_at=datetime.utcnow()
+            )
+
+            self.session.add(perf)
             self.session.commit()
 
             logger.info(f"Mock order placed: {symbol} x{quantity} @ ₹{current_price:.2f}")
@@ -133,21 +205,22 @@ class MockTradingService:
             result = []
             for order in orders:
                 # Get current stock price for P&L calculation
-                stock = self.session.query(Stock).filter(Stock.symbol == order.symbol).first()
-                current_price = stock.close_price if stock else None
+                stock = self.session.query(Stock).filter(Stock.symbol == order.tradingsymbol).first()
+                current_price = stock.current_price if stock else None
 
                 # Calculate P&L
+                entry_price = order.average_price or order.price
                 pnl = None
                 pnl_percent = None
-                if current_price and order.price:
-                    pnl = (current_price - order.price) * order.quantity
-                    pnl_percent = ((current_price - order.price) / order.price) * 100
+                if current_price and entry_price:
+                    pnl = (current_price - entry_price) * order.quantity
+                    pnl_percent = ((current_price - entry_price) / entry_price) * 100
 
                 result.append({
                     'order_id': order.id,
-                    'symbol': order.symbol,
+                    'symbol': order.tradingsymbol,
                     'quantity': order.quantity,
-                    'entry_price': order.price,
+                    'entry_price': entry_price,
                     'current_price': current_price,
                     'pnl': pnl,
                     'pnl_percent': pnl_percent,

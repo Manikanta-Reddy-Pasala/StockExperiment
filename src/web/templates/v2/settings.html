@@ -1,0 +1,414 @@
+{% extends "v2/base.html" %}
+{% block title %}Settings - Trading Journal{% endblock %}
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Trading Mode -->
+    <div class="col-12">
+        <div class="card border-primary">
+            <div class="card-header bg-primary bg-opacity-10"><i class="bi bi-toggles me-2"></i>Trading Mode</div>
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="form-check form-switch form-switch-lg">
+                                <input class="form-check-input" type="checkbox" id="trading-mode-toggle" style="width:3em;height:1.5em;cursor:pointer;">
+                            </div>
+                            <div>
+                                <div id="mode-label" class="fw-bold fs-5">Paper Mode</div>
+                                <div id="mode-desc" class="small text-muted">Orders are simulated. No real money used.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mt-3 mt-md-0">
+                        <div id="mode-status" class="alert alert-warning mb-0 py-2 small">
+                            <i class="bi bi-pencil-square me-1"></i> Paper trading active - all buys are simulated
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fyers Broker Credentials -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-shield-lock me-2"></i>Fyers Broker</span>
+                <span id="fyers-conn-badge" class="badge bg-secondary">Checking...</span>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label small">Client ID (App ID)</label>
+                    <input type="text" class="form-control form-control-sm" id="fyers-client-id" placeholder="e.g. ABCD1234-100">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Secret Key</label>
+                    <div class="input-group input-group-sm">
+                        <input type="password" class="form-control" id="fyers-secret-key" placeholder="Enter secret key">
+                        <button class="btn btn-outline-secondary" type="button" onclick="toggleSecret()"><i class="bi bi-eye"></i></button>
+                    </div>
+                    <div class="form-text">Only needed when setting up or changing credentials</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Redirect URI</label>
+                    <input type="text" class="form-control form-control-sm" id="fyers-redirect-uri" placeholder="https://stock.oneshell.in/api/brokers/fyers/exchange-token">
+                </div>
+                <!-- Token Status -->
+                <div id="token-status-section" class="mb-3 p-2 rounded border small" style="display:none;">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="text-muted">Token Status</span>
+                        <span id="token-status-badge" class="badge bg-secondary">--</span>
+                    </div>
+                    <div id="token-expiry-info" class="text-muted"></div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button class="btn btn-primary btn-sm" onclick="saveFyersConfig()"><i class="bi bi-check me-1"></i> Save Credentials</button>
+                    <button class="btn btn-outline-success btn-sm" onclick="testFyersConnection()"><i class="bi bi-plug me-1"></i> Test Connection</button>
+                    <button class="btn btn-outline-info btn-sm" onclick="refreshFyersToken()"><i class="bi bi-arrow-repeat me-1"></i> Refresh Token</button>
+                    <button class="btn btn-outline-warning btn-sm" onclick="generateAuthUrl()"><i class="bi bi-key me-1"></i> Re-Auth</button>
+                </div>
+                <div id="fyers-auth-section" class="mt-3" style="display:none;">
+                    <div class="alert alert-info small mb-2">
+                        <i class="bi bi-info-circle me-1"></i> Complete authorization in the browser, then paste the auth code below:
+                    </div>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control" id="fyers-auth-code" placeholder="Paste authorization code here">
+                        <button class="btn btn-success" onclick="exchangeAuthCode()"><i class="bi bi-check2"></i> Verify</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paper Trading Capital -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header"><i class="bi bi-piggy-bank me-2"></i>Paper Trading Capital</div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label small">Virtual Capital</label>
+                    <div class="input-group">
+                        <span class="input-group-text">&#8377;</span>
+                        <input type="number" class="form-control" id="virtual-capital" value="100000" min="10000" step="10000">
+                    </div>
+                    <div class="form-text">Starting capital for paper trading simulations</div>
+                </div>
+                <div id="portfolio-summary" class="mb-3 small" style="display:none;">
+                    <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span class="text-muted">Current Value:</span> <strong id="port-value">--</strong></div>
+                    <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span class="text-muted">Active Positions:</span> <strong id="port-active">--</strong></div>
+                    <div class="d-flex justify-content-between"><span class="text-muted">Total P&L:</span> <strong id="port-pnl">--</strong></div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary btn-sm" onclick="saveCapital()"><i class="bi bi-check me-1"></i> Save</button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="resetPortfolio()"><i class="bi bi-arrow-counterclockwise me-1"></i> Reset Portfolio</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auto-trading config -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header"><i class="bi bi-robot me-2"></i>Auto-Trading</div>
+            <div class="card-body">
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" id="auto-enabled">
+                    <label class="form-check-label" for="auto-enabled">Enable Auto-Trading</label>
+                </div>
+                <div id="auto-mode-note" class="alert alert-info small py-1 px-2 mb-3">
+                    <i class="bi bi-info-circle me-1"></i> <span id="auto-mode-text">In paper mode, auto-trading places simulated orders</span>
+                </div>
+                <div class="row g-3">
+                    <div class="col-6">
+                        <label class="form-label small">Max Weekly Amount</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">&#8377;</span>
+                            <input type="number" class="form-control" id="max-amount" value="10000" min="1000">
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small">Max Buys/Week</label>
+                        <input type="number" class="form-control form-control-sm" id="max-buys" value="5" min="1">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small">Execution Time</label>
+                        <input type="time" class="form-control form-control-sm" id="exec-time" value="09:20">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small">Min Confidence</label>
+                        <input type="number" class="form-control form-control-sm" id="min-confidence" value="0.7" min="0" max="1" step="0.05">
+                    </div>
+                </div>
+                <button class="btn btn-primary btn-sm mt-3" onclick="saveAutoTrading()"><i class="bi bi-check me-1"></i> Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strategy info -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header"><i class="bi bi-info-circle me-2"></i>Strategy: 8-21 EMA</div>
+            <div class="card-body small">
+                <ul class="mb-0">
+                    <li><strong>Entry:</strong> Price > 8 EMA > 21 EMA (Power Zone) + DeMarker &lt; 0.30 (oversold pullback)</li>
+                    <li><strong>Exit:</strong> Price &lt; 21 EMA or stop loss hit</li>
+                    <li><strong>Target 1:</strong> Fibonacci 127.2% (sell 40%)</li>
+                    <li><strong>Target 2:</strong> Fibonacci 161.8% (sell 30%)</li>
+                    <li><strong>Target 3:</strong> Fibonacci 200% (sell remaining)</li>
+                    <li><strong>Stop Loss:</strong> Below recent swing low</li>
+                    <li><strong>Hold Period:</strong> 5-14 days (swing)</li>
+                    <li><strong>Backtest:</strong> PF 3.84, 58.5% Win Rate</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentMode = 'paper'; // 'paper' or 'live'
+
+async function loadSettings() {
+    const [settings, fyers, mockStatus, portfolio] = await Promise.all([
+        Trading.api('/api/auto-trading/settings'),
+        Trading.api('/brokers/fyers/api/info'),
+        Trading.api('/api/mock-trading/status'),
+        Trading.api('/api/auto-trading/paper-trading/portfolio')
+    ]);
+
+    // Trading mode toggle
+    if (mockStatus.success) {
+        currentMode = mockStatus.is_mock_trading_mode ? 'paper' : 'live';
+        document.getElementById('trading-mode-toggle').checked = !mockStatus.is_mock_trading_mode;
+        updateModeUI();
+    }
+
+    // Auto-trading settings
+    if (settings.success && settings.settings) {
+        const s = settings.settings;
+        document.getElementById('auto-enabled').checked = s.is_enabled;
+        document.getElementById('max-amount').value = s.max_amount_per_week;
+        document.getElementById('max-buys').value = s.max_buys_per_week;
+        document.getElementById('exec-time').value = s.execution_time || '09:20';
+        document.getElementById('min-confidence').value = s.minimum_confidence_score;
+        document.getElementById('virtual-capital').value = s.virtual_capital || 100000;
+    }
+
+    // Fyers broker + token status
+    if (fyers.success) {
+        document.getElementById('fyers-client-id').value = fyers.client_id || '';
+        document.getElementById('fyers-redirect-uri').value = fyers.redirect_uri || '';
+        const badge = document.getElementById('fyers-conn-badge');
+        if (fyers.access_token) {
+            badge.className = 'badge bg-success';
+            badge.textContent = 'Connected';
+        } else if (fyers.client_id) {
+            badge.className = 'badge bg-warning';
+            badge.textContent = 'Needs Auth';
+        } else {
+            badge.className = 'badge bg-secondary';
+            badge.textContent = 'Not Configured';
+        }
+
+        // Token expiry status
+        if (fyers.access_token) {
+            const tokenSection = document.getElementById('token-status-section');
+            tokenSection.style.display = '';
+            const tokenBadge = document.getElementById('token-status-badge');
+            const tokenInfo = document.getElementById('token-expiry-info');
+
+            if (fyers.token_is_expired) {
+                tokenBadge.className = 'badge bg-danger';
+                tokenBadge.textContent = 'Expired';
+                tokenInfo.innerHTML = 'Token has expired. Click <strong>Refresh Token</strong> or <strong>Re-Auth</strong>.';
+            } else if (fyers.token_expiring_soon) {
+                tokenBadge.className = 'badge bg-warning';
+                tokenBadge.textContent = 'Expiring Soon';
+                const hrs = fyers.token_expires_in_hours;
+                tokenInfo.textContent = hrs != null ? `Expires in ${hrs} hours` : 'Expiring soon';
+            } else if (fyers.token_expiry) {
+                tokenBadge.className = 'badge bg-success';
+                tokenBadge.textContent = 'Valid';
+                const hrs = fyers.token_expires_in_hours;
+                tokenInfo.textContent = hrs != null ? `Expires in ${hrs} hours` : `Expires: ${fyers.token_expiry}`;
+            } else {
+                tokenBadge.className = 'badge bg-info';
+                tokenBadge.textContent = 'Active';
+                tokenInfo.textContent = 'Token active (expiry unknown)';
+            }
+        }
+    }
+
+    // Portfolio summary
+    if (portfolio.success && portfolio.active_positions > 0) {
+        document.getElementById('portfolio-summary').style.display = '';
+        document.getElementById('port-value').textContent = Trading.formatINR(portfolio.current_capital);
+        document.getElementById('port-active').textContent = portfolio.active_positions;
+        const pnl = portfolio.total_pnl || 0;
+        document.getElementById('port-pnl').className = `fw-bold ${Trading.pnlClass(pnl)}`;
+        document.getElementById('port-pnl').textContent = Trading.formatINR(pnl);
+    }
+}
+
+function updateModeUI() {
+    const toggle = document.getElementById('trading-mode-toggle');
+    const isLive = toggle.checked;
+    currentMode = isLive ? 'live' : 'paper';
+
+    const label = document.getElementById('mode-label');
+    const desc = document.getElementById('mode-desc');
+    const status = document.getElementById('mode-status');
+    const autoNote = document.getElementById('auto-mode-text');
+
+    if (isLive) {
+        label.textContent = 'Live Mode';
+        desc.textContent = 'Orders are placed with real money via Fyers broker.';
+        status.className = 'alert alert-danger mb-0 py-2 small';
+        status.innerHTML = '<i class="bi bi-lightning-charge me-1"></i> Live trading active - real money will be used for orders';
+        autoNote.textContent = 'In live mode, auto-trading places real orders via Fyers';
+    } else {
+        label.textContent = 'Paper Mode';
+        desc.textContent = 'Orders are simulated. No real money used.';
+        status.className = 'alert alert-warning mb-0 py-2 small';
+        status.innerHTML = '<i class="bi bi-pencil-square me-1"></i> Paper trading active - all buys are simulated';
+        autoNote.textContent = 'In paper mode, auto-trading places simulated orders';
+    }
+}
+
+// Trading mode toggle handler
+document.getElementById('trading-mode-toggle').addEventListener('change', async function() {
+    const goLive = this.checked;
+    if (goLive) {
+        if (!confirm('Switch to LIVE mode? Real money will be used for trades.')) {
+            this.checked = false;
+            return;
+        }
+    }
+    const res = await Trading.api('/api/mock-trading/toggle', {
+        method: 'POST',
+        body: { enabled: !goLive }
+    });
+    if (res.success) {
+        updateModeUI();
+        Trading.toast(`Switched to ${goLive ? 'Live' : 'Paper'} mode`, goLive ? 'warning' : 'success');
+        // Update sidebar badge
+        const badge = document.getElementById('mode-badge');
+        if (badge) {
+            badge.className = goLive ? 'badge bg-success w-100 py-2 fs-6' : 'badge bg-warning w-100 py-2 fs-6';
+            badge.innerHTML = goLive ? '<i class="bi bi-lightning-charge me-1"></i> Live Mode' : '<i class="bi bi-pencil-square me-1"></i> Paper Mode';
+        }
+    } else {
+        this.checked = !goLive;
+        Trading.toast(res.error || 'Failed to switch mode', 'danger');
+    }
+});
+
+function toggleSecret() {
+    const input = document.getElementById('fyers-secret-key');
+    input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+async function saveFyersConfig() {
+    const clientId = document.getElementById('fyers-client-id').value.trim();
+    const secretKey = document.getElementById('fyers-secret-key').value.trim();
+    const redirectUri = document.getElementById('fyers-redirect-uri').value.trim();
+    if (!clientId) { Trading.toast('Client ID is required', 'warning'); return; }
+    const body = { client_id: clientId, redirect_uri: redirectUri };
+    if (secretKey) body.secret_key = secretKey;
+    const res = await Trading.api('/api/brokers/fyers/config', { method: 'POST', body });
+    if (res.success) {
+        Trading.toast('Fyers credentials saved', 'success');
+        const badge = document.getElementById('fyers-conn-badge');
+        badge.className = 'badge bg-warning'; badge.textContent = 'Needs Auth';
+        if (res.auth_url) {
+            window.open(res.auth_url, '_blank');
+            document.getElementById('fyers-auth-section').style.display = '';
+        }
+    } else {
+        Trading.toast(res.error || 'Failed to save', 'danger');
+    }
+}
+
+async function testFyersConnection() {
+    Trading.toast('Testing connection...', 'info');
+    const res = await Trading.api('/api/brokers/fyers/test', { method: 'POST' });
+    if (res.success) {
+        Trading.toast('Fyers connection successful!', 'success');
+        document.getElementById('fyers-conn-badge').className = 'badge bg-success';
+        document.getElementById('fyers-conn-badge').textContent = 'Connected';
+    } else {
+        Trading.toast(res.error || 'Connection failed', 'danger');
+    }
+}
+
+async function refreshFyersToken() {
+    Trading.toast('Refreshing token via v3 API...', 'info');
+    const res = await Trading.api('/brokers/fyers/api/refresh-token', { method: 'POST' });
+    if (res.success) {
+        Trading.toast('Token refreshed successfully!', 'success');
+        document.getElementById('fyers-conn-badge').className = 'badge bg-success';
+        document.getElementById('fyers-conn-badge').textContent = 'Connected';
+        // Reload to update token status
+        loadSettings();
+    } else {
+        Trading.toast(res.error || 'Token refresh failed. Try Re-Auth.', 'danger');
+    }
+}
+
+async function generateAuthUrl() {
+    const res = await Trading.api('/api/brokers/fyers/auth-url', { method: 'POST' });
+    if (res.success && res.auth_url) {
+        window.open(res.auth_url, '_blank');
+        document.getElementById('fyers-auth-section').style.display = '';
+        Trading.toast('Auth URL opened. Complete login, then paste the code.', 'info');
+    } else {
+        Trading.toast(res.error || 'Failed to generate auth URL. Save credentials first.', 'danger');
+    }
+}
+
+async function exchangeAuthCode() {
+    const authCode = document.getElementById('fyers-auth-code').value.trim();
+    if (!authCode) { Trading.toast('Paste the auth code first', 'warning'); return; }
+    const res = await Trading.api('/api/brokers/fyers/exchange-token', { method: 'POST', body: { auth_code: authCode } });
+    if (res.success) {
+        Trading.toast('Fyers authenticated successfully!', 'success');
+        document.getElementById('fyers-conn-badge').className = 'badge bg-success';
+        document.getElementById('fyers-conn-badge').textContent = 'Connected';
+        document.getElementById('fyers-auth-section').style.display = 'none';
+    } else {
+        Trading.toast(res.error || 'Auth code exchange failed', 'danger');
+    }
+}
+
+async function saveCapital() {
+    const capital = parseFloat(document.getElementById('virtual-capital').value);
+    if (capital < 10000) { Trading.toast('Minimum 10,000', 'warning'); return; }
+    const res = await Trading.api('/api/auto-trading/settings', { method: 'PUT', body: { virtual_capital: capital } });
+    Trading.toast(res.success ? 'Capital updated' : (res.error || 'Failed'), res.success ? 'success' : 'danger');
+}
+
+async function resetPortfolio() {
+    if (!confirm('Reset entire paper portfolio? This deletes all paper trades and positions.')) return;
+    const res = await Trading.api('/api/auto-trading/paper-trading/reset', { method: 'POST' });
+    Trading.toast(res.success ? 'Portfolio reset' : (res.error || 'Failed'), res.success ? 'success' : 'danger');
+    if (res.success) setTimeout(() => location.reload(), 1000);
+}
+
+async function saveAutoTrading() {
+    const body = {
+        is_enabled: document.getElementById('auto-enabled').checked,
+        max_amount_per_week: parseFloat(document.getElementById('max-amount').value),
+        max_buys_per_week: parseInt(document.getElementById('max-buys').value),
+        execution_time: document.getElementById('exec-time').value,
+        minimum_confidence_score: parseFloat(document.getElementById('min-confidence').value)
+    };
+    const res = await Trading.api('/api/auto-trading/settings', { method: 'PUT', body });
+    Trading.toast(res.success ? 'Settings saved' : (res.error || 'Failed'), res.success ? 'success' : 'danger');
+}
+
+loadSettings();
+</script>
+{% endblock %}

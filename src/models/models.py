@@ -9,8 +9,9 @@ from flask_login import UserMixin
 # Import enhanced stock models and use their Base
 from .stock_models import (
     Stock, MarketDataSnapshot, MarketCapCategory,
-    SymbolMaster, Base
+    SymbolMaster, DailySuggestedStock, Base
 )
+
 
 
 class User(UserMixin, Base):
@@ -528,6 +529,8 @@ class AutoTradingSettings(Base):
     auto_stop_loss_enabled = Column(Boolean, default=True)  # Auto set stop-loss
     auto_target_price_enabled = Column(Boolean, default=True)  # Auto set target price
     execution_time = Column(String(10), default='09:20')  # Time to execute (HH:MM format, market opens 9:15 AM)
+    trading_mode = Column(String(20), default='swing')  # 'swing', 'day', 'both'
+    virtual_capital = Column(Float, default=100000.0)    # Configurable paper trading capital
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -595,9 +598,21 @@ class OrderPerformance(Base):
     symbol = Column(String(50), nullable=False)
     entry_price = Column(Float, nullable=False)
     quantity = Column(Integer, nullable=False)
+    original_quantity = Column(Integer)                    # Quantity at entry (never changes)
+    remaining_quantity = Column(Integer)                   # Quantity still held
     stop_loss = Column(Float)
     target_price = Column(Float)
+    target_price_1 = Column(Float)                         # Fib 127.2%
+    target_price_2 = Column(Float)                         # Fib 161.8%
+    target_price_3 = Column(Float)                         # Fib 200%
     strategy = Column(String(50))  # 8-21 EMA strategy: 'default_risk' or 'high_risk'
+    trading_type = Column(String(20), default='swing')     # 'swing' or 'day'
+
+    # Partial exit tracking
+    partial_exit_1_done = Column(Boolean, default=False)   # 25% sold at Fib 127.2%
+    partial_exit_2_done = Column(Boolean, default=False)   # 50% sold at Fib 161.8%
+    partial_exit_3_done = Column(Boolean, default=False)   # 25% sold at Fib 200%
+    partial_pnl_realized = Column(Float, default=0.0)      # Running sum of partial exit P&L
 
     # Current status
     current_price = Column(Float)

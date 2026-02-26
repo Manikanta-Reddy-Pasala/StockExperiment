@@ -156,48 +156,25 @@ class FundamentalDataService:
             }
     
     def _fetch_fundamental_data(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """Fetch fundamental data for a single stock from external APIs."""
+        """Fetch fundamental data for a single stock. Tries Fyers, falls back to sector estimates."""
         try:
-            # Try multiple data sources in priority order
-            data = None
-
-            # Try Fyers first (if fundamental data is available)
             data = self._fetch_from_fyers(symbol)
             if data:
                 return data
 
-            # Skip Yahoo Finance for now - use estimated data directly for speed
-            # Yahoo Finance calls are too slow and often fail
-            # data = self._fetch_from_yahoo_finance(symbol)
-            # if data:
-            #     return data
+            return self._get_estimated_fundamental_data(symbol)
 
-            # Use estimated data based on sector (much faster)
-            data = self._get_estimated_fundamental_data(symbol)
-            return data
-            
         except Exception as e:
             logger.error(f"Error fetching fundamental data for {symbol}: {e}")
             return None
-    
+
     def _fetch_fundamental_data_with_session(self, symbol: str, session) -> Optional[Dict[str, Any]]:
         """Fetch fundamental data for a single stock using existing session."""
         try:
-            # Try multiple data sources in priority order
-            data = None
-
-            # Try Fyers first (if fundamental data is available)
             data = self._fetch_from_fyers(symbol)
             if data:
                 return data
 
-            # Skip Yahoo Finance for now - use estimated data directly for speed
-            # Yahoo Finance calls are too slow and often fail
-            # data = self._fetch_from_yahoo_finance(symbol)
-            # if data:
-            #     return data
-
-            # Use estimated data based on sector using existing session (much faster)
             data = self._get_estimated_fundamental_data_with_session(symbol, session)
             return data
             

@@ -1,6 +1,7 @@
 """
 Auto-Trading Service
 Handles automated trading execution with weekly limits and performance tracking.
+Supports swing trading (EMA strategy) and day trading (gap-up/momentum).
 """
 
 import logging
@@ -69,7 +70,7 @@ class AutoTradingService:
     def execute_auto_trading_for_user(self, user_id: int) -> Dict[str, Any]:
         """
         Execute auto-trading for a specific user.
-        Uses a fresh session per user execution.
+        Supports swing, day, or both trading modes.
         """
         with self.db_manager.get_session() as session:
             try:
@@ -120,7 +121,7 @@ class AutoTradingService:
                     }
 
                 # Step 3: Check account balance
-                balance_result = self._check_account_balance(session, user_id, execution)
+                balance_result = self._check_account_balance(session, user_id, settings, execution)
                 if not balance_result['proceed']:
                     execution.status = 'skipped'
                     execution.error_message = balance_result['message']
@@ -137,9 +138,35 @@ class AutoTradingService:
                     balance_result['available_balance']
                 )
 
-                # Step 4: Select top strategies
-                strategies_result = self._select_top_strategies(session, settings, limits_result['remaining_buys'])
-                if not strategies_result['stocks']:
+                trading_mode = settings.trading_mode or 'swing'
+                all_stocks = []
+                all_strategies = []
+
+                # Step 4a: Swing trading stock selection
+                if trading_mode in ('swing', 'both'):
+                    strategies_result = self._select_top_strategies(session, settings, limits_result['remaining_buys'])
+                    if strategies_result['stocks']:
+                        for stock in strategies_result['stocks']:
+                            stock['_trading_type'] = 'swing'
+                        all_stocks.extend(strategies_result['stocks'])
+                        all_strategies.extend(strategies_result['strategies_used'])
+
+                # Step 4b: Day trading stock selection
+                if trading_mode in ('day', 'both'):
+                    from src.services.trading.day_trading_service import get_day_trading_service
+                    day_service = get_day_trading_service()
+                    remaining_slots = limits_result['remaining_buys'] - len(all_stocks)
+                    if remaining_slots > 0:
+                        day_result = day_service.select_day_trading_stocks(
+                            session, user_id, max_stocks=min(remaining_slots, 5)
+                        )
+                        if day_result['stocks']:
+                            for stock in day_result['stocks']:
+                                stock['_trading_type'] = 'day'
+                            all_stocks.extend(day_result['stocks'])
+                            all_strategies.extend(day_result['strategies_used'])
+
+                if not all_stocks:
                     execution.status = 'skipped'
                     execution.error_message = 'No suitable stocks found'
                     session.commit()
@@ -153,13 +180,13 @@ class AutoTradingService:
                 # Step 5: Create buy orders
                 user = session.query(User).filter_by(id=user_id).first()
                 orders_result = self._create_buy_orders(
-                    session, user, settings, strategies_result['stocks'], available_amount, execution
+                    session, user, settings, all_stocks, available_amount, execution
                 )
 
                 # Update execution status
                 execution.orders_created = orders_result['orders_created']
                 execution.total_amount_invested = orders_result['total_invested']
-                execution.selected_strategies = json.dumps(strategies_result['strategies_used'])
+                execution.selected_strategies = json.dumps(list(set(all_strategies)))
                 execution.execution_details = json.dumps(orders_result['details'])
 
                 if orders_result['orders_created'] > 0:
@@ -258,6 +285,7 @@ class AutoTradingService:
             }
 
     def _check_account_balance(self, session: Session, user_id: int,
+                              settings: AutoTradingSettings,
                               execution: AutoTradingExecution) -> Dict[str, Any]:
         """Check account balance from broker or use virtual capital for paper trading."""
         try:
@@ -265,12 +293,11 @@ class AutoTradingService:
             is_paper_trading = user.is_mock_trading_mode if user else False
 
             if is_paper_trading:
-                virtual_capital = 100000.0
+                virtual_capital = settings.virtual_capital or 100000.0
 
-                # Query active positions from order_performance (mock orders have status COMPLETE,
-                # so querying Order.order_status for open/pending would always return 0)
+                # Query active positions from order_performance
                 used_capital = session.execute(text("""
-                    SELECT COALESCE(SUM(entry_price * quantity), 0)
+                    SELECT COALESCE(SUM(entry_price * COALESCE(remaining_quantity, quantity)), 0)
                     FROM order_performance
                     WHERE user_id = :user_id AND is_active = true
                 """), {'user_id': user_id}).scalar() or 0.0
@@ -358,7 +385,11 @@ class AutoTradingService:
                     d.target_price,
                     d.stop_loss,
                     d.recommendation,
-                    d.date
+                    d.date,
+                    d.fib_target_1,
+                    d.fib_target_2,
+                    d.fib_target_3,
+                    d.sector
                 FROM daily_suggested_stocks d
                 WHERE d.date = (SELECT MAX(date) FROM daily_suggested_stocks)
                   AND d.strategy = ANY(:strategies)
@@ -376,6 +407,18 @@ class AutoTradingService:
             })
 
             stocks = [dict(row._mapping) for row in result]
+
+            # Sector cap: max 2 stocks per sector to avoid concentration risk
+            sector_counts = {}
+            capped = []
+            for s in stocks:
+                sec = s.get('sector') or 'Unknown'
+                sector_counts[sec] = sector_counts.get(sec, 0) + 1
+                if sector_counts[sec] <= 2:
+                    capped.append(s)
+                else:
+                    logger.info(f"Sector cap: skipping {s['symbol']} (sector '{sec}' already has 2 picks)")
+            stocks = capped
 
             if not stocks:
                 logger.warning("No stocks found matching 8-21 EMA criteria")
@@ -416,6 +459,17 @@ class AutoTradingService:
                     symbol = stock['symbol']
                     current_price = stock['current_price']
 
+                    # Pre-market gap check: skip if price gapped >3% from signal price
+                    # If live price unavailable, proceed with signal price (paper trading safe)
+                    live_price = self._get_live_price(session, symbol, user.id)
+                    if live_price and current_price and current_price > 0:
+                        gap_pct = ((live_price - current_price) / current_price) * 100
+                        if abs(gap_pct) > 3.0:
+                            logger.info(f"Skipping {symbol}: gap {gap_pct:.1f}% exceeds 3% "
+                                       f"(signal: {current_price:.2f}, live: {live_price:.2f})")
+                            continue
+                        current_price = live_price  # Use live price for order
+
                     # Cap per-stock allocation to remaining capital
                     allocation = min(amount_per_stock, remaining_capital)
                     quantity = int(allocation / current_price)
@@ -436,6 +490,7 @@ class AutoTradingService:
 
                     target_price = stock['target_price']
                     stop_loss = stock['stop_loss'] or (current_price * 0.95)
+                    trading_type = stock.get('_trading_type', 'swing')
 
                     if user.is_mock_trading_mode:
                         order_result = self._create_mock_order(
@@ -460,7 +515,7 @@ class AutoTradingService:
                         order_id = order_result['order_id']
                         self._create_performance_tracking(
                             session, order_id, user.id, execution.id, stock, quantity, current_price,
-                            stop_loss, target_price
+                            stop_loss, target_price, trading_type
                         )
 
                         order_details.append({
@@ -471,10 +526,11 @@ class AutoTradingService:
                             'stop_loss': stop_loss,
                             'target': target_price,
                             'order_id': order_id,
-                            'mode': 'paper' if user.is_mock_trading_mode else 'live'
+                            'mode': 'paper' if user.is_mock_trading_mode else 'live',
+                            'trading_type': trading_type
                         })
 
-                        logger.info(f"Order created for {symbol}: {quantity} @ {current_price:.2f}")
+                        logger.info(f"Order created for {symbol}: {quantity} @ {current_price:.2f} ({trading_type})")
 
                 except Exception as e:
                     logger.error(f"Failed to create order for {stock['symbol']}: {e}")
@@ -493,6 +549,42 @@ class AutoTradingService:
                 'total_invested': 0.0,
                 'details': []
             }
+
+    def _get_live_price(self, session: Session, symbol: str, user_id: int) -> Optional[float]:
+        """Get live price for a symbol. Tries stocks table first, then broker API."""
+        try:
+            # Try stocks table first (always available for paper trading)
+            from src.models.stock_models import Stock
+            stocks_price = None
+            stock = session.query(Stock).filter_by(symbol=symbol).first()
+            if stock and stock.current_price and stock.current_price > 0:
+                stocks_price = float(stock.current_price)
+
+            # Try broker API for fresher intraday data
+            broker_price = None
+            try:
+                from src.services.brokers.fyers_service import get_fyers_service
+                fyers_service = get_fyers_service()
+                result = fyers_service.quotes(user_id, symbol)
+                if result.get('status') == 'success' and result.get('data'):
+                    data = result['data']
+                    if isinstance(data, dict):
+                        ltp = data.get('ltp') or data.get('v', {}).get('lp')
+                        if ltp and ltp > 0:
+                            broker_price = float(ltp)
+                    elif isinstance(data, list) and len(data) > 0:
+                        ltp = data[0].get('v', {}).get('lp')
+                        if ltp and ltp > 0:
+                            broker_price = float(ltp)
+            except Exception as e:
+                logger.debug(f"Broker quote failed for {symbol}: {e}")
+
+            # Prefer broker price (live) if available, otherwise use stocks table
+            return broker_price or stocks_price
+
+        except Exception as e:
+            logger.error(f"Error fetching live price for {symbol}: {e}")
+            return None
 
     def _create_mock_order(self, session: Session, user_id: int, symbol: str,
                           quantity: int, price: float, target_price: float,
@@ -540,9 +632,31 @@ class AutoTradingService:
                                     user_id: int, execution_id: int,
                                     stock_data: Dict, quantity: int,
                                     entry_price: float, stop_loss: float,
-                                    target_price: float) -> None:
-        """Create performance tracking for order."""
+                                    target_price: float,
+                                    trading_type: str = 'swing') -> None:
+        """Create performance tracking for order with partial exit targets."""
         try:
+            # Determine partial exit targets
+            if trading_type == 'swing':
+                # Use Fib levels from daily_suggested_stocks
+                target_price_1 = stock_data.get('fib_target_1') or target_price
+                target_price_2 = stock_data.get('fib_target_2')
+                target_price_3 = stock_data.get('fib_target_3')
+
+                # If fib targets not available, calculate from target_price (Fib 127.2%)
+                if not target_price_2 and target_price and entry_price:
+                    swing_range = target_price - entry_price
+                    if swing_range > 0:
+                        # target_price is ~Fib 127.2%, scale up for 161.8% and 200%
+                        fib_unit = swing_range / 0.272  # reverse engineer the fib range
+                        target_price_2 = entry_price + (fib_unit * 0.618)
+                        target_price_3 = entry_price + (fib_unit * 1.000)
+            else:
+                # Day trading: single target, no partial exits
+                target_price_1 = None
+                target_price_2 = None
+                target_price_3 = None
+
             performance = OrderPerformance(
                 order_id=order_id,
                 user_id=user_id,
@@ -550,20 +664,28 @@ class AutoTradingService:
                 symbol=stock_data['symbol'],
                 entry_price=entry_price,
                 quantity=quantity,
+                original_quantity=quantity,
+                remaining_quantity=quantity,
                 stop_loss=stop_loss,
                 target_price=target_price,
+                target_price_1=target_price_1,
+                target_price_2=target_price_2,
+                target_price_3=target_price_3,
                 strategy=stock_data.get('strategy'),
+                trading_type=trading_type,
                 current_price=entry_price,
                 current_value=entry_price * quantity,
                 unrealized_pnl=0.0,
                 unrealized_pnl_pct=0.0,
+                partial_pnl_realized=0.0,
                 is_active=True
             )
 
             session.add(performance)
             session.flush()
 
-            logger.info(f"Performance tracking created for {order_id}")
+            logger.info(f"Performance tracking created for {order_id} ({trading_type})"
+                       f"{f' targets: {target_price_1}/{target_price_2}/{target_price_3}' if target_price_1 else ''}")
 
         except Exception as e:
             logger.error(f"Error creating performance tracking: {e}")

@@ -1,0 +1,244 @@
+{% extends "v2/base.html" %}
+{% block title %}Portfolio - Trading Journal{% endblock %}
+{% block page_title %}Paper Portfolio{% endblock %}
+
+{% block content %}
+<!-- Summary cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card summary-card h-100">
+            <div class="card-body text-center py-3">
+                <div class="text-muted small mb-1">Invested</div>
+                <div id="total-invested" class="fs-5 fw-bold">--</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card summary-card h-100">
+            <div class="card-body text-center py-3">
+                <div class="text-muted small mb-1">Current Value</div>
+                <div id="current-value" class="fs-5 fw-bold">--</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card summary-card h-100">
+            <div class="card-body text-center py-3">
+                <div class="text-muted small mb-1">Unrealized P&L</div>
+                <div id="unrealized-pnl" class="fs-5 fw-bold">--</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card summary-card h-100">
+            <div class="card-body text-center py-3">
+                <div class="text-muted small mb-1">Realized P&L</div>
+                <div id="realized-pnl" class="fs-5 fw-bold">--</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Active positions table -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-journal-text me-2"></i>Active Positions</span>
+        <button class="btn btn-sm btn-outline-primary" onclick="loadPortfolio()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th class="text-end">Entry</th>
+                    <th class="text-end">Current</th>
+                    <th class="text-end">P&L</th>
+                    <th class="text-center">Days</th>
+                    <th class="text-center">Stop Loss</th>
+                    <th class="text-center">Targets</th>
+                    <th class="text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="active-tbody">
+                <tr><td colspan="8" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm"></div> Loading positions...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Sell confirmation modal -->
+<div class="modal fade" id="sellModal" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger bg-opacity-10">
+                <h6 class="modal-title"><i class="bi bi-arrow-down-circle me-2"></i>Sell Position</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Close paper position for <strong id="sell-symbol">--</strong>?</p>
+                <div class="small text-muted">
+                    Entry: <span id="sell-entry">--</span> | Current: <span id="sell-current">--</span><br>
+                    P&L: <span id="sell-pnl">--</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-danger btn-sm" id="btn-confirm-sell" onclick="confirmSell()">Sell</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Go Live modal -->
+<div class="modal fade" id="goLiveModal" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary bg-opacity-10">
+                <h6 class="modal-title"><i class="bi bi-lightning-charge me-2"></i>Go Live</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Place a <strong>real broker order</strong> for <strong id="live-symbol">--</strong>?</p>
+                <div class="mb-2">
+                    <label class="form-label small">Quantity</label>
+                    <input type="number" class="form-control form-control-sm" id="live-qty" value="1" min="1">
+                </div>
+                <div class="alert alert-warning small py-1 px-2 mb-0"><i class="bi bi-exclamation-triangle me-1"></i>This will use real money via your connected broker.</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-primary btn-sm" onclick="confirmGoLive()">Place Order</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let sellPositionId = null;
+let liveSymbol = '';
+
+async function loadPortfolio() {
+    const [portfolio, positions] = await Promise.all([
+        Trading.api('/api/auto-trading/paper-trading/portfolio'),
+        Trading.api('/api/auto-trading/paper-trading/positions?status=active')
+    ]);
+
+    // Summary cards
+    if (portfolio.success) {
+        const invested = positions.positions ? positions.positions.reduce((s, p) => s + (p.entry_price || 0) * (p.quantity || 0), 0) : 0;
+        const currentVal = positions.positions ? positions.positions.reduce((s, p) => s + (p.current_price || p.entry_price || 0) * (p.remaining_quantity || p.quantity || 0), 0) : 0;
+
+        document.getElementById('total-invested').textContent = Trading.formatINR(invested);
+        document.getElementById('current-value').textContent = Trading.formatINR(currentVal);
+
+        const urPnl = portfolio.unrealized_pnl || 0;
+        const rPnl = portfolio.realized_pnl || 0;
+        document.getElementById('unrealized-pnl').textContent = Trading.formatINR(urPnl);
+        document.getElementById('unrealized-pnl').className = `fs-5 fw-bold ${Trading.pnlClass(urPnl)}`;
+        document.getElementById('realized-pnl').textContent = Trading.formatINR(rPnl);
+        document.getElementById('realized-pnl').className = `fs-5 fw-bold ${Trading.pnlClass(rPnl)}`;
+    }
+
+    // Positions table
+    const tbody = document.getElementById('active-tbody');
+    if (!positions.success || !positions.positions || positions.positions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No active positions. <a href="/picks">Browse today\'s picks</a></td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = positions.positions.map(p => {
+        const sym = (p.symbol || '').replace('NSE:', '').replace('-EQ', '');
+        const pnlPct = p.unrealized_pnl_pct || 0;
+        const pnl = p.unrealized_pnl || 0;
+
+        // Target badges
+        const t1 = p.target_price_1 ? `<span class="target-badge ${p.partial_exit_1_done ? 'target-hit' : 'target-pending'}" title="T1: ${Trading.formatPrice(p.target_price_1)}">T1${p.partial_exit_1_done ? ' &#10003;' : ''}</span>` : '';
+        const t2 = p.target_price_2 ? `<span class="target-badge ${p.partial_exit_2_done ? 'target-hit' : 'target-pending'}" title="T2: ${Trading.formatPrice(p.target_price_2)}">T2${p.partial_exit_2_done ? ' &#10003;' : ''}</span>` : '';
+        const t3 = p.target_price_3 ? `<span class="target-badge ${p.partial_exit_3_done ? 'target-hit' : 'target-pending'}" title="T3: ${Trading.formatPrice(p.target_price_3)}">T3${p.partial_exit_3_done ? ' &#10003;' : ''}</span>` : '';
+
+        // Row color
+        let rowClass = '';
+        if (p.stop_loss && p.current_price) {
+            const distSl = ((p.current_price - p.stop_loss) / p.current_price) * 100;
+            if (distSl < 3) rowClass = 'table-warning';
+            else if (pnl > 0) rowClass = 'table-success bg-opacity-25';
+            else if (pnl < 0) rowClass = 'table-danger bg-opacity-25';
+        }
+
+        return `<tr class="${rowClass}">
+            <td class="fw-medium">${sym}<div class="small text-muted">Qty: ${p.remaining_quantity || p.quantity || 0}</div></td>
+            <td class="text-end">${Trading.formatPrice(p.entry_price)}</td>
+            <td class="text-end">${Trading.formatPrice(p.current_price)}</td>
+            <td class="text-end ${Trading.pnlClass(pnl)}">
+                ${Trading.formatINR(pnl)}<br><span class="small">${Trading.formatPct(pnlPct)}</span>
+            </td>
+            <td class="text-center">${p.days_held || 0}</td>
+            <td class="text-center text-danger small">${Trading.formatPrice(p.stop_loss)}</td>
+            <td class="text-center">${t1} ${t2} ${t3}</td>
+            <td class="text-center">
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-danger btn-sm" onclick="openSellModal(${p.id}, '${sym}', ${p.entry_price}, ${p.current_price}, ${pnl})" title="Sell">
+                        <i class="bi bi-x-circle"></i>
+                    </button>
+                    <button class="btn btn-outline-primary btn-sm" onclick="openGoLiveModal('${p.symbol}', ${p.remaining_quantity || p.quantity || 1})" title="Go Live">
+                        <i class="bi bi-lightning-charge"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function openSellModal(id, symbol, entry, current, pnl) {
+    sellPositionId = id;
+    document.getElementById('sell-symbol').textContent = symbol;
+    document.getElementById('sell-entry').textContent = Trading.formatPrice(entry);
+    document.getElementById('sell-current').textContent = Trading.formatPrice(current);
+    document.getElementById('sell-pnl').textContent = Trading.formatINR(pnl);
+    document.getElementById('sell-pnl').className = Trading.pnlClass(pnl);
+    new bootstrap.Modal(document.getElementById('sellModal')).show();
+}
+
+async function confirmSell() {
+    if (!sellPositionId) return;
+    const btn = document.getElementById('btn-confirm-sell');
+    btn.disabled = true; btn.textContent = 'Selling...';
+
+    const res = await Trading.closePosition(sellPositionId);
+    bootstrap.Modal.getInstance(document.getElementById('sellModal')).hide();
+    btn.disabled = false; btn.textContent = 'Sell';
+
+    if (res.success) {
+        Trading.toast(`Position closed. P&L: ${Trading.formatINR(res.realized_pnl)}`, res.realized_pnl >= 0 ? 'success' : 'warning');
+        loadPortfolio();
+    } else {
+        Trading.toast(res.error || 'Failed to close position', 'danger');
+    }
+}
+
+function openGoLiveModal(symbol, qty) {
+    liveSymbol = symbol;
+    document.getElementById('live-symbol').textContent = symbol.replace('NSE:', '').replace('-EQ', '');
+    document.getElementById('live-qty').value = qty;
+    new bootstrap.Modal(document.getElementById('goLiveModal')).show();
+}
+
+async function confirmGoLive() {
+    const qty = parseInt(document.getElementById('live-qty').value);
+    if (!qty || qty < 1) { Trading.toast('Enter valid quantity', 'warning'); return; }
+
+    const res = await Trading.liveBuy(liveSymbol.replace('NSE:', '').replace('-EQ', ''), qty);
+    bootstrap.Modal.getInstance(document.getElementById('goLiveModal')).hide();
+
+    if (res.success) {
+        Trading.toast(`Live order placed for ${liveSymbol}`, 'success');
+    } else {
+        Trading.toast(res.error || 'Live order failed', 'danger');
+    }
+}
+
+loadPortfolio();
+</script>
+{% endblock %}

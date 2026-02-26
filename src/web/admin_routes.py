@@ -237,7 +237,6 @@ def trigger_pipeline():
 
 
 @admin_bp.route('/trigger/technical-indicators', methods=['POST'])
-@admin_bp.route('/trigger/ml-training', methods=['POST'])  # Keep old route for backwards compatibility
 def trigger_technical_indicators():
     """Trigger technical indicators calculation and daily snapshot update."""
     task_id = f"technical_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -282,7 +281,7 @@ def trigger_all():
         task_data = {
             'type': 'all',
             'status': 'running',
-            'description': 'Complete Data + ML Pipeline',
+            'description': 'Complete Data + Technical Indicators Pipeline',
             'start_time': datetime.now().isoformat(),
             'steps': [],
             'output': '',
@@ -461,12 +460,10 @@ def retry_failed_steps(task_id):
             # Map step name to command
             if step_name == 'pipeline':
                 command = ['python3', 'run_pipeline.py']
-            elif step_name == 'fill_data':
-                command = ['python3', 'fill_data_sql.py']
-            elif step_name == 'business_logic':
-                command = ['python3', 'fix_business_logic.py']
-            elif step_name == 'ml_training':
-                command = ['python3', 'train_ml_model.py']
+            elif step_name == 'technical_indicators':
+                command = ['python3', '-c',
+                           'from scheduler import calculate_technical_indicators, update_daily_snapshot; '
+                           'calculate_technical_indicators(); update_daily_snapshot()']
             elif step_name == 'csv_export':
                 command = ['python3', '-c', 'from data_scheduler import export_daily_csv; export_daily_csv()']
 

@@ -75,6 +75,29 @@
                                     </div>
 
                                     <div id="auto-trading-config" style="display: none;">
+                                        <!-- Trading Mode & Virtual Capital -->
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label for="at-trading-mode" class="form-label">Trading Mode</label>
+                                                <select class="form-select" id="at-trading-mode">
+                                                    <option value="swing">Swing Trading (5-14 day holds)</option>
+                                                    <option value="day">Day Trading (same-day close)</option>
+                                                    <option value="both">Both (Swing + Day)</option>
+                                                </select>
+                                                <div class="form-text">
+                                                    <strong>Swing:</strong> 8-21 EMA strategy, partial exits at Fib levels (25%/50%/25%)<br>
+                                                    <strong>Day:</strong> Gap-up/momentum stocks, auto-closed at 3:20 PM<br>
+                                                    <strong>Both:</strong> Runs both strategies
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="virtual-capital" class="form-label">Virtual Capital (₹)</label>
+                                                <input type="number" class="form-control" id="virtual-capital"
+                                                       min="10000" step="10000" value="100000">
+                                                <div class="form-text">Paper trading starting capital (min: ₹10,000)</div>
+                                            </div>
+                                        </div>
+
                                         <!-- Weekly Limits -->
                                         <div class="row mb-3">
                                             <div class="col-md-6">
@@ -119,6 +142,28 @@
                                                 <label for="execution-time" class="form-label">Execution Time</label>
                                                 <input type="time" class="form-control" id="execution-time" value="09:20">
                                                 <div class="form-text">Daily execution time (market opens at 9:15 AM, recommended: 9:20 AM)</div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Monitoring & Exit Strategy Info -->
+                                        <div class="row mb-3">
+                                            <div class="col-md-12">
+                                                <div class="alert alert-light border mb-0">
+                                                    <h6 class="alert-heading mb-2"><i class="bi bi-clock-history me-2"></i>Monitoring Schedule</h6>
+                                                    <small>
+                                                        <strong>Hourly checks:</strong> 10:00, 11:00, 12:00, 13:00, 14:00, 15:15 (stop-loss & target monitoring)<br>
+                                                        <strong>Day trade close:</strong> 3:20 PM (all day positions force-closed)<br>
+                                                        <strong>Reconciliation:</strong> 6:00 PM (end-of-day performance update)
+                                                    </small>
+                                                    <hr class="my-2">
+                                                    <h6 class="alert-heading mb-2"><i class="bi bi-bullseye me-2"></i>Swing Exit Strategy (Partial Profit Booking)</h6>
+                                                    <small>
+                                                        <strong>25%</strong> sold at Fib 127.2% target |
+                                                        <strong>50%</strong> sold at Fib 161.8% target |
+                                                        <strong>25%</strong> sold at Fib 200% target<br>
+                                                        Stop-loss triggers full exit. Max hold: 14 days.
+                                                    </small>
+                                                </div>
                                             </div>
                                         </div>
 
@@ -563,6 +608,8 @@
 
                 // Populate form
                 document.getElementById('auto-trading-enabled').checked = settings.is_enabled || false;
+                document.getElementById('at-trading-mode').value = settings.trading_mode || 'swing';
+                document.getElementById('virtual-capital').value = settings.virtual_capital || 100000;
                 document.getElementById('max-amount-per-week').value = settings.max_amount_per_week || 10000;
                 document.getElementById('max-buys-per-week').value = settings.max_buys_per_week || 5;
                 document.getElementById('auto-stop-loss').checked = settings.auto_stop_loss_enabled !== false;
@@ -589,6 +636,8 @@
             // Collect settings
             const settings = {
                 is_enabled: document.getElementById('auto-trading-enabled').checked,
+                trading_mode: document.getElementById('at-trading-mode').value,
+                virtual_capital: parseFloat(document.getElementById('virtual-capital').value),
                 max_amount_per_week: parseFloat(document.getElementById('max-amount-per-week').value),
                 max_buys_per_week: parseInt(document.getElementById('max-buys-per-week').value),
                 auto_stop_loss_enabled: document.getElementById('auto-stop-loss').checked,

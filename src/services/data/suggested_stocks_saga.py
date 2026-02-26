@@ -296,7 +296,7 @@ class SuggestedStocksSagaOrchestrator:
             return {'regime': 'neutral', 'nifty_above_ema21': True, 'nifty_ema8_above_ema21': True, 'bullish_pct': 50.0, 'method': 'error'}
 
     def execute_suggested_stocks_saga(self, user_id: int, strategies: List[str] = None,
-                                   limit: int = 5, search: str = None, sort_by: str = None,
+                                   limit: int = 50, search: str = None, sort_by: str = None,
                                    sort_order: str = 'desc', sector: str = None,
                                    model_type: str = 'hybrid') -> Dict[str, Any]:
         """
@@ -959,6 +959,7 @@ class SuggestedStocksSagaOrchestrator:
                 'target_price': target_2,
                 'stop_loss': stop_loss,
 
+                'volume_ratio': stock_data.get('volume_ratio'),
                 'buy_signal': buy_signal and not is_short,
                 'sell_signal': sell_signal or is_short,
                 'short_signal': is_short,
@@ -1606,8 +1607,8 @@ class SuggestedStocksSagaOrchestrator:
                 recent_sl = session.execute(text("""
                     SELECT DISTINCT symbol FROM order_performance
                     WHERE exit_reason = 'stop_loss'
-                      AND closed_at >= CURRENT_DATE - INTERVAL :cooldown_days
-                """), {'cooldown_days': f'{STOP_LOSS_COOLDOWN_DAYS} days'}).fetchall()
+                      AND closed_at >= CURRENT_DATE - INTERVAL '1 day' * :cooldown_days
+                """), {'cooldown_days': STOP_LOSS_COOLDOWN_DAYS}).fetchall()
 
                 for row in recent_sl:
                     sym = (row[0] or '').upper().replace('NSE:', '').replace('-EQ', '').strip()
@@ -1618,11 +1619,11 @@ class SuggestedStocksSagaOrchestrator:
                 repeated_sl = session.execute(text("""
                     SELECT symbol, COUNT(*) as sl_count FROM order_performance
                     WHERE exit_reason = 'stop_loss'
-                      AND closed_at >= CURRENT_DATE - INTERVAL :period_days
+                      AND closed_at >= CURRENT_DATE - INTERVAL '1 day' * :period_days
                     GROUP BY symbol
                     HAVING COUNT(*) >= :max_hits
                 """), {
-                    'period_days': f'{STOP_LOSS_MAX_HITS_PERIOD_DAYS} days',
+                    'period_days': STOP_LOSS_MAX_HITS_PERIOD_DAYS,
                     'max_hits': STOP_LOSS_MAX_HITS
                 }).fetchall()
 

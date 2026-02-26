@@ -46,7 +46,9 @@ def get_settings():
                         'minimum_market_sentiment': 0.0,
                         'auto_stop_loss_enabled': True,
                         'auto_target_price_enabled': True,
-                        'execution_time': '09:20'
+                        'execution_time': '09:20',
+                        'trading_mode': 'swing',
+                        'virtual_capital': 100000.0
                     }
                 }), 200
 
@@ -62,6 +64,8 @@ def get_settings():
                     'auto_stop_loss_enabled': settings.auto_stop_loss_enabled,
                     'auto_target_price_enabled': settings.auto_target_price_enabled,
                     'execution_time': settings.execution_time,
+                    'trading_mode': settings.trading_mode or 'swing',
+                    'virtual_capital': settings.virtual_capital or 100000.0,
                     'created_at': settings.created_at.isoformat() if settings.created_at else None,
                     'updated_at': settings.updated_at.isoformat() if settings.updated_at else None
                 }
@@ -149,6 +153,20 @@ def update_settings():
                 settings.auto_target_price_enabled = data['auto_target_price_enabled']
             if 'execution_time' in data:
                 settings.execution_time = data['execution_time']
+            if 'trading_mode' in data:
+                if data['trading_mode'] not in ('swing', 'day', 'both'):
+                    return jsonify({
+                        'success': False,
+                        'error': "trading_mode must be 'swing', 'day', or 'both'"
+                    }), 400
+                settings.trading_mode = data['trading_mode']
+            if 'virtual_capital' in data:
+                if data['virtual_capital'] < 10000:
+                    return jsonify({
+                        'success': False,
+                        'error': 'Minimum virtual capital is 10,000'
+                    }), 400
+                settings.virtual_capital = data['virtual_capital']
 
             session.commit()
 
@@ -292,14 +310,24 @@ def get_orders():
                     'symbol': order.symbol,
                     'entry_price': order.entry_price,
                     'quantity': order.quantity,
+                    'original_quantity': order.original_quantity,
+                    'remaining_quantity': order.remaining_quantity,
                     'stop_loss': order.stop_loss,
                     'target_price': order.target_price,
+                    'target_price_1': order.target_price_1,
+                    'target_price_2': order.target_price_2,
+                    'target_price_3': order.target_price_3,
                     'strategy': order.strategy,
+                    'trading_type': order.trading_type or 'swing',
                     'current_price': order.current_price,
                     'unrealized_pnl': order.unrealized_pnl,
                     'unrealized_pnl_pct': order.unrealized_pnl_pct,
                     'realized_pnl': order.realized_pnl,
                     'realized_pnl_pct': order.realized_pnl_pct,
+                    'partial_pnl_realized': order.partial_pnl_realized,
+                    'partial_exit_1_done': order.partial_exit_1_done,
+                    'partial_exit_2_done': order.partial_exit_2_done,
+                    'partial_exit_3_done': order.partial_exit_3_done,
                     'exit_price': order.exit_price,
                     'exit_date': order.exit_date.isoformat() if order.exit_date else None,
                     'exit_reason': order.exit_reason,
@@ -390,7 +418,7 @@ def get_weekly_status():
                     Order.user_id == user_id,
                     Order.created_at >= start_of_week,
                     Order.transaction_type == 'BUY',
-                    Order.order_status.in_(['COMPLETE', 'EXECUTED'])
+                    Order.order_status.in_(['COMPLETE', 'COMPLETED', 'EXECUTED'])
                 )
             ).first()
 
@@ -533,22 +561,19 @@ def get_paper_portfolio():
     """
     try:
         from src.models.database import get_database_manager
-        from src.models.models import OrderPerformance, Order, User
+        from src.models.models import OrderPerformance, Order, User, AutoTradingSettings
         from sqlalchemy import func, and_
 
         user_id = current_user.id
 
-        # Default initial capital for paper trading
-        INITIAL_CAPITAL = 100000.0
-
         with get_database_manager().get_session() as session:
-            # Verify user is in paper trading mode
             user = session.query(User).filter_by(id=user_id).first()
-            if not user or not user.is_mock_trading_mode:
-                return jsonify({
-                    'success': False,
-                    'error': 'Paper trading not enabled for this user'
-                }), 400
+            if not user:
+                return jsonify({'success': False, 'error': 'User not found'}), 404
+
+            # Get configurable virtual capital from settings
+            at_settings = session.query(AutoTradingSettings).filter_by(user_id=user_id).first()
+            INITIAL_CAPITAL = (at_settings.virtual_capital if at_settings and at_settings.virtual_capital else 100000.0)
 
             # Get all paper trading orders (is_mock_order = True)
             mock_orders = session.query(Order).filter(
@@ -556,11 +581,11 @@ def get_paper_portfolio():
                     Order.user_id == user_id,
                     Order.is_mock_order == True,
                     Order.transaction_type == 'BUY',
-                    Order.order_status.in_(['COMPLETE', 'EXECUTED'])
+                    Order.order_status.in_(['COMPLETE', 'COMPLETED', 'EXECUTED'])
                 )
             ).all()
 
-            order_ids = [o.id for o in mock_orders]
+            order_ids = [o.order_id for o in mock_orders]
 
             if not order_ids:
                 # No paper trades yet
@@ -654,24 +679,19 @@ def get_paper_daily_pnl():
     """
     try:
         from src.models.database import get_database_manager
-        from src.models.models import OrderPerformance, OrderPerformanceSnapshot, Order, User
+        from src.models.models import OrderPerformance, OrderPerformanceSnapshot, Order, User, AutoTradingSettings
         from sqlalchemy import func, and_
         from datetime import date
 
         user_id = current_user.id
         days = int(request.args.get('days', 30))
 
-        INITIAL_CAPITAL = 100000.0
         start_date = date.today() - timedelta(days=days)
 
         with get_database_manager().get_session() as session:
-            # Verify user is in paper trading mode
-            user = session.query(User).filter_by(id=user_id).first()
-            if not user or not user.is_mock_trading_mode:
-                return jsonify({
-                    'success': False,
-                    'error': 'Paper trading not enabled for this user'
-                }), 400
+            # Get configurable virtual capital
+            at_settings = session.query(AutoTradingSettings).filter_by(user_id=user_id).first()
+            INITIAL_CAPITAL = (at_settings.virtual_capital if at_settings and at_settings.virtual_capital else 100000.0)
 
             # Get paper trading order IDs
             mock_orders = session.query(Order).filter(
@@ -679,11 +699,11 @@ def get_paper_daily_pnl():
                     Order.user_id == user_id,
                     Order.is_mock_order == True,
                     Order.transaction_type == 'BUY',
-                    Order.order_status.in_(['COMPLETE', 'EXECUTED'])
+                    Order.order_status.in_(['COMPLETE', 'COMPLETED', 'EXECUTED'])
                 )
             ).all()
 
-            order_ids = [o.id for o in mock_orders]
+            order_ids = [o.order_id for o in mock_orders]
 
             if not order_ids:
                 # Return empty chart data
@@ -771,25 +791,17 @@ def get_paper_positions():
         status = request.args.get('status', 'all')
 
         with get_database_manager().get_session() as session:
-            # Verify user is in paper trading mode
-            user = session.query(User).filter_by(id=user_id).first()
-            if not user or not user.is_mock_trading_mode:
-                return jsonify({
-                    'success': False,
-                    'error': 'Paper trading not enabled for this user'
-                }), 400
-
             # Get paper trading order IDs
             mock_orders = session.query(Order).filter(
                 and_(
                     Order.user_id == user_id,
                     Order.is_mock_order == True,
                     Order.transaction_type == 'BUY',
-                    Order.order_status.in_(['COMPLETE', 'EXECUTED'])
+                    Order.order_status.in_(['COMPLETE', 'COMPLETED', 'EXECUTED'])
                 )
             ).all()
 
-            order_ids = [o.id for o in mock_orders]
+            order_ids = [o.order_id for o in mock_orders]
 
             if not order_ids:
                 return jsonify({
@@ -817,10 +829,13 @@ def get_paper_positions():
                     'id': p.id,
                     'symbol': p.symbol,
                     'quantity': p.quantity,
+                    'original_quantity': p.original_quantity,
+                    'remaining_quantity': p.remaining_quantity,
                     'entry_price': float(p.entry_price) if p.entry_price else None,
                     'current_price': float(p.current_price) if p.current_price else None,
                     'entry_date': p.created_at.isoformat() if p.created_at else None,
                     'strategy': p.strategy,
+                    'trading_type': p.trading_type or 'swing',
                     'is_active': p.is_active,
                     'days_held': p.days_held,
 
@@ -829,10 +844,19 @@ def get_paper_positions():
                     'unrealized_pnl_pct': float(p.unrealized_pnl_pct) if p.unrealized_pnl_pct else 0,
                     'realized_pnl': float(p.realized_pnl) if p.realized_pnl else 0,
                     'realized_pnl_pct': float(p.realized_pnl_pct) if p.realized_pnl_pct else 0,
+                    'partial_pnl_realized': float(p.partial_pnl_realized) if p.partial_pnl_realized else 0,
 
                     # Targets
                     'stop_loss': float(p.stop_loss) if p.stop_loss else None,
                     'target_price': float(p.target_price) if p.target_price else None,
+                    'target_price_1': float(p.target_price_1) if p.target_price_1 else None,
+                    'target_price_2': float(p.target_price_2) if p.target_price_2 else None,
+                    'target_price_3': float(p.target_price_3) if p.target_price_3 else None,
+
+                    # Partial exit status
+                    'partial_exit_1_done': p.partial_exit_1_done,
+                    'partial_exit_2_done': p.partial_exit_2_done,
+                    'partial_exit_3_done': p.partial_exit_3_done,
 
                     # Performance
                     'is_profitable': p.is_profitable,
@@ -863,6 +887,218 @@ def get_paper_positions():
         }), 500
 
 
+@auto_trading_bp.route('/paper-trading/positions/<int:position_id>/close', methods=['POST'])
+@login_required
+def close_paper_position(position_id):
+    """
+    Close a paper trading position manually.
+
+    Sets exit_price to current market price, marks position inactive,
+    and calculates realized P&L.
+    """
+    try:
+        from src.models.database import get_database_manager
+        from src.models.models import OrderPerformance, Order, User
+        from src.models.stock_models import Stock
+        from sqlalchemy import and_
+
+        user_id = current_user.id
+
+        with get_database_manager().get_session() as session:
+            # Get the position
+            perf = session.query(OrderPerformance).filter_by(id=position_id).first()
+            if not perf:
+                return jsonify({
+                    'success': False,
+                    'error': 'Position not found'
+                }), 404
+
+            if not perf.is_active:
+                return jsonify({
+                    'success': False,
+                    'error': 'Position already closed'
+                }), 400
+
+            # Verify ownership via order
+            order = session.query(Order).filter_by(order_id=perf.order_id).first()
+            if not order or order.user_id != user_id or not order.is_mock_order:
+                return jsonify({
+                    'success': False,
+                    'error': 'Position not found'
+                }), 404
+
+            # Get current price from stocks table
+            symbol_clean = perf.symbol.replace('NSE:', '').replace('-EQ', '')
+            stock = session.query(Stock).filter(
+                Stock.symbol.ilike(f'%{symbol_clean}%')
+            ).first()
+
+            exit_price = float(stock.current_price) if stock and stock.current_price else float(perf.current_price or perf.entry_price)
+
+            # Calculate realized P&L
+            qty = perf.remaining_quantity or perf.quantity or 0
+            realized_pnl = (exit_price - float(perf.entry_price)) * qty + float(perf.partial_pnl_realized or 0)
+
+            # Update position
+            perf.exit_price = exit_price
+            perf.exit_date = datetime.now()
+            perf.exit_reason = 'manual'
+            perf.is_active = False
+            perf.remaining_quantity = 0
+            perf.realized_pnl = realized_pnl
+            perf.realized_pnl_pct = (realized_pnl / (float(perf.entry_price) * (perf.quantity or 1))) * 100 if perf.entry_price and perf.quantity else 0
+            perf.is_profitable = realized_pnl > 0
+            perf.unrealized_pnl = 0
+            perf.unrealized_pnl_pct = 0
+
+            session.commit()
+
+            logger.info(f"Paper position {position_id} closed for user {user_id}: P&L={realized_pnl:.2f}")
+
+            return jsonify({
+                'success': True,
+                'realized_pnl': round(realized_pnl, 2),
+                'exit_price': round(exit_price, 2),
+                'message': f'Position closed at {exit_price:.2f}'
+            }), 200
+
+    except Exception as e:
+        logger.error(f"Error closing paper position: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
+
+@auto_trading_bp.route('/paper-trading/alerts', methods=['GET'])
+@login_required
+def get_paper_alerts():
+    """
+    Get alerts for paper trading positions nearing SL/target or with sell signals.
+    """
+    try:
+        from src.models.database import get_database_manager
+        from src.models.models import OrderPerformance, Order, User
+        from src.models.stock_models import Stock
+        from sqlalchemy import and_
+
+        user_id = current_user.id
+
+        with get_database_manager().get_session() as session:
+            user = session.query(User).filter_by(id=user_id).first()
+            if not user or not user.is_mock_trading_mode:
+                return jsonify({'success': True, 'alerts': []}), 200
+
+            # Get active paper positions
+            mock_orders = session.query(Order).filter(
+                and_(
+                    Order.user_id == user_id,
+                    Order.is_mock_order == True,
+                    Order.transaction_type == 'BUY',
+                    Order.order_status.in_(['COMPLETE', 'COMPLETED', 'EXECUTED'])
+                )
+            ).all()
+
+            order_ids = [o.order_id for o in mock_orders]
+            if not order_ids:
+                return jsonify({'success': True, 'alerts': []}), 200
+
+            active = session.query(OrderPerformance).filter(
+                and_(
+                    OrderPerformance.order_id.in_(order_ids),
+                    OrderPerformance.is_active == True
+                )
+            ).all()
+
+            alerts = []
+            for p in active:
+                current = float(p.current_price or p.entry_price or 0)
+                entry = float(p.entry_price or 0)
+                if not current or not entry:
+                    continue
+
+                sl = float(p.stop_loss) if p.stop_loss else None
+                t1 = float(p.target_price_1) if p.target_price_1 else None
+                t2 = float(p.target_price_2) if p.target_price_2 else None
+                t3 = float(p.target_price_3) if p.target_price_3 else None
+
+                # Check stop loss proximity (< 3%)
+                if sl and sl > 0:
+                    dist_sl = (current - sl) / current * 100
+                    if dist_sl < 3:
+                        alerts.append({
+                            'type': 'stop_loss',
+                            'severity': 'danger' if dist_sl < 1 else 'warning',
+                            'symbol': p.symbol,
+                            'position_id': p.id,
+                            'current_price': current,
+                            'threshold': sl,
+                            'message': f'{p.symbol} is {dist_sl:.1f}% from stop loss ({Trading_formatINR(sl)})'
+                        })
+
+                # Check next target proximity (< 2%)
+                next_target = None
+                if t1 and not p.partial_exit_1_done and current < t1:
+                    next_target = t1
+                elif t2 and not p.partial_exit_2_done and current < t2:
+                    next_target = t2
+                elif t3 and not p.partial_exit_3_done and current < t3:
+                    next_target = t3
+
+                if next_target:
+                    dist_t = (next_target - current) / current * 100
+                    if dist_t < 2:
+                        alerts.append({
+                            'type': 'target',
+                            'severity': 'success',
+                            'symbol': p.symbol,
+                            'position_id': p.id,
+                            'current_price': current,
+                            'threshold': next_target,
+                            'message': f'{p.symbol} is {dist_t:.1f}% from target {Trading_formatINR(next_target)}'
+                        })
+
+                # Check sell signal from stocks table
+                symbol_clean = (p.symbol or '').replace('NSE:', '').replace('-EQ', '')
+                stock = session.query(Stock).filter(
+                    Stock.symbol.ilike(f'%{symbol_clean}%')
+                ).first()
+                if stock and stock.sell_signal:
+                    alerts.append({
+                        'type': 'sell_signal',
+                        'severity': 'warning',
+                        'symbol': p.symbol,
+                        'position_id': p.id,
+                        'current_price': current,
+                        'threshold': None,
+                        'message': f'{p.symbol} has an active SELL signal'
+                    })
+
+            # Sort by severity (danger first)
+            severity_order = {'danger': 0, 'warning': 1, 'success': 2}
+            alerts.sort(key=lambda a: severity_order.get(a['severity'], 3))
+
+            return jsonify({
+                'success': True,
+                'alerts': alerts,
+                'total': len(alerts)
+            }), 200
+
+    except Exception as e:
+        logger.error(f"Error getting paper alerts: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
+
+def Trading_formatINR(amount):
+    """Helper to format INR amounts for alert messages."""
+    if amount is None:
+        return '--'
+    return f'\u20B9{amount:,.2f}'
+
+
 @auto_trading_bp.route('/paper-trading/reset', methods=['POST'])
 @login_required
 def reset_paper_portfolio():
@@ -876,7 +1112,7 @@ def reset_paper_portfolio():
     """
     try:
         from src.models.database import get_database_manager
-        from src.models.models import OrderPerformance, OrderPerformanceSnapshot, Order, User
+        from src.models.models import OrderPerformance, OrderPerformanceSnapshot, Order, User, AutoTradingSettings
         from sqlalchemy import and_
 
         user_id = current_user.id
@@ -889,6 +1125,10 @@ def reset_paper_portfolio():
                     'success': False,
                     'error': 'Paper trading not enabled for this user'
                 }), 400
+
+            # Get configurable virtual capital
+            at_settings = session.query(AutoTradingSettings).filter_by(user_id=user_id).first()
+            initial_capital = (at_settings.virtual_capital if at_settings and at_settings.virtual_capital else 100000.0)
 
             # Get paper trading orders
             mock_orders = session.query(Order).filter(
@@ -930,7 +1170,7 @@ def reset_paper_portfolio():
                 'success': True,
                 'message': 'Paper trading portfolio reset successfully',
                 'deleted_orders': deleted_orders,
-                'initial_capital': 100000.0
+                'initial_capital': initial_capital
             }), 200
 
     except Exception as e:

@@ -211,7 +211,7 @@ def update_daily_snapshot():
             result = orchestrator.execute_suggested_stocks_saga(
                 user_id=1,
                 strategies=['unified'],  # Single unified strategy
-                limit=5  # Top 5 stocks (13mo backtest-optimized)
+                limit=50  # Top 50 stocks
             )
 
             if result['status'] == 'completed':
@@ -289,7 +289,7 @@ def execute_auto_trading():
 
 
 def update_order_performance():
-    """Update performance tracking for all active orders (runs daily at 6:00 PM)."""
+    """Update performance tracking for all active orders (runs hourly during market hours + 6 PM reconciliation)."""
     logger.info("\n" + "=" * 80)
     logger.info("ORDER PERFORMANCE UPDATE")
     logger.info("=" * 80)
@@ -305,11 +305,35 @@ def update_order_performance():
             logger.info(f"  Orders updated: {result.get('orders_updated', 0)}")
             logger.info(f"  Snapshots created: {result.get('snapshots_created', 0)}")
             logger.info(f"  Orders closed: {result.get('orders_closed', 0)}")
+            logger.info(f"  Partial exits: {result.get('partial_exits', 0)}")
         else:
             logger.error(f"❌ Performance update failed: {result.get('error')}")
 
     except Exception as e:
         logger.error(f"❌ Performance tracking failed: {e}", exc_info=True)
+
+
+def close_day_trading_positions():
+    """Force close all day trading positions before market close (runs at 3:20 PM)."""
+    logger.info("\n" + "=" * 80)
+    logger.info("DAY TRADING POSITION CLOSE")
+    logger.info("=" * 80)
+
+    try:
+        performance_service = get_performance_tracking_service()
+        logger.info("📊 Closing all day trading positions before market close...")
+
+        result = performance_service.close_day_trading_positions()
+
+        if result.get('success'):
+            logger.info(f"✅ Day trading close completed")
+            logger.info(f"  Positions closed: {result.get('positions_closed', 0)}")
+            logger.info(f"  Total P&L: {result.get('total_pnl', 0):.2f}")
+        else:
+            logger.error(f"❌ Day trading close failed: {result.get('error')}")
+
+    except Exception as e:
+        logger.error(f"❌ Day trading close failed: {e}", exc_info=True)
 
 
 def check_broker_token_status():
@@ -487,7 +511,9 @@ def run_scheduler():
     logger.info("=" * 80)
     logger.info("Scheduled Tasks:")
     logger.info("  - Auto-Trading Execution:      Daily at 09:20 AM (5 min after market opens)")
-    logger.info("  - Performance Tracking:        Daily at 06:00 PM (after market close)")
+    logger.info("  - Hourly Position Monitoring:  10:00, 11:00, 12:00, 13:00, 14:00, 15:15")
+    logger.info("  - Day Trade Close:             Daily at 03:20 PM (before market close)")
+    logger.info("  - Performance Reconciliation:  Daily at 06:00 PM (after market close)")
     logger.info("  - Technical Indicators:        Daily at 10:00 PM (after data pipeline)")
     logger.info("  - Daily Stock Picks:           Daily at 10:15 PM (after indicators)")
     logger.info("  - Cleanup Old Snapshots:       Weekly (Sunday) at 03:00 AM")
@@ -512,7 +538,14 @@ def run_scheduler():
     # Schedule auto-trading at 9:20 AM
     schedule.every().day.at("09:20").do(execute_auto_trading)
 
-    # Schedule performance tracking at 6:00 PM
+    # Hourly position monitoring during market hours (catch stop-loss/target hits in time)
+    for hour_time in ['10:00', '11:00', '12:00', '13:00', '14:00', '15:15']:
+        schedule.every().day.at(hour_time).do(update_order_performance)
+
+    # Force close day trading positions before market close
+    schedule.every().day.at("15:20").do(close_day_trading_positions)
+
+    # End-of-day performance reconciliation at 6:00 PM
     schedule.every().day.at("18:00").do(update_order_performance)
 
     # Schedule technical indicators calculation at 10:00 PM (after data pipeline runs at 9:00 PM)

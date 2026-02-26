@@ -101,6 +101,14 @@ class EMAStrategyCalculator:
             # Calculate DeMarker oscillator (14-period)
             demarker = self._calculate_demarker(df, period=14)
 
+            # Calculate ATR (14-period) for dynamic stop-loss
+            atr_14 = self._calculate_atr(df, period=14)
+
+            # Calculate volume ratio (latest volume / 20-day average)
+            avg_volume_20d = float(df['volume'].tail(20).mean()) if len(df) >= 20 else float(df['volume'].mean())
+            latest_volume = float(df['volume'].iloc[-1])
+            volume_ratio = latest_volume / avg_volume_20d if avg_volume_20d > 0 else 1.0
+
             # Calculate Fibonacci extension targets
             fib_targets = self._calculate_fibonacci_extensions(df)
 
@@ -113,7 +121,7 @@ class EMAStrategyCalculator:
             power_zone_status = self._get_power_zone_status(current_price, ema_8, ema_21)
 
             # Generate buy/sell signals
-            signals = self._generate_signals(df, current_price, ema_8, ema_21, demarker)
+            signals = self._generate_signals(df, current_price, ema_8, ema_21, demarker, atr_14, volume_ratio)
 
             # Calculate EMA strength metrics
             ema_metrics = self._calculate_ema_metrics(current_price, ema_8, ema_21)
@@ -133,6 +141,11 @@ class EMAStrategyCalculator:
                 'price_above_ema8_pct': ema_metrics['price_above_ema8_pct'],
                 'ema8_slope': ema_metrics['ema8_slope'],
                 'ema21_slope': ema_metrics['ema21_slope'],
+
+                # ATR & Volume
+                'atr_14': atr_14,
+                'volume_ratio': round(volume_ratio, 2),
+                'avg_volume_20d': round(avg_volume_20d, 0),
 
                 # DeMarker
                 'demarker': demarker,
@@ -300,8 +313,36 @@ class EMAStrategyCalculator:
                 'ema21_slope': 0.0
             }
 
+    def _calculate_atr(self, df: pd.DataFrame, period: int = 14) -> float:
+        """
+        Calculate Average True Range (ATR) for dynamic stop-loss sizing.
+
+        True Range = max(High-Low, |High-prevClose|, |Low-prevClose|)
+        ATR = SMA of True Range over `period` days.
+        """
+        try:
+            high = df['high']
+            low = df['low']
+            prev_close = df['close'].shift(1)
+
+            tr1 = high - low
+            tr2 = (high - prev_close).abs()
+            tr3 = (low - prev_close).abs()
+
+            true_range = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+            atr = float(true_range.rolling(window=period).mean().iloc[-1])
+
+            if pd.isna(atr):
+                return 0.0
+            return round(atr, 2)
+
+        except Exception as e:
+            logger.error(f"Error calculating ATR: {e}")
+            return 0.0
+
     def _generate_signals(self, df: pd.DataFrame, price: float, ema_8: float,
-                         ema_21: float, demarker: float) -> Dict:
+                         ema_21: float, demarker: float,
+                         atr_14: float = 0.0, volume_ratio: float = 1.0) -> Dict:
         """
         Generate buy/sell/short signals based on 8-21 EMA strategy rules.
 
@@ -343,6 +384,12 @@ class EMAStrategyCalculator:
                     buy_signal = True
                     signal_quality = 'medium'
 
+                # Volume filter: only downgrade on very low volume (< 50% of avg)
+                if buy_signal and volume_ratio < 0.5:
+                    if signal_quality == 'high':
+                        signal_quality = 'medium'
+                    # Keep medium signals — don't kill them entirely
+
             # SHORT SIGNAL LOGIC (Bearish Power Zone)
             short_signal = False
             short_quality = 'none'
@@ -364,15 +411,24 @@ class EMAStrategyCalculator:
             # SELL SIGNAL LOGIC (exit long)
             sell_signal = is_bearish_power_zone or (price < ema_21)
 
-            # Calculate stop loss / cover price
+            # Calculate stop loss / cover price using ATR-based dynamic sizing
             recent_low = float(df['low'].tail(20).min())
             recent_high = float(df['high'].tail(20).max())
-            stop_below_ema21 = ema_21 * 0.98  # 2% below 21 EMA
-            stop_loss = min(stop_below_ema21, recent_low)
 
-            # Short cover (stop for shorts) = above 21 EMA or recent swing high
-            cover_above_ema21 = ema_21 * 1.02  # 2% above 21 EMA
-            short_cover = max(cover_above_ema21, recent_high)
+            if atr_14 > 0:
+                # ATR-based: 1.5x ATR below 21 EMA, floored at recent swing low
+                stop_below_ema21 = ema_21 - (1.5 * atr_14)
+                stop_loss = max(stop_below_ema21, recent_low)
+
+                # Short cover: 1.5x ATR above 21 EMA, capped at recent swing high
+                cover_above_ema21 = ema_21 + (1.5 * atr_14)
+                short_cover = min(cover_above_ema21, recent_high)
+            else:
+                # Fallback: fixed 2% if ATR unavailable
+                stop_below_ema21 = ema_21 * 0.98
+                stop_loss = min(stop_below_ema21, recent_low)
+                cover_above_ema21 = ema_21 * 1.02
+                short_cover = max(cover_above_ema21, recent_high)
 
             return {
                 'buy_signal': buy_signal,
@@ -426,77 +482,93 @@ class EMAStrategyCalculator:
                     demarker = result.get('demarker', 0.5)
 
                     # === BULLISH SCORING (Long) ===
+                    # Weights: EMA sep 15, DeMarker 45, Price dist 25, Volume 15 = 100
                     if is_bullish:
                         separation = result.get('ema_separation_pct', 0)
                         price_dist = result.get('price_above_ema8_pct', 0)
+                        vol_ratio = result.get('volume_ratio', 1.0)
 
-                        sep_score = min(separation / 5.0, 1.0) * 20.0
+                        sep_score = min(separation / 5.0, 1.0) * 15.0
 
                         if 0.55 <= demarker <= 0.70:
-                            dm_score = 50.0
+                            dm_score = 45.0
                         elif 0.45 <= demarker < 0.55:
-                            dm_score = 40.0
+                            dm_score = 36.0
                         elif 0.35 <= demarker < 0.45:
-                            dm_score = 25.0
+                            dm_score = 22.5
                         elif demarker < 0.35:
-                            dm_score = 12.5
+                            dm_score = 11.25
                         else:
                             dm_score = 0.0
 
                         if 0 <= price_dist <= 1.0:
-                            dist_score = 30.0
+                            dist_score = 25.0
                         elif price_dist <= 2.0:
-                            dist_score = 24.9
+                            dist_score = 20.0
                         elif price_dist <= 3.0:
-                            dist_score = 18.0
+                            dist_score = 15.0
                         elif price_dist <= 5.0:
-                            dist_score = 9.9
+                            dist_score = 8.0
                         else:
-                            dist_score = 3.0
+                            dist_score = 2.5
 
-                        result['ema_strategy_score'] = round(max(0.0, min(100.0, sep_score + dm_score + dist_score)), 2)
+                        # Volume component (0-15 points): bonus for volume surge
+                        if vol_ratio > 2.0:
+                            vol_score = 15.0
+                        elif vol_ratio > 1.5:
+                            vol_score = 10.0
+                        elif vol_ratio >= 1.0:
+                            vol_score = 5.0
+                        else:
+                            vol_score = 0.0
+
+                        result['ema_strategy_score'] = round(max(0.0, min(100.0, sep_score + dm_score + dist_score + vol_score)), 2)
 
                     # === BEARISH SCORING (Short) ===
+                    # Weights: EMA sep 15, DeMarker 45, Price dist 25, Volume 15 = 100
                     elif is_bearish:
-                        # Inverted: EMA separation below (21 EMA > 8 EMA), price below both
                         ema_8 = result.get('ema_8', 0)
                         ema_21 = result.get('ema_21', 0)
                         price = result.get('current_price', 0)
+                        vol_ratio = result.get('volume_ratio', 1.0)
 
-                        # Component 1: Bearish EMA separation (0-20 points)
-                        # Wider gap (21 EMA >> 8 EMA) = stronger downtrend
                         bear_sep_pct = ((ema_21 - ema_8) / ema_21) * 100 if ema_21 > 0 else 0
-                        sep_score = min(bear_sep_pct / 5.0, 1.0) * 20.0
+                        sep_score = min(bear_sep_pct / 5.0, 1.0) * 15.0
 
-                        # Component 2: DeMarker selling pressure (0-50 points)
-                        # For shorts: lower DeMarker = stronger selling = better short entry
-                        # Inverted logic from bullish model
                         if 0.30 <= demarker <= 0.45:
-                            dm_score = 50.0   # Strong selling pressure
+                            dm_score = 45.0
                         elif 0.45 < demarker <= 0.55:
-                            dm_score = 40.0   # Moderate selling
+                            dm_score = 36.0
                         elif 0.55 < demarker <= 0.65:
-                            dm_score = 25.0   # Mild
+                            dm_score = 22.5
                         elif demarker > 0.65:
-                            dm_score = 12.5   # Weak selling / overbought bounce
+                            dm_score = 11.25
                         else:
-                            dm_score = 0.0    # Deeply oversold (<0.30) — bounce likely
+                            dm_score = 0.0
 
-                        # Component 3: Price distance below 8 EMA (0-30 points)
-                        # Tight to EMA = better short entry (not already crashed)
                         price_below_ema8_pct = ((ema_8 - price) / ema_8) * 100 if ema_8 > 0 else 0
                         if 0 <= price_below_ema8_pct <= 1.0:
-                            dist_score = 30.0
+                            dist_score = 25.0
                         elif price_below_ema8_pct <= 2.0:
-                            dist_score = 24.9
+                            dist_score = 20.0
                         elif price_below_ema8_pct <= 3.0:
-                            dist_score = 18.0
+                            dist_score = 15.0
                         elif price_below_ema8_pct <= 5.0:
-                            dist_score = 9.9
+                            dist_score = 8.0
                         else:
-                            dist_score = 3.0
+                            dist_score = 2.5
 
-                        result['ema_strategy_score'] = round(max(0.0, min(100.0, sep_score + dm_score + dist_score)), 2)
+                        # Volume component (0-15 points)
+                        if vol_ratio > 2.0:
+                            vol_score = 15.0
+                        elif vol_ratio > 1.5:
+                            vol_score = 10.0
+                        elif vol_ratio >= 1.0:
+                            vol_score = 5.0
+                        else:
+                            vol_score = 0.0
+
+                        result['ema_strategy_score'] = round(max(0.0, min(100.0, sep_score + dm_score + dist_score + vol_score)), 2)
                         result['signal_direction'] = 'SHORT'
 
                     else:

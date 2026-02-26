@@ -1,0 +1,191 @@
+{% extends "v2/base.html" %}
+{% block title %}Trade History - Trading Journal{% endblock %}
+{% block page_title %}Trade History{% endblock %}
+
+{% block content %}
+<!-- Stats cards -->
+<div class="row g-3 mb-4" id="stats-cards">
+    <div class="col-6 col-md-4 col-xl">
+        <div class="card summary-card h-100"><div class="card-body text-center py-2">
+            <div class="text-muted small">Trades</div>
+            <div id="stat-total" class="fs-5 fw-bold">--</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-xl">
+        <div class="card summary-card h-100"><div class="card-body text-center py-2">
+            <div class="text-muted small">Win Rate</div>
+            <div id="stat-winrate" class="fs-5 fw-bold">--</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-xl">
+        <div class="card summary-card h-100"><div class="card-body text-center py-2">
+            <div class="text-muted small">Avg Win</div>
+            <div id="stat-avg-win" class="fs-5 fw-bold text-success">--</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-xl">
+        <div class="card summary-card h-100"><div class="card-body text-center py-2">
+            <div class="text-muted small">Avg Loss</div>
+            <div id="stat-avg-loss" class="fs-5 fw-bold text-danger">--</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-xl">
+        <div class="card summary-card h-100"><div class="card-body text-center py-2">
+            <div class="text-muted small">Best Trade</div>
+            <div id="stat-best" class="fs-5 fw-bold text-success">--</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-xl">
+        <div class="card summary-card h-100"><div class="card-body text-center py-2">
+            <div class="text-muted small">Worst Trade</div>
+            <div id="stat-worst" class="fs-5 fw-bold text-danger">--</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-xl">
+        <div class="card summary-card h-100"><div class="card-body text-center py-2">
+            <div class="text-muted small">Profit Factor</div>
+            <div id="stat-pf" class="fs-5 fw-bold">--</div>
+        </div></div>
+    </div>
+</div>
+
+<!-- Monthly P&L chart -->
+<div class="card mb-4">
+    <div class="card-header">Monthly P&L</div>
+    <div class="card-body" style="height:220px;">
+        <canvas id="monthly-pnl-chart"></canvas>
+    </div>
+</div>
+
+<!-- Filters & table -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span>Closed Trades</span>
+        <div class="d-flex gap-2">
+            <select class="form-select form-select-sm" id="filter-result" style="width:auto;">
+                <option value="all">All</option>
+                <option value="won">Won</option>
+                <option value="lost">Lost</option>
+            </select>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th>Entry Date</th>
+                    <th>Exit Date</th>
+                    <th class="text-end">Entry</th>
+                    <th class="text-end">Exit</th>
+                    <th class="text-end">P&L %</th>
+                    <th class="text-center">Days</th>
+                    <th>Exit Reason</th>
+                </tr>
+            </thead>
+            <tbody id="history-tbody">
+                <tr><td colspan="8" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm"></div> Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let closedTrades = [];
+let monthlyChart = null;
+
+async function loadHistory() {
+    const data = await Trading.api('/api/auto-trading/paper-trading/positions?status=closed');
+    if (!data.success) return;
+
+    closedTrades = data.positions || [];
+
+    // Compute stats
+    const wins = closedTrades.filter(t => (t.realized_pnl || 0) > 0);
+    const losses = closedTrades.filter(t => (t.realized_pnl || 0) < 0);
+    const total = closedTrades.length;
+
+    document.getElementById('stat-total').textContent = total;
+
+    const winRate = total > 0 ? (wins.length / total * 100) : 0;
+    document.getElementById('stat-winrate').textContent = winRate.toFixed(1) + '%';
+    document.getElementById('stat-winrate').className = `fs-5 fw-bold ${winRate >= 50 ? 'text-success' : 'text-danger'}`;
+
+    const avgWin = wins.length > 0 ? wins.reduce((s, t) => s + (t.realized_pnl_pct || 0), 0) / wins.length : 0;
+    const avgLoss = losses.length > 0 ? losses.reduce((s, t) => s + (t.realized_pnl_pct || 0), 0) / losses.length : 0;
+    document.getElementById('stat-avg-win').textContent = Trading.formatPct(avgWin);
+    document.getElementById('stat-avg-loss').textContent = Trading.formatPct(avgLoss);
+
+    const pnls = closedTrades.map(t => t.realized_pnl || 0);
+    const best = pnls.length > 0 ? Math.max(...pnls) : 0;
+    const worst = pnls.length > 0 ? Math.min(...pnls) : 0;
+    document.getElementById('stat-best').textContent = Trading.formatINR(best);
+    document.getElementById('stat-worst').textContent = Trading.formatINR(worst);
+
+    const totalWinAmt = wins.reduce((s, t) => s + (t.realized_pnl || 0), 0);
+    const totalLossAmt = Math.abs(losses.reduce((s, t) => s + (t.realized_pnl || 0), 0));
+    const pf = totalLossAmt > 0 ? (totalWinAmt / totalLossAmt) : (totalWinAmt > 0 ? 999 : 0);
+    document.getElementById('stat-pf').textContent = pf.toFixed(2);
+    document.getElementById('stat-pf').className = `fs-5 fw-bold ${pf >= 1 ? 'text-success' : 'text-danger'}`;
+
+    // Monthly P&L chart
+    const monthly = {};
+    closedTrades.forEach(t => {
+        if (!t.exit_date) return;
+        const key = t.exit_date.substring(0, 7); // YYYY-MM
+        monthly[key] = (monthly[key] || 0) + (t.realized_pnl || 0);
+    });
+    const sortedMonths = Object.keys(monthly).sort();
+    if (monthlyChart) monthlyChart.destroy();
+    if (sortedMonths.length > 0) {
+        monthlyChart = Trading.createMonthlyPnlChart('monthly-pnl-chart',
+            sortedMonths.map(m => m),
+            sortedMonths.map(m => monthly[m])
+        );
+    }
+
+    renderTable();
+}
+
+function renderTable() {
+    const filter = document.getElementById('filter-result').value;
+    let filtered = closedTrades;
+    if (filter === 'won') filtered = closedTrades.filter(t => (t.realized_pnl || 0) > 0);
+    if (filter === 'lost') filtered = closedTrades.filter(t => (t.realized_pnl || 0) < 0);
+
+    const tbody = document.getElementById('history-tbody');
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No closed trades yet</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(t => {
+        const sym = (t.symbol || '').replace('NSE:', '').replace('-EQ', '');
+        const pnlPct = t.realized_pnl_pct || 0;
+        const pnl = t.realized_pnl || 0;
+        const reasonBadge = {
+            'manual': 'bg-secondary',
+            'stop_loss': 'bg-danger',
+            'target_hit': 'bg-success',
+            'sell_signal': 'bg-warning'
+        };
+        return `<tr>
+            <td class="fw-medium">${sym}</td>
+            <td class="small">${t.entry_date ? t.entry_date.split('T')[0] : '--'}</td>
+            <td class="small">${t.exit_date ? t.exit_date.split('T')[0] : '--'}</td>
+            <td class="text-end">${Trading.formatPrice(t.entry_price)}</td>
+            <td class="text-end">${Trading.formatPrice(t.exit_price)}</td>
+            <td class="text-end ${Trading.pnlClass(pnl)}">${Trading.formatPct(pnlPct)}<br><span class="small">${Trading.formatINR(pnl)}</span></td>
+            <td class="text-center">${t.days_held || '--'}</td>
+            <td><span class="badge ${reasonBadge[t.exit_reason] || 'bg-secondary'}">${(t.exit_reason || 'N/A').replace('_', ' ')}</span></td>
+        </tr>`;
+    }).join('');
+}
+
+document.getElementById('filter-result').addEventListener('change', renderTable);
+
+loadHistory();
+</script>
+{% endblock %}

@@ -144,7 +144,8 @@ class OrderSyncService:
         try:
             with self.db_manager.get_session() as session:
                 orders = session.query(Order).filter(
-                    Order.user_id == user_id
+                    Order.user_id == user_id,
+                    Order.is_mock_order != True
                 ).order_by(
                     Order.placed_at.desc()
                 ).all()
@@ -266,7 +267,7 @@ class OrderSyncService:
                             Order.user_id == user_id
                         ).first()
 
-                        if db_order:
+                        if db_order and not db_order.is_mock_order:
                             # Mark as cancelled since it no longer exists on broker
                             db_order.order_status = 'CANCELLED'
                             db_order.status_message = 'Order not found on broker - marked as cancelled'

@@ -45,7 +45,10 @@ def create_app():
     
     # Generate a secret key for sessions
     app.secret_key = secrets.token_hex(16)
-    
+
+    # Force template auto-reload so Jinja re-reads files on each request
+    app.config['TEMPLATES_AUTO_RELOAD'] = True
+
     # Request/response logging middleware removed for clean console output
     print("🔇 Console logging optimized - Only essential logs will be shown")
     
@@ -266,74 +269,64 @@ def create_app():
 
 
     
+    # Primary UI routes (v2 templates)
     @app.route('/')
     @app.route('/dashboard')
     @login_required
     def dashboard():
         """Dashboard page."""
-        return render_template('dashboard.html')
-    
-    
-    
-    @app.route('/logs')
+        return render_template('v2/dashboard.html')
+
+    @app.route('/picks')
     @login_required
-    def logs():
-        """Logs page."""
-        return render_template('logs.html')
-    
-    @app.route('/orders')
-    def orders():
-        """Orders page."""
-        return render_template('orders.html')
-    
-    @app.route('/trades')
-    @login_required
-    def trades():
-        """Trades page."""
-        return render_template('trades.html')
-    
+    def picks():
+        """Today's Picks page."""
+        return render_template('v2/picks.html')
+
     @app.route('/portfolio')
     @login_required
     def portfolio():
         """Portfolio page."""
-        return render_template('portfolio.html')
-    
-    @app.route('/strategies')
+        return render_template('v2/portfolio.html')
+
+    @app.route('/history')
     @login_required
-    def strategies():
-        """Strategies page."""
-        return render_template('strategies.html')
-    
-    @app.route('/suggested_stocks')
-    @login_required
-    def suggested_stocks():
-        """Suggested stocks page - 8-21 EMA Swing Trading Strategy."""
-        return render_template('suggested_stocks.html')
-    
-    @app.route('/reports')
-    @login_required
-    def reports():
-        """Reports page."""
-        return render_template('reports.html')
-    
-    @app.route('/alerts')
-    @login_required
-    def alerts():
-        """Alerts page."""
-        return render_template('alerts.html')
-    
-    @app.route('/brokers')
-    @login_required
-    def brokers():
-        """Brokers page."""
-        return render_template('brokers.html')
-    
+    def history():
+        """Trade History page."""
+        return render_template('v2/history.html')
+
     @app.route('/settings')
     @login_required
     def settings():
         """Settings page."""
-        return render_template('settings.html')
-    
+        return render_template('v2/settings.html')
+
+    # Keep /v2/ paths as aliases for bookmarks
+    @app.route('/v2/')
+    @login_required
+    def v2_dashboard():
+        return redirect(url_for('dashboard'))
+
+    @app.route('/v2/picks')
+    @login_required
+    def v2_picks():
+        return redirect(url_for('picks'))
+
+    @app.route('/v2/portfolio')
+    @login_required
+    def v2_portfolio():
+        return redirect(url_for('portfolio'))
+
+    @app.route('/v2/history')
+    @login_required
+    def v2_history():
+        return redirect(url_for('history'))
+
+    @app.route('/v2/settings')
+    @login_required
+    def v2_settings():
+        return redirect(url_for('settings'))
+
     # Admin routes
     @app.route('/admin/users')
     @login_required
@@ -1219,7 +1212,7 @@ def create_app():
             from ..services.trading.mock_trading_service import get_mock_trading_service
             with db_manager.get_session() as session:
                 mock_trading_service = get_mock_trading_service(session)
-                result = mock_trading_service.calculate_model_performance(current_user.id)
+                result = mock_trading_service.calculate_performance(current_user.id)
 
             if result['success']:
                 return jsonify(result)
@@ -1322,6 +1315,7 @@ def create_app():
     except ImportError as e:
         app.logger.warning(f"Admin routes not available: {e}")
         app.logger.warning("Admin dashboard functionality will be disabled")
+
 
     # Register data management routes (yfinance, data population)
     try:

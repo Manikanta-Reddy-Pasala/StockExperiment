@@ -500,17 +500,6 @@ def get_triple_model_view():
         }), 500
 
 
-# Keep old endpoint for backward compatibility
-@suggested_stocks_bp.route('/dual-model-view', methods=['GET'])
-@login_required
-def get_dual_model_view():
-    """
-    DEPRECATED: Use /triple-model-view instead.
-    Redirects to triple-model-view endpoint.
-    """
-    return get_triple_model_view()
-
-
 @suggested_stocks_bp.route('/recalculate', methods=['POST'])
 @login_required
 def recalculate_suggestions():
@@ -525,14 +514,7 @@ def recalculate_suggestions():
         from datetime import datetime
 
         user_id = current_user.id
-        logger.info(f"🔄 Manual recalculation requested by user {user_id}")
-
-        # Check if user is admin (optional - you can remove this check)
-        # if not current_user.is_admin:
-        #     return jsonify({
-        #         'success': False,
-        #         'error': 'Admin privileges required for recalculation'
-        #     }), 403
+        logger.info(f"Manual recalculation requested by user {user_id}")
 
         def run_recalculation():
             """Background task to run recalculation."""
@@ -545,7 +527,7 @@ def recalculate_suggestions():
                 result = orchestrator.execute_suggested_stocks_saga(
                     user_id=1,  # System user
                     strategies=['unified'],
-                    limit=5  # 13mo backtest-optimized: top 5 picks for PF 3.84
+                    limit=50  # Top 50 stocks
                 )
 
                 if result.get('success'):

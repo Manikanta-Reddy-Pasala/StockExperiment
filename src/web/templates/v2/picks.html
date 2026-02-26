@@ -1,0 +1,213 @@
+{% extends "v2/base.html" %}
+{% block title %}Today's Picks - Trading Journal{% endblock %}
+{% block page_title %}Today's Picks{% endblock %}
+
+{% block content %}
+<!-- Market regime banner -->
+<div id="market-banner" class="alert alert-info mb-4" style="display:none;">
+    <i class="bi bi-graph-up me-2"></i> <span id="market-regime-text">Loading market regime...</span>
+</div>
+
+<!-- Filter tabs -->
+<ul class="nav nav-tabs mb-3" id="signal-filter">
+    <li class="nav-item"><a class="nav-link active" href="#" data-filter="all">All</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" data-filter="strong_buy">Strong Buy</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" data-filter="buy">Buy</a></li>
+</ul>
+
+<!-- Loading & count -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div id="picks-count" class="text-muted small">Loading...</div>
+    <button class="btn btn-sm btn-outline-primary" onclick="loadPicks()" id="refresh-btn">
+        <i class="bi bi-arrow-clockwise"></i> Refresh
+    </button>
+</div>
+
+<!-- Card grid -->
+<div class="row g-3" id="picks-grid">
+    <div class="col-12 text-center py-5"><div class="spinner-border"></div></div>
+</div>
+
+<!-- Buy modal -->
+<div class="modal fade" id="buyModal" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title" id="buyModalTitle">Buy Stock</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label small">Symbol</label>
+                    <input type="text" class="form-control" id="buy-symbol" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Price</label>
+                    <input type="text" class="form-control" id="buy-price" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Quantity</label>
+                    <input type="number" class="form-control" id="buy-qty" value="1" min="1">
+                </div>
+                <div class="mb-2 text-muted small">
+                    Estimated: <strong id="buy-total">--</strong>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-success w-100" id="btn-paper-buy" onclick="confirmBuy('paper')">
+                    <i class="bi bi-pencil-square me-1"></i> Paper Buy
+                </button>
+                <button class="btn btn-outline-primary w-100" id="btn-live-buy" onclick="confirmBuy('live')">
+                    <i class="bi bi-lightning-charge me-1"></i> Live Buy
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allStocks = [];
+let currentFilter = 'all';
+
+async function loadPicks() {
+    document.getElementById('picks-grid').innerHTML = '<div class="col-12 text-center py-5"><div class="spinner-border"></div></div>';
+
+    const [stocksData, sentiment] = await Promise.all([
+        Trading.api('/api/suggested-stocks?limit=50'),
+        Trading.api('/api/suggested-stocks/market-sentiment')
+    ]);
+
+    // Market banner
+    if (sentiment.success || sentiment.regime) {
+        const regime = (sentiment.regime || sentiment.market_regime || 'neutral').toLowerCase();
+        const banner = document.getElementById('market-banner');
+        banner.style.display = '';
+        if (regime.includes('bull')) {
+            banner.className = 'alert alert-success mb-4';
+            banner.innerHTML = '<i class="bi bi-graph-up-arrow me-2"></i> <strong>Bullish Market</strong> - Favorable conditions for buying';
+        } else if (regime.includes('bear')) {
+            banner.className = 'alert alert-danger mb-4';
+            banner.innerHTML = '<i class="bi bi-graph-down-arrow me-2"></i> <strong>Bearish Market</strong> - Exercise caution';
+        } else {
+            banner.className = 'alert alert-info mb-4';
+            banner.innerHTML = '<i class="bi bi-dash-circle me-2"></i> <strong>Neutral Market</strong> - Mixed signals';
+        }
+    }
+
+    // Process stocks
+    allStocks = stocksData.stocks || stocksData.data || [];
+    allStocks.forEach(s => { s._signal = Trading.getSignalStrength(s); });
+
+    renderPicks();
+}
+
+function renderPicks() {
+    let filtered = allStocks;
+    if (currentFilter === 'strong_buy') {
+        filtered = allStocks.filter(s => s._signal.label === 'STRONG BUY');
+    } else if (currentFilter === 'buy') {
+        filtered = allStocks.filter(s => s._signal.label === 'BUY' || s._signal.label === 'STRONG BUY');
+    }
+
+    document.getElementById('picks-count').textContent = `${filtered.length} stocks`;
+
+    if (filtered.length === 0) {
+        document.getElementById('picks-grid').innerHTML = '<div class="col-12 text-center text-muted py-5">No stocks match this filter</div>';
+        return;
+    }
+
+    document.getElementById('picks-grid').innerHTML = filtered.map(s => {
+        const sig = s._signal;
+        const score = (s.selection_score || s.ema_trend_score || 0).toFixed(0);
+        const symbol = s.symbol || s.stock_name || '';
+        return `
+        <div class="col-md-6 col-lg-4">
+            <div class="card pick-card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <h6 class="mb-0 fw-bold">${symbol}</h6>
+                            <div class="small text-muted">${s.stock_name && s.stock_name !== symbol ? s.stock_name : (s.sector || '')}</div>
+                        </div>
+                        <span class="badge ${sig.cls}"><i class="bi ${sig.icon} me-1"></i>${sig.label}</span>
+                    </div>
+                    <div class="row g-2 mb-3 small">
+                        <div class="col-6">
+                            <span class="text-muted">Price:</span> <strong>${Trading.formatPrice(s.current_price)}</strong>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Score:</span> <strong>${score}</strong>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Target 1:</span> <span class="text-success">${Trading.formatPrice(s.fib_target_1)}</span>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Stop Loss:</span> <span class="text-danger">${Trading.formatPrice(s.stop_loss)}</span>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-success btn-sm flex-fill" onclick="openBuyModal('${symbol}', ${s.current_price || 0})">
+                            <i class="bi bi-pencil-square me-1"></i> Paper Buy
+                        </button>
+                        <button class="btn btn-outline-primary btn-sm flex-fill" onclick="openBuyModal('${symbol}', ${s.current_price || 0}, true)">
+                            <i class="bi bi-lightning-charge me-1"></i> Live Buy
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+let buyMode = 'paper';
+function openBuyModal(symbol, price, isLive = false) {
+    buyMode = isLive ? 'live' : 'paper';
+    document.getElementById('buy-symbol').value = symbol;
+    document.getElementById('buy-price').value = Trading.formatPrice(price);
+    document.getElementById('buy-qty').value = 1;
+    document.getElementById('buy-total').textContent = Trading.formatINR(price);
+    document.getElementById('buyModalTitle').textContent = (isLive ? 'Live' : 'Paper') + ' Buy: ' + symbol;
+
+    // Highlight the relevant button
+    document.getElementById('btn-paper-buy').className = isLive ? 'btn btn-outline-success w-100' : 'btn btn-success w-100';
+    document.getElementById('btn-live-buy').className = isLive ? 'btn btn-primary w-100' : 'btn btn-outline-primary w-100';
+
+    new bootstrap.Modal(document.getElementById('buyModal')).show();
+}
+
+document.getElementById('buy-qty').addEventListener('input', function() {
+    const price = parseFloat(document.getElementById('buy-price').value.replace(/[^\d.]/g, ''));
+    document.getElementById('buy-total').textContent = Trading.formatINR(price * (parseInt(this.value) || 0));
+});
+
+async function confirmBuy(mode) {
+    const symbol = document.getElementById('buy-symbol').value;
+    const qty = parseInt(document.getElementById('buy-qty').value);
+    if (!qty || qty < 1) { Trading.toast('Enter a valid quantity', 'warning'); return; }
+
+    const res = mode === 'live' ? await Trading.liveBuy(symbol, qty) : await Trading.paperBuy(symbol, qty);
+    bootstrap.Modal.getInstance(document.getElementById('buyModal')).hide();
+
+    if (res.success) {
+        Trading.toast(`${mode === 'live' ? 'Live' : 'Paper'} order placed: ${symbol} x${qty}`, 'success');
+    } else {
+        Trading.toast(res.error || 'Order failed', 'danger');
+    }
+}
+
+// Filter tabs
+document.getElementById('signal-filter').addEventListener('click', e => {
+    e.preventDefault();
+    const link = e.target.closest('a[data-filter]');
+    if (!link) return;
+    document.querySelectorAll('#signal-filter .nav-link').forEach(l => l.classList.remove('active'));
+    link.classList.add('active');
+    currentFilter = link.dataset.filter;
+    renderPicks();
+});
+
+loadPicks();
+</script>
+{% endblock %}

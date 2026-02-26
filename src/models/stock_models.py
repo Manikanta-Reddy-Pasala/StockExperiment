@@ -134,6 +134,50 @@ class SymbolMaster(Base):
         return f'<SymbolMaster {self.symbol}: {self.name}>'
 
 
+class DailySuggestedStock(Base):
+    """Daily suggested stock picks from strategy screening."""
+    __tablename__ = 'daily_suggested_stocks'
+    __table_args__ = (
+        UniqueConstraint('date', 'symbol', 'strategy', 'model_type', name='daily_suggested_stocks_date_symbol_strategy_model_type_key'),
+    )
+
+    id = Column(Integer, primary_key=True)
+    date = Column(Date, nullable=False, index=True)
+    symbol = Column(String(50), nullable=False, index=True)
+    strategy = Column(String(50), nullable=False, default='ema_8_21')
+    model_type = Column(String(20), nullable=False, default='traditional')
+    stock_name = Column(String(200))
+    current_price = Column(Float)
+    market_cap = Column(Float)
+    selection_score = Column(Float)
+    rank = Column(Integer)
+    target_price = Column(Float)
+    stop_loss = Column(Float)
+    recommendation = Column(String(20))
+    reason = Column(Text)
+    ema_8 = Column(Float)
+    ema_21 = Column(Float)
+    ema_trend_score = Column(Float)
+    ema_score = Column(Float)
+    demarker = Column(Float)
+    fib_target_1 = Column(Float)
+    fib_target_2 = Column(Float)
+    fib_target_3 = Column(Float)
+    buy_signal = Column(Boolean, default=False)
+    sell_signal = Column(Boolean, default=False)
+    signal_quality = Column(String(20))
+    sector = Column(String(100))
+    market_cap_category = Column(String(20))
+    pe_ratio = Column(Float)
+    pb_ratio = Column(Float)
+    roe = Column(Float)
+    beta = Column(Float)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<DailySuggestedStock {self.symbol} ({self.date})>'
+
+
 class MarketDataSnapshot(Base):
     """Daily market data snapshots for analysis."""
     __tablename__ = 'market_data_snapshots'

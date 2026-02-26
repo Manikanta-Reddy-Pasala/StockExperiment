@@ -1,0 +1,256 @@
+{% extends "v2/base.html" %}
+{% block title %}Dashboard - Trading Journal{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Summary cards -->
+<div class="row g-3 mb-4" id="summary-cards">
+    <div class="col-6 col-lg-3">
+        <div class="card summary-card h-100">
+            <div class="card-body text-center py-3">
+                <div class="text-muted small mb-1">Total P&L</div>
+                <div id="total-pnl" class="fs-4 fw-bold">--</div>
+                <div id="total-pnl-pct" class="small">--</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card summary-card h-100">
+            <div class="card-body text-center py-3">
+                <div class="text-muted small mb-1">Win Rate</div>
+                <div id="win-rate" class="fs-4 fw-bold">--</div>
+                <div id="win-loss" class="small text-muted">--</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card summary-card h-100">
+            <div class="card-body text-center py-3">
+                <div class="text-muted small mb-1">Active Positions</div>
+                <div id="active-count" class="fs-4 fw-bold text-primary">--</div>
+                <div id="positions-value" class="small text-muted">--</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card summary-card h-100">
+            <div class="card-body text-center py-3">
+                <div class="text-muted small mb-1">Available Capital</div>
+                <div id="cash-available" class="fs-4 fw-bold">--</div>
+                <div id="initial-capital" class="small text-muted">--</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Alerts section -->
+<div id="alerts-section" class="mb-4" style="display:none;">
+    <div class="card border-warning">
+        <div class="card-header bg-warning bg-opacity-10 d-flex align-items-center">
+            <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>
+            <strong>Sell Alerts</strong>
+            <span id="alerts-count" class="badge bg-warning ms-2">0</span>
+        </div>
+        <div class="card-body p-0">
+            <div id="alerts-list" class="list-group list-group-flush"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Equity curve & Today's picks -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Equity Curve</span>
+                <div class="btn-group btn-group-sm" id="period-selector">
+                    <button class="btn btn-outline-primary" data-days="7">1W</button>
+                    <button class="btn btn-outline-primary active" data-days="30">1M</button>
+                    <button class="btn btn-outline-primary" data-days="90">3M</button>
+                </div>
+            </div>
+            <div class="card-body" style="height:280px;">
+                <canvas id="equity-chart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Top Picks Today</span>
+                <a href="/picks" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body p-0" id="top-picks-container">
+                <div class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm"></div> Loading...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Active positions mini table -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Active Positions</span>
+        <a href="/portfolio" class="btn btn-sm btn-outline-primary">View All</a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th class="text-end">Entry</th>
+                    <th class="text-end">Current</th>
+                    <th class="text-end">P&L %</th>
+                    <th class="text-center">Days</th>
+                    <th class="text-center">Status</th>
+                </tr>
+            </thead>
+            <tbody id="positions-tbody">
+                <tr><td colspan="6" class="text-center text-muted py-3"><div class="spinner-border spinner-border-sm"></div> Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let equityChart = null;
+
+async function loadDashboard() {
+    // Load all data in parallel
+    const [portfolio, positions, picks, alerts] = await Promise.all([
+        Trading.api('/api/auto-trading/paper-trading/portfolio'),
+        Trading.api('/api/auto-trading/paper-trading/positions?status=active'),
+        Trading.api('/api/suggested-stocks?limit=3'),
+        Trading.api('/api/auto-trading/paper-trading/alerts')
+    ]);
+
+    // Summary cards
+    if (portfolio.success) {
+        const totalPnl = (portfolio.realized_pnl || 0) + (portfolio.unrealized_pnl || 0);
+        document.getElementById('total-pnl').className = `fs-4 fw-bold ${Trading.pnlClass(totalPnl)}`;
+        document.getElementById('total-pnl').textContent = Trading.formatINR(totalPnl);
+        document.getElementById('total-pnl-pct').className = `small ${Trading.pnlClass(totalPnl)}`;
+        document.getElementById('total-pnl-pct').textContent = Trading.formatPct(portfolio.total_pnl_pct || 0);
+
+        const wr = portfolio.win_rate || 0;
+        document.getElementById('win-rate').textContent = wr.toFixed(1) + '%';
+        document.getElementById('win-rate').className = `fs-4 fw-bold ${wr >= 50 ? 'text-success' : 'text-danger'}`;
+        document.getElementById('win-loss').textContent = `${portfolio.profitable_trades || 0}W / ${portfolio.loss_trades || 0}L`;
+
+        document.getElementById('active-count').textContent = portfolio.active_positions || 0;
+        document.getElementById('positions-value').textContent = Trading.formatINR(portfolio.positions_value);
+
+        document.getElementById('cash-available').textContent = Trading.formatINR(portfolio.cash_available);
+        document.getElementById('initial-capital').textContent = `of ${Trading.formatINR(portfolio.initial_capital)}`;
+    }
+
+    // Alerts
+    if (alerts.success && alerts.alerts && alerts.alerts.length > 0) {
+        document.getElementById('alerts-section').style.display = '';
+        document.getElementById('alerts-count').textContent = alerts.alerts.length;
+        const list = document.getElementById('alerts-list');
+        list.innerHTML = alerts.alerts.map(a => `
+            <div class="list-group-item d-flex justify-content-between align-items-center py-2">
+                <div>
+                    <i class="bi ${a.severity === 'danger' ? 'bi-exclamation-octagon-fill text-danger' : a.severity === 'success' ? 'bi-bullseye text-success' : 'bi-exclamation-triangle text-warning'} me-2"></i>
+                    <strong>${a.symbol}</strong> <span class="text-muted small">${a.message}</span>
+                </div>
+                <a href="/portfolio" class="btn btn-sm btn-outline-${a.severity}">View</a>
+            </div>
+        `).join('');
+    }
+
+    // Active positions table
+    if (positions.success) {
+        const tbody = document.getElementById('positions-tbody');
+        if (!positions.positions || positions.positions.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No active positions. <a href="/picks">Browse picks</a></td></tr>';
+        } else {
+            tbody.innerHTML = positions.positions.slice(0, 8).map(p => {
+                const pnlPct = p.unrealized_pnl_pct || 0;
+                const statusDot = pnlPct > 0 ? 'status-dot status-dot-profit' : pnlPct < 0 ? 'status-dot status-dot-loss' : 'status-dot status-dot-neutral';
+                return `<tr>
+                    <td class="fw-medium">${(p.symbol || '').replace('NSE:','').replace('-EQ','')}</td>
+                    <td class="text-end">${Trading.formatPrice(p.entry_price)}</td>
+                    <td class="text-end">${Trading.formatPrice(p.current_price)}</td>
+                    <td class="text-end ${Trading.pnlClass(pnlPct)}">${Trading.formatPct(pnlPct)}</td>
+                    <td class="text-center">${p.days_held || 0}</td>
+                    <td class="text-center"><span class="${statusDot}"></span></td>
+                </tr>`;
+            }).join('');
+        }
+    }
+
+    // Top picks
+    if (picks.success || picks.stocks) {
+        const stocks = picks.stocks || picks.data || [];
+        const container = document.getElementById('top-picks-container');
+        if (stocks.length === 0) {
+            container.innerHTML = '<div class="text-center text-muted py-4">No picks available today</div>';
+        } else {
+            container.innerHTML = stocks.slice(0, 3).map(s => {
+                const signal = Trading.getSignalStrength(s);
+                return `<div class="list-group-item border-0 border-bottom">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${s.symbol || s.stock_name || ''}</strong>
+                            <span class="badge ${signal.cls} ms-1">${signal.label}</span>
+                            <div class="small text-muted">${Trading.formatPrice(s.current_price)} &middot; Score: ${(s.selection_score || s.ema_trend_score || 0).toFixed(0)}</div>
+                        </div>
+                        <button class="btn btn-sm btn-success" onclick="quickPaperBuy('${s.symbol}')">
+                            <i class="bi bi-cart-plus"></i>
+                        </button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+    }
+
+    // Equity chart
+    loadEquityChart(30);
+}
+
+async function loadEquityChart(days) {
+    const data = await Trading.api(`/api/auto-trading/paper-trading/daily-pnl?days=${days}`);
+    if (equityChart) { equityChart.destroy(); equityChart = null; }
+
+    if (data.success && data.daily_pnl && data.daily_pnl.length > 0) {
+        const labels = data.daily_pnl.map(d => d.date);
+        const values = data.daily_pnl.map(d => (data.initial_capital || 100000) + d.pnl);
+        equityChart = Trading.createEquityChart('equity-chart', labels, values);
+    } else {
+        const ctx = document.getElementById('equity-chart').getContext('2d');
+        ctx.font = '14px Inter';
+        ctx.fillStyle = '#94a3b8';
+        ctx.textAlign = 'center';
+        ctx.fillText('No data yet. Start paper trading to see your equity curve.', ctx.canvas.width / 2, ctx.canvas.height / 2);
+    }
+}
+
+function quickPaperBuy(symbol) {
+    const qty = prompt(`Buy how many shares of ${symbol}?`, '1');
+    if (!qty || isNaN(qty) || parseInt(qty) < 1) return;
+    Trading.paperBuy(symbol, qty).then(res => {
+        if (res.success) {
+            Trading.toast(`Bought ${qty} shares of ${symbol}`, 'success');
+            setTimeout(() => loadDashboard(), 1000);
+        } else {
+            Trading.toast(res.error || 'Order failed', 'danger');
+        }
+    });
+}
+
+// Period selector
+document.getElementById('period-selector').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-days]');
+    if (!btn) return;
+    document.querySelectorAll('#period-selector button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    loadEquityChart(parseInt(btn.dataset.days));
+});
+
+loadDashboard();
+</script>
+{% endblock %}
