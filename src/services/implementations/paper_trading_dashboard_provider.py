@@ -8,14 +8,14 @@ trading mode (User.is_mock_trading_mode = True).
 
 import logging
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date as dt_date
 from sqlalchemy import text, and_, desc, func
 
 from ..interfaces.dashboard_interface import IDashboardProvider, DashboardMetrics, MarketIndex
 
 logger = logging.getLogger(__name__)
 
-INITIAL_CAPITAL = 100_000.0
+DEFAULT_CAPITAL = 100_000.0
 
 
 class PaperTradingDashboardProvider(IDashboardProvider):
@@ -25,19 +25,39 @@ class PaperTradingDashboardProvider(IDashboardProvider):
         from src.models.database import get_database_manager
         return get_database_manager()
 
+    def _get_initial_capital(self, session, user_id: int) -> float:
+        """Get user's configured virtual capital from AutoTradingSettings."""
+        from src.models.models import AutoTradingSettings
+        settings = session.query(AutoTradingSettings).filter_by(user_id=user_id).first()
+        return float(settings.virtual_capital) if settings and settings.virtual_capital else DEFAULT_CAPITAL
+
     def get_market_overview(self, user_id: int) -> Dict[str, Any]:
-        """Top suggested stocks from daily_suggested_stocks as market overview."""
+        """Top suggested stocks from daily_suggested_stocks with live prices from stocks table."""
         try:
             db_manager = self._get_db_manager()
             market_indices = []
 
             with db_manager.get_session() as session:
+                # Check data freshness
+                date_query = text("SELECT MAX(date) FROM daily_suggested_stocks")
+                max_date = session.execute(date_query).scalar()
+
+                staleness_warning = None
+                if max_date:
+                    days_old = (dt_date.today() - max_date).days if isinstance(max_date, dt_date) else 0
+                    if days_old > 1:
+                        staleness_warning = f"Data is {days_old} days old (from {max_date}). Run recalculation for fresh picks."
+
+                # Use COALESCE to prefer live prices from stocks table
                 query = text("""
-                    SELECT symbol, stock_name, current_price, selection_score
-                    FROM daily_suggested_stocks
-                    WHERE date = (SELECT MAX(date) FROM daily_suggested_stocks)
-                    AND current_price IS NOT NULL
-                    ORDER BY selection_score DESC
+                    SELECT d.symbol, d.stock_name,
+                           COALESCE(s.current_price, d.current_price) as current_price,
+                           d.selection_score
+                    FROM daily_suggested_stocks d
+                    LEFT JOIN stocks s ON d.symbol = s.symbol
+                    WHERE d.date = (SELECT MAX(date) FROM daily_suggested_stocks)
+                    AND COALESCE(s.current_price, d.current_price) IS NOT NULL
+                    ORDER BY d.selection_score DESC
                     LIMIT 10
                 """)
                 result = session.execute(query)
@@ -54,10 +74,15 @@ class PaperTradingDashboardProvider(IDashboardProvider):
                         'score': float(selection_score or 0),
                     })
 
+            message = 'Top suggested stocks (paper trading mode)'
+            if staleness_warning:
+                message = staleness_warning
+
             return {
                 'success': True,
                 'data': market_indices,
-                'message': 'Top suggested stocks (paper trading mode)',
+                'message': message,
+                'data_date': str(max_date) if max_date else None,
                 'last_updated': datetime.now().isoformat()
             }
 
@@ -71,21 +96,30 @@ class PaperTradingDashboardProvider(IDashboardProvider):
             }
 
     def get_portfolio_summary(self, user_id: int) -> Dict[str, Any]:
-        """Aggregate portfolio from order_performance (active mock orders)."""
+        """Aggregate portfolio from order_performance (active mock orders) with live prices."""
         try:
             db_manager = self._get_db_manager()
 
             with db_manager.get_session() as session:
-                query = text("""
+                INITIAL_CAPITAL = self._get_initial_capital(session, user_id)
+
+                # Get active positions with live prices from stocks table
+                active_query = text("""
                     SELECT
                         COUNT(*) as positions_count,
-                        COALESCE(SUM(entry_price * quantity), 0) as total_invested,
-                        COALESCE(SUM(current_price * quantity), 0) as total_current_value,
-                        COALESCE(SUM(unrealized_pnl), 0) as total_unrealized_pnl
-                    FROM order_performance
-                    WHERE user_id = :user_id AND is_active = true
+                        COALESCE(SUM(op.entry_price * COALESCE(op.remaining_quantity, op.quantity)), 0) as total_invested,
+                        COALESCE(SUM(
+                            COALESCE(s.current_price, op.current_price) * COALESCE(op.remaining_quantity, op.quantity)
+                        ), 0) as total_current_value,
+                        COALESCE(SUM(
+                            (COALESCE(s.current_price, op.current_price) - op.entry_price) * COALESCE(op.remaining_quantity, op.quantity)
+                            + COALESCE(op.partial_pnl_realized, 0)
+                        ), 0) as total_unrealized_pnl
+                    FROM order_performance op
+                    LEFT JOIN stocks s ON op.symbol = s.symbol
+                    WHERE op.user_id = :user_id AND op.is_active = true
                 """)
-                row = session.execute(query, {'user_id': user_id}).fetchone()
+                row = session.execute(active_query, {'user_id': user_id}).fetchone()
 
                 positions_count = int(row[0] or 0)
                 total_invested = float(row[1] or 0)
@@ -122,7 +156,7 @@ class PaperTradingDashboardProvider(IDashboardProvider):
             return {
                 'success': True,
                 'data': metrics.to_dict(),
-                'message': f'Paper trading portfolio (Initial: ₹{INITIAL_CAPITAL:,.0f})',
+                'message': f'Paper trading portfolio (Initial: {INITIAL_CAPITAL:,.0f})',
                 'last_updated': datetime.now().isoformat()
             }
 
@@ -136,36 +170,46 @@ class PaperTradingDashboardProvider(IDashboardProvider):
             }
 
     def get_top_holdings(self, user_id: int, limit: int = 5) -> Dict[str, Any]:
-        """Active positions from order_performance where is_active=True."""
+        """Active positions from order_performance with live prices from stocks table."""
         try:
             db_manager = self._get_db_manager()
 
             with db_manager.get_session() as session:
                 query = text("""
-                    SELECT symbol, quantity, entry_price, current_price,
-                           unrealized_pnl, unrealized_pnl_pct, stop_loss,
-                           target_price, strategy, created_at
-                    FROM order_performance
-                    WHERE user_id = :user_id AND is_active = true
-                    ORDER BY (current_price * quantity) DESC
+                    SELECT op.symbol,
+                           COALESCE(op.remaining_quantity, op.quantity) as quantity,
+                           op.entry_price,
+                           COALESCE(s.current_price, op.current_price) as current_price,
+                           op.stop_loss, op.target_price, op.strategy, op.created_at,
+                           COALESCE(op.partial_pnl_realized, 0) as partial_pnl
+                    FROM order_performance op
+                    LEFT JOIN stocks s ON op.symbol = s.symbol
+                    WHERE op.user_id = :user_id AND op.is_active = true
+                    ORDER BY (COALESCE(s.current_price, op.current_price) * COALESCE(op.remaining_quantity, op.quantity)) DESC
                     LIMIT :limit
                 """)
                 rows = session.execute(query, {'user_id': user_id, 'limit': limit}).fetchall()
 
                 holdings = []
                 for row in rows:
-                    symbol, quantity, entry_price, current_price, unrealized_pnl, \
-                        unrealized_pnl_pct, stop_loss, target_price, strategy, created_at = row
-                    current_value = (float(current_price or 0)) * int(quantity or 0)
+                    symbol, quantity, entry_price, current_price, \
+                        stop_loss, target_price, strategy, created_at, partial_pnl = row
+                    qty = int(quantity or 0)
+                    cp = float(current_price or 0)
+                    ep = float(entry_price or 0)
+                    current_value = cp * qty
+                    unrealized_pnl = (cp - ep) * qty + float(partial_pnl or 0)
+                    total_entry = ep * qty
+                    pnl_pct = (unrealized_pnl / total_entry * 100) if total_entry > 0 else 0
                     holdings.append({
                         'symbol': symbol or '',
                         'symbol_name': (symbol or '').replace('NSE:', '').replace('-EQ', ''),
-                        'quantity': int(quantity or 0),
-                        'entry_price': float(entry_price or 0),
-                        'current_price': float(current_price or 0),
+                        'quantity': qty,
+                        'entry_price': ep,
+                        'current_price': cp,
                         'current_value': round(current_value, 2),
-                        'pnl': float(unrealized_pnl or 0),
-                        'pnl_percent': float(unrealized_pnl_pct or 0),
+                        'pnl': round(unrealized_pnl, 2),
+                        'pnl_percent': round(pnl_pct, 2),
                         'stop_loss': float(stop_loss or 0),
                         'target_price': float(target_price or 0),
                         'strategy': strategy or '',
@@ -236,14 +280,16 @@ class PaperTradingDashboardProvider(IDashboardProvider):
             }
 
     def get_account_balance(self, user_id: int) -> Dict[str, Any]:
-        """Calculate balance from INITIAL_CAPITAL minus invested + realized P&L."""
+        """Calculate balance from user's virtual capital minus invested + realized P&L."""
         try:
             db_manager = self._get_db_manager()
 
             with db_manager.get_session() as session:
-                # Active positions: invested capital
+                INITIAL_CAPITAL = self._get_initial_capital(session, user_id)
+
+                # Active positions: invested capital (use remaining_quantity for partial exits)
                 active_query = text("""
-                    SELECT COALESCE(SUM(entry_price * quantity), 0) as invested
+                    SELECT COALESCE(SUM(entry_price * COALESCE(remaining_quantity, quantity)), 0) as invested
                     FROM order_performance
                     WHERE user_id = :user_id AND is_active = true
                 """)
@@ -363,6 +409,7 @@ class PaperTradingDashboardProvider(IDashboardProvider):
             db_manager = self._get_db_manager()
 
             with db_manager.get_session() as session:
+                INITIAL_CAPITAL = self._get_initial_capital(session, user_id)
                 # All orders in period - win rate only from closed positions
                 query = text("""
                     SELECT
@@ -427,7 +474,7 @@ class PaperTradingDashboardProvider(IDashboardProvider):
                 'error': str(e),
                 'data': {
                     'return_percent': 0, 'win_rate': 0, 'total_pnl': 0,
-                    'portfolio_value': INITIAL_CAPITAL, 'period': period,
+                    'portfolio_value': DEFAULT_CAPITAL, 'period': period,
                     'period_days': 30, 'sharpe_ratio': 0, 'max_drawdown': 0,
                     'volatility': 0, 'best_day': 0, 'worst_day': 0,
                     'total_trading_days': 0, 'chart_data': []
@@ -452,7 +499,7 @@ class PaperTradingDashboardProvider(IDashboardProvider):
                     """)
                     params = {f'sym_{i}': s for i, s in enumerate(symbols)}
                 else:
-                    # Get active positions' symbols + top suggested stocks
+                    # Get active positions' symbols + top suggested stocks (with live prices)
                     query = text("""
                         (SELECT s.symbol, s.name, s.current_price, s.volume
                          FROM stocks s
@@ -460,10 +507,13 @@ class PaperTradingDashboardProvider(IDashboardProvider):
                          WHERE op.user_id = :user_id AND op.is_active = true
                          AND s.current_price IS NOT NULL)
                         UNION
-                        (SELECT ds.symbol, ds.stock_name as name, ds.current_price, 0 as volume
+                        (SELECT ds.symbol, ds.stock_name as name,
+                                COALESCE(s2.current_price, ds.current_price) as current_price,
+                                COALESCE(s2.volume, 0) as volume
                          FROM daily_suggested_stocks ds
+                         LEFT JOIN stocks s2 ON ds.symbol = s2.symbol
                          WHERE ds.date = (SELECT MAX(date) FROM daily_suggested_stocks)
-                         AND ds.current_price IS NOT NULL
+                         AND COALESCE(s2.current_price, ds.current_price) IS NOT NULL
                          ORDER BY ds.selection_score DESC
                          LIMIT 5)
                         LIMIT 10

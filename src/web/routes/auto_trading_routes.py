@@ -862,7 +862,7 @@ def get_paper_positions():
 
                 # Compute days_held live for active positions
                 if p.is_active and p.created_at:
-                    days_held = (datetime.utcnow() - p.created_at).days
+                    days_held = (datetime.now() - p.created_at).days
                 else:
                     days_held = p.days_held or 0
 

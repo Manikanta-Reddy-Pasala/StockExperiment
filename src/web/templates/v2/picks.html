@@ -15,9 +15,19 @@
     <li class="nav-item"><a class="nav-link" href="#" data-filter="buy">Buy</a></li>
 </ul>
 
+<!-- Staleness warning -->
+<div id="staleness-banner" class="alert alert-warning mb-3" style="display:none;">
+    <i class="bi bi-exclamation-triangle me-2"></i>
+    <span id="staleness-text"></span>
+    <button class="btn btn-sm btn-warning ms-2" onclick="recalculatePicks()">Recalculate Now</button>
+</div>
+
 <!-- Loading & count -->
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <div id="picks-count" class="text-muted small">Loading...</div>
+    <div>
+        <span id="picks-count" class="text-muted small">Loading...</span>
+        <span id="picks-date" class="text-muted small ms-2"></span>
+    </div>
     <button class="btn btn-sm btn-outline-primary" onclick="loadPicks()" id="refresh-btn">
         <i class="bi bi-arrow-clockwise"></i> Refresh
     </button>
@@ -96,11 +106,32 @@ async function loadPicks() {
         }
     }
 
+    // Show staleness warning if data is old
+    if (stocksData.staleness_warning) {
+        document.getElementById('staleness-banner').style.display = '';
+        document.getElementById('staleness-text').textContent = stocksData.staleness_warning;
+    } else {
+        document.getElementById('staleness-banner').style.display = 'none';
+    }
+    if (stocksData.date) {
+        document.getElementById('picks-date').textContent = `(Data: ${stocksData.date})`;
+    }
+
     // Process stocks
     allStocks = stocksData.stocks || stocksData.data || [];
     allStocks.forEach(s => { s._signal = Trading.getSignalStrength(s); });
 
     renderPicks();
+}
+
+async function recalculatePicks() {
+    Trading.toast('Recalculating stock picks... This may take a few minutes.', 'info');
+    const res = await Trading.api('/api/suggested-stocks/recalculate', { method: 'POST' });
+    if (res.success) {
+        Trading.toast('Recalculation started. Refresh in a few minutes.', 'success');
+    } else {
+        Trading.toast(res.error || 'Recalculation failed', 'danger');
+    }
 }
 
 function renderPicks() {

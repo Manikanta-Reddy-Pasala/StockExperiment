@@ -108,6 +108,7 @@ class MockTradingService:
             ).order_by(desc(DailySuggestedStock.date)).first()
 
             # Create mock order
+            now = datetime.now()
             mock_order_id = f"MOCK-{uuid.uuid4().hex[:12].upper()}"
             order = Order(
                 user_id=user_id,
@@ -121,13 +122,17 @@ class MockTradingService:
                 filled_quantity=quantity,
                 pending_quantity=0,
                 order_status='COMPLETE',
-                created_at=datetime.utcnow(),
+                created_at=now,
                 is_mock_order=True,
                 strategy=suggested.strategy if suggested else 'ema_8_21'
             )
 
             self.session.add(order)
             self.session.flush()  # Get order.id before creating performance record
+
+            # Compute stop_loss from suggested or default 5% below entry
+            stop_loss = suggested.stop_loss if suggested else round(current_price * 0.95, 2)
+            target_price = suggested.target_price if suggested else round(current_price * 1.10, 2)
 
             # Create OrderPerformance record for portfolio tracking
             perf = OrderPerformance(
@@ -142,8 +147,8 @@ class MockTradingService:
                 current_value=total_value,
                 unrealized_pnl=0.0,
                 unrealized_pnl_pct=0.0,
-                stop_loss=suggested.stop_loss if suggested else None,
-                target_price=suggested.target_price if suggested else None,
+                stop_loss=stop_loss,
+                target_price=target_price,
                 target_price_1=suggested.fib_target_1 if suggested else None,
                 target_price_2=suggested.fib_target_2 if suggested else None,
                 target_price_3=suggested.fib_target_3 if suggested else None,
@@ -151,7 +156,7 @@ class MockTradingService:
                 trading_type='swing',
                 is_active=True,
                 days_held=0,
-                created_at=datetime.utcnow()
+                created_at=now
             )
 
             self.session.add(perf)

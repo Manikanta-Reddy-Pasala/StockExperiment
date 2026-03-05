@@ -143,16 +143,29 @@ def get_suggested_stocks():
         except Exception as e:
             logger.warning(f"Could not detect market regime: {e}")
 
-        logger.info(f"✅ Returned {len(stocks)} suggested stocks from {query_date} | Regime: {market_regime}")
+        # Check data staleness
+        staleness_warning = None
+        if query_date:
+            try:
+                days_old = (dt_date.today() - query_date).days
+            except TypeError:
+                days_old = 0
+            if days_old > 1:
+                staleness_warning = f"Data is {days_old} days old (from {query_date}). Click Refresh to recalculate."
 
-        return jsonify({
+        logger.info(f"Returned {len(stocks)} suggested stocks from {query_date} | Regime: {market_regime}")
+
+        response = {
             'success': True,
             'data': stocks,
             'total': len(stocks),
             'date': str(query_date),
             'last_updated': datetime.now().isoformat(),
             'market_regime': market_regime
-        }), 200
+        }
+        if staleness_warning:
+            response['staleness_warning'] = staleness_warning
+        return jsonify(response), 200
 
     except ValueError as e:
         logger.error(f"Invalid parameter: {e}")
