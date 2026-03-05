@@ -23,24 +23,46 @@ class OrderPerformanceTrackingService:
     def update_all_active_orders(self) -> Dict[str, Any]:
         """
         Update performance metrics for all active orders.
-        Uses a fresh session per invocation to avoid stale connections.
+        Fetches all prices first to avoid session detachment from broker API calls.
         """
         db_manager = get_database_manager()
+
+        # Phase 1: Collect symbols and fetch prices OUTSIDE the main session
+        # This avoids DetachedInstanceError when broker API calls expire session objects
+        try:
+            with db_manager.get_session() as session:
+                active_orders_data = session.query(
+                    OrderPerformance.id, OrderPerformance.symbol, OrderPerformance.user_id
+                ).filter_by(is_active=True).all()
+
+            if not active_orders_data:
+                logger.info("No active orders to track")
+                return {
+                    'success': True,
+                    'message': 'No active orders',
+                    'orders_updated': 0
+                }
+
+            logger.info(f"Found {len(active_orders_data)} active orders to update")
+
+            # Fetch prices for all unique symbols
+            price_map = {}
+            symbols_seen = set()
+            for _, symbol, user_id in active_orders_data:
+                if symbol not in symbols_seen:
+                    symbols_seen.add(symbol)
+                    price = self._get_current_price_standalone(symbol, user_id)
+                    if price:
+                        price_map[symbol] = price
+
+        except Exception as e:
+            logger.error(f"Failed to fetch prices: {e}", exc_info=True)
+            return {'success': False, 'error': str(e)}
+
+        # Phase 2: Update orders in a fresh session with pre-fetched prices
         with db_manager.get_session() as session:
             try:
-                logger.info("Starting performance update for all active orders")
-
                 active_orders = session.query(OrderPerformance).filter_by(is_active=True).all()
-
-                if not active_orders:
-                    logger.info("No active orders to track")
-                    return {
-                        'success': True,
-                        'message': 'No active orders',
-                        'orders_updated': 0
-                    }
-
-                logger.info(f"Found {len(active_orders)} active orders to update")
 
                 updated_count = 0
                 snapshot_count = 0
@@ -49,7 +71,7 @@ class OrderPerformanceTrackingService:
 
                 for order_perf in active_orders:
                     try:
-                        current_price = self._get_current_price(session, order_perf.symbol, order_perf.user_id)
+                        current_price = price_map.get(order_perf.symbol)
                         if not current_price:
                             logger.warning(f"Could not fetch price for {order_perf.symbol}")
                             continue
@@ -90,6 +112,42 @@ class OrderPerformanceTrackingService:
                     'success': False,
                     'error': str(e)
                 }
+
+    def _get_current_price_standalone(self, symbol: str, user_id: int = 1) -> Optional[float]:
+        """Get current price without requiring a session. Uses own session + broker API."""
+        stocks_price = None
+        broker_price = None
+
+        # Try stocks table with its own session
+        try:
+            db_manager = get_database_manager()
+            with db_manager.get_session() as s:
+                from src.models.stock_models import Stock
+                stock = s.query(Stock).filter_by(symbol=symbol).first()
+                if stock and stock.current_price and stock.current_price > 0:
+                    stocks_price = float(stock.current_price)
+        except Exception as e:
+            logger.debug(f"Stocks table price failed for {symbol}: {e}")
+
+        # Try broker API for fresher intraday data
+        try:
+            from src.services.brokers.fyers_service import get_fyers_service
+            fyers_service = get_fyers_service()
+            result = fyers_service.quotes(user_id, symbol)
+            if result.get('status') == 'success' and result.get('data'):
+                data = result['data']
+                if isinstance(data, dict):
+                    ltp = data.get('ltp') or data.get('v', {}).get('lp')
+                    if ltp and ltp > 0:
+                        broker_price = float(ltp)
+                elif isinstance(data, list) and len(data) > 0:
+                    ltp = data[0].get('v', {}).get('lp')
+                    if ltp and ltp > 0:
+                        broker_price = float(ltp)
+        except Exception as e:
+            logger.debug(f"Broker quote failed for {symbol}: {e}")
+
+        return broker_price or stocks_price
 
     def _get_current_price(self, session: Session, symbol: str, user_id: int = 1) -> Optional[float]:
         """Get current price for a symbol. Tries stocks table first, then broker API."""
