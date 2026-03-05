@@ -41,6 +41,12 @@ class MockTradingService:
             Dict with order details and status
         """
         try:
+            if not quantity or quantity < 1:
+                return {
+                    'success': False,
+                    'error': 'Quantity must be at least 1'
+                }
+
             # Get user to check trading mode
             user = self.session.query(User).filter(User.id == user_id).first()
             if not user:
