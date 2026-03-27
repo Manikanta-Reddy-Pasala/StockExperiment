@@ -1,7 +1,7 @@
 x-common-env: &common-env
   TZ: Asia/Kolkata
   DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-trader}:${POSTGRES_PASSWORD:-trader_password}@database:5432/${POSTGRES_DB:-trading_system}
-  DRAGONFLY_URL: redis://:${DRAGONFLY_PASSWORD:-}@dragonfly:6379/0
+  DRAGONFLY_URL: redis://dragonfly:6379/0
   PYTHONPATH: /app
   FYERS_CLIENT_ID: ${FYERS_CLIENT_ID:-}
   FYERS_ACCESS_TOKEN: ${FYERS_ACCESS_TOKEN:-}
@@ -113,7 +113,7 @@ services:
   dragonfly:
     image: docker.dragonflydb.io/dragonflydb/dragonfly
     container_name: trading_system_dragonfly
-    command: dragonfly --requirepass ${DRAGONFLY_PASSWORD:-}
+    command: dragonfly --maxmemory=384mb --proactor_threads=1
     environment:
       - TZ=Asia/Kolkata
     ports:
@@ -122,14 +122,14 @@ services:
     networks:
       - trading_network
     healthcheck:
-      test: ["CMD", "redis-cli", "-h", "localhost", "-p", "6379", "-a", "${DRAGONFLY_PASSWORD:-}", "ping"]
+      test: ["CMD", "redis-cli", "-h", "localhost", "-p", "6379", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 512M
 
   # Technical Indicators Scheduler
   technical_scheduler:
