@@ -179,11 +179,13 @@ class AutoTradingService:
 
                 # Step 5: Create buy orders
                 user = session.query(User).filter_by(id=user_id).first()
+                execution_id = execution.id
                 orders_result = self._create_buy_orders(
-                    session, user, settings, all_stocks, available_amount, execution
+                    session, user, settings, all_stocks, available_amount, execution_id
                 )
 
-                # Update execution status
+                # Re-fetch execution after external API calls may have detached it
+                execution = session.get(AutoTradingExecution, execution_id)
                 execution.orders_created = orders_result['orders_created']
                 execution.total_amount_invested = orders_result['total_invested']
                 execution.selected_strategies = json.dumps(list(set(all_strategies)))
@@ -441,7 +443,7 @@ class AutoTradingService:
 
     def _create_buy_orders(self, session: Session, user: User, settings: AutoTradingSettings,
                           stocks: List[Dict], available_amount: float,
-                          execution: AutoTradingExecution) -> Dict[str, Any]:
+                          execution_id: int) -> Dict[str, Any]:
         """Create buy orders for selected stocks."""
         try:
             from src.services.core.unified_broker_service import get_unified_broker_service
@@ -450,6 +452,10 @@ class AutoTradingService:
             orders_created = 0
             total_invested = 0.0
             order_details = []
+
+            # Extract user fields upfront to avoid detached session issues
+            user_id = user.id
+            is_paper_trading = user.is_mock_trading_mode
 
             amount_per_stock = available_amount / len(stocks) if stocks else 0
             remaining_capital = available_amount
@@ -461,7 +467,7 @@ class AutoTradingService:
 
                     # Pre-market gap check: skip if price gapped >3% from signal price
                     # If live price unavailable, proceed with signal price (paper trading safe)
-                    live_price = self._get_live_price(session, symbol, user.id)
+                    live_price = self._get_live_price(session, symbol, user_id)
                     if live_price and current_price and current_price > 0:
                         gap_pct = ((live_price - current_price) / current_price) * 100
                         if abs(gap_pct) > 3.0:
@@ -492,14 +498,14 @@ class AutoTradingService:
                     stop_loss = stock['stop_loss'] or (current_price * 0.95)
                     trading_type = stock.get('_trading_type', 'swing')
 
-                    if user.is_mock_trading_mode:
+                    if is_paper_trading:
                         order_result = self._create_mock_order(
-                            session, user.id, symbol, quantity, current_price,
+                            session, user_id, symbol, quantity, current_price,
                             target_price, stop_loss, stock
                         )
                     else:
                         order_result = unified_service.place_order(
-                            user_id=user.id,
+                            user_id=user_id,
                             order_data={
                                 'symbol': symbol,
                                 'quantity': quantity,
@@ -516,7 +522,7 @@ class AutoTradingService:
 
                         order_id = order_result['order_id']
                         self._create_performance_tracking(
-                            session, order_id, user.id, execution.id, stock, quantity, current_price,
+                            session, order_id, user_id, execution_id, stock, quantity, current_price,
                             stop_loss, target_price, trading_type
                         )
 
@@ -528,7 +534,7 @@ class AutoTradingService:
                             'stop_loss': stop_loss,
                             'target': target_price,
                             'order_id': order_id,
-                            'mode': 'paper' if user.is_mock_trading_mode else 'live',
+                            'mode': 'paper' if is_paper_trading else 'live',
                             'trading_type': trading_type
                         })
 
