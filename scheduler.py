@@ -22,14 +22,24 @@ from src.services.trading.order_performance_tracking_service import get_performa
 from src.services.brokers.fyers_token_refresh import FyersTokenRefreshService
 
 # Configure logging with rotation (max 50MB per file, keep 5 backups)
+import os
 from logging.handlers import RotatingFileHandler
+
+_log_handlers = [logging.StreamHandler()]
+try:
+    os.makedirs('logs', exist_ok=True)
+    _log_handlers.append(
+        RotatingFileHandler('logs/scheduler.log', maxBytes=50*1024*1024, backupCount=5)
+    )
+except (PermissionError, OSError) as _log_err:
+    # Log directory not writable (e.g. mounted volume owned by another user).
+    # Fall back to stdout-only logging so the scheduler still starts.
+    print(f"WARNING: Cannot write to logs/scheduler.log ({_log_err}). Logging to stdout only.")
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        RotatingFileHandler('logs/scheduler.log', maxBytes=50*1024*1024, backupCount=5),
-        logging.StreamHandler()
-    ]
+    handlers=_log_handlers
 )
 logger = logging.getLogger(__name__)
 

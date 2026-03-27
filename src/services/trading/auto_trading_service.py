@@ -500,11 +500,13 @@ class AutoTradingService:
                     else:
                         order_result = unified_service.place_order(
                             user_id=user.id,
-                            symbol=symbol,
-                            quantity=quantity,
-                            order_type='MARKET',
-                            transaction_type='BUY',
-                            product='INTRADAY'
+                            order_data={
+                                'symbol': symbol,
+                                'quantity': quantity,
+                                'order_type': 'MARKET',
+                                'transaction_type': 'BUY',
+                                'product': 'INTRADAY'
+                            }
                         )
 
                     if order_result.get('success'):

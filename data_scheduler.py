@@ -16,14 +16,22 @@ import subprocess
 sys.path.insert(0, str(Path(__file__).parent))
 
 # Configure logging with rotation (max 50MB per file, keep 5 backups)
+import os
 from logging.handlers import RotatingFileHandler
+
+_log_handlers = [logging.StreamHandler()]
+try:
+    os.makedirs('logs', exist_ok=True)
+    _log_handlers.append(
+        RotatingFileHandler('logs/data_scheduler.log', maxBytes=50*1024*1024, backupCount=5)
+    )
+except (PermissionError, OSError) as _log_err:
+    print(f"WARNING: Cannot write to logs/data_scheduler.log ({_log_err}). Logging to stdout only.")
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        RotatingFileHandler('logs/data_scheduler.log', maxBytes=50*1024*1024, backupCount=5),
-        logging.StreamHandler()
-    ]
+    handlers=_log_handlers
 )
 logger = logging.getLogger(__name__)
 
