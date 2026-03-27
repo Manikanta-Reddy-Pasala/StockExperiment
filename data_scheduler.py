@@ -77,21 +77,6 @@ def run_data_pipeline():
     _run_subprocess_with_retry(['python3', 'run_pipeline.py'], 'Data Pipeline', timeout=3600, max_retries=2)
 
 
-def fill_missing_data():
-    """Fill missing data fields (Daily at 9:30 PM after pipeline).
-    Now handled inline via the pipeline saga's fundamental data step.
-    Kept as no-op for scheduler compatibility.
-    """
-    logger.info("fill_missing_data: Skipped (handled by pipeline saga)")
-
-
-def calculate_business_logic():
-    """Calculate derived financial metrics (Daily at 9:45 PM).
-    Now handled inline via the pipeline saga's volatility/metrics step.
-    Kept as no-op for scheduler compatibility.
-    """
-    logger.info("calculate_business_logic: Skipped (handled by pipeline saga)")
-
 
 def export_daily_csv():
     """
@@ -332,8 +317,6 @@ def run_scheduler():
     logger.info("Scheduled Tasks:")
     logger.info("  - Symbol Master Update:    Weekly (Monday) at 06:00 AM")
     logger.info("  - Data Pipeline (6 steps): Daily at 09:00 PM (after market close)")
-    logger.info("  - Fill Missing Data:       Daily at 09:30 PM")
-    logger.info("  - Business Logic Calc:     Daily at 09:30 PM (parallel with fill)")
     logger.info("  - CSV Export:              Daily at 10:00 PM")
     logger.info("  - Data Quality Check:      Daily at 10:00 PM (parallel with CSV)")
     logger.info("=" * 80)
@@ -344,11 +327,7 @@ def run_scheduler():
     # Daily data pipeline (9 PM - after market close at 3:30 PM + buffer)
     schedule.every().day.at("21:00").do(run_data_pipeline)
 
-    # Fill missing data & business logic in parallel (9:30 PM - after pipeline completes)
-    schedule.every().day.at("21:30").do(fill_missing_data)
-    schedule.every().day.at("21:30").do(calculate_business_logic)
-
-    # Export CSV & validate quality in parallel (10 PM - after calculations)
+    # Export CSV & validate quality (10 PM - after pipeline completes)
     schedule.every().day.at("22:00").do(export_daily_csv)
     schedule.every().day.at("22:00").do(validate_data_quality)
     
@@ -356,8 +335,6 @@ def run_scheduler():
     # Uncomment to run tasks on scheduler start
     # logger.info("Running initial data pipeline...")
     # run_data_pipeline()
-    # fill_missing_data()
-    # calculate_business_logic()
     
     # Keep scheduler running
     logger.info("Data scheduler is now running. Press Ctrl+C to stop.")

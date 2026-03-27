@@ -388,73 +388,38 @@ class SuggestedStocksSagaOrchestrator:
             return saga.to_dict()
     
     def _execute_step1_stock_discovery(self, saga: SuggestedStocksSaga) -> SuggestedStocksSaga:
-        """Step 1: Discover tradeable stocks from broker API."""
+        """Step 1: Initialize saga - stocks are sourced from database in Step 2."""
         step = SagaStep(
             step_id="step1_discovery",
-            name="Stock Discovery",
-            description="Discover tradeable stocks from broker API using search terms"
+            name="Saga Initialization",
+            description="Initialize suggested stocks saga - stock data sourced from database"
         )
         saga.add_step(step)
         saga.update_step_status("step1_discovery", SagaStepStatus.IN_PROGRESS)
-        
+
         try:
-            print(f"🔍 STAGE 1: Discovering tradeable stocks...")
-            
-            # Search terms for stock discovery
-            search_terms = [
-                "NIFTY", "SENSEX", "BANKNIFTY", "NIFTYNXT50", "FINNIFTY",
-                "BANK", "IT", "PHARMA", "AUTO", "FMCG", "METAL", "INFRA", "ENERGY",
-                "FINANCE", "TECH", "HEALTHCARE", "CONSUMER", "COMMODITY",
-                "LTD", "LIMITED", "CORP", "INC", "INDUSTRIES"
-            ]
-            
-            all_symbols = set()
-            discovered_stocks = []
-            successful_searches = 0
-            failed_searches = 0
-            
-            for term in search_terms:
-                try:
-                    search_result = self.fyers_service.search(saga.user_id, term, "NSE")
-                    
-                    if search_result.get('status') == 'success':
-                        symbols = search_result.get('data', [])
-                        for symbol_data in symbols:
-                            if symbol_data.get('symbol') not in all_symbols:
-                                all_symbols.add(symbol_data.get('symbol'))
-                                discovered_stocks.append(symbol_data)
-                        successful_searches += 1
-                    else:
-                        failed_searches += 1
-                        
-                except Exception as e:
-                    logger.warning(f"Search failed for term '{term}': {e}")
-                    failed_searches += 1
-            
-            step.input_count = len(search_terms)
-            step.output_count = len(discovered_stocks)
+            logger.info("Starting suggested stocks saga - stocks will be sourced from database in Step 2")
+            print(f"🔍 STAGE 1: Initializing suggested stocks saga...")
+
+            step.input_count = 0
+            step.output_count = 0
             step.metadata = {
-                'successful_searches': successful_searches,
-                'failed_searches': failed_searches,
-                'unique_symbols': len(all_symbols),
-                'search_terms_used': search_terms
+                'note': 'Stock discovery via API removed - database is the source of truth'
             }
-            step.results = discovered_stocks
             step.additional_info = {
-                'discovery_method': 'broker_api_search',
-                'exchange': 'NSE',
-                'search_coverage': f"{successful_searches}/{len(search_terms)} terms successful"
+                'discovery_method': 'database',
+                'exchange': 'NSE'
             }
-            
-            saga.update_step_status("step1_discovery", SagaStepStatus.COMPLETED, 
+
+            saga.update_step_status("step1_discovery", SagaStepStatus.COMPLETED,
                                   metadata=step.metadata)
-            
-            print(f"   ✅ Discovered {len(discovered_stocks)} unique stocks from {successful_searches} successful searches")
-            
+
+            print(f"   ✅ Saga initialized - proceeding to database filtering")
+
             return saga
-            
+
         except Exception as e:
-            error_msg = f"Stock discovery failed: {str(e)}"
+            error_msg = f"Saga initialization failed: {str(e)}"
             saga.update_step_status("step1_discovery", SagaStepStatus.FAILED, error_msg)
             return saga
     
@@ -1679,3 +1644,7 @@ def get_suggested_stocks_saga_orchestrator() -> SuggestedStocksSagaOrchestrator:
     if _saga_orchestrator is None:
         _saga_orchestrator = SuggestedStocksSagaOrchestrator()
     return _saga_orchestrator
+
+
+# Backward-compatible alias
+get_suggested_stocks_saga = get_suggested_stocks_saga_orchestrator

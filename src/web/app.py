@@ -43,8 +43,10 @@ def create_app():
     """Create Flask application."""
     app = Flask(__name__)
     
-    # Generate a secret key for sessions
-    app.secret_key = secrets.token_hex(16)
+    # Use SECRET_KEY from environment, fall back to random (dev only)
+    app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_hex(16)
+    if not os.environ.get('SECRET_KEY'):
+        print("WARNING: SECRET_KEY not set - sessions will not persist across restarts")
 
     # Force template auto-reload so Jinja re-reads files on each request
     app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -120,10 +122,30 @@ def create_app():
         from ..services.data.stock_initialization_service import get_stock_initialization_service
         stock_init_service = get_stock_initialization_service()
 
-        # Run complete stock initialization in background thread
+        # Run complete stock initialization in background thread (only if data is stale)
         import threading
         def run_complete_stock_initialization():
             try:
+                # Check if startup pipeline is disabled via env var
+                if os.environ.get('SKIP_STARTUP_PIPELINE', '').lower() in ('true', '1', 'yes'):
+                    app.logger.info("⏭️ Startup pipeline SKIPPED (SKIP_STARTUP_PIPELINE=true)")
+                    return
+
+                # Check data freshness - only run if data is more than 2 days old
+                from sqlalchemy import text
+                from datetime import timedelta
+                with db_manager.get_session() as session:
+                    result = session.execute(text(
+                        "SELECT MAX(date) as latest_date FROM historical_data"
+                    )).fetchone()
+                    if result and result.latest_date:
+                        from datetime import date
+                        days_old = (date.today() - result.latest_date).days
+                        if days_old <= 2:
+                            app.logger.info(f"⏭️ Startup pipeline SKIPPED - data is fresh ({days_old} day(s) old)")
+                            return
+                        app.logger.info(f"📊 Data is {days_old} days old - running pipeline to refresh")
+
                 app.logger.info("🚀 Running COMPLETE system initialization...")
                 app.logger.info("📊 This includes: Symbol Master → Stocks → Historical Data → Technical Indicators → Volatility")
 

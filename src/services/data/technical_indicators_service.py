@@ -6,7 +6,6 @@ Supports 20+ indicators for enhanced stock filtering and analysis
 
 import logging
 import pandas as pd
-import numpy as np
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime, timedelta, date
 import time
@@ -290,97 +289,6 @@ class TechnicalIndicatorsService:
             # Return neutral values (0.5) on error
             return pd.Series([0.5] * len(df), index=df.index)
 
-    def _calculate_rsi(self, prices: pd.Series, period: int = 14) -> pd.Series:
-        """Calculate Relative Strength Index."""
-        delta = prices.diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-        rs = gain / loss
-        rsi = 100 - (100 / (1 + rs))
-        return rsi
-
-    def _calculate_macd(self, prices: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> Dict[str, pd.Series]:
-        """Calculate MACD."""
-        ema_fast = prices.ewm(span=fast).mean()
-        ema_slow = prices.ewm(span=slow).mean()
-        macd = ema_fast - ema_slow
-        macd_signal = macd.ewm(span=signal).mean()
-        macd_histogram = macd - macd_signal
-
-        return {
-            'macd': macd,
-            'signal': macd_signal,
-            'histogram': macd_histogram
-        }
-
-    def _calculate_atr(self, df: pd.DataFrame, period: int = 14) -> Dict[str, pd.Series]:
-        """Calculate Average True Range."""
-        high_low = df['high'] - df['low']
-        high_close = np.abs(df['high'] - df['close'].shift())
-        low_close = np.abs(df['low'] - df['close'].shift())
-
-        tr = np.maximum(high_low, np.maximum(high_close, low_close))
-        atr = tr.rolling(window=period).mean()
-
-        return {'atr': atr}
-
-    def _calculate_bollinger_bands(self, prices: pd.Series, period: int = 20, std_dev: float = 2) -> Dict[str, pd.Series]:
-        """Calculate Bollinger Bands."""
-        sma = prices.rolling(window=period).mean()
-        std = prices.rolling(window=period).std()
-
-        upper = sma + (std * std_dev)
-        lower = sma - (std * std_dev)
-
-        return {
-            'upper': upper,
-            'middle': sma,
-            'lower': lower
-        }
-
-    def _calculate_adx(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
-        """Calculate Average Directional Index."""
-        # Calculate directional movement
-        dm_plus = np.maximum(df['high'].diff(), 0)
-        dm_minus = np.maximum(-df['low'].diff(), 0)
-
-        # Calculate true range
-        tr = np.maximum(df['high'] - df['low'],
-                       np.maximum(np.abs(df['high'] - df['close'].shift()),
-                                 np.abs(df['low'] - df['close'].shift())))
-
-        # Smooth the values
-        dm_plus_smooth = dm_plus.rolling(window=period).mean()
-        dm_minus_smooth = dm_minus.rolling(window=period).mean()
-        tr_smooth = tr.rolling(window=period).mean()
-
-        # Calculate DI+ and DI-
-        di_plus = (dm_plus_smooth / tr_smooth) * 100
-        di_minus = (dm_minus_smooth / tr_smooth) * 100
-
-        # Calculate DX
-        dx = np.abs(di_plus - di_minus) / (di_plus + di_minus) * 100
-
-        # Calculate ADX
-        adx = dx.rolling(window=period).mean()
-
-        return adx
-
-    def _calculate_obv(self, prices: pd.Series, volumes: pd.Series) -> pd.Series:
-        """Calculate On Balance Volume."""
-        obv = pd.Series(index=prices.index, dtype=float)
-        obv.iloc[0] = volumes.iloc[0]
-
-        for i in range(1, len(prices)):
-            if prices.iloc[i] > prices.iloc[i-1]:
-                obv.iloc[i] = obv.iloc[i-1] + volumes.iloc[i]
-            elif prices.iloc[i] < prices.iloc[i-1]:
-                obv.iloc[i] = obv.iloc[i-1] - volumes.iloc[i]
-            else:
-                obv.iloc[i] = obv.iloc[i-1]
-
-        return obv
-
     def _store_indicators(self, symbol: str, indicators_df: pd.DataFrame) -> int:
         """Store calculated indicators in database."""
         try:
@@ -474,17 +382,12 @@ class TechnicalIndicatorsService:
                 return {
                     'symbol': latest.symbol,
                     'date': latest.date,
-                    'sma_20': latest.sma_20,
+                    'ema_8': latest.ema_8,
+                    'ema_21': latest.ema_21,
+                    'demarker': latest.demarker,
                     'sma_50': latest.sma_50,
                     'sma_200': latest.sma_200,
-                    'rsi_14': latest.rsi_14,
-                    'macd': latest.macd,
-                    'atr_percentage': latest.atr_percentage,
-                    'bb_width': latest.bb_width,
-                    'adx_14': latest.adx_14,
-                    'volume_ratio': latest.volume_ratio,
-                    'price_momentum_20d': latest.price_momentum_20d,
-                    'volatility_rank': latest.volatility_rank,
+                    'data_points_used': latest.data_points_used,
                     'calculation_date': latest.calculation_date
                 }
 

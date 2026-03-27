@@ -26,11 +26,11 @@ show_usage() {
     echo -e "  ${GREEN}status${NC}      - Show container status"
     echo -e "  ${GREEN}logs${NC}        - View all logs (real-time)"
     echo -e "  ${GREEN}logs-app${NC}    - View trading app logs"
-    echo -e "  ${GREEN}logs-ml${NC}     - View ML scheduler logs"
+    echo -e "  ${GREEN}logs-tech${NC}   - View technical scheduler logs"
     echo -e "  ${GREEN}logs-data${NC}   - View data scheduler logs"
     echo -e "  ${GREEN}restart${NC}     - Restart all services"
     echo -e "  ${GREEN}restart-app${NC} - Restart trading app only"
-    echo -e "  ${GREEN}restart-ml${NC}  - Restart ML scheduler only"
+    echo -e "  ${GREEN}restart-tech${NC} - Restart technical scheduler only"
     echo -e "  ${GREEN}restart-data${NC} - Restart data scheduler only"
     echo -e "  ${GREEN}stop${NC}        - Stop all services"
     echo -e "  ${GREEN}start${NC}       - Start all services"
@@ -66,9 +66,9 @@ case $COMMAND in
         ssh $SERVER_USER@$SERVER_IP "cd $REMOTE_DIR && docker compose logs -f trading_system"
         ;;
 
-    logs-ml)
-        echo -e "${BLUE}Showing ML scheduler logs (Ctrl+C to exit)...${NC}"
-        ssh $SERVER_USER@$SERVER_IP "cd $REMOTE_DIR && docker compose logs -f ml_scheduler"
+    logs-tech)
+        echo -e "${BLUE}Showing technical scheduler logs (Ctrl+C to exit)...${NC}"
+        ssh $SERVER_USER@$SERVER_IP "cd $REMOTE_DIR && docker compose logs -f technical_scheduler"
         ;;
 
     logs-data)
@@ -88,10 +88,10 @@ case $COMMAND in
         echo -e "${GREEN}✓ Trading app restarted${NC}"
         ;;
 
-    restart-ml)
-        echo -e "${BLUE}Restarting ML scheduler...${NC}"
-        ssh $SERVER_USER@$SERVER_IP "cd $REMOTE_DIR && docker compose restart ml_scheduler"
-        echo -e "${GREEN}✓ ML scheduler restarted${NC}"
+    restart-tech)
+        echo -e "${BLUE}Restarting technical scheduler...${NC}"
+        ssh $SERVER_USER@$SERVER_IP "cd $REMOTE_DIR && docker compose restart technical_scheduler"
+        echo -e "${GREEN}✓ Technical scheduler restarted${NC}"
         ;;
 
     restart-data)

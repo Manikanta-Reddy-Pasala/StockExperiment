@@ -1,12 +1,60 @@
+x-common-env: &common-env
+  TZ: Asia/Kolkata
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-trader}:${POSTGRES_PASSWORD:-trader_password}@database:5432/${POSTGRES_DB:-trading_system}
+  DRAGONFLY_URL: redis://:${DRAGONFLY_PASSWORD:-}@dragonfly:6379/0
+  PYTHONPATH: /app
+  FYERS_CLIENT_ID: ${FYERS_CLIENT_ID:-}
+  FYERS_ACCESS_TOKEN: ${FYERS_ACCESS_TOKEN:-}
+  FYERS_PIN: ${FYERS_PIN:-}
+  FYERS_CLIENT_ID_LOGIN: ${FYERS_CLIENT_ID_LOGIN:-}
+  SECRET_KEY: ${SECRET_KEY:-}
+
+x-screening-env: &screening-env
+  # Data Provider Mode
+  DATA_PROVIDER_MODE: ${DATA_PROVIDER_MODE:-auto}
+  YFINANCE_HISTORICAL_ENABLED: ${YFINANCE_HISTORICAL_ENABLED:-false}
+  # Stock Screening - Stage 1: Market Data
+  SCREENING_MIN_PRICE_THRESHOLD: ${SCREENING_MIN_PRICE_THRESHOLD:-50.0}
+  SCREENING_MIN_DAILY_VOLUME: ${SCREENING_MIN_DAILY_VOLUME:-50000}
+  SCREENING_MAX_DAILY_CHANGE_PERCENT: ${SCREENING_MAX_DAILY_CHANGE_PERCENT:-25.0}
+  SCREENING_BATCH_SIZE: ${SCREENING_BATCH_SIZE:-50}
+  SCREENING_QUOTES_RATE_LIMIT_DELAY: ${SCREENING_QUOTES_RATE_LIMIT_DELAY:-0.3}
+  SCREENING_MAX_ATR_PERCENTAGE: ${SCREENING_MAX_ATR_PERCENTAGE:-5.0}
+  SCREENING_MIN_AVG_VOLUME_20D: ${SCREENING_MIN_AVG_VOLUME_20D:-100000}
+  SCREENING_MAX_BID_ASK_SPREAD: ${SCREENING_MAX_BID_ASK_SPREAD:-2.0}
+  SCREENING_MIN_HISTORICAL_VOLATILITY: ${SCREENING_MIN_HISTORICAL_VOLATILITY:-10.0}
+  SCREENING_MAX_HISTORICAL_VOLATILITY: ${SCREENING_MAX_HISTORICAL_VOLATILITY:-60.0}
+  SCREENING_MAX_BETA: ${SCREENING_MAX_BETA:-1.2}
+  # Stock Screening - Stage 2: Business Logic
+  SCREENING_MAX_SECTOR_ALLOCATION: ${SCREENING_MAX_SECTOR_ALLOCATION:-30.0}
+  SCREENING_MIN_MARKET_CAP_CRORES: ${SCREENING_MIN_MARKET_CAP_CRORES:-500}
+  SCREENING_MAX_FINAL_STOCKS: ${SCREENING_MAX_FINAL_STOCKS:-50}
+  SCREENING_MAX_POSITION_SIZE: ${SCREENING_MAX_POSITION_SIZE:-5.0}
+  SCREENING_MAX_PE_RATIO: ${SCREENING_MAX_PE_RATIO:-50.0}
+  SCREENING_MIN_ROE: ${SCREENING_MIN_ROE:-5.0}
+  SCREENING_MAX_DEBT_EQUITY: ${SCREENING_MAX_DEBT_EQUITY:-2.0}
+  SCREENING_MIN_DIVIDEND_YIELD: ${SCREENING_MIN_DIVIDEND_YIELD:-0.0}
+  # Volatility configuration
+  VOLATILITY_MAX_STOCKS: ${VOLATILITY_MAX_STOCKS:-500}
+  VOLATILITY_BATCH_SIZE: ${VOLATILITY_BATCH_SIZE:-20}
+  VOLATILITY_RATE_LIMIT_DELAY: ${VOLATILITY_RATE_LIMIT_DELAY:-0.3}
+  VOLATILITY_MAX_WORKERS: ${VOLATILITY_MAX_WORKERS:-3}
+  VOLATILITY_HISTORICAL_DAYS: ${VOLATILITY_HISTORICAL_DAYS:-365}
+  VOLATILITY_ATR_PERIOD: ${VOLATILITY_ATR_PERIOD:-14}
+  VOLATILITY_BETA_PERIOD: ${VOLATILITY_BETA_PERIOD:-252}
+  VOLATILITY_HISTORICAL_VOLATILITY_PERIOD: ${VOLATILITY_HISTORICAL_VOLATILITY_PERIOD:-252}
+  VOLATILITY_VOLUME_AVERAGE_PERIOD: ${VOLATILITY_VOLUME_AVERAGE_PERIOD:-20}
+  VOLATILITY_FULL_REFRESH: ${VOLATILITY_FULL_REFRESH:-false}
+
 services:
   # PostgreSQL database
   database:
-    image: postgres:15
+    image: postgres:15.10
     container_name: trading_system_db
     environment:
-      POSTGRES_DB: trading_system
-      POSTGRES_USER: trader
-      POSTGRES_PASSWORD: trader_password
+      POSTGRES_DB: ${POSTGRES_DB:-trading_system}
+      POSTGRES_USER: ${POSTGRES_USER:-trader}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trader_password}
       TZ: Asia/Kolkata
     ports:
       - "127.0.0.1:5432:5432"
@@ -17,10 +65,14 @@ services:
     networks:
       - trading_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U trader -d trading_system"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trader} -d ${POSTGRES_DB:-trading_system}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   # Trading system application
   trading_system:
@@ -32,69 +84,36 @@ services:
       dragonfly:
         condition: service_healthy
     environment:
-      - TZ=Asia/Kolkata
-      - DATABASE_URL=postgresql+psycopg://trader:trader_password@database:5432/trading_system
-      - DRAGONFLY_URL=redis://dragonfly:6379/0
-      - FLASK_ENV=production
-      - PYTHONPATH=/app
-      - FYERS_CLIENT_ID=${FYERS_CLIENT_ID:-your_client_id}
-      - FYERS_ACCESS_TOKEN=${FYERS_ACCESS_TOKEN:-your_access_token}
-      - FYERS_PIN=${FYERS_PIN:-9884}
-      - FYERS_CLIENT_ID_LOGIN=${FYERS_CLIENT_ID_LOGIN:-}
-      # Data Provider Mode: 'broker' (only broker), 'yfinance' (only yfinance), 'auto' (broker with yfinance fallback)
-      # Use 'auto' for paper trading - yfinance is used ONLY for price validation, NOT bulk data
-      - DATA_PROVIDER_MODE=${DATA_PROVIDER_MODE:-auto}
-      # Enable yfinance for historical data (disabled by default to avoid rate limits)
-      - YFINANCE_HISTORICAL_ENABLED=${YFINANCE_HISTORICAL_ENABLED:-false}
-      # WebAuthn/Passkey Configuration (update for production domain)
-      - WEBAUTHN_RP_ID=${WEBAUTHN_RP_ID:-stock.oneshell.in}
-      - WEBAUTHN_RP_NAME=${WEBAUTHN_RP_NAME:-Trading System}
-      - WEBAUTHN_RP_ORIGIN=${WEBAUTHN_RP_ORIGIN:-https://stock.oneshell.in}
-      # Stock Screening Configuration - Stage 1: Market Data Screening
-      - SCREENING_MIN_PRICE_THRESHOLD=${SCREENING_MIN_PRICE_THRESHOLD:-50.0}
-      - SCREENING_MIN_DAILY_VOLUME=${SCREENING_MIN_DAILY_VOLUME:-50000}
-      - SCREENING_MAX_DAILY_CHANGE_PERCENT=${SCREENING_MAX_DAILY_CHANGE_PERCENT:-25.0}
-      - SCREENING_BATCH_SIZE=${SCREENING_BATCH_SIZE:-50}
-      - SCREENING_QUOTES_RATE_LIMIT_DELAY=${SCREENING_QUOTES_RATE_LIMIT_DELAY:-0.3}
-      - SCREENING_MAX_ATR_PERCENTAGE=${SCREENING_MAX_ATR_PERCENTAGE:-5.0}
-      - SCREENING_MIN_AVG_VOLUME_20D=${SCREENING_MIN_AVG_VOLUME_20D:-100000}
-      - SCREENING_MAX_BID_ASK_SPREAD=${SCREENING_MAX_BID_ASK_SPREAD:-2.0}
-      - SCREENING_MIN_HISTORICAL_VOLATILITY=${SCREENING_MIN_HISTORICAL_VOLATILITY:-10.0}
-      - SCREENING_MAX_HISTORICAL_VOLATILITY=${SCREENING_MAX_HISTORICAL_VOLATILITY:-60.0}
-      - SCREENING_MAX_BETA=${SCREENING_MAX_BETA:-1.2}
-      # Stock Screening Configuration - Stage 2: Business Logic Screening
-      - SCREENING_MAX_SECTOR_ALLOCATION=${SCREENING_MAX_SECTOR_ALLOCATION:-30.0}
-      - SCREENING_MIN_MARKET_CAP_CRORES=${SCREENING_MIN_MARKET_CAP_CRORES:-500}
-      - SCREENING_MAX_FINAL_STOCKS=${SCREENING_MAX_FINAL_STOCKS:-50}
-      - SCREENING_MAX_POSITION_SIZE=${SCREENING_MAX_POSITION_SIZE:-5.0}
-      - SCREENING_MAX_PE_RATIO=${SCREENING_MAX_PE_RATIO:-50.0}
-      - SCREENING_MIN_ROE=${SCREENING_MIN_ROE:-5.0}
-      - SCREENING_MAX_DEBT_EQUITY=${SCREENING_MAX_DEBT_EQUITY:-2.0}
-      - SCREENING_MIN_DIVIDEND_YIELD=${SCREENING_MIN_DIVIDEND_YIELD:-0.0}
-      # Volatility calculation configuration
-      - VOLATILITY_MAX_STOCKS=${VOLATILITY_MAX_STOCKS:-500}
-      - VOLATILITY_BATCH_SIZE=${VOLATILITY_BATCH_SIZE:-20}
-      - VOLATILITY_RATE_LIMIT_DELAY=${VOLATILITY_RATE_LIMIT_DELAY:-0.3}
-      - VOLATILITY_MAX_WORKERS=${VOLATILITY_MAX_WORKERS:-3}
-      - VOLATILITY_HISTORICAL_DAYS=${VOLATILITY_HISTORICAL_DAYS:-365}
-      - VOLATILITY_ATR_PERIOD=${VOLATILITY_ATR_PERIOD:-14}
-      - VOLATILITY_BETA_PERIOD=${VOLATILITY_BETA_PERIOD:-252}
-      - VOLATILITY_HISTORICAL_VOLATILITY_PERIOD=${VOLATILITY_HISTORICAL_VOLATILITY_PERIOD:-252}
-      - VOLATILITY_VOLUME_AVERAGE_PERIOD=${VOLATILITY_VOLUME_AVERAGE_PERIOD:-20}
-      - VOLATILITY_FULL_REFRESH=${VOLATILITY_FULL_REFRESH:-false}
+      <<: [*common-env, *screening-env]
+      FLASK_ENV: production
+      # WebAuthn/Passkey Configuration
+      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-stock.oneshell.in}
+      WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME:-Trading System}
+      WEBAUTHN_RP_ORIGIN: ${WEBAUTHN_RP_ORIGIN:-https://stock.oneshell.in}
     ports:
       - "127.0.0.1:5001:5001"
     volumes:
-      - ./logs:/app/src/data/logs
+      - ./logs:/app/logs
     restart: unless-stopped
     networks:
       - trading_network
     command: python run.py --multi-user
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
   # Dragonfly for caching and session management
   dragonfly:
     image: docker.dragonflydb.io/dragonflydb/dragonfly
     container_name: trading_system_dragonfly
+    command: dragonfly --requirepass ${DRAGONFLY_PASSWORD:-}
     environment:
       - TZ=Asia/Kolkata
     ports:
@@ -103,12 +122,16 @@ services:
     networks:
       - trading_network
     healthcheck:
-      test: ["CMD", "redis-cli", "-h", "localhost", "-p", "6379", "ping"]
+      test: ["CMD", "redis-cli", "-h", "localhost", "-p", "6379", "-a", "${DRAGONFLY_PASSWORD:-}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
-  # Technical Indicators Scheduler for technical analysis and daily stock picks
+  # Technical Indicators Scheduler
   technical_scheduler:
     build: .
     container_name: trading_system_technical_scheduler
@@ -118,46 +141,7 @@ services:
       dragonfly:
         condition: service_healthy
     environment:
-      - TZ=Asia/Kolkata
-      - DATABASE_URL=postgresql+psycopg://trader:trader_password@database:5432/trading_system
-      - DRAGONFLY_URL=redis://dragonfly:6379/0
-      - PYTHONPATH=/app
-      - FYERS_CLIENT_ID=${FYERS_CLIENT_ID:-your_client_id}
-      - FYERS_ACCESS_TOKEN=${FYERS_ACCESS_TOKEN:-your_access_token}
-      - FYERS_PIN=${FYERS_PIN:-9884}
-      - FYERS_CLIENT_ID_LOGIN=${FYERS_CLIENT_ID_LOGIN:-}
-      # Stock Screening Configuration - Stage 1: Market Data Screening
-      - SCREENING_MIN_PRICE_THRESHOLD=${SCREENING_MIN_PRICE_THRESHOLD:-50.0}
-      - SCREENING_MIN_DAILY_VOLUME=${SCREENING_MIN_DAILY_VOLUME:-50000}
-      - SCREENING_MAX_DAILY_CHANGE_PERCENT=${SCREENING_MAX_DAILY_CHANGE_PERCENT:-25.0}
-      - SCREENING_BATCH_SIZE=${SCREENING_BATCH_SIZE:-50}
-      - SCREENING_QUOTES_RATE_LIMIT_DELAY=${SCREENING_QUOTES_RATE_LIMIT_DELAY:-0.3}
-      - SCREENING_MAX_ATR_PERCENTAGE=${SCREENING_MAX_ATR_PERCENTAGE:-5.0}
-      - SCREENING_MIN_AVG_VOLUME_20D=${SCREENING_MIN_AVG_VOLUME_20D:-100000}
-      - SCREENING_MAX_BID_ASK_SPREAD=${SCREENING_MAX_BID_ASK_SPREAD:-2.0}
-      - SCREENING_MIN_HISTORICAL_VOLATILITY=${SCREENING_MIN_HISTORICAL_VOLATILITY:-10.0}
-      - SCREENING_MAX_HISTORICAL_VOLATILITY=${SCREENING_MAX_HISTORICAL_VOLATILITY:-60.0}
-      - SCREENING_MAX_BETA=${SCREENING_MAX_BETA:-1.2}
-      # Stock Screening Configuration - Stage 2: Business Logic Screening
-      - SCREENING_MAX_SECTOR_ALLOCATION=${SCREENING_MAX_SECTOR_ALLOCATION:-30.0}
-      - SCREENING_MIN_MARKET_CAP_CRORES=${SCREENING_MIN_MARKET_CAP_CRORES:-500}
-      - SCREENING_MAX_FINAL_STOCKS=${SCREENING_MAX_FINAL_STOCKS:-50}
-      - SCREENING_MAX_POSITION_SIZE=${SCREENING_MAX_POSITION_SIZE:-5.0}
-      - SCREENING_MAX_PE_RATIO=${SCREENING_MAX_PE_RATIO:-50.0}
-      - SCREENING_MIN_ROE=${SCREENING_MIN_ROE:-5.0}
-      - SCREENING_MAX_DEBT_EQUITY=${SCREENING_MAX_DEBT_EQUITY:-2.0}
-      - SCREENING_MIN_DIVIDEND_YIELD=${SCREENING_MIN_DIVIDEND_YIELD:-0.0}
-      # Volatility calculation configuration
-      - VOLATILITY_MAX_STOCKS=${VOLATILITY_MAX_STOCKS:-500}
-      - VOLATILITY_BATCH_SIZE=${VOLATILITY_BATCH_SIZE:-20}
-      - VOLATILITY_RATE_LIMIT_DELAY=${VOLATILITY_RATE_LIMIT_DELAY:-0.3}
-      - VOLATILITY_MAX_WORKERS=${VOLATILITY_MAX_WORKERS:-3}
-      - VOLATILITY_HISTORICAL_DAYS=${VOLATILITY_HISTORICAL_DAYS:-365}
-      - VOLATILITY_ATR_PERIOD=${VOLATILITY_ATR_PERIOD:-14}
-      - VOLATILITY_BETA_PERIOD=${VOLATILITY_BETA_PERIOD:-252}
-      - VOLATILITY_HISTORICAL_VOLATILITY_PERIOD=${VOLATILITY_HISTORICAL_VOLATILITY_PERIOD:-252}
-      - VOLATILITY_VOLUME_AVERAGE_PERIOD=${VOLATILITY_VOLUME_AVERAGE_PERIOD:-20}
-      - VOLATILITY_FULL_REFRESH=${VOLATILITY_FULL_REFRESH:-false}
+      <<: [*common-env, *screening-env]
     volumes:
       - ./logs:/app/logs
     restart: unless-stopped
@@ -170,8 +154,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
-  # Data Pipeline Scheduler for data updates and calculations
+  # Data Pipeline Scheduler
   data_scheduler:
     build: .
     container_name: trading_system_data_scheduler
@@ -181,46 +169,7 @@ services:
       dragonfly:
         condition: service_healthy
     environment:
-      - TZ=Asia/Kolkata
-      - DATABASE_URL=postgresql+psycopg://trader:trader_password@database:5432/trading_system
-      - DRAGONFLY_URL=redis://dragonfly:6379/0
-      - PYTHONPATH=/app
-      - FYERS_CLIENT_ID=${FYERS_CLIENT_ID:-your_client_id}
-      - FYERS_ACCESS_TOKEN=${FYERS_ACCESS_TOKEN:-your_access_token}
-      - FYERS_PIN=${FYERS_PIN:-9884}
-      - FYERS_CLIENT_ID_LOGIN=${FYERS_CLIENT_ID_LOGIN:-}
-      # Stock Screening Configuration - Stage 1: Market Data Screening
-      - SCREENING_MIN_PRICE_THRESHOLD=${SCREENING_MIN_PRICE_THRESHOLD:-50.0}
-      - SCREENING_MIN_DAILY_VOLUME=${SCREENING_MIN_DAILY_VOLUME:-50000}
-      - SCREENING_MAX_DAILY_CHANGE_PERCENT=${SCREENING_MAX_DAILY_CHANGE_PERCENT:-25.0}
-      - SCREENING_BATCH_SIZE=${SCREENING_BATCH_SIZE:-50}
-      - SCREENING_QUOTES_RATE_LIMIT_DELAY=${SCREENING_QUOTES_RATE_LIMIT_DELAY:-0.3}
-      - SCREENING_MAX_ATR_PERCENTAGE=${SCREENING_MAX_ATR_PERCENTAGE:-5.0}
-      - SCREENING_MIN_AVG_VOLUME_20D=${SCREENING_MIN_AVG_VOLUME_20D:-100000}
-      - SCREENING_MAX_BID_ASK_SPREAD=${SCREENING_MAX_BID_ASK_SPREAD:-2.0}
-      - SCREENING_MIN_HISTORICAL_VOLATILITY=${SCREENING_MIN_HISTORICAL_VOLATILITY:-10.0}
-      - SCREENING_MAX_HISTORICAL_VOLATILITY=${SCREENING_MAX_HISTORICAL_VOLATILITY:-60.0}
-      - SCREENING_MAX_BETA=${SCREENING_MAX_BETA:-1.2}
-      # Stock Screening Configuration - Stage 2: Business Logic Screening
-      - SCREENING_MAX_SECTOR_ALLOCATION=${SCREENING_MAX_SECTOR_ALLOCATION:-30.0}
-      - SCREENING_MIN_MARKET_CAP_CRORES=${SCREENING_MIN_MARKET_CAP_CRORES:-500}
-      - SCREENING_MAX_FINAL_STOCKS=${SCREENING_MAX_FINAL_STOCKS:-50}
-      - SCREENING_MAX_POSITION_SIZE=${SCREENING_MAX_POSITION_SIZE:-5.0}
-      - SCREENING_MAX_PE_RATIO=${SCREENING_MAX_PE_RATIO:-50.0}
-      - SCREENING_MIN_ROE=${SCREENING_MIN_ROE:-5.0}
-      - SCREENING_MAX_DEBT_EQUITY=${SCREENING_MAX_DEBT_EQUITY:-2.0}
-      - SCREENING_MIN_DIVIDEND_YIELD=${SCREENING_MIN_DIVIDEND_YIELD:-0.0}
-      # Volatility calculation configuration
-      - VOLATILITY_MAX_STOCKS=${VOLATILITY_MAX_STOCKS:-500}
-      - VOLATILITY_BATCH_SIZE=${VOLATILITY_BATCH_SIZE:-20}
-      - VOLATILITY_RATE_LIMIT_DELAY=${VOLATILITY_RATE_LIMIT_DELAY:-0.3}
-      - VOLATILITY_MAX_WORKERS=${VOLATILITY_MAX_WORKERS:-3}
-      - VOLATILITY_HISTORICAL_DAYS=${VOLATILITY_HISTORICAL_DAYS:-365}
-      - VOLATILITY_ATR_PERIOD=${VOLATILITY_ATR_PERIOD:-14}
-      - VOLATILITY_BETA_PERIOD=${VOLATILITY_BETA_PERIOD:-252}
-      - VOLATILITY_HISTORICAL_VOLATILITY_PERIOD=${VOLATILITY_HISTORICAL_VOLATILITY_PERIOD:-252}
-      - VOLATILITY_VOLUME_AVERAGE_PERIOD=${VOLATILITY_VOLUME_AVERAGE_PERIOD:-20}
-      - VOLATILITY_FULL_REFRESH=${VOLATILITY_FULL_REFRESH:-false}
+      <<: [*common-env, *screening-env]
     volumes:
       - ./logs:/app/logs
       - ./exports:/app/exports
@@ -234,6 +183,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
 
 volumes:
   postgres_data:

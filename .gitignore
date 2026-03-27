@@ -7,6 +7,12 @@ logs/
 *.db
 :memory:*
 
+# Environment files (contain secrets)
+.env
+.env.production
+.env.local
+.env.*.local
+
 # Cookie files and debug files
 *.txt
 cookies.txt

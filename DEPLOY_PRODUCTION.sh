@@ -137,8 +137,20 @@ echo -e "${BLUE}[7/8] Loading image and starting services...${NC}"
 ssh $SERVER_USER@$SERVER_IP << EOF
     cd $REMOTE_DIR
 
-    # Update docker-compose.yml to use image instead of build
-    sed -i 's/build: \./image: $IMAGE_NAME:$IMAGE_TAG/' docker-compose.yml
+    # Create override file for image-based deployment (preserves original docker-compose.yml)
+    cat > docker-compose.override.yml << 'OVERRIDE'
+services:
+  trading_system:
+    image: $IMAGE_NAME:$IMAGE_TAG
+    build: !reset null
+  technical_scheduler:
+    image: $IMAGE_NAME:$IMAGE_TAG
+    build: !reset null
+  data_scheduler:
+    image: $IMAGE_NAME:$IMAGE_TAG
+    build: !reset null
+OVERRIDE
+    sed -i "s|\\\$IMAGE_NAME|$IMAGE_NAME|g; s|\\\$IMAGE_TAG|$IMAGE_TAG|g" docker-compose.override.yml
 
     echo "Loading Docker image..."
     docker load -i trading_system_image.tar

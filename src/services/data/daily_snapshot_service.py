@@ -315,7 +315,7 @@ class DailySnapshotService:
         """
         query = text("""
             DELETE FROM daily_suggested_stocks
-            WHERE date < CURRENT_DATE - INTERVAL ':keep_days days'
+            WHERE date < CURRENT_DATE - :keep_days * INTERVAL '1 day'
         """)
         
         result = self.db.execute(query, {'keep_days': keep_days})

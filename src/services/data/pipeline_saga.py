@@ -296,13 +296,29 @@ class PipelineSaga:
                 
                 if count >= 2000:  # Expected ~2253 stocks
                     logger.info(f"📊 Stocks already exist: {count} records")
-                    # Skip fundamental data update for speed - can be done later via web interface
-                    logger.info("⚡ Skipping fundamental data update for faster saga completion")
 
+                    # Check if fundamental data is mostly missing
+                    missing_fundamentals = session.execute(text(
+                        "SELECT COUNT(*) as cnt FROM stocks WHERE pe_ratio IS NULL AND sector IS NULL AND eps IS NULL"
+                    )).fetchone().cnt
+                    missing_pct = (missing_fundamentals / count * 100) if count > 0 else 0
+
+                    if missing_pct > 50:
+                        logger.info(f"⚠️ {missing_pct:.0f}% of stocks missing fundamentals ({missing_fundamentals}/{count}) - running initialization for missing stocks")
+                        from ..data.stock_initialization_service import get_stock_initialization_service
+                        init_service = get_stock_initialization_service()
+                        result = init_service.fast_sync_stocks(user_id=1)
+                        return {
+                            'success': True,
+                            'records_processed': result.get('stocks_created', 0) if result.get('success') else count,
+                            'message': f'Ran fundamental data update for {missing_fundamentals} stocks missing data'
+                        }
+
+                    logger.info("⚡ Skipping fundamental data update - data is sufficiently complete")
                     return {
                         'success': True,
                         'records_processed': count,
-                        'message': f'Stocks already has {count} records, fundamental data skipped for speed'
+                        'message': f'Stocks already has {count} records with sufficient fundamental data'
                     }
                 else:
                     # Trigger stock sync (volatility warning is expected here)
