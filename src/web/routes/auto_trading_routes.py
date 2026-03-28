@@ -619,10 +619,29 @@ def get_paper_portfolio():
             # Fetch live prices from stocks table for active positions
             from src.models.stock_models import Stock
             active_symbols = list(set(p.symbol for p in active_positions if p.symbol))
-            live_prices = {}
+            stocks_prices = {}
             if active_symbols:
                 stocks = session.query(Stock).filter(Stock.symbol.in_(active_symbols)).all()
-                live_prices = {s.symbol: float(s.current_price) for s in stocks if s.current_price and s.current_price > 0}
+                stocks_prices = {s.symbol: float(s.current_price) for s in stocks if s.current_price and s.current_price > 0}
+
+            # Build live_prices: prefer order_performance.current_price (maintained by tracking service)
+            # Only use stocks table price if it differs from entry (i.e., stocks data is fresh)
+            live_prices = {}
+            for p in active_positions:
+                if not p.symbol:
+                    continue
+                op_price = float(p.current_price) if p.current_price and float(p.current_price) > 0 else None
+                st_price = stocks_prices.get(p.symbol)
+                entry_p = float(p.entry_price) if p.entry_price else 0
+                # Use stocks price only if it differs from entry price (not stale)
+                if st_price and abs(st_price - entry_p) > 0.001:
+                    live_prices[p.symbol] = st_price
+                elif op_price and abs(op_price - entry_p) > 0.001:
+                    live_prices[p.symbol] = op_price
+                elif op_price:
+                    live_prices[p.symbol] = op_price
+                elif st_price:
+                    live_prices[p.symbol] = st_price
 
             # Calculate values using live prices
             total_invested = sum((p.entry_price or 0) * (p.quantity or 0) for p in performances)
@@ -740,9 +759,11 @@ def get_paper_daily_pnl():
                     'total_days': 0
                 }), 200
 
-            # Query daily snapshots grouped by date
+            # Query daily snapshots grouped by calendar date (not full timestamp)
+            # Use DATE() to collapse multiple intraday snapshots into one row per day
+            from sqlalchemy import cast, Date as SADate
             daily_data = session.query(
-                OrderPerformanceSnapshot.snapshot_date,
+                cast(OrderPerformanceSnapshot.snapshot_date, SADate).label('snap_day'),
                 func.sum(OrderPerformanceSnapshot.unrealized_pnl).label('total_pnl'),
                 func.sum(OrderPerformanceSnapshot.value).label('total_value'),
                 func.count(OrderPerformanceSnapshot.id).label('positions_count')
@@ -751,8 +772,10 @@ def get_paper_daily_pnl():
                     OrderPerformanceSnapshot.order_performance_id.in_(perf_ids),
                     OrderPerformanceSnapshot.snapshot_date >= start_date
                 )
-            ).group_by(OrderPerformanceSnapshot.snapshot_date).order_by(
-                OrderPerformanceSnapshot.snapshot_date
+            ).group_by(
+                cast(OrderPerformanceSnapshot.snapshot_date, SADate)
+            ).order_by(
+                cast(OrderPerformanceSnapshot.snapshot_date, SADate)
             ).all()
 
             # Format response
@@ -760,9 +783,11 @@ def get_paper_daily_pnl():
             for row in daily_data:
                 pnl = float(row.total_pnl or 0)
                 pnl_pct = (pnl / INITIAL_CAPITAL * 100) if INITIAL_CAPITAL > 0 else 0
+                snap_day = row.snap_day
+                date_str = snap_day.isoformat() if hasattr(snap_day, 'isoformat') else str(snap_day)
 
                 daily_pnl.append({
-                    'date': row.snapshot_date.isoformat() if row.snapshot_date else None,
+                    'date': date_str,
                     'pnl': round(pnl, 2),
                     'pnl_pct': round(pnl_pct, 2),
                     'portfolio_value': round(float(row.total_value or 0), 2),
@@ -839,10 +864,29 @@ def get_paper_positions():
             # Fetch live prices from stocks table for active positions
             from src.models.stock_models import Stock
             active_symbols = list(set(p.symbol for p in performances if p.symbol and p.is_active))
-            live_prices = {}
+            stocks_prices = {}
             if active_symbols:
                 stocks = session.query(Stock).filter(Stock.symbol.in_(active_symbols)).all()
-                live_prices = {s.symbol: float(s.current_price) for s in stocks if s.current_price and s.current_price > 0}
+                stocks_prices = {s.symbol: float(s.current_price) for s in stocks if s.current_price and s.current_price > 0}
+
+            # Build live_prices: prefer order_performance.current_price (maintained by tracking service)
+            # Only use stocks table price if it differs from entry (i.e., stocks data is fresh)
+            live_prices = {}
+            for p in performances:
+                if not p.symbol or not p.is_active:
+                    continue
+                op_price = float(p.current_price) if p.current_price and float(p.current_price) > 0 else None
+                st_price = stocks_prices.get(p.symbol)
+                entry_p = float(p.entry_price) if p.entry_price else 0
+                # Use stocks price only if it differs from entry price (not stale)
+                if st_price and abs(st_price - entry_p) > 0.001:
+                    live_prices[p.symbol] = st_price
+                elif op_price and abs(op_price - entry_p) > 0.001:
+                    live_prices[p.symbol] = op_price
+                elif op_price:
+                    live_prices[p.symbol] = op_price
+                elif st_price:
+                    live_prices[p.symbol] = st_price
 
             # Format positions
             positions = []
