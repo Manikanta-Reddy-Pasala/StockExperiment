@@ -138,11 +138,11 @@ class OrderPerformanceTrackingService:
                 data = result['data']
                 if isinstance(data, dict):
                     ltp = data.get('ltp') or data.get('v', {}).get('lp')
-                    if ltp and ltp > 0:
+                    if ltp and float(ltp) > 0:
                         broker_price = float(ltp)
                 elif isinstance(data, list) and len(data) > 0:
                     ltp = data[0].get('v', {}).get('lp')
-                    if ltp and ltp > 0:
+                    if ltp and float(ltp) > 0:
                         broker_price = float(ltp)
         except Exception as e:
             logger.debug(f"Broker quote failed for {symbol}: {e}")
@@ -170,11 +170,11 @@ class OrderPerformanceTrackingService:
                     data = result['data']
                     if isinstance(data, dict):
                         ltp = data.get('ltp') or data.get('v', {}).get('lp')
-                        if ltp and ltp > 0:
+                        if ltp and float(ltp) > 0:
                             broker_price = float(ltp)
                     elif isinstance(data, list) and len(data) > 0:
                         ltp = data[0].get('v', {}).get('lp')
-                        if ltp and ltp > 0:
+                        if ltp and float(ltp) > 0:
                             broker_price = float(ltp)
             except Exception as e:
                 logger.debug(f"Broker quote failed for {symbol}: {e}")
