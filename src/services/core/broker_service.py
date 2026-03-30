@@ -93,15 +93,20 @@ class BrokerService:
 
         if 'access_token' in token_response:
             access_token = token_response['access_token']
+            refresh_token = token_response.get('refresh_token', '')
 
-            # Save the new tokens
-            self.save_broker_config('fyers', {
+            # Save the new tokens including refresh_token for API-based refresh
+            save_data = {
                 'access_token': access_token,
                 'is_connected': True,
                 'connection_status': 'connected'
-            }, user_id)
+            }
+            if refresh_token:
+                save_data['refresh_token'] = refresh_token
 
-            return {'success': True, 'access_token': access_token}
+            self.save_broker_config('fyers', save_data, user_id)
+
+            return {'success': True, 'access_token': access_token, 'refresh_token': refresh_token}
         else:
             raise ValueError(token_response.get('message', 'Failed to obtain access token'))
 
@@ -231,15 +236,25 @@ class BrokerService:
                 )
                 session.add(config)
             
-            # Update fields (storing directly without encryption for simplicity)
-            config.client_id = config_data.get('client_id', '')
-            config.access_token = config_data.get('access_token', '')
-            config.refresh_token = config_data.get('refresh_token', '')
-            config.api_key = config_data.get('api_key', '')
-            config.api_secret = config_data.get('api_secret', '')
-            config.redirect_url = config_data.get('redirect_url', '')
-            config.app_type = config_data.get('app_type', '100')
-            config.is_active = config_data.get('is_active', True)
+            # Map frontend field names to DB column names
+            field_aliases = {
+                'secret_key': 'api_secret',
+                'redirect_uri': 'redirect_url',
+            }
+            # Apply aliases so frontend field names work
+            for alias, db_field in field_aliases.items():
+                if alias in config_data and db_field not in config_data:
+                    config_data[db_field] = config_data[alias]
+
+            # Only update fields that are explicitly provided (don't overwrite with empty defaults)
+            updatable_fields = [
+                'client_id', 'access_token', 'refresh_token', 'api_key',
+                'api_secret', 'redirect_url', 'app_type', 'is_active',
+                'is_connected', 'connection_status', 'error_message'
+            ]
+            for field in updatable_fields:
+                if field in config_data and config_data[field] is not None:
+                    setattr(config, field, config_data[field])
             config.updated_at = datetime.utcnow()
             
             session.commit()
@@ -309,20 +324,15 @@ class FyersOAuth2Flow:
         """Generate the authorization URL for user login with automated callback."""
         if not FYERS_AVAILABLE:
             raise Exception("fyers-apiv3 library not available")
-        
+
         try:
-            # Get the configuration from the database
-            config = self.get_broker_config('fyers', user_id)
-            if not config or not config.get('redirect_url') or not config.get('client_id') or not config.get('api_secret'):
-                raise ValueError('FYERS configuration not found in database.')
-            
-            # Create session model for OAuth flow using database configuration
+            # Use credentials passed via constructor (already fetched by BrokerService)
             app_session = fyersModel.SessionModel(
-                client_id=config.get('client_id'),
-                redirect_uri=config.get('redirect_url'),
+                client_id=self.client_id,
+                redirect_uri=self.redirect_uri,
                 response_type=self.response_type,
-                state=str(user_id),  # Pass user_id in state for callback
-                secret_key=config.get('api_secret'),
+                state=str(user_id),
+                secret_key=self.secret_key,
                 grant_type=self.grant_type
             )
             
