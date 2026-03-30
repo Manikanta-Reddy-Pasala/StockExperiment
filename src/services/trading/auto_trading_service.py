@@ -460,10 +460,28 @@ class AutoTradingService:
             amount_per_stock = available_amount / len(stocks) if stocks else 0
             remaining_capital = available_amount
 
+            # Get symbols with active positions to avoid duplicate buys
+            active_symbols = set()
+            try:
+                active_positions = session.query(OrderPerformance.symbol).filter(
+                    OrderPerformance.user_id == user_id,
+                    OrderPerformance.is_active == True
+                ).all()
+                active_symbols = {row.symbol for row in active_positions}
+                if active_symbols:
+                    logger.info(f"Skipping {len(active_symbols)} symbols with active positions: {active_symbols}")
+            except Exception as e:
+                logger.warning(f"Could not check active positions: {e}")
+
             for stock in stocks:
                 try:
                     symbol = stock['symbol']
                     current_price = stock['current_price']
+
+                    # Skip if already holding an active position in this stock
+                    if symbol in active_symbols:
+                        logger.info(f"Skipping {symbol}: already have active position")
+                        continue
 
                     # Pre-market gap check: skip if price gapped >3% from signal price
                     # If live price unavailable, proceed with signal price (paper trading safe)

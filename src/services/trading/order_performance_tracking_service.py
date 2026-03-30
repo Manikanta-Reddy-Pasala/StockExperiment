@@ -342,12 +342,13 @@ class OrderPerformanceTrackingService:
 
     def _execute_full_exit(self, order_perf: OrderPerformance, exit_price: float,
                            exit_reason: str, pnl: float, skip_pnl_calc: bool = False) -> None:
-        """Close order and record exit details."""
+        """Close order and record exit details. Creates SELL order for paper trades."""
         try:
             order_perf.is_active = False
             order_perf.exit_price = exit_price
             order_perf.exit_date = datetime.now()
             order_perf.exit_reason = exit_reason
+            sell_quantity = order_perf.remaining_quantity or order_perf.quantity
             order_perf.remaining_quantity = 0
 
             if skip_pnl_calc:
@@ -357,6 +358,36 @@ class OrderPerformanceTrackingService:
 
             total_entry = order_perf.entry_price * (order_perf.original_quantity or order_perf.quantity)
             order_perf.realized_pnl_pct = (order_perf.realized_pnl / total_entry) * 100 if total_entry > 0 else 0
+
+            # Create SELL order in orders table for paper trading visibility
+            try:
+                from src.models.models import Order
+                from sqlalchemy.orm import object_session
+                session = object_session(order_perf)
+                if session:
+                    sell_order_id = f"SELL_{order_perf.order_id}_{int(datetime.now().timestamp())}"
+                    sell_order = Order(
+                        user_id=order_perf.user_id,
+                        order_id=sell_order_id,
+                        tradingsymbol=order_perf.symbol,
+                        exchange='NSE',
+                        order_type='MARKET',
+                        transaction_type='SELL',
+                        quantity=sell_quantity,
+                        price=exit_price,
+                        average_price=exit_price,
+                        filled_quantity=sell_quantity,
+                        pending_quantity=0,
+                        order_status='COMPLETE',
+                        placed_at=datetime.now(),
+                        is_mock_order=True,
+                        strategy=exit_reason
+                    )
+                    session.add(sell_order)
+                    logger.info(f"SELL order created: {sell_order_id} for {order_perf.symbol} "
+                               f"qty={sell_quantity} @ {exit_price:.2f} ({exit_reason})")
+            except Exception as sell_err:
+                logger.warning(f"Could not create SELL order for {order_perf.symbol}: {sell_err}")
 
             logger.info(f"Order closed: {order_perf.order_id} ({exit_reason}) "
                        f"P&L: {order_perf.realized_pnl:.2f} ({order_perf.realized_pnl_pct:.2f}%)")
