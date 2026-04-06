@@ -186,14 +186,11 @@ class TokenManagerService:
                 
                 refresh_token = config.refresh_token
         
-        if not refresh_token:
-            logger.error(f"No refresh token available for user {user_id}, broker {broker_name}")
-            return None
-        
         try:
-            # Call the registered refresh callback
+            # Call the registered refresh callback (pass empty string if no refresh_token,
+            # let the callback handle missing-token logic and mark reauth_required)
             callback = self._refresh_callbacks[broker_name]
-            new_token_data = callback(user_id, refresh_token)
+            new_token_data = callback(user_id, refresh_token or '')
             
             if new_token_data and new_token_data.get('access_token'):
                 logger.info(f"Successfully refreshed token for user {user_id}, broker {broker_name}")
