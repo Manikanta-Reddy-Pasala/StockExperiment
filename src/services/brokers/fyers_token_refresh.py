@@ -216,11 +216,11 @@ class FyersTokenRefreshService:
                 return None
             bearer_token = r3.json()["data"]["access_token"]
 
-            # Step 4: Get authorization code
+            # Step 4: Get authorization code (v3 endpoint)
             app_id = client_id.split("-")[0] if "-" in client_id else client_id
             logger.info(f"Tier 2 Step 4: Getting auth code...")
             r4 = s.post(
-                "https://api.fyers.in/api/v2/token",
+                "https://api-t1.fyers.in/api/v3/token",
                 headers={
                     "authorization": f"Bearer {bearer_token}",
                     "content-type": "application/json; charset=UTF-8",
