@@ -4,6 +4,22 @@
 
 ---
 
+## Overview
+
+StockExperiment is an automated swing trading system for NSE that analyzes 2,259+ stocks daily using the 8-21 EMA technical strategy to generate buy/sell signals and daily stock picks, running fully automated via Docker containers.
+
+---
+
+## Stack
+
+- **Python 3**
+- **Flask** (web framework) / **FastAPI** (alternative)
+- **pytest** (testing framework)
+- `requirements.txt` or `pyproject.toml` for dependency management
+- **Docker** (containerization)
+
+---
+
 ## What Is This?
 
 A production-ready, fully automated stock trading system that:
@@ -142,6 +158,25 @@ The system uses a **backtest-optimized 8-21 EMA swing trading strategy** with th
 - ✅ **Saga Pattern** - Fault-tolerant data pipeline
 - ✅ **Production Ready** - Docker, logging, monitoring
 - ✅ **Web Dashboard** - Interactive charts and trading interface
+
+---
+
+## Run
+
+Install dependencies and run the main entrypoint:
+```bash
+pip install -r requirements.txt && python run.py
+```
+
+Run using Docker Compose:
+```bash
+docker compose up --build
+```
+
+Or use the quick-start wrapper script:
+```bash
+./run.sh dev
+```
 
 ---
 
