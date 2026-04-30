@@ -67,14 +67,6 @@ class Stock(Base):
     trades_per_day = Column(Integer)  # Average trades per day
     liquidity_score = Column(Float)  # Liquidity score (0-1 scale)
 
-    # 8-21 EMA Strategy Indicators (Simplified Model)
-    ema_8 = Column(Float)  # 8-day EMA (fast moving average)
-    ema_21 = Column(Float)  # 21-day EMA (slow moving average)
-    demarker = Column(Float)  # DeMarker oscillator (0-1, <0.30 = oversold)
-    buy_signal = Column(Boolean, default=False)  # Buy signal active
-    sell_signal = Column(Boolean, default=False)  # Sell signal active
-    indicators_last_updated = Column(DateTime)  # Last indicator calculation time
-
     # Status and metadata
     is_active = Column(Boolean, default=True, index=True)
     is_tradeable = Column(Boolean, default=True)
@@ -144,8 +136,8 @@ class DailySuggestedStock(Base):
     id = Column(Integer, primary_key=True)
     date = Column(Date, nullable=False, index=True)
     symbol = Column(String(50), nullable=False, index=True)
-    strategy = Column(String(50), nullable=False, default='ema_8_21')
-    model_type = Column(String(20), nullable=False, default='traditional')
+    strategy = Column(String(50), nullable=False, default='ema_200_400')
+    model_type = Column(String(20), nullable=False, default='crossover')
     stock_name = Column(String(200))
     current_price = Column(Float)
     market_cap = Column(Float)
@@ -155,16 +147,6 @@ class DailySuggestedStock(Base):
     stop_loss = Column(Float)
     recommendation = Column(String(20))
     reason = Column(Text)
-    ema_8 = Column(Float)
-    ema_21 = Column(Float)
-    ema_trend_score = Column(Float)
-    ema_score = Column(Float)
-    demarker = Column(Float)
-    fib_target_1 = Column(Float)
-    fib_target_2 = Column(Float)
-    fib_target_3 = Column(Float)
-    buy_signal = Column(Boolean, default=False)
-    sell_signal = Column(Boolean, default=False)
     signal_quality = Column(String(20))
     sector = Column(String(100))
     market_cap_category = Column(String(20))

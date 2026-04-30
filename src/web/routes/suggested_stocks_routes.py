@@ -63,7 +63,7 @@ def get_suggested_stocks():
             # Build query with filters - use subquery with DISTINCT ON to avoid duplicates
             # Then wrap in outer query to apply proper sorting
             # Also show both buy AND sell signals (not just buy_signal = TRUE)
-            valid_sort_fields = ['selection_score', 'current_price', 'ema_trend_score', 'demarker', 'market_cap']
+            valid_sort_fields = ['selection_score', 'current_price', 'market_cap', 'rank']
             if sort_by not in valid_sort_fields:
                 sort_by = 'selection_score'
             order_dir = 'ASC' if sort_order.lower() == 'asc' else 'DESC'
@@ -93,15 +93,6 @@ def get_suggested_stocks():
                         COALESCE(s.current_price, d.current_price) as current_price,
                         d.strategy,
                         d.selection_score,
-                        COALESCE(s.ema_8, d.ema_8) as ema_8,
-                        COALESCE(s.ema_21, d.ema_21) as ema_21,
-                        d.ema_trend_score,
-                        COALESCE(s.demarker, d.demarker) as demarker,
-                        d.fib_target_1,
-                        d.fib_target_2,
-                        d.fib_target_3,
-                        COALESCE(s.buy_signal, d.buy_signal) as buy_signal,
-                        COALESCE(s.sell_signal, d.sell_signal) as sell_signal,
                         d.signal_quality,
                         d.recommendation,
                         d.target_price,
@@ -133,15 +124,8 @@ def get_suggested_stocks():
             stock['signal_direction'] = 'SHORT' if rec == 'SHORT' else 'LONG'
             stock['short_signal'] = rec == 'SHORT'
 
-        # Detect current market regime
-        market_regime = 'neutral'
-        try:
-            from src.services.data.suggested_stocks_saga import SuggestedStocksSagaOrchestrator
-            orchestrator = SuggestedStocksSagaOrchestrator()
-            regime_info = orchestrator.detect_market_regime()
-            market_regime = regime_info.get('regime', 'neutral')
-        except Exception as e:
-            logger.warning(f"Could not detect market regime: {e}")
+        # Market regime detection retired with the legacy 8-21 strategy.
+        market_regime = 'crossover_1h'
 
         # Check data staleness
         staleness_warning = None
@@ -409,15 +393,6 @@ def get_triple_model_view():
                         COALESCE(s.current_price, d.current_price) as current_price,
                         d.strategy,
                         d.selection_score,
-                        COALESCE(s.ema_8, d.ema_8) as ema_8,
-                        COALESCE(s.ema_21, d.ema_21) as ema_21,
-                        d.ema_trend_score,
-                        COALESCE(s.demarker, d.demarker) as demarker,
-                        d.fib_target_1,
-                        d.fib_target_2,
-                        d.fib_target_3,
-                        COALESCE(s.buy_signal, d.buy_signal) as buy_signal,
-                        COALESCE(s.sell_signal, d.sell_signal) as sell_signal,
                         d.signal_quality,
                         d.recommendation,
                         d.target_price,
@@ -435,7 +410,7 @@ def get_triple_model_view():
                     WHERE d.date = :date
                     ORDER BY d.symbol, d.selection_score DESC
                 ) AS unique_stocks
-                ORDER BY selection_score DESC, ema_trend_score DESC
+                ORDER BY selection_score DESC NULLS LAST
             """)
 
             result = session.execute(query, {'date': query_date})
@@ -449,46 +424,21 @@ def get_triple_model_view():
             }
         }
 
-        # Filter stocks by strategy
+        # Bucket stocks by market-cap to give the UI two risk tiers.
         for stock in all_stocks:
-            strategy = stock.get('strategy', '')
-            market_cap = stock.get('market_cap_category', '')
-
-            # Map strategy names (handle case variations)
-            if 'default' in strategy.lower() or strategy.upper() == 'DEFAULT_RISK':
-                risk_level = 'default_risk'
-            elif 'high' in strategy.lower() or strategy.upper() == 'HIGH_RISK':
-                risk_level = 'high_risk'
-            elif strategy.lower() == 'unified':
-                # For unified strategy, categorize by market cap:
-                # large_cap -> default_risk (conservative)
-                # mid_cap, small_cap -> high_risk (aggressive)
-                if market_cap == 'large_cap':
-                    risk_level = 'default_risk'
-                else:
-                    risk_level = 'high_risk'
-            else:
-                # Skip unknown strategies
-                continue
-
-            # Add to appropriate group
+            market_cap = (stock.get('market_cap_category') or '').lower()
+            risk_level = 'default_risk' if market_cap == 'large_cap' else 'high_risk'
             grouped_results['ema_strategy'][risk_level].append(stock)
 
-        # Apply limit to each group
         for risk_level in grouped_results['ema_strategy']:
             grouped_results['ema_strategy'][risk_level] = grouped_results['ema_strategy'][risk_level][:limit]
 
-        # Calculate statistics
-        stats = {
-            'ema_strategy': {}
-        }
-        for risk_level in grouped_results['ema_strategy']:
-            stocks_in_group = grouped_results['ema_strategy'][risk_level]
+        stats = {'ema_strategy': {}}
+        for risk_level, bucket in grouped_results['ema_strategy'].items():
             stats['ema_strategy'][risk_level] = {
-                'count': len(stocks_in_group),
-                'avg_selection_score': sum(s.get('selection_score', 0) or 0 for s in stocks_in_group) / len(stocks_in_group) if stocks_in_group else 0,
-                'avg_ema_trend_score': sum(s.get('ema_trend_score', 0) or 0 for s in stocks_in_group) / len(stocks_in_group) if stocks_in_group else 0,
-                'high_quality_signals': sum(1 for s in stocks_in_group if s.get('signal_quality') == 'high')
+                'count': len(bucket),
+                'avg_selection_score': sum(s.get('selection_score', 0) or 0 for s in bucket) / len(bucket) if bucket else 0,
+                'high_quality_signals': sum(1 for s in bucket if s.get('signal_quality') == 'high'),
             }
 
         response = {
@@ -498,10 +448,10 @@ def get_triple_model_view():
             'data': grouped_results,
             'statistics': stats,
             'total_stocks': sum(len(grouped_results['ema_strategy'][rl]) for rl in grouped_results['ema_strategy']),
-            'strategy_type': '8-21 EMA Swing Trading'
+            'strategy_type': 'EMA 200/400 Crossover (1H)',
         }
 
-        logger.info(f"✅ 8-21 EMA Strategy view: {response['total_stocks']} total stocks across both risk levels")
+        logger.info(f"EMA 200/400 view: {response['total_stocks']} total stocks across both risk levels")
 
         return jsonify(response), 200
 

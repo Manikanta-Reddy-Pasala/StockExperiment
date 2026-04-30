@@ -3,7 +3,7 @@ Historical Data Models for Enhanced Technical Analysis
 Stores OHLCV data for comprehensive technical indicator calculations
 """
 
-from sqlalchemy import Column, Integer, String, Float, DateTime, BigInteger, Date, Boolean, Index
+from sqlalchemy import Column, Integer, String, Float, DateTime, BigInteger, Date, Boolean, Index, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -68,36 +68,151 @@ class HistoricalData(Base):
 
 
 class TechnicalIndicators(Base):
-    """
-    Calculated technical indicators - cached for performance
-    Pre-calculated indicators avoid real-time computation overhead
-    """
+    """Slim cache of context indicators (SMA 50/200). Legacy 8/21 + DeMarker
+    columns are kept for backwards compatibility with previously calculated
+    rows but are no longer populated."""
     __tablename__ = 'technical_indicators'
 
     id = Column(Integer, primary_key=True)
     symbol = Column(String(50), nullable=False, index=True)
     date = Column(Date, nullable=False, index=True)
 
-    # 8-21 EMA Strategy Indicators (Core)
-    ema_8 = Column(Float)      # Fast EMA (8-day) - REQUIRED for power zone
-    ema_21 = Column(Float)     # Slow EMA (21-day) - REQUIRED for power zone
-    demarker = Column(Float)   # DeMarker oscillator (0-1) - REQUIRED for entry timing
+    # Legacy columns left in place for historical rows
+    ema_8 = Column(Float)
+    ema_21 = Column(Float)
+    demarker = Column(Float)
 
-    # Context Indicators (Optional but useful)
-    sma_50 = Column(Float)     # Medium-term trend confirmation
-    sma_200 = Column(Float)    # Major trend identification (bull/bear market)
+    sma_50 = Column(Float)
+    sma_200 = Column(Float)
 
-    # Calculation metadata
     calculation_date = Column(DateTime, default=datetime.utcnow)
-    data_points_used = Column(Integer)  # Number of historical points used
+    data_points_used = Column(Integer)
 
-    # Composite indexes
     __table_args__ = (
         Index('ix_technical_symbol_date', 'symbol', 'date'),
     )
 
     def __repr__(self):
         return f'<TechnicalIndicators {self.symbol} {self.date}>'
+
+
+class HistoricalData1H(Base):
+    """
+    1-Hour OHLCV data for EMA 200/400 crossover strategy.
+    """
+    __tablename__ = 'historical_data_1h'
+
+    id = Column(Integer, primary_key=True)
+    symbol = Column(String(50), nullable=False, index=True)
+    timestamp = Column(BigInteger, nullable=False)  # Candle open time (Unix UTC seconds)
+    candle_time = Column(DateTime, nullable=False, index=True)  # IST datetime for readability
+
+    open = Column(Float, nullable=False)
+    high = Column(Float, nullable=False)
+    low = Column(Float, nullable=False)
+    close = Column(Float, nullable=False)
+    volume = Column(BigInteger, nullable=False, default=0)
+
+    # Cached EMA values for the crossover strategy
+    ema_200 = Column(Float)
+    ema_400 = Column(Float)
+
+    data_source = Column(String(20), default='fyers')
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('symbol', 'timestamp', name='uq_hist1h_symbol_ts'),
+        Index('ix_hist1h_symbol_time', 'symbol', 'candle_time'),
+    )
+
+    def __repr__(self):
+        return f'<HistoricalData1H {self.symbol} {self.candle_time}: {self.close}>'
+
+
+class EMACrossoverState(Base):
+    """
+    Per-user / per-symbol state for the EMA 200/400 1H crossover strategy.
+
+    Trend: 'BUY' (EMA200 above EMA400), 'SELL' (EMA200 below EMA400), 'NONE'.
+    Stage: 0=waiting crossover, 1=crossover seen (waiting break of crossover candle),
+           2=alert1 fired, retest of EMA200 pending, 3=retest1 captured (entry1 armed),
+           4=entry1 taken, waiting EMA400 touch, 5=retest2 captured (entry2 armed).
+    """
+    __tablename__ = 'ema_crossover_state'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    symbol = Column(String(50), nullable=False, index=True)
+
+    trend = Column(String(8), nullable=False, default='NONE')  # BUY / SELL / NONE
+    stage = Column(Integer, nullable=False, default=0)
+
+    # Crossover candle (where EMA200 crossed EMA400)
+    crossover_ts = Column(BigInteger)
+    crossover_high = Column(Float)
+    crossover_low = Column(Float)
+
+    # Retest 1 candle (EMA200 retest)
+    retest1_ts = Column(BigInteger)
+    retest1_high = Column(Float)
+    retest1_low = Column(Float)
+
+    # Retest 2 candle (EMA400 retest)
+    retest2_ts = Column(BigInteger)
+    retest2_high = Column(Float)
+    retest2_low = Column(Float)
+
+    # Entries taken
+    entries_count = Column(Integer, default=0)
+    entry1_price = Column(Float)
+    entry1_time = Column(DateTime)
+    entry2_price = Column(Float)
+    entry2_time = Column(DateTime)
+
+    # Risk management
+    stop_loss = Column(Float)       # Long: EMA400 close, Short: EMA400 close
+    target_price = Column(Float)    # 5000 pts for index, RR-based for stocks
+    position_active = Column(Boolean, default=False)
+
+    last_evaluated_ts = Column(BigInteger)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'symbol', name='uq_ema_state_user_symbol'),
+        Index('ix_ema_state_symbol_trend', 'symbol', 'trend'),
+    )
+
+    def __repr__(self):
+        return f'<EMACrossoverState user={self.user_id} {self.symbol} {self.trend}/stage={self.stage}>'
+
+
+class EMACrossoverSignal(Base):
+    """Audit log of every signal/alert/entry emitted by the strategy."""
+    __tablename__ = 'ema_crossover_signals'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    symbol = Column(String(50), nullable=False, index=True)
+
+    signal_type = Column(String(32), nullable=False)  # CROSSOVER, ALERT1, ALERT2, ALERT3, ENTRY1, ENTRY2, EXIT
+    trend = Column(String(8), nullable=False)
+    candle_ts = Column(BigInteger, nullable=False)
+    candle_time = Column(DateTime, nullable=False)
+    price = Column(Float)
+    ema_200 = Column(Float)
+    ema_400 = Column(Float)
+    note = Column(String(255))
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('ix_ema_sig_symbol_time', 'symbol', 'candle_time'),
+    )
+
+    def __repr__(self):
+        return f'<EMACrossoverSignal {self.symbol} {self.signal_type} @ {self.candle_time}>'
 
 
 class MarketBenchmarks(Base):

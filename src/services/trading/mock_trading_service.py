@@ -130,7 +130,7 @@ class MockTradingService:
                 order_status='COMPLETE',
                 created_at=now,
                 is_mock_order=True,
-                strategy=suggested.strategy if suggested else 'ema_8_21'
+                strategy=suggested.strategy if suggested else 'ema_200_400'
             )
 
             self.session.add(order)
@@ -155,10 +155,10 @@ class MockTradingService:
                 unrealized_pnl_pct=0.0,
                 stop_loss=stop_loss,
                 target_price=target_price,
-                target_price_1=suggested.fib_target_1 if suggested else None,
-                target_price_2=suggested.fib_target_2 if suggested else None,
-                target_price_3=suggested.fib_target_3 if suggested else None,
-                strategy=suggested.strategy if suggested else 'ema_8_21',
+                target_price_1=None,
+                target_price_2=None,
+                target_price_3=None,
+                strategy=suggested.strategy if suggested else 'ema_200_400',
                 trading_type='swing',
                 is_active=True,
                 days_held=0,

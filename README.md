@@ -1,470 +1,193 @@
 # NSE Stock Trading System
 
-**Automated swing trading system for NSE (National Stock Exchange) using the 8-21 EMA strategy.**
+**Automated NSE trading on the EMA 200/400 1H crossover strategy.**
 
 ---
 
-## What Is This?
+## Strategy in 60 seconds
 
-A production-ready, fully automated stock trading system that:
+Timeframe: **1 hour (NSE)**. Universe: **Nifty 500** (`src/data/symbols/nifty500.csv`,
+refresh with `tools/refresh_nifty500.py`).
 
-- **Analyzes 2,259+ NSE stocks** daily
-- **Uses pure 8-21 EMA technical strategy** (no AI/ML)
-- **Generates daily stock picks** with buy/sell signals
-- **Runs completely automated** via Docker containers
-- **Supports multiple brokers** (Fyers API, Zerodha planned)
+```
+Trend
+  BUY trend  : EMA200 crosses above EMA400 on 1H close.
+  SELL trend : EMA200 crosses below EMA400 on 1H close.
 
-### Trading Style
+Buy setup (long side)
+  Alert 1  Price breaks the high of the crossover candle and closes above it.
+  Alert 2  Price retests EMA200 (closes below it). The retest candle is locked.
+  Entry 1  Price breaks the retest candle high and sustains -> BUY.
+  Alert 3  Price touches / crosses below EMA400. New retest candle locked.
+  Entry 2  Price breaks the new retest candle high and sustains -> BUY (pyramid).
 
-- **Swing Trading**: 10-15 day holding periods
-- **Target Gains**: 7-12% per trade
-- **Stop Loss**: 5-7% below entry
-- **NOT for day trading** - this is a swing trading system
+Sell setup is the mirror image.
+
+Risk management
+  Stop loss : 1H close on the wrong side of EMA400 -> exit all entries.
+  Target    : +/- 5000 points (index symbols) or 1:3 RR (equities).
+  Multiple entries allowed under the same trend.
+```
+
+The visual reference is the standard "EMA 200 & EMA 400 Crossover Strategy"
+chart on NSE 1H bars; signals are emitted on **closed 1H candles only**.
+
+---
+
+## Architecture
+
+```
+Docker Services:
+  trading_system        Flask web app (Port 5001)
+  scheduler             Strategy + cron jobs
+  database              PostgreSQL 15
+  dragonfly             Redis-compatible cache
+```
+
+**Login / token flow** is unchanged from the legacy system: Fyers OAuth,
+auto-refresh every 5 hours, manual re-auth via `/brokers/fyers`.
+
+### Data pipeline (1H)
+
+```
+Fyers history (resolution=60)
+   -> historical_data_1h         (per-symbol OHLCV, EMA200/400 cache)
+   -> ema_crossover_strategy     (state machine evaluates each candle)
+   -> ema_crossover_state        (per-user/per-symbol stage + entries)
+   -> ema_crossover_signals      (audit log of every alert/entry/exit)
+   -> daily_suggested_stocks     (today's actionable BUY/SELL picks)
+   -> auto_trading_service       (places orders for picks)
+```
+
+The strategy runs a minute after every NSE 1H candle close
+(10:16, 11:16, 12:16, 13:16, 14:16, 15:31 IST) plus a 22:00 catch-up.
 
 ---
 
 ## Quick Start
 
-Get the system running in 5 minutes:
-
 ```bash
-# 1. Clone repository
-git clone https://github.com/your-username/StockExperiment.git
-cd StockExperiment
-
-# 2. Create .env file with your Fyers credentials
+# 1. Configure
 cp .env.example .env
-nano .env  # Add your FYERS_CLIENT_ID and FYERS_SECRET_KEY
+nano .env                           # FYERS_CLIENT_ID, FYERS_SECRET_KEY
 
-# 3. Start all services
+# 2. Boot
 ./run.sh dev
 
-# 4. Access web interface
-http://localhost:5001
-```
+# 3. Apply migrations (first run only)
+docker exec trading_system_db psql -U trader -d trading_system \
+  -f /migrations/2026_04_30_ema_200_400_strategy.sql
+docker exec trading_system_db psql -U trader -d trading_system \
+  -f /migrations/2026_04_30_clear_trade_deals.sql
 
-**Default Login:**
-- Email: `admin@example.com`
-- Password: `admin123`
-- ⚠️ Change password immediately in production!
+# 4. Authorize Fyers in the web UI
+open http://localhost:5001/brokers/fyers
 
----
+# 5. Backfill 1H history for Nifty 500 (one-shot)
+docker exec trading_system venv/bin/python tools/refresh_nifty500.py
+docker exec trading_system venv/bin/python -c "
+from src.services.technical.ema_crossover_runner import get_ema_crossover_runner
+runner = get_ema_crossover_runner()
+print(runner.backfill_universe(user_id=1, days=120, max_symbols=500))
+"
 
-## Documentation
-
-### Comprehensive Guides
-
-- **[FEATURES.md](FEATURES.md)** - Complete system features and how everything works
-  - 8-21 EMA strategy explained in detail
-  - Technical architecture
-  - Data pipeline
-  - API endpoints
-  - Database schema
-  - Frontend features
-
-- **[HOW_TO_RUN.md](HOW_TO_RUN.md)** - Setup and deployment guide
-  - Installation steps
-  - Configuration options
-  - Docker deployment
-  - Broker setup (Fyers)
-  - Troubleshooting
-  - Maintenance
-
-- **[CLAUDE.md](CLAUDE.md)** - Developer guide (for Claude Code AI assistant)
-  - Code patterns
-  - Development commands
-  - Critical implementation details
-
----
-
-## System Overview
-
-### Architecture
-
-```
-Docker Services (5 containers):
-├── trading_system       - Flask web app (Port 5001)
-├── technical_scheduler  - Indicators & stock picks (daily 10 PM)
-├── data_scheduler       - Data collection pipeline (daily 9 PM)
-├── database             - PostgreSQL 15
-└── dragonfly            - Redis-compatible cache
-```
-
-### Daily Automation Schedule
-
-```
-09:00 PM → Data pipeline (fetch prices, history)
-10:00 PM → Calculate technical indicators (EMA, DeMarker)
-10:15 PM → Generate daily stock picks (top 5 stocks)
-03:00 AM → Cleanup old data (Sunday only)
-06:00 AM → Update symbol master (Monday only)
-```
-
-### 8-21 EMA Strategy (D_momentum Model)
-
-The system uses a **backtest-optimized 8-21 EMA swing trading strategy** with the **D_momentum scoring model**, validated across 13 months of production data (Jan 2025 - Jan 2026).
-
-**Scoring Model — D_momentum (weights: 20/50/30):**
-- **EMA Separation (20pts):** Wider gap between 8 EMA and 21 EMA = stronger trend
-- **DeMarker Momentum (50pts):** Sweet spot 0.55-0.70 = strong buying pressure (not oversold — momentum-based)
-- **Price Distance from 8 EMA (30pts):** 0-1% above EMA = ideal entry (not over-extended)
-
-**BUY Signal (Power Zone):**
-- Price > 8 EMA > 21 EMA (Power Zone active)
-- DeMarker 0.55-0.70 (momentum sweet spot)
-- Signal quality: medium or high only
-- Top 5 picks by composite score
-
-**SELL Signal:**
-- 8 EMA crosses below 21 EMA
-- Price breaks below 21 EMA
-- Stop loss hit
-
-**Backtest Results (13 months, 34,560 parameter combinations):**
-- Win Rate: 58.5%
-- Profit Factor: 3.84
-- Cumulative Return: +339%
-
-**Target & Stop Loss:**
-- Fibonacci extensions for targets (127.2%, 161.8%, 200%)
-- Stop loss below 21 EMA or recent swing low
-
----
-
-## Key Features
-
-- ✅ **D_momentum Scoring Model** - Backtest-optimized (PF 3.84, 58.5% WR)
-- ✅ **Single Unified Strategy** - 8-21 EMA crossover with DeMarker momentum
-- ✅ **Fully Automated** - Zero manual intervention
-- ✅ **2,259+ NSE Stocks** - Complete market coverage
-- ✅ **Daily Stock Picks** - Top 5 high-conviction recommendations daily
-- ✅ **Multi-Broker Support** - Fyers API (Zerodha planned)
-- ✅ **Saga Pattern** - Fault-tolerant data pipeline
-- ✅ **Production Ready** - Docker, logging, monitoring
-- ✅ **Web Dashboard** - Interactive charts and trading interface
-
----
-
-## Technology Stack
-
-**Backend:**
-- Python 3.11
-- Flask 3.0 (web framework)
-- SQLAlchemy 2.0 (ORM)
-- PostgreSQL 15 (database)
-- pandas + pandas-ta (technical analysis)
-
-**Frontend:**
-- Bootstrap 5 (UI framework)
-- Chart.js (charts)
-- Vanilla JavaScript
-
-**DevOps:**
-- Docker & Docker Compose
-- 5 containerized services
-- Volume persistence
-- Health checks
-
----
-
-## Essential Commands
-
-```bash
-# Start system
-./run.sh dev                                    # Development mode
-./run.sh prod                                   # Production mode
-
-# Stop system
-docker compose down
-
-# View logs
-docker compose logs -f                          # All services
-docker compose logs -f trading_system           # Web app
-docker compose logs -f technical_scheduler      # Indicators
-docker compose logs -f data_scheduler           # Data pipeline
-
-# Check status
-docker compose ps                               # Container status
-./tools/check_all_schedulers.sh                # Scheduler status
-
-# Database access
-docker exec -it trading_system_db psql -U trader -d trading_system
-
-# Manual operations
-python run_pipeline.py                          # Run data pipeline
-docker exec trading_system python tools/generate_daily_snapshot.py  # Generate picks
+# 6. Trigger a strategy run
+docker exec trading_system venv/bin/python -c "
+from src.services.technical.ema_crossover_runner import get_ema_crossover_runner
+print(get_ema_crossover_runner().run_for_user(user_id=1))
+"
 ```
 
 ---
 
-## Database Schema
+## Schedule
 
-**11 tables** with ~1.6M records, ~500MB total:
+| Time (IST)            | Job                                |
+|-----------------------|------------------------------------|
+| 09:20                 | Auto-trading execution             |
+| 10:16, 11:16, 12:16, 13:16, 14:16, 15:31 | EMA 200/400 strategy run (1H close +1m) |
+| 10:00 / 11:00 / ... / 15:15 | Position monitoring          |
+| 15:20                 | Day-trading position close         |
+| 18:00                 | Performance reconciliation         |
+| 22:00                 | Strategy catch-up + housekeeping   |
+| Sun 03:00             | Cleanup snapshots (>90 days)       |
+| Every 5h              | Fyers token API refresh            |
+| Every 6h              | Token status check                 |
 
-**Core Data:**
-- `stocks` - Current stock info (2,259 stocks)
-- `historical_data` - 1-year OHLCV data (820K records)
-- `technical_indicators` - Daily indicators (820K records)
-- `daily_suggested_stocks` - Daily picks (5/day, growing)
-- `symbol_master` - NSE symbol list (2,259 symbols)
+---
+
+## Database (current)
+
+**Strategy tables (new):**
+- `historical_data_1h` — 1H OHLCV + cached EMA200/400
+- `ema_crossover_state` — per-user/per-symbol state machine
+- `ema_crossover_signals` — every alert/entry/exit emitted
+
+**Strategy tables (existing, repurposed):**
+- `daily_suggested_stocks` — today's actionable picks (`strategy='ema_200_400'`)
+- `historical_data` — daily OHLCV (kept for screening / sma_50 / sma_200)
+- `technical_indicators` — daily SMA50/200 cache (legacy 8/21/DeMarker columns
+  retained but no longer populated)
 
 **Trading:**
-- `users` - User accounts
-- `broker_configurations` - Broker API credentials
-- `orders` - Order history
-- `positions` - Open positions
-- `trades` - Completed trades
-
-**System:**
-- `pipeline_tracking` - Saga execution status
+- `users`, `broker_configurations`, `webauthn_credentials` (auth — never wiped)
+- `orders`, `trades`, `positions`, `holdings`
+- `auto_trading_settings`, `auto_trading_executions`, `order_performances`
+- `dry_run_portfolios`, `dry_run_positions`
 
 ---
 
-## API Endpoints
+## Migrations
+
+| File | Purpose |
+|------|---------|
+| `migrations/2026_04_30_ema_200_400_strategy.sql` | Create new tables, drop legacy 8-21 columns from `stocks`, reset `daily_suggested_stocks` |
+| `migrations/2026_04_30_clear_trade_deals.sql`   | TRUNCATE all order / trade / position / dry-run / suggested-stocks rows. Auth tables untouched. |
+
+Run them in order. Both are idempotent.
+
+---
+
+## Key APIs
 
 ```bash
-# Get suggested stocks
 curl "http://localhost:5001/api/suggested-stocks?limit=10"
-
-# Get stock chart data
-curl "http://localhost:5001/api/charts/stock/NSE:RELIANCE-EQ"
-
-# Dashboard metrics
+curl "http://localhost:5001/api/charts/stock/NSE:HDFCBANK-EQ"
 curl "http://localhost:5001/api/dashboard/metrics"
-
-# Broker status
 curl "http://localhost:5001/api/broker/status"
 ```
 
----
-
-## Web Interface
-
-Access at: **http://localhost:5001**
-
-**Pages:**
-- `/` - Dashboard (metrics, charts, positions)
-- `/api/suggested-stocks` - Daily stock picks
-- `/settings` - Trading and broker settings
-- `/brokers/fyers` - Fyers broker integration
-
----
-
-## Prerequisites
-
-- **Docker & Docker Compose** (20.10+)
-- **4GB RAM** minimum, 8GB recommended
-- **5GB disk space** minimum
-- **Fyers Trading Account** with API access
-- **Stable internet** for market data
-
----
-
-## Broker Setup
-
-### Fyers API
-
-1. **Create Fyers Account**: https://fyers.in/
-2. **Enable API Access**: https://myapi.fyers.in/
-3. **Create App** and get credentials:
-   - App ID (Client ID)
-   - Secret Key
-4. **Add to `.env` file**:
-   ```env
-   FYERS_CLIENT_ID=your_app_id
-   FYERS_SECRET_KEY=your_secret_key
-   ```
-5. **Authorize in web interface**: http://localhost:5001/brokers/fyers
+Web pages:
+- `/` — Dashboard
+- `/api/suggested-stocks` — EMA 200/400 picks
+- `/settings` — Trading + broker settings
+- `/brokers/fyers` — Fyers OAuth (login/token flow unchanged)
 
 ---
 
 ## Troubleshooting
 
-### Common Issues
+**No 1H data yet** — run the backfill snippet from Quick Start (step 5).
 
-**1. Containers won't start**
-```bash
-docker compose down -v
-docker compose up -d --build
+**Token expired** — go to `/brokers/fyers`, click *Refresh Token*. The auto-refresh
+service re-runs every 5 hours.
+
+**No picks today** — check the runner ran:
+```sql
+SELECT * FROM ema_crossover_signals
+ORDER BY created_at DESC LIMIT 20;
 ```
 
-**2. Database connection errors**
-```bash
-docker compose restart database
-sleep 10
-docker compose restart trading_system
-```
-
-**3. Fyers token expired**
-- Visit: http://localhost:5001/brokers/fyers
-- Click "Refresh Token"
-- Re-authorize
-
-**4. Pipeline failures**
-```bash
-# Check logs
-docker compose logs data_scheduler | grep ERROR
-
-# Adjust rate limits in .env
-SCREENING_QUOTES_RATE_LIMIT_DELAY=0.5
-VOLATILITY_MAX_WORKERS=3
-
-# Restart
-docker compose restart data_scheduler
-```
-
-**5. No stock picks generated**
-```bash
-# Check data exists
-docker exec -it trading_system_db psql -U trader -d trading_system -c "
-SELECT COUNT(*) FROM historical_data WHERE date >= CURRENT_DATE - 365;
-"
-
-# Run manual calculation
-docker exec trading_system python tools/generate_daily_snapshot.py
-```
-
-For more troubleshooting, see **[HOW_TO_RUN.md](HOW_TO_RUN.md)**.
-
----
-
-## Performance
-
-- **Data Pipeline**: 20-30 minutes (daily)
-- **Indicators Calculation**: 5-7 minutes (daily)
-- **Stock Selection**: 2-3 minutes (daily)
-- **API Response Time**: <100ms (cached)
-- **Database Size**: ~500MB, ~1.6M records
-- **Memory Usage**: ~2GB total (all containers)
-
----
-
-## System Requirements
-
-**Minimum:**
-- 2 CPU cores
-- 4GB RAM
-- 10GB disk space
-- Ubuntu 20.04+ or macOS 10.15+
-
-**Recommended:**
-- 4 CPU cores
-- 8GB RAM
-- 20GB disk space
-- Ubuntu 22.04 LTS or macOS 12+
-
----
-
-## Project Structure
-
-```
-StockExperiment/
-├── init-scripts/
-│   └── 01-init-db.sql          # Database schema
-├── src/
-│   ├── models/                  # SQLAlchemy models
-│   ├── services/                # Business logic
-│   │   ├── core/               # Core services
-│   │   ├── brokers/            # Broker integrations
-│   │   ├── data/               # Data pipeline
-│   │   ├── technical/          # Technical analysis
-│   │   └── trading/            # Trading services
-│   └── web/
-│       ├── routes/             # API endpoints
-│       ├── templates/          # HTML templates
-│       └── static/             # CSS, JS, images
-├── tools/                       # Utility scripts
-├── logs/                        # Application logs
-├── exports/                     # CSV exports
-├── config.py                    # Configuration
-├── run.py                       # Flask launcher
-├── scheduler.py                 # Technical indicators scheduler
-├── data_scheduler.py            # Data pipeline scheduler
-├── run_pipeline.py              # Manual pipeline runner
-├── docker-compose.yml           # Docker services
-├── Dockerfile                   # Container image
-├── requirements.txt             # Python dependencies
-├── .env                         # Environment variables
-├── README.md                    # This file
-├── FEATURES.md                  # Comprehensive features guide
-├── HOW_TO_RUN.md               # Setup & deployment guide
-└── CLAUDE.md                    # Developer guide
-```
-
----
-
-## Support
-
-**Documentation:**
-- **Features Guide**: [FEATURES.md](FEATURES.md)
-- **Setup Guide**: [HOW_TO_RUN.md](HOW_TO_RUN.md)
-- **Developer Guide**: [CLAUDE.md](CLAUDE.md)
-
-**Quick Help:**
-```bash
-# Check system status
-./tools/check_all_schedulers.sh
-
-# View logs
-docker compose logs -f
-
-# Database access
-docker exec -it trading_system_db psql -U trader -d trading_system
-
-# Manual pipeline
-python run_pipeline.py
-```
-
-**Web Interface:**
-- Dashboard: http://localhost:5001
-- Broker Setup: http://localhost:5001/brokers/fyers
-- Settings: http://localhost:5001/settings
-
----
-
-## Contributing
-
-This is a personal trading system. For questions or issues:
-1. Check documentation first (FEATURES.md, HOW_TO_RUN.md)
-2. Review logs: `docker compose logs -f`
-3. Check database: `docker exec -it trading_system_db psql`
+**Reset everything** — re-run `2026_04_30_clear_trade_deals.sql` (clears trades
+only, keeps users / brokers / candle history).
 
 ---
 
 ## License
 
-Private use only. Not for redistribution.
-
----
+Private use only.
 
 ## Disclaimer
 
-⚠️ **Trading Risk Disclaimer**
-
-This software is for educational and informational purposes only. Stock trading involves substantial risk of loss and is not suitable for everyone. Past performance is not indicative of future results.
-
-**Key Risks:**
-- You may lose all invested capital
-- Historical backtests do not guarantee future performance
-- Market conditions change and strategies may become ineffective
-- Technical analysis has limitations and is not always accurate
-- System errors, bugs, or outages may result in losses
-
-**Your Responsibilities:**
-- Understand the risks before trading
-- Only invest capital you can afford to lose
-- Monitor your positions regularly
-- Set appropriate stop losses
-- Diversify your portfolio
-- Consult with a licensed financial advisor
-
-**No Warranty:**
-This software is provided "as is" without warranties of any kind. The developers are not liable for any losses incurred through use of this system.
-
-**By using this system, you acknowledge and accept all risks associated with stock trading.**
-
----
-
-**Built for automated swing trading with the D_momentum scoring model**
-
-Last Updated: February 16, 2026
+Stock trading involves substantial risk of loss. This software is provided
+"as is", with no warranty. Past performance does not predict future results.

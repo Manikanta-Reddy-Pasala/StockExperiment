@@ -33,10 +33,11 @@ class DayTradingService:
             Dict with 'stocks' list and metadata
         """
         try:
-            # Step 1: Get candidate stocks from database
+            # Step 1: Get candidate stocks from database (gap-up + volume surge filters
+            # do the heavy lifting for day trading; EMA-based pre-filter retired).
             candidates_query = text("""
-                SELECT symbol, stock_name, current_price, ema_8, ema_21,
-                       avg_daily_volume_20d, buy_signal
+                SELECT symbol, stock_name, current_price,
+                       avg_daily_volume_20d
                 FROM stocks
                 WHERE is_active = TRUE
                   AND is_tradeable = TRUE
@@ -44,8 +45,6 @@ class DayTradingService:
                   AND current_price >= 100
                   AND current_price <= 5000
                   AND avg_daily_volume_20d > 0
-                  AND ema_8 IS NOT NULL
-                  AND ema_21 IS NOT NULL
                 ORDER BY avg_daily_volume_20d DESC
                 LIMIT 200
             """)
@@ -68,10 +67,7 @@ class DayTradingService:
             for candidate in candidates:
                 symbol = candidate['symbol']
                 prev_close = candidate['current_price']  # Last known close from stocks table
-                ema_8 = candidate['ema_8']
-                ema_21 = candidate['ema_21']
                 avg_volume = candidate['avg_daily_volume_20d']
-                buy_signal = candidate['buy_signal']
 
                 quote = live_quotes.get(symbol, {})
                 open_price = quote.get('open_price')
@@ -95,12 +91,8 @@ class DayTradingService:
                 else:
                     continue
 
-                # Bullish EMA trend: ema_8 > ema_21
-                bullish = ema_8 > ema_21 if ema_8 and ema_21 else False
-
-                # Score: gap_pct * volume_ratio * trend_multiplier
-                trend_multiplier = 1.0 if buy_signal else 0.5
-                score = gap_pct * volume_ratio * trend_multiplier
+                # Score = gap_pct * volume_ratio (trend filter retired with 8-21 EMA strategy)
+                score = gap_pct * volume_ratio
 
                 # Day trading targets
                 entry_price = ltp
@@ -115,11 +107,7 @@ class DayTradingService:
                     'selection_score': round(score, 4),
                     'gap_pct': round(gap_pct, 2),
                     'volume_ratio': round(volume_ratio, 2),
-                    'ema_8': ema_8,
-                    'ema_21': ema_21,
-                    'ema_trend_score': 1.0 if bullish else 0.5,
-                    'demarker': None,
-                    'signal_quality': 'high' if bullish else 'medium',
+                    'signal_quality': 'high',
                     'target_price': round(target_price, 2),
                     'stop_loss': round(stop_loss, 2),
                     'recommendation': 'BUY',

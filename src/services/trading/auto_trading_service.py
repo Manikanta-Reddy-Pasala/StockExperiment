@@ -368,10 +368,14 @@ class AutoTradingService:
 
     def _select_top_strategies(self, session: Session, settings: AutoTradingSettings,
                                max_stocks: int) -> Dict[str, Any]:
-        """Select top 8-21 EMA strategy stocks with best signals."""
-        try:
-            preferred_strategies = json.loads(settings.preferred_strategies or '["unified"]')
+        """Select top picks from the EMA 200/400 1H crossover strategy.
 
+        Reads `daily_suggested_stocks` rows produced by the EMA crossover runner
+        (strategy = 'ema_200_400'). Only fresh BUY/SELL recommendations from the
+        latest available date are eligible. A per-sector cap of 2 picks keeps
+        position concentration in check.
+        """
+        try:
             query = text("""
                 SELECT
                     d.symbol,
@@ -379,63 +383,48 @@ class AutoTradingService:
                     d.current_price,
                     d.strategy,
                     d.selection_score,
-                    d.ema_8,
-                    d.ema_21,
-                    d.ema_trend_score,
-                    d.demarker,
-                    d.signal_quality,
                     d.target_price,
                     d.stop_loss,
                     d.recommendation,
                     d.date,
-                    d.fib_target_1,
-                    d.fib_target_2,
-                    d.fib_target_3,
                     d.sector
                 FROM daily_suggested_stocks d
-                WHERE d.date = (SELECT MAX(date) FROM daily_suggested_stocks)
-                  AND d.strategy = ANY(:strategies)
-                  AND d.buy_signal = TRUE
-                  AND d.recommendation = 'BUY'
-                  AND d.target_price > d.current_price
-                  AND d.signal_quality IN ('high', 'medium')
-                ORDER BY d.selection_score DESC, d.ema_trend_score DESC
+                WHERE d.date = (SELECT MAX(date) FROM daily_suggested_stocks
+                                 WHERE strategy = 'ema_200_400')
+                  AND d.strategy = 'ema_200_400'
+                  AND d.recommendation IN ('BUY', 'SELL')
+                ORDER BY d.selection_score DESC NULLS LAST,
+                         d.created_at DESC
                 LIMIT :limit
             """)
 
-            result = session.execute(query, {
-                'strategies': preferred_strategies,
-                'limit': max_stocks
-            })
-
+            result = session.execute(query, {'limit': max_stocks})
             stocks = [dict(row._mapping) for row in result]
 
             # Sector cap: max 2 stocks per sector to avoid concentration risk
-            sector_counts = {}
-            capped = []
+            sector_counts: Dict[str, int] = {}
+            capped: List[Dict[str, Any]] = []
             for s in stocks:
                 sec = s.get('sector') or 'Unknown'
                 sector_counts[sec] = sector_counts.get(sec, 0) + 1
                 if sector_counts[sec] <= 2:
                     capped.append(s)
                 else:
-                    logger.info(f"Sector cap: skipping {s['symbol']} (sector '{sec}' already has 2 picks)")
+                    logger.info(
+                        f"Sector cap: skipping {s['symbol']} (sector '{sec}' already has 2 picks)"
+                    )
             stocks = capped
 
             if not stocks:
-                logger.warning("No stocks found matching 8-21 EMA criteria")
-
-            strategies_used = list(set([s['strategy'] for s in stocks]))
-
-            logger.info(f"Selected {len(stocks)} stocks from 8-21 EMA strategies: {strategies_used}")
+                logger.warning("No EMA 200/400 picks available for today")
 
             return {
                 'stocks': stocks,
-                'strategies_used': strategies_used
+                'strategies_used': ['ema_200_400'] if stocks else []
             }
 
         except Exception as e:
-            logger.error(f"Error selecting 8-21 EMA strategies: {e}")
+            logger.error(f"Error selecting EMA 200/400 picks: {e}")
             return {
                 'stocks': [],
                 'strategies_used': []
@@ -662,26 +651,11 @@ class AutoTradingService:
                                     trading_type: str = 'swing') -> None:
         """Create performance tracking for order with partial exit targets."""
         try:
-            # Determine partial exit targets
-            if trading_type == 'swing':
-                # Use Fib levels from daily_suggested_stocks
-                target_price_1 = stock_data.get('fib_target_1') or target_price
-                target_price_2 = stock_data.get('fib_target_2')
-                target_price_3 = stock_data.get('fib_target_3')
-
-                # If fib targets not available, calculate from target_price (Fib 127.2%)
-                if not target_price_2 and target_price and entry_price:
-                    swing_range = target_price - entry_price
-                    if swing_range > 0:
-                        # target_price is ~Fib 127.2%, scale up for 161.8% and 200%
-                        fib_unit = swing_range / 0.272  # reverse engineer the fib range
-                        target_price_2 = entry_price + (fib_unit * 0.618)
-                        target_price_3 = entry_price + (fib_unit * 1.000)
-            else:
-                # Day trading: single target, no partial exits
-                target_price_1 = None
-                target_price_2 = None
-                target_price_3 = None
+            # Partial-exit ladder retired with the legacy strategy. Single
+            # target_price drives the exit; partial targets remain null.
+            target_price_1 = None
+            target_price_2 = None
+            target_price_3 = None
 
             performance = OrderPerformance(
                 order_id=order_id,

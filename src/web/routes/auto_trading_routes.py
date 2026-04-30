@@ -1168,21 +1168,8 @@ def get_paper_alerts():
                             'message': f'{p.symbol} is {dist_t:.1f}% from target {Trading_formatINR(next_target)}'
                         })
 
-                # Check sell signal from stocks table
-                symbol_clean = (p.symbol or '').replace('NSE:', '').replace('-EQ', '')
-                stock = session.query(Stock).filter(
-                    Stock.symbol.ilike(f'%{symbol_clean}%')
-                ).first()
-                if stock and stock.sell_signal:
-                    alerts.append({
-                        'type': 'sell_signal',
-                        'severity': 'warning',
-                        'symbol': p.symbol,
-                        'position_id': p.id,
-                        'current_price': current,
-                        'threshold': None,
-                        'message': f'{p.symbol} has an active SELL signal'
-                    })
+                # Sell-signal flag was retired with the legacy strategy; the
+                # EMA 200/400 runner emits exits via ema_crossover_signals.
 
             # Sort by severity (danger first)
             severity_order = {'danger': 0, 'warning': 1, 'success': 2}

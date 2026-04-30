@@ -199,95 +199,18 @@ class TechnicalIndicatorsService:
             return None
 
     def _calculate_all_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Calculate context indicators (SMA 50/200) for the daily candle pipeline.
+
+        The 8-21 EMA / DeMarker calculations were retired with the move to the
+        EMA 200/400 1H crossover strategy; the legacy columns remain in the
+        ``technical_indicators`` table for historical rows but are no longer
+        populated.
         """
-        Calculate 8-21 EMA strategy indicators.
-
-        This simplified method calculates only the indicators needed for the
-        pure 8-21 EMA swing trading strategy:
-        - EMA 8 & 21 (core strategy)
-        - DeMarker oscillator (entry timing)
-        - SMA 50 & 200 (context)
-
-        Args:
-            df: DataFrame with columns ['date', 'open', 'high', 'low', 'close', 'volume']
-
-        Returns:
-            DataFrame with all original data plus calculated indicator columns
-        """
-
-        # Create a copy to avoid modifying original data
         indicators = df.copy()
-
-        # ===== 8-21 EMA STRATEGY - CORE INDICATORS =====
-
-        # EMA 8: Fast exponential moving average (8-day)
-        # Used to identify short-term momentum
-        indicators['ema_8'] = df['close'].ewm(span=8, adjust=False).mean()
-
-        # EMA 21: Slow exponential moving average (21-day)
-        # Represents institutional holding period, acts as dynamic support/resistance
-        indicators['ema_21'] = df['close'].ewm(span=21, adjust=False).mean()
-
-        # DeMarker Oscillator: Measures buying/selling pressure (14-period)
-        # Range: 0-1; <0.30 = oversold (buy opportunity), >0.70 = overbought (avoid)
-        indicators['demarker'] = self._calculate_demarker(df, period=14)
-
-        # ===== CONTEXT INDICATORS (OPTIONAL) =====
-
-        # SMA 50: Medium-term trend confirmation
-        # Price above SMA 50 confirms uptrend
         indicators['sma_50'] = df['close'].rolling(window=50).mean()
-
-        # SMA 200: Major trend identification (bull/bear market)
-        # Price above SMA 200 = bull market context
         indicators['sma_200'] = df['close'].rolling(window=200).mean()
-
-        # Metadata: Track how many data points were used for calculation
         indicators['data_points_used'] = len(df)
-
         return indicators
-
-    def _calculate_demarker(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
-        """
-        Calculate DeMarker oscillator (0-1 range).
-
-        DeMarker measures buying and selling pressure:
-        - < 0.30: Oversold (good buy opportunity during pullbacks)
-        - > 0.70: Overbought (potential pullback coming)
-        - 0.30-0.70: Neutral zone
-
-        Args:
-            df: DataFrame with high and low columns
-            period: Lookback period (default 14)
-
-        Returns:
-            Series with DeMarker values (0-1)
-        """
-        try:
-            # Calculate DeMax and DeMin
-            high_diff = df['high'].diff()
-            low_diff = df['low'].diff()
-
-            demax = high_diff.where(high_diff > 0, 0)
-            demin = (-low_diff).where(low_diff < 0, 0)
-
-            # Calculate SMA of DeMax and DeMin
-            demax_sma = demax.rolling(window=period).mean()
-            demin_sma = demin.rolling(window=period).mean()
-
-            # Calculate DeMarker
-            demarker = demax_sma / (demax_sma + demin_sma)
-
-            # Handle NaN and clamp to 0-1
-            demarker = demarker.fillna(0.5)  # Neutral if calculation fails
-            demarker = demarker.clip(0, 1)   # Ensure 0-1 range
-
-            return demarker
-
-        except Exception as e:
-            logger.error(f"Error calculating DeMarker: {e}")
-            # Return neutral values (0.5) on error
-            return pd.Series([0.5] * len(df), index=df.index)
 
     def _store_indicators(self, symbol: str, indicators_df: pd.DataFrame) -> int:
         """Store calculated indicators in database."""
@@ -308,32 +231,19 @@ class TechnicalIndicatorsService:
                         ).first()
 
                         if existing:
-                            # Update existing record with 8-21 EMA strategy indicators
-                            for column in ['ema_8', 'ema_21', 'demarker', 'sma_50', 'sma_200']:
+                            for column in ['sma_50', 'sma_200']:
                                 if column in row and pd.notna(row[column]):
                                     setattr(existing, column, float(row[column]))
-
                             existing.data_points_used = int(row['data_points_used'])
                             existing.calculation_date = datetime.utcnow()
                             records_stored += 1
                         else:
-                            # Create new record only if it doesn't exist
-                            # Use a savepoint to handle unique constraint violations gracefully
                             try:
                                 indicator_record = TechnicalIndicators(
                                     symbol=symbol,
                                     date=row['date'],
-
-                                    # 8-21 EMA Strategy Indicators (Core)
-                                    ema_8=float(row['ema_8']) if 'ema_8' in row and pd.notna(row['ema_8']) else None,
-                                    ema_21=float(row['ema_21']) if 'ema_21' in row and pd.notna(row['ema_21']) else None,
-                                    demarker=float(row['demarker']) if 'demarker' in row and pd.notna(row['demarker']) else None,
-
-                                    # Context Indicators (Optional)
                                     sma_50=float(row['sma_50']) if 'sma_50' in row and pd.notna(row['sma_50']) else None,
                                     sma_200=float(row['sma_200']) if 'sma_200' in row and pd.notna(row['sma_200']) else None,
-
-                                    # Metadata
                                     data_points_used=int(row['data_points_used']),
                                     calculation_date=datetime.utcnow()
                                 )
@@ -382,13 +292,10 @@ class TechnicalIndicatorsService:
                 return {
                     'symbol': latest.symbol,
                     'date': latest.date,
-                    'ema_8': latest.ema_8,
-                    'ema_21': latest.ema_21,
-                    'demarker': latest.demarker,
                     'sma_50': latest.sma_50,
                     'sma_200': latest.sma_200,
                     'data_points_used': latest.data_points_used,
-                    'calculation_date': latest.calculation_date
+                    'calculation_date': latest.calculation_date,
                 }
 
         except Exception as e:

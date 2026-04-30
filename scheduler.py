@@ -16,10 +16,10 @@ from datetime import datetime, timedelta
 sys.path.insert(0, str(Path(__file__).parent))
 
 from src.models.database import get_database_manager
-from src.services.data.daily_snapshot_service import DailySnapshotService
 from src.services.trading.auto_trading_service import get_auto_trading_service
 from src.services.trading.order_performance_tracking_service import get_performance_tracking_service
 from src.services.brokers.fyers_token_refresh import FyersTokenRefreshService
+from src.services.technical.ema_crossover_runner import get_ema_crossover_runner
 
 # Configure logging with rotation (max 50MB per file, keep 5 backups)
 import os
@@ -132,132 +132,50 @@ def check_data_freshness(max_age_days: int = 3) -> dict:
         }
 
 
-def calculate_technical_indicators():
-    """Calculate 8-21 EMA strategy indicators for all stocks."""
+def run_ema_crossover_strategy():
+    """Run the EMA 200/400 1H crossover strategy for the primary user.
+
+    Refreshes 1H candles via Fyers, advances the per-symbol state machine,
+    and writes today's BUY/SELL picks into ``daily_suggested_stocks``.
+    """
     logger.info("\n" + "=" * 80)
-    logger.info("CALCULATING 8-21 EMA STRATEGY INDICATORS")
+    logger.info("RUNNING EMA 200/400 CROSSOVER STRATEGY (1H)")
     logger.info("=" * 80)
 
     try:
-        from src.services.technical.ema_strategy_calculator import get_ema_strategy_calculator
-        from sqlalchemy import text
-
-        db_manager = get_database_manager()
-        with db_manager.get_session() as session:
-            # Get all active tradeable stocks
-            query = text("""
-                SELECT symbol
-                FROM stocks
-                WHERE is_active = TRUE
-                AND is_tradeable = TRUE
-                AND is_suspended = FALSE
-                ORDER BY symbol
-            """)
-            result = session.execute(query)
-            symbols = [row[0] for row in result]
-
-            logger.info(f"Found {len(symbols)} tradeable stocks")
-
-            # Calculate EMA strategy indicators
-            calculator = get_ema_strategy_calculator(session)
-            indicators_results = calculator.calculate_all_indicators(symbols, lookback_days=252)
-
-            # Update stocks table with calculated indicators AND current_price from latest historical data
-            update_count = 0
-            for symbol, indicators in indicators_results.items():
-                # Update indicators, current_price (from latest close), and last_updated timestamp
-                update_query = text("""
-                    UPDATE stocks
-                    SET
-                        ema_8 = :ema_8,
-                        ema_21 = :ema_21,
-                        demarker = :demarker,
-                        buy_signal = :buy_signal,
-                        sell_signal = :sell_signal,
-                        current_price = COALESCE(:current_price, current_price),
-                        indicators_last_updated = CURRENT_TIMESTAMP,
-                        last_updated = CURRENT_TIMESTAMP
-                    WHERE symbol = :symbol
-                """)
-
-                session.execute(update_query, {
-                    'symbol': symbol,
-                    'ema_8': indicators.get('ema_8'),
-                    'ema_21': indicators.get('ema_21'),
-                    'demarker': indicators.get('demarker'),
-                    'buy_signal': indicators.get('buy_signal'),
-                    'sell_signal': indicators.get('sell_signal'),
-                    'current_price': indicators.get('current_price')  # Latest close price from historical data
-                })
-                update_count += 1
-
-            session.commit()
-
-            logger.info(f"✅ 8-21 EMA strategy indicators calculated and saved for {update_count} stocks")
-            logger.info(f"  8 & 21 EMA: Trend identification and power zones")
-            logger.info(f"  DeMarker: Pullback timing (< 0.30 = oversold entry)")
-            logger.info(f"  Fibonacci: Extension targets (127.2%, 161.8%, 200%)")
-            logger.info(f"  Signals: Buy when Price > 8 EMA > 21 EMA + DeMarker oversold")
-
+        runner = get_ema_crossover_runner()
+        result = runner.run_for_user(user_id=1, max_symbols=500, backfill_days=5)
+        logger.info(
+            f"✅ Strategy run: {result.get('symbols_processed', 0)} symbols, "
+            f"{result.get('signals_emitted', 0)} signals emitted, "
+            f"{len(result.get('errors', []))} errors"
+        )
     except Exception as e:
-        logger.error(f"❌ EMA strategy indicator calculation failed: {e}", exc_info=True)
-
-
-def update_daily_snapshot():
-    """Update daily suggested stocks snapshot using technical indicators."""
-    logger.info("\n" + "=" * 80)
-    logger.info("UPDATING DAILY STOCK PICKS (Technical Indicators)")
-    logger.info("=" * 80)
-
-    try:
-        from src.services.data.suggested_stocks_saga import SuggestedStocksSagaOrchestrator
-
-        orchestrator = SuggestedStocksSagaOrchestrator()
-
-        # Run unified 8-21 EMA strategy
-        logger.info(f"\n📊 Running unified 8-21 EMA swing trading strategy...")
-
-        try:
-            result = orchestrator.execute_suggested_stocks_saga(
-                user_id=1,
-                strategies=['unified'],  # Single unified strategy
-                limit=50  # Top 50 stocks
-            )
-
-            if result['status'] == 'completed':
-                stocks_count = result['summary'].get('final_result_count', 0)
-                logger.info(f"✅ Strategy completed: {stocks_count} stocks selected")
-            else:
-                logger.error(f"❌ Strategy failed: {result.get('errors', [])}")
-
-        except Exception as e:
-            logger.error(f"❌ Strategy error: {e}", exc_info=True)
-
-        logger.info("\n" + "=" * 80)
-        logger.info(f"✅ Daily snapshot update complete!")
-        logger.info(f"  Selection method: 8-21 EMA Swing Trading (Bull/Bear regime-aware)")
-        logger.info(f"    - Bullish: Price > 8 EMA > 21 EMA → LONG (D_momentum)")
-        logger.info(f"    - Bearish: Price < 8 EMA < 21 EMA → SHORT (D_momentum inverted)")
-        logger.info(f"    - Profit Targets: Fibonacci 127.2%, 161.8%, 200%")
-        logger.info("=" * 80)
-
-    except Exception as e:
-        logger.error(f"❌ Daily snapshot update failed: {e}", exc_info=True)
+        logger.error(f"❌ EMA 200/400 strategy run failed: {e}", exc_info=True)
 
 
 def cleanup_old_snapshots():
-    """Clean up old snapshots (runs weekly on Sunday at 3 AM)."""
+    """Delete suggested-stocks rows older than 90 days (runs Sunday at 03:00)."""
     logger.info("=" * 80)
     logger.info("CLEANING UP OLD SNAPSHOTS")
     logger.info("=" * 80)
 
     try:
+        from sqlalchemy import text
+
         db_manager = get_database_manager()
         with db_manager.get_session() as session:
-            snapshot_service = DailySnapshotService(session)
-            deleted = snapshot_service.delete_old_snapshots(keep_days=90)
-            logger.info(f"✅ Cleaned up {deleted} old snapshot records (>90 days)")
-
+            res = session.execute(
+                text(
+                    """
+                    DELETE FROM daily_suggested_stocks
+                    WHERE date < CURRENT_DATE - INTERVAL '90 days'
+                    """
+                )
+            )
+            deleted = res.rowcount or 0
+            session.commit()
+            logger.info(f"✅ Cleaned up {deleted} old snapshot rows (>90 days)")
     except Exception as e:
         logger.error(f"❌ Snapshot cleanup failed: {e}", exc_info=True)
 
@@ -517,24 +435,23 @@ def refresh_all_fyers_tokens():
 def run_scheduler():
     """Main scheduler loop."""
     logger.info("=" * 80)
-    logger.info("📊 8-21 EMA SWING TRADING SYSTEM SCHEDULER")
+    logger.info("📊 EMA 200/400 CROSSOVER (1H) TRADING SCHEDULER")
     logger.info("=" * 80)
     logger.info("Scheduled Tasks:")
-    logger.info("  - Auto-Trading Execution:      Daily at 09:20 AM (5 min after market opens)")
-    logger.info("  - Hourly Position Monitoring:  10:00, 11:00, 12:00, 13:00, 14:00, 15:15")
-    logger.info("  - Day Trade Close:             Daily at 03:20 PM (before market close)")
-    logger.info("  - Performance Reconciliation:  Daily at 06:00 PM (after market close)")
-    logger.info("  - Technical Indicators:        Daily at 10:00 PM (after data pipeline)")
-    logger.info("  - Daily Stock Picks:           Daily at 10:15 PM (after indicators)")
+    logger.info("  - Auto-Trading Execution:      Daily at 09:20 AM")
+    logger.info("  - Strategy Run (1H close):     10:30, 11:30, 12:30, 13:30, 14:30, 15:30")
+    logger.info("  - Position Monitoring:         10:00, 11:00, 12:00, 13:00, 14:00, 15:15")
+    logger.info("  - Day Trade Close:             Daily at 03:20 PM")
+    logger.info("  - Performance Reconciliation:  Daily at 06:00 PM")
     logger.info("  - Cleanup Old Snapshots:       Weekly (Sunday) at 03:00 AM")
     logger.info("  - Token Status Check:          Every 6 hours")
     logger.info("")
-    logger.info("📈 PURE 8-21 EMA SWING TRADING STRATEGY")
-    logger.info("  1. Power Zone: 8 EMA > 21 EMA (trend identification)")
-    logger.info("  2. DeMarker Oscillator: < 0.30 (pullback timing)")
-    logger.info("  3. Fibonacci Extensions: 127.2%, 161.8%, 200% (profit targets)")
-    logger.info("  - Entry: Price > 8 EMA > 21 EMA + DeMarker oversold")
-    logger.info("  - Stop: Below 21 EMA or recent swing low")
+    logger.info("📈 EMA 200/400 1H CROSSOVER STRATEGY")
+    logger.info("  - Trend: EMA200 vs EMA400 on 1H closes")
+    logger.info("  - Alerts: 1) Crossover-candle break  2) EMA200 retest  3) EMA400 touch")
+    logger.info("  - Entries: Break of retest candle high (long) / low (short)")
+    logger.info("  - Stop:    1H close on the wrong side of EMA400")
+    logger.info("  - Target:  +/-5000 pts for indices, 1:3 RR for equities")
     logger.info("  - NO ML MODELS - Pure technical analysis")
     logger.info("=" * 80)
 
@@ -558,11 +475,13 @@ def run_scheduler():
     # End-of-day performance reconciliation at 6:00 PM
     schedule.every().day.at("18:00").do(update_order_performance)
 
-    # Schedule technical indicators calculation at 10:00 PM (after data pipeline runs at 9:00 PM)
-    schedule.every().day.at("22:00").do(calculate_technical_indicators)
+    # Run EMA 200/400 strategy 1 minute after every NSE 1H candle close.
+    # NSE 1H candles close at 10:15, 11:15, 12:15, 13:15, 14:15, 15:30 IST.
+    for run_time in ['10:16', '11:16', '12:16', '13:16', '14:16', '15:31']:
+        schedule.every().day.at(run_time).do(run_ema_crossover_strategy)
 
-    # Schedule daily snapshot update at 10:15 PM (after indicators calculated)
-    schedule.every().day.at("22:15").do(update_daily_snapshot)
+    # Evening backfill catch-up + post-market run for late candles.
+    schedule.every().day.at("22:00").do(run_ema_crossover_strategy)
 
     # Schedule weekly cleanup on Sunday at 3:00 AM
     schedule.every().sunday.at("03:00").do(cleanup_old_snapshots)

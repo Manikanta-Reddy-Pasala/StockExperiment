@@ -1,0 +1,35 @@
+# Acutaas Chemicals Ltd. (ACUTAAS.NS)
+
+## Backtest Summary
+
+- **Source:** Yahoo chart API (1H bars)
+- **Window:** 2025-06-02 09:15:00 → 2026-04-30 15:30:00 (1574 bars)
+- **Last close:** 2594.10
+- **Strategy:** EMA 200/400 1H crossover
+- **Target rule:** 1:3 RR (equity)
+- **Stop-loss rule:** 1H close on wrong side of EMA400
+
+## Signal Counts
+
+| Signal | Count |
+|--------|-------|
+| CROSSOVER | 0 |
+| ALERT1 | 0 |
+| ALERT2 | 0 |
+| ALERT3 | 0 |
+| ENTRY1 | 0 |
+| ENTRY2 | 0 |
+| EXIT | 0 |
+
+## P&L
+
+- **Trades closed:** 0
+- **Trades open at end:** 0
+- **Winners / losers:** 0 / 0
+- **Total realized P&L (per unit):** 0.00
+- **Avg P&L per closed trade:** 0.00
+
+## Last 30 Signals
+
+| Time | Type | Trend | Price | EMA200 | EMA400 | Note |
+|------|------|-------|-------|--------|--------|------|
