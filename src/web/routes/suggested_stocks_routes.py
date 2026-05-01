@@ -93,7 +93,7 @@ def get_suggested_stocks():
                         COALESCE(s.current_price, d.current_price) as current_price,
                         d.strategy,
                         d.selection_score,
-                        d.signal_quality,
+                        -- signal_quality removed (EMA 200/400 strategy uses selection_score)
                         d.recommendation,
                         d.target_price,
                         d.stop_loss,
@@ -393,7 +393,7 @@ def get_triple_model_view():
                         COALESCE(s.current_price, d.current_price) as current_price,
                         d.strategy,
                         d.selection_score,
-                        d.signal_quality,
+                        -- signal_quality removed (EMA 200/400 strategy uses selection_score)
                         d.recommendation,
                         d.target_price,
                         d.stop_loss,
@@ -438,7 +438,7 @@ def get_triple_model_view():
             stats['ema_strategy'][risk_level] = {
                 'count': len(bucket),
                 'avg_selection_score': sum(s.get('selection_score', 0) or 0 for s in bucket) / len(bucket) if bucket else 0,
-                'high_quality_signals': sum(1 for s in bucket if s.get('signal_quality') == 'high'),
+                'first_entry_picks': sum(1 for s in bucket if (s.get('selection_score') or 0) >= 100),
             }
 
         response = {

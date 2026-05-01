@@ -149,17 +149,16 @@
     <!-- Strategy info -->
     <div class="col-lg-6">
         <div class="card h-100">
-            <div class="card-header"><i class="bi bi-info-circle me-2"></i>Strategy: 8-21 EMA</div>
+            <div class="card-header"><i class="bi bi-info-circle me-2"></i>Strategy: EMA 200/400 1H Crossover</div>
             <div class="card-body small">
                 <ul class="mb-0">
-                    <li><strong>Entry:</strong> Price > 8 EMA > 21 EMA (Power Zone) + DeMarker &lt; 0.30 (oversold pullback)</li>
-                    <li><strong>Exit:</strong> Price &lt; 21 EMA or stop loss hit</li>
-                    <li><strong>Target 1:</strong> Fibonacci 127.2% (sell 40%)</li>
-                    <li><strong>Target 2:</strong> Fibonacci 161.8% (sell 30%)</li>
-                    <li><strong>Target 3:</strong> Fibonacci 200% (sell remaining)</li>
-                    <li><strong>Stop Loss:</strong> Below recent swing low</li>
-                    <li><strong>Hold Period:</strong> 5-14 days (swing)</li>
-                    <li><strong>Backtest:</strong> PF 3.84, 58.5% Win Rate</li>
+                    <li><strong>Trend ID:</strong> EMA 200 crosses EMA 400 (above = BUY, below = SELL)</li>
+                    <li><strong>Entry 1:</strong> Break of EMA 200 retest candle (score 100)</li>
+                    <li><strong>Entry 2:</strong> Break of EMA 400 retest candle (score 90, pyramid)</li>
+                    <li><strong>Stop Loss:</strong> 1H close past EMA 400 (closes all entries)</li>
+                    <li><strong>Target:</strong> 5000 pts (index) / 1:3 RR (equity)</li>
+                    <li><strong>Timeframe:</strong> 1H bars (504 NSE Nifty 500)</li>
+                    <li><strong>Backtest:</strong> 31.6% WR, 2.77:1 R:R, +9429 net (Fyers, 720d)</li>
                 </ul>
             </div>
         </div>

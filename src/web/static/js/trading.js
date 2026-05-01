@@ -57,24 +57,20 @@ const Trading = {
         return value > 0 ? 'table-success' : 'table-danger';
     },
 
-    // ---- Signal strength (reused from suggested_stocks.html logic) ----
+    // ---- Signal strength: EMA 200/400 crossover. Score 100=Entry1, 90=Entry2 ----
     getSignalStrength(stock) {
-        const dir = (stock.signal_direction || '').toUpperCase();
-        const buy = stock.buy_signal;
-        const sell = stock.sell_signal;
-        const dm = stock.demarker;
-        const score = stock.selection_score || stock.ema_trend_score || 0;
+        const rec = (stock.recommendation || '').toUpperCase();
+        const score = stock.selection_score || 0;
+        const stage1 = score >= 100;
 
-        if (dir === 'LONG' && buy && dm >= 0.55 && dm <= 0.70 && score >= 70)
-            return { label: 'STRONG BUY', cls: 'bg-success', icon: 'bi-arrow-up-circle-fill' };
-        if (dir === 'LONG' && buy)
-            return { label: 'BUY', cls: 'bg-success bg-opacity-75', icon: 'bi-arrow-up-circle' };
-        if (dir === 'LONG' && !buy && !sell)
-            return { label: 'HOLD', cls: 'bg-secondary', icon: 'bi-dash-circle' };
-        if (sell)
-            return { label: 'SELL', cls: 'bg-danger bg-opacity-75', icon: 'bi-arrow-down-circle' };
-        if (dir === 'SHORT')
-            return { label: 'STRONG SELL', cls: 'bg-danger', icon: 'bi-arrow-down-circle-fill' };
+        if (rec === 'BUY')
+            return stage1
+                ? { label: 'STRONG BUY', cls: 'bg-success', icon: 'bi-arrow-up-circle-fill' }
+                : { label: 'BUY', cls: 'bg-success bg-opacity-75', icon: 'bi-arrow-up-circle' };
+        if (rec === 'SELL' || rec === 'SHORT')
+            return stage1
+                ? { label: 'STRONG SELL', cls: 'bg-danger', icon: 'bi-arrow-down-circle-fill' }
+                : { label: 'SELL', cls: 'bg-danger bg-opacity-75', icon: 'bi-arrow-down-circle' };
         return { label: 'NEUTRAL', cls: 'bg-secondary', icon: 'bi-dash-circle' };
     },
 

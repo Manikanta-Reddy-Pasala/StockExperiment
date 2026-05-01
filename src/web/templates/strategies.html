@@ -11,7 +11,7 @@
                 <h4 class="card-title mb-0 text-white">
                     <i class="bi bi-graph-up-arrow me-2"></i>8-21 EMA Swing Trading Strategy
                 </h4>
-                <small class="opacity-75">D_momentum Scoring Model - Backtest-Optimized (PF 3.84, 58.5% WR)</small>
+                <small class="opacity-75">EMA 200/400 1H Crossover — Trend-following with 1:3 RR (Backtested 504 NSE Nifty 500, 720d)</small>
             </div>
             <div>
                 <span class="badge bg-success fs-6">
@@ -50,7 +50,7 @@
                         <h6 class="text-muted mb-2 fw-semibold">Buy Signals</h6>
                         <h2 class="fw-bold mb-0 text-success" id="buy-signals">590</h2>
                         <small class="text-success">
-                            <i class="bi bi-arrow-up-circle"></i> Power Zone Active
+                            <i class="bi bi-arrow-up-circle"></i> EMA 200 above EMA 400
                         </small>
                     </div>
                     <div class="bg-gradient-success rounded-3 p-3">
@@ -83,10 +83,10 @@
             <div class="card-body">
                 <div class="d-flex align-items-center">
                     <div class="flex-grow-1">
-                        <h6 class="text-muted mb-2 fw-semibold">Strong Buy</h6>
-                        <h2 class="fw-bold mb-0 text-info" id="strong-buy">9</h2>
+                        <h6 class="text-muted mb-2 fw-semibold">First Entries (Score 100)</h6>
+                        <h2 class="fw-bold mb-0 text-info" id="strong-buy">0</h2>
                         <small class="text-info">
-                            <i class="bi bi-gem"></i> DeMarker 0.55-0.70
+                            <i class="bi bi-gem"></i> EMA 200 retest break
                         </small>
                     </div>
                     <div class="bg-gradient-info rounded-3 p-3">
@@ -110,49 +110,48 @@
             <div class="card-body">
                 <div class="alert alert-info mb-4">
                     <h6 class="alert-heading">
-                        <i class="bi bi-lightbulb-fill me-2"></i>What is the 8-21 EMA Strategy?
+                        <i class="bi bi-lightbulb-fill me-2"></i>EMA 200 / EMA 400 Crossover (1H)
                     </h6>
                     <p class="mb-0">
-                        A regime-aware swing trading strategy that identifies both <strong>LONG</strong> and <strong>SHORT</strong> entry points.
-                        Detects market regime (bull/bear) using Nifty 50 or market breadth, then generates signals in the appropriate direction.
+                        Trend-following strategy on the <strong>1H timeframe</strong>. Detects trend by EMA 200 crossing EMA 400, then waits for retest confirmation before entering. Multi-entry pyramid: <strong>Entry 1</strong> on EMA 200 retest break, <strong>Entry 2</strong> on EMA 400 retest break. Single stop at 1H close past EMA 400.
                     </p>
                 </div>
 
-                <h6 class="fw-bold mb-3">Core Components:</h6>
+                <h6 class="fw-bold mb-3">Stage Chain:</h6>
 
                 <div class="mb-4">
                     <h6 class="text-primary">
-                        <i class="bi bi-1-circle-fill me-2"></i>Power Zone (Trend Identification)
+                        <i class="bi bi-1-circle-fill me-2"></i>Trend Identification
                     </h6>
                     <p class="ms-4 mb-2">
-                        <strong>8 EMA > 21 EMA:</strong> Confirms bullish trend when 8-day EMA crosses above 21-day EMA
+                        <strong>EMA 200 crosses EMA 400</strong>: above = BUY trend, below = SELL trend
                     </p>
                     <p class="ms-4 mb-0 text-muted small">
-                        The "Power Zone" indicates strong momentum when price stays above both EMAs.
+                        State machine locks the crossover candle and waits for break-and-close above its high (BUY) or below its low (SELL).
                     </p>
                 </div>
 
                 <div class="mb-4">
                     <h6 class="text-success">
-                        <i class="bi bi-2-circle-fill me-2"></i>DeMarker Momentum (Entry Timing) — 50pts weight
+                        <i class="bi bi-2-circle-fill me-2"></i>Retest 1 → First Entry
                     </h6>
                     <p class="ms-4 mb-2">
-                        <strong>DeMarker 0.55-0.70:</strong> Identifies strong buying momentum within uptrend
+                        Price <strong>retests EMA 200</strong> from the opposite side, then breaks the retest candle's high (BUY) or low (SELL) and sustains.
                     </p>
                     <p class="ms-4 mb-0 text-muted small">
-                        Ranges from 0 to 1. Higher values (0.55-0.70) = stronger buying pressure = best entries. This is the #1 scoring factor (50pts). Validated across 13 months of data — momentum beats oversold.
+                        Selection score: <strong>100</strong>. This is the high-conviction entry.
                     </p>
                 </div>
 
                 <div class="mb-4">
                     <h6 class="text-warning">
-                        <i class="bi bi-3-circle-fill me-2"></i>Fibonacci Extensions (Profit Targets)
+                        <i class="bi bi-3-circle-fill me-2"></i>Retest 2 → Second Entry (Pyramid)
                     </h6>
                     <p class="ms-4 mb-2">
-                        <strong>Targets:</strong> 127.2%, 161.8%, 200% extensions from recent swing low
+                        After Entry 1, price <strong>pulls back to EMA 400</strong>. Break of the new retest candle triggers Entry 2.
                     </p>
                     <p class="ms-4 mb-0 text-muted small">
-                        Take partial profits at each Fibonacci level for optimal risk/reward.
+                        Selection score: <strong>90</strong>. Lets the system pyramid into a strong move.
                     </p>
                 </div>
 
@@ -161,10 +160,10 @@
                         <i class="bi bi-shield-fill-exclamation me-2"></i>Risk Management
                     </h6>
                     <ul class="mb-0">
-                        <li><strong>Stop Loss:</strong> Below 21 EMA or recent swing low (5-7%)</li>
-                        <li><strong>Position Size:</strong> Max 5% per trade</li>
-                        <li><strong>Time Frame:</strong> 10-15 day holds (swing trading)</li>
-                        <li><strong>Win Rate:</strong> 58.5% with PF 3.84 (13-month backtest)</li>
+                        <li><strong>Stop Loss:</strong> 1H close past EMA 400 (closes ALL open entries)</li>
+                        <li><strong>Target:</strong> 5000 absolute pts (indices) or 1:3 RR (equity)</li>
+                        <li><strong>Time Frame:</strong> 1H bars; entries hold hours-to-days</li>
+                        <li><strong>Backtest:</strong> 31.6% WR, 2.77:1 R:R, +9429 net P&amp;L per unit (Fyers, 504 NSE Nifty 500, 720d)</li>
                     </ul>
                 </div>
             </div>
@@ -190,32 +189,32 @@
 
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Type</label>
-                    <p class="mb-0">Regime-Aware Technical Analysis (Bull + Bear)</p>
+                    <p class="mb-0">Trend-Following (BUY + SELL via crossover)</p>
                 </div>
 
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Trading Style</label>
-                    <p class="mb-0">Swing Trading (10-15 days)</p>
+                    <p class="mb-0">1H Intraday → Multi-day swing</p>
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Target Returns</label>
-                    <p class="mb-0">7-12% per trade</p>
+                    <label class="form-label fw-semibold">Target</label>
+                    <p class="mb-0">5000 pts (index) / 1:3 RR (equity)</p>
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Risk per Trade</label>
-                    <p class="mb-0">5-7% (Below 21 EMA)</p>
+                    <label class="form-label fw-semibold">Stop Loss</label>
+                    <p class="mb-0">1H close past EMA 400</p>
                 </div>
 
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Universe</label>
-                    <p class="mb-0">NSE Stocks (2,259 total)</p>
+                    <p class="mb-0">Nifty 500 (504 NSE symbols)</p>
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Calculation Schedule</label>
-                    <p class="mb-0 small text-muted">Daily at 10:00 PM IST</p>
+                    <label class="form-label fw-semibold">Evaluation Schedule</label>
+                    <p class="mb-0 small text-muted">Hourly during market hours (9:15 AM – 3:30 PM IST)</p>
                 </div>
 
                 <hr>
@@ -231,7 +230,7 @@
 
                 <div class="alert alert-info mt-3 mb-0 small">
                     <i class="bi bi-info-circle me-1"></i>
-                    D_momentum model — optimized via 34,560-param grid search across 13 months. Top 5 picks daily.
+                    EMA 200/400 1H crossover — backtested 504 NSE Nifty 500 over 720 days using Fyers production data.
                 </div>
             </div>
         </div>
@@ -250,19 +249,19 @@
             <div class="card-body">
                 <ol class="mb-0">
                     <li class="mb-3">
-                        <strong>Power Zone Confirmation:</strong> Price must be above both 8 EMA and 21 EMA
+                        <strong>Crossover (Trend ID):</strong> EMA 200 crosses above EMA 400 → BUY trend (mirror for SELL)
                     </li>
                     <li class="mb-3">
-                        <strong>Trend Alignment:</strong> 8 EMA must be above 21 EMA (bullish setup)
+                        <strong>First Alert:</strong> 1H close breaks crossover candle's high (BUY) or low (SELL)
                     </li>
                     <li class="mb-3">
-                        <strong>Timing Signal:</strong> DeMarker oscillator 0.55-0.70 (strong momentum)
+                        <strong>Second Alert (Retest 1):</strong> Price retests EMA 200 from opposite side, then breaks retest candle → <strong>Entry 1</strong>
                     </li>
                     <li class="mb-3">
-                        <strong>Volume Check:</strong> Above average daily volume (50,000+ shares)
+                        <strong>Third Alert (Retest 2):</strong> Price pulls to EMA 400, retest break → <strong>Entry 2</strong> (pyramid)
                     </li>
                     <li class="mb-0">
-                        <strong>Market Cap:</strong> Minimum 500 Cr for liquidity
+                        <strong>Universe:</strong> Nifty 500 only; min 405 1H bars (~80 trading days) for warmup
                     </li>
                 </ol>
             </div>
@@ -279,21 +278,20 @@
             <div class="card-body">
                 <ol class="mb-0">
                     <li class="mb-3">
-                        <strong>Profit Targets (Fibonacci):</strong>
+                        <strong>Target Hit:</strong> Bar high (BUY) or low (SELL) reaches the configured target.
                         <ul class="mt-1">
-                            <li>Take 33% at 127.2% extension</li>
-                            <li>Take 33% at 161.8% extension</li>
-                            <li>Take 34% at 200% extension</li>
+                            <li>Indices: 5000 absolute pts</li>
+                            <li>Equities: 1:3 risk-reward (3 × distance from entry to EMA 400)</li>
                         </ul>
                     </li>
                     <li class="mb-3">
-                        <strong>Stop Loss:</strong> Exit if price closes below 21 EMA
+                        <strong>Stop Loss:</strong> 1H close past EMA 400 (BUY: close &lt; EMA 400; SELL: close &gt; EMA 400). Closes <strong>all</strong> open entries together.
                     </li>
                     <li class="mb-3">
-                        <strong>Time Stop:</strong> Exit after 15 days if no profit target hit
+                        <strong>Trend Flip:</strong> Opposite EMA crossover resets state machine and exits.
                     </li>
                     <li class="mb-0">
-                        <strong>Sell Signal:</strong> Exit immediately if sell signal generated
+                        <strong>Pyramiding:</strong> Multiple Entry 2 retests allowed per cycle (pyramid loop) — disabled if you want single-entry mode.
                     </li>
                 </ol>
             </div>
