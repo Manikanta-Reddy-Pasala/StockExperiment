@@ -1,350 +1,268 @@
 # EMA 200 / 400 1H Crossover Strategy
 
-**Status:** Live in production on `77.42.45.12` (StockExperiment VM)
-**Repo HEAD:** `d4970384` (committed `feat: EMA 200/400 1H crossover strategy with Nifty 500 backtest`)
-**Universe:** 504 NSE Nifty 500 symbols (`src/data/symbols/nifty500.csv`)
-**Timeframe:** 1H bars (Fyers `interval='1h'`)
+Production: `77.42.45.12` · Repo HEAD `92b66400` · Universe: 504 NSE Nifty 500.
 
 ---
 
-## 1. What this strategy does
+# A. FUNCTIONAL
 
-Trend-following with a **stateful 6-stage state machine**. Detects market trend
-via EMA 200 vs EMA 400 crossover on the 1H timeframe, waits for retest
-confirmation, and pyramids into the move with two entries.
+## What it does
 
-Mirror image works for SELL setups (price below EMA 200, retests from below).
+Trend-following on 1H bars. Detects trend via EMA 200 vs EMA 400 crossover,
+waits for retest confirmation, takes up to 2 entries per cycle.
 
-```
-                       BUY setup (mirror for SELL)
-┌──────────────────────────────────────────────────────────────────────┐
-│ Stage 0  Watch for crossover                                         │
-│   ↓                                                                  │
-│ Stage 1  EMA 200 crosses above EMA 400 → CROSSOVER signal            │
-│            (lock crossover candle high/low)                          │
-│   ↓                                                                  │
-│ Stage 2  1H close > crossover candle high → ALERT 1                  │
-│   ↓                                                                  │
-│ Stage 3  Price retests EMA 200 (1H low < EMA200,                     │
-│            1H close < EMA200) → ALERT 2 (lock retest1)               │
-│   ↓                                                                  │
-│ Stage 4  1H close > retest1 high → ENTRY 1 (score 100)               │
-│            • Stop = current EMA 400                                  │
-│            • Target = entry + 3 × |entry − EMA 400| (1:3 RR equity)  │
-│            • Target = entry + 5000 pts (index)                       │
-│   ↓                                                                  │
-│ Stage 5  Price pulls to EMA 400 (1H low ≤ EMA400) → ALERT 3          │
-│            (lock retest2)                                            │
-│   ↓                                                                  │
-│ Stage 4  1H close > retest2 high → ENTRY 2 (score 90, pyramid)       │
-│            ↺ (stage loops back to 4 — additional EMA 400 retests     │
-│              can pyramid further)                                    │
-│                                                                      │
-│ EXIT: any 1H close < EMA 400 → close ALL open entries together       │
-└──────────────────────────────────────────────────────────────────────┘
-```
+## Stage chain (BUY; SELL is mirror)
 
----
+| # | Stage | Trigger | Action |
+|---|-------|---------|--------|
+| 1 | Trend ID | EMA 200 crosses above EMA 400 | Lock crossover candle |
+| 2 | First Alert | 1H close > crossover candle high | Watch for retest |
+| 3 | Second Alert | 1H close < EMA 200 (retest) | Lock retest1 candle |
+| 4 | **Entry 1** | 1H close > retest1 high | **BUY** (score 100) |
+| 5 | Third Alert | 1H low ≤ EMA 400 | Lock retest2 candle |
+| 6 | **Entry 2** | 1H close > retest2 high | **BUY** pyramid (score 90) |
+| — | Exit | 1H close < EMA 400 | Close ALL entries |
 
-## 2. Code map
+## Risk model
 
-| Layer | File | Purpose |
-|-------|------|---------|
-| State machine | `src/services/technical/ema_crossover_strategy.py` | Per-symbol 6-stage state machine, signal emission |
-| Orchestrator | `src/services/technical/ema_crossover_runner.py` | Hourly run loop, `daily_suggested_stocks` writer |
-| 1H data fetch | `src/services/data/historical_1h_service.py` | Fyers backfill (95-day chunks) + incremental update |
-| Universe | `src/services/data/nifty500_universe.py` | Loads `src/data/symbols/nifty500.csv` |
-| Models | `src/models/historical_models.py` | `HistoricalData1H`, `EMACrossoverState`, `EMACrossoverSignal` |
-| Auto-trading | `src/services/trading/auto_trading_service.py` | Reads `strategy='ema_200_400'` picks |
-| UI route | `src/web/routes/suggested_stocks_routes.py` | API for stock picks |
-| UI templates | `src/web/templates/strategies.html`, `suggested_stocks.html`, `v2/picks.html`, `v2/settings.html` | Strategy + pick views |
-| Backtest | `tools/backtests/run_ema_200_400_backtest.py` | Yahoo + Fyers offline harness with cycle breakdown |
-| Migrations | `migrations/2026_04_30_ema_200_400_strategy.sql` (schema) + `..._clear_trade_deals.sql` (wipe) | Schema + data wipe |
+| Item | Rule |
+|------|------|
+| Stop loss | 1H close past EMA 400 |
+| Target (equity) | 1 : 3 RR (entry + 3 × distance to EMA 400) |
+| Target (index) | 5000 absolute pts |
+| Pyramid | Entry 2 may repeat on each EMA 400 retest |
+| Position size | Max 2 stocks per sector |
+| Re-entry | Allowed after next opposite crossover |
 
----
-
-## 3. Database schema
-
-### New tables
-
-```sql
-historical_data_1h          -- 1H OHLCV per symbol/timestamp + cached EMAs
-ema_crossover_state         -- Per-user/symbol state machine (stage, retest data, entries)
-ema_crossover_signals       -- Append-only audit log: CROSSOVER, ALERT1-3, ENTRY1-2, EXIT
-```
-
-### Dropped columns (from `stocks`, `technical_indicators`)
-
-```
-ema_8, ema_21, demarker, buy_signal, sell_signal, ema_8_21_score, signal_quality
-```
-
-### Wiped tables (`clear_trade_deals.sql`)
-
-```
-trades, orders, positions, holdings, auto_trading_executions,
-order_performance, order_performance_snapshots, dry_run_positions,
-dry_run_portfolios, daily_suggested_stocks
-```
-
-Auth tables (`users`, `broker_configurations`, `webauthn_credentials`) **NOT touched**.
-
----
-
-## 4. Auto-trading integration
-
-`auto_trading_service._select_top_strategies()` reads:
-
-```sql
-SELECT symbol, current_price, target_price, stop_loss, recommendation, selection_score
-  FROM daily_suggested_stocks
- WHERE strategy = 'ema_200_400'
-   AND date = CURRENT_DATE
-   AND recommendation IN ('BUY', 'SELL')
-ORDER BY selection_score DESC NULLS LAST, created_at DESC
-```
-
-| `selection_score` | Meaning |
-|-------------------|---------|
-| 100 | Entry 1 (EMA 200 retest break) — high-conviction |
-| 90 | Entry 2 (EMA 400 retest break) — pyramid |
-
-Sector cap retained: max 2 picks per sector (no concentration risk).
-
----
-
-## 5. Backtest results (Fyers Nifty 500, 720 days, 1H)
-
-Run inside `trading_system_app` container on production VM.
+## Backtest (Fyers Nifty 500, 720d, 1H)
 
 | Metric | Value |
 |--------|-------|
-| Symbols processed | 498 / 504 (6 had no Fyers data) |
-| Symbols with trades | 483 |
-| Total closed trades | 2,695 |
-| Trade-level winners | 852 |
-| **Trade-level win rate** | **31.6%** |
-| Trade-level losses | 1,843 (68.4%) |
-| Target hits (always wins) | 758 |
-| EMA400 close-exits (mostly losses) | 1,937 |
-| **Net P&L per unit** | **+9,429** |
-| Avg P&L per trade | +3.50 |
-| Avg WIN | +159.50 |
-| Avg LOSS | −57.55 |
+| Trades | 2,695 |
+| Win rate | 31.6% |
 | **Reward : Risk** | **2.77 : 1** |
-| Stock-level profitable | 247 |
-| Stock-level losing | 236 |
+| Avg win / loss | +159.50 / −57.55 |
+| **Net P&L per unit** | **+9,429** |
+| Profitable stocks | 247 / 483 |
+| Target hits (always wins) | 758 |
+| EMA-exit closes | 1,937 (1,843 losers, 94 winners) |
 
-### Stage hit counts (BUY + SELL combined)
+**Why 68% loss rate works:** R:R 2.77 turns low win rate into +11.05 expectancy.
+100% of losses come from EMA 400 close-exits (capped). All target hits win.
 
-| Stage | Count | BUY | SELL |
-|-------|-------|-----|------|
-| CROSSOVER | 3,200 | 1,513 | 1,687 |
-| ALERT1 | 2,750 | 1,251 | 1,499 |
-| ALERT2 | 2,625 | 1,133 | 1,492 |
-| **ENTRY1** | **2,034** | 869 | 1,165 |
-| ALERT3 | 1,508 | 656 | 852 |
-| **ENTRY2** | **707** | 286 | 421 |
-| EXIT | 1,976 | 850 | 1,126 |
-
-### Funnel conversion
+## Stage funnel
 
 | Transition | Rate |
 |------------|------|
-| Crossover → Alert1 | 85.9% (most trends break out) |
-| Alert1 → Alert2 | 95.5% (almost always retest EMA 200) |
-| Alert2 → Entry1 | 77.5% (retest break converts) |
-| Entry1 → Alert3 | 74.1% (price often pulls to EMA 400) |
-| Alert3 → Entry2 | 46.9% (pyramid 2nd entry) |
-| Entry → Exit | 97.1% (most close via EMA 400 cross) |
+| Crossover → Alert 1 | 85.9% |
+| Alert 1 → Alert 2 | 95.5% |
+| Alert 2 → **Entry 1** | 77.5% |
+| Entry 1 → Alert 3 | 74.1% |
+| Alert 3 → **Entry 2** | 46.9% |
+| Entry → Exit | 97.1% |
+
+## What user sees in UI
+
+- `/strategies` — strategy description, entry/exit rules, settings
+- `/suggested_stocks` — daily picks table (Trend, Stage, Score, Target, EMA 400 Stop)
+- Modal — recommendation, selection score, target price, stop loss
+- CSV export — same fields
 
 ---
 
-## 6. Why the 68.4% loss rate is OK
+# B. TECHNICAL
 
-Trend-following profile = **low win rate, high reward-to-risk**.
+## Code map
 
-- Avg winner: +159.50 / unit
-- Avg loser:  −57.55 / unit
-- 31.6% × 159.50 + 68.4% × (−57.55) = **+11.05 expectancy per trade**
-- Multiplied across 2,695 trades → +9,429 net
+| Layer | File |
+|-------|------|
+| State machine | `src/services/technical/ema_crossover_strategy.py` |
+| Hourly orchestrator | `src/services/technical/ema_crossover_runner.py` |
+| 1H Fyers fetcher | `src/services/data/historical_1h_service.py` |
+| Universe loader | `src/services/data/nifty500_universe.py` |
+| Models | `src/models/historical_models.py` |
+| Auto-trade consumer | `src/services/trading/auto_trading_service.py` |
+| API route | `src/web/routes/suggested_stocks_routes.py` |
+| UI | `src/web/templates/{strategies,suggested_stocks}.html`, `v2/{picks,settings}.html` |
+| Backtest harness | `tools/backtests/run_ema_200_400_backtest.py` |
+| Migrations | `migrations/2026_04_30_{ema_200_400_strategy,clear_trade_deals}.sql` |
 
-**100% of losses come from EMA 400 close-exits.** No target hit ever loses
-(by definition — closes at target price).
+## Schema
 
-Indices (5 tested) had **0 target hits** because 5000-pt absolute target is
-unreachable on 1H — NIFTY moves 50-300 pts/session. For indices, consider
-a tighter target or use the equity 1:3 RR rule.
+**New tables**
 
----
+| Table | Purpose |
+|-------|---------|
+| `historical_data_1h` | 1H OHLCV per symbol/ts + cached EMA 200/400 |
+| `ema_crossover_state` | Per-user/symbol state (stage, retest1/2, entries) |
+| `ema_crossover_signals` | Append-only audit: CROSSOVER, ALERT1-3, ENTRY1-2, EXIT |
 
-## 7. Operations
+**Dropped:** `ema_8`, `ema_21`, `demarker`, `buy_signal`, `sell_signal`, `signal_quality`, `fib_target_1/2/3`, `ema_8_21_score`.
 
-### Daily flow
+**Wiped (clear_trade_deals.sql):** `trades`, `orders`, `positions`, `holdings`, `auto_trading_executions`, `order_performance`, `dry_run_*`, `daily_suggested_stocks`. Auth tables untouched.
+
+## Data flow
 
 ```
-09:00 IST   Fyers token auto-refresh check (technical_scheduler)
-09:15 IST   NSE market opens
-09:15-15:30 Hourly: ema_crossover_runner.run_for_user(user_id=1)
-              ↓
-            Refreshes latest 1H candles (last 5 days)
-              ↓
-            Evaluates strategy state machine per symbol
-              ↓
-            Promotes ENTRY signals to daily_suggested_stocks
-              (ON CONFLICT upsert by date/symbol/strategy/model_type)
-              ↓
-            auto_trading_service queries fresh picks → places orders
-15:30 IST   NSE market closes
-22:00 IST   Daily snapshot + cleanup
+Fyers API (1h interval, 95d chunks)
+    ↓
+Historical1HService.backfill_universe(user_id=1, days=120)
+    ↓
+historical_data_1h (Postgres)
+    ↓
+EMACrossoverRunner.run_for_user(user_id)  ← hourly during 09:15-15:30 IST
+    ↓
+EMACrossoverStrategy.evaluate()           ← state machine per symbol
+    ↓
+ema_crossover_signals (audit) + ema_crossover_state (incremental)
+    ↓
+_promote_to_daily_picks() — only ENTRY1/ENTRY2 → daily_suggested_stocks
+    ↓
+auto_trading_service._select_top_strategies() — query ema_200_400 picks
+    ↓
+Fyers order placement (live or paper)
 ```
 
-### Manual operations
+## API contract — `daily_suggested_stocks`
+
+```sql
+strategy        = 'ema_200_400'
+model_type      = 'crossover'
+recommendation  IN ('BUY', 'SELL')
+selection_score = 100  -- Entry 1 (high conviction)
+                | 90   -- Entry 2 (pyramid)
+target_price    = entry + 3 * |entry - ema_400|   -- equity
+                | entry ± 5000                     -- index
+stop_loss       = current EMA 400
+```
+
+Upsert key: `(date, symbol, strategy, model_type)` — idempotent re-runs.
+
+## State machine — `EMACrossoverState`
+
+| Field | Notes |
+|-------|-------|
+| `trend` | NONE / BUY / SELL |
+| `stage` | 0–5 |
+| `crossover_ts/high/low` | Locked at trend flip |
+| `retest1_ts/high/low` | Set at ALERT 2 |
+| `retest2_ts/high/low` | Set at ALERT 3 (loops) |
+| `entries_count` | Total entries this cycle |
+| `entry1_price/time`, `entry2_price/time` | First two entries |
+| `stop_loss` | EMA 400 at Entry 1 time |
+| `target_price` | RR or 5000 pts |
+| `position_active` | True between Entry 1 and EXIT |
+| `last_evaluated_ts` | Incremental replay marker |
+
+## Config — `StrategyConfig`
+
+```python
+target_points     = 5000.0   # index
+rr_multiple       = 3.0      # equity
+ema_fast_period   = 200
+ema_slow_period   = 400
+sustain_minutes   = 15       # informational on 1H
+```
+
+## Container layout (production VM)
+
+| Container | Role | New code |
+|-----------|------|----------|
+| `trading_system_app` | Flask UI + API (`:5001`) | ✓ |
+| `trading_system_technical_scheduler` | Hourly strategy run | ✓ |
+| `trading_system_data_scheduler` | 1H + daily data pipeline | ✓ |
+| `trading_system_db` | Postgres 15 | schema migrated |
+| `trading_system_dragonfly` | Cache | unchanged |
+
+Volumes: only `./logs`, `./exports`, `./init-scripts` mounted. Code is **baked
+into images** — production code changes require `docker compose build`.
+
+## Ops runbook
 
 ```bash
-# Apply migrations (already done on prod)
+# Apply migrations
 docker cp migrations/2026_04_30_ema_200_400_strategy.sql trading_system_db:/tmp/
 docker exec trading_system_db psql -U trader -d trading_system \
     -f /tmp/2026_04_30_ema_200_400_strategy.sql
 
-# Backfill 1H universe (120 days for first run)
+# First-time backfill (120d × 504 symbols)
 docker exec -w /app trading_system_app /usr/local/bin/python -c "
 from src.services.technical.ema_crossover_runner import get_ema_crossover_runner
-print(get_ema_crossover_runner().backfill_universe(user_id=1, days=120, max_symbols=500))
-"
+print(get_ema_crossover_runner().backfill_universe(user_id=1, days=120, max_symbols=500))"
 
-# Trigger one strategy run
+# Hourly run (manual trigger)
 docker exec -w /app trading_system_app /usr/local/bin/python -c "
 from src.services.technical.ema_crossover_runner import get_ema_crossover_runner
-print(get_ema_crossover_runner().run_for_user(user_id=1, max_symbols=500))
-"
+print(get_ema_crossover_runner().run_for_user(user_id=1, max_symbols=500))"
 
-# Check today's signals
+# Today's picks
 docker exec trading_system_db psql -U trader -d trading_system -c "
 SELECT symbol, recommendation, target_price, stop_loss, selection_score
   FROM daily_suggested_stocks
- WHERE strategy = 'ema_200_400' AND date = CURRENT_DATE
+ WHERE strategy='ema_200_400' AND date=CURRENT_DATE
  ORDER BY selection_score DESC LIMIT 20;"
 
-# Check signal audit log
+# Signal audit
 docker exec trading_system_db psql -U trader -d trading_system -c "
-SELECT signal_type, COUNT(*)
-  FROM ema_crossover_signals
+SELECT signal_type, COUNT(*) FROM ema_crossover_signals
  WHERE created_at > NOW() - INTERVAL '1 day'
  GROUP BY signal_type ORDER BY 2 DESC;"
 ```
 
-### Backtest harness
+## Backtest harness
 
 ```bash
-# Local Yahoo backtest (no DB, no Fyers token)
+# Yahoo (offline, no DB, no token)
 venv/bin/python tools/backtests/run_ema_200_400_backtest.py --days 720 --source yahoo
 venv/bin/python tools/backtests/run_ema_200_400_backtest.py --days 720 --source yahoo \
     --universe nifty500 --out exports/backtests/nifty500_full
 
-# Fyers backtest (production data; requires DB + token)
+# Fyers (production data; container)
 docker exec -w /app trading_system_app /usr/local/bin/python \
     /app/tools/backtests/run_ema_200_400_backtest.py \
     --days 720 --source fyers --user-id 1 \
     --universe nifty500 --out /app/exports/backtests_fyers/nifty500_full
 ```
 
-Per-stock report at `exports/backtests/<dir>/<symbol>.md` includes:
-- Signal counts table (CROSSOVER/ALERT1-3/ENTRY1-2/EXIT)
-- P&L summary (winners/losers, target/EMA exits)
-- **Strategy Cycles section** — per-cycle stage table with time/price/EMAs/notes
-- Closed trades table with exit reasons (TARGET / EXIT_EMA400)
+Per-stock report contains: signal counts, P&L summary, **Strategy Cycles**
+section (per-cycle stage table with time/price/EMA/note), closed trades with
+exit reasons (TARGET / EXIT_EMA400).
+
+## Performance numbers (per session)
+
+- Fyers Nifty 500 backfill: ~30-40 min (504 × 8 chunks × 0.3s rate)
+- Hourly strategy run: ~2-3 min for 504 symbols
+- Backtest (Yahoo, 720d, 504 symbols): ~12-15 min
+- Backtest (Fyers, 720d, 504 symbols): ~30-45 min
+
+## Known limitations
+
+1. Indices target 5000 pts unreachable on 1H (NIFTY moves 50-300/session)
+2. No HTF filter (daily trend ignored)
+3. Pyramid Entry 2 can loop unbounded
+4. No volume/ATR confirmation
+5. Fyers history capped at ~2 years for 1H (Yahoo gives ~3 years)
+
+## Future improvements
+
+| Tweak | Expected impact |
+|-------|-----------------|
+| Daily HTF filter | WR 31.6% → ~40-45% |
+| Disable Entry 2 | Halve loss count, halve compound exposure |
+| ATR stop instead of EMA 400 close | Tighter losses |
+| Volume filter on retest break | Drop low-conviction entries |
+| Tighter index target (200-500 pts) | Indices become tradeable |
 
 ---
 
-## 8. Risk management
+# C. RESULT FILES
 
-| Item | Rule |
-|------|------|
-| Stop loss | 1H close past EMA 400 (closes ALL open entries together) |
-| Target (equity) | 1 : 3 risk-reward (entry + 3 × distance to EMA 400) |
-| Target (index) | 5000 absolute points |
-| Position size | Max 2 stocks per sector (auto_trading sector cap) |
-| Pyramid limit | Currently unlimited Entry 2 retests; can constrain in `_step_buy/sell` |
-| Re-entry after exit | Allowed once next CROSSOVER fires |
-| HTF filter | None yet (potential improvement) |
-
----
-
-## 9. Configuration
-
-`StrategyConfig` (`ema_crossover_strategy.py`):
-
-```python
-target_points: float = 5000.0     # Absolute index target
-rr_multiple: float = 3.0          # Equity reward-to-risk multiple
-sustain_minutes: int = 15         # Informational on 1H
-ema_fast_period: int = 200        # EMA 200
-ema_slow_period: int = 400        # EMA 400
-```
-
-`Historical1HService`:
-
-```python
-FYERS_INTRADAY_MAX_DAYS = 95      # Per-call chunk size (Fyers cap)
-rate_limit_delay = 0.3            # Seconds between Fyers calls
-```
-
-`auto_trading_service` (sector cap, hard-coded):
-
-```python
-MAX_PER_SECTOR = 2
-```
-
----
-
-## 10. Migration from 8-21 EMA strategy
-
-The previous `ema_strategy_calculator.py` (8-21 EMA + DeMarker + Fibonacci
-extensions) is **deleted**. UI references in `suggested_stocks.html`,
-`strategies.html`, `v2/picks.html`, `v2/settings.html`, `trading.js`, and
-`suggested_stocks_routes.py` have all been updated.
-
-Removed concepts:
-- "Power Zone" (8 > 21 EMA)
-- DeMarker oscillator
-- Fibonacci profit targets (127.2%, 161.8%, 200%)
-- Multiple `fib_target_1/2/3` columns
-- `signal_quality` field
-
-Replaced with:
-- EMA 200 / 400 trend
-- Single `target_price` per pick
-- `stop_loss` = EMA 400 level
-- `selection_score` = 100 (Entry 1) or 90 (Entry 2)
-- `recommendation` = `BUY` or `SELL`
-
----
-
-## 11. Known limitations
-
-1. **Indices target unreachable** on 1H (5000 pts ≈ 22% on NIFTY)
-2. **No higher-timeframe filter** — strategy takes 1H BUY signals even if daily trend is bearish
-3. **Pyramid loop unbounded** — repeated EMA 400 retests can compound losses
-4. **No volume filter** — low-volume retest breakouts treated same as high-volume
-5. **Fyers history capped** at ~2 years for 1H; longer windows need Yahoo fallback
-6. **Sustain rule informational** on 1H — entry fires on 1H close break, not actual N-minute sustain
-
----
-
-## 12. Files generated this session
-
-| Path | Purpose |
+| File | Content |
 |------|---------|
-| `STRATEGY.md` (this file) | Master strategy doc |
-| `exports/backtests/NIFTY500_RESULTS.md` | Yahoo Nifty 500 backtest aggregate |
-| `exports/backtests/FYERS_NIFTY500_RESULTS.md` | Fyers vs Yahoo comparison |
-| `exports/backtests/INDICES_RESULTS.md` | NIFTY/BANKNIFTY/sectoral indices |
+| `STRATEGY.md` | This doc |
+| `exports/backtests/NIFTY500_RESULTS.md` | Yahoo Nifty 500 aggregate |
+| `exports/backtests/FYERS_NIFTY500_RESULTS.md` | Fyers vs Yahoo compare |
+| `exports/backtests/INDICES_RESULTS.md` | NIFTY/BANKNIFTY/sectoral |
 | `exports/backtests/STAGE_HIT_COUNTS.md` | Funnel + BUY/SELL split |
-| `exports/backtests/LOSS_ANALYSIS.md` | Loss breakdown by exit reason |
-| `exports/backtests/_summary.md` | Smoke 5-stock aggregate |
-| `exports/backtests/<symbol>.md` | Per-stock cycle reports (smoke) |
-| `exports/backtests/nifty500_full/<symbol>.md` | Per-stock Yahoo reports (504) |
-| `exports/backtests/fyers_nifty500_full/<symbol>.md` | Per-stock Fyers reports (504) |
-| `exports/backtests/indices/<symbol>.md` | Per-index reports (5) |
-| `exports/backtests/vm_nifty500_full/<symbol>.md` | VM-run validation reports |
+| `exports/backtests/LOSS_ANALYSIS.md` | Loss source breakdown |
+| `exports/backtests/<dir>/<symbol>.md` | Per-stock cycle reports |
