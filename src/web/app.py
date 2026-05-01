@@ -1355,6 +1355,14 @@ def create_app():
     except ImportError as e:
         app.logger.warning(f"WebAuthn routes not available: {e}")
 
+    # On-demand backtest (single stock + date range)
+    try:
+        from .routes.backtest_routes import backtest_bp
+        app.register_blueprint(backtest_bp)
+        app.logger.info("Backtest routes registered successfully")
+    except ImportError as e:
+        app.logger.warning(f"Backtest routes not available: {e}")
+
     # Individual broker page routes
     @app.route('/brokers/fyers')
     @login_required

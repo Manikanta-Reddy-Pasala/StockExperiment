@@ -587,10 +587,35 @@ def main() -> int:
                              "fallback). 'fyers' requires Postgres + valid token.")
     parser.add_argument("--user-id", type=int, default=1,
                         help="Fyers user_id (default 1) for token lookup")
+    parser.add_argument("--symbol", type=str, default=None,
+                        help="Single-stock mode. Yahoo (RELIANCE.NS / ^NSEI) or "
+                             "Fyers (NSE:RELIANCE-EQ) format. Overrides --universe.")
+    parser.add_argument("--from", dest="date_from", type=str, default=None,
+                        help="Start date YYYY-MM-DD (overrides --days; Yahoo only honors range)")
+    parser.add_argument("--to", dest="date_to", type=str, default=None,
+                        help="End date YYYY-MM-DD (defaults to today when --from given)")
     args = parser.parse_args()
     _FYERS_CACHE["user_id"] = args.user_id
 
-    if args.universe == "nifty500":
+    # Convert --from/--to to days window (1H window must end at "now" for Yahoo
+    # range param; for Fyers we pass exact dates)
+    if args.date_from:
+        from_dt = datetime.strptime(args.date_from, "%Y-%m-%d")
+        to_dt = datetime.strptime(args.date_to, "%Y-%m-%d") if args.date_to else datetime.now()
+        delta_days = max(1, (datetime.now() - from_dt).days)
+        args.days = min(delta_days, 730)
+        print(f"Date range: {from_dt.date()} → {to_dt.date()} ({args.days} days)")
+
+    if args.symbol:
+        # Normalize Fyers-style to Yahoo for harness fetcher
+        sym = args.symbol.upper()
+        if sym.startswith("NSE:") and sym.endswith("-EQ"):
+            sym = sym.replace("NSE:", "").replace("-EQ", "") + ".NS"
+        elif sym.endswith("-INDEX"):
+            sym = "^" + sym.replace("NSE:", "").replace("-INDEX", "")
+        symbols_list = [(sym, sym)]
+        print(f"Universe: single symbol ({sym})")
+    elif args.universe == "nifty500":
         symbols_list = nifty500_yahoo_symbols(limit=args.limit)
         if not symbols_list:
             print("Nifty 500 cache empty. Run tools/refresh_nifty500.py first.")
