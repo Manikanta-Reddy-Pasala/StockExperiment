@@ -91,11 +91,22 @@ class StrategyConfig:
 
     # ---- Opt-in tuning toggles (all default = spec-compliant / disabled) ----
     # 1) Higher-timeframe trend filter: only allow CROSSOVER in matching regime.
-    #    BUY  fires only if close > htf_sma at crossover bar.
-    #    SELL fires only if close < htf_sma at crossover bar.
-    #    htf_period_bars=1400 ~= 200-day SMA on 1H bars.
+    #    BUY  fires only if close > htf_sma_buy at crossover bar.
+    #    SELL fires only if close < htf_sma_sell at crossover bar.
+    #    Asymmetric periods: BUY uses long-term SMA (200d), SELL uses
+    #    medium-term SMA (50d) so SELL can catch stock-specific downtrends
+    #    even when broad market is in long-term uptrend.
     htf_filter_enabled: bool = False
-    htf_period_bars: int = 1400
+    htf_buy_period_bars: int = 1400   # ~200-day SMA on 1H bars (BUY confirm)
+    htf_sell_period_bars: int = 1400  # default same as BUY; configurable
+    # Optional margin (fraction). Require close < htf_sma_sell * (1 - margin)
+    # for SELL. Filters out shallow dips. E.g. 0.02 = require close 2% below
+    # SELL SMA. 0 = simple "close below SMA" check.
+    htf_sell_margin_pct: float = 0.0
+    htf_buy_margin_pct: float = 0.0
+    # Legacy single-period field (kept for backwards compat). When non-zero,
+    # overrides both htf_buy_period_bars and htf_sell_period_bars.
+    htf_period_bars: int = 0
 
     # 2) Cap number of ALERT3 (retest2 candle) re-locks per cycle.
     #    0 = unlimited (spec). E.g. 2 stops chop near EMA400 from generating
@@ -121,12 +132,15 @@ class EMACrossoverStrategy:
     # ------------------------------------------------------------------
     @staticmethod
     def compute_emas(df: pd.DataFrame, fast: int = 200, slow: int = 400,
-                      htf_period_bars: Optional[int] = None) -> pd.DataFrame:
+                      htf_buy_period_bars: Optional[int] = None,
+                      htf_sell_period_bars: Optional[int] = None) -> pd.DataFrame:
         df = df.copy()
         df["ema_200"] = df["close"].ewm(span=fast, adjust=False).mean()
         df["ema_400"] = df["close"].ewm(span=slow, adjust=False).mean()
-        if htf_period_bars and htf_period_bars > 0:
-            df["htf_sma"] = df["close"].rolling(htf_period_bars, min_periods=1).mean()
+        if htf_buy_period_bars and htf_buy_period_bars > 0:
+            df["htf_sma_buy"] = df["close"].rolling(htf_buy_period_bars, min_periods=1).mean()
+        if htf_sell_period_bars and htf_sell_period_bars > 0:
+            df["htf_sma_sell"] = df["close"].rolling(htf_sell_period_bars, min_periods=1).mean()
         return df
 
     # ------------------------------------------------------------------
@@ -143,11 +157,19 @@ class EMACrossoverStrategy:
             return []
 
         df = self._candles_to_df(candles)
+        # Resolve HTF periods: legacy htf_period_bars overrides both if set.
+        if self.config.htf_filter_enabled:
+            legacy = self.config.htf_period_bars
+            buy_p  = legacy if legacy > 0 else self.config.htf_buy_period_bars
+            sell_p = legacy if legacy > 0 else self.config.htf_sell_period_bars
+        else:
+            buy_p = sell_p = None
         df = self.compute_emas(
             df,
             self.config.ema_fast_period,
             self.config.ema_slow_period,
-            htf_period_bars=self.config.htf_period_bars if self.config.htf_filter_enabled else None,
+            htf_buy_period_bars=buy_p,
+            htf_sell_period_bars=sell_p,
         )
 
         state = self._load_state(user_id, symbol)
@@ -189,12 +211,20 @@ class EMACrossoverStrategy:
         cross_dn = prev_ema200 >= prev_ema400 and ema200 < ema400
 
         # Optional HTF filter: only accept crossover if regime matches.
+        # Symmetric default (same period for BUY/SELL); configurable margin
+        # requires close to be margin% below/above SMA for confirmation.
         htf_ok_buy = htf_ok_sell = True
-        if self.config.htf_filter_enabled and "htf_sma" in row.index:
-            htf = row["htf_sma"]
-            if pd.notna(htf):
-                htf_ok_buy = row["close"] > htf
-                htf_ok_sell = row["close"] < htf
+        if self.config.htf_filter_enabled:
+            if "htf_sma_buy" in row.index:
+                htf_b = row["htf_sma_buy"]
+                if pd.notna(htf_b):
+                    threshold = htf_b * (1 + self.config.htf_buy_margin_pct)
+                    htf_ok_buy = row["close"] > threshold
+            if "htf_sma_sell" in row.index:
+                htf_s = row["htf_sma_sell"]
+                if pd.notna(htf_s):
+                    threshold = htf_s * (1 - self.config.htf_sell_margin_pct)
+                    htf_ok_sell = row["close"] < threshold
 
         # Trend reset on opposite crossover — closes ALL open positions.
         if cross_up:

@@ -729,8 +729,17 @@ def main() -> int:
     # ---- Tuning flags (opt-in; default = spec-compliant) ----
     parser.add_argument("--htf-filter", action="store_true",
                         help="Enable HTF (higher-timeframe) trend filter on crossovers")
-    parser.add_argument("--htf-period-bars", type=int, default=1400,
-                        help="HTF SMA period in bars (default 1400 ~= 200d on 1H)")
+    parser.add_argument("--htf-buy-period-bars", type=int, default=1400,
+                        help="HTF SMA period for BUY (default 1400 ~= 200d on 1H)")
+    parser.add_argument("--htf-sell-period-bars", type=int, default=1400,
+                        help="HTF SMA period for SELL (default 1400 ~= 200d on 1H)")
+    parser.add_argument("--htf-buy-margin-pct", type=float, default=0.0,
+                        help="BUY confirm requires close > SMA*(1+margin). 0=disabled")
+    parser.add_argument("--htf-sell-margin-pct", type=float, default=0.0,
+                        help="SELL confirm requires close < SMA*(1-margin). E.g. 0.03 "
+                             "= 3%% below SMA (filters shallow dips). 0=disabled")
+    parser.add_argument("--htf-period-bars", type=int, default=0,
+                        help="Legacy: single HTF period overrides BUY+SELL when >0")
     parser.add_argument("--max-alert3-locks", type=int, default=0,
                         help="Cap ALERT3 re-locks per cycle (0=unlimited)")
     parser.add_argument("--retest2-sl-cap-pct", type=float, default=0.0,
@@ -778,12 +787,18 @@ def main() -> int:
 
     config = StrategyConfig(
         htf_filter_enabled=args.htf_filter,
+        htf_buy_period_bars=args.htf_buy_period_bars,
+        htf_sell_period_bars=args.htf_sell_period_bars,
+        htf_buy_margin_pct=args.htf_buy_margin_pct,
+        htf_sell_margin_pct=args.htf_sell_margin_pct,
         htf_period_bars=args.htf_period_bars,
         max_alert3_locks_per_cycle=args.max_alert3_locks,
         retest2_sl_cap_pct=args.retest2_sl_cap_pct,
         skip_retest2=args.skip_retest2,
     )
     print(f"Config tuning: htf_filter={config.htf_filter_enabled} "
+          f"buy_p={config.htf_buy_period_bars}+m{config.htf_buy_margin_pct} "
+          f"sell_p={config.htf_sell_period_bars}+m{config.htf_sell_margin_pct} "
           f"max_alert3_locks={config.max_alert3_locks_per_cycle} "
           f"retest2_sl_cap_pct={config.retest2_sl_cap_pct} "
           f"skip_retest2={config.skip_retest2}")
