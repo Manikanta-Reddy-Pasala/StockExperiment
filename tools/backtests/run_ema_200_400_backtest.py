@@ -746,6 +746,18 @@ def main() -> int:
                         help="Cap ENTRY2 SL distance from entry (e.g. 0.03 = 3%%, 0=disabled)")
     parser.add_argument("--skip-retest2", action="store_true",
                         help="Skip retest2/ENTRY2 phase entirely (retest1 only)")
+    parser.add_argument("--skip-sell", action="store_true",
+                        help="Skip SELL trend entirely (BUY-only mode)")
+    parser.add_argument("--skip-buy", action="store_true",
+                        help="Skip BUY trend entirely (SELL-only mode)")
+    parser.add_argument("--sell-slope-bars", type=int, default=0,
+                        help="EMA200 slope confirmation window for SELL (bars). 0=disabled")
+    parser.add_argument("--sell-slope-min-pct", type=float, default=0.0,
+                        help="Min EMA200 % drop over slope window (e.g. 0.005=0.5%%)")
+    parser.add_argument("--buy-slope-bars", type=int, default=0,
+                        help="EMA200 slope confirmation window for BUY (bars). 0=disabled")
+    parser.add_argument("--buy-slope-min-pct", type=float, default=0.0,
+                        help="Min EMA200 %% rise over slope window")
     args = parser.parse_args()
     _FYERS_CACHE["user_id"] = args.user_id
 
@@ -795,6 +807,12 @@ def main() -> int:
         max_alert3_locks_per_cycle=args.max_alert3_locks,
         retest2_sl_cap_pct=args.retest2_sl_cap_pct,
         skip_retest2=args.skip_retest2,
+        skip_sell=args.skip_sell,
+        skip_buy=args.skip_buy,
+        sell_slope_bars=args.sell_slope_bars,
+        sell_slope_min_pct=args.sell_slope_min_pct,
+        buy_slope_bars=args.buy_slope_bars,
+        buy_slope_min_pct=args.buy_slope_min_pct,
     )
     print(f"Config tuning: htf_filter={config.htf_filter_enabled} "
           f"buy_p={config.htf_buy_period_bars}+m{config.htf_buy_margin_pct} "

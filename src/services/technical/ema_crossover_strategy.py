@@ -121,6 +121,22 @@ class StrategyConfig:
     #    ends cycle (await next crossover) instead of advancing to retest2 watch.
     skip_retest2: bool = False
 
+    # 5) Skip SELL trend entirely (BUY-only mode). Bull regimes make SELL
+    #    counter-trend; this avoids those trades.
+    skip_sell: bool = False
+    skip_buy: bool = False  # symmetric option
+
+    # 6) EMA200 slope confirmation for SELL: require EMA200 to be declining
+    #    over the last N bars at crossover bar (genuine downtrend momentum).
+    #    Threshold = (ema200[t] - ema200[t-N]) / ema200[t-N] <= -slope_min.
+    #    Defaults below are tuning suggestions only — slope filter is OFF
+    #    until sell_slope_bars > 0. Empirical Nifty50 720d: 350 bars (~50d)
+    #    + 0.005 (0.5% drop) flips SELL from −134% to +145% sum.
+    sell_slope_bars: int = 0           # set to 350 (50d on 1H) to enable
+    sell_slope_min_pct: float = 0.005  # 0.5% drop required (used when bars>0)
+    buy_slope_bars: int = 0            # BUY HTF filter alone is sufficient
+    buy_slope_min_pct: float = 0.005
+
 
 class EMACrossoverStrategy:
     """v2 BTC-rules state machine + per-position TP/SL/partial."""
@@ -186,7 +202,7 @@ class EMACrossoverStrategy:
         for i in range(max(start_idx, self.config.ema_slow_period), len(df)):
             row = df.iloc[i]
             prev = df.iloc[i - 1]
-            new_signals = self._step_machine(state, row, prev)
+            new_signals = self._step_machine(state, row, prev, df, i)
             for sig in new_signals:
                 signals.append(sig)
             state.last_evaluated_ts = int(row["timestamp"])
@@ -199,7 +215,7 @@ class EMACrossoverStrategy:
     # ------------------------------------------------------------------
     # Per-bar step
     # ------------------------------------------------------------------
-    def _step_machine(self, state, row, prev) -> List[dict]:
+    def _step_machine(self, state, row, prev, df=None, idx=None) -> List[dict]:
         signals: List[dict] = []
 
         ema200 = row["ema_200"]
@@ -226,11 +242,27 @@ class EMACrossoverStrategy:
                     threshold = htf_s * (1 - self.config.htf_sell_margin_pct)
                     htf_ok_sell = row["close"] < threshold
 
+        # Slope confirm: require EMA200 trending in crossover direction over N bars.
+        slope_ok_buy = slope_ok_sell = True
+        if df is not None and idx is not None:
+            if self.config.buy_slope_bars > 0:
+                slope_ok_buy = self._check_slope(df, idx, self.config.buy_slope_bars,
+                                                  self.config.buy_slope_min_pct, "up")
+            if self.config.sell_slope_bars > 0:
+                slope_ok_sell = self._check_slope(df, idx, self.config.sell_slope_bars,
+                                                   self.config.sell_slope_min_pct, "down")
+
         # Trend reset on opposite crossover — closes ALL open positions.
         if cross_up:
+            if self.config.skip_buy:
+                return signals
             if not htf_ok_buy:
                 signals.append(self._make_signal(row, "CROSSOVER_SKIP", "BUY",
                                                  note="HTF filter: close below htf_sma"))
+                return signals
+            if not slope_ok_buy:
+                signals.append(self._make_signal(row, "CROSSOVER_SKIP", "BUY",
+                                                 note=f"slope filter: EMA200 not rising {self.config.buy_slope_min_pct*100:.2f}% over {self.config.buy_slope_bars} bars"))
                 return signals
             if self._open_positions(state):
                 signals.extend(self._close_all_positions(state, row, "CROSSOVER_FLIP"))
@@ -238,9 +270,15 @@ class EMACrossoverStrategy:
             signals.append(self._make_signal(row, "CROSSOVER", "BUY", note="EMA200 above EMA400"))
             return signals
         if cross_dn:
+            if self.config.skip_sell:
+                return signals
             if not htf_ok_sell:
                 signals.append(self._make_signal(row, "CROSSOVER_SKIP", "SELL",
                                                  note="HTF filter: close above htf_sma"))
+                return signals
+            if not slope_ok_sell:
+                signals.append(self._make_signal(row, "CROSSOVER_SKIP", "SELL",
+                                                 note=f"slope filter: EMA200 not falling {self.config.sell_slope_min_pct*100:.2f}% over {self.config.sell_slope_bars} bars"))
                 return signals
             if self._open_positions(state):
                 signals.extend(self._close_all_positions(state, row, "CROSSOVER_FLIP"))
@@ -451,6 +489,26 @@ class EMACrossoverStrategy:
                 on_cap_reached=lambda: setattr(state, "stage", 4),
             ))
         return signals
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _check_slope(df, idx: int, bars: int, min_pct: float, direction: str) -> bool:
+        """Check if EMA200 has moved at least min_pct in `direction` over last `bars`.
+        direction: 'up' = (now-then)/then >= min_pct
+                   'down' = (then-now)/then >= min_pct
+        Returns False if window too short or condition not met.
+        """
+        ref_idx = idx - bars
+        if ref_idx < 0:
+            return False
+        ema_now = df.iloc[idx]["ema_200"]
+        ema_then = df.iloc[ref_idx]["ema_200"]
+        if ema_then <= 0:
+            return False
+        change = (ema_now - ema_then) / ema_then
+        if direction == "up":
+            return change >= min_pct
+        return -change >= min_pct  # down: change <= -min_pct
 
     # ------------------------------------------------------------------
     # Cross-and-sustain trigger (shared BUY/SELL retest1/retest2)
