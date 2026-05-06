@@ -307,6 +307,7 @@ class StrategyState:
     retest1_invalidated: bool = False
     retest1_pending_cross_ts: Optional[int] = None
     retest2_pending_cross_ts: Optional[int] = None
+    alert3_locks_count: int = 0
     positions_json: list = None  # mutable; init in __post_init__
 
     def __post_init__(self):
@@ -725,6 +726,17 @@ def main() -> int:
                         help="Start date YYYY-MM-DD (overrides --days; Yahoo only honors range)")
     parser.add_argument("--to", dest="date_to", type=str, default=None,
                         help="End date YYYY-MM-DD (defaults to today when --from given)")
+    # ---- Tuning flags (opt-in; default = spec-compliant) ----
+    parser.add_argument("--htf-filter", action="store_true",
+                        help="Enable HTF (higher-timeframe) trend filter on crossovers")
+    parser.add_argument("--htf-period-bars", type=int, default=1400,
+                        help="HTF SMA period in bars (default 1400 ~= 200d on 1H)")
+    parser.add_argument("--max-alert3-locks", type=int, default=0,
+                        help="Cap ALERT3 re-locks per cycle (0=unlimited)")
+    parser.add_argument("--retest2-sl-cap-pct", type=float, default=0.0,
+                        help="Cap ENTRY2 SL distance from entry (e.g. 0.03 = 3%%, 0=disabled)")
+    parser.add_argument("--skip-retest2", action="store_true",
+                        help="Skip retest2/ENTRY2 phase entirely (retest1 only)")
     args = parser.parse_args()
     _FYERS_CACHE["user_id"] = args.user_id
 
@@ -764,7 +776,17 @@ def main() -> int:
         symbols_list = SMOKE_SYMBOLS
         print(f"Universe: smoke ({len(symbols_list)} symbols)")
 
-    config = StrategyConfig()
+    config = StrategyConfig(
+        htf_filter_enabled=args.htf_filter,
+        htf_period_bars=args.htf_period_bars,
+        max_alert3_locks_per_cycle=args.max_alert3_locks,
+        retest2_sl_cap_pct=args.retest2_sl_cap_pct,
+        skip_retest2=args.skip_retest2,
+    )
+    print(f"Config tuning: htf_filter={config.htf_filter_enabled} "
+          f"max_alert3_locks={config.max_alert3_locks_per_cycle} "
+          f"retest2_sl_cap_pct={config.retest2_sl_cap_pct} "
+          f"skip_retest2={config.skip_retest2}")
     strat = OfflineStrategy(config)
 
     aggregate = []

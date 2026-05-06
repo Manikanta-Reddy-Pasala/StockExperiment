@@ -84,10 +84,31 @@ class StrategyConfig:
     target_pct: float = DEFAULT_TARGET_PCT          # 30% TP
     partial_pct: float = DEFAULT_PARTIAL_PCT        # 15% partial-book trigger
     partial_qty_frac: float = DEFAULT_PARTIAL_QTY_FRAC
-    re_entry_cap: int = DEFAULT_RE_ENTRY_CAP        # max 3 attempts per alert
+    re_entry_cap: int = DEFAULT_RE_ENTRY_CAP        # max attempts per alert
     sustain_minutes: int = DEFAULT_SUSTAIN_MINUTES
     ema_fast_period: int = 200
     ema_slow_period: int = 400
+
+    # ---- Opt-in tuning toggles (all default = spec-compliant / disabled) ----
+    # 1) Higher-timeframe trend filter: only allow CROSSOVER in matching regime.
+    #    BUY  fires only if close > htf_sma at crossover bar.
+    #    SELL fires only if close < htf_sma at crossover bar.
+    #    htf_period_bars=1400 ~= 200-day SMA on 1H bars.
+    htf_filter_enabled: bool = False
+    htf_period_bars: int = 1400
+
+    # 2) Cap number of ALERT3 (retest2 candle) re-locks per cycle.
+    #    0 = unlimited (spec). E.g. 2 stops chop near EMA400 from generating
+    #    infinite re-entries.
+    max_alert3_locks_per_cycle: int = 0
+
+    # 3) Tighten ENTRY2 SL — cap distance from entry. 0 = disabled (use spec
+    #    retest2.low/high). E.g. 0.03 caps SL at 3% from entry.
+    retest2_sl_cap_pct: float = 0.0
+
+    # 4) Skip retest2 (ENTRY2) phase entirely. retest1 invalidate or cap-reached
+    #    ends cycle (await next crossover) instead of advancing to retest2 watch.
+    skip_retest2: bool = False
 
 
 class EMACrossoverStrategy:
@@ -99,10 +120,13 @@ class EMACrossoverStrategy:
 
     # ------------------------------------------------------------------
     @staticmethod
-    def compute_emas(df: pd.DataFrame, fast: int = 200, slow: int = 400) -> pd.DataFrame:
+    def compute_emas(df: pd.DataFrame, fast: int = 200, slow: int = 400,
+                      htf_period_bars: Optional[int] = None) -> pd.DataFrame:
         df = df.copy()
         df["ema_200"] = df["close"].ewm(span=fast, adjust=False).mean()
         df["ema_400"] = df["close"].ewm(span=slow, adjust=False).mean()
+        if htf_period_bars and htf_period_bars > 0:
+            df["htf_sma"] = df["close"].rolling(htf_period_bars, min_periods=1).mean()
         return df
 
     # ------------------------------------------------------------------
@@ -119,7 +143,12 @@ class EMACrossoverStrategy:
             return []
 
         df = self._candles_to_df(candles)
-        df = self.compute_emas(df, self.config.ema_fast_period, self.config.ema_slow_period)
+        df = self.compute_emas(
+            df,
+            self.config.ema_fast_period,
+            self.config.ema_slow_period,
+            htf_period_bars=self.config.htf_period_bars if self.config.htf_filter_enabled else None,
+        )
 
         state = self._load_state(user_id, symbol)
         signals: List[dict] = []
@@ -159,14 +188,30 @@ class EMACrossoverStrategy:
         cross_up = prev_ema200 <= prev_ema400 and ema200 > ema400
         cross_dn = prev_ema200 >= prev_ema400 and ema200 < ema400
 
+        # Optional HTF filter: only accept crossover if regime matches.
+        htf_ok_buy = htf_ok_sell = True
+        if self.config.htf_filter_enabled and "htf_sma" in row.index:
+            htf = row["htf_sma"]
+            if pd.notna(htf):
+                htf_ok_buy = row["close"] > htf
+                htf_ok_sell = row["close"] < htf
+
         # Trend reset on opposite crossover — closes ALL open positions.
         if cross_up:
+            if not htf_ok_buy:
+                signals.append(self._make_signal(row, "CROSSOVER_SKIP", "BUY",
+                                                 note="HTF filter: close below htf_sma"))
+                return signals
             if self._open_positions(state):
                 signals.extend(self._close_all_positions(state, row, "CROSSOVER_FLIP"))
             self._reset_state(state, "BUY", row)
             signals.append(self._make_signal(row, "CROSSOVER", "BUY", note="EMA200 above EMA400"))
             return signals
         if cross_dn:
+            if not htf_ok_sell:
+                signals.append(self._make_signal(row, "CROSSOVER_SKIP", "SELL",
+                                                 note="HTF filter: close above htf_sma"))
+                return signals
             if self._open_positions(state):
                 signals.extend(self._close_all_positions(state, row, "CROSSOVER_FLIP"))
             self._reset_state(state, "SELL", row)
@@ -229,9 +274,17 @@ class EMACrossoverStrategy:
                     signals.append(self._make_signal(row, "ALERT2_SKIP", "BUY",
                                                      note="EMA400 touched before retest1 break — omit ENTRY1"))
                 state.retest1_pending_cross_ts = None  # abandon any pending retest1 sustain
+                if self.config.skip_retest2:
+                    self._reset_state(state, "NONE", row)
+                    return signals
                 state.stage = 4
             else:
                 # 3b) Cross + sustain logic on retest1.high
+                def _r1_buy_cap():
+                    if self.config.skip_retest2:
+                        self._reset_state(state, "NONE", row)
+                    else:
+                        state.stage = 4
                 signals.extend(self._handle_retest_break_buy(
                     state, row, prev,
                     level=state.retest1_high,
@@ -241,16 +294,27 @@ class EMACrossoverStrategy:
                     entry_alert="retest1",
                     sl=float(ema400),
                     sl_type="ema400",
-                    on_cap_reached=lambda: setattr(state, "stage", 4),
+                    on_cap_reached=_r1_buy_cap,
                 ))
         # Stage 4 -> ALERT3: EMA400 touch / cross below
         if state.stage == 4:
             if row["low"] <= ema400:
+                cap_n = self.config.max_alert3_locks_per_cycle
+                cur = state.alert3_locks_count or 0
+                if cap_n > 0 and cur >= cap_n:
+                    # Cap hit: end cycle (await next crossover) instead of re-locking
+                    signals.append(self._make_signal(
+                        row, "ALERT3_SKIP", "BUY",
+                        note=f"max_alert3_locks_per_cycle={cap_n} reached — end cycle"
+                    ))
+                    self._reset_state(state, "NONE", row)
+                    return signals
                 state.retest2_ts = int(row["timestamp"])
                 state.retest2_high = float(row["high"])
                 state.retest2_low = float(row["low"])
                 state.retest2_attempts = 0
                 state.retest2_pending_cross_ts = None
+                state.alert3_locks_count = cur + 1
                 state.stage = 5
                 signals.append(self._make_signal(row, "ALERT3", "BUY",
                                                  note="EMA400 retest candle locked"))
@@ -301,8 +365,16 @@ class EMACrossoverStrategy:
                     signals.append(self._make_signal(row, "ALERT2_SKIP", "SELL",
                                                      note="EMA400 touched before retest1 break — omit ENTRY1"))
                 state.retest1_pending_cross_ts = None
+                if self.config.skip_retest2:
+                    self._reset_state(state, "NONE", row)
+                    return signals
                 state.stage = 4
             else:
+                def _r1_sell_cap():
+                    if self.config.skip_retest2:
+                        self._reset_state(state, "NONE", row)
+                    else:
+                        state.stage = 4
                 signals.extend(self._handle_retest_break_sell(
                     state, row, prev,
                     level=state.retest1_low,
@@ -312,16 +384,26 @@ class EMACrossoverStrategy:
                     entry_alert="retest1",
                     sl=float(ema400),
                     sl_type="ema400",
-                    on_cap_reached=lambda: setattr(state, "stage", 4),
+                    on_cap_reached=_r1_sell_cap,
                 ))
 
         if state.stage == 4:
             if row["high"] >= ema400:
+                cap_n = self.config.max_alert3_locks_per_cycle
+                cur = state.alert3_locks_count or 0
+                if cap_n > 0 and cur >= cap_n:
+                    signals.append(self._make_signal(
+                        row, "ALERT3_SKIP", "SELL",
+                        note=f"max_alert3_locks_per_cycle={cap_n} reached — end cycle"
+                    ))
+                    self._reset_state(state, "NONE", row)
+                    return signals
                 state.retest2_ts = int(row["timestamp"])
                 state.retest2_high = float(row["high"])
                 state.retest2_low = float(row["low"])
                 state.retest2_attempts = 0
                 state.retest2_pending_cross_ts = None
+                state.alert3_locks_count = cur + 1
                 state.stage = 5
                 signals.append(self._make_signal(row, "ALERT3", "SELL",
                                                  note="EMA400 retest candle locked"))
@@ -493,6 +575,16 @@ class EMACrossoverStrategy:
         else:
             target = entry_price * (1 - self.config.target_pct)
             partial = entry_price * (1 - self.config.partial_pct)
+        # Optional ENTRY2 SL cap — tighten retest2 SL distance from entry.
+        if (entry_alert == "retest2" and sl_type == "static"
+                and self.config.retest2_sl_cap_pct > 0):
+            cap_pct = self.config.retest2_sl_cap_pct
+            if trend == "BUY":
+                cap_sl = entry_price * (1 - cap_pct)
+                sl = max(sl, cap_sl)  # tighter = closer to entry = larger value
+            else:
+                cap_sl = entry_price * (1 + cap_pct)
+                sl = min(sl, cap_sl)
         return {
             "trend": trend,
             "entry_alert": entry_alert,            # 'retest1' | 'retest2'
@@ -670,6 +762,7 @@ class EMACrossoverStrategy:
         state.retest1_invalidated = False
         state.retest1_pending_cross_ts = None
         state.retest2_pending_cross_ts = None
+        state.alert3_locks_count = 0
         self._save_positions(state, [])
 
     # ------------------------------------------------------------------
@@ -714,6 +807,7 @@ class EMACrossoverStrategy:
                     user_id=user_id, symbol=symbol, trend="NONE", stage=0,
                     retest1_attempts=0, retest2_attempts=0,
                     retest1_invalidated=False, positions_json=[],
+                    alert3_locks_count=0,
                 )
                 session.add(state)
                 session.commit()

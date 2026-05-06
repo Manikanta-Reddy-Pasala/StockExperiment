@@ -186,6 +186,8 @@ class EMACrossoverState(Base):
     # Stores bar timestamp where retest level was first broken.
     retest1_pending_cross_ts = Column(BigInteger)
     retest2_pending_cross_ts = Column(BigInteger)
+    # Tuning: count ALERT3 locks per cycle (capped via config.max_alert3_locks_per_cycle).
+    alert3_locks_count = Column(Integer, nullable=False, default=0)
 
     last_evaluated_ts = Column(BigInteger)
     created_at = Column(DateTime, default=datetime.utcnow)
