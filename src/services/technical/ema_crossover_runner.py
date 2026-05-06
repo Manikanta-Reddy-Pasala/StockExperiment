@@ -49,17 +49,18 @@ class EMACrossoverRunner:
     def __init__(self, config: Optional[StrategyConfig] = None):
         self.db = get_database_manager()
         self.candles = get_historical_1h_service()
-        # Production preset: empirically-tuned filters from Nifty50 720d
-        # backtest. Spec logic (Stage 0-5, retests, SL handling) UNCHANGED —
-        # these only gate the CROSSOVER signal at trend detection.
+        # Production preset (minimal, empirically tuned on Nifty50 720d):
+        #   BUY  = HTF filter only (close > 200d SMA at crossover)
+        #   SELL = HTF filter + EMA200 slope (50d, 0.5% drop required)
+        # Spec logic (Stage 0-5, retests, SL handling) UNCHANGED. Filters
+        # only gate the CROSSOVER signal at trend detection.
         if config is None:
             config = StrategyConfig(
                 htf_filter_enabled=True,
-                htf_buy_period_bars=1400,        # 200d
-                htf_sell_period_bars=1400,       # 200d
-                max_alert3_locks_per_cycle=2,    # cap retest2 re-locks
-                sell_slope_bars=350,             # 50d EMA200 slope check for SELL
-                sell_slope_min_pct=0.005,        # require 0.5% drop
+                htf_buy_period_bars=1400,        # 200d on 1H
+                htf_sell_period_bars=1400,       # 200d on 1H
+                sell_slope_bars=350,             # 50d EMA200 slope check (SELL)
+                sell_slope_min_pct=0.005,        # require >=0.5% drop
             )
         self.strategy: EMACrossoverStrategy = get_ema_crossover_strategy(config)
 
