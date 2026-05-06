@@ -4,6 +4,7 @@ Stores OHLCV data for comprehensive technical indicator calculations
 """
 
 from sqlalchemy import Column, Integer, String, Float, DateTime, BigInteger, Date, Boolean, Index, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -170,10 +171,21 @@ class EMACrossoverState(Base):
     entry2_price = Column(Float)
     entry2_time = Column(DateTime)
 
-    # Risk management
-    stop_loss = Column(Float)       # Long: EMA400 close, Short: EMA400 close
-    target_price = Column(Float)    # 5000 pts for index, RR-based for stocks
+    # Risk management — last entry's SL/target shown for UI; authoritative
+    # per-position state lives in positions_json.
+    stop_loss = Column(Float)
+    target_price = Column(Float)
     position_active = Column(Boolean, default=False)
+
+    # v2 BTC rules state
+    retest1_attempts = Column(Integer, nullable=False, default=0)
+    retest2_attempts = Column(Integer, nullable=False, default=0)
+    retest1_invalidated = Column(Boolean, nullable=False, default=False)
+    positions_json = Column(JSONB, nullable=False, default=list)
+    # Pending cross detection — wait sustain_minutes before triggering ENTRY.
+    # Stores bar timestamp where retest level was first broken.
+    retest1_pending_cross_ts = Column(BigInteger)
+    retest2_pending_cross_ts = Column(BigInteger)
 
     last_evaluated_ts = Column(BigInteger)
     created_at = Column(DateTime, default=datetime.utcnow)

@@ -44,6 +44,30 @@ SMOKE_SYMBOLS = [
     ("ICICIBANK.NS", "ICICI Bank"),
 ]
 
+# NIFTY 50 constituents (Yahoo .NS format). Source mirrors
+# yfinance_data_service.get_nifty50_stocks().
+NIFTY50_BASE = [
+    'ADANIENT', 'ADANIPORTS', 'APOLLOHOSP', 'ASIANPAINT', 'AXISBANK',
+    'BAJAJ-AUTO', 'BAJFINANCE', 'BAJAJFINSV', 'BPCL', 'BHARTIARTL',
+    'BRITANNIA', 'CIPLA', 'COALINDIA', 'DIVISLAB', 'DRREDDY',
+    'EICHERMOT', 'GRASIM', 'HCLTECH', 'HDFCBANK', 'HDFCLIFE',
+    'HEROMOTOCO', 'HINDALCO', 'HINDUNILVR', 'ICICIBANK', 'ITC',
+    'INDUSINDBK', 'INFY', 'JSWSTEEL', 'KOTAKBANK', 'LT',
+    'M&M', 'MARUTI', 'NTPC', 'NESTLEIND', 'ONGC',
+    'POWERGRID', 'RELIANCE', 'SBILIFE', 'SBIN', 'SUNPHARMA',
+    'TCS', 'TATACONSUM', 'TATAMOTORS', 'TATASTEEL', 'TECHM',
+    'TITAN', 'ULTRACEMCO', 'UPL', 'WIPRO', 'LTIM',
+]
+# Yahoo .NS format. `&` gets URL-encoded by fetch_1h_yahoo() so M&M.NS works.
+# Override map for symbols Yahoo lists under different ticker than NSE.
+YAHOO_OVERRIDES = {
+    "TATAMOTORS": "TATAMOTORS.NS",  # active again post-2024 demerger
+    "LTIM": "LTIM.NS",
+}
+NIFTY50_SYMBOLS = [
+    (YAHOO_OVERRIDES.get(s, f"{s}.NS"), s) for s in NIFTY50_BASE
+]
+
 # Indian benchmark indices — 5000-pt target rule applies (image spec).
 INDEX_SYMBOLS = [
     ("^NSEI", "NIFTY 50"),
@@ -71,9 +95,10 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
 
 def fetch_1h_yahoo(symbol: str, days: int = 720) -> pd.DataFrame:
     """Yahoo chart API. Hourly data window cap is ~730 days."""
+    from urllib.parse import quote
     params = {"interval": "1h", "range": f"{min(days, 730)}d"}
     try:
-        r = requests.get(YAHOO_URL.format(symbol=symbol),
+        r = requests.get(YAHOO_URL.format(symbol=quote(symbol, safe=".^")),
                          params=params, headers=HEADERS, timeout=30)
         r.raise_for_status()
         payload = r.json()
@@ -276,6 +301,17 @@ class StrategyState:
     target_price: Optional[float] = None
     position_active: bool = False
     last_evaluated_ts: Optional[int] = None
+    # v2 BTC rules
+    retest1_attempts: int = 0
+    retest2_attempts: int = 0
+    retest1_invalidated: bool = False
+    retest1_pending_cross_ts: Optional[int] = None
+    retest2_pending_cross_ts: Optional[int] = None
+    positions_json: list = None  # mutable; init in __post_init__
+
+    def __post_init__(self):
+        if self.positions_json is None:
+            self.positions_json = []
 
 
 class OfflineStrategy(EMACrossoverStrategy):
@@ -316,114 +352,153 @@ def simulate_pnl(
     signals: List[Dict],
     df: pd.DataFrame,
     symbol: str,
-    target_points: float = 5000.0,
-    rr_multiple: float = 3.0,
+    partial_qty_frac: float = 0.5,
 ) -> Dict:
-    """Walk bars chronologically with target/SL enforcement.
+    """Walk strategy signals; v2 strategy emits per-position events directly.
 
-    Each ENTRY1/ENTRY2 opens 1 unit with target & SL captured at signal time.
-        - Target: bar.high >= target (BUY) / bar.low <= target (SELL) -> closed at target.
-        - SL:     1H close past EMA400 -> EXIT signal already emitted by strategy,
-                  so SL exits arrive as EXIT events (close at signal price).
-    Multiple entries close together when EXIT fires (cascade close).
+    Signal types consumed:
+        ENTRY1 / ENTRY2  -> open 1 unit; carries 'sl' and 'target' fields
+        PARTIAL          -> book partial_qty_frac of earliest matching open pos
+        STOP_HIT         -> close remaining qty of earliest matching open pos
+        TARGET_HIT       -> close remaining qty of earliest matching open pos
+        EXIT             -> ignored (force-close already emitted as STOP_HIT)
+    P&L per unit. FIFO match by trend (PARTIAL/STOP_HIT/TARGET_HIT close
+    earliest-open same-trend position).
     """
     if df.empty:
         return _empty_pnl()
 
-    bars = df.set_index("timestamp", drop=False).sort_index()
-    bar_ts_list: List[int] = list(bars.index)
-    is_index = _is_index_symbol(symbol)
-
-    sigs_by_ts: Dict[int, List[Dict]] = {}
-    for s in signals:
-        sigs_by_ts.setdefault(int(s["candle_ts"]), []).append(s)
-
-    open_entries: List[Dict] = []
+    open_positions: List[Dict] = []
     closed: List[Dict] = []
     pnl_total = 0.0
 
-    def _open_entry(sig: Dict) -> Dict:
-        ema400 = float(sig["ema_400"])
-        entry_price = float(sig["price"])
-        if is_index:
-            target = entry_price + target_points if sig["trend"] == "BUY" \
-                else entry_price - target_points
-        else:
-            risk = abs(entry_price - ema400)
-            target = entry_price + risk * rr_multiple if sig["trend"] == "BUY" \
-                else entry_price - risk * rr_multiple
-        return {
-            "type": sig["signal_type"],
-            "trend": sig["trend"],
-            "price": entry_price,
-            "time": sig["candle_time"],
-            "entry_ts": int(sig["candle_ts"]),
-            "target": target,
-            "sl_ema400": ema400,
-        }
+    def _pnl(trend: str, entry: float, exit_price: float, qty: float) -> float:
+        if trend == "BUY":
+            return qty * (exit_price - entry)
+        return qty * (entry - exit_price)
 
-    def _close(e: Dict, exit_price: float, exit_time, reason: str) -> float:
-        pnl = (exit_price - e["price"]) if e["trend"] == "BUY" else (e["price"] - exit_price)
-        closed.append({
-            **e,
-            "exit_price": exit_price,
-            "exit_time": exit_time,
-            "exit_reason": reason,
-            "pnl": pnl,
-        })
-        return pnl
+    def _pct(trend: str, entry: float, exit_price: float) -> float:
+        """Per-leg % return (independent of position size)."""
+        if entry <= 0:
+            return 0.0
+        if trend == "BUY":
+            return (exit_price / entry - 1.0) * 100.0
+        return (1.0 - exit_price / entry) * 100.0
 
-    for ts in bar_ts_list:
-        bar = bars.loc[ts]
+    def _match(trend: str, need_qty: bool = True) -> Optional[Dict]:
+        for p in open_positions:
+            if p["trend"] != trend:
+                continue
+            if need_qty and p["qty"] <= 0:
+                continue
+            return p
+        return None
 
-        # 1. Process signals at this timestamp first (entries / EXITs)
-        for sig in sigs_by_ts.get(int(ts), []):
-            t = sig["signal_type"]
-            if t in ("ENTRY1", "ENTRY2"):
-                open_entries.append(_open_entry(sig))
-            elif t == "EXIT" and open_entries:
-                for e in open_entries:
-                    pnl_total += _close(e, float(sig["price"]),
-                                        sig["candle_time"], "EXIT_EMA400")
-                open_entries = []
-
-        # 2. Walk forward bars (skip entry bar itself) checking target hit
-        if open_entries:
-            still: List[Dict] = []
-            for e in open_entries:
-                if int(ts) <= e["entry_ts"]:
-                    still.append(e)
-                    continue
-                hit = False
-                if e["trend"] == "BUY" and float(bar["high"]) >= e["target"]:
-                    pnl_total += _close(e, e["target"], bar["candle_time"], "TARGET")
-                    hit = True
-                elif e["trend"] == "SELL" and float(bar["low"]) <= e["target"]:
-                    pnl_total += _close(e, e["target"], bar["candle_time"], "TARGET")
-                    hit = True
-                if not hit:
-                    still.append(e)
-            open_entries = still
-
+    for sig in signals:
+        t = sig["signal_type"]
+        trend = sig["trend"]
+        if t in ("ENTRY1", "ENTRY2"):
+            open_positions.append({
+                "type": t,
+                "trend": trend,
+                "entry_alert": "retest1" if t == "ENTRY1" else "retest2",
+                "entry_price": float(sig["price"]),
+                "entry_time": sig["candle_time"],
+                "entry_ts": int(sig["candle_ts"]),
+                "target": float(sig.get("target") or 0.0),
+                "sl": float(sig.get("sl") or 0.0),
+                "qty": 1.0,
+                "partial_booked": False,
+            })
+        elif t == "PARTIAL":
+            for p in open_positions:
+                if p["trend"] == trend and not p["partial_booked"] and p["qty"] > 0:
+                    book = p["qty"] * partial_qty_frac
+                    exit_price = float(sig["price"])
+                    pnl = _pnl(trend, p["entry_price"], exit_price, book)
+                    pnl_total += pnl
+                    closed.append({
+                        **{k: p[k] for k in ("trend", "entry_alert", "entry_price",
+                                              "entry_time", "type")},
+                        "exit_price": exit_price,
+                        "exit_time": sig["candle_time"],
+                        "exit_reason": "PARTIAL",
+                        "qty_closed": book,
+                        "pnl": pnl,
+                        "pct": _pct(trend, p["entry_price"], exit_price),
+                    })
+                    p["qty"] -= book
+                    p["partial_booked"] = True
+                    p["sl"] = p["entry_price"]  # trail SL to entry
+                    break
+        elif t in ("TARGET_HIT", "STOP_HIT"):
+            p = _match(trend, need_qty=True)
+            if p is not None:
+                exit_price = float(sig["price"])
+                pnl = _pnl(trend, p["entry_price"], exit_price, p["qty"])
+                pnl_total += pnl
+                closed.append({
+                    **{k: p[k] for k in ("trend", "entry_alert", "entry_price",
+                                          "entry_time", "type")},
+                    "exit_price": exit_price,
+                    "exit_time": sig["candle_time"],
+                    "exit_reason": t,
+                    "qty_closed": p["qty"],
+                    "pnl": pnl,
+                    "pct": _pct(trend, p["entry_price"], exit_price),
+                })
+                p["qty"] = 0.0
+            open_positions = [p for p in open_positions if p["qty"] > 0]
+        # EXIT, CROSSOVER, ALERT*, ALERT2_SKIP -> no P&L action
+    pcts = [c["pct"] for c in closed]
     return {
         "trades_closed": len(closed),
-        "trades_open": len(open_entries),
-        "winners": sum(1 for c in closed if c["pnl"] > 0),
-        "losers": sum(1 for c in closed if c["pnl"] <= 0),
+        "trades_open": len(open_positions),
+        "winners": sum(1 for c in closed if c["pct"] > 0),
+        "losers": sum(1 for c in closed if c["pct"] <= 0),
         "total_pnl": pnl_total,
         "avg_pnl": (pnl_total / len(closed)) if closed else 0.0,
-        "target_hits": sum(1 for c in closed if c["exit_reason"] == "TARGET"),
-        "ema_exits": sum(1 for c in closed if c["exit_reason"] == "EXIT_EMA400"),
+        "sum_pct": sum(pcts),
+        "avg_pct": (sum(pcts) / len(pcts)) if pcts else 0.0,
+        "median_pct": sorted(pcts)[len(pcts) // 2] if pcts else 0.0,
+        "target_hits": sum(1 for c in closed if c["exit_reason"] == "TARGET_HIT"),
+        "stop_hits": sum(1 for c in closed if c["exit_reason"] == "STOP_HIT"),
+        "partials": sum(1 for c in closed if c["exit_reason"] == "PARTIAL"),
         "closed": closed,
-        "open": open_entries,
+        "open": open_positions,
     }
 
 
 def _empty_pnl() -> Dict:
     return {
         "trades_closed": 0, "trades_open": 0, "winners": 0, "losers": 0,
-        "total_pnl": 0.0, "avg_pnl": 0.0, "target_hits": 0, "ema_exits": 0,
+        "total_pnl": 0.0, "avg_pnl": 0.0,
+        "sum_pct": 0.0, "avg_pct": 0.0, "median_pct": 0.0,
+        "target_hits": 0, "stop_hits": 0, "partials": 0,
         "closed": [], "open": [],
+    }
+
+
+def summarize_subset(legs: List[Dict]) -> Dict:
+    """Aggregate stats for any subset of closed legs (BUY-only, SELL-only,
+    retest1-only, retest2-only, etc.)."""
+    if not legs:
+        return {
+            "legs": 0, "winners": 0, "win_rate": 0.0,
+            "avg_pct": 0.0, "sum_pct": 0.0, "median_pct": 0.0,
+            "target_hits": 0, "stop_hits": 0, "partials": 0,
+        }
+    pcts = [c["pct"] for c in legs]
+    return {
+        "legs": len(legs),
+        "winners": sum(1 for c in legs if c["pct"] > 0),
+        "win_rate": sum(1 for c in legs if c["pct"] > 0) / len(legs) * 100,
+        "avg_pct": sum(pcts) / len(pcts),
+        "sum_pct": sum(pcts),
+        "median_pct": sorted(pcts)[len(pcts) // 2],
+        "target_hits": sum(1 for c in legs if c["exit_reason"] == "TARGET_HIT"),
+        "stop_hits": sum(1 for c in legs if c["exit_reason"] == "STOP_HIT"),
+        "partials": sum(1 for c in legs if c["exit_reason"] == "PARTIAL"),
     }
 
 
@@ -434,23 +509,35 @@ def _empty_pnl() -> Dict:
 #   Trend Identification → First Alert → Second Alert (Retest 1)
 #   → First Entry → Third Alert (Retest 2) → Second Entry → Exit
 STAGE_LABELS_BUY = {
-    "CROSSOVER": "Trend Identification (BUY)",
-    "ALERT1":    "First Alert — break + close above crossover candle high",
-    "ALERT2":    "Second Alert (Retest 1) — EMA200 retest from above",
-    "ENTRY1":    "First Entry (BUY) — break of retest1 high, sustain",
-    "ALERT3":    "Third Alert (Retest 2) — price touches/crosses EMA400",
-    "ENTRY2":    "Second Entry (BUY) — break of retest2 high, sustain",
-    "EXIT":      "Exit — 1H close below EMA400",
+    "CROSSOVER":   "Trend Identification (BUY)",
+    "ALERT1":      "First Alert — break + close above crossover candle high",
+    "ALERT2":      "Second Alert (Retest 1) — EMA200 retest from above",
+    "ALERT2_SKIP": "Retest1 invalidated — EMA400 touched before ENTRY1",
+    "ENTRY1":      "First Entry (BUY) — retest1 break (cap 3 attempts)",
+    "ALERT3":      "Third Alert (Retest 2) — price touches/crosses EMA400",
+    "ENTRY2":      "Second Entry (BUY) — retest2 break (cap 3 attempts)",
+    "PARTIAL":     "Partial book — 50% qty @ 15%, trail SL → entry",
+    "TARGET_HIT":  "Target hit — 30% from entry",
+    "STOP_HIT":    "Stop hit — per-position SL triggered",
+    "PENDING":     "Cross detected — sustain check pending",
+    "PENDING_CANCEL": "Sustain check cancelled (price retraced)",
+    "EXIT":        "Exit — 1H close below EMA400",
 }
 
 STAGE_LABELS_SELL = {
-    "CROSSOVER": "Trend Identification (SELL)",
-    "ALERT1":    "First Alert — break + close below crossover candle low",
-    "ALERT2":    "Second Alert (Retest 1) — EMA200 retest from below",
-    "ENTRY1":    "First Entry (SELL) — break of retest1 low, sustain",
-    "ALERT3":    "Third Alert (Retest 2) — price touches/crosses EMA400",
-    "ENTRY2":    "Second Entry (SELL) — break of retest2 low, sustain",
-    "EXIT":      "Exit — 1H close above EMA400",
+    "CROSSOVER":   "Trend Identification (SELL)",
+    "ALERT1":      "First Alert — break + close below crossover candle low",
+    "ALERT2":      "Second Alert (Retest 1) — EMA200 retest from below",
+    "ALERT2_SKIP": "Retest1 invalidated — EMA400 touched before ENTRY1",
+    "ENTRY1":      "First Entry (SELL) — retest1 break (cap 3 attempts)",
+    "ALERT3":      "Third Alert (Retest 2) — price touches/crosses EMA400",
+    "ENTRY2":      "Second Entry (SELL) — retest2 break (cap 3 attempts)",
+    "PARTIAL":     "Partial book — 50% qty @ 15%, trail SL → entry",
+    "TARGET_HIT":  "Target hit — 30% from entry",
+    "STOP_HIT":    "Stop hit — per-position SL triggered",
+    "PENDING":     "Cross detected — sustain check pending",
+    "PENDING_CANCEL": "Sustain check cancelled (price retraced)",
+    "EXIT":        "Exit — 1H close above EMA400",
 }
 
 
@@ -498,28 +585,70 @@ def render_md(symbol: str, name: str, df: pd.DataFrame,
         f"- **Source:** Yahoo chart API (1H bars)",
         f"- **Window:** {first} → {last} ({bar_count} bars)",
         f"- **Last close:** {last_close:.2f}",
-        f"- **Strategy:** EMA 200/400 1H crossover",
-        f"- **Target rule:** {'5000 pts (index)' if _is_index_symbol(symbol) else '1:3 RR (equity)'}",
-        f"- **Stop-loss rule:** 1H close on wrong side of EMA400",
+        f"- **Strategy:** EMA 200/400 1H crossover (v2 BTC rules)",
+        f"- **Target:** entry × (1 ± 30%)",
+        f"- **Partial:** 50% qty booked @ 15%, trail SL → entry",
+        f"- **SL:** ENTRY1 = EMA400 close-based; ENTRY2 = retest2 candle low/high",
+        f"- **Re-entry cap:** 3 attempts each at retest1 and retest2",
         "",
         "## Signal Counts",
         "",
         "| Signal | Count |",
         "|--------|-------|",
     ]
-    for k in ("CROSSOVER", "ALERT1", "ALERT2", "ALERT3", "ENTRY1", "ENTRY2", "EXIT"):
+    for k in ("CROSSOVER", "ALERT1", "ALERT2", "ALERT2_SKIP", "ALERT3",
+              "PENDING", "PENDING_CANCEL",
+              "ENTRY1", "ENTRY2", "PARTIAL", "TARGET_HIT", "STOP_HIT", "EXIT"):
         lines.append(f"| {k} | {type_counts.get(k, 0)} |")
 
     lines += [
         "",
-        "## P&L",
+        "## P&L (combined)",
         "",
-        f"- **Trades closed:** {pnl['trades_closed']}",
+        f"- **Closed legs:** {pnl['trades_closed']} (incl. partial bookings)",
         f"- **Trades open at end:** {pnl['trades_open']}",
         f"- **Winners / losers:** {pnl['winners']} / {pnl['losers']}",
-        f"- **Target hits / EMA400 exits:** {pnl.get('target_hits', 0)} / {pnl.get('ema_exits', 0)}",
-        f"- **Total realized P&L (per unit):** {pnl['total_pnl']:.2f}",
-        f"- **Avg P&L per closed trade:** {pnl['avg_pnl']:.2f}",
+        f"- **Target hits / Stop hits / Partials:** "
+        f"{pnl.get('target_hits', 0)} / {pnl.get('stop_hits', 0)} / {pnl.get('partials', 0)}",
+        f"- **Avg / median % per leg:** {pnl.get('avg_pct', 0):.2f}% / {pnl.get('median_pct', 0):.2f}%",
+        f"- **Sum % (uncompounded):** {pnl.get('sum_pct', 0):.2f}%",
+    ]
+
+    # ---- Direction + alert breakdown ----
+    closed = pnl.get("closed") or []
+    buy_legs   = [c for c in closed if c["trend"] == "BUY"]
+    sell_legs  = [c for c in closed if c["trend"] == "SELL"]
+    retest1    = [c for c in closed if c.get("entry_alert") == "retest1"]
+    retest2    = [c for c in closed if c.get("entry_alert") == "retest2"]
+    buy_r1   = [c for c in buy_legs  if c.get("entry_alert") == "retest1"]
+    buy_r2   = [c for c in buy_legs  if c.get("entry_alert") == "retest2"]
+    sell_r1  = [c for c in sell_legs if c.get("entry_alert") == "retest1"]
+    sell_r2  = [c for c in sell_legs if c.get("entry_alert") == "retest2"]
+    buckets = [
+        ("BUY (all)",         buy_legs),
+        ("BUY @ 2nd Alert (retest1)",  buy_r1),
+        ("BUY @ 3rd Alert (retest2)",  buy_r2),
+        ("SELL (all)",        sell_legs),
+        ("SELL @ 2nd Alert (retest1)", sell_r1),
+        ("SELL @ 3rd Alert (retest2)", sell_r2),
+        ("retest1 (combined)",         retest1),
+        ("retest2 (combined)",         retest2),
+    ]
+    lines += [
+        "",
+        "## Direction × Alert breakdown",
+        "",
+        "| Bucket | Legs | Win | Win% | Tgt | SL | Prt | Avg % | Sum % |",
+        "|--------|------|-----|------|-----|----|-----|-------|-------|",
+    ]
+    for name, subset in buckets:
+        s = summarize_subset(subset)
+        lines.append(
+            f"| {name} | {s['legs']} | {s['winners']} | {s['win_rate']:.1f}% | "
+            f"{s['target_hits']} | {s['stop_hits']} | {s['partials']} | "
+            f"{s['avg_pct']:.2f}% | {s['sum_pct']:.1f}% |"
+        )
+    lines += [
         "",
         "## Strategy Cycles",
         "",
@@ -553,16 +682,17 @@ def render_md(symbol: str, name: str, df: pd.DataFrame,
     if pnl["closed"]:
         lines += [
             "",
-            "## Closed Trades",
+            "## Closed Legs",
             "",
-            "| Trend | Entry Time | Entry | Exit Time | Exit | Reason | P&L |",
-            "|-------|-----------|-------|-----------|------|--------|-----|",
+            "| Trend | Alert | Entry Time | Entry | Exit Time | Exit | Reason | Qty | % |",
+            "|-------|-------|-----------|-------|-----------|------|--------|-----|---|",
         ]
         for t in pnl["closed"]:
             lines.append(
-                f"| {t['trend']} | {t['time']} | {t['price']:.2f} | "
-                f"{t['exit_time']} | {t['exit_price']:.2f} | "
-                f"{t.get('exit_reason', '')} | {t['pnl']:.2f} |"
+                f"| {t['trend']} | {t.get('entry_alert','')} | {t['entry_time']} | "
+                f"{t['entry_price']:.2f} | {t['exit_time']} | "
+                f"{t['exit_price']:.2f} | {t.get('exit_reason', '')} | "
+                f"{t.get('qty_closed', 1.0):.2f} | {t.get('pct', 0):.2f}% |"
             )
 
     path.write_text("\n".join(lines) + "\n")
@@ -575,16 +705,17 @@ def main() -> int:
                         help="History window (Yahoo caps 1H at ~730d)")
     parser.add_argument("--out", type=Path,
                         default=ROOT / "exports" / "backtests")
-    parser.add_argument("--universe", choices=["smoke", "nifty500", "indices"],
+    parser.add_argument("--universe", choices=["smoke", "nifty50", "nifty500", "indices"],
                         default="smoke",
-                        help="smoke=5-stock sanity; nifty500=full Nifty 500; "
-                             "indices=NIFTY/BANKNIFTY/sectoral (5000-pt target)")
+                        help="smoke=5-stock sanity; nifty50=NIFTY 50 constituents; "
+                             "nifty500=full Nifty 500; indices=NIFTY/BANKNIFTY/sectoral")
     parser.add_argument("--limit", type=int, default=None,
                         help="When --universe=nifty500, cap to first N")
     parser.add_argument("--source", choices=["auto", "fyers", "yahoo"],
                         default="auto",
-                        help="Data source (default auto: Fyers first, Yahoo "
-                             "fallback). 'fyers' requires Postgres + valid token.")
+                        help="Data source. Default 'auto' = Fyers first, Yahoo "
+                             "fallback per-symbol (recommended). 'fyers' = Fyers "
+                             "only, errors if token missing. 'yahoo' = Yahoo only.")
     parser.add_argument("--user-id", type=int, default=1,
                         help="Fyers user_id (default 1) for token lookup")
     parser.add_argument("--symbol", type=str, default=None,
@@ -615,6 +746,11 @@ def main() -> int:
             sym = "^" + sym.replace("NSE:", "").replace("-INDEX", "")
         symbols_list = [(sym, sym)]
         print(f"Universe: single symbol ({sym})")
+    elif args.universe == "nifty50":
+        symbols_list = NIFTY50_SYMBOLS
+        if args.limit:
+            symbols_list = symbols_list[:args.limit]
+        print(f"Universe: NIFTY 50 ({len(symbols_list)} symbols)")
     elif args.universe == "nifty500":
         symbols_list = nifty500_yahoo_symbols(limit=args.limit)
         if not symbols_list:
@@ -657,61 +793,153 @@ def main() -> int:
         signals = strat.evaluate(user_id=1, symbol=symbol, candles=candles)
         pnl = simulate_pnl(
             signals, df, symbol,
-            target_points=config.target_points,
-            rr_multiple=config.rr_multiple,
+            partial_qty_frac=config.partial_qty_frac,
         )
 
         path = render_md(symbol, name, df, signals, pnl, args.out)
-        print(f"  bars={len(candles)}  signals={len(signals)}  "
-              f"closed={pnl['trades_closed']}  tgt={pnl['target_hits']}  "
-              f"ema={pnl['ema_exits']}  pnl={pnl['total_pnl']:.2f}  -> {path}")
+        # Per-direction aggregates for the global summary
+        closed = pnl.get("closed") or []
+        buy_stats  = summarize_subset([c for c in closed if c["trend"] == "BUY"])
+        sell_stats = summarize_subset([c for c in closed if c["trend"] == "SELL"])
+        print(f"  src={src}  bars={len(candles)}  legs={pnl['trades_closed']} "
+              f"BUY({buy_stats['legs']} avg{buy_stats['avg_pct']:.1f}%) "
+              f"SELL({sell_stats['legs']} avg{sell_stats['avg_pct']:.1f}%) "
+              f"-> {path}")
         aggregate.append({
             "symbol": symbol,
             "name": name,
             "bars": len(candles),
             "signals": len(signals),
-            "closed": pnl["trades_closed"],
+            "closed_legs": closed,
+            "trades_closed": pnl["trades_closed"],
             "winners": pnl["winners"],
             "target_hits": pnl["target_hits"],
-            "ema_exits": pnl["ema_exits"],
-            "pnl": pnl["total_pnl"],
+            "stop_hits": pnl["stop_hits"],
+            "partials": pnl["partials"],
+            "sum_pct": pnl["sum_pct"],
+            "avg_pct": pnl["avg_pct"],
+            "buy": buy_stats,
+            "sell": sell_stats,
         })
 
     # Top-level summary file
-    total_closed = sum(a['closed'] for a in aggregate)
+    total_closed = sum(a['trades_closed'] for a in aggregate)
     total_winners = sum(a['winners'] for a in aggregate)
     total_target = sum(a['target_hits'] for a in aggregate)
-    total_ema = sum(a['ema_exits'] for a in aggregate)
-    total_pnl = sum(a['pnl'] for a in aggregate)
+    total_stop = sum(a['stop_hits'] for a in aggregate)
+    total_partial = sum(a['partials'] for a in aggregate)
+    total_sum_pct = sum(a['sum_pct'] for a in aggregate)
+    avg_pct_overall = (total_sum_pct / total_closed) if total_closed else 0.0
+    profitable_symbols = sum(1 for a in aggregate if a['sum_pct'] > 0)
+    # Universe-wide direction subsets
+    all_closed = [c for a in aggregate for c in a.get("closed_legs", [])]
+    g_buy  = summarize_subset([c for c in all_closed if c["trend"] == "BUY"])
+    g_sell = summarize_subset([c for c in all_closed if c["trend"] == "SELL"])
+    g_buy_r1  = summarize_subset([c for c in all_closed if c["trend"] == "BUY"  and c.get("entry_alert") == "retest1"])
+    g_buy_r2  = summarize_subset([c for c in all_closed if c["trend"] == "BUY"  and c.get("entry_alert") == "retest2"])
+    g_sell_r1 = summarize_subset([c for c in all_closed if c["trend"] == "SELL" and c.get("entry_alert") == "retest1"])
+    g_sell_r2 = summarize_subset([c for c in all_closed if c["trend"] == "SELL" and c.get("entry_alert") == "retest2"])
+    profitable_buy  = sum(1 for a in aggregate if a['buy']['sum_pct'] > 0)
+    profitable_sell = sum(1 for a in aggregate if a['sell']['sum_pct'] > 0)
+
+    def _bucket_row(name: str, s: Dict) -> str:
+        return (
+            f"| {name} | {s['legs']} | {s['win_rate']:.1f}% | "
+            f"{s['target_hits']} | {s['stop_hits']} | {s['partials']} | "
+            f"{s['avg_pct']:.2f}% | {s['sum_pct']:.1f}% |"
+        )
 
     summary_lines = [
         "# EMA 200/400 1H Crossover — Backtest Summary",
         "",
         f"_Generated: {datetime.now().isoformat(timespec='seconds')}_",
         "",
-        "## Headline",
+        "## Headline (combined BUY+SELL)",
         "",
-        f"- Symbols processed: {len(aggregate)}",
-        f"- Total closed trades: {total_closed}",
-        f"- Winners (target hits + EMA-exit > 0): {total_winners}",
+        f"- Symbols processed: {len(aggregate)} (profitable combined: {profitable_symbols})",
+        f"- Profitable BUY-only symbols: {profitable_buy} / {len(aggregate)}",
+        f"- Profitable SELL-only symbols: {profitable_sell} / {len(aggregate)}",
+        f"- Total closed legs: {total_closed}",
         f"- Win rate: {(total_winners / total_closed * 100) if total_closed else 0:.1f}%",
-        f"- Target hits / EMA-exit closes: {total_target} / {total_ema}",
-        f"- Sum P&L per unit: {total_pnl:.2f}",
+        f"- Target hits / Stop hits / Partials: {total_target} / {total_stop} / {total_partial}",
+        f"- **Avg % per leg: {avg_pct_overall:.2f}%**",
+        f"- **Sum % across all legs (uncompounded): {total_sum_pct:.1f}%**",
+        f"- Data source mix: fyers={source_counts.get('fyers',0)} "
+        f"yahoo={source_counts.get('yahoo',0)} none={source_counts.get('none',0)}",
+        "",
+        "## Direction × Alert breakdown (universe)",
+        "",
+        "| Bucket | Legs | Win% | Tgt | SL | Prt | Avg % | Sum % |",
+        "|--------|------|------|-----|----|-----|-------|-------|",
+        _bucket_row("BUY (all)", g_buy),
+        _bucket_row("BUY @ 2nd Alert (retest1)", g_buy_r1),
+        _bucket_row("BUY @ 3rd Alert (retest2)", g_buy_r2),
+        _bucket_row("SELL (all)", g_sell),
+        _bucket_row("SELL @ 2nd Alert (retest1)", g_sell_r1),
+        _bucket_row("SELL @ 3rd Alert (retest2)", g_sell_r2),
         "",
         "## Per-symbol",
         "",
-        "| Symbol | Bars | Signals | Closed | Winners | Tgt | EMA | P&L |",
-        "|--------|------|---------|--------|---------|-----|-----|-----|",
+        "| Symbol | Bars | Sig | Legs | BUY legs | BUY avg% | BUY sum% | SELL legs | SELL avg% | SELL sum% | Tot avg% | Tot sum% |",
+        "|--------|------|-----|------|---------|---------|---------|-----------|----------|----------|---------|---------|",
     ]
     for a in aggregate:
+        b, s = a["buy"], a["sell"]
         summary_lines.append(
-            f"| {a['symbol']} | {a['bars']} | {a['signals']} | {a['closed']} | "
-            f"{a['winners']} | {a['target_hits']} | {a['ema_exits']} | "
-            f"{a['pnl']:.2f} |"
+            f"| {a['symbol']} | {a['bars']} | {a['signals']} | {a['trades_closed']} | "
+            f"{b['legs']} | {b['avg_pct']:.2f}% | {b['sum_pct']:.1f}% | "
+            f"{s['legs']} | {s['avg_pct']:.2f}% | {s['sum_pct']:.1f}% | "
+            f"{a['avg_pct']:.2f}% | {a['sum_pct']:.1f}% |"
         )
     summary_path = args.out / "_summary.md"
     summary_path.write_text("\n".join(summary_lines) + "\n")
     print(f"\nSummary -> {summary_path}")
+
+    # ---- Per-direction summary files ----
+    def _write_direction_summary(direction: str, g_all: Dict, g_r1: Dict, g_r2: Dict,
+                                  agg_key: str, profitable: int, path: Path) -> None:
+        lines_d = [
+            f"# EMA 200/400 — {direction} Strategy Summary",
+            "",
+            f"_Generated: {datetime.now().isoformat(timespec='seconds')}_",
+            "",
+            "## Headline",
+            "",
+            f"- Symbols processed: {len(aggregate)} (profitable {direction}-only: {profitable})",
+            f"- {direction} closed legs: {g_all['legs']}",
+            f"- Win rate: {g_all['win_rate']:.1f}%",
+            f"- Target hits / Stop hits / Partials: "
+            f"{g_all['target_hits']} / {g_all['stop_hits']} / {g_all['partials']}",
+            f"- **Avg % per leg: {g_all['avg_pct']:.2f}%**",
+            f"- **Sum % across all legs (uncompounded): {g_all['sum_pct']:.1f}%**",
+            "",
+            "## Alert breakdown",
+            "",
+            "| Bucket | Legs | Win% | Tgt | SL | Prt | Avg % | Sum % |",
+            "|--------|------|------|-----|----|-----|-------|-------|",
+            _bucket_row(f"{direction} (all)",            g_all),
+            _bucket_row(f"{direction} @ 2nd Alert (retest1)", g_r1),
+            _bucket_row(f"{direction} @ 3rd Alert (retest2)", g_r2),
+            "",
+            "## Per-symbol",
+            "",
+            "| Symbol | Legs | Win | Win% | Tgt | SL | Prt | Avg % | Sum % |",
+            "|--------|------|-----|------|-----|----|-----|-------|-------|",
+        ]
+        for a in aggregate:
+            s = a[agg_key]
+            lines_d.append(
+                f"| {a['symbol']} | {s['legs']} | {s['winners']} | {s['win_rate']:.1f}% | "
+                f"{s['target_hits']} | {s['stop_hits']} | {s['partials']} | "
+                f"{s['avg_pct']:.2f}% | {s['sum_pct']:.1f}% |"
+            )
+        path.write_text("\n".join(lines_d) + "\n")
+        print(f"{direction} Summary -> {path}")
+
+    _write_direction_summary("BUY", g_buy, g_buy_r1, g_buy_r2, "buy",
+                              profitable_buy, args.out / "_summary_buy.md")
+    _write_direction_summary("SELL", g_sell, g_sell_r1, g_sell_r2, "sell",
+                              profitable_sell, args.out / "_summary_sell.md")
 
     return 0
 

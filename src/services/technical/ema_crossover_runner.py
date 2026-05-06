@@ -136,28 +136,28 @@ class EMACrossoverRunner:
         return [r[0] for r in rows]
 
     def _promote_to_daily_picks(self, symbol: str, signals: List[dict]) -> None:
-        """Write actionable ENTRY signals to ``daily_suggested_stocks``."""
+        """Write actionable ENTRY signals to ``daily_suggested_stocks``.
+
+        v2 BTC rules: target = entry * (1 + target_pct), SL is per-entry:
+            ENTRY1 -> EMA400 (close-based exit)
+            ENTRY2 -> retest2.low (BUY) / retest2.high (SELL)
+        """
         actionable = [s for s in signals if s["signal_type"] in ("ENTRY1", "ENTRY2")]
         if not actionable:
             return
 
         today = date.today()
+        target_pct = self.strategy.config.target_pct
         with self.db.get_session() as session:
             for sig in actionable:
                 recommendation = "BUY" if sig["trend"] == "BUY" else "SELL"
-                target_pts = self.strategy.config.target_points
-                rr = self.strategy.config.rr_multiple
                 price = float(sig["price"])
                 ema400 = float(sig["ema_400"])
-                # Reuse strategy target math for consistency
-                if recommendation == "BUY":
-                    target_price = price + target_pts if symbol.endswith("INDEX") \
-                        else price + abs(price - ema400) * rr
-                    stop_loss = ema400
-                else:
-                    target_price = price - target_pts if symbol.endswith("INDEX") \
-                        else price - abs(price - ema400) * rr
-                    stop_loss = ema400
+                # Strategy stamps target/sl onto each ENTRY signal directly.
+                target_price = float(sig.get("target") or
+                                     (price * (1 + target_pct) if recommendation == "BUY"
+                                      else price * (1 - target_pct)))
+                stop_loss = float(sig.get("sl") or ema400)
 
                 session.execute(
                     text(

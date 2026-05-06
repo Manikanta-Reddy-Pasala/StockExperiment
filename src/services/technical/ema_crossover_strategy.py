@@ -1,31 +1,54 @@
 """
-EMA 200/400 Crossover Strategy (1H timeframe).
+EMA 200/400 Crossover Strategy — v2 (BTC trade rules).
 
-Trend rule:
-    BUY trend  : EMA200 crosses above EMA400.
+Trend rule (1H or 30m bars):
+    BUY trend  : EMA200 crosses above EMA400 (crossover candle locked).
     SELL trend : EMA200 crosses below EMA400.
 
 Buy setup state machine (long side):
     Stage 0 : Wait for crossover.
-    Stage 1 : Crossover candle locked. Watch for break of crossover candle high (Alert 1).
-    Stage 2 : Alert 1 fired. Watch for retest of EMA200 (close below + close, locks retest1).
-    Stage 3 : Retest1 locked. If price > retest1.high and sustains N minutes -> ENTRY 1.
-              Then watch EMA400 touch.
-    Stage 4 : EMA400 touched / crossed below. Watch for break of new retest candle high
-              that sustains N minutes -> ENTRY 2.
-    Exit    : Any 1H close below EMA400 -> exit longs, reset to Stage 0.
+    Stage 1 : Crossover candle locked. Watch for break + close above its high
+              -> ALERT1, advance to Stage 2.
+    Stage 2 : Wait for retest of EMA200 from above (close < EMA200) -> ALERT2,
+              lock retest1 candle, reset retest1_attempts=0,
+              retest1_invalidated=False, advance to Stage 3.
+    Stage 3 : Retest1 armed. On every new bar:
+                - If low <= EMA400 BEFORE next ENTRY1 break -> retest1 path
+                  invalidated (omit 1st entry). Advance to Stage 4 (retest2 watch).
+                - Edge-detect: prev close <= retest1.high AND curr close >
+                  retest1.high -> ENTRY1 fires. retest1_attempts++. Allow up to
+                  3 ENTRY1 fires (initial + 2 re-entries) at the same retest1
+                  level (price must dip below and re-break).
+                - On 3rd attempt OR EMA400 touch -> advance to Stage 4.
+              SL for each ENTRY1 position = EMA400 close (close-based exit).
+    Stage 4 : Retest2 watch. On low <= EMA400 -> ALERT3, lock retest2 candle,
+              reset retest2_attempts=0, advance to Stage 5.
+    Stage 5 : Retest2 armed. Edge-detect break of retest2.high -> ENTRY2 fires.
+              retest2_attempts++. Allow up to 3 ENTRY2 fires. After 3 OR a new
+              ALERT3 lock -> revert to Stage 4 (allow next ALERT3 lock).
+              SL for each ENTRY2 position = retest2.low.
 
-Sell setup is the mirror image (price below crossover candle low, retest of EMA200 from
-below, EMA400 touch from below, exits on close above EMA400).
+Position management (per bar after stage step):
+    For each open position:
+      - TARGET: bar.high >= entry * (1 + target_pct) -> close all qty at target.
+      - PARTIAL: bar.high >= entry * (1 + partial_pct) AND not partial_booked
+                 -> book partial_qty_frac of qty at partial price, set
+                 trail_sl=entry, mark partial_booked.
+      - STOP_HIT: bar.low <= current_sl -> close remaining at SL. SL is
+                  per-position (EMA400 for ENTRY1, retest2.low for ENTRY2,
+                  entry-price after partial booking).
+    The bar-close EMA400 exit (close < EMA400) still emits an EXIT signal that
+    closes ALL open positions (overrides per-position SL where applicable).
 
-Multiple entries allowed (pyramid). Single SL: 1H close on the wrong side of EMA400.
-Target: 5000 absolute points for index symbols, or 1:3 RR for equities (configurable).
+Sell setup is the mirror image (close > EMA200 retest from below, EMA400 touch
+from below for retest2, retest2.high SL for ENTRY2, etc.).
 """
 
+import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from typing import List, Optional, Tuple
+from datetime import datetime
+from typing import List, Optional
 
 import pandas as pd
 
@@ -46,30 +69,34 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-INDEX_SYMBOLS = {"NSE:NIFTY50-INDEX", "NSE:NIFTYBANK-INDEX", "NSE:BANKNIFTY-INDEX"}
-DEFAULT_TARGET_POINTS = 5000.0
-DEFAULT_RR_MULTIPLE = 3.0
-DEFAULT_SUSTAIN_MINUTES = 15  # On 1H timeframe, "sustain" granularity is informational
+# Default v2 risk parameters — match BTC trade rules PDF v1.1.
+DEFAULT_TARGET_PCT = 0.30
+DEFAULT_PARTIAL_PCT = 0.15
+DEFAULT_PARTIAL_QTY_FRAC = 0.5
+# Spec wording: "Allow 3 re-entries only at 2nd Alert" — interpreted literally
+# as 1 initial entry + 3 re-entries = 4 total attempts at the alert.
+DEFAULT_RE_ENTRY_CAP = 4
+DEFAULT_SUSTAIN_MINUTES = 15  # Informational on 1H bars; effective on <=30m
 
 
 @dataclass
 class StrategyConfig:
-    target_points: float = DEFAULT_TARGET_POINTS
-    rr_multiple: float = DEFAULT_RR_MULTIPLE
+    target_pct: float = DEFAULT_TARGET_PCT          # 30% TP
+    partial_pct: float = DEFAULT_PARTIAL_PCT        # 15% partial-book trigger
+    partial_qty_frac: float = DEFAULT_PARTIAL_QTY_FRAC
+    re_entry_cap: int = DEFAULT_RE_ENTRY_CAP        # max 3 attempts per alert
     sustain_minutes: int = DEFAULT_SUSTAIN_MINUTES
     ema_fast_period: int = 200
     ema_slow_period: int = 400
 
 
 class EMACrossoverStrategy:
-    """1H EMA200/400 crossover strategy with multi-stage entry state machine."""
+    """v2 BTC-rules state machine + per-position TP/SL/partial."""
 
     def __init__(self, config: Optional[StrategyConfig] = None):
         self.config = config or StrategyConfig()
         self.db = get_database_manager()
 
-    # ------------------------------------------------------------------
-    # Indicator math
     # ------------------------------------------------------------------
     @staticmethod
     def compute_emas(df: pd.DataFrame, fast: int = 200, slow: int = 400) -> pd.DataFrame:
@@ -78,8 +105,6 @@ class EMACrossoverStrategy:
         df["ema_400"] = df["close"].ewm(span=slow, adjust=False).mean()
         return df
 
-    # ------------------------------------------------------------------
-    # Public entry: evaluate one symbol given its 1H candles (ascending order)
     # ------------------------------------------------------------------
     def evaluate(
         self,
@@ -99,8 +124,6 @@ class EMACrossoverStrategy:
         state = self._load_state(user_id, symbol)
         signals: List[dict] = []
 
-        # Replay only candles after `last_evaluated_ts` to keep the state machine
-        # incremental; on a fresh state we replay the full window for backfill.
         start_idx = 0
         if state.last_evaluated_ts:
             mask = df["timestamp"] > state.last_evaluated_ts
@@ -109,11 +132,10 @@ class EMACrossoverStrategy:
             else:
                 start_idx = len(df)
 
-        # Walk every candle past start_idx
         for i in range(max(start_idx, self.config.ema_slow_period), len(df)):
             row = df.iloc[i]
             prev = df.iloc[i - 1]
-            new_signals = self._step_machine(state, row, prev, df, i)
+            new_signals = self._step_machine(state, row, prev)
             for sig in new_signals:
                 signals.append(sig)
             state.last_evaluated_ts = int(row["timestamp"])
@@ -124,16 +146,9 @@ class EMACrossoverStrategy:
         return signals
 
     # ------------------------------------------------------------------
-    # State machine core (single-bar step)
+    # Per-bar step
     # ------------------------------------------------------------------
-    def _step_machine(
-        self,
-        state: EMACrossoverState,
-        row: pd.Series,
-        prev: pd.Series,
-        df: pd.DataFrame,
-        idx: int,
-    ) -> List[dict]:
+    def _step_machine(self, state, row, prev) -> List[dict]:
         signals: List[dict] = []
 
         ema200 = row["ema_200"]
@@ -144,100 +159,119 @@ class EMACrossoverStrategy:
         cross_up = prev_ema200 <= prev_ema400 and ema200 > ema400
         cross_dn = prev_ema200 >= prev_ema400 and ema200 < ema400
 
-        # ---- Trend reset on opposite crossover ----
+        # Trend reset on opposite crossover — closes ALL open positions.
         if cross_up:
+            if self._open_positions(state):
+                signals.extend(self._close_all_positions(state, row, "CROSSOVER_FLIP"))
             self._reset_state(state, "BUY", row)
             signals.append(self._make_signal(row, "CROSSOVER", "BUY", note="EMA200 above EMA400"))
             return signals
         if cross_dn:
+            if self._open_positions(state):
+                signals.extend(self._close_all_positions(state, row, "CROSSOVER_FLIP"))
             self._reset_state(state, "SELL", row)
             signals.append(self._make_signal(row, "CROSSOVER", "SELL", note="EMA200 below EMA400"))
             return signals
 
-        # No active trend yet — nothing to do.
         if state.trend == "NONE":
             return signals
 
-        # Stop-loss / exit check (1H close on wrong side of EMA400) -------------------
-        if state.position_active:
-            if state.trend == "BUY" and row["close"] < ema400:
-                signals.append(self._make_signal(row, "EXIT", state.trend, note="Close below EMA400"))
-                self._reset_state(state, "NONE", row)
-                return signals
-            if state.trend == "SELL" and row["close"] > ema400:
-                signals.append(self._make_signal(row, "EXIT", state.trend, note="Close above EMA400"))
-                self._reset_state(state, "NONE", row)
-                return signals
+        # Per-spec interpretation: SL is per-position (intra-bar).
+        # Trend reset happens ONLY on opposite crossover (handled above).
+        # No close-below-EMA400 force-close — that conflated SL with trend reset.
 
-        # ---- Stage transitions per trend direction ----
+        # 1) Stage transitions (alerts + entries)
         if state.trend == "BUY":
             signals.extend(self._step_buy(state, row, prev))
-        elif state.trend == "SELL":
+        else:
             signals.extend(self._step_sell(state, row, prev))
+
+        # 2) Per-position TP / partial / SL on the same bar
+        signals.extend(self._manage_positions(state, row))
 
         return signals
 
     # ------------------------------------------------------------------
-    def _step_buy(self, state: EMACrossoverState, row: pd.Series, prev: pd.Series) -> List[dict]:
+    def _step_buy(self, state, row, prev) -> List[dict]:
         signals: List[dict] = []
         ema200 = row["ema_200"]
         ema400 = row["ema_400"]
 
-        # Stage 1: Alert 1 — break of crossover candle high + close above
+        # Stage 1 -> ALERT1: break + close above crossover candle high
         if state.stage == 1 and state.crossover_high is not None:
             if row["close"] > state.crossover_high and row["high"] > state.crossover_high:
                 state.stage = 2
                 signals.append(self._make_signal(row, "ALERT1", "BUY",
                                                  note="Break + close above crossover candle high"))
 
-        # Stage 2: Alert 2 — retest of EMA200 (close below EMA200)
+        # Stage 2 -> ALERT2: retest of EMA200 (close below EMA200)
         if state.stage == 2:
             if row["close"] < ema200 and row["low"] < ema200:
                 state.retest1_ts = int(row["timestamp"])
                 state.retest1_high = float(row["high"])
                 state.retest1_low = float(row["low"])
+                state.retest1_attempts = 0
+                state.retest1_invalidated = False
+                state.retest1_pending_cross_ts = None
                 state.stage = 3
                 signals.append(self._make_signal(row, "ALERT2", "BUY",
                                                  note="EMA200 retest candle locked"))
 
-        # Stage 3: Entry 1 — break retest1 high (sustain handled at the 1H close)
+        # Stage 3: retest1 armed.
         if state.stage == 3 and state.retest1_high is not None:
-            if row["close"] > state.retest1_high:
-                state.entries_count = (state.entries_count or 0) + 1
-                state.entry1_price = float(row["close"])
-                state.entry1_time = row["candle_time"]
-                state.position_active = True
-                state.stop_loss = float(ema400)
-                state.target_price = self._calc_target(row["close"], ema400, "BUY", state.symbol)
+            # 3a) EMA400 touch behavior depends on whether ENTRY1 already taken:
+            #     - 0 entries -> spec invalidates retest1 path ("Omit 1st entry")
+            #     - >=1 entry -> SL handled per-position; advance to retest2 watch
+            #     Either way we advance to stage 4 so ALERT3 fires same bar.
+            if row["low"] <= ema400:
+                if (state.retest1_attempts or 0) == 0:
+                    state.retest1_invalidated = True
+                    signals.append(self._make_signal(row, "ALERT2_SKIP", "BUY",
+                                                     note="EMA400 touched before retest1 break — omit ENTRY1"))
+                state.retest1_pending_cross_ts = None  # abandon any pending retest1 sustain
                 state.stage = 4
-                signals.append(self._make_signal(row, "ENTRY1", "BUY",
-                                                 price=row["close"],
-                                                 note="Buy entry 1 (retest1 break)"))
-
-        # Stage 4: Alert 3 — EMA400 touch / cross below
+            else:
+                # 3b) Cross + sustain logic on retest1.high
+                signals.extend(self._handle_retest_break_buy(
+                    state, row, prev,
+                    level=state.retest1_high,
+                    pending_attr="retest1_pending_cross_ts",
+                    attempts_attr="retest1_attempts",
+                    entry_signal="ENTRY1",
+                    entry_alert="retest1",
+                    sl=float(ema400),
+                    sl_type="ema400",
+                    on_cap_reached=lambda: setattr(state, "stage", 4),
+                ))
+        # Stage 4 -> ALERT3: EMA400 touch / cross below
         if state.stage == 4:
             if row["low"] <= ema400:
                 state.retest2_ts = int(row["timestamp"])
                 state.retest2_high = float(row["high"])
                 state.retest2_low = float(row["low"])
+                state.retest2_attempts = 0
+                state.retest2_pending_cross_ts = None
                 state.stage = 5
                 signals.append(self._make_signal(row, "ALERT3", "BUY",
                                                  note="EMA400 retest candle locked"))
 
-        # Stage 5: Entry 2 — break retest2 high
+        # Stage 5: retest2 armed
         if state.stage == 5 and state.retest2_high is not None:
-            if row["close"] > state.retest2_high:
-                state.entries_count = (state.entries_count or 0) + 1
-                state.entry2_price = float(row["close"])
-                state.entry2_time = row["candle_time"]
-                state.stage = 4  # allow further EMA400 retests/entries (pyramid)
-                signals.append(self._make_signal(row, "ENTRY2", "BUY",
-                                                 price=row["close"],
-                                                 note="Buy entry 2 (retest2 break)"))
+            signals.extend(self._handle_retest_break_buy(
+                state, row, prev,
+                level=state.retest2_high,
+                pending_attr="retest2_pending_cross_ts",
+                attempts_attr="retest2_attempts",
+                entry_signal="ENTRY2",
+                entry_alert="retest2",
+                sl=float(state.retest2_low),
+                sl_type="static",
+                on_cap_reached=lambda: setattr(state, "stage", 4),
+            ))
         return signals
 
     # ------------------------------------------------------------------
-    def _step_sell(self, state: EMACrossoverState, row: pd.Series, prev: pd.Series) -> List[dict]:
+    def _step_sell(self, state, row, prev) -> List[dict]:
         signals: List[dict] = []
         ema200 = row["ema_200"]
         ema400 = row["ema_400"]
@@ -253,54 +287,360 @@ class EMACrossoverStrategy:
                 state.retest1_ts = int(row["timestamp"])
                 state.retest1_high = float(row["high"])
                 state.retest1_low = float(row["low"])
+                state.retest1_attempts = 0
+                state.retest1_invalidated = False
+                state.retest1_pending_cross_ts = None
                 state.stage = 3
                 signals.append(self._make_signal(row, "ALERT2", "SELL",
                                                  note="EMA200 retest candle locked"))
 
         if state.stage == 3 and state.retest1_low is not None:
-            if row["close"] < state.retest1_low:
-                state.entries_count = (state.entries_count or 0) + 1
-                state.entry1_price = float(row["close"])
-                state.entry1_time = row["candle_time"]
-                state.position_active = True
-                state.stop_loss = float(ema400)
-                state.target_price = self._calc_target(row["close"], ema400, "SELL", state.symbol)
+            if row["high"] >= ema400:
+                if (state.retest1_attempts or 0) == 0:
+                    state.retest1_invalidated = True
+                    signals.append(self._make_signal(row, "ALERT2_SKIP", "SELL",
+                                                     note="EMA400 touched before retest1 break — omit ENTRY1"))
+                state.retest1_pending_cross_ts = None
                 state.stage = 4
-                signals.append(self._make_signal(row, "ENTRY1", "SELL",
-                                                 price=row["close"],
-                                                 note="Sell entry 1 (retest1 break)"))
+            else:
+                signals.extend(self._handle_retest_break_sell(
+                    state, row, prev,
+                    level=state.retest1_low,
+                    pending_attr="retest1_pending_cross_ts",
+                    attempts_attr="retest1_attempts",
+                    entry_signal="ENTRY1",
+                    entry_alert="retest1",
+                    sl=float(ema400),
+                    sl_type="ema400",
+                    on_cap_reached=lambda: setattr(state, "stage", 4),
+                ))
 
         if state.stage == 4:
             if row["high"] >= ema400:
                 state.retest2_ts = int(row["timestamp"])
                 state.retest2_high = float(row["high"])
                 state.retest2_low = float(row["low"])
+                state.retest2_attempts = 0
+                state.retest2_pending_cross_ts = None
                 state.stage = 5
                 signals.append(self._make_signal(row, "ALERT3", "SELL",
                                                  note="EMA400 retest candle locked"))
 
         if state.stage == 5 and state.retest2_low is not None:
-            if row["close"] < state.retest2_low:
-                state.entries_count = (state.entries_count or 0) + 1
-                state.entry2_price = float(row["close"])
-                state.entry2_time = row["candle_time"]
-                state.stage = 4
-                signals.append(self._make_signal(row, "ENTRY2", "SELL",
-                                                 price=row["close"],
-                                                 note="Sell entry 2 (retest2 break)"))
+            signals.extend(self._handle_retest_break_sell(
+                state, row, prev,
+                level=state.retest2_low,
+                pending_attr="retest2_pending_cross_ts",
+                attempts_attr="retest2_attempts",
+                entry_signal="ENTRY2",
+                entry_alert="retest2",
+                sl=float(state.retest2_high),
+                sl_type="static",
+                on_cap_reached=lambda: setattr(state, "stage", 4),
+            ))
         return signals
 
     # ------------------------------------------------------------------
-    def _calc_target(self, entry_price: float, ema400: float, trend: str, symbol: str) -> float:
-        if symbol in INDEX_SYMBOLS:
-            return entry_price + self.config.target_points if trend == "BUY" \
-                else entry_price - self.config.target_points
-        risk = abs(entry_price - ema400)
-        if trend == "BUY":
-            return entry_price + risk * self.config.rr_multiple
-        return entry_price - risk * self.config.rr_multiple
+    # Cross-and-sustain trigger (shared BUY/SELL retest1/retest2)
+    # ------------------------------------------------------------------
+    def _handle_retest_break_buy(self, state, row, prev, *, level, pending_attr,
+                                  attempts_attr, entry_signal, entry_alert,
+                                  sl, sl_type, on_cap_reached) -> List[dict]:
+        """BUY-side cross + sustain-15min logic for retest1.high or retest2.high.
 
-    def _reset_state(self, state: EMACrossoverState, trend: str, row: pd.Series) -> None:
+        Detects cross-up edge, marks pending, then triggers ENTRY only when
+        elapsed >= sustain_minutes AND price still above level. Cancels pending
+        if price closes back below level before sustain elapsed.
+        """
+        signals: List[dict] = []
+        pending_ts = getattr(state, pending_attr, None)
+        attempts = getattr(state, attempts_attr, 0) or 0
+        cap = attempts < self.config.re_entry_cap
+
+        # 1) Resolve any existing pending first
+        if pending_ts is not None:
+            elapsed_min = (int(row["timestamp"]) - int(pending_ts)) / 60.0
+            if row["close"] <= level:
+                # Failed sustain — cancel pending. Allow re-arm via next edge.
+                setattr(state, pending_attr, None)
+                signals.append(self._make_signal(
+                    row, "PENDING_CANCEL", "BUY",
+                    note=f"{entry_signal} sustain failed after {elapsed_min:.0f}m"
+                ))
+            elif elapsed_min >= self.config.sustain_minutes:
+                # Sustained — fire ENTRY
+                if cap:
+                    setattr(state, attempts_attr, attempts + 1)
+                    new_attempts = attempts + 1
+                    pos = self._open_position(
+                        row, trend="BUY", entry_alert=entry_alert,
+                        sl=sl, sl_type=sl_type,
+                    )
+                    self._append_position(state, pos)
+                    state.entries_count = (state.entries_count or 0) + 1
+                    if entry_signal == "ENTRY1" and state.entry1_price is None:
+                        state.entry1_price = pos["entry_price"]
+                        state.entry1_time = pos["entry_time"]
+                    if entry_signal == "ENTRY2" and state.entry2_price is None:
+                        state.entry2_price = pos["entry_price"]
+                        state.entry2_time = pos["entry_time"]
+                    state.stop_loss = pos["sl"]
+                    state.target_price = pos["target"]
+                    state.position_active = True
+                    sig = self._make_signal(
+                        row, entry_signal, "BUY", price=pos["entry_price"],
+                        note=f"BUY {entry_signal} attempt {new_attempts}/{self.config.re_entry_cap} "
+                             f"({entry_alert} break sustained {elapsed_min:.0f}m)"
+                    )
+                    sig["sl"] = pos["sl"]
+                    sig["target"] = pos["target"]
+                    signals.append(sig)
+                    setattr(state, pending_attr, None)
+                    if new_attempts >= self.config.re_entry_cap:
+                        on_cap_reached()
+                        return signals
+                else:
+                    setattr(state, pending_attr, None)
+            # else: still pending, not yet elapsed — wait
+
+        # 2) New edge cross — only if no pending and cap not full
+        if getattr(state, pending_attr, None) is None and cap:
+            edge_break = (prev["close"] <= level and row["close"] > level)
+            if edge_break:
+                setattr(state, pending_attr, int(row["timestamp"]))
+                signals.append(self._make_signal(
+                    row, "PENDING", "BUY",
+                    note=f"{entry_signal} cross detected — sustain check pending "
+                         f"({self.config.sustain_minutes}m)"
+                ))
+        return signals
+
+    def _handle_retest_break_sell(self, state, row, prev, *, level, pending_attr,
+                                   attempts_attr, entry_signal, entry_alert,
+                                   sl, sl_type, on_cap_reached) -> List[dict]:
+        """SELL-side mirror of _handle_retest_break_buy."""
+        signals: List[dict] = []
+        pending_ts = getattr(state, pending_attr, None)
+        attempts = getattr(state, attempts_attr, 0) or 0
+        cap = attempts < self.config.re_entry_cap
+
+        if pending_ts is not None:
+            elapsed_min = (int(row["timestamp"]) - int(pending_ts)) / 60.0
+            if row["close"] >= level:
+                setattr(state, pending_attr, None)
+                signals.append(self._make_signal(
+                    row, "PENDING_CANCEL", "SELL",
+                    note=f"{entry_signal} sustain failed after {elapsed_min:.0f}m"
+                ))
+            elif elapsed_min >= self.config.sustain_minutes:
+                if cap:
+                    setattr(state, attempts_attr, attempts + 1)
+                    new_attempts = attempts + 1
+                    pos = self._open_position(
+                        row, trend="SELL", entry_alert=entry_alert,
+                        sl=sl, sl_type=sl_type,
+                    )
+                    self._append_position(state, pos)
+                    state.entries_count = (state.entries_count or 0) + 1
+                    if entry_signal == "ENTRY1" and state.entry1_price is None:
+                        state.entry1_price = pos["entry_price"]
+                        state.entry1_time = pos["entry_time"]
+                    if entry_signal == "ENTRY2" and state.entry2_price is None:
+                        state.entry2_price = pos["entry_price"]
+                        state.entry2_time = pos["entry_time"]
+                    state.stop_loss = pos["sl"]
+                    state.target_price = pos["target"]
+                    state.position_active = True
+                    sig = self._make_signal(
+                        row, entry_signal, "SELL", price=pos["entry_price"],
+                        note=f"SELL {entry_signal} attempt {new_attempts}/{self.config.re_entry_cap} "
+                             f"({entry_alert} break sustained {elapsed_min:.0f}m)"
+                    )
+                    sig["sl"] = pos["sl"]
+                    sig["target"] = pos["target"]
+                    signals.append(sig)
+                    setattr(state, pending_attr, None)
+                    if new_attempts >= self.config.re_entry_cap:
+                        on_cap_reached()
+                        return signals
+                else:
+                    setattr(state, pending_attr, None)
+
+        if getattr(state, pending_attr, None) is None and cap:
+            edge_break = (prev["close"] >= level and row["close"] < level)
+            if edge_break:
+                setattr(state, pending_attr, int(row["timestamp"]))
+                signals.append(self._make_signal(
+                    row, "PENDING", "SELL",
+                    note=f"{entry_signal} cross detected — sustain check pending "
+                         f"({self.config.sustain_minutes}m)"
+                ))
+        return signals
+
+    # ------------------------------------------------------------------
+    # Position helpers
+    # ------------------------------------------------------------------
+    def _open_position(self, row, trend, entry_alert, sl, sl_type) -> dict:
+        """sl_type:
+            'ema400'  -> SL = current EMA400 each bar (dynamic). Used for ENTRY1.
+            'static'  -> SL = fixed price `sl`. Used for ENTRY2 (retest2 candle low/high)
+                         and post-partial trail (sl=entry_price).
+        """
+        entry_price = float(row["close"])
+        if trend == "BUY":
+            target = entry_price * (1 + self.config.target_pct)
+            partial = entry_price * (1 + self.config.partial_pct)
+        else:
+            target = entry_price * (1 - self.config.target_pct)
+            partial = entry_price * (1 - self.config.partial_pct)
+        return {
+            "trend": trend,
+            "entry_alert": entry_alert,            # 'retest1' | 'retest2'
+            "entry_ts": int(row["timestamp"]),
+            "entry_time": row["candle_time"].isoformat() if hasattr(row["candle_time"], "isoformat") else str(row["candle_time"]),
+            "entry_price": entry_price,
+            "sl": sl,
+            "sl_type": sl_type,
+            "target": target,
+            "partial_threshold": partial,
+            "partial_booked": False,
+            "qty_remaining": 1.0,
+        }
+
+    def _open_positions(self, state) -> list:
+        return self._load_positions(state)
+
+    def _append_position(self, state, pos: dict) -> None:
+        positions = self._load_positions(state)
+        positions.append(pos)
+        self._save_positions(state, positions)
+
+    def _save_positions(self, state, positions: list) -> None:
+        # JSONB column accepts list directly via SQLAlchemy. Keep raw text fallback
+        # for non-JSONB backends (sqlite tests).
+        try:
+            state.positions_json = positions
+        except Exception:
+            state.positions_json = json.dumps(positions)
+
+    def _load_positions(self, state) -> list:
+        raw = getattr(state, "positions_json", None)
+        if raw is None:
+            return []
+        if isinstance(raw, list):
+            return list(raw)
+        if isinstance(raw, str):
+            try:
+                return json.loads(raw) or []
+            except Exception:
+                return []
+        return []
+
+    # ------------------------------------------------------------------
+    def _manage_positions(self, state, row) -> List[dict]:
+        """Per-bar TP / partial / SL on each open position (high/low approx)."""
+        signals: List[dict] = []
+        positions = self._load_positions(state)
+        if not positions:
+            return signals
+
+        bar_high = float(row["high"])
+        bar_low = float(row["low"])
+        cur_ema400 = float(row["ema_400"])
+        still_open: list = []
+
+        for pos in positions:
+            trend = pos["trend"]
+            entry = float(pos["entry_price"])
+            target = float(pos["target"])
+            sl_type = pos.get("sl_type", "static")
+            # Dynamic SL: ENTRY1 SL tracks current EMA400 each bar; ENTRY2
+            # SL is static (retest2 candle low/high). Post-partial trail sets
+            # sl_type='static' with sl=entry_price.
+            if sl_type == "ema400":
+                sl = cur_ema400
+            else:
+                sl = float(pos["sl"])
+            partial = float(pos["partial_threshold"])
+            booked = bool(pos.get("partial_booked"))
+
+            # 1) Target hit (full close)
+            if trend == "BUY" and bar_high >= target:
+                signals.append(self._make_signal(
+                    row, "TARGET_HIT", trend, price=target,
+                    note=f"Target hit ({self.config.target_pct*100:.0f}%) qty={pos['qty_remaining']:.2f} alert={pos['entry_alert']}"
+                ))
+                continue
+            if trend == "SELL" and bar_low <= target:
+                signals.append(self._make_signal(
+                    row, "TARGET_HIT", trend, price=target,
+                    note=f"Target hit ({self.config.target_pct*100:.0f}%) qty={pos['qty_remaining']:.2f} alert={pos['entry_alert']}"
+                ))
+                continue
+
+            # 2) Partial booking @ partial_pct
+            if not booked:
+                if trend == "BUY" and bar_high >= partial:
+                    book_qty = pos["qty_remaining"] * self.config.partial_qty_frac
+                    pos["qty_remaining"] = pos["qty_remaining"] - book_qty
+                    pos["partial_booked"] = True
+                    pos["sl"] = entry  # trail SL to entry
+                    pos["sl_type"] = "static"
+                    sl = entry
+                    booked = True
+                    signals.append(self._make_signal(
+                        row, "PARTIAL", trend, price=partial,
+                        note=f"Partial book {book_qty:.2f} @ {self.config.partial_pct*100:.0f}%; trail SL->entry alert={pos['entry_alert']}"
+                    ))
+                elif trend == "SELL" and bar_low <= partial:
+                    book_qty = pos["qty_remaining"] * self.config.partial_qty_frac
+                    pos["qty_remaining"] = pos["qty_remaining"] - book_qty
+                    pos["partial_booked"] = True
+                    pos["sl"] = entry
+                    pos["sl_type"] = "static"
+                    sl = entry
+                    booked = True
+                    signals.append(self._make_signal(
+                        row, "PARTIAL", trend, price=partial,
+                        note=f"Partial book {book_qty:.2f} @ {self.config.partial_pct*100:.0f}%; trail SL->entry alert={pos['entry_alert']}"
+                    ))
+
+            # 3) SL hit on remaining qty
+            if trend == "BUY" and bar_low <= sl:
+                signals.append(self._make_signal(
+                    row, "STOP_HIT", trend, price=sl,
+                    note=f"SL hit qty={pos['qty_remaining']:.2f} sl={sl:.2f} alert={pos['entry_alert']}"
+                ))
+                continue
+            if trend == "SELL" and bar_high >= sl:
+                signals.append(self._make_signal(
+                    row, "STOP_HIT", trend, price=sl,
+                    note=f"SL hit qty={pos['qty_remaining']:.2f} sl={sl:.2f} alert={pos['entry_alert']}"
+                ))
+                continue
+
+            still_open.append(pos)
+
+        self._save_positions(state, still_open)
+        if not still_open:
+            state.position_active = False
+        return signals
+
+    def _close_all_positions(self, state, row, reason: str) -> List[dict]:
+        """Force-close every open position at row close (CROSSOVER_FLIP / EXIT_EMA400)."""
+        signals: List[dict] = []
+        positions = self._load_positions(state)
+        for pos in positions:
+            signals.append(self._make_signal(
+                row, "STOP_HIT", pos["trend"], price=float(row["close"]),
+                note=f"Force close ({reason}) qty={pos['qty_remaining']:.2f} alert={pos['entry_alert']}"
+            ))
+        self._save_positions(state, [])
+        state.position_active = False
+        return signals
+
+    # ------------------------------------------------------------------
+    def _reset_state(self, state, trend: str, row) -> None:
         state.trend = trend
         state.stage = 1 if trend in ("BUY", "SELL") else 0
         if trend in ("BUY", "SELL"):
@@ -325,6 +665,12 @@ class EMACrossoverStrategy:
         state.stop_loss = None
         state.target_price = None
         state.position_active = False
+        state.retest1_attempts = 0
+        state.retest2_attempts = 0
+        state.retest1_invalidated = False
+        state.retest1_pending_cross_ts = None
+        state.retest2_pending_cross_ts = None
+        self._save_positions(state, [])
 
     # ------------------------------------------------------------------
     @staticmethod
@@ -342,7 +688,7 @@ class EMACrossoverStrategy:
         )
 
     @staticmethod
-    def _make_signal(row: pd.Series, signal_type: str, trend: str,
+    def _make_signal(row, signal_type: str, trend: str,
                       price: Optional[float] = None, note: str = "") -> dict:
         return {
             "signal_type": signal_type,
@@ -364,13 +710,17 @@ class EMACrossoverStrategy:
                 .one_or_none()
             )
             if state is None:
-                state = EMACrossoverState(user_id=user_id, symbol=symbol, trend="NONE", stage=0)
+                state = EMACrossoverState(
+                    user_id=user_id, symbol=symbol, trend="NONE", stage=0,
+                    retest1_attempts=0, retest2_attempts=0,
+                    retest1_invalidated=False, positions_json=[],
+                )
                 session.add(state)
                 session.commit()
             session.expunge(state)
         return state
 
-    def _save_state(self, state: EMACrossoverState) -> None:
+    def _save_state(self, state) -> None:
         with self.db.get_session() as session:
             session.merge(state)
             session.commit()

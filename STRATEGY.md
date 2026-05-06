@@ -1,6 +1,9 @@
-# EMA 200 / 400 1H Crossover Strategy
+# EMA 200 / 400 Crossover Strategy — v2 (BTC trade rules)
 
-Production: `77.42.45.12` · Repo HEAD `92b66400` · Universe: 504 NSE Nifty 500.
+Production: `77.42.45.12` · Universe: 504 NSE Nifty 500. Default 1H bars
+(timeframe customizable to 30min via `historical_data_*` switch).
+
+Spec source: `BTC Trade Rules_V1.1.pdf`.
 
 ---
 
@@ -8,58 +11,47 @@ Production: `77.42.45.12` · Repo HEAD `92b66400` · Universe: 504 NSE Nifty 500
 
 ## What it does
 
-Trend-following on 1H bars. Detects trend via EMA 200 vs EMA 400 crossover,
-waits for retest confirmation, takes up to 2 entries per cycle.
+Trend-following. EMA 200 vs EMA 400 crossover sets direction. Two confirmation
+alerts then up to 3 re-entries each at retest1 (EMA 200) and retest2 (EMA 400).
+Per-position 30% target, 15% partial-book + trail SL → entry. EMA 400 close-
+based exit closes everything.
 
-## Stage chain (BUY; SELL is mirror)
+## Stage chain (BUY; SELL mirror)
 
 | # | Stage | Trigger | Action |
 |---|-------|---------|--------|
+| 0 | Wait | — | Wait for crossover |
 | 1 | Trend ID | EMA 200 crosses above EMA 400 | Lock crossover candle |
-| 2 | First Alert | 1H close > crossover candle high | Watch for retest |
-| 3 | Second Alert | 1H close < EMA 200 (retest) | Lock retest1 candle |
-| 4 | **Entry 1** | 1H close > retest1 high | **BUY** (score 100) |
-| 5 | Third Alert | 1H low ≤ EMA 400 | Lock retest2 candle |
-| 6 | **Entry 2** | 1H close > retest2 high | **BUY** pyramid (score 90) |
-| — | Exit | 1H close < EMA 400 | Close ALL entries |
+| 2 | First Alert | bar close > crossover candle high | Watch for retest |
+| 3 | Second Alert | bar close < EMA 200 (retest1) | Lock retest1 candle, attempts=0, invalidated=False |
+| 3 | Retest1 invalidate | bar low ≤ EMA 400 AND attempts==0 | Skip ENTRY1, jump to Stage 4 |
+| 3 | EMA400 touch post-entry | bar low ≤ EMA 400 AND attempts>0 | Per-position SL hits + advance to Stage 4 (ALERT3 fires same bar) |
+| 3 | **Entry 1** (cross + sustain) | edge cross of retest1.high → PENDING; entry fires when (now − pending_ts) ≥ sustain_minutes AND close still > level. PENDING_CANCEL if close drops back below before sustain elapses. | **BUY** ×4 max, SL=current EMA400 (dynamic) |
+| 4 | Third Alert | bar low ≤ EMA 400 | Lock retest2 candle, attempts=0 |
+| 5 | **Entry 2** (cross + sustain) | edge cross of retest2.high → PENDING; entry after sustain_minutes elapsed | **BUY** ×4 max, SL=retest2.low (static) |
+| Per-bar | Per-position management | TP @ entry×1.30, partial @ entry×1.15, SL hit | Emits TARGET_HIT / PARTIAL / STOP_HIT |
 
-## Risk model
+"Edge break" = price must dip back below the alert level then re-cross to count
+as a new attempt. Stops a single break from consuming all 3 re-entries.
+
+## Risk model (per position)
 
 | Item | Rule |
 |------|------|
-| Stop loss | 1H close past EMA 400 |
-| Target (equity) | 1 : 3 RR (entry + 3 × distance to EMA 400) |
-| Target (index) | 5000 absolute pts |
-| Pyramid | Entry 2 may repeat on each EMA 400 retest |
-| Position size | Max 2 stocks per sector |
-| Re-entry | Allowed after next opposite crossover |
+| Target | entry × (1 + 30%) for BUY, entry × (1 − 30%) for SELL |
+| Partial | bar.high ≥ entry × 1.15 (BUY) → book 50% qty, trail SL → entry |
+| SL (ENTRY1) | intra-bar low ≤ current EMA 400 (dynamic, per-position) |
+| SL (ENTRY2) | retest2.low (BUY) / retest2.high (SELL) — static, per-position |
+| SL after partial | sl=entry price (static); trail to breakeven |
+| Re-entry cap | 4 attempts at retest1, 4 at retest2 (1 initial + 3 re-entries each) |
+| Re-arm retest2 | 4th retest1 attempt OR EMA 400 touch → advance to retest2 |
+| Pyramid | Stage 5 → 4 after 4th retest2 attempt; new ALERT3 lock re-arms |
+| Trend reset | Opposite crossover ONLY (no EMA 400 close-based reset) |
 
-## Backtest (Fyers Nifty 500, 720d, 1H)
+## Backtest
 
-| Metric | Value |
-|--------|-------|
-| Trades | 2,695 |
-| Win rate | 31.6% |
-| **Reward : Risk** | **2.77 : 1** |
-| Avg win / loss | +159.50 / −57.55 |
-| **Net P&L per unit** | **+9,429** |
-| Profitable stocks | 247 / 483 |
-| Target hits (always wins) | 758 |
-| EMA-exit closes | 1,937 (1,843 losers, 94 winners) |
-
-**Why 68% loss rate works:** R:R 2.77 turns low win rate into +11.05 expectancy.
-100% of losses come from EMA 400 close-exits (capped). All target hits win.
-
-## Stage funnel
-
-| Transition | Rate |
-|------------|------|
-| Crossover → Alert 1 | 85.9% |
-| Alert 1 → Alert 2 | 95.5% |
-| Alert 2 → **Entry 1** | 77.5% |
-| Entry 1 → Alert 3 | 74.1% |
-| Alert 3 → **Entry 2** | 46.9% |
-| Entry → Exit | 97.1% |
+v1 stats below are stale — superseded by v2 rules. Re-run via
+`tools/backtests/run_ema_200_400_backtest.py` to regenerate.
 
 ## What user sees in UI
 
@@ -85,7 +77,7 @@ waits for retest confirmation, takes up to 2 entries per cycle.
 | API route | `src/web/routes/suggested_stocks_routes.py` |
 | UI | `src/web/templates/{strategies,suggested_stocks}.html`, `v2/{picks,settings}.html` |
 | Backtest harness | `tools/backtests/run_ema_200_400_backtest.py` |
-| Migrations | `migrations/2026_04_30_{ema_200_400_strategy,clear_trade_deals}.sql` |
+| Migrations | `migrations/2026_04_30_{ema_200_400_strategy,clear_trade_deals}.sql`, `migrations/2026_05_06_ema_strategy_v2.sql` |
 
 ## Schema
 
@@ -129,11 +121,10 @@ Fyers order placement (live or paper)
 strategy        = 'ema_200_400'
 model_type      = 'crossover'
 recommendation  IN ('BUY', 'SELL')
-selection_score = 100  -- Entry 1 (high conviction)
-                | 90   -- Entry 2 (pyramid)
-target_price    = entry + 3 * |entry - ema_400|   -- equity
-                | entry ± 5000                     -- index
-stop_loss       = current EMA 400
+selection_score = 100  -- ENTRY1 (high conviction)
+                | 90   -- ENTRY2 (pyramid)
+target_price    = entry × (1 ± 0.30)                  -- 30% TP
+stop_loss       = ENTRY1 → EMA 400, ENTRY2 → retest2.low/high
 ```
 
 Upsert key: `(date, symbol, strategy, model_type)` — idempotent re-runs.
@@ -154,15 +145,37 @@ Upsert key: `(date, symbol, strategy, model_type)` — idempotent re-runs.
 | `position_active` | True between Entry 1 and EXIT |
 | `last_evaluated_ts` | Incremental replay marker |
 
-## Config — `StrategyConfig`
+## Config — `StrategyConfig` (v2)
 
 ```python
-target_points     = 5000.0   # index
-rr_multiple       = 3.0      # equity
+target_pct        = 0.30     # 30% take-profit
+partial_pct       = 0.15     # 15% partial-book trigger
+partial_qty_frac  = 0.5      # book 50% at partial
+re_entry_cap      = 4        # 1 initial + 3 re-entries per alert
+sustain_minutes   = 15       # informational on 1H; effective on <=30m
 ema_fast_period   = 200
 ema_slow_period   = 400
-sustain_minutes   = 15       # informational on 1H
 ```
+
+## Signals emitted
+
+`CROSSOVER`, `ALERT1`, `ALERT2`, `ALERT2_SKIP` (EMA400 invalidate),
+`ALERT3`, `PENDING` (cross detected, sustain check armed),
+`PENDING_CANCEL` (close retraced before sustain),
+`ENTRY1`, `ENTRY2`, `PARTIAL`, `TARGET_HIT`, `STOP_HIT`, `EXIT`.
+
+ENTRY signals carry per-position `target` and `sl` fields directly.
+
+## State columns added (v2)
+
+| Column | Type | Meaning |
+|--------|------|---------|
+| `retest1_attempts` | int | ENTRY1 fires this cycle (cap 3) |
+| `retest2_attempts` | int | ENTRY2 fires this cycle (cap 3) |
+| `retest1_invalidated` | bool | EMA400 touched before ENTRY1 break |
+| `retest1_pending_cross_ts` | bigint | Bar timestamp where retest1 cross detected; entry fires after sustain elapsed |
+| `retest2_pending_cross_ts` | bigint | Bar timestamp where retest2 cross detected; entry fires after sustain elapsed |
+| `positions_json` | jsonb | List of open positions w/ entry/sl/sl_type/target/qty/partial flag |
 
 ## Container layout (production VM)
 
@@ -180,10 +193,13 @@ into images** — production code changes require `docker compose build`.
 ## Ops runbook
 
 ```bash
-# Apply migrations
+# Apply migrations (v1 + v2)
 docker cp migrations/2026_04_30_ema_200_400_strategy.sql trading_system_db:/tmp/
+docker cp migrations/2026_05_06_ema_strategy_v2.sql trading_system_db:/tmp/
 docker exec trading_system_db psql -U trader -d trading_system \
     -f /tmp/2026_04_30_ema_200_400_strategy.sql
+docker exec trading_system_db psql -U trader -d trading_system \
+    -f /tmp/2026_05_06_ema_strategy_v2.sql
 
 # First-time backfill (120d × 504 symbols)
 docker exec -w /app trading_system_app /usr/local/bin/python -c "
