@@ -952,6 +952,7 @@ class EMACrossoverStrategy:
 
         bar_high = float(row["high"])
         bar_low = float(row["low"])
+        bar_close = float(row["close"])
         cur_ema200 = float(row["ema_200"])
         cur_ema400 = float(row["ema_400"])
         still_open: list = []
@@ -1018,17 +1019,21 @@ class EMACrossoverStrategy:
                         note=f"Partial book {book_qty:.2f} @ {self.config.partial_pct*100:.0f}%; trail SL->EMA200 alert={pos['entry_alert']}"
                     ))
 
-            # 3) SL hit on remaining qty
-            if trend == "BUY" and bar_low <= sl:
+            # 3) SL hit on remaining qty.
+            # Per BTC trade rules v1.2 — all "Price cross below/above" SL
+            # triggers are close-based (bar.close beyond level), not wick.
+            # Applies uniformly to: ENTRY1 EMA400 SL, ENTRY2 retest2 static SL,
+            # and post-partial EMA200 trail.
+            if trend == "BUY" and bar_close < sl:
                 signals.append(self._make_signal(
-                    row, "STOP_HIT", trend, price=sl,
-                    note=f"SL hit qty={pos['qty_remaining']:.2f} sl={sl:.2f} alert={pos['entry_alert']}"
+                    row, "STOP_HIT", trend, price=bar_close,
+                    note=f"SL hit (close<{sl_type}) qty={pos['qty_remaining']:.2f} sl={sl:.2f} alert={pos['entry_alert']}"
                 ))
                 continue
-            if trend == "SELL" and bar_high >= sl:
+            if trend == "SELL" and bar_close > sl:
                 signals.append(self._make_signal(
-                    row, "STOP_HIT", trend, price=sl,
-                    note=f"SL hit qty={pos['qty_remaining']:.2f} sl={sl:.2f} alert={pos['entry_alert']}"
+                    row, "STOP_HIT", trend, price=bar_close,
+                    note=f"SL hit (close>{sl_type}) qty={pos['qty_remaining']:.2f} sl={sl:.2f} alert={pos['entry_alert']}"
                 ))
                 continue
 
