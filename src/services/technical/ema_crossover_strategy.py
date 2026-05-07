@@ -56,6 +56,7 @@ try:
     from ...models.database import get_database_manager
     from ...models.historical_models import (
         HistoricalData1H,
+        HistoricalData15M,
         EMACrossoverState,
         EMACrossoverSignal,
     )
@@ -63,6 +64,7 @@ except ImportError:
     from src.models.database import get_database_manager
     from src.models.historical_models import (
         HistoricalData1H,
+        HistoricalData15M,
         EMACrossoverState,
         EMACrossoverSignal,
     )
@@ -165,6 +167,7 @@ class EMACrossoverStrategy:
         user_id: int,
         symbol: str,
         candles: List[HistoricalData1H],
+        latest_15m_bar: Optional[HistoricalData15M] = None,
     ) -> List[dict]:
         if len(candles) < self.config.ema_slow_period + 5:
             logger.debug(
@@ -207,9 +210,219 @@ class EMACrossoverStrategy:
                 signals.append(sig)
             state.last_evaluated_ts = int(row["timestamp"])
 
+        # Intra-bar 15m sustain pass: if a retest break is pending and the
+        # latest 15m close still holds beyond the level for >= sustain_minutes,
+        # fire ENTRY now instead of waiting for the next 1H close.
+        if latest_15m_bar is not None and len(df) > 0:
+            last_1h_row = df.iloc[-1]
+            signals.extend(self._intra_bar_sustain_15m(state, last_1h_row, latest_15m_bar))
+
         self._save_state(state)
         for sig in signals:
             self._record_signal(user_id, symbol, sig)
+        return signals
+
+    # ------------------------------------------------------------------
+    # 15m intra-bar sustain check (entry confirmation only)
+    # ------------------------------------------------------------------
+    def _intra_bar_sustain_15m(self, state, last_1h_row, bar15m) -> List[dict]:
+        """Resolve any pending retest break against the latest 15m bar.
+
+        Only the post-cross sustain confirmation runs on 15m data; trend
+        detection, EMA200/400 and retest locking still come from 1H.
+        """
+        if state.trend not in ("BUY", "SELL"):
+            return []
+        try:
+            bar_ts = int(bar15m.timestamp)
+        except Exception:
+            return []
+        # Build a synthetic row carrying the 15m price/timestamp but the
+        # latest known 1H EMAs so signal records remain consistent.
+        synth = pd.Series({
+            "timestamp": bar_ts,
+            "candle_time": bar15m.candle_time,
+            "open": float(bar15m.open),
+            "high": float(bar15m.high),
+            "low": float(bar15m.low),
+            "close": float(bar15m.close),
+            "ema_200": float(last_1h_row["ema_200"]),
+            "ema_400": float(last_1h_row["ema_400"]),
+        })
+
+        signals: List[dict] = []
+        if state.trend == "BUY":
+            if state.stage == 3 and state.retest1_pending_cross_ts and state.retest1_high is not None:
+                def _r1_buy_cap():
+                    if self.config.skip_retest2:
+                        self._reset_state(state, "NONE", synth)
+                    else:
+                        state.stage = 4
+                signals.extend(self._resolve_pending_15m_buy(
+                    state, synth,
+                    level=float(state.retest1_high),
+                    pending_attr="retest1_pending_cross_ts",
+                    attempts_attr="retest1_attempts",
+                    entry_signal="ENTRY1",
+                    entry_alert="retest1",
+                    sl=float(last_1h_row["ema_400"]),
+                    sl_type="ema400",
+                    on_cap_reached=_r1_buy_cap,
+                ))
+            if state.stage == 5 and state.retest2_pending_cross_ts and state.retest2_high is not None:
+                signals.extend(self._resolve_pending_15m_buy(
+                    state, synth,
+                    level=float(state.retest2_high),
+                    pending_attr="retest2_pending_cross_ts",
+                    attempts_attr="retest2_attempts",
+                    entry_signal="ENTRY2",
+                    entry_alert="retest2",
+                    sl=float(state.retest2_low),
+                    sl_type="static",
+                    on_cap_reached=lambda: setattr(state, "stage", 4),
+                ))
+        else:  # SELL
+            if state.stage == 3 and state.retest1_pending_cross_ts and state.retest1_low is not None:
+                def _r1_sell_cap():
+                    if self.config.skip_retest2:
+                        self._reset_state(state, "NONE", synth)
+                    else:
+                        state.stage = 4
+                signals.extend(self._resolve_pending_15m_sell(
+                    state, synth,
+                    level=float(state.retest1_low),
+                    pending_attr="retest1_pending_cross_ts",
+                    attempts_attr="retest1_attempts",
+                    entry_signal="ENTRY1",
+                    entry_alert="retest1",
+                    sl=float(last_1h_row["ema_400"]),
+                    sl_type="ema400",
+                    on_cap_reached=_r1_sell_cap,
+                ))
+            if state.stage == 5 and state.retest2_pending_cross_ts and state.retest2_low is not None:
+                signals.extend(self._resolve_pending_15m_sell(
+                    state, synth,
+                    level=float(state.retest2_low),
+                    pending_attr="retest2_pending_cross_ts",
+                    attempts_attr="retest2_attempts",
+                    entry_signal="ENTRY2",
+                    entry_alert="retest2",
+                    sl=float(state.retest2_high),
+                    sl_type="static",
+                    on_cap_reached=lambda: setattr(state, "stage", 4),
+                ))
+        return signals
+
+    def _resolve_pending_15m_buy(self, state, row, *, level, pending_attr,
+                                  attempts_attr, entry_signal, entry_alert,
+                                  sl, sl_type, on_cap_reached) -> List[dict]:
+        """15m sustain resolver — mirrors block 1 of _handle_retest_break_buy."""
+        signals: List[dict] = []
+        pending_ts = getattr(state, pending_attr, None)
+        if pending_ts is None:
+            return signals
+        if int(row["timestamp"]) <= int(pending_ts):
+            return signals  # 15m bar predates pending arm
+        attempts = getattr(state, attempts_attr, 0) or 0
+        cap = attempts < self.config.re_entry_cap
+
+        elapsed_min = (int(row["timestamp"]) - int(pending_ts)) / 60.0
+        if row["close"] <= level:
+            setattr(state, pending_attr, None)
+            signals.append(self._make_signal(
+                row, "PENDING_CANCEL", "BUY",
+                note=f"{entry_signal} sustain failed after {elapsed_min:.0f}m (15m)"
+            ))
+            return signals
+        if elapsed_min < self.config.sustain_minutes:
+            return signals
+        if not cap:
+            setattr(state, pending_attr, None)
+            return signals
+
+        setattr(state, attempts_attr, attempts + 1)
+        new_attempts = attempts + 1
+        pos = self._open_position(
+            row, trend="BUY", entry_alert=entry_alert, sl=sl, sl_type=sl_type,
+        )
+        self._append_position(state, pos)
+        state.entries_count = (state.entries_count or 0) + 1
+        if entry_signal == "ENTRY1" and state.entry1_price is None:
+            state.entry1_price = pos["entry_price"]
+            state.entry1_time = pos["entry_time"]
+        if entry_signal == "ENTRY2" and state.entry2_price is None:
+            state.entry2_price = pos["entry_price"]
+            state.entry2_time = pos["entry_time"]
+        state.stop_loss = pos["sl"]
+        state.target_price = pos["target"]
+        state.position_active = True
+        sig = self._make_signal(
+            row, entry_signal, "BUY", price=pos["entry_price"],
+            note=f"BUY {entry_signal} attempt {new_attempts}/{self.config.re_entry_cap} "
+                 f"({entry_alert} break sustained {elapsed_min:.0f}m on 15m)"
+        )
+        sig["sl"] = pos["sl"]
+        sig["target"] = pos["target"]
+        signals.append(sig)
+        setattr(state, pending_attr, None)
+        if new_attempts >= self.config.re_entry_cap:
+            on_cap_reached()
+        return signals
+
+    def _resolve_pending_15m_sell(self, state, row, *, level, pending_attr,
+                                   attempts_attr, entry_signal, entry_alert,
+                                   sl, sl_type, on_cap_reached) -> List[dict]:
+        """15m sustain resolver — mirrors block 1 of _handle_retest_break_sell."""
+        signals: List[dict] = []
+        pending_ts = getattr(state, pending_attr, None)
+        if pending_ts is None:
+            return signals
+        if int(row["timestamp"]) <= int(pending_ts):
+            return signals
+        attempts = getattr(state, attempts_attr, 0) or 0
+        cap = attempts < self.config.re_entry_cap
+
+        elapsed_min = (int(row["timestamp"]) - int(pending_ts)) / 60.0
+        if row["close"] >= level:
+            setattr(state, pending_attr, None)
+            signals.append(self._make_signal(
+                row, "PENDING_CANCEL", "SELL",
+                note=f"{entry_signal} sustain failed after {elapsed_min:.0f}m (15m)"
+            ))
+            return signals
+        if elapsed_min < self.config.sustain_minutes:
+            return signals
+        if not cap:
+            setattr(state, pending_attr, None)
+            return signals
+
+        setattr(state, attempts_attr, attempts + 1)
+        new_attempts = attempts + 1
+        pos = self._open_position(
+            row, trend="SELL", entry_alert=entry_alert, sl=sl, sl_type=sl_type,
+        )
+        self._append_position(state, pos)
+        state.entries_count = (state.entries_count or 0) + 1
+        if entry_signal == "ENTRY1" and state.entry1_price is None:
+            state.entry1_price = pos["entry_price"]
+            state.entry1_time = pos["entry_time"]
+        if entry_signal == "ENTRY2" and state.entry2_price is None:
+            state.entry2_price = pos["entry_price"]
+            state.entry2_time = pos["entry_time"]
+        state.stop_loss = pos["sl"]
+        state.target_price = pos["target"]
+        state.position_active = True
+        sig = self._make_signal(
+            row, entry_signal, "SELL", price=pos["entry_price"],
+            note=f"SELL {entry_signal} attempt {new_attempts}/{self.config.re_entry_cap} "
+                 f"({entry_alert} break sustained {elapsed_min:.0f}m on 15m)"
+        )
+        sig["sl"] = pos["sl"]
+        sig["target"] = pos["target"]
+        signals.append(sig)
+        setattr(state, pending_attr, None)
+        if new_attempts >= self.config.re_entry_cap:
+            on_cap_reached()
         return signals
 
     # ------------------------------------------------------------------

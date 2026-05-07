@@ -154,6 +154,25 @@ def run_ema_crossover_strategy():
         logger.error(f"❌ EMA 200/400 strategy run failed: {e}", exc_info=True)
 
 
+def run_ema_pending_sustain_check():
+    """Intra-1H 15m sustain check — fires ENTRY ~15m after a retest break.
+
+    Only processes symbols whose state has a pending cross flagged by the
+    last 1H run. Trend detection and EMA200/400 still come from 1H bars.
+    """
+    try:
+        runner = get_ema_crossover_runner()
+        result = runner.run_pending_sustains(user_id=1)
+        if result.get("pending_symbols", 0) > 0:
+            logger.info(
+                f"⏱  15m sustain check: {result.get('pending_symbols', 0)} pending, "
+                f"{result.get('signals_emitted', 0)} signals, "
+                f"{len(result.get('errors', []))} errors"
+            )
+    except Exception as e:
+        logger.error(f"❌ 15m sustain check failed: {e}", exc_info=True)
+
+
 def cleanup_old_snapshots():
     """Delete suggested-stocks rows older than 90 days (runs Sunday at 03:00)."""
     logger.info("=" * 80)
@@ -439,7 +458,8 @@ def run_scheduler():
     logger.info("=" * 80)
     logger.info("Scheduled Tasks:")
     logger.info("  - Auto-Trading Execution:      Daily at 09:20 AM")
-    logger.info("  - Strategy Run (1H close):     10:30, 11:30, 12:30, 13:30, 14:30, 15:30")
+    logger.info("  - Strategy Run (1H close):     10:16, 11:16, 12:16, 13:16, 14:16, 15:31")
+    logger.info("  - 15m Sustain Check:           every 15m during market hours")
     logger.info("  - Position Monitoring:         10:00, 11:00, 12:00, 13:00, 14:00, 15:15")
     logger.info("  - Day Trade Close:             Daily at 03:20 PM")
     logger.info("  - Performance Reconciliation:  Daily at 06:00 PM")
@@ -479,6 +499,20 @@ def run_scheduler():
     # NSE 1H candles close at 10:15, 11:15, 12:15, 13:15, 14:15, 15:30 IST.
     for run_time in ['10:16', '11:16', '12:16', '13:16', '14:16', '15:31']:
         schedule.every().day.at(run_time).do(run_ema_crossover_strategy)
+
+    # 15m sustain check at every NSE 15m close (1m grace) for symbols with
+    # a pending retest break — fires ENTRY ~15m after the level breach
+    # instead of waiting for the next 1H close.
+    sustain_times = [
+        '09:31', '09:46', '10:01',
+        '10:31', '10:46', '11:01',
+        '11:31', '11:46', '12:01',
+        '12:31', '12:46', '13:01',
+        '13:31', '13:46', '14:01',
+        '14:31', '14:46', '15:01', '15:16',
+    ]
+    for t in sustain_times:
+        schedule.every().day.at(t).do(run_ema_pending_sustain_check)
 
     # Evening backfill catch-up + post-market run for late candles.
     schedule.every().day.at("22:00").do(run_ema_crossover_strategy)

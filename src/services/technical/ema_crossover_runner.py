@@ -23,6 +23,7 @@ try:
     from ...models.database import get_database_manager
     from ...models.stock_models import Stock
     from ..data.historical_1h_service import get_historical_1h_service
+    from ..data.historical_15m_service import get_historical_15m_service
     from ..data.nifty500_universe import load_nifty500
     from .ema_crossover_strategy import (
         EMACrossoverStrategy,
@@ -33,6 +34,7 @@ except ImportError:
     from src.models.database import get_database_manager
     from src.models.stock_models import Stock
     from src.services.data.historical_1h_service import get_historical_1h_service
+    from src.services.data.historical_15m_service import get_historical_15m_service
     from src.services.data.nifty500_universe import load_nifty500
     from src.services.technical.ema_crossover_strategy import (
         EMACrossoverStrategy,
@@ -49,6 +51,7 @@ class EMACrossoverRunner:
     def __init__(self, config: Optional[StrategyConfig] = None):
         self.db = get_database_manager()
         self.candles = get_historical_1h_service()
+        self.candles_15m = get_historical_15m_service()
         # Production preset (minimal, empirically tuned on Nifty50 720d):
         #   BUY  = HTF filter only (close > 200d SMA at crossover)
         #   SELL = HTF filter + EMA200 slope (50d, 0.5% drop required)
@@ -88,15 +91,21 @@ class EMACrossoverRunner:
             try:
                 # 1. Refresh data
                 self.candles.update_latest(user_id, symbol, lookback_days=backfill_days)
+                # Lightweight 15m refresh — only needed for the sustain check.
+                try:
+                    self.candles_15m.update_latest(user_id, symbol, lookback_days=2)
+                except Exception as e:
+                    logger.warning(f"{symbol}: 15m refresh failed: {e}")
 
                 # 2. Load candles
                 window = self.candles.load_candles(symbol, limit=600)
                 if len(window) < self.strategy.config.ema_slow_period + 5:
                     logger.debug(f"{symbol}: insufficient 1H data ({len(window)})")
                     continue
+                latest_15m = self.candles_15m.latest_candle(symbol)
 
                 # 3. Evaluate strategy
-                signals = self.strategy.evaluate(user_id, symbol, window)
+                signals = self.strategy.evaluate(user_id, symbol, window, latest_15m_bar=latest_15m)
                 if signals:
                     signals_total.extend((symbol, s) for s in signals)
                     self._promote_to_daily_picks(symbol, signals)
@@ -123,6 +132,78 @@ class EMACrossoverRunner:
         if symbols is None:
             symbols = self._default_universe(max_symbols)
         return self.candles.backfill_universe(user_id, symbols, days=days)
+
+    def run_pending_sustains(
+        self,
+        user_id: int,
+        backfill_days: int = 5,
+    ) -> Dict:
+        """Process only symbols whose state has a pending retest break.
+
+        Cheap intra-1H pass: refresh 15m for the subset, then re-run
+        ``evaluate`` so the 15m sustain check can fire ENTRY without waiting
+        for the next 1H close.
+        """
+        try:
+            from ...models.historical_models import EMACrossoverState
+        except ImportError:
+            from src.models.historical_models import EMACrossoverState
+
+        with self.db.get_session() as session:
+            rows = (
+                session.query(EMACrossoverState.symbol)
+                .filter(EMACrossoverState.user_id == user_id)
+                .filter(
+                    (EMACrossoverState.retest1_pending_cross_ts.isnot(None))
+                    | (EMACrossoverState.retest2_pending_cross_ts.isnot(None))
+                )
+                .all()
+            )
+        symbols = [r[0] for r in rows]
+        if not symbols:
+            return {"success": True, "user_id": user_id, "pending_symbols": 0,
+                    "signals_emitted": 0}
+
+        signals_total: List[dict] = []
+        errors: List[Dict] = []
+        for symbol in symbols:
+            try:
+                self.candles_15m.update_latest(user_id, symbol, lookback_days=2)
+                window = self.candles.load_candles(symbol, limit=600)
+                if len(window) < self.strategy.config.ema_slow_period + 5:
+                    continue
+                latest_15m = self.candles_15m.latest_candle(symbol)
+                if latest_15m is None:
+                    continue
+                signals = self.strategy.evaluate(
+                    user_id, symbol, window, latest_15m_bar=latest_15m
+                )
+                if signals:
+                    signals_total.extend((symbol, s) for s in signals)
+                    self._promote_to_daily_picks(symbol, signals)
+            except Exception as e:
+                logger.error(f"Pending sustain error for {symbol}: {e}", exc_info=True)
+                errors.append({"symbol": symbol, "error": str(e)})
+
+        return {
+            "success": True,
+            "user_id": user_id,
+            "pending_symbols": len(symbols),
+            "signals_emitted": len(signals_total),
+            "errors": errors,
+        }
+
+    def backfill_15m_universe(
+        self,
+        user_id: int,
+        symbols: Optional[List[str]] = None,
+        days: int = 30,
+        max_symbols: int = 500,
+    ) -> Dict:
+        """One-shot 15m backfill — only needed once per symbol set."""
+        if symbols is None:
+            symbols = self._default_universe(max_symbols)
+        return self.candles_15m.backfill_universe(user_id, symbols, days=days)
 
     # ------------------------------------------------------------------
     # Internals

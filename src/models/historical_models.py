@@ -131,6 +131,37 @@ class HistoricalData1H(Base):
         return f'<HistoricalData1H {self.symbol} {self.candle_time}: {self.close}>'
 
 
+class HistoricalData15M(Base):
+    """
+    15-minute OHLCV data — used only for the EMA 200/400 sustain check after
+    a retest level break. Trend detection still runs on the 1H series.
+    """
+    __tablename__ = 'historical_data_15m'
+
+    id = Column(Integer, primary_key=True)
+    symbol = Column(String(50), nullable=False, index=True)
+    timestamp = Column(BigInteger, nullable=False)
+    candle_time = Column(DateTime, nullable=False, index=True)
+
+    open = Column(Float, nullable=False)
+    high = Column(Float, nullable=False)
+    low = Column(Float, nullable=False)
+    close = Column(Float, nullable=False)
+    volume = Column(BigInteger, nullable=False, default=0)
+
+    data_source = Column(String(20), default='fyers')
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('symbol', 'timestamp', name='uq_hist15m_symbol_ts'),
+        Index('ix_hist15m_symbol_time', 'symbol', 'candle_time'),
+    )
+
+    def __repr__(self):
+        return f'<HistoricalData15M {self.symbol} {self.candle_time}: {self.close}>'
+
+
 class EMACrossoverState(Base):
     """
     Per-user / per-symbol state for the EMA 200/400 1H crossover strategy.
