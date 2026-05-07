@@ -707,6 +707,10 @@ def main() -> int:
                         help="Pending-cross sustain wait in minutes. On 1H bars "
                              "values <60 fire on next 1H close, 60-119 fire after "
                              "1 bar, 120+ fire after 2 bars. Default 15.")
+    parser.add_argument("--sell-sustain-minutes", type=int, default=None,
+                        help="Override sustain wait for SELL side only. Default "
+                             "(None) = same as --sustain-minutes. Backtest evidence "
+                             "favors 75 for SELL on 1H bars.")
     args = parser.parse_args()
     _FYERS_CACHE["user_id"] = args.user_id
 
@@ -756,6 +760,7 @@ def main() -> int:
         buy_slope_bars=args.buy_slope_bars,
         buy_slope_min_pct=args.buy_slope_min_pct,
         sustain_minutes=args.sustain_minutes,
+        sell_sustain_minutes=args.sell_sustain_minutes,
     )
     print(f"Config tuning: htf_filter={config.htf_filter_enabled} "
           f"buy_p={config.htf_buy_period_bars}+m{config.htf_buy_margin_pct} "

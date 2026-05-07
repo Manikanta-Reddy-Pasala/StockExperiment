@@ -88,6 +88,10 @@ class StrategyConfig:
     partial_qty_frac: float = DEFAULT_PARTIAL_QTY_FRAC
     re_entry_cap: int = DEFAULT_RE_ENTRY_CAP        # max attempts per alert
     sustain_minutes: int = DEFAULT_SUSTAIN_MINUTES
+    # Optional: override sustain wait for SELL side only. None = same as
+    # sustain_minutes. Backtest evidence: BUY benefits from fast (15m), SELL
+    # benefits from slow (~75m) sustain confirmation on 1H bars.
+    sell_sustain_minutes: Optional[int] = None
     ema_fast_period: int = 200
     ema_slow_period: int = 400
 
@@ -146,6 +150,13 @@ class EMACrossoverStrategy:
     def __init__(self, config: Optional[StrategyConfig] = None):
         self.config = config or StrategyConfig()
         self.db = get_database_manager()
+
+    def _sustain_minutes_for(self, trend: str) -> int:
+        """Per-side sustain: BUY uses sustain_minutes; SELL uses
+        sell_sustain_minutes if set, else sustain_minutes."""
+        if trend == "SELL" and self.config.sell_sustain_minutes is not None:
+            return int(self.config.sell_sustain_minutes)
+        return int(self.config.sustain_minutes)
 
     # ------------------------------------------------------------------
     @staticmethod
@@ -334,7 +345,7 @@ class EMACrossoverStrategy:
                 note=f"{entry_signal} sustain failed after {elapsed_min:.0f}m (15m)"
             ))
             return signals
-        if elapsed_min < self.config.sustain_minutes:
+        if elapsed_min < self._sustain_minutes_for("BUY"):
             return signals
         if not cap:
             setattr(state, pending_attr, None)
@@ -390,7 +401,7 @@ class EMACrossoverStrategy:
                 note=f"{entry_signal} sustain failed after {elapsed_min:.0f}m (15m)"
             ))
             return signals
-        if elapsed_min < self.config.sustain_minutes:
+        if elapsed_min < self._sustain_minutes_for("SELL"):
             return signals
         if not cap:
             setattr(state, pending_attr, None)
@@ -750,7 +761,7 @@ class EMACrossoverStrategy:
                     row, "PENDING_CANCEL", "BUY",
                     note=f"{entry_signal} sustain failed after {elapsed_min:.0f}m"
                 ))
-            elif elapsed_min >= self.config.sustain_minutes:
+            elif elapsed_min >= self._sustain_minutes_for("BUY"):
                 # Sustained — fire ENTRY
                 if cap:
                     setattr(state, attempts_attr, attempts + 1)
@@ -794,7 +805,7 @@ class EMACrossoverStrategy:
                 signals.append(self._make_signal(
                     row, "PENDING", "BUY",
                     note=f"{entry_signal} cross detected — sustain check pending "
-                         f"({self.config.sustain_minutes}m)"
+                         f"({self._sustain_minutes_for('BUY')}m)"
                 ))
         return signals
 
@@ -815,7 +826,7 @@ class EMACrossoverStrategy:
                     row, "PENDING_CANCEL", "SELL",
                     note=f"{entry_signal} sustain failed after {elapsed_min:.0f}m"
                 ))
-            elif elapsed_min >= self.config.sustain_minutes:
+            elif elapsed_min >= self._sustain_minutes_for("SELL"):
                 if cap:
                     setattr(state, attempts_attr, attempts + 1)
                     new_attempts = attempts + 1
@@ -856,7 +867,7 @@ class EMACrossoverStrategy:
                 signals.append(self._make_signal(
                     row, "PENDING", "SELL",
                     note=f"{entry_signal} cross detected — sustain check pending "
-                         f"({self.config.sustain_minutes}m)"
+                         f"({self._sustain_minutes_for('SELL')}m)"
                 ))
         return signals
 
@@ -865,9 +876,11 @@ class EMACrossoverStrategy:
     # ------------------------------------------------------------------
     def _open_position(self, row, trend, entry_alert, sl, sl_type) -> dict:
         """sl_type:
-            'ema400'  -> SL = current EMA400 each bar (dynamic). Used for ENTRY1.
-            'static'  -> SL = fixed price `sl`. Used for ENTRY2 (retest2 candle low/high)
-                         and post-partial trail (sl=entry_price).
+            'ema400'  -> SL = current EMA400 each bar. Used for ENTRY1 pre-partial.
+            'ema200'  -> SL = current EMA200 each bar. Used for both ENTRY1 and
+                         ENTRY2 post-partial trail (BTC trade rules v1.2).
+            'static'  -> SL = fixed price `sl`. Used for ENTRY2 pre-partial
+                         (retest2 candle low/high).
         """
         entry_price = float(row["close"])
         if trend == "BUY":
@@ -939,6 +952,7 @@ class EMACrossoverStrategy:
 
         bar_high = float(row["high"])
         bar_low = float(row["low"])
+        cur_ema200 = float(row["ema_200"])
         cur_ema400 = float(row["ema_400"])
         still_open: list = []
 
@@ -947,11 +961,15 @@ class EMACrossoverStrategy:
             entry = float(pos["entry_price"])
             target = float(pos["target"])
             sl_type = pos.get("sl_type", "static")
-            # Dynamic SL: ENTRY1 SL tracks current EMA400 each bar; ENTRY2
-            # SL is static (retest2 candle low/high). Post-partial trail sets
-            # sl_type='static' with sl=entry_price.
+            # Dynamic SL types:
+            #   'ema400' -> SL = current EMA400 (ENTRY1 pre-partial).
+            #   'ema200' -> SL = current EMA200 (post-partial trail per
+            #               BTC trade rules v1.2 — both ENTRY1 and ENTRY2).
+            #   'static' -> SL = fixed price (ENTRY2 retest2 candle low/high).
             if sl_type == "ema400":
                 sl = cur_ema400
+            elif sl_type == "ema200":
+                sl = cur_ema200
             else:
                 sl = float(pos["sl"])
             partial = float(pos["partial_threshold"])
@@ -971,31 +989,33 @@ class EMACrossoverStrategy:
                 ))
                 continue
 
-            # 2) Partial booking @ partial_pct
+            # 2) Partial booking @ partial_pct.
+            # Per BTC trade rules v1.2: post-partial SL trails the 200 EMA
+            # for the remaining qty (both ENTRY1 and ENTRY2).
             if not booked:
                 if trend == "BUY" and bar_high >= partial:
                     book_qty = pos["qty_remaining"] * self.config.partial_qty_frac
                     pos["qty_remaining"] = pos["qty_remaining"] - book_qty
                     pos["partial_booked"] = True
-                    pos["sl"] = entry  # trail SL to entry
-                    pos["sl_type"] = "static"
-                    sl = entry
+                    pos["sl_type"] = "ema200"
+                    pos["sl"] = cur_ema200
+                    sl = cur_ema200
                     booked = True
                     signals.append(self._make_signal(
                         row, "PARTIAL", trend, price=partial,
-                        note=f"Partial book {book_qty:.2f} @ {self.config.partial_pct*100:.0f}%; trail SL->entry alert={pos['entry_alert']}"
+                        note=f"Partial book {book_qty:.2f} @ {self.config.partial_pct*100:.0f}%; trail SL->EMA200 alert={pos['entry_alert']}"
                     ))
                 elif trend == "SELL" and bar_low <= partial:
                     book_qty = pos["qty_remaining"] * self.config.partial_qty_frac
                     pos["qty_remaining"] = pos["qty_remaining"] - book_qty
                     pos["partial_booked"] = True
-                    pos["sl"] = entry
-                    pos["sl_type"] = "static"
-                    sl = entry
+                    pos["sl_type"] = "ema200"
+                    pos["sl"] = cur_ema200
+                    sl = cur_ema200
                     booked = True
                     signals.append(self._make_signal(
                         row, "PARTIAL", trend, price=partial,
-                        note=f"Partial book {book_qty:.2f} @ {self.config.partial_pct*100:.0f}%; trail SL->entry alert={pos['entry_alert']}"
+                        note=f"Partial book {book_qty:.2f} @ {self.config.partial_pct*100:.0f}%; trail SL->EMA200 alert={pos['entry_alert']}"
                     ))
 
             # 3) SL hit on remaining qty
