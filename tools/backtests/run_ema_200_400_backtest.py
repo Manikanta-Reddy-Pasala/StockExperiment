@@ -49,16 +49,22 @@ SMOKE_SYMBOLS = [
 # NIFTY 50 constituents (plain NSE tickers).
 NIFTY50_BASE = [
     'ADANIENT', 'ADANIPORTS', 'APOLLOHOSP', 'ASIANPAINT', 'AXISBANK',
-    'BAJAJ-AUTO', 'BAJFINANCE', 'BAJAJFINSV', 'BPCL', 'BHARTIARTL',
-    'BRITANNIA', 'CIPLA', 'COALINDIA', 'DIVISLAB', 'DRREDDY',
-    'EICHERMOT', 'GRASIM', 'HCLTECH', 'HDFCBANK', 'HDFCLIFE',
-    'HEROMOTOCO', 'HINDALCO', 'HINDUNILVR', 'ICICIBANK', 'ITC',
-    'INDUSINDBK', 'INFY', 'JSWSTEEL', 'KOTAKBANK', 'LT',
-    'M&M', 'MARUTI', 'NTPC', 'NESTLEIND', 'ONGC',
-    'POWERGRID', 'RELIANCE', 'SBILIFE', 'SBIN', 'SUNPHARMA',
-    'TCS', 'TATACONSUM', 'TATAMOTORS', 'TATASTEEL', 'TECHM',
-    'TITAN', 'ULTRACEMCO', 'UPL', 'WIPRO', 'LTIM',
+    'BAJAJ-AUTO', 'BAJFINANCE', 'BAJAJFINSV', 'BEL', 'BPCL',
+    'BHARTIARTL', 'BRITANNIA', 'CIPLA', 'COALINDIA', 'DIVISLAB',
+    'DRREDDY', 'EICHERMOT', 'GRASIM', 'HCLTECH', 'HDFCBANK',
+    'HDFCLIFE', 'HEROMOTOCO', 'HINDALCO', 'HINDUNILVR', 'ICICIBANK',
+    'ITC', 'INDUSINDBK', 'INFY', 'JIOFIN', 'JSWSTEEL',
+    'KOTAKBANK', 'LT', 'M&M', 'MARUTI', 'NTPC',
+    'NESTLEIND', 'ONGC', 'POWERGRID', 'RELIANCE', 'SBILIFE',
+    'SBIN', 'SHRIRAMFIN', 'SUNPHARMA', 'TCS', 'TATACONSUM',
+    'TMPV', 'TATASTEEL', 'TECHM', 'TITAN', 'TRENT',
+    'ULTRACEMCO', 'UPL', 'WIPRO',
 ]
+# Notes on 2024-2025 NIFTY 50 reconstitution:
+#   - TATAMOTORS demerged into TMPV (passenger) + TMCV (commercial). Index
+#     entry continued via TMPV; TMCV listed too recently for 1H backfill.
+#   - LTIM dropped (Fyers history rejects "Invalid symbol"); replaced by
+#     BEL/TRENT/JIOFIN/SHRIRAMFIN (recent NIFTY 50 inclusions).
 NIFTY50_SYMBOLS = [(s, s) for s in NIFTY50_BASE]
 
 # Indian benchmark indices — 5000-pt target rule applies (image spec).
