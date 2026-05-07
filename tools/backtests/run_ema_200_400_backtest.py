@@ -1,9 +1,12 @@
 """
 Offline backtest harness for the EMA 200/400 1H crossover strategy.
 
-Pulls 1-hour OHLCV from yfinance for a small list of NSE symbols, runs the
-strategy state machine directly (no DB), and emits one Markdown report per
-symbol summarizing signals + P&L.
+Pulls 1-hour OHLCV from Fyers (broker API) for a list of NSE symbols, runs
+the strategy state machine directly (no DB), and emits one Markdown report
+per symbol summarizing signals + P&L.
+
+Requires a valid Fyers session for ``--user-id`` (default 1) in the
+``broker_configurations`` table.
 
 Usage:
     venv/bin/python tools/backtests/run_ema_200_400_backtest.py
@@ -21,7 +24,6 @@ from types import SimpleNamespace
 from typing import Dict, List, Optional
 
 import pandas as pd
-import requests
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
@@ -37,15 +39,14 @@ from src.services.data.nifty500_universe import (  # noqa: E402
 
 # Smoke-test basket — banks, IT, FMCG, energy. Used when --universe=smoke.
 SMOKE_SYMBOLS = [
-    ("HDFCBANK.NS", "HDFC Bank"),
-    ("RELIANCE.NS", "Reliance Industries"),
-    ("INFY.NS", "Infosys"),
-    ("TCS.NS", "Tata Consultancy"),
-    ("ICICIBANK.NS", "ICICI Bank"),
+    ("HDFCBANK", "HDFC Bank"),
+    ("RELIANCE", "Reliance Industries"),
+    ("INFY", "Infosys"),
+    ("TCS", "Tata Consultancy"),
+    ("ICICIBANK", "ICICI Bank"),
 ]
 
-# NIFTY 50 constituents (Yahoo .NS format). Source mirrors
-# yfinance_data_service.get_nifty50_stocks().
+# NIFTY 50 constituents (plain NSE tickers).
 NIFTY50_BASE = [
     'ADANIENT', 'ADANIPORTS', 'APOLLOHOSP', 'ASIANPAINT', 'AXISBANK',
     'BAJAJ-AUTO', 'BAJFINANCE', 'BAJAJFINSV', 'BPCL', 'BHARTIARTL',
@@ -58,15 +59,7 @@ NIFTY50_BASE = [
     'TCS', 'TATACONSUM', 'TATAMOTORS', 'TATASTEEL', 'TECHM',
     'TITAN', 'ULTRACEMCO', 'UPL', 'WIPRO', 'LTIM',
 ]
-# Yahoo .NS format. `&` gets URL-encoded by fetch_1h_yahoo() so M&M.NS works.
-# Override map for symbols Yahoo lists under different ticker than NSE.
-YAHOO_OVERRIDES = {
-    "TATAMOTORS": "TATAMOTORS.NS",  # active again post-2024 demerger
-    "LTIM": "LTIM.NS",
-}
-NIFTY50_SYMBOLS = [
-    (YAHOO_OVERRIDES.get(s, f"{s}.NS"), s) for s in NIFTY50_BASE
-]
+NIFTY50_SYMBOLS = [(s, s) for s in NIFTY50_BASE]
 
 # Indian benchmark indices — 5000-pt target rule applies (image spec).
 INDEX_SYMBOLS = [
@@ -78,68 +71,24 @@ INDEX_SYMBOLS = [
 ]
 
 
-def nifty500_yahoo_symbols(limit: Optional[int] = None) -> List[tuple]:
-    """Return ``[(yahoo_symbol, company_name)]`` for the Nifty 500."""
+def nifty500_symbols(limit: Optional[int] = None) -> List[tuple]:
+    """Return ``[(symbol, company_name)]`` for the Nifty 500.
+
+    Symbols are plain NSE tickers; fetcher converts to Fyers ``NSE:..-EQ``.
+    """
     rows = load_nifty500_with_meta()
     out = []
     for fyers_sym, name, _industry in rows:
-        # Fyers ``NSE:RELIANCE-EQ`` -> Yahoo ``RELIANCE.NS``
         plain = fyers_sym.replace("NSE:", "").replace("-EQ", "")
-        out.append((f"{plain}.NS", name))
+        out.append((plain, name))
     return out[:limit] if limit else out
-
-
-YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
-HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
-
-
-def fetch_1h_yahoo(symbol: str, days: int = 720) -> pd.DataFrame:
-    """Yahoo chart API. Hourly data window cap is ~730 days."""
-    from urllib.parse import quote
-    params = {"interval": "1h", "range": f"{min(days, 730)}d"}
-    try:
-        r = requests.get(YAHOO_URL.format(symbol=quote(symbol, safe=".^")),
-                         params=params, headers=HEADERS, timeout=30)
-        r.raise_for_status()
-        payload = r.json()
-    except Exception as e:
-        print(f"  yahoo fetch failed: {e}")
-        return pd.DataFrame()
-
-    result = (payload.get("chart") or {}).get("result") or []
-    if not result:
-        return pd.DataFrame()
-    res = result[0]
-    timestamps = res.get("timestamp") or []
-    quote = ((res.get("indicators") or {}).get("quote") or [{}])[0]
-    if not timestamps or not quote:
-        return pd.DataFrame()
-
-    df = pd.DataFrame(
-        {
-            "timestamp": timestamps,
-            "open": quote.get("open"),
-            "high": quote.get("high"),
-            "low": quote.get("low"),
-            "close": quote.get("close"),
-            "volume": quote.get("volume"),
-        }
-    )
-    df = df.dropna(subset=["open", "high", "low", "close"]).reset_index(drop=True)
-    if df.empty:
-        return df
-    df["candle_time"] = pd.to_datetime(df["timestamp"], unit="s", utc=True) \
-        .dt.tz_convert("Asia/Kolkata").dt.tz_localize(None)
-    df["volume"] = df["volume"].fillna(0).astype("int64")
-    df["timestamp"] = df["timestamp"].astype("int64")
-    return df[["timestamp", "candle_time", "open", "high", "low", "close", "volume"]]
 
 
 # ---- Fyers fetcher (production primary) ------------------------------
 # Reuses FyersService.history() — same token flow used in production. Needs:
 #   1. Postgres reachable (broker_configurations table holds access_token)
 #   2. Valid Fyers session for user_id (default 1)
-# Falls back to Yahoo when DB or token unavailable.
+# Errors out (empty df) when DB or token unavailable.
 
 _FYERS_CACHE = {"service": None, "init_failed": False, "user_id": 1}
 
@@ -166,9 +115,18 @@ def _fyers_service():
         return None
 
 
-def yahoo_to_fyers_symbol(yahoo_sym: str) -> str:
-    """``RELIANCE.NS`` -> ``NSE:RELIANCE-EQ``. Index ``^NSEI`` -> ``NSE:NIFTY50-INDEX``."""
-    s = yahoo_sym.upper()
+def to_fyers_symbol(sym: str) -> str:
+    """Normalize input ticker to Fyers format.
+
+    Accepts:
+      - Plain NSE ticker     ``RELIANCE``       -> ``NSE:RELIANCE-EQ``
+      - Yahoo style          ``RELIANCE.NS``    -> ``NSE:RELIANCE-EQ``
+      - Index pseudo-ticker  ``^NSEI``          -> ``NSE:NIFTY50-INDEX``
+      - Already Fyers        ``NSE:RELIANCE-EQ`` (passthrough)
+    """
+    s = sym.upper()
+    if s.startswith("NSE:"):
+        return s
     if s.startswith("^"):
         idx_map = {
             "^NSEI": "NSE:NIFTY50-INDEX",
@@ -188,7 +146,7 @@ def fetch_1h_fyers(symbol: str, days: int = 720,
     if svc is None:
         return pd.DataFrame()
 
-    fyers_sym = yahoo_to_fyers_symbol(symbol)
+    fyers_sym = to_fyers_symbol(symbol)
     end_dt = datetime.now()
     start_dt = end_dt - timedelta(days=days)
     cursor = start_dt
@@ -240,24 +198,9 @@ def fetch_1h_fyers(symbol: str, days: int = 720,
                "close", "volume"]]
 
 
-def fetch_1h_data(symbol: str, days: int = 720,
-                  source: str = "auto", user_id: int = 1) -> tuple:
-    """Return ``(df, source_used)``.
-
-    ``source``:
-        - ``fyers``: only Fyers, error if unavailable.
-        - ``yahoo``: only Yahoo.
-        - ``auto`` (default): Fyers first, Yahoo fallback per-symbol.
-    """
-    if source == "yahoo":
-        return fetch_1h_yahoo(symbol, days), "yahoo"
-    if source == "fyers":
-        return fetch_1h_fyers(symbol, days, user_id), "fyers"
-    # auto: Fyers first, fall back to Yahoo on empty
-    df = fetch_1h_fyers(symbol, days, user_id)
-    if not df.empty:
-        return df, "fyers"
-    return fetch_1h_yahoo(symbol, days), "yahoo"
+def fetch_1h_data(symbol: str, days: int = 720, user_id: int = 1) -> tuple:
+    """Return ``(df, source_used)``. Fyers is the only data source."""
+    return fetch_1h_fyers(symbol, days, user_id), "fyers"
 
 
 def df_to_candles(df: pd.DataFrame) -> List[SimpleNamespace]:
@@ -583,7 +526,7 @@ def render_md(symbol: str, name: str, df: pd.DataFrame,
         "",
         "## Backtest Summary",
         "",
-        f"- **Source:** Yahoo chart API (1H bars)",
+        f"- **Source:** Fyers history API (1H bars)",
         f"- **Window:** {first} → {last} ({bar_count} bars)",
         f"- **Last close:** {last_close:.2f}",
         f"- **Strategy:** EMA 200/400 1H crossover (v2 BTC rules)",
@@ -703,7 +646,7 @@ def render_md(symbol: str, name: str, df: pd.DataFrame,
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--days", type=int, default=720,
-                        help="History window (Yahoo caps 1H at ~730d)")
+                        help="History window in calendar days")
     parser.add_argument("--out", type=Path,
                         default=ROOT / "exports" / "backtests")
     parser.add_argument("--universe", choices=["smoke", "nifty50", "nifty500", "indices"],
@@ -712,18 +655,14 @@ def main() -> int:
                              "nifty500=full Nifty 500; indices=NIFTY/BANKNIFTY/sectoral")
     parser.add_argument("--limit", type=int, default=None,
                         help="When --universe=nifty500, cap to first N")
-    parser.add_argument("--source", choices=["auto", "fyers", "yahoo"],
-                        default="auto",
-                        help="Data source. Default 'auto' = Fyers first, Yahoo "
-                             "fallback per-symbol (recommended). 'fyers' = Fyers "
-                             "only, errors if token missing. 'yahoo' = Yahoo only.")
     parser.add_argument("--user-id", type=int, default=1,
                         help="Fyers user_id (default 1) for token lookup")
     parser.add_argument("--symbol", type=str, default=None,
-                        help="Single-stock mode. Yahoo (RELIANCE.NS / ^NSEI) or "
-                             "Fyers (NSE:RELIANCE-EQ) format. Overrides --universe.")
+                        help="Single-stock mode. Plain (RELIANCE), Yahoo "
+                             "(RELIANCE.NS / ^NSEI), or Fyers (NSE:RELIANCE-EQ) "
+                             "format. Overrides --universe.")
     parser.add_argument("--from", dest="date_from", type=str, default=None,
-                        help="Start date YYYY-MM-DD (overrides --days; Yahoo only honors range)")
+                        help="Start date YYYY-MM-DD (overrides --days)")
     parser.add_argument("--to", dest="date_to", type=str, default=None,
                         help="End date YYYY-MM-DD (defaults to today when --from given)")
     # ---- Tuning flags (opt-in; default = spec-compliant) ----
@@ -765,22 +704,15 @@ def main() -> int:
     args = parser.parse_args()
     _FYERS_CACHE["user_id"] = args.user_id
 
-    # Convert --from/--to to days window (1H window must end at "now" for Yahoo
-    # range param; for Fyers we pass exact dates)
     if args.date_from:
         from_dt = datetime.strptime(args.date_from, "%Y-%m-%d")
         to_dt = datetime.strptime(args.date_to, "%Y-%m-%d") if args.date_to else datetime.now()
         delta_days = max(1, (datetime.now() - from_dt).days)
-        args.days = min(delta_days, 730)
+        args.days = delta_days
         print(f"Date range: {from_dt.date()} → {to_dt.date()} ({args.days} days)")
 
     if args.symbol:
-        # Normalize Fyers-style to Yahoo for harness fetcher
         sym = args.symbol.upper()
-        if sym.startswith("NSE:") and sym.endswith("-EQ"):
-            sym = sym.replace("NSE:", "").replace("-EQ", "") + ".NS"
-        elif sym.endswith("-INDEX"):
-            sym = "^" + sym.replace("NSE:", "").replace("-INDEX", "")
         symbols_list = [(sym, sym)]
         print(f"Universe: single symbol ({sym})")
     elif args.universe == "nifty50":
@@ -789,7 +721,7 @@ def main() -> int:
             symbols_list = symbols_list[:args.limit]
         print(f"Universe: NIFTY 50 ({len(symbols_list)} symbols)")
     elif args.universe == "nifty500":
-        symbols_list = nifty500_yahoo_symbols(limit=args.limit)
+        symbols_list = nifty500_symbols(limit=args.limit)
         if not symbols_list:
             print("Nifty 500 cache empty. Run tools/refresh_nifty500.py first.")
             return 2
@@ -828,11 +760,10 @@ def main() -> int:
     strat = OfflineStrategy(config)
 
     aggregate = []
-    source_counts = {"fyers": 0, "yahoo": 0, "none": 0}
+    source_counts = {"fyers": 0, "none": 0}
     for symbol, name in symbols_list:
         print(f"--- {symbol} ---", flush=True)
-        df, src = fetch_1h_data(symbol, days=args.days,
-                                source=args.source, user_id=args.user_id)
+        df, src = fetch_1h_data(symbol, days=args.days, user_id=args.user_id)
         source_counts[src if not df.empty else "none"] = \
             source_counts.get(src if not df.empty else "none", 0) + 1
         print(f"  source={src}, bars={len(df)}", flush=True) if df.empty else None
@@ -924,8 +855,8 @@ def main() -> int:
         f"- Target hits / Stop hits / Partials: {total_target} / {total_stop} / {total_partial}",
         f"- **Avg % per leg: {avg_pct_overall:.2f}%**",
         f"- **Sum % across all legs (uncompounded): {total_sum_pct:.1f}%**",
-        f"- Data source mix: fyers={source_counts.get('fyers',0)} "
-        f"yahoo={source_counts.get('yahoo',0)} none={source_counts.get('none',0)}",
+        f"- Data source: Fyers ({source_counts.get('fyers',0)} ok / "
+        f"{source_counts.get('none',0)} no-data)",
         "",
         "## Direction × Alert breakdown (universe)",
         "",
