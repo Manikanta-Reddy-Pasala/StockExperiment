@@ -123,6 +123,19 @@ class StrategyConfig:
     # ewm(adjust=False) drifts vs Fyers chart for hundreds of bars.
     sma_seed_ema: bool = True
 
+    # ---- Quality filters ----
+    # Minimum EMA200/EMA400 separation at crossover as fraction of price.
+    # Touching EMAs (gap below threshold) whipsaw; filter them.
+    # Backtest evidence (Nifty50 180d Fyers): default 0.0005 lifts win rate
+    # 27.7% -> 44.4% and flips sum % from -19 to +8.5. Set 0 for spec-strict.
+    min_crossover_gap_pct: float = 0.0005
+    # Volume confirmation on ENTRY break bar. Skip ENTRY if break-bar volume
+    # is below avg(volume, N) × mult. mult=0 disables (default — was too
+    # aggressive in 6m backtest, dropped legs from 9 to 3 without improving
+    # quality). Toggle on with mult=0.8 for longer windows / liquid stocks.
+    volume_confirm_bars: int = 20
+    volume_confirm_mult: float = 0.0
+
     # ---- Opt-in tuning toggles (all default = spec-compliant / disabled) ----
     # 1) Higher-timeframe trend filter: only allow CROSSOVER in matching regime.
     #    BUY  fires only if close > htf_sma_buy at crossover bar.
@@ -186,6 +199,22 @@ class EMACrossoverStrategy:
             return int(self.config.sell_sustain_minutes)
         return int(self.config.sustain_minutes)
 
+    def _volume_ok(self, row) -> bool:
+        """Volume confirmation gate. True if break-bar volume >=
+        avg(volume, N) × mult, or if filter disabled / volume_sma missing."""
+        if not self.config.volume_confirm_bars or self.config.volume_confirm_mult <= 0:
+            return True
+        try:
+            vol = float(row["volume"])
+            avg = float(row.get("volume_sma", 0)) if hasattr(row, "get") else 0.0
+            if avg <= 0:
+                avg = float(row["volume_sma"]) if "volume_sma" in row.index else 0.0
+        except Exception:
+            return True
+        if avg <= 0:
+            return True  # warmup or missing — skip filter
+        return vol >= avg * self.config.volume_confirm_mult
+
     # ------------------------------------------------------------------
     @staticmethod
     def _sma_seeded_ema(close: pd.Series, span: int) -> pd.Series:
@@ -211,7 +240,8 @@ class EMACrossoverStrategy:
     def compute_emas(df: pd.DataFrame, fast: int = 200, slow: int = 400,
                       htf_buy_period_bars: Optional[int] = None,
                       htf_sell_period_bars: Optional[int] = None,
-                      sma_seed: bool = True) -> pd.DataFrame:
+                      sma_seed: bool = True,
+                      volume_sma_bars: int = 0) -> pd.DataFrame:
         df = df.copy()
         if sma_seed:
             df["ema_200"] = EMACrossoverStrategy._sma_seeded_ema(df["close"], fast)
@@ -223,6 +253,8 @@ class EMACrossoverStrategy:
             df["htf_sma_buy"] = df["close"].rolling(htf_buy_period_bars, min_periods=1).mean()
         if htf_sell_period_bars and htf_sell_period_bars > 0:
             df["htf_sma_sell"] = df["close"].rolling(htf_sell_period_bars, min_periods=1).mean()
+        if volume_sma_bars and volume_sma_bars > 0 and "volume" in df.columns:
+            df["volume_sma"] = df["volume"].rolling(volume_sma_bars, min_periods=1).mean()
         return df
 
     # ------------------------------------------------------------------
@@ -254,6 +286,7 @@ class EMACrossoverStrategy:
             htf_buy_period_bars=buy_p,
             htf_sell_period_bars=sell_p,
             sma_seed=self.config.sma_seed_ema,
+            volume_sma_bars=self.config.volume_confirm_bars or 0,
         )
 
         state = self._load_state(user_id, symbol)
@@ -404,6 +437,13 @@ class EMACrossoverStrategy:
         if not cap:
             setattr(state, pending_attr, None)
             return signals
+        if not self._volume_ok(row):
+            setattr(state, pending_attr, None)
+            signals.append(self._make_signal(
+                row, "ENTRY_SKIP", "BUY",
+                note=f"{entry_signal} volume filter: vol below {self.config.volume_confirm_mult}x avg(volume,{self.config.volume_confirm_bars}) (15m)"
+            ))
+            return signals
 
         setattr(state, attempts_attr, attempts + 1)
         new_attempts = attempts + 1
@@ -460,6 +500,13 @@ class EMACrossoverStrategy:
         if not cap:
             setattr(state, pending_attr, None)
             return signals
+        if not self._volume_ok(row):
+            setattr(state, pending_attr, None)
+            signals.append(self._make_signal(
+                row, "ENTRY_SKIP", "SELL",
+                note=f"{entry_signal} volume filter: vol below {self.config.volume_confirm_mult}x avg(volume,{self.config.volume_confirm_bars}) (15m)"
+            ))
+            return signals
 
         setattr(state, attempts_attr, attempts + 1)
         new_attempts = attempts + 1
@@ -503,6 +550,17 @@ class EMACrossoverStrategy:
 
         cross_up = prev_ema200 <= prev_ema400 and ema200 > ema400
         cross_dn = prev_ema200 >= prev_ema400 and ema200 < ema400
+
+        # Quality filter: require minimum EMA gap as fraction of price.
+        # Filters out touching crossings that immediately whipsaw.
+        if (cross_up or cross_dn) and self.config.min_crossover_gap_pct > 0:
+            gap_pct = abs(ema200 - ema400) / float(row["close"]) if row["close"] else 0.0
+            if gap_pct < self.config.min_crossover_gap_pct:
+                signals.append(self._make_signal(
+                    row, "CROSSOVER_SKIP", "BUY" if cross_up else "SELL",
+                    note=f"min_gap filter: gap={gap_pct*100:.3f}% < {self.config.min_crossover_gap_pct*100:.3f}%"
+                ))
+                cross_up = cross_dn = False
 
         # Optional HTF filter: only accept crossover if regime matches.
         # Symmetric default (same period for BUY/SELL); configurable margin
@@ -870,7 +928,14 @@ class EMACrossoverStrategy:
                     note=f"{entry_signal} sustain failed after {elapsed_min:.0f}m"
                 ))
             elif elapsed_min >= self._sustain_minutes_for("BUY"):
-                # Sustained — fire ENTRY
+                # Sustained — fire ENTRY (after volume gate)
+                if cap and not self._volume_ok(row):
+                    setattr(state, pending_attr, None)
+                    signals.append(self._make_signal(
+                        row, "ENTRY_SKIP", "BUY",
+                        note=f"{entry_signal} volume filter: vol below {self.config.volume_confirm_mult}x avg(volume,{self.config.volume_confirm_bars})"
+                    ))
+                    return signals
                 if cap:
                     setattr(state, attempts_attr, attempts + 1)
                     new_attempts = attempts + 1
@@ -935,6 +1000,13 @@ class EMACrossoverStrategy:
                     note=f"{entry_signal} sustain failed after {elapsed_min:.0f}m"
                 ))
             elif elapsed_min >= self._sustain_minutes_for("SELL"):
+                if cap and not self._volume_ok(row):
+                    setattr(state, pending_attr, None)
+                    signals.append(self._make_signal(
+                        row, "ENTRY_SKIP", "SELL",
+                        note=f"{entry_signal} volume filter: vol below {self.config.volume_confirm_mult}x avg(volume,{self.config.volume_confirm_bars})"
+                    ))
+                    return signals
                 if cap:
                     setattr(state, attempts_attr, attempts + 1)
                     new_attempts = attempts + 1

@@ -802,6 +802,14 @@ def main() -> int:
     parser.add_argument("--source", choices=["auto", "fyers", "yahoo"], default="auto",
                         help="Data source. auto = Fyers then Yahoo fallback. yahoo "
                              "needs no auth; useful when Fyers token expired.")
+    parser.add_argument("--min-crossover-gap-pct", type=float, default=0.0005,
+                        help="Min EMA200/EMA400 gap at crossover as fraction of price. "
+                             "Default 0.0005 (0.05%%). Set 0 for spec-strict.")
+    parser.add_argument("--volume-confirm-bars", type=int, default=20,
+                        help="Volume SMA window for entry confirmation. Default 20.")
+    parser.add_argument("--volume-confirm-mult", type=float, default=0.0,
+                        help="Required break-bar volume as multiple of avg. "
+                             "0=disabled (default). Recommended 0.8.")
     args = parser.parse_args()
     _FYERS_CACHE["user_id"] = args.user_id
 
@@ -842,6 +850,9 @@ def main() -> int:
         require_retest_from_upside=not args.no_retest_from_upside,
         sma_seed_ema=not args.no_sma_seed_ema,
         sanity_flip_trend=not args.no_sanity_flip,
+        min_crossover_gap_pct=args.min_crossover_gap_pct,
+        volume_confirm_bars=args.volume_confirm_bars,
+        volume_confirm_mult=args.volume_confirm_mult,
         htf_filter_enabled=args.htf_filter,
         htf_buy_period_bars=args.htf_buy_period_bars,
         htf_sell_period_bars=args.htf_sell_period_bars,
@@ -865,6 +876,8 @@ def main() -> int:
           f"partial2_buy={config.partial_pct_entry2_buy} partial2_sell={config.partial_pct_entry2_sell} "
           f"retest_upside={config.require_retest_from_upside} "
           f"sma_seed_ema={config.sma_seed_ema} sanity_flip={config.sanity_flip_trend}")
+    print(f"Filters: min_gap={config.min_crossover_gap_pct} "
+          f"vol_confirm={config.volume_confirm_bars}bars×{config.volume_confirm_mult}")
     print(f"Tuning: htf_filter={config.htf_filter_enabled} "
           f"buy_p={config.htf_buy_period_bars}+m{config.htf_buy_margin_pct} "
           f"sell_p={config.htf_sell_period_bars}+m{config.htf_sell_margin_pct} "
