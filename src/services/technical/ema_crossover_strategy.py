@@ -74,9 +74,12 @@ logger = logging.getLogger(__name__)
 # Default risk parameters — match Strategy-1 spec.
 # Profit target is 10% by default; spec calls it customizable to 10%/15%/20%.
 DEFAULT_TARGET_PCT = 0.10
-# Partial book — 5% for ENTRY1, 15% for ENTRY2 (per Strategy-1 spec).
+# Partial book — Strategy-1 spec is asymmetric:
+#   BUY  ENTRY1=5%,  ENTRY2=15%
+#   SELL ENTRY1=5%,  ENTRY2=5%
 DEFAULT_PARTIAL_PCT_ENTRY1 = 0.05
-DEFAULT_PARTIAL_PCT_ENTRY2 = 0.15
+DEFAULT_PARTIAL_PCT_ENTRY2_BUY = 0.15
+DEFAULT_PARTIAL_PCT_ENTRY2_SELL = 0.05
 DEFAULT_PARTIAL_QTY_FRAC = 0.5
 # "Allow 3 re-entries only at 2nd Alert" — 1 initial + 3 re-entries = 4 total.
 DEFAULT_RE_ENTRY_CAP = 4
@@ -89,9 +92,11 @@ ALLOWED_TARGET_PCTS = (0.10, 0.15, 0.20)
 @dataclass
 class StrategyConfig:
     target_pct: float = DEFAULT_TARGET_PCT
-    # Per-entry partial-book trigger (spec: 5% for retest1, 15% for retest2).
+    # Per-entry / per-side partial-book triggers.
+    # Strategy-1 spec defaults: BUY entry1=5%/entry2=15%, SELL entry1=5%/entry2=5%.
     partial_pct_entry1: float = DEFAULT_PARTIAL_PCT_ENTRY1
-    partial_pct_entry2: float = DEFAULT_PARTIAL_PCT_ENTRY2
+    partial_pct_entry2_buy: float = DEFAULT_PARTIAL_PCT_ENTRY2_BUY
+    partial_pct_entry2_sell: float = DEFAULT_PARTIAL_PCT_ENTRY2_SELL
     partial_qty_frac: float = DEFAULT_PARTIAL_QTY_FRAC
     re_entry_cap: int = DEFAULT_RE_ENTRY_CAP        # max attempts per alert
     sustain_minutes: int = DEFAULT_SUSTAIN_MINUTES
@@ -986,12 +991,15 @@ class EMACrossoverStrategy:
                          (retest2 candle low/high).
         """
         entry_price = float(row["close"])
-        # Per-entry partial trigger (spec: 5% for retest1 / ENTRY1, 15% for retest2 / ENTRY2).
-        partial_pct = (
-            self.config.partial_pct_entry1
-            if entry_alert == "retest1"
-            else self.config.partial_pct_entry2
-        )
+        # Per-entry / per-side partial trigger.
+        # Strategy-1 spec: BUY entry1=5%/entry2=15%, SELL entry1=5%/entry2=5%.
+        if entry_alert == "retest1":
+            partial_pct = self.config.partial_pct_entry1
+        else:  # retest2
+            partial_pct = (
+                self.config.partial_pct_entry2_buy if trend == "BUY"
+                else self.config.partial_pct_entry2_sell
+            )
         if trend == "BUY":
             target = entry_price * (1 + self.config.target_pct)
             partial = entry_price * (1 + partial_pct)
@@ -1102,7 +1110,7 @@ class EMACrossoverStrategy:
 
             # 2) Partial booking @ per-entry partial_pct (5% retest1, 15% retest2).
             # Spec: post-partial SL trails the 200 EMA for the remaining qty.
-            pos_partial_pct = float(pos.get("partial_pct", self.config.partial_pct_entry2))
+            pos_partial_pct = float(pos.get("partial_pct", self.config.partial_pct_entry2_buy))
             if not booked:
                 if trend == "BUY" and bar_high >= partial:
                     book_qty = pos["qty_remaining"] * self.config.partial_qty_frac

@@ -596,8 +596,9 @@ def render_md(symbol: str, name: str, df: pd.DataFrame,
         type_counts[s["signal_type"]] = type_counts.get(s["signal_type"], 0) + 1
 
     tgt_pct = (config.target_pct if config else 0.10) * 100
-    p1_pct = (config.partial_pct_entry1 if config else 0.05) * 100
-    p2_pct = (config.partial_pct_entry2 if config else 0.15) * 100
+    p1_pct  = (config.partial_pct_entry1 if config else 0.05) * 100
+    p2b_pct = (config.partial_pct_entry2_buy  if config else 0.15) * 100
+    p2s_pct = (config.partial_pct_entry2_sell if config else 0.05) * 100
     lines = [
         f"# {name} ({symbol})",
         "",
@@ -607,7 +608,7 @@ def render_md(symbol: str, name: str, df: pd.DataFrame,
         f"- **Last close:** {last_close:.2f}",
         f"- **Strategy:** EMA 200/400 1H crossover (Strategy-1 spec)",
         f"- **Target:** entry × (1 ± {tgt_pct:.0f}%)",
-        f"- **Partial:** 50% qty booked @ {p1_pct:.0f}% (ENTRY1) / {p2_pct:.0f}% (ENTRY2), trail SL → EMA200",
+        f"- **Partial:** 50% qty @ {p1_pct:.0f}% (ENTRY1) / BUY-ENTRY2 {p2b_pct:.0f}% / SELL-ENTRY2 {p2s_pct:.0f}%, trail SL → EMA200",
         f"- **SL:** ENTRY1 = EMA400 close-based; ENTRY2 = retest2 candle low/high",
         f"- **Re-entry cap:** 1 initial + 3 re-entries at each of 2nd / 3rd alert",
         "",
@@ -785,8 +786,10 @@ def main() -> int:
                         help="Profit target as fraction of entry. Spec: 0.10/0.15/0.20. Default 0.10.")
     parser.add_argument("--partial-pct-entry1", type=float, default=0.05,
                         help="Partial-book trigger for ENTRY1 as fraction of entry. Spec: 0.05.")
-    parser.add_argument("--partial-pct-entry2", type=float, default=0.15,
-                        help="Partial-book trigger for ENTRY2 as fraction of entry. Spec: 0.15.")
+    parser.add_argument("--partial-pct-entry2-buy", type=float, default=0.15,
+                        help="Partial-book trigger for BUY ENTRY2 as fraction of entry. Spec: 0.15.")
+    parser.add_argument("--partial-pct-entry2-sell", type=float, default=0.05,
+                        help="Partial-book trigger for SELL ENTRY2 as fraction of entry. Spec: 0.05.")
     parser.add_argument("--no-retest-from-upside", action="store_true",
                         help="Disable spec-strict 'retest from upside' guard "
                              "(legacy behavior — locks retest candle on any close beyond EMA).")
@@ -834,7 +837,8 @@ def main() -> int:
     config = StrategyConfig(
         target_pct=args.target_pct,
         partial_pct_entry1=args.partial_pct_entry1,
-        partial_pct_entry2=args.partial_pct_entry2,
+        partial_pct_entry2_buy=args.partial_pct_entry2_buy,
+        partial_pct_entry2_sell=args.partial_pct_entry2_sell,
         require_retest_from_upside=not args.no_retest_from_upside,
         sma_seed_ema=not args.no_sma_seed_ema,
         sanity_flip_trend=not args.no_sanity_flip,
@@ -857,7 +861,8 @@ def main() -> int:
         sell_sustain_minutes=args.sell_sustain_minutes,
     )
     print(f"Config: target_pct={config.target_pct} "
-          f"partial1={config.partial_pct_entry1} partial2={config.partial_pct_entry2} "
+          f"partial1={config.partial_pct_entry1} "
+          f"partial2_buy={config.partial_pct_entry2_buy} partial2_sell={config.partial_pct_entry2_sell} "
           f"retest_upside={config.require_retest_from_upside} "
           f"sma_seed_ema={config.sma_seed_ema} sanity_flip={config.sanity_flip_trend}")
     print(f"Tuning: htf_filter={config.htf_filter_enabled} "
