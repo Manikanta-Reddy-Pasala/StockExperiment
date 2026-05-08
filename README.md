@@ -81,9 +81,6 @@ and require the price to come from the correct side ("from upside" for BUY,
 | Profit | `partial_qty_frac` | 0.5 | 50% of qty booked at partial. |
 | Profit | `re_entry_cap` | 4 | 1 initial + 3 re-entries per alert. |
 | Profit | `sustain_minutes` | 15 | Wait after retest break before ENTRY fires. |
-| Target | `target_mode` | `static` | `static` or `atr`. ATR only active if `target_pct=0`. |
-| Target | `target_atr_period` | 14 | Wilder's ATR window when `target_mode=atr`. |
-| Target | `target_atr_mult` | 3.0 | ATR multiplier; target = entry ± mult × ATR. |
 | Spec guards | `require_retest_from_upside` | True | Only lock retest candle on real transition. |
 | Spec guards | `sanity_flip_trend` | True | Force end-cycle on EMA inversion without edge. |
 | Spec guards | `sma_seed_ema` | True | Pine-style EMA (matches Fyers chart). |
@@ -102,23 +99,18 @@ Loader merges DB overrides onto code defaults at every strategy run.
 
 ---
 
-## Backtest results — Nifty 50, **365d Fyers** (current defaults)
-
-Three meaningful profiles:
+## Backtest results — Nifty 50, **365d Fyers**
 
 | Profile | Legs | Win% | Tgt | SL | Avg% | Sum% |
 |---|---|---|---|---|---|---|
 | Spec strict (gap=0, static 10%) | 446 | 38.3% | 61 | 308 | 0.74 | **+331.3** |
 | **gap=0.0003 + static 10%** ← default | **23** | **60.9%** | 7 | 9 | 3.32 | +76.4 |
-| gap=0.0003 + ATR mult=3, no floor | 20 | **70.0%** | 14 | 6 | 1.22 | +24.4 |
 
-Pick by goal:
-- **Maximum total return** → spec strict — 446 legs, 308 SL hits, +331% sum
-- **Risk-adjusted** (default) → gap=0.0003 — 23 legs, 9 SL hits, 60.9% win
-- **Highest hit rate** → gap=0.0003 + ATR no floor — 70% win, 14 target hits, smaller per-trade
+Default trades 19× less often, 7pp higher win rate, 34× fewer SL hits. Spec
+strict captures more total $ but with much higher drawdown risk per trade.
 
-**The dominant lever is `min_crossover_gap_pct=0.0003`** — drops legs 446→23, lifts
-win rate 38% → 61%, cuts SL hits 308→9.
+**The dominant lever is `min_crossover_gap_pct=0.0003`** — drops legs 446→23,
+lifts win rate 38%→61%, cuts SL hits 308→9.
 
 ### Threshold sweep on `min_crossover_gap_pct` (1y Fyers)
 

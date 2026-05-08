@@ -82,8 +82,6 @@ class EMACrossoverRunner:
             bars = max(bars, config.ema_fast_period + config.sell_slope_bars)
         if config.buy_slope_bars and config.buy_slope_bars > 0:
             bars = max(bars, config.ema_fast_period + config.buy_slope_bars)
-        if config.target_mode == "atr" and config.target_atr_period > 0:
-            bars = max(bars, config.ema_slow_period + config.target_atr_period)
         if config.volume_confirm_mult > 0:
             bars = max(bars, config.ema_slow_period + (config.volume_confirm_bars or 0))
         return bars
