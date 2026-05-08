@@ -207,7 +207,7 @@ class SuggestedStocksSagaOrchestrator:
         with self.db.get_session() as session:
             base_sql = """
                 SELECT date, symbol, stock_name, current_price, target_price,
-                       stop_loss, recommendation, selection_score, signal_quality,
+                       stop_loss, recommendation, selection_score,
                        reason, sector
                 FROM daily_suggested_stocks
                 WHERE strategy = 'ema_200_400'

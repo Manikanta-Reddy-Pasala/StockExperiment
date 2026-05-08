@@ -445,9 +445,8 @@ class TestSettings:
     def test_strategy_info_card(self, page):
         page.goto(f"{BASE_URL}/settings")
         page.wait_for_load_state("networkidle")
-        text = page.locator('.card:has-text("8-21 EMA")').inner_text()
+        text = page.locator('.card:has-text("EMA 200/400")').inner_text()
         assert "Entry" in text
-        assert "Fibonacci" in text
 
     def test_toggle_secret_visibility(self, page):
         page.goto(f"{BASE_URL}/settings")

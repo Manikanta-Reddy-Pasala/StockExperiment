@@ -107,7 +107,6 @@ class DayTradingService:
                     'selection_score': round(score, 4),
                     'gap_pct': round(gap_pct, 2),
                     'volume_ratio': round(volume_ratio, 2),
-                    'signal_quality': 'high',
                     'target_price': round(target_price, 2),
                     'stop_loss': round(stop_loss, 2),
                     'recommendation': 'BUY',

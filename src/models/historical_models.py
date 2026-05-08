@@ -69,19 +69,12 @@ class HistoricalData(Base):
 
 
 class TechnicalIndicators(Base):
-    """Slim cache of context indicators (SMA 50/200). Legacy 8/21 + DeMarker
-    columns are kept for backwards compatibility with previously calculated
-    rows but are no longer populated."""
+    """Daily SMA 50/200 cache used by the EMA 200/400 1H strategy for HTF gating."""
     __tablename__ = 'technical_indicators'
 
     id = Column(Integer, primary_key=True)
     symbol = Column(String(50), nullable=False, index=True)
     date = Column(Date, nullable=False, index=True)
-
-    # Legacy columns left in place for historical rows
-    ema_8 = Column(Float)
-    ema_21 = Column(Float)
-    demarker = Column(Float)
 
     sma_50 = Column(Float)
     sma_200 = Column(Float)

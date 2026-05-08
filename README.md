@@ -1,133 +1,95 @@
-# NSE Stock Trading System
+# StockExperiment — EMA 200/400 1H Crossover
 
-EMA 200/400 1H crossover strategy with BTC trade rules. Universe: Nifty 50/500.
+NSE swing-trading bot. Universe: Nifty 50/500. Strategy: EMA 200 vs EMA 400 on 1H bars
+with BTC trade rules. Spec: `BTC Trade Rules_V1.1.pdf`. Full doc: `STRATEGY.md`.
 
----
-
-## Strategy
-
-**Timeframe**: 1H bars. **Trend**: EMA200 crosses EMA400.
-
-```
-BUY trend   EMA200 above EMA400 (crossover candle locked)
-SELL trend  EMA200 below EMA400
-
-Stage chain (BUY; SELL is mirror)
-  ALERT1  close > crossover candle high
-  ALERT2  close < EMA200 (retest1 candle locked)
-  ENTRY1  break retest1 high + sustain (cap 4 attempts)
-          - omitted if EMA400 touched before retest1 break
-          - SL = current EMA400 (dynamic, per-position)
-  ALERT3  low <= EMA400 (retest2 candle locked)
-  ENTRY2  break retest2 high + sustain (cap 4 attempts)
-          - SL = retest2 candle low
-```
-
-**Risk per position**:
-- Target = entry × (1 + 30%)
-- Partial = bar.high >= entry × 1.15 → book 50% qty, trail SL to entry
-- Trend reset: opposite crossover only
-- Multiple positions allowed (pyramid).
-
-Spec source: `BTC Trade Rules_V1.1.pdf`.
+Production: `77.42.45.12` · App: <https://stock.oneshell.in>
 
 ---
 
-## Production filters (live config)
+## Strategy in 30 seconds
 
-Default `EMACrossoverRunner` ships with empirically tuned filters. Spec
-state machine UNCHANGED — filters only gate the CROSSOVER signal.
+```
+Trend       EMA200 cross EMA400        BUY (above) / SELL (below)
+ALERT1      close beyond crossover candle
+ALERT2      retest EMA200 (lock retest1 candle)
+ENTRY1      break retest1 high + 15m sustain   SL = current EMA400 (dynamic)
+ALERT3      retest EMA400 (lock retest2 candle)
+ENTRY2      break retest2 high + 15m sustain   SL = retest2.low (static)
+
+Per-position:  TP = entry × 1.30
+               Partial = bar.high ≥ entry × 1.15 → book 50%, trail SL → entry
+               Re-entry cap: 4 attempts each at retest1/retest2
+               Trend reset: opposite crossover only
+```
+
+Live filters layered on the spec:
 
 | Filter | BUY | SELL |
 |---|---|---|
-| **HTF SMA (200d)** | close > 200d SMA | close < 200d SMA |
-| **EMA200 slope (50d)** | — | EMA200 dropped ≥0.5% over last 50d |
+| HTF SMA(200d) | close > 200d SMA | close < 200d SMA |
+| EMA200 slope (50d) | — | EMA200 dropped ≥ 0.5% over 50d |
 
-```python
-StrategyConfig(
-    htf_filter_enabled=True,
-    htf_buy_period_bars=1400,    # 200d on 1H
-    htf_sell_period_bars=1400,
-    sell_slope_bars=350,         # 50d
-    sell_slope_min_pct=0.005,    # 0.5%
-)
-```
-
-To disable filters (pure-spec mode): pass `StrategyConfig()`.
+Pure-spec mode: pass `StrategyConfig()`.
 
 ---
 
-## Backtest results — Nifty 50, 720d (Yahoo)
+## Backtest — Nifty 50, 720d
 
-| Variant | Win % | Avg %/leg | Sum % | BUY sum % | SELL sum % |
+| Variant | Win % | Avg %/leg | Sum % | BUY | SELL |
 |---|---|---|---|---|---|
-| Pure spec (no filters) | 22.4 | 0.99 | +1,309 | +1,430 | −121 |
+| Pure spec | 22.4 | 0.99 | +1,309 | +1,430 | −121 |
 | HTF only | 27.5 | 1.69 | +1,495 | +1,629 | −134 |
-| **HTF + slope50 (live)** | **30.0** | **1.96** | **+1,697** | **+1,552** | **+145** |
+| **HTF + slope50 (live)** | **30.0** | **1.96** | **+1,697** | +1,552 | +145 |
 | HTF + alert3-cap2 + slope50 | 36.3 | 3.10 | +2,249 | +2,104 | +145 |
 
-**Live config** (HTF+slope50) flips SELL from −134% → +145%. Optional
-`max_alert3_locks_per_cycle=2` adds another +30% if enabled.
+---
+
+## Stack
+
+Python 3.11 / Flask · PostgreSQL 15 · Dragonfly · Fyers API · Docker Compose.
+
+Containers (`docker-compose.yml`):
+
+| Container | Role |
+|---|---|
+| `trading_system_app` | Flask UI + API (`:5001`) |
+| `trading_system_technical_scheduler` | Hourly strategy run + 15m sustain |
+| `trading_system_data_scheduler` | 1H + daily data pipeline |
+| `trading_system_db` | Postgres 15 |
+| `trading_system_dragonfly` | Cache |
+
+Code is **baked into images** — code changes require `docker compose build`.
 
 ---
 
-## Build commands
+## Run locally
 
-### Java (Spring Boot)
 ```bash
-./mvnw clean package -DskipTests
-./mvnw test -Dtest=ClassName#methodName
+cp .env.example .env          # add Fyers creds, DATABASE_URL
+./run.sh dev
+# → http://localhost:5001
 ```
 
-### Python (Flask backend)
+Tests:
 ```bash
-pip install -r requirements.txt && python main.py     # Port 5100
+pip install -r requirements.txt
 python -m pytest
 ```
 
-### Frontend
+Backtest (offline, no DB / no token):
 ```bash
-cd PosFrontend && npm install && npm run start         # React 16
-cd PosAdmin && yarn install && yarn dev                # React 18, port 5174
-```
-
----
-
-## Backtest harness
-
-```bash
-# Default (Fyers preferred, Yahoo fallback per-symbol)
 venv/bin/python tools/backtests/run_ema_200_400_backtest.py \
-    --days 720 --universe nifty50 --out exports/backtests/run1
+    --days 720 --universe nifty50 --source yahoo \
+    --out exports/backtests/run1
 ```
 
-CLI flags:
-- `--universe` smoke / nifty50 / nifty500 / indices
-- `--source` auto / fyers / yahoo
-- `--htf-filter` enable HTF SMA gate
-- `--sell-slope-bars N --sell-slope-min-pct X` slope confirm for SELL
-- `--max-alert3-locks N` cap retest2 re-locks per cycle (0=off)
-- `--retest2-sl-cap-pct X` cap ENTRY2 SL distance (0=off)
-- `--skip-retest2` / `--skip-sell` / `--skip-buy` direction toggles
+CLI flags: `--universe smoke|nifty50|nifty500|indices`, `--source auto|fyers|yahoo`,
+`--htf-filter`, `--sell-slope-bars N --sell-slope-min-pct X`,
+`--max-alert3-locks N`, `--retest2-sl-cap-pct X`,
+`--skip-buy / --skip-sell / --skip-retest2`.
 
-Outputs:
-- `_summary.md` (combined)
-- `_summary_buy.md` (BUY only)
-- `_summary_sell.md` (SELL only)
-- per-stock `<symbol>.md` with cycles + closed legs in %
-
----
-
-## Migrations
-
-```bash
-docker cp migrations/2026_05_06_ema_strategy_v2.sql        trading_system_db:/tmp/
-docker cp migrations/2026_05_07_ema_strategy_v2_tuning.sql trading_system_db:/tmp/
-docker exec trading_system_db psql -U trader -d trading_system \
-    -f /tmp/2026_05_06_ema_strategy_v2.sql
-docker exec trading_system_db psql -U trader -d trading_system \
-    -f /tmp/2026_05_07_ema_strategy_v2_tuning.sql
-```
+Outputs: `_summary.md`, `_summary_buy.md`, `_summary_sell.md`, per-symbol `<symbol>.md`.
 
 ---
 
@@ -135,41 +97,36 @@ docker exec trading_system_db psql -U trader -d trading_system \
 
 | Layer | File |
 |---|---|
-| Strategy state machine | `src/services/technical/ema_crossover_strategy.py` |
-| Hourly runner | `src/services/technical/ema_crossover_runner.py` |
+| State machine | `src/services/technical/ema_crossover_strategy.py` |
+| Hourly orchestrator | `src/services/technical/ema_crossover_runner.py` |
 | 1H Fyers fetcher | `src/services/data/historical_1h_service.py` |
 | Universe loader | `src/services/data/nifty500_universe.py` |
-| State + signals models | `src/models/historical_models.py` |
+| Models / state / signals | `src/models/historical_models.py` |
 | Auto-trade consumer | `src/services/trading/auto_trading_service.py` |
 | API route | `src/web/routes/suggested_stocks_routes.py` |
 | Backtest harness | `tools/backtests/run_ema_200_400_backtest.py` |
 
----
-
-## Containers (production VM 77.42.45.12)
-
-```
-trading_system_app                 Flask UI + API (:5001)
-trading_system_technical_scheduler hourly strategy run
-trading_system_data_scheduler      1H + daily data pipeline
-trading_system_db                  Postgres 15
-trading_system_dragonfly           cache
-```
-
-Code is **baked into images** — code changes require `docker compose build`.
+Schema: `historical_data_1h` (OHLCV + cached EMA 200/400), `historical_data_15m`
+(sustain check), `ema_crossover_state` (per user/symbol stage),
+`ema_crossover_signals` (audit log), `daily_suggested_stocks`
+(`strategy='ema_200_400'`, `model_type='crossover'`).
 
 ---
 
-## Ops cheatsheet
+## Ops
 
 ```bash
 # Apply migrations (idempotent)
-ssh root@77.42.45.12 "cd /opt/trading_system && \
-    docker exec trading_system_db psql -U trader -d trading_system \
-        -f /tmp/<migration>.sql"
+for m in 2026_04_30_ema_200_400_strategy.sql \
+         2026_05_06_ema_strategy_v2.sql \
+         2026_05_07_ema_strategy_v2_tuning.sql \
+         2026_05_07_historical_data_15m.sql; do
+  docker cp migrations/$m trading_system_db:/tmp/
+  docker exec trading_system_db psql -U trader -d trading_system -f /tmp/$m
+done
 
-# Backfill universe (120d × 504 symbols)
-docker exec -w /app trading_system_app /usr/local/bin/python -c "
+# Backfill universe (120d × 504 symbols, ~30-40 min)
+docker exec -w /app trading_system_app python -c "
 from src.services.technical.ema_crossover_runner import get_ema_crossover_runner
 print(get_ema_crossover_runner().backfill_universe(user_id=1, days=120, max_symbols=500))"
 
@@ -189,9 +146,9 @@ SELECT signal_type, COUNT(*) FROM ema_crossover_signals
 
 ---
 
-## Reference: deeper docs
+## Reference
 
-- `STRATEGY.md` — full strategy spec, state machine, signal taxonomy
-- `BTC Trade Rules_V1.1.pdf` — original rules document
-- `exports/backtests/nifty50_htf_slope50/` — live-config backtest reference
-- `exports/backtests/nifty50_slope50/` — best variant (with alert3-cap2)
+- `STRATEGY.md` — full spec, state machine, signal taxonomy
+- `BTC Trade Rules_V1.1.pdf` — source rules
+- `exports/backtests/nifty50_htf_slope50/` — live-config reference run
+- `exports/backtests/nifty50_slope50/` — best variant (alert3-cap2)
