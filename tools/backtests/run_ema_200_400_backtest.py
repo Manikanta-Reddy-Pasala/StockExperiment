@@ -204,9 +204,76 @@ def fetch_1h_fyers(symbol: str, days: int = 720,
                "close", "volume"]]
 
 
-def fetch_1h_data(symbol: str, days: int = 720, user_id: int = 1) -> tuple:
-    """Return ``(df, source_used)``. Fyers is the only data source."""
-    return fetch_1h_fyers(symbol, days, user_id), "fyers"
+YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+YAHOO_HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
+
+
+def _plain_to_yahoo_symbol(sym: str) -> str:
+    """``RELIANCE`` -> ``RELIANCE.NS``. Index ``^NSEI`` stays as-is."""
+    s = sym.upper()
+    if s.startswith("^"):
+        return s
+    if s.endswith(".NS"):
+        return s
+    return f"{s}.NS"
+
+
+def fetch_1h_yahoo(symbol: str, days: int = 720) -> pd.DataFrame:
+    """Yahoo chart API (free, no auth). 1H window cap is ~730 days."""
+    import requests
+    from urllib.parse import quote
+    yahoo_sym = _plain_to_yahoo_symbol(symbol.replace("NSE:", "").replace("-EQ", ""))
+    params = {"interval": "1h", "range": f"{min(days, 730)}d"}
+    try:
+        r = requests.get(YAHOO_URL.format(symbol=quote(yahoo_sym, safe=".^")),
+                         params=params, headers=YAHOO_HEADERS, timeout=30)
+        r.raise_for_status()
+        payload = r.json()
+    except Exception as e:
+        print(f"  yahoo fetch failed: {e}")
+        return pd.DataFrame()
+
+    result = (payload.get("chart") or {}).get("result") or []
+    if not result:
+        return pd.DataFrame()
+    res = result[0]
+    timestamps = res.get("timestamp") or []
+    quote_block = ((res.get("indicators") or {}).get("quote") or [{}])[0]
+    if not timestamps or not quote_block:
+        return pd.DataFrame()
+
+    df = pd.DataFrame({
+        "timestamp": timestamps,
+        "open": quote_block.get("open"),
+        "high": quote_block.get("high"),
+        "low": quote_block.get("low"),
+        "close": quote_block.get("close"),
+        "volume": quote_block.get("volume"),
+    })
+    df = df.dropna(subset=["open", "high", "low", "close"]).reset_index(drop=True)
+    if df.empty:
+        return df
+    df["candle_time"] = pd.to_datetime(df["timestamp"], unit="s", utc=True) \
+        .dt.tz_convert("Asia/Kolkata").dt.tz_localize(None)
+    df["volume"] = df["volume"].fillna(0).astype("int64")
+    df["timestamp"] = df["timestamp"].astype("int64")
+    return df[["timestamp", "candle_time", "open", "high", "low", "close", "volume"]]
+
+
+def fetch_1h_data(symbol: str, days: int = 720, user_id: int = 1,
+                  source: str = "auto") -> tuple:
+    """Return ``(df, source_used)``. ``source`` in {auto, fyers, yahoo}.
+
+    auto = try Fyers first, fall back to Yahoo on empty/error.
+    """
+    if source == "yahoo":
+        return fetch_1h_yahoo(symbol, days), "yahoo"
+    if source == "fyers":
+        return fetch_1h_fyers(symbol, days, user_id), "fyers"
+    df = fetch_1h_fyers(symbol, days, user_id)
+    if not df.empty:
+        return df, "fyers"
+    return fetch_1h_yahoo(symbol, days), "yahoo"
 
 
 def df_to_candles(df: pd.DataFrame) -> List[SimpleNamespace]:
@@ -466,8 +533,8 @@ STAGE_LABELS_BUY = {
     "ENTRY1":      "First Entry (BUY) — retest1 break (cap 3 attempts)",
     "ALERT3":      "Third Alert (Retest 2) — price touches/crosses EMA400",
     "ENTRY2":      "Second Entry (BUY) — retest2 break (cap 3 attempts)",
-    "PARTIAL":     "Partial book — 50% qty @ 15%, trail SL → entry",
-    "TARGET_HIT":  "Target hit — 30% from entry",
+    "PARTIAL":     "Partial book — 50% qty, trail SL → EMA200",
+    "TARGET_HIT":  "Target hit",
     "STOP_HIT":    "Stop hit — per-position SL triggered",
     "PENDING":     "Cross detected — sustain check pending",
     "PENDING_CANCEL": "Sustain check cancelled (price retraced)",
@@ -482,8 +549,8 @@ STAGE_LABELS_SELL = {
     "ENTRY1":      "First Entry (SELL) — retest1 break (cap 3 attempts)",
     "ALERT3":      "Third Alert (Retest 2) — price touches/crosses EMA400",
     "ENTRY2":      "Second Entry (SELL) — retest2 break (cap 3 attempts)",
-    "PARTIAL":     "Partial book — 50% qty @ 15%, trail SL → entry",
-    "TARGET_HIT":  "Target hit — 30% from entry",
+    "PARTIAL":     "Partial book — 50% qty, trail SL → EMA200",
+    "TARGET_HIT":  "Target hit",
     "STOP_HIT":    "Stop hit — per-position SL triggered",
     "PENDING":     "Cross detected — sustain check pending",
     "PENDING_CANCEL": "Sustain check cancelled (price retraced)",
@@ -508,7 +575,8 @@ def build_cycles(signals: List[Dict]) -> List[Dict]:
 
 
 def render_md(symbol: str, name: str, df: pd.DataFrame,
-              signals: List[Dict], pnl: Dict, out_dir: Path) -> Path:
+              signals: List[Dict], pnl: Dict, out_dir: Path,
+              config: Optional["StrategyConfig"] = None) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     fname = f"{symbol.replace('.NS', '').lower()}.md"
     path = out_dir / fname
@@ -527,19 +595,21 @@ def render_md(symbol: str, name: str, df: pd.DataFrame,
     for s in signals:
         type_counts[s["signal_type"]] = type_counts.get(s["signal_type"], 0) + 1
 
+    tgt_pct = (config.target_pct if config else 0.10) * 100
+    p1_pct = (config.partial_pct_entry1 if config else 0.05) * 100
+    p2_pct = (config.partial_pct_entry2 if config else 0.15) * 100
     lines = [
         f"# {name} ({symbol})",
         "",
         "## Backtest Summary",
         "",
-        f"- **Source:** Fyers history API (1H bars)",
         f"- **Window:** {first} → {last} ({bar_count} bars)",
         f"- **Last close:** {last_close:.2f}",
-        f"- **Strategy:** EMA 200/400 1H crossover (v2 BTC rules)",
-        f"- **Target:** entry × (1 ± 30%)",
-        f"- **Partial:** 50% qty booked @ 15%, trail SL → entry",
+        f"- **Strategy:** EMA 200/400 1H crossover (Strategy-1 spec)",
+        f"- **Target:** entry × (1 ± {tgt_pct:.0f}%)",
+        f"- **Partial:** 50% qty booked @ {p1_pct:.0f}% (ENTRY1) / {p2_pct:.0f}% (ENTRY2), trail SL → EMA200",
         f"- **SL:** ENTRY1 = EMA400 close-based; ENTRY2 = retest2 candle low/high",
-        f"- **Re-entry cap:** 3 attempts each at retest1 and retest2",
+        f"- **Re-entry cap:** 1 initial + 3 re-entries at each of 2nd / 3rd alert",
         "",
         "## Signal Counts",
         "",
@@ -726,6 +796,9 @@ def main() -> int:
     parser.add_argument("--no-sanity-flip", action="store_true",
                         help="Disable trend-inversion sanity flip "
                              "(legacy: keep BUY cycle live even after EMA200 < EMA400).")
+    parser.add_argument("--source", choices=["auto", "fyers", "yahoo"], default="auto",
+                        help="Data source. auto = Fyers then Yahoo fallback. yahoo "
+                             "needs no auth; useful when Fyers token expired.")
     args = parser.parse_args()
     _FYERS_CACHE["user_id"] = args.user_id
 
@@ -799,7 +872,7 @@ def main() -> int:
     source_counts = {"fyers": 0, "none": 0}
     for symbol, name in symbols_list:
         print(f"--- {symbol} ---", flush=True)
-        df, src = fetch_1h_data(symbol, days=args.days, user_id=args.user_id)
+        df, src = fetch_1h_data(symbol, days=args.days, user_id=args.user_id, source=args.source)
         source_counts[src if not df.empty else "none"] = \
             source_counts.get(src if not df.empty else "none", 0) + 1
         print(f"  source={src}, bars={len(df)}", flush=True) if df.empty else None
@@ -808,7 +881,7 @@ def main() -> int:
             render_md(symbol, name, df, [], {"trades_closed": 0, "trades_open": 0,
                                              "winners": 0, "losers": 0,
                                              "total_pnl": 0, "avg_pnl": 0,
-                                             "closed": [], "open": []}, args.out)
+                                             "closed": [], "open": []}, args.out, config)
             continue
 
         candles = df_to_candles(df)
@@ -823,7 +896,7 @@ def main() -> int:
             partial_qty_frac=config.partial_qty_frac,
         )
 
-        path = render_md(symbol, name, df, signals, pnl, args.out)
+        path = render_md(symbol, name, df, signals, pnl, args.out, config)
         # Per-direction aggregates for the global summary
         closed = pnl.get("closed") or []
         buy_stats  = summarize_subset([c for c in closed if c["trend"] == "BUY"])
