@@ -162,18 +162,16 @@ class StrategyConfig:
     volume_confirm_bars: int = 20
     volume_confirm_mult: float = 0.0
 
-    # ---- Dynamic target ----
+    # ---- Target mode ----
     # 'static'  target = entry × (1 ± target_pct). Spec default.
     # 'atr'     target = entry ± (target_atr_mult × ATR(target_atr_period)).
-    #           Adapts per-stock volatility. target_pct acts as a floor on BUY
-    #           (max of static + ATR target) so you never give up a 10% baseline.
-    #           Wilder's ATR smoothing per industry standard.
+    #           Adapts per-stock volatility. target_pct acts as a FLOOR — so
+    #           ATR is *only* active when target_pct = 0.0 (otherwise the floor
+    #           almost always wins on Nifty50 1H since ATR×3 < 10%).
+    #           Wilder's ATR smoothing.
     target_mode: str = "static"
     target_atr_period: int = 14
     target_atr_mult: float = 3.0
-    # Lookback for legacy swing_high mode (kept for backwards-compat; mode is
-    # functionally inert on Nifty50 1H — floor dominates).
-    swing_lookback_bars: int = 50
 
     # ---- Opt-in tuning toggles (all default = spec-compliant / disabled) ----
     # 1) Higher-timeframe trend filter: only allow CROSSOVER in matching regime.
@@ -301,7 +299,6 @@ class EMACrossoverStrategy:
                       htf_sell_period_bars: Optional[int] = None,
                       sma_seed: bool = True,
                       volume_sma_bars: int = 0,
-                      swing_lookback_bars: int = 0,
                       atr_period: int = 0) -> pd.DataFrame:
         df = df.copy()
         if sma_seed:
@@ -316,9 +313,6 @@ class EMACrossoverStrategy:
             df["htf_sma_sell"] = df["close"].rolling(htf_sell_period_bars, min_periods=1).mean()
         if volume_sma_bars and volume_sma_bars > 0 and "volume" in df.columns:
             df["volume_sma"] = df["volume"].rolling(volume_sma_bars, min_periods=1).mean()
-        if swing_lookback_bars and swing_lookback_bars > 0:
-            df["swing_high"] = df["high"].rolling(swing_lookback_bars, min_periods=1).max()
-            df["swing_low"]  = df["low"].rolling(swing_lookback_bars,  min_periods=1).min()
         if atr_period and atr_period > 0:
             df["atr"] = EMACrossoverStrategy._wilder_atr(
                 df["high"], df["low"], df["close"], atr_period
@@ -355,8 +349,6 @@ class EMACrossoverStrategy:
             htf_sell_period_bars=sell_p,
             sma_seed=self.config.sma_seed_ema,
             volume_sma_bars=self.config.volume_confirm_bars or 0,
-            swing_lookback_bars=(self.config.swing_lookback_bars
-                                 if self.config.target_mode == "swing_high" else 0),
             atr_period=(self.config.target_atr_period
                         if self.config.target_mode == "atr" else 0),
         )
@@ -1152,10 +1144,6 @@ class EMACrossoverStrategy:
                 if atr > 0:
                     atr_target = entry_price + self.config.target_atr_mult * atr
                     target = max(atr_target, static_target)  # floor at static
-            elif self.config.target_mode == "swing_high":
-                swing = float(row["swing_high"]) if "swing_high" in row.index else 0.0
-                if swing > 0:
-                    target = max(swing, static_target)
             partial = entry_price * (1 + partial_pct)
         else:
             static_target = entry_price * (1 - self.config.target_pct)
@@ -1165,10 +1153,6 @@ class EMACrossoverStrategy:
                 if atr > 0:
                     atr_target = entry_price - self.config.target_atr_mult * atr
                     target = min(atr_target, static_target)  # floor at static
-            elif self.config.target_mode == "swing_high":
-                swing = float(row["swing_low"]) if "swing_low" in row.index else 0.0
-                if swing > 0:
-                    target = min(swing, static_target)
             partial = entry_price * (1 - partial_pct)
         # Optional ENTRY2 SL cap — tighten retest2 SL distance from entry.
         if (entry_alert == "retest2" and sl_type == "static"

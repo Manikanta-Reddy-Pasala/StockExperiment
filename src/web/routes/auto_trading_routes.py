@@ -210,13 +210,11 @@ _EMA_FIELDS = [
     # group: target_mode
     ('target_mode', 'str', 'static', 'target',
      "static: entry × (1 ± target_pct). atr: entry ± mult × ATR(period), "
-     "floored at target_pct. swing_high: legacy (inert on Nifty50 1H)."),
+     "floored at target_pct (so set target_pct=0 to make ATR active)."),
     ('target_atr_period', 'int', 14, 'target',
      'ATR period for target_mode=atr. Wilder smoothing.'),
     ('target_atr_mult', 'float', 3.0, 'target',
-     'ATR multiplier for target distance. 3.0 ~ classic swing trade.'),
-    ('swing_lookback_bars', 'int', 50, 'target',
-     'Legacy swing_high lookback (1H bars).'),
+     'ATR multiplier. 3.0 ~ classic swing trade.'),
     # group: spec_guards
     ('require_retest_from_upside', 'bool', True, 'spec_guards',
      'Lock retest candle only on a true transition from above (BUY) / below '
