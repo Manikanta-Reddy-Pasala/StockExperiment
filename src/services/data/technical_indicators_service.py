@@ -199,13 +199,7 @@ class TechnicalIndicatorsService:
             return None
 
     def _calculate_all_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Calculate context indicators (SMA 50/200) for the daily candle pipeline.
-
-        The 8-21 EMA / DeMarker calculations were retired with the move to the
-        EMA 200/400 1H crossover strategy; the legacy columns remain in the
-        ``technical_indicators`` table for historical rows but are no longer
-        populated.
-        """
+        """Calculate daily SMA 50/200 — used as the HTF gate for the EMA 200/400 1H strategy."""
         indicators = df.copy()
         indicators['sma_50'] = df['close'].rolling(window=50).mean()
         indicators['sma_200'] = df['close'].rolling(window=200).mean()

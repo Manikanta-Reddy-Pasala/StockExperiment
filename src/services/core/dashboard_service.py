@@ -15,9 +15,8 @@ class DashboardService:
         """Get dashboard metrics using broker-specific APIs."""
         metrics = self.integration_service.get_dashboard_metrics(user_id)
 
-        # Single unified 8-21 EMA strategy - no strategy count needed
         metrics['active_strategies_count'] = 1
-        metrics['active_strategies'] = ['8-21 EMA Strategy']
+        metrics['active_strategies'] = ['EMA 200/400 1H Crossover']
 
         return metrics
     

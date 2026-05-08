@@ -331,7 +331,7 @@ def get_available_strategies():
 @login_required
 def get_triple_model_view():
     """
-    Get suggested stocks using 8-21 EMA Swing Trading Strategy for BOTH risk levels.
+    Get suggested stocks for BOTH risk levels (EMA 200/400 1H crossover).
 
     Returns a view showing:
     - Default Risk Strategy (conservative, large-cap)
@@ -376,12 +376,12 @@ def get_triple_model_view():
 
         user_id = current_user.id
 
-        logger.info(f"🎯 8-21 EMA Strategy view request: limit={limit}, date={query_date}, user={user_id}")
+        logger.info(f"🎯 Suggested-stocks view request: limit={limit}, date={query_date}, user={user_id}")
 
         db = get_database_manager()
 
         with db.get_session() as session:
-            # Query 8-21 EMA strategy stocks with fresh data from stocks table
+            # Pull EMA 200/400 picks joined with fresh data from stocks table
             # Use DISTINCT ON to avoid duplicates from multiple strategies
             query = text("""
                 SELECT * FROM (
@@ -466,7 +466,7 @@ def recalculate_suggestions():
     """
     Trigger on-demand recalculation of suggested stocks.
 
-    This runs the full 8-21 EMA strategy pipeline and updates
+    This runs the EMA 200/400 1H strategy pipeline and updates
     the daily_suggested_stocks table with fresh recommendations.
     """
     try:

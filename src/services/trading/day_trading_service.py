@@ -91,7 +91,6 @@ class DayTradingService:
                 else:
                     continue
 
-                # Score = gap_pct * volume_ratio (trend filter retired with 8-21 EMA strategy)
                 score = gap_pct * volume_ratio
 
                 # Day trading targets

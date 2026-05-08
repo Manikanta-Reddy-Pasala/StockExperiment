@@ -150,5 +150,6 @@ SELECT signal_type, COUNT(*) FROM ema_crossover_signals
 
 - `STRATEGY.md` — full spec, state machine, signal taxonomy
 - `BTC Trade Rules_V1.1.pdf` — source rules
-- `exports/backtests/nifty50_htf_slope50/` — live-config reference run
-- `exports/backtests/nifty50_slope50/` — best variant (alert3-cap2)
+- `exports/backtests/720d/` — 720-day reference runs
+- `exports/backtests/{buy_htf,buy_plain,sell_all,sell_plain}/` — variant reports
+- `exports/backtests/capital_report.md` — 200K INR capital simulation

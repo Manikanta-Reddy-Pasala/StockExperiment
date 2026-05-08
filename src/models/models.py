@@ -143,7 +143,7 @@ class Order(Base):
     placed_by = Column(String(50))
     variety = Column(String(20))
     is_mock_order = Column(Boolean, default=False)  # Mock order flag
-    strategy = Column(String(50))  # 'default_risk' or 'high_risk' (8-21 EMA strategy)
+    strategy = Column(String(50))
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -524,7 +524,7 @@ class AutoTradingSettings(Base):
     max_amount_per_week = Column(Float, default=10000.0)  # Max investment per week (₹)
     max_buys_per_week = Column(Integer, default=5)  # Max number of trades per week
     preferred_strategies = Column(Text)  # JSON array of preferred strategies: ['default_risk', 'high_risk']
-    minimum_confidence_score = Column(Float, default=0.7)  # Minimum signal quality score (8-21 EMA)
+    minimum_confidence_score = Column(Float, default=0.7)  # Minimum confidence score
     minimum_market_sentiment = Column(Float, default=0.0)  # Minimum market sentiment (-1 to 1)
     auto_stop_loss_enabled = Column(Boolean, default=True)  # Auto set stop-loss
     auto_target_price_enabled = Column(Boolean, default=True)  # Auto set target price
@@ -602,16 +602,16 @@ class OrderPerformance(Base):
     remaining_quantity = Column(Integer)                   # Quantity still held
     stop_loss = Column(Float)
     target_price = Column(Float)
-    target_price_1 = Column(Float)                         # Fib 127.2%
-    target_price_2 = Column(Float)                         # Fib 161.8%
-    target_price_3 = Column(Float)                         # Fib 200%
-    strategy = Column(String(50))  # 8-21 EMA strategy: 'default_risk' or 'high_risk'
+    target_price_1 = Column(Float)                         # Partial-exit target 1 (legacy slot, currently unused)
+    target_price_2 = Column(Float)                         # Partial-exit target 2 (legacy slot, currently unused)
+    target_price_3 = Column(Float)                         # Partial-exit target 3 (legacy slot, currently unused)
+    strategy = Column(String(50))
     trading_type = Column(String(20), default='swing')     # 'swing' or 'day'
 
-    # Partial exit tracking
-    partial_exit_1_done = Column(Boolean, default=False)   # 25% sold at Fib 127.2%
-    partial_exit_2_done = Column(Boolean, default=False)   # 50% sold at Fib 161.8%
-    partial_exit_3_done = Column(Boolean, default=False)   # 25% sold at Fib 200%
+    # Partial exit tracking (legacy slots — EMA 200/400 strategy uses single 15% partial)
+    partial_exit_1_done = Column(Boolean, default=False)
+    partial_exit_2_done = Column(Boolean, default=False)
+    partial_exit_3_done = Column(Boolean, default=False)
     partial_pnl_realized = Column(Float, default=0.0)      # Running sum of partial exit P&L
 
     # Current status

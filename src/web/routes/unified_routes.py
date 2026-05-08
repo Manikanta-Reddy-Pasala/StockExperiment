@@ -246,7 +246,7 @@ def api_get_watchlist_quotes():
 @unified_bp.route('/suggested-stocks', methods=['GET'])
 @login_required
 def api_get_suggested_stocks():
-    """Get suggested stocks using user's selected broker (single 8-21 EMA strategy)."""
+    """Get suggested stocks (EMA 200/400 1H crossover) via user's selected broker."""
     try:
         limit = request.args.get('limit', 50, type=int)
 
@@ -299,7 +299,7 @@ def api_get_stock_analysis(symbol):
 @unified_bp.route('/suggested-stocks/strategy-performance', methods=['GET'])
 @login_required
 def api_get_strategy_performance():
-    """Get 8-21 EMA strategy performance."""
+    """Get strategy performance (EMA 200/400 1H crossover)."""
     try:
         period = request.args.get('period', '1M')
 

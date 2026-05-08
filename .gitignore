@@ -7,6 +7,9 @@ logs/
 *.db
 :memory:*
 
+# Runtime CSV exports (regenerated daily by data_scheduler)
+exports/*.csv
+
 # Environment files (contain secrets)
 .env
 .env.production

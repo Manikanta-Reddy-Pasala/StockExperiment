@@ -278,7 +278,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
             # Execute saga with technical focus
             saga_results = saga_orchestrator.execute_suggested_stocks_saga(
                 user_id=user_id,
-                strategies=['unified'],  # Unified 8-21 EMA strategy
+                strategies=['unified'],
                 limit=criteria.get('limit', 5),
                 search=criteria.get('search'),
                 sort_by=criteria.get('sort_by', 'current_price'),
@@ -338,7 +338,7 @@ class FyersSuggestedStocksProvider(ISuggestedStocksProvider):
             # Execute saga with fundamental focus
             saga_results = saga_orchestrator.execute_suggested_stocks_saga(
                 user_id=user_id,
-                strategies=['unified'],  # Unified 8-21 EMA strategy
+                strategies=['unified'],
                 limit=criteria.get('limit', 5),
                 search=criteria.get('search'),
                 sort_by=criteria.get('sort_by', 'pe_ratio'),

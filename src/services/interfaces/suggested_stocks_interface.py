@@ -17,7 +17,7 @@ class StrategyType(Enum):
     HIGH_RISK = "high_risk"
     CONSERVATIVE = "conservative"
     AGGRESSIVE = "aggressive"
-    UNIFIED = "unified"  # Single unified 8-21 EMA strategy
+    UNIFIED = "unified"
 
 
 class ISuggestedStocksProvider(ABC):
