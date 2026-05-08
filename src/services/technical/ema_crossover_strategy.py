@@ -71,20 +71,27 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Default v2 risk parameters — match BTC trade rules PDF v1.1.
-DEFAULT_TARGET_PCT = 0.30
-DEFAULT_PARTIAL_PCT = 0.15
+# Default risk parameters — match Strategy-1 spec.
+# Profit target is 10% by default; spec calls it customizable to 10%/15%/20%.
+DEFAULT_TARGET_PCT = 0.10
+# Partial book — 5% for ENTRY1, 15% for ENTRY2 (per Strategy-1 spec).
+DEFAULT_PARTIAL_PCT_ENTRY1 = 0.05
+DEFAULT_PARTIAL_PCT_ENTRY2 = 0.15
 DEFAULT_PARTIAL_QTY_FRAC = 0.5
-# Spec wording: "Allow 3 re-entries only at 2nd Alert" — interpreted literally
-# as 1 initial entry + 3 re-entries = 4 total attempts at the alert.
+# "Allow 3 re-entries only at 2nd Alert" — 1 initial + 3 re-entries = 4 total.
 DEFAULT_RE_ENTRY_CAP = 4
-DEFAULT_SUSTAIN_MINUTES = 15  # Informational on 1H bars; effective on <=30m
+DEFAULT_SUSTAIN_MINUTES = 15  # Effective on <=30m intra-bar resolver
+# Spec: profit target customizable to 10/15/20%. Code accepts any float; helper
+# documents the canonical set.
+ALLOWED_TARGET_PCTS = (0.10, 0.15, 0.20)
 
 
 @dataclass
 class StrategyConfig:
-    target_pct: float = DEFAULT_TARGET_PCT          # 30% TP
-    partial_pct: float = DEFAULT_PARTIAL_PCT        # 15% partial-book trigger
+    target_pct: float = DEFAULT_TARGET_PCT
+    # Per-entry partial-book trigger (spec: 5% for retest1, 15% for retest2).
+    partial_pct_entry1: float = DEFAULT_PARTIAL_PCT_ENTRY1
+    partial_pct_entry2: float = DEFAULT_PARTIAL_PCT_ENTRY2
     partial_qty_frac: float = DEFAULT_PARTIAL_QTY_FRAC
     re_entry_cap: int = DEFAULT_RE_ENTRY_CAP        # max attempts per alert
     sustain_minutes: int = DEFAULT_SUSTAIN_MINUTES
@@ -94,6 +101,22 @@ class StrategyConfig:
     sell_sustain_minutes: Optional[int] = None
     ema_fast_period: int = 200
     ema_slow_period: int = 400
+
+    # ---- Spec-strict guards (default ON; turn OFF for legacy behavior) ----
+    # Strategy-1 retest-candle definition: "price moves towards EMA from upside
+    # (above EMA)". Lock retest only on a true transition — prev bar must have
+    # been above the EMA. Eliminates phantom alerts when price was already below.
+    require_retest_from_upside: bool = True
+    # Sanity guard: if state.trend disagrees with current EMA200/EMA400 ordering
+    # for more than `trend_inversion_grace_bars` consecutive bars (without a
+    # true crossover edge), force end-cycle. Catches cases where the cross was
+    # missed (gaps, very small EMAs near each other).
+    sanity_flip_trend: bool = True
+    trend_inversion_grace_bars: int = 1
+    # SMA-seeded EMA (Fyers / TradingView Pine convention). First `span` bars
+    # use SMA(close, span); after that the EMA recurses from that seed. Pure
+    # ewm(adjust=False) drifts vs Fyers chart for hundreds of bars.
+    sma_seed_ema: bool = True
 
     # ---- Opt-in tuning toggles (all default = spec-compliant / disabled) ----
     # 1) Higher-timeframe trend filter: only allow CROSSOVER in matching regime.
@@ -160,12 +183,37 @@ class EMACrossoverStrategy:
 
     # ------------------------------------------------------------------
     @staticmethod
+    def _sma_seeded_ema(close: pd.Series, span: int) -> pd.Series:
+        """SMA-seeded EMA — Fyers/TradingView Pine convention.
+
+        First `span` bars are NaN. Bar `span-1` is seeded as SMA(close, span).
+        Subsequent bars recurse with alpha = 2/(span+1).
+        """
+        if len(close) < span:
+            return pd.Series([float("nan")] * len(close), index=close.index)
+        alpha = 2.0 / (span + 1.0)
+        out = [float("nan")] * len(close)
+        # Seed at index span-1 with SMA over the first `span` closes.
+        seed = float(close.iloc[:span].mean())
+        out[span - 1] = seed
+        prev = seed
+        for i in range(span, len(close)):
+            prev = (float(close.iloc[i]) - prev) * alpha + prev
+            out[i] = prev
+        return pd.Series(out, index=close.index)
+
+    @staticmethod
     def compute_emas(df: pd.DataFrame, fast: int = 200, slow: int = 400,
                       htf_buy_period_bars: Optional[int] = None,
-                      htf_sell_period_bars: Optional[int] = None) -> pd.DataFrame:
+                      htf_sell_period_bars: Optional[int] = None,
+                      sma_seed: bool = True) -> pd.DataFrame:
         df = df.copy()
-        df["ema_200"] = df["close"].ewm(span=fast, adjust=False).mean()
-        df["ema_400"] = df["close"].ewm(span=slow, adjust=False).mean()
+        if sma_seed:
+            df["ema_200"] = EMACrossoverStrategy._sma_seeded_ema(df["close"], fast)
+            df["ema_400"] = EMACrossoverStrategy._sma_seeded_ema(df["close"], slow)
+        else:
+            df["ema_200"] = df["close"].ewm(span=fast, adjust=False).mean()
+            df["ema_400"] = df["close"].ewm(span=slow, adjust=False).mean()
         if htf_buy_period_bars and htf_buy_period_bars > 0:
             df["htf_sma_buy"] = df["close"].rolling(htf_buy_period_bars, min_periods=1).mean()
         if htf_sell_period_bars and htf_sell_period_bars > 0:
@@ -200,6 +248,7 @@ class EMACrossoverStrategy:
             self.config.ema_slow_period,
             htf_buy_period_bars=buy_p,
             htf_sell_period_bars=sell_p,
+            sma_seed=self.config.sma_seed_ema,
         )
 
         state = self._load_state(user_id, symbol)
@@ -513,6 +562,26 @@ class EMACrossoverStrategy:
         if state.trend == "NONE":
             return signals
 
+        # Sanity flip: catch missed crossovers (gaps / EMAs straddling).
+        # If state.trend disagrees with current EMA200/EMA400 ordering, end the
+        # cycle and close any open positions. Only triggers when no edge cross
+        # fired this bar (cross_up/cross_dn handled above already).
+        if self.config.sanity_flip_trend:
+            inverted = (
+                (state.trend == "BUY" and ema200 < ema400)
+                or (state.trend == "SELL" and ema200 > ema400)
+            )
+            if inverted:
+                if self._open_positions(state):
+                    signals.extend(self._close_all_positions(state, row, "TREND_INVERSION"))
+                signals.append(self._make_signal(
+                    row, "TREND_RESET", state.trend,
+                    note=f"EMA inversion without crossover edge "
+                         f"(EMA200={ema200:.2f} EMA400={ema400:.2f}) — end cycle"
+                ))
+                self._reset_state(state, "NONE", row)
+                return signals
+
         # Per-spec interpretation: SL is per-position (intra-bar).
         # Trend reset happens ONLY on opposite crossover (handled above).
         # No close-below-EMA400 force-close — that conflated SL with trend reset.
@@ -541,9 +610,20 @@ class EMACrossoverStrategy:
                 signals.append(self._make_signal(row, "ALERT1", "BUY",
                                                  note="Break + close above crossover candle high"))
 
-        # Stage 2 -> ALERT2: retest of EMA200 (close below EMA200)
+        # Stage 2 -> ALERT2: retest of EMA200. Spec note: "price moves towards
+        # 200 EMA from upside (above 200 EMA)" — require prior bar to have been
+        # ABOVE EMA200 (true transition from upside) before locking the retest
+        # candle. Without this, alerts fire when price has already been below
+        # EMA200 for many bars (Cycle 1 trace bug).
         if state.stage == 2:
-            if row["close"] < ema200 and row["low"] < ema200:
+            cross_below_200 = row["close"] < ema200 and row["low"] < ema200
+            from_upside = True
+            if self.config.require_retest_from_upside:
+                # prev bar must close above EMA200 (or be NaN-warmup tolerated).
+                prev_ema200 = prev["ema_200"]
+                if pd.notna(prev_ema200):
+                    from_upside = prev["close"] > prev_ema200
+            if cross_below_200 and from_upside:
                 state.retest1_ts = int(row["timestamp"])
                 state.retest1_high = float(row["high"])
                 state.retest1_low = float(row["low"])
@@ -552,7 +632,7 @@ class EMACrossoverStrategy:
                 state.retest1_pending_cross_ts = None
                 state.stage = 3
                 signals.append(self._make_signal(row, "ALERT2", "BUY",
-                                                 note="EMA200 retest candle locked"))
+                                                 note="EMA200 retest candle locked (from upside)"))
 
         # Stage 3: retest1 armed.
         if state.stage == 3 and state.retest1_high is not None:
@@ -588,9 +668,17 @@ class EMACrossoverStrategy:
                     sl_type="ema400",
                     on_cap_reached=_r1_buy_cap,
                 ))
-        # Stage 4 -> ALERT3: EMA400 touch / cross below
+        # Stage 4 -> ALERT3: EMA400 touch / cross below. Spec note: "price moves
+        # towards 400 EMA from upside (above 400 EMA)" — require prior bar to
+        # have been ABOVE EMA400 before locking retest2 candle.
         if state.stage == 4:
-            if row["low"] <= ema400:
+            touch_400 = row["low"] <= ema400
+            from_upside = True
+            if self.config.require_retest_from_upside:
+                prev_ema400 = prev["ema_400"]
+                if pd.notna(prev_ema400):
+                    from_upside = prev["close"] > prev_ema400
+            if touch_400 and from_upside:
                 cap_n = self.config.max_alert3_locks_per_cycle
                 cur = state.alert3_locks_count or 0
                 if cap_n > 0 and cur >= cap_n:
@@ -609,7 +697,7 @@ class EMACrossoverStrategy:
                 state.alert3_locks_count = cur + 1
                 state.stage = 5
                 signals.append(self._make_signal(row, "ALERT3", "BUY",
-                                                 note="EMA400 retest candle locked"))
+                                                 note="EMA400 retest candle locked (from upside)"))
 
         # Stage 5: retest2 armed
         if state.stage == 5 and state.retest2_high is not None:
@@ -638,8 +726,16 @@ class EMACrossoverStrategy:
                 signals.append(self._make_signal(row, "ALERT1", "SELL",
                                                  note="Break + close below crossover candle low"))
 
+        # SELL mirror: spec note "price moves towards 200 EMA from downside"
+        # — require prior bar to have been BELOW EMA200 (true transition).
         if state.stage == 2:
-            if row["close"] > ema200 and row["high"] > ema200:
+            cross_above_200 = row["close"] > ema200 and row["high"] > ema200
+            from_downside = True
+            if self.config.require_retest_from_upside:
+                prev_ema200 = prev["ema_200"]
+                if pd.notna(prev_ema200):
+                    from_downside = prev["close"] < prev_ema200
+            if cross_above_200 and from_downside:
                 state.retest1_ts = int(row["timestamp"])
                 state.retest1_high = float(row["high"])
                 state.retest1_low = float(row["low"])
@@ -648,7 +744,7 @@ class EMACrossoverStrategy:
                 state.retest1_pending_cross_ts = None
                 state.stage = 3
                 signals.append(self._make_signal(row, "ALERT2", "SELL",
-                                                 note="EMA200 retest candle locked"))
+                                                 note="EMA200 retest candle locked (from downside)"))
 
         if state.stage == 3 and state.retest1_low is not None:
             if row["high"] >= ema400:
@@ -679,8 +775,15 @@ class EMACrossoverStrategy:
                     on_cap_reached=_r1_sell_cap,
                 ))
 
+        # SELL mirror retest2: require prior bar BELOW EMA400.
         if state.stage == 4:
-            if row["high"] >= ema400:
+            touch_400 = row["high"] >= ema400
+            from_downside = True
+            if self.config.require_retest_from_upside:
+                prev_ema400 = prev["ema_400"]
+                if pd.notna(prev_ema400):
+                    from_downside = prev["close"] < prev_ema400
+            if touch_400 and from_downside:
                 cap_n = self.config.max_alert3_locks_per_cycle
                 cur = state.alert3_locks_count or 0
                 if cap_n > 0 and cur >= cap_n:
@@ -698,7 +801,7 @@ class EMACrossoverStrategy:
                 state.alert3_locks_count = cur + 1
                 state.stage = 5
                 signals.append(self._make_signal(row, "ALERT3", "SELL",
-                                                 note="EMA400 retest candle locked"))
+                                                 note="EMA400 retest candle locked (from downside)"))
 
         if state.stage == 5 and state.retest2_low is not None:
             signals.extend(self._handle_retest_break_sell(
@@ -878,17 +981,23 @@ class EMACrossoverStrategy:
         """sl_type:
             'ema400'  -> SL = current EMA400 each bar. Used for ENTRY1 pre-partial.
             'ema200'  -> SL = current EMA200 each bar. Used for both ENTRY1 and
-                         ENTRY2 post-partial trail (BTC trade rules v1.2).
+                         ENTRY2 post-partial trail (Strategy-1 spec).
             'static'  -> SL = fixed price `sl`. Used for ENTRY2 pre-partial
                          (retest2 candle low/high).
         """
         entry_price = float(row["close"])
+        # Per-entry partial trigger (spec: 5% for retest1 / ENTRY1, 15% for retest2 / ENTRY2).
+        partial_pct = (
+            self.config.partial_pct_entry1
+            if entry_alert == "retest1"
+            else self.config.partial_pct_entry2
+        )
         if trend == "BUY":
             target = entry_price * (1 + self.config.target_pct)
-            partial = entry_price * (1 + self.config.partial_pct)
+            partial = entry_price * (1 + partial_pct)
         else:
             target = entry_price * (1 - self.config.target_pct)
-            partial = entry_price * (1 - self.config.partial_pct)
+            partial = entry_price * (1 - partial_pct)
         # Optional ENTRY2 SL cap — tighten retest2 SL distance from entry.
         if (entry_alert == "retest2" and sl_type == "static"
                 and self.config.retest2_sl_cap_pct > 0):
@@ -908,6 +1017,7 @@ class EMACrossoverStrategy:
             "sl": sl,
             "sl_type": sl_type,
             "target": target,
+            "partial_pct": partial_pct,
             "partial_threshold": partial,
             "partial_booked": False,
             "qty_remaining": 1.0,
@@ -990,9 +1100,9 @@ class EMACrossoverStrategy:
                 ))
                 continue
 
-            # 2) Partial booking @ partial_pct.
-            # Per BTC trade rules v1.2: post-partial SL trails the 200 EMA
-            # for the remaining qty (both ENTRY1 and ENTRY2).
+            # 2) Partial booking @ per-entry partial_pct (5% retest1, 15% retest2).
+            # Spec: post-partial SL trails the 200 EMA for the remaining qty.
+            pos_partial_pct = float(pos.get("partial_pct", self.config.partial_pct_entry2))
             if not booked:
                 if trend == "BUY" and bar_high >= partial:
                     book_qty = pos["qty_remaining"] * self.config.partial_qty_frac
@@ -1004,7 +1114,7 @@ class EMACrossoverStrategy:
                     booked = True
                     signals.append(self._make_signal(
                         row, "PARTIAL", trend, price=partial,
-                        note=f"Partial book {book_qty:.2f} @ {self.config.partial_pct*100:.0f}%; trail SL->EMA200 alert={pos['entry_alert']}"
+                        note=f"Partial book {book_qty:.2f} @ {pos_partial_pct*100:.0f}%; trail SL->EMA200 alert={pos['entry_alert']}"
                     ))
                 elif trend == "SELL" and bar_low <= partial:
                     book_qty = pos["qty_remaining"] * self.config.partial_qty_frac
@@ -1016,7 +1126,7 @@ class EMACrossoverStrategy:
                     booked = True
                     signals.append(self._make_signal(
                         row, "PARTIAL", trend, price=partial,
-                        note=f"Partial book {book_qty:.2f} @ {self.config.partial_pct*100:.0f}%; trail SL->EMA200 alert={pos['entry_alert']}"
+                        note=f"Partial book {book_qty:.2f} @ {pos_partial_pct*100:.0f}%; trail SL->EMA200 alert={pos['entry_alert']}"
                     ))
 
             # 3) SL hit on remaining qty.

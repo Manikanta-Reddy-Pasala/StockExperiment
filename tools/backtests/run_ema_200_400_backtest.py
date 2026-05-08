@@ -711,6 +711,21 @@ def main() -> int:
                         help="Override sustain wait for SELL side only. Default "
                              "(None) = same as --sustain-minutes. Backtest evidence "
                              "favors 75 for SELL on 1H bars.")
+    parser.add_argument("--target-pct", type=float, default=0.10,
+                        help="Profit target as fraction of entry. Spec: 0.10/0.15/0.20. Default 0.10.")
+    parser.add_argument("--partial-pct-entry1", type=float, default=0.05,
+                        help="Partial-book trigger for ENTRY1 as fraction of entry. Spec: 0.05.")
+    parser.add_argument("--partial-pct-entry2", type=float, default=0.15,
+                        help="Partial-book trigger for ENTRY2 as fraction of entry. Spec: 0.15.")
+    parser.add_argument("--no-retest-from-upside", action="store_true",
+                        help="Disable spec-strict 'retest from upside' guard "
+                             "(legacy behavior — locks retest candle on any close beyond EMA).")
+    parser.add_argument("--no-sma-seed-ema", action="store_true",
+                        help="Disable Fyers/Pine-style SMA-seeded EMA (use plain ewm). "
+                             "Default ON keeps EMAs aligned with Fyers chart.")
+    parser.add_argument("--no-sanity-flip", action="store_true",
+                        help="Disable trend-inversion sanity flip "
+                             "(legacy: keep BUY cycle live even after EMA200 < EMA400).")
     args = parser.parse_args()
     _FYERS_CACHE["user_id"] = args.user_id
 
@@ -744,6 +759,12 @@ def main() -> int:
         print(f"Universe: smoke ({len(symbols_list)} symbols)")
 
     config = StrategyConfig(
+        target_pct=args.target_pct,
+        partial_pct_entry1=args.partial_pct_entry1,
+        partial_pct_entry2=args.partial_pct_entry2,
+        require_retest_from_upside=not args.no_retest_from_upside,
+        sma_seed_ema=not args.no_sma_seed_ema,
+        sanity_flip_trend=not args.no_sanity_flip,
         htf_filter_enabled=args.htf_filter,
         htf_buy_period_bars=args.htf_buy_period_bars,
         htf_sell_period_bars=args.htf_sell_period_bars,
@@ -762,7 +783,11 @@ def main() -> int:
         sustain_minutes=args.sustain_minutes,
         sell_sustain_minutes=args.sell_sustain_minutes,
     )
-    print(f"Config tuning: htf_filter={config.htf_filter_enabled} "
+    print(f"Config: target_pct={config.target_pct} "
+          f"partial1={config.partial_pct_entry1} partial2={config.partial_pct_entry2} "
+          f"retest_upside={config.require_retest_from_upside} "
+          f"sma_seed_ema={config.sma_seed_ema} sanity_flip={config.sanity_flip_trend}")
+    print(f"Tuning: htf_filter={config.htf_filter_enabled} "
           f"buy_p={config.htf_buy_period_bars}+m{config.htf_buy_margin_pct} "
           f"sell_p={config.htf_sell_period_bars}+m{config.htf_sell_margin_pct} "
           f"max_alert3_locks={config.max_alert3_locks_per_cycle} "
