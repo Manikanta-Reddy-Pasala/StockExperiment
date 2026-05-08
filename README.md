@@ -99,18 +99,26 @@ Loader merges DB overrides onto code defaults at every strategy run.
 
 ---
 
-## Backtest results — Nifty 50, **365d Fyers**
+## Backtest results — **ADANIPORTS, 365d Fyers**
 
-| Profile | Legs | Win% | Tgt | SL | Avg% | Sum% |
-|---|---|---|---|---|---|---|
-| Spec strict (gap=0, static 10%) | 446 | 38.3% | 61 | 308 | 0.74 | **+331.3** |
-| **gap=0.0003 + static 10%** ← default | **23** | **60.9%** | 7 | 9 | 3.32 | +76.4 |
+Reference symbol while iterating on the strategy. Run other symbols via
+`--symbol NSE:<NAME>-EQ` or remove `--symbol` for the full universe.
 
-Default trades 19× less often, 7pp higher win rate, 34× fewer SL hits. Spec
-strict captures more total $ but with much higher drawdown risk per trade.
+| Profile | Legs | Win% | Tgt | SL | Sum% |
+|---|---|---|---|---|---|
+| Spec strict (gap=0, static 10%) | 7 | 57.1% | 0 | 5 | +6.1% |
+| **gap=0.0003 + static 10%** ← default | 0 | — | — | — | — |
 
-**The dominant lever is `min_crossover_gap_pct=0.0003`** — drops legs 446→23,
-lifts win rate 38%→61%, cuts SL hits 308→9.
+Single-symbol 1y is a small sample — default filter discards every ADANIPORTS
+crossover in this window. Across the full Nifty 50 universe (where it has
+proper sample size), gap=0.0003 lifts win rate 38%→61%, cuts SL hits 34×.
+
+```bash
+# Reproduce
+docker exec -w /app trading_system_app python /app/tools/backtests/run_ema_200_400_backtest.py \
+    --symbol 'NSE:ADANIPORTS-EQ' --source fyers --user-id 1 --days 365 \
+    --out /app/exports/backtests/adaniports_y1_default
+```
 
 ### Threshold sweep on `min_crossover_gap_pct` (1y Fyers)
 
