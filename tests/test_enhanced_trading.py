@@ -138,8 +138,8 @@ class TestProcessExitLogic:
         assert order.exit_reason == 'stop_loss'
         assert order.remaining_quantity == 0
 
-    def test_partial_exit_1_at_fib_127(self):
-        """Price hitting Fib 127.2% should sell 25% of original_quantity."""
+    def test_partial_exit_1_at_target_1(self):
+        """Price hitting target 1 should sell 25% of original_quantity."""
         svc = self._get_service()
         order = self._make_order()
         result = svc._process_exit_logic(order, 130.0)  # Above target_price_1 (127.2)
@@ -153,8 +153,8 @@ class TestProcessExitLogic:
         # P&L for 25 shares: (130 - 100) * 25 = 750
         assert order.partial_pnl_realized == 750.0
 
-    def test_partial_exit_2_at_fib_161(self):
-        """Price hitting Fib 161.8% should sell 50% of original_quantity."""
+    def test_partial_exit_2_at_target_2(self):
+        """Price hitting target 2 should sell 50% of original_quantity."""
         svc = self._get_service()
         order = self._make_order(
             partial_exit_1_done=True,
@@ -170,8 +170,8 @@ class TestProcessExitLogic:
         # P&L for 50 shares: (165 - 100) * 50 = 3250, plus existing 750
         assert order.partial_pnl_realized == 750.0 + 3250.0
 
-    def test_partial_exit_3_at_fib_200(self):
-        """Price hitting Fib 200% should sell remaining and fully close."""
+    def test_partial_exit_3_at_target_3(self):
+        """Price hitting target 3 should sell remaining and fully close."""
         svc = self._get_service()
         order = self._make_order(
             partial_exit_1_done=True,
@@ -491,10 +491,7 @@ class TestDayTradingService:
             'symbol': 'NSE:TEST-EQ',
             'stock_name': 'Test Stock',
             'current_price': 100.0,
-            'ema_8': 102.0,
-            'ema_21': 98.0,
-            'avg_daily_volume_20d': 1000000.0,
-            'buy_signal': True
+            'avg_daily_volume_20d': 1000000.0
         }
         session.execute.return_value = [mock_row]
 
@@ -550,16 +547,13 @@ class TestAutoTradingServiceIntegration:
         return AutoTradingService()
 
     def test_create_performance_tracking_swing(self):
-        """Swing mode should set partial exit targets from fib levels."""
+        """Swing mode should NOT set partial exit targets (legacy targets are null)."""
         svc = self._get_service()
         session = MagicMock()
 
         stock_data = {
             'symbol': 'NSE:RELIANCE-EQ',
-            'strategy': 'unified',
-            'fib_target_1': 127.2,
-            'fib_target_2': 161.8,
-            'fib_target_3': 200.0,
+            'strategy': 'unified'
         }
 
         svc._create_performance_tracking(
@@ -572,9 +566,9 @@ class TestAutoTradingServiceIntegration:
         call_args = session.add.call_args[0][0]
         assert call_args.original_quantity == 10
         assert call_args.remaining_quantity == 10
-        assert call_args.target_price_1 == 127.2
-        assert call_args.target_price_2 == 161.8
-        assert call_args.target_price_3 == 200.0
+        assert call_args.target_price_1 is None
+        assert call_args.target_price_2 is None
+        assert call_args.target_price_3 is None
         assert call_args.trading_type == 'swing'
         assert call_args.partial_pnl_realized == 0.0
 
@@ -600,35 +594,6 @@ class TestAutoTradingServiceIntegration:
         assert call_args.target_price_3 is None
         assert call_args.trading_type == 'day'
 
-    def test_create_performance_tracking_fib_calculation_fallback(self):
-        """When fib_target_2/3 not in stock_data, calculate from swing range."""
-        svc = self._get_service()
-        session = MagicMock()
-
-        stock_data = {
-            'symbol': 'NSE:TEST-EQ',
-            'strategy': 'unified',
-            'fib_target_1': 127.2,
-            'fib_target_2': None,  # Missing
-            'fib_target_3': None,  # Missing
-        }
-
-        svc._create_performance_tracking(
-            session, 'MOCK_1_TEST_789', 1, 1, stock_data,
-            quantity=10, entry_price=100.0, stop_loss=90.0,
-            target_price=127.2, trading_type='swing'
-        )
-
-        call_args = session.add.call_args[0][0]
-        assert call_args.target_price_1 == 127.2
-        # target_price=127.2, entry=100, swing_range=27.2
-        # fib_unit = 27.2 / 0.272 = 100
-        # target_2 = 100 + (100 * 0.618) = 161.8
-        # target_3 = 100 + (100 * 1.0) = 200
-        assert call_args.target_price_2 is not None
-        assert abs(call_args.target_price_2 - 161.8) < 0.1
-        assert call_args.target_price_3 is not None
-        assert abs(call_args.target_price_3 - 200.0) < 0.1
 
     def test_check_account_balance_uses_settings_virtual_capital(self):
         """Paper trading should use settings.virtual_capital instead of hardcoded 100K."""

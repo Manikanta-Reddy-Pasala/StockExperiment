@@ -157,9 +157,6 @@ def export_daily_csv():
             suggested_query = """
                 SELECT date, symbol, stock_name, current_price, market_cap,
                        strategy, selection_score, rank,
-                       ema_8, ema_21, ema_trend_score, demarker,
-                       fib_target_1, fib_target_2, fib_target_3,
-                       buy_signal, sell_signal, signal_quality,
                        rsi_14, macd, sma_50, sma_200,
                        pe_ratio, pb_ratio, roe, eps, beta,
                        revenue_growth, earnings_growth, operating_margin,

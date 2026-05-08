@@ -147,7 +147,6 @@ class DailySuggestedStock(Base):
     stop_loss = Column(Float)
     recommendation = Column(String(20))
     reason = Column(Text)
-    signal_quality = Column(String(20))
     sector = Column(String(100))
     market_cap_category = Column(String(20))
     pe_ratio = Column(Float)

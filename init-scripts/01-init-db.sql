@@ -238,13 +238,6 @@ CREATE TABLE IF NOT EXISTS stocks (
     liquidity_score DOUBLE PRECISION,  -- Liquidity score (0-1 scale) for Stage 1 filtering
     volatility_last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- For tracking volatility updates
     volatility DECIMAL(10,6),  -- Calculated volatility for the stock
-    -- 8-21 EMA Strategy Indicators
-    ema_8 DOUBLE PRECISION,  -- 8-day Exponential Moving Average
-    ema_21 DOUBLE PRECISION,  -- 21-day Exponential Moving Average
-    demarker DOUBLE PRECISION,  -- DeMarker oscillator (0-1 scale)
-    buy_signal BOOLEAN DEFAULT FALSE,  -- Buy signal based on 8-21 EMA strategy
-    sell_signal BOOLEAN DEFAULT FALSE,  -- Sell signal based on 8-21 EMA strategy
-    indicators_last_updated TIMESTAMP,  -- Last time technical indicators were calculated
     is_active BOOLEAN DEFAULT TRUE,
     is_tradeable BOOLEAN DEFAULT TRUE,
     is_suspended BOOLEAN DEFAULT FALSE,
@@ -792,23 +785,6 @@ CREATE TABLE IF NOT EXISTS daily_suggested_stocks (
     recommendation VARCHAR(20),
     reason TEXT,
 
-    -- 8-21 EMA Strategy Indicators
-    ema_8 DOUBLE PRECISION,
-    ema_21 DOUBLE PRECISION,
-    ema_trend_score DOUBLE PRECISION,
-    ema_score DOUBLE PRECISION,
-    demarker DOUBLE PRECISION,
-
-    -- Fibonacci Targets
-    fib_target_1 DOUBLE PRECISION,  -- 127.2% extension
-    fib_target_2 DOUBLE PRECISION,  -- 161.8% extension (golden ratio)
-    fib_target_3 DOUBLE PRECISION,  -- 200-261.8% extension
-
-    -- Enhanced Signals
-    buy_signal BOOLEAN DEFAULT FALSE,
-    sell_signal BOOLEAN DEFAULT FALSE,
-    signal_quality VARCHAR(20),  -- 'high', 'medium', 'low'
-
     -- Additional metadata
     sector VARCHAR(100),
     market_cap_category VARCHAR(20),
@@ -830,19 +806,8 @@ CREATE INDEX IF NOT EXISTS idx_daily_suggested_ml_score ON daily_suggested_stock
 COMMENT ON TABLE daily_suggested_stocks IS 'Daily stock picks using unified 8-21 EMA Swing Trading Strategy. Stores top 50 stocks updated daily at 10:15 PM IST.';
 
 -- Add column comments for 8-21 EMA Strategy indicators
-COMMENT ON COLUMN daily_suggested_stocks.strategy IS 'Strategy name: ema_8_21 for unified 8-21 EMA swing trading strategy.';
-COMMENT ON COLUMN daily_suggested_stocks.model_type IS 'Model type: traditional for pure technical analysis, ml for machine learning models.';
-COMMENT ON COLUMN daily_suggested_stocks.ema_8 IS '8-period EMA: Short-term momentum average for trend identification.';
-COMMENT ON COLUMN daily_suggested_stocks.ema_21 IS '21-period EMA: Institutional holding period average for trend confirmation.';
-COMMENT ON COLUMN daily_suggested_stocks.ema_trend_score IS 'EMA Trend Score (0-100): Measures strength of uptrend based on EMA separation.';
-COMMENT ON COLUMN daily_suggested_stocks.ema_score IS 'EMA Score: PRIMARY RANKING METRIC for stock selection. Higher = better opportunity.';
-COMMENT ON COLUMN daily_suggested_stocks.demarker IS 'DeMarker Oscillator (0-1): Entry timing. <0.30 = oversold (HIGH quality), >0.70 = overbought (avoid).';
-COMMENT ON COLUMN daily_suggested_stocks.fib_target_1 IS 'Fibonacci Target 1 (127.2% extension): Conservative profit target.';
-COMMENT ON COLUMN daily_suggested_stocks.fib_target_2 IS 'Fibonacci Target 2 (161.8% golden ratio): Standard profit target.';
-COMMENT ON COLUMN daily_suggested_stocks.fib_target_3 IS 'Fibonacci Target 3 (200% extension): Aggressive profit target.';
-COMMENT ON COLUMN daily_suggested_stocks.buy_signal IS 'BUY Signal: TRUE when Price > 8 EMA > 21 EMA (power zone active).';
-COMMENT ON COLUMN daily_suggested_stocks.sell_signal IS 'SELL Signal: TRUE when Price < 8 EMA < 21 EMA (bearish trend).';
-COMMENT ON COLUMN daily_suggested_stocks.signal_quality IS 'Signal Quality: HIGH (power zone + DeMarker oversold), MEDIUM (power zone + mild pullback), LOW (power zone only).';
+COMMENT ON COLUMN daily_suggested_stocks.strategy IS 'Strategy name: ema_200_400 for 1H timeframe crossover swing trading strategy.';
+COMMENT ON COLUMN daily_suggested_stocks.model_type IS 'Model type: crossover.';
 
 -- Grant permissions
 GRANT ALL PRIVILEGES ON TABLE daily_suggested_stocks TO trader;

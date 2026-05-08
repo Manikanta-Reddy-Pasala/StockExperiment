@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 COLUMN_LIST = (
     "date, symbol, strategy, model_type, stock_name, current_price, market_cap, "
     "selection_score, rank, target_price, stop_loss, recommendation, reason, "
-    "signal_quality, sector, market_cap_category, created_at"
+    "sector, market_cap_category, created_at"
 )
 
 
@@ -68,7 +68,6 @@ class DailySnapshotService:
                     "stop_loss": stock.get("stop_loss"),
                     "recommendation": stock.get("recommendation"),
                     "reason": stock.get("reason"),
-                    "signal_quality": stock.get("signal_quality"),
                     "sector": stock.get("sector"),
                     "market_cap_category": stock.get("market_cap_category"),
                 }
@@ -79,12 +78,12 @@ class DailySnapshotService:
                         date, symbol, strategy, model_type, stock_name,
                         current_price, market_cap, selection_score, rank,
                         target_price, stop_loss, recommendation, reason,
-                        signal_quality, sector, market_cap_category, created_at
+                        sector, market_cap_category, created_at
                     ) VALUES (
                         :date, :symbol, :strategy, :model_type, :stock_name,
                         :current_price, :market_cap, :selection_score, :rank,
                         :target_price, :stop_loss, :recommendation, :reason,
-                        :signal_quality, :sector, :market_cap_category,
+                        :sector, :market_cap_category,
                         CURRENT_TIMESTAMP
                     )
                     ON CONFLICT (date, symbol, strategy, model_type) DO UPDATE SET
@@ -97,7 +96,6 @@ class DailySnapshotService:
                         stop_loss = EXCLUDED.stop_loss,
                         recommendation = EXCLUDED.recommendation,
                         reason = EXCLUDED.reason,
-                        signal_quality = EXCLUDED.signal_quality,
                         sector = EXCLUDED.sector,
                         market_cap_category = EXCLUDED.market_cap_category
                     RETURNING (xmax = 0) AS inserted

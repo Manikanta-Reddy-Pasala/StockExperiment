@@ -62,7 +62,6 @@ def get_suggested_stocks():
 
             # Build query with filters - use subquery with DISTINCT ON to avoid duplicates
             # Then wrap in outer query to apply proper sorting
-            # Also show both buy AND sell signals (not just buy_signal = TRUE)
             valid_sort_fields = ['selection_score', 'current_price', 'market_cap', 'rank']
             if sort_by not in valid_sort_fields:
                 sort_by = 'selection_score'
@@ -93,7 +92,6 @@ def get_suggested_stocks():
                         COALESCE(s.current_price, d.current_price) as current_price,
                         d.strategy,
                         d.selection_score,
-                        -- signal_quality removed (EMA 200/400 strategy uses selection_score)
                         d.recommendation,
                         d.target_price,
                         d.stop_loss,
@@ -393,7 +391,6 @@ def get_triple_model_view():
                         COALESCE(s.current_price, d.current_price) as current_price,
                         d.strategy,
                         d.selection_score,
-                        -- signal_quality removed (EMA 200/400 strategy uses selection_score)
                         d.recommendation,
                         d.target_price,
                         d.stop_loss,

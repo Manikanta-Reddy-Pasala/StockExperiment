@@ -259,11 +259,11 @@ class EMACrossoverRunner:
                         INSERT INTO daily_suggested_stocks
                             (date, symbol, strategy, model_type, stock_name,
                              current_price, target_price, stop_loss, recommendation,
-                             selection_score, signal_quality, reason, created_at)
+                             selection_score, reason, created_at)
                         VALUES
                             (:date, :symbol, 'ema_200_400', 'crossover',
                              :stock_name, :current_price, :target_price, :stop_loss,
-                             :recommendation, :score, :quality, :reason,
+                             :recommendation, :score, :reason,
                              CURRENT_TIMESTAMP)
                         ON CONFLICT (date, symbol, strategy, model_type) DO UPDATE
                           SET current_price = EXCLUDED.current_price,
@@ -271,7 +271,6 @@ class EMACrossoverRunner:
                               stop_loss     = EXCLUDED.stop_loss,
                               recommendation = EXCLUDED.recommendation,
                               selection_score = EXCLUDED.selection_score,
-                              signal_quality = EXCLUDED.signal_quality,
                               reason = EXCLUDED.reason
                         """
                     ),
