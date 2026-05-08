@@ -236,37 +236,6 @@ def trigger_pipeline():
     })
 
 
-@admin_bp.route('/trigger/technical-indicators', methods=['POST'])
-def trigger_technical_indicators():
-    """Trigger technical indicators calculation and daily snapshot update."""
-    task_id = f"technical_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-
-    def run_technical_indicators():
-        from scheduler import calculate_technical_indicators, update_daily_snapshot
-
-        # Calculate technical indicators
-        logger.info("🔄 Running technical indicators calculation...")
-        calculate_technical_indicators()
-
-        # Update daily snapshot
-        logger.info("🔄 Updating daily snapshot...")
-        update_daily_snapshot()
-
-        return "Technical indicators calculated and daily snapshot updated"
-
-    thread = threading.Thread(
-        target=run_function_async,
-        args=(task_id, run_technical_indicators, 'Calculate Technical Indicators', 'technical_indicators')
-    )
-    thread.start()
-
-    return jsonify({
-        'success': True,
-        'task_id': task_id,
-        'message': 'Technical indicators calculation started'
-    })
-
-
 @admin_bp.route('/trigger/all', methods=['POST'])
 def trigger_all():
     """Trigger all processes in sequence."""
@@ -281,7 +250,7 @@ def trigger_all():
         task_data = {
             'type': 'all',
             'status': 'running',
-            'description': 'Complete Data + Technical Indicators Pipeline',
+            'description': 'Data Pipeline',
             'start_time': datetime.now().isoformat(),
             'steps': [],
             'output': '',
@@ -292,7 +261,7 @@ def trigger_all():
 
         db_manager = get_database_manager()
 
-        # Step 1: Data Pipeline
+        # Data Pipeline
         try:
             running_tasks[overall_task_id]['steps'].append({
                 'name': 'pipeline',
@@ -317,41 +286,6 @@ def trigger_all():
             save_task_to_db(overall_task_id, running_tasks[overall_task_id])
             logger.error(f"Pipeline failed: {e}", exc_info=True)
 
-        # Step 2: Technical Indicators Calculation (replaces ML Training)
-        try:
-            running_tasks[overall_task_id]['steps'].append({
-                'name': 'technical_indicators',
-                'description': 'Calculate Technical Indicators',
-                'status': 'running',
-                'start_time': datetime.now().isoformat()
-            })
-            save_task_to_db(overall_task_id, running_tasks[overall_task_id])
-
-            # Actually run the technical indicators calculation
-            from scheduler import calculate_technical_indicators, update_daily_snapshot
-
-            logger.info("🔄 Running technical indicators calculation...")
-            calculate_technical_indicators()
-            running_tasks[overall_task_id]['output'] += "\n✅ Technical indicators calculated successfully"
-
-            # Also update the daily snapshot with fresh indicators
-            logger.info("🔄 Updating daily snapshot with fresh indicators...")
-            update_daily_snapshot()
-            running_tasks[overall_task_id]['output'] += "\n✅ Daily snapshot updated with fresh indicators"
-
-            running_tasks[overall_task_id]['steps'][-1]['status'] = 'completed'
-            running_tasks[overall_task_id]['steps'][-1]['end_time'] = datetime.now().isoformat()
-            save_task_to_db(overall_task_id, running_tasks[overall_task_id])
-
-        except Exception as e:
-            running_tasks[overall_task_id]['steps'][-1]['status'] = 'failed'
-            running_tasks[overall_task_id]['steps'][-1]['error'] = str(e)
-            running_tasks[overall_task_id]['steps'][-1]['end_time'] = datetime.now().isoformat()
-            running_tasks[overall_task_id]['error'] += f"\nTechnical Indicators calculation failed: {str(e)}"
-            save_task_to_db(overall_task_id, running_tasks[overall_task_id])
-            logger.error(f"Technical Indicators calculation failed: {e}", exc_info=True)
-
-        # Mark overall task as completed
         failed_count = len([s for s in running_tasks[overall_task_id]['steps'] if s['status'] == 'failed'])
         running_tasks[overall_task_id]['status'] = 'completed' if failed_count == 0 else 'failed'
         running_tasks[overall_task_id]['end_time'] = datetime.now().isoformat()
@@ -460,10 +394,6 @@ def retry_failed_steps(task_id):
             # Map step name to command
             if step_name == 'pipeline':
                 command = ['python3', 'run_pipeline.py']
-            elif step_name == 'technical_indicators':
-                command = ['python3', '-c',
-                           'from scheduler import calculate_technical_indicators, update_daily_snapshot; '
-                           'calculate_technical_indicators(); update_daily_snapshot()']
             elif step_name == 'csv_export':
                 command = ['python3', '-c', 'from data_scheduler import export_daily_csv; export_daily_csv()']
 

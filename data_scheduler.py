@@ -143,7 +143,7 @@ def export_daily_csv():
             logger.info("Exporting latest technical indicators...")
             tech_query = """
                 SELECT DISTINCT ON (symbol)
-                    symbol, date, ema_8, ema_21, demarker, sma_50, sma_200
+                    symbol, date, sma_50, sma_200
                 FROM technical_indicators
                 ORDER BY symbol, date DESC
             """
@@ -290,23 +290,21 @@ def validate_data_quality():
             logger.info(f"  Total records: {history_stats.total_records:,}")
             logger.info(f"  Date range: {history_stats.earliest_date} to {history_stats.latest_date}")
 
-            # Check technical indicators (updated columns)
+            # Check technical indicators
             tech_stats = session.execute(text("""
                 SELECT
                     COUNT(DISTINCT symbol) as symbols_with_tech,
                     COUNT(*) as total_records,
-                    COUNT(ema_8) as with_ema8,
-                    COUNT(ema_21) as with_ema21,
-                    COUNT(demarker) as with_demarker
+                    COUNT(sma_50) as with_sma50,
+                    COUNT(sma_200) as with_sma200
                 FROM technical_indicators
             """)).fetchone()
 
             logger.info("\nTechnical Indicators:")
             logger.info(f"  Symbols with indicators: {tech_stats.symbols_with_tech}")
             logger.info(f"  Total records: {tech_stats.total_records:,}")
-            logger.info(f"  With EMA-8: {tech_stats.with_ema8:,}")
-            logger.info(f"  With EMA-21: {tech_stats.with_ema21:,}")
-            logger.info(f"  With DeMarker: {tech_stats.with_demarker:,}")
+            logger.info(f"  With SMA-50: {tech_stats.with_sma50:,}")
+            logger.info(f"  With SMA-200: {tech_stats.with_sma200:,}")
 
             logger.info("\n✅ Data quality validation completed at 10:30 PM")
 

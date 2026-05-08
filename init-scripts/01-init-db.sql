@@ -400,16 +400,10 @@ CREATE TABLE IF NOT EXISTS technical_indicators (
     symbol VARCHAR(50) NOT NULL,
     date DATE NOT NULL,
 
-    -- 8-21 EMA Strategy Indicators (Core)
-    ema_8 DOUBLE PRECISION,        -- Fast EMA (8-day) - REQUIRED for power zone
-    ema_21 DOUBLE PRECISION,       -- Slow EMA (21-day) - REQUIRED for power zone
-    demarker DOUBLE PRECISION,     -- DeMarker oscillator (0-1) - REQUIRED for entry timing
+    -- Context indicators (daily) used by HTF gating
+    sma_50 DOUBLE PRECISION,
+    sma_200 DOUBLE PRECISION,
 
-    -- Context Indicators (Optional but useful)
-    sma_50 DOUBLE PRECISION,       -- Medium-term trend confirmation
-    sma_200 DOUBLE PRECISION,      -- Major trend identification (bull/bear market)
-
-    -- Metadata
     calculation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     data_points_used INTEGER,
     UNIQUE(symbol, date)
@@ -486,19 +480,7 @@ CREATE INDEX IF NOT EXISTS idx_technical_date ON technical_indicators(date);
 CREATE INDEX IF NOT EXISTS idx_technical_symbol_date ON technical_indicators(symbol, date);
 CREATE INDEX IF NOT EXISTS idx_technical_symbol_date_desc ON technical_indicators(symbol, date DESC);
 
--- 8-21 EMA Strategy Indexes (for optimized querying)
-CREATE INDEX IF NOT EXISTS idx_technical_ema8 ON technical_indicators(ema_8) WHERE ema_8 IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_technical_ema21 ON technical_indicators(ema_21) WHERE ema_21 IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_technical_demarker ON technical_indicators(demarker) WHERE demarker IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_technical_ema_strategy ON technical_indicators(symbol, date, ema_8, ema_21, demarker) WHERE ema_8 IS NOT NULL AND ema_21 IS NOT NULL;
-
--- Technical Indicators Table Comments
-COMMENT ON TABLE technical_indicators IS 'Historical technical indicators calculated from OHLCV data. Includes moving averages, momentum, volatility, and volume indicators. Primary columns for 8-21 EMA strategy: ema_8, ema_21, demarker.';
-
--- 8-21 EMA Strategy Column Comments
-COMMENT ON COLUMN technical_indicators.ema_8 IS '8-day Exponential Moving Average (fast EMA). Used to identify short-term trend. Part of 8-21 EMA strategy power zone (Price > EMA8 > EMA21 = bullish).';
-COMMENT ON COLUMN technical_indicators.ema_21 IS '21-day Exponential Moving Average (slow EMA). Represents institutional holding period. Acts as dynamic support/resistance in 8-21 EMA strategy.';
-COMMENT ON COLUMN technical_indicators.demarker IS 'DeMarker Oscillator (0-1 range, 14-period). Measures buying/selling pressure. <0.30 = oversold (ideal buy), >0.70 = overbought (avoid). Used for entry timing in pullbacks.';
+COMMENT ON TABLE technical_indicators IS 'Daily SMA cache (50/200) used by the EMA 200/400 1H strategy for HTF trend gating.';
 
 -- Market Benchmarks Indexes
 CREATE INDEX IF NOT EXISTS idx_benchmark_name ON market_benchmarks(benchmark);
@@ -737,21 +719,20 @@ ON CONFLICT (user_id) DO NOTHING;
 
 -- ============================================================================
 -- DAILY SUGGESTED STOCKS TABLE
--- Stores daily stock picks using unified 8-21 EMA Swing Trading Strategy
--- Single strategy approach across all market caps
+-- Stores daily stock picks emitted by the EMA 200/400 1H crossover strategy.
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS daily_suggested_stocks (
     id SERIAL PRIMARY KEY,
     date DATE NOT NULL,
     symbol VARCHAR(50) NOT NULL,
-    strategy VARCHAR(50) NOT NULL DEFAULT 'ema_8_21',
-    model_type VARCHAR(20) NOT NULL DEFAULT 'traditional',
+    strategy VARCHAR(50) NOT NULL DEFAULT 'ema_200_400',
+    model_type VARCHAR(20) NOT NULL DEFAULT 'crossover',
     stock_name VARCHAR(200),
     current_price DOUBLE PRECISION,
     market_cap DOUBLE PRECISION,
 
-    -- Ranking (8-21 EMA unified strategy)
+    -- Ranking
     selection_score DOUBLE PRECISION,
     rank INTEGER,
 
@@ -802,10 +783,7 @@ CREATE INDEX IF NOT EXISTS idx_daily_suggested_symbol ON daily_suggested_stocks(
 CREATE INDEX IF NOT EXISTS idx_daily_suggested_date_strategy ON daily_suggested_stocks(date, strategy);
 CREATE INDEX IF NOT EXISTS idx_daily_suggested_ml_score ON daily_suggested_stocks(ml_prediction_score DESC);
 
--- Add table comment
-COMMENT ON TABLE daily_suggested_stocks IS 'Daily stock picks using unified 8-21 EMA Swing Trading Strategy. Stores top 50 stocks updated daily at 10:15 PM IST.';
-
--- Add column comments for 8-21 EMA Strategy indicators
+COMMENT ON TABLE daily_suggested_stocks IS 'Daily stock picks emitted by the EMA 200/400 1H crossover strategy.';
 COMMENT ON COLUMN daily_suggested_stocks.strategy IS 'Strategy name: ema_200_400 for 1H timeframe crossover swing trading strategy.';
 COMMENT ON COLUMN daily_suggested_stocks.model_type IS 'Model type: crossover.';
 

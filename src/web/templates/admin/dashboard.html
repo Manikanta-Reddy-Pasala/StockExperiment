@@ -496,9 +496,9 @@
                 <h5 class="mb-0"><i class="bi bi-lightning-charge-fill me-2"></i>Execute Complete Pipeline</h5>
             </div>
             <div class="card-body">
-                <p class="mb-3">Execute complete pipeline: Data Pipeline (6-step saga) → Technical Indicators</p>
+                <p class="mb-3">Execute complete data pipeline (6-step saga). Strategy runs hourly via the technical scheduler.</p>
                 <button class="btn btn-danger-trigger w-100" id="runAllBtn" onclick="triggerAll()">
-                    <i class="bi bi-play-fill me-2"></i>Run Complete Pipeline (25-35 min)
+                    <i class="bi bi-play-fill me-2"></i>Run Data Pipeline
                 </button>
             </div>
         </div>
@@ -677,7 +677,6 @@ async function retryFailedSteps(taskId) {
 async function retrySingleStep(stepType, stepDescription) {
     const taskTypeMap = {
         'pipeline': 'pipeline',
-        'technical_indicators': 'technical-indicators',
         'csv_export': 'csv-export'
     };
 
