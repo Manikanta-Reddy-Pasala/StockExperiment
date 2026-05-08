@@ -811,6 +811,16 @@ def main() -> int:
     parser.add_argument("--volume-confirm-mult", type=float, default=0.0,
                         help="Required break-bar volume as multiple of avg. "
                              "0=disabled (default). Recommended 0.8.")
+    parser.add_argument("--target-mode", choices=["static", "atr", "swing_high"], default="static",
+                        help="Target computation. static: entry × (1 ± target_pct). "
+                             "atr: entry ± atr_mult × ATR(period), floored at target_pct. "
+                             "swing_high: legacy (inert on Nifty50 1H).")
+    parser.add_argument("--target-atr-period", type=int, default=14,
+                        help="ATR window for target_mode=atr. Wilder's smoothing.")
+    parser.add_argument("--target-atr-mult", type=float, default=3.0,
+                        help="ATR multiplier for target_mode=atr. Default 3.0.")
+    parser.add_argument("--swing-lookback-bars", type=int, default=50,
+                        help="Lookback (1H bars) for swing_high target.")
     args = parser.parse_args()
     _FYERS_CACHE["user_id"] = args.user_id
 
@@ -854,6 +864,10 @@ def main() -> int:
         min_crossover_gap_pct=args.min_crossover_gap_pct,
         volume_confirm_bars=args.volume_confirm_bars,
         volume_confirm_mult=args.volume_confirm_mult,
+        target_mode=args.target_mode,
+        target_atr_period=args.target_atr_period,
+        target_atr_mult=args.target_atr_mult,
+        swing_lookback_bars=args.swing_lookback_bars,
         htf_filter_enabled=args.htf_filter,
         htf_buy_period_bars=args.htf_buy_period_bars,
         htf_sell_period_bars=args.htf_sell_period_bars,

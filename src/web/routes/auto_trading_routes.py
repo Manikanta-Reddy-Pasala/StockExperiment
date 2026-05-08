@@ -185,6 +185,196 @@ def update_settings():
         }), 500
 
 
+# ==========================================
+# EMA 200/400 Strategy Config (per-user overrides)
+# ==========================================
+
+# Field metadata — name, type, default, group, help text.
+# Used by the GET endpoint (UI rendering) and the PUT validator.
+_EMA_FIELDS = [
+    # group: profit
+    ('target_pct', 'float', 0.10, 'profit',
+     'Take-profit as fraction of entry. Spec: 0.10 / 0.15 / 0.20.'),
+    ('partial_pct_entry1', 'float', 0.05, 'profit',
+     'Partial-book trigger for ENTRY1 (5% per spec).'),
+    ('partial_pct_entry2_buy', 'float', 0.15, 'profit',
+     'Partial-book for BUY ENTRY2 (15% per spec).'),
+    ('partial_pct_entry2_sell', 'float', 0.05, 'profit',
+     'Partial-book for SELL ENTRY2 (5% per spec).'),
+    ('partial_qty_frac', 'float', 0.5, 'profit',
+     'Fraction of qty booked at partial. 0.5 = book 50%.'),
+    ('re_entry_cap', 'int', 4, 'profit',
+     '1 initial + 3 re-entries at each of 2nd / 3rd alert.'),
+    ('sustain_minutes', 'int', 15, 'profit',
+     'Sustain wait after a retest break before firing ENTRY.'),
+    # group: target_mode
+    ('target_mode', 'str', 'static', 'target',
+     "static: entry × (1 ± target_pct). atr: entry ± mult × ATR(period), "
+     "floored at target_pct. swing_high: legacy (inert on Nifty50 1H)."),
+    ('target_atr_period', 'int', 14, 'target',
+     'ATR period for target_mode=atr. Wilder smoothing.'),
+    ('target_atr_mult', 'float', 3.0, 'target',
+     'ATR multiplier for target distance. 3.0 ~ classic swing trade.'),
+    ('swing_lookback_bars', 'int', 50, 'target',
+     'Legacy swing_high lookback (1H bars).'),
+    # group: spec_guards
+    ('require_retest_from_upside', 'bool', True, 'spec_guards',
+     'Lock retest candle only on a true transition from above (BUY) / below '
+     '(SELL) the EMA. Eliminates phantom alerts.'),
+    ('sanity_flip_trend', 'bool', True, 'spec_guards',
+     'Force end-cycle when EMA200/EMA400 ordering disagrees with state.trend '
+     '(catches missed crossovers on gaps / slow drift).'),
+    ('sma_seed_ema', 'bool', True, 'spec_guards',
+     'SMA-seeded EMA (Fyers / TradingView Pine convention). Off = raw ewm '
+     '(drifts vs Fyers chart at <365d backfill).'),
+    # group: quality
+    ('min_crossover_gap_pct', 'float', 0.0003, 'quality',
+     'Minimum EMA200/400 gap at the crossover bar (fraction of price). '
+     '0.0003 = elbow on Nifty50 1y sweep. Set 0 for spec-strict.'),
+    ('volume_confirm_bars', 'int', 20, 'quality',
+     'Window for volume SMA used by entry confirmation.'),
+    ('volume_confirm_mult', 'float', 0.0, 'quality',
+     'Required break-bar volume as multiple of avg. 0 = disabled.'),
+    # group: htf_filter
+    ('htf_filter_enabled', 'bool', True, 'htf_filter',
+     'Higher-timeframe trend gate at the crossover bar.'),
+    ('htf_buy_period_bars', 'int', 1400, 'htf_filter',
+     '~200d SMA on 1H. BUY only fires if close > htf_sma_buy.'),
+    ('htf_sell_period_bars', 'int', 1400, 'htf_filter',
+     'SELL HTF SMA period (1H bars).'),
+    ('htf_buy_margin_pct', 'float', 0.0, 'htf_filter',
+     'Require close > htf_sma * (1 + margin). 0 = simple comparison.'),
+    ('htf_sell_margin_pct', 'float', 0.0, 'htf_filter',
+     'Require close < htf_sma * (1 - margin).'),
+    # group: tuning
+    ('sell_slope_bars', 'int', 350, 'tuning',
+     '50d EMA200 slope confirmation window for SELL crossovers (1H bars).'),
+    ('sell_slope_min_pct', 'float', 0.005, 'tuning',
+     'Min EMA200 % drop over slope window for SELL. 0.005 = 0.5%.'),
+    ('buy_slope_bars', 'int', 0, 'tuning',
+     'Same for BUY. 0 = disabled.'),
+    ('buy_slope_min_pct', 'float', 0.005, 'tuning', 'Min EMA200 rise.'),
+    ('max_alert3_locks_per_cycle', 'int', 0, 'tuning',
+     'Cap retest2 re-locks per cycle. 0 = unlimited.'),
+    ('retest2_sl_cap_pct', 'float', 0.0, 'tuning',
+     'Tighten ENTRY2 SL — cap distance from entry. 0 = use spec retest2.low/high.'),
+    ('skip_retest2', 'bool', False, 'tuning',
+     'Skip ENTRY2 phase entirely.'),
+    ('skip_buy', 'bool', False, 'tuning', 'Skip BUY trends.'),
+    ('skip_sell', 'bool', False, 'tuning', 'Skip SELL trends.'),
+]
+
+
+def _coerce(value, type_str):
+    if value is None or value == '':
+        return None
+    if type_str == 'bool':
+        if isinstance(value, bool):
+            return value
+        return str(value).lower() in ('1', 'true', 'yes', 'on')
+    if type_str == 'int':
+        return int(value)
+    if type_str == 'float':
+        return float(value)
+    return str(value)
+
+
+@auto_trading_bp.route('/ema-strategy/config', methods=['GET'])
+@login_required
+def get_ema_strategy_config():
+    """Return effective EMA 200/400 config (defaults + user overrides) plus
+    field metadata for UI rendering."""
+    try:
+        from src.models.database import get_database_manager
+        from src.models.models import AutoTradingSettings
+        from src.services.technical.ema_crossover_runner import get_ema_crossover_runner
+
+        user_id = current_user.id
+        runner = get_ema_crossover_runner()
+        effective = runner._effective_config(user_id)
+        from dataclasses import asdict
+        eff_dict = asdict(effective)
+
+        with get_database_manager().get_session() as session:
+            row = session.query(AutoTradingSettings).filter_by(user_id=user_id).first()
+            overrides = (row.ema_strategy_config or {}) if row else {}
+
+        fields = []
+        for name, ftype, default, group, help_text in _EMA_FIELDS:
+            fields.append({
+                'name': name,
+                'type': ftype,
+                'default': default,
+                'group': group,
+                'help': help_text,
+                'override': overrides.get(name),
+                'effective': eff_dict.get(name, default),
+            })
+
+        return jsonify({
+            'success': True,
+            'fields': fields,
+            'min_required_bars': runner.min_required_bars(effective),
+            'recommended_backfill_days': runner.required_backfill_days(effective),
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error getting ema-strategy config: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+
+@auto_trading_bp.route('/ema-strategy/config', methods=['PUT'])
+@login_required
+def put_ema_strategy_config():
+    """Persist per-user EMA 200/400 config overrides as JSONB.
+    Body: {"target_pct": 0.15, "min_crossover_gap_pct": 0.0005, ...}
+    Pass null/empty to clear an override (revert to default)."""
+    try:
+        from src.models.database import get_database_manager
+        from src.models.models import AutoTradingSettings
+
+        user_id = current_user.id
+        body = request.get_json() or {}
+
+        # Build clean override dict — only known fields, type-coerced.
+        valid = {f[0]: f[1] for f in _EMA_FIELDS}
+        clean = {}
+        errors = []
+        for key, val in body.items():
+            if key not in valid:
+                errors.append(f"unknown field: {key}")
+                continue
+            try:
+                if val in (None, ''):
+                    clean[key] = None  # clear override
+                else:
+                    clean[key] = _coerce(val, valid[key])
+            except Exception as e:
+                errors.append(f"{key}: {e}")
+        if errors:
+            return jsonify({'success': False, 'error': '; '.join(errors)}), 400
+
+        with get_database_manager().get_session() as session:
+            row = session.query(AutoTradingSettings).filter_by(user_id=user_id).first()
+            if row is None:
+                row = AutoTradingSettings(user_id=user_id)
+                session.add(row)
+            current = dict(row.ema_strategy_config or {})
+            for k, v in clean.items():
+                if v is None:
+                    current.pop(k, None)
+                else:
+                    current[k] = v
+            row.ema_strategy_config = current or None
+            session.commit()
+
+        return jsonify({'success': True, 'overrides': current}), 200
+
+    except Exception as e:
+        logger.error(f"Error saving ema-strategy config: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+
 @auto_trading_bp.route('/executions', methods=['GET'])
 @login_required
 def get_executions():

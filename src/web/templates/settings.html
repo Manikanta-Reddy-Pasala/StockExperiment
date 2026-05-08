@@ -341,11 +341,171 @@
             </div>
         </div>
     </div>
-    
+
+    <!-- ============================================================ -->
+    <!-- EMA 200/400 Strategy Configuration                            -->
+    <!-- ============================================================ -->
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-gradient-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-graph-up-arrow me-2"></i>EMA 200/400 Strategy Parameters
+                </h5>
+                <small class="text-white-50">Per-user overrides; blank = default</small>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info small mb-3" id="ema-strategy-meta">
+                    Loading active config...
+                </div>
+                <form id="ema-strategy-form">
+                    <div id="ema-strategy-fields"><em>Loading…</em></div>
+                    <div class="d-flex justify-content-end mt-3 gap-2">
+                        <button type="button" class="btn btn-outline-secondary" id="ema-strategy-reset-btn">
+                            <i class="bi bi-arrow-counterclockwise"></i> Revert to defaults
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save-fill"></i> Save Strategy Config
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
 </div>
 {% endblock %}
 
 {% block scripts %}
+<script>
+// ----------------------------------------------------------------------
+// EMA 200/400 strategy parameters — load + save
+// ----------------------------------------------------------------------
+const EMA_GROUP_LABELS = {
+    profit:      'Profit / Partial / Sustain',
+    target:      'Target Mode',
+    spec_guards: 'Spec-strict Guards',
+    quality:     'Quality Filters',
+    htf_filter:  'Higher-timeframe Filter',
+    tuning:      'Opt-in Tuning Toggles',
+};
+
+function emaRenderField(f) {
+    const val = f.override !== null && f.override !== undefined ? f.override : '';
+    const placeholder = `default ${f.default}`;
+    let input;
+    if (f.type === 'bool') {
+        const checked = (f.override === true) ? 'checked' : '';
+        const indet = (f.override === null || f.override === undefined);
+        input = `<div class="form-check form-switch">
+                   <input class="form-check-input ema-cfg-field" type="checkbox"
+                          data-name="${f.name}" data-type="bool" ${checked}
+                          ${indet ? 'data-indeterminate="1"' : ''}>
+                   <label class="form-check-label small">
+                     ${indet ? '(default '+f.default+')' : ''}
+                   </label>
+                 </div>`;
+    } else {
+        input = `<input type="${f.type === 'int' ? 'number' : (f.type === 'float' ? 'number' : 'text')}"
+                       class="form-control form-control-sm ema-cfg-field"
+                       data-name="${f.name}" data-type="${f.type}"
+                       value="${val}" placeholder="${placeholder}"
+                       ${f.type === 'float' ? 'step="0.0001"' : ''}>`;
+    }
+    return `
+        <div class="col-md-6 mb-3">
+            <label class="form-label fw-semibold small mb-1">
+                ${f.name} <span class="badge bg-light text-muted">eff: ${f.effective}</span>
+            </label>
+            ${input}
+            <div class="form-text small text-muted">${f.help}</div>
+        </div>
+    `;
+}
+
+async function loadEmaStrategyConfig() {
+    try {
+        const res = await fetch('/api/auto-trading/ema-strategy/config');
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+
+        const meta = document.getElementById('ema-strategy-meta');
+        meta.innerHTML = `Active config requires at least <b>${data.min_required_bars}</b> 1H bars
+                          (${data.recommended_backfill_days} days backfill recommended).`;
+
+        // Group fields
+        const groups = {};
+        data.fields.forEach(f => {
+            if (!groups[f.group]) groups[f.group] = [];
+            groups[f.group].push(f);
+        });
+
+        let html = '';
+        Object.keys(groups).forEach(g => {
+            html += `<h6 class="text-primary mt-3">${EMA_GROUP_LABELS[g] || g}</h6>
+                     <div class="row">`;
+            groups[g].forEach(f => { html += emaRenderField(f); });
+            html += '</div>';
+        });
+        document.getElementById('ema-strategy-fields').innerHTML = html;
+    } catch (e) {
+        document.getElementById('ema-strategy-fields').innerHTML =
+            `<div class="alert alert-danger">Load failed: ${e}</div>`;
+    }
+}
+
+async function saveEmaStrategyConfig(ev) {
+    ev.preventDefault();
+    const fields = document.querySelectorAll('.ema-cfg-field');
+    const body = {};
+    fields.forEach(el => {
+        const name = el.dataset.name;
+        const type = el.dataset.type;
+        if (type === 'bool') {
+            // Indeterminate (untouched) -> null. Otherwise checked state.
+            body[name] = el.checked;
+        } else {
+            const v = el.value.trim();
+            body[name] = v === '' ? null : (type === 'int' ? parseInt(v) :
+                                            type === 'float' ? parseFloat(v) : v);
+        }
+    });
+    try {
+        const res = await fetch('/api/auto-trading/ema-strategy/config', {
+            method: 'PUT', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+        await loadEmaStrategyConfig();
+        alert('Strategy config saved.');
+    } catch (e) {
+        alert('Save failed: ' + e);
+    }
+}
+
+async function resetEmaStrategyConfig() {
+    if (!confirm('Clear all EMA 200/400 overrides and revert to defaults?')) return;
+    const body = {};
+    document.querySelectorAll('.ema-cfg-field').forEach(el => {
+        body[el.dataset.name] = null;
+    });
+    try {
+        await fetch('/api/auto-trading/ema-strategy/config', {
+            method: 'PUT', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        });
+        await loadEmaStrategyConfig();
+    } catch (e) { alert('Reset failed: ' + e); }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadEmaStrategyConfig();
+    const form = document.getElementById('ema-strategy-form');
+    if (form) form.addEventListener('submit', saveEmaStrategyConfig);
+    const reset = document.getElementById('ema-strategy-reset-btn');
+    if (reset) reset.addEventListener('click', resetEmaStrategyConfig);
+});
+</script>
 <script>
     // Notification function
     function showNotification(message, type = 'info') {

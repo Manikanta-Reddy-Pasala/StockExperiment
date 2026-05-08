@@ -2,6 +2,7 @@
 Data Models for the Automated Trading System
 """
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text, ForeignKey, UniqueConstraint, LargeBinary
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from flask_login import UserMixin
@@ -531,6 +532,9 @@ class AutoTradingSettings(Base):
     execution_time = Column(String(10), default='09:20')  # Time to execute (HH:MM format, market opens 9:15 AM)
     trading_mode = Column(String(20), default='swing')  # 'swing', 'day', 'both'
     virtual_capital = Column(Float, default=100000.0)    # Configurable paper trading capital
+    # Per-user EMA 200/400 strategy overrides. JSONB blob; merged onto
+    # StrategyConfig defaults at runtime by EMACrossoverRunner.
+    ema_strategy_config = Column(JSONB)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

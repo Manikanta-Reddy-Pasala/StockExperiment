@@ -91,6 +91,26 @@ ALLOWED_TARGET_PCTS = (0.10, 0.15, 0.20)
 
 @dataclass
 class StrategyConfig:
+    """
+    EMA 200/400 1H crossover strategy configuration.
+
+    Every field can be overridden per-user via auto_trading_settings.ema_strategy_config
+    (JSONB). Loader: ``EMACrossoverRunner._effective_config(user_id)``. Defaults below
+    encode the spec-strict + audit-fix profile that backtests recommend.
+
+    Notes per group:
+
+    * **Profit / partial / SL** — drive position economics.
+    * **Spec-strict guards** — eliminate phantom alerts and missed crossovers.
+      Toggle off only if you intentionally want pre-audit behavior.
+    * **EMA accuracy** — SMA-seeded EMA (Pine convention). Off = raw ewm
+      (drifts vs Fyers chart at <365d backfill).
+    * **Quality filters** — additive over the spec; set to 0/None to disable.
+    * **Dynamic target** — let the take-profit hunt for the recent swing
+      high/low instead of a flat percent move.
+    * **Opt-in tuning toggles** — HTF, slope, ALERT3 cap, retest2 SL cap, etc.
+      All default disabled.
+    """
     target_pct: float = DEFAULT_TARGET_PCT
     # Per-entry / per-side partial-book triggers.
     # Strategy-1 spec defaults: BUY entry1=5%/entry2=15%, SELL entry1=5%/entry2=5%.
@@ -141,6 +161,19 @@ class StrategyConfig:
     # quality). Toggle on with mult=0.8 for longer windows / liquid stocks.
     volume_confirm_bars: int = 20
     volume_confirm_mult: float = 0.0
+
+    # ---- Dynamic target ----
+    # 'static'  target = entry × (1 ± target_pct). Spec default.
+    # 'atr'     target = entry ± (target_atr_mult × ATR(target_atr_period)).
+    #           Adapts per-stock volatility. target_pct acts as a floor on BUY
+    #           (max of static + ATR target) so you never give up a 10% baseline.
+    #           Wilder's ATR smoothing per industry standard.
+    target_mode: str = "static"
+    target_atr_period: int = 14
+    target_atr_mult: float = 3.0
+    # Lookback for legacy swing_high mode (kept for backwards-compat; mode is
+    # functionally inert on Nifty50 1H — floor dominates).
+    swing_lookback_bars: int = 50
 
     # ---- Opt-in tuning toggles (all default = spec-compliant / disabled) ----
     # 1) Higher-timeframe trend filter: only allow CROSSOVER in matching regime.
@@ -243,11 +276,33 @@ class EMACrossoverStrategy:
         return pd.Series(out, index=close.index)
 
     @staticmethod
+    def _wilder_atr(high: pd.Series, low: pd.Series, close: pd.Series, period: int) -> pd.Series:
+        """Wilder's ATR — industry standard. SMA-seed for first `period` bars,
+        then exponential-style smoothing with α = 1/period."""
+        prev_close = close.shift(1)
+        tr = pd.concat([(high - low), (high - prev_close).abs(), (low - prev_close).abs()],
+                       axis=1).max(axis=1)
+        n = len(tr)
+        if n < period:
+            return pd.Series([float("nan")] * n, index=tr.index)
+        out = [float("nan")] * n
+        seed = float(tr.iloc[1:period + 1].mean())  # ignore first NaN
+        out[period] = seed
+        prev = seed
+        for i in range(period + 1, n):
+            x = float(tr.iloc[i])
+            prev = (prev * (period - 1) + x) / period
+            out[i] = prev
+        return pd.Series(out, index=tr.index)
+
+    @staticmethod
     def compute_emas(df: pd.DataFrame, fast: int = 200, slow: int = 400,
                       htf_buy_period_bars: Optional[int] = None,
                       htf_sell_period_bars: Optional[int] = None,
                       sma_seed: bool = True,
-                      volume_sma_bars: int = 0) -> pd.DataFrame:
+                      volume_sma_bars: int = 0,
+                      swing_lookback_bars: int = 0,
+                      atr_period: int = 0) -> pd.DataFrame:
         df = df.copy()
         if sma_seed:
             df["ema_200"] = EMACrossoverStrategy._sma_seeded_ema(df["close"], fast)
@@ -261,6 +316,13 @@ class EMACrossoverStrategy:
             df["htf_sma_sell"] = df["close"].rolling(htf_sell_period_bars, min_periods=1).mean()
         if volume_sma_bars and volume_sma_bars > 0 and "volume" in df.columns:
             df["volume_sma"] = df["volume"].rolling(volume_sma_bars, min_periods=1).mean()
+        if swing_lookback_bars and swing_lookback_bars > 0:
+            df["swing_high"] = df["high"].rolling(swing_lookback_bars, min_periods=1).max()
+            df["swing_low"]  = df["low"].rolling(swing_lookback_bars,  min_periods=1).min()
+        if atr_period and atr_period > 0:
+            df["atr"] = EMACrossoverStrategy._wilder_atr(
+                df["high"], df["low"], df["close"], atr_period
+            )
         return df
 
     # ------------------------------------------------------------------
@@ -293,6 +355,10 @@ class EMACrossoverStrategy:
             htf_sell_period_bars=sell_p,
             sma_seed=self.config.sma_seed_ema,
             volume_sma_bars=self.config.volume_confirm_bars or 0,
+            swing_lookback_bars=(self.config.swing_lookback_bars
+                                 if self.config.target_mode == "swing_high" else 0),
+            atr_period=(self.config.target_atr_period
+                        if self.config.target_mode == "atr" else 0),
         )
 
         state = self._load_state(user_id, symbol)
@@ -1079,10 +1145,30 @@ class EMACrossoverStrategy:
                 else self.config.partial_pct_entry2_sell
             )
         if trend == "BUY":
-            target = entry_price * (1 + self.config.target_pct)
+            static_target = entry_price * (1 + self.config.target_pct)
+            target = static_target
+            if self.config.target_mode == "atr":
+                atr = float(row["atr"]) if "atr" in row.index and pd.notna(row.get("atr")) else 0.0
+                if atr > 0:
+                    atr_target = entry_price + self.config.target_atr_mult * atr
+                    target = max(atr_target, static_target)  # floor at static
+            elif self.config.target_mode == "swing_high":
+                swing = float(row["swing_high"]) if "swing_high" in row.index else 0.0
+                if swing > 0:
+                    target = max(swing, static_target)
             partial = entry_price * (1 + partial_pct)
         else:
-            target = entry_price * (1 - self.config.target_pct)
+            static_target = entry_price * (1 - self.config.target_pct)
+            target = static_target
+            if self.config.target_mode == "atr":
+                atr = float(row["atr"]) if "atr" in row.index and pd.notna(row.get("atr")) else 0.0
+                if atr > 0:
+                    atr_target = entry_price - self.config.target_atr_mult * atr
+                    target = min(atr_target, static_target)  # floor at static
+            elif self.config.target_mode == "swing_high":
+                swing = float(row["swing_low"]) if "swing_low" in row.index else 0.0
+                if swing > 0:
+                    target = min(swing, static_target)
             partial = entry_price * (1 - partial_pct)
         # Optional ENTRY2 SL cap — tighten retest2 SL distance from entry.
         if (entry_alert == "retest2" and sl_type == "static"

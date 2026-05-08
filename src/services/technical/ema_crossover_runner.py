@@ -65,7 +65,121 @@ class EMACrossoverRunner:
                 sell_slope_bars=350,             # 50d EMA200 slope check (SELL)
                 sell_slope_min_pct=0.005,        # require >=0.5% drop
             )
+        self._base_config = config
         self.strategy: EMACrossoverStrategy = get_ema_crossover_strategy(config)
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def min_required_bars(config: StrategyConfig) -> int:
+        """Minimum 1H bar count for every active feature in `config` to be
+        valid. Used to gate evaluation and to size backfills."""
+        bars = config.ema_slow_period + 5
+        if config.htf_filter_enabled:
+            bars = max(bars, config.htf_buy_period_bars or 0,
+                       config.htf_sell_period_bars or 0,
+                       config.htf_period_bars or 0)
+        if config.sell_slope_bars and config.sell_slope_bars > 0:
+            bars = max(bars, config.ema_fast_period + config.sell_slope_bars)
+        if config.buy_slope_bars and config.buy_slope_bars > 0:
+            bars = max(bars, config.ema_fast_period + config.buy_slope_bars)
+        if config.target_mode == "swing_high" and config.swing_lookback_bars > 0:
+            bars = max(bars, config.ema_slow_period + config.swing_lookback_bars)
+        if config.target_mode == "atr" and config.target_atr_period > 0:
+            bars = max(bars, config.ema_slow_period + config.target_atr_period)
+        if config.volume_confirm_mult > 0:
+            bars = max(bars, config.ema_slow_period + (config.volume_confirm_bars or 0))
+        return bars
+
+    @staticmethod
+    def required_backfill_days(config: StrategyConfig) -> int:
+        """Convert min_required_bars to calendar days. NSE = ~7 1H bars/day,
+        trading days are 5/7 of calendar days. Add 30-day holiday buffer."""
+        bars = EMACrossoverRunner.min_required_bars(config)
+        trading_days = (bars + 6) // 7
+        return int(trading_days * (7.0 / 5.0)) + 30
+
+    def _effective_config(self, user_id: int) -> StrategyConfig:
+        """Merge per-user overrides from auto_trading_settings.ema_strategy_config
+        onto the base config. Missing column / row / fields = defaults."""
+        try:
+            from ...models.models import AutoTradingSettings
+        except ImportError:
+            from src.models.models import AutoTradingSettings
+        try:
+            with self.db.get_session() as session:
+                row = (
+                    session.query(AutoTradingSettings)
+                    .filter_by(user_id=user_id)
+                    .first()
+                )
+                overrides = (row.ema_strategy_config or {}) if row else {}
+        except Exception as e:
+            logger.warning(f"ema_strategy_config load failed for user {user_id}: {e}")
+            return self._base_config
+        if not overrides:
+            return self._base_config
+
+        from dataclasses import asdict, fields
+        valid_keys = {f.name for f in fields(StrategyConfig)}
+        merged = asdict(self._base_config)
+        for k, v in overrides.items():
+            if k in valid_keys and v is not None:
+                merged[k] = v
+        return StrategyConfig(**merged)
+
+    def _ensure_data_sufficient(
+        self, user_id: int, symbol: str, config: StrategyConfig
+    ) -> int:
+        """Make sure local 1H history has enough bars for the active config.
+        If short, auto-trigger a single backfill call sized to the requirement.
+
+        Returns: current bar count after any auto-backfill.
+        """
+        window = self.candles.load_candles(symbol, limit=1)
+        try:
+            with self.db.get_session() as session:
+                from sqlalchemy import func
+                try:
+                    from ...models.historical_models import HistoricalData1H
+                except ImportError:
+                    from src.models.historical_models import HistoricalData1H
+                count = (
+                    session.query(func.count(HistoricalData1H.id))
+                    .filter(HistoricalData1H.symbol == symbol)
+                    .scalar()
+                ) or 0
+        except Exception:
+            count = len(window)
+
+        need = self.min_required_bars(config)
+        if count >= need:
+            return count
+
+        days = self.required_backfill_days(config)
+        logger.info(
+            f"{symbol}: only {count} 1H bars, need {need} for active config — "
+            f"backfilling {days}d"
+        )
+        try:
+            self.candles.backfill_symbol(user_id, symbol, days=days)
+        except Exception as e:
+            logger.error(f"{symbol}: auto-backfill failed: {e}")
+        # Recount
+        try:
+            with self.db.get_session() as session:
+                from sqlalchemy import func
+                try:
+                    from ...models.historical_models import HistoricalData1H
+                except ImportError:
+                    from src.models.historical_models import HistoricalData1H
+                count = (
+                    session.query(func.count(HistoricalData1H.id))
+                    .filter(HistoricalData1H.symbol == symbol)
+                    .scalar()
+                ) or 0
+        except Exception:
+            pass
+        return count
 
     # ------------------------------------------------------------------
     # Public entry points
@@ -87,9 +201,17 @@ class EMACrossoverRunner:
         signals_total: List[dict] = []
         errors: List[Dict] = []
 
+        # Per-user config: overlay DB overrides onto the base config and
+        # swap it onto the strategy for this run.
+        effective = self._effective_config(user_id)
+        self.strategy.config = effective
+        need_bars = self.min_required_bars(effective)
+        load_limit = max(need_bars + 50, 600)
+
         for symbol in symbols:
             try:
-                # 1. Refresh data
+                # 1. Refresh data — auto-extends backfill if local history is short
+                self._ensure_data_sufficient(user_id, symbol, effective)
                 self.candles.update_latest(user_id, symbol, lookback_days=backfill_days)
                 # Lightweight 15m refresh — only needed for the sustain check.
                 try:
@@ -97,10 +219,11 @@ class EMACrossoverRunner:
                 except Exception as e:
                     logger.warning(f"{symbol}: 15m refresh failed: {e}")
 
-                # 2. Load candles
-                window = self.candles.load_candles(symbol, limit=600)
-                if len(window) < self.strategy.config.ema_slow_period + 5:
-                    logger.debug(f"{symbol}: insufficient 1H data ({len(window)})")
+                # 2. Load candles (window sized to active config requirements)
+                window = self.candles.load_candles(symbol, limit=load_limit)
+                if len(window) < need_bars:
+                    logger.debug(f"{symbol}: insufficient 1H data "
+                                 f"({len(window)} < {need_bars})")
                     continue
                 latest_15m = self.candles_15m.latest_candle(symbol)
 
@@ -125,12 +248,20 @@ class EMACrossoverRunner:
         self,
         user_id: int,
         symbols: Optional[List[str]] = None,
-        days: int = 120,
+        days: Optional[int] = None,
         max_symbols: int = 500,
     ) -> Dict:
-        """One-shot: pull a long history before the first strategy run."""
+        """One-shot: pull a long history before the first strategy run.
+
+        ``days=None`` (default) sizes the window from the user's effective
+        config so every active feature (EMA400 + HTF SMA + slope + swing +
+        volume) has enough warmup history.
+        """
         if symbols is None:
             symbols = self._default_universe(max_symbols)
+        if days is None:
+            days = self.required_backfill_days(self._effective_config(user_id))
+            logger.info(f"Auto-sized backfill window: {days}d ({len(symbols)} symbols)")
         return self.candles.backfill_universe(user_id, symbols, days=days)
 
     def run_pending_sustains(

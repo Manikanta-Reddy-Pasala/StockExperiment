@@ -1,47 +1,133 @@
 # StockExperiment — EMA 200/400 1H Crossover
 
-NSE swing-trading bot. Universe: Nifty 50/500. Strategy: EMA 200 vs EMA 400 on 1H bars
-with BTC trade rules. Spec: `BTC Trade Rules_V1.1.pdf`. Full doc: `STRATEGY.md`.
+NSE swing-trading bot. Universe: Nifty 50/500. Strategy-1 spec (`BTC Trade Rules_V1.1.pdf`)
+on 1H bars with audit fixes. Full state-machine doc: `STRATEGY.md`.
 
 Production: `77.42.45.12` · App: <https://stock.oneshell.in>
 
 ---
 
-## Strategy in 30 seconds
+## Strategy — full spec (BUY and SELL)
 
-```
-Trend       EMA200 cross EMA400        BUY (above) / SELL (below)
-ALERT1      close beyond crossover candle
-ALERT2      retest EMA200 (lock retest1 candle)
-ENTRY1      break retest1 high + 15m sustain   SL = current EMA400 (dynamic)
-ALERT3      retest EMA400 (lock retest2 candle)
-ENTRY2      break retest2 high + 15m sustain   SL = retest2.low (static)
+EMA200 / EMA400 crossover sets trend. Then a 5-stage chain emits up to 2 entries
+(retest1 + retest2), each with its own re-entry cap, SL rule, and partial-book
+logic. **SL triggers and ALERT2/ALERT3 retest detection are all close-based**
+and require the price to come from the correct side ("from upside" for BUY,
+"from downside" for SELL).
 
-Per-position:  TP = entry × 1.30
-               Partial = bar.high ≥ entry × 1.15 → book 50%, trail SL → entry
-               Re-entry cap: 4 attempts each at retest1/retest2
-               Trend reset: opposite crossover only
-```
+### BUY setup
 
-Live filters layered on the spec:
+| # | Stage | Trigger | Side guard | Action |
+|---|---|---|---|---|
+| 0 | Wait | — | — | Wait for crossover |
+| 1 | Trend ID (BUY) | `EMA200 cross above EMA400` from below + gap ≥ `min_crossover_gap_pct` | — | Lock crossover candle |
+| 2 | ALERT1 | `close > crossover_high && high > crossover_high` | — | Watch for retest |
+| 3 | ALERT2 (retest1) | `close < EMA200 && low < EMA200` | **prev close > prev EMA200** (true transition from upside) | Lock retest1 candle (`high`, `low`); attempts=0; invalidated=False |
+| 3 | retest1 invalidate | `low ≤ EMA400` AND attempts==0 | — | Skip ENTRY1, advance to Stage 4 |
+| 3 | **ENTRY1 BUY** | edge cross of `retest1.high` → PENDING; ENTRY fires after `sustain_minutes` AND close still > level | — | up to 4 attempts (1 + 3 re-entries); `SL = current EMA400` (dynamic, close-based exit) |
+| 4 | ALERT3 (retest2) | `low ≤ EMA400` | **prev close > prev EMA400** (from upside) | Lock retest2 candle; attempts=0; max_alert3_locks counter ++ |
+| 5 | **ENTRY2 BUY** | edge cross of `retest2.high` + sustain | — | up to 4 attempts; `SL = retest2.low` (static, close-based exit) |
+| Per-bar | Position management | TP / partial / SL on each open position | — | TARGET / PARTIAL / STOP_HIT |
 
-| Filter | BUY | SELL |
+**BUY risk model (per position)**:
+
+| Item | Rule | Spec / Default |
 |---|---|---|
-| HTF SMA(200d) | close > 200d SMA | close < 200d SMA |
-| EMA200 slope (50d) | — | EMA200 dropped ≥ 0.5% over 50d |
+| Target | `entry × (1 + target_pct)` | 10% (configurable to 10/15/20%) |
+| Partial @ ENTRY1 | `bar.high ≥ entry × (1 + partial_pct_entry1)` → book 50% qty, trail SL → EMA200 | 5% |
+| Partial @ ENTRY2 | `bar.high ≥ entry × (1 + partial_pct_entry2_buy)` → book 50% qty, trail SL → EMA200 | 15% |
+| ENTRY1 SL | `bar.close < EMA400` | dynamic |
+| ENTRY2 SL | `bar.close < retest2.low` | static |
+| Trend reset | opposite crossover OR EMA inversion grace period | sanity_flip_trend |
 
-Pure-spec mode: pass `StrategyConfig()`.
+### SELL setup (mirror)
+
+| # | Stage | Trigger | Side guard | Action |
+|---|---|---|---|---|
+| 0 | Wait | — | — | Wait for crossover |
+| 1 | Trend ID (SELL) | `EMA200 cross below EMA400` from above + gap ≥ `min_crossover_gap_pct` | — | Lock crossover candle |
+| 2 | ALERT1 | `close < crossover_low && low < crossover_low` | — | Watch for retest |
+| 3 | ALERT2 (retest1) | `close > EMA200 && high > EMA200` | **prev close < prev EMA200** (true transition from downside) | Lock retest1 candle (`high`, `low`); attempts=0; invalidated=False |
+| 3 | retest1 invalidate | `high ≥ EMA400` AND attempts==0 | — | Skip ENTRY1, advance to Stage 4 |
+| 3 | **ENTRY1 SELL** | edge cross of `retest1.low` (price drops below) + sustain | — | up to 4 attempts; `SL = current EMA400` (dynamic, close-based) |
+| 4 | ALERT3 (retest2) | `high ≥ EMA400` | **prev close < prev EMA400** (from downside) | Lock retest2 candle; attempts=0 |
+| 5 | **ENTRY2 SELL** | edge cross of `retest2.low` + sustain | — | up to 4 attempts; `SL = retest2.high` (static, close-based) |
+
+**SELL risk model (per position)**:
+
+| Item | Rule | Spec / Default |
+|---|---|---|
+| Target | `entry × (1 − target_pct)` | 10% |
+| Partial @ ENTRY1 | `bar.low ≤ entry × (1 − partial_pct_entry1)` → book 50% qty, trail SL → EMA200 | 5% |
+| **Partial @ ENTRY2** | `bar.low ≤ entry × (1 − partial_pct_entry2_sell)` → book 50% qty, trail SL → EMA200 | **5%** ← asymmetric vs BUY (15%) |
+| ENTRY1 SL | `bar.close > EMA400` | dynamic |
+| ENTRY2 SL | `bar.close > retest2.high` | static |
+
+### Cycle reset
+
+- **Opposite crossover edge** (`cross_dn` cancels BUY trend, vice-versa) — closes all open positions, starts new cycle from Stage 1.
+- **EMA inversion sanity flip** — if `state.trend=BUY` but `EMA200 < EMA400` and no edge fired this bar, force end-cycle. Catches missed crossovers on gaps. (`sanity_flip_trend=True` default.)
 
 ---
 
-## Backtest — Nifty 50, 720d
+## Configuration parameters (all per-user via `auto_trading_settings.ema_strategy_config` JSONB)
 
-| Variant | Win % | Avg %/leg | Sum % | BUY | SELL |
+| Group | Parameter | Default | Notes |
+|---|---|---|---|
+| Profit | `target_pct` | **0.10** | Take-profit. Customizable to 0.10 / 0.15 / 0.20 per spec. |
+| Profit | `partial_pct_entry1` | 0.05 | Partial-book trigger at retest1 entry (BUY+SELL). |
+| Profit | `partial_pct_entry2_buy` | 0.15 | Partial-book trigger at retest2 BUY. |
+| Profit | `partial_pct_entry2_sell` | 0.05 | Partial-book trigger at retest2 SELL (asymmetric). |
+| Profit | `partial_qty_frac` | 0.5 | 50% of qty booked at partial. |
+| Profit | `re_entry_cap` | 4 | 1 initial + 3 re-entries per alert. |
+| Profit | `sustain_minutes` | 15 | Wait after retest break before ENTRY fires. |
+| Target | `target_mode` | `static` | `static` / `atr` / `swing_high` (legacy, inert). |
+| Target | `target_atr_period` | 14 | Wilder's ATR window when `target_mode=atr`. |
+| Target | `target_atr_mult` | 3.0 | ATR multiplier; target = entry ± mult × ATR. |
+| Spec guards | `require_retest_from_upside` | True | Only lock retest candle on real transition. |
+| Spec guards | `sanity_flip_trend` | True | Force end-cycle on EMA inversion without edge. |
+| Spec guards | `sma_seed_ema` | True | Pine-style EMA (matches Fyers chart). |
+| Quality | `min_crossover_gap_pct` | **0.0003** | Filter touching crossings. Elbow on Nifty50 1y. |
+| Quality | `volume_confirm_mult` | 0.0 | Skip ENTRY if break-bar vol < mult × avg. 0=off. |
+| HTF | `htf_filter_enabled` | True | BUY: close > 200d SMA; SELL: close < 200d SMA. |
+| HTF | `htf_buy_period_bars` | 1400 | ~200d SMA on 1H. |
+| HTF | `htf_sell_period_bars` | 1400 | Same for SELL. |
+| Tuning | `sell_slope_bars` / `_min_pct` | 350 / 0.005 | EMA200 50d slope ≥ 0.5% drop required for SELL. |
+| Tuning | `max_alert3_locks_per_cycle` | 0 | Cap retest2 re-locks. 0 = unlimited. |
+| Tuning | `retest2_sl_cap_pct` | 0.0 | Tighten ENTRY2 SL. 0 = use spec retest2.low/high. |
+| Tuning | `skip_buy` / `skip_sell` / `skip_retest2` | False | Direction toggles. |
+
+Edit at **/settings → EMA 200/400 Strategy Parameters**, or via `PUT /api/auto-trading/ema-strategy/config`.
+Loader merges DB overrides onto code defaults at every strategy run.
+
+---
+
+## Backtest results — Nifty 50, **365d Fyers** (current defaults)
+
+| Variant | Legs | Win% | Tgt | SL | Avg% | Sum% |
+|---|---|---|---|---|---|---|
+| No filter (gap=0, static 10%) | 446 | 38.3% | 61 | 308 | 0.74 | +331.3 |
+| **gap=0.0003, static 10%** ← default | 23 | **60.9%** | 7 | 9 | 3.32 | +76.4 |
+| gap=0.0003, ATR mult=3 (with 10% floor) | 23 | 60.9% | 7 | 9 | 3.32 | +76.4 |
+| gap=0.0003, ATR mult=3, no floor | 20 | **70.0%** | 14 | 6 | 1.22 | +24.4 |
+
+**Key finding**: dynamic targets (ATR / swing) are **inert when target_pct floor is 10%** —
+recent ATR × 3 / swing_high rarely exceeds 10% on Nifty50 1H, so floor always wins. Drop
+floor (`target_pct=0.0`) to make ATR mode active: smaller wins, higher hit rate.
+
+**The dominant lever is `min_crossover_gap_pct=0.0003`** — drops legs 446→23 (filters
+whipsaw flips), lifts win rate 38% → 61%, cuts SL hits 308→9.
+
+### Threshold sweep on `min_crossover_gap_pct` (1y Fyers)
+
+| gap | Legs | Win% | Sum% | Tgt | SL |
 |---|---|---|---|---|---|
-| Pure spec | 22.4 | 0.99 | +1,309 | +1,430 | −121 |
-| HTF only | 27.5 | 1.69 | +1,495 | +1,629 | −134 |
-| **HTF + slope50 (live)** | **30.0** | **1.96** | **+1,697** | +1,552 | +145 |
-| HTF + alert3-cap2 + slope50 | 36.3 | 3.10 | +2,249 | +2,104 | +145 |
+| 0 (off) | 446 | 38.3% | +331 | 61 | 308 |
+| 0.0001 | 209 | 37.8% | +122 | 32 | 140 |
+| 0.0002 | 69 | 34.8% | +40 | 12 | 46 |
+| **0.0003** ← elbow | 23 | 60.9% | +76 | 7 | 9 |
+| 0.0004 | 12 | 100% | +85 | 5 | 0 (small sample) |
+| 0.001 | 0 | — | 0 | — | — |
 
 ---
 
