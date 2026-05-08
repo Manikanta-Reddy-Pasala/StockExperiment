@@ -126,9 +126,15 @@ class StrategyConfig:
     # ---- Quality filters ----
     # Minimum EMA200/EMA400 separation at crossover as fraction of price.
     # Touching EMAs (gap below threshold) whipsaw; filter them.
-    # Backtest evidence (Nifty50 180d Fyers): default 0.0005 lifts win rate
-    # 27.7% -> 44.4% and flips sum % from -19 to +8.5. Set 0 for spec-strict.
-    min_crossover_gap_pct: float = 0.0005
+    # Backtest evidence (Nifty50 1y Fyers, threshold sweep):
+    #   gap=0      446 legs / 38.3% win / +331% sum / 308 SL
+    #   gap=0.0001 209 legs / 37.8% win / +122% sum / 140 SL
+    #   gap=0.0002  69 legs / 34.8% win /  +40% sum /  46 SL
+    #   gap=0.0003  23 legs / 60.9% win /  +76% sum /   9 SL  <- elbow
+    #   gap=0.0004  12 legs / 100%  win /  +85% sum /   0 SL  (small sample)
+    # 0.0003 wins on risk-adjusted P&L: meaningful sample, +22pp win-rate
+    # uplift, 4.5x avg-per-leg vs unfiltered. Set 0 for spec-strict.
+    min_crossover_gap_pct: float = 0.0003
     # Volume confirmation on ENTRY break bar. Skip ENTRY if break-bar volume
     # is below avg(volume, N) × mult. mult=0 disables (default — was too
     # aggressive in 6m backtest, dropped legs from 9 to 3 without improving
