@@ -833,10 +833,10 @@ def main() -> int:
     parser.add_argument("--source", choices=["auto", "fyers", "yahoo"], default="auto",
                         help="Data source. auto = Fyers then Yahoo fallback. yahoo "
                              "needs no auth; useful when Fyers token expired.")
-    parser.add_argument("--min-crossover-gap-pct", type=float, default=0.0003,
+    parser.add_argument("--min-crossover-gap-pct", type=float, default=0.0,
                         help="Min EMA200/EMA400 gap at crossover as fraction of price. "
-                             "Default 0.0003 (0.03%%) = elbow on Nifty50 1y sweep. "
-                             "Set 0 for spec-strict.")
+                             "Default 0 = spec-strict (no filter). "
+                             "Empirical Nifty50 1y sweep elbow = 0.0003.")
     parser.add_argument("--volume-confirm-bars", type=int, default=20,
                         help="Volume SMA window for entry confirmation. Default 20.")
     parser.add_argument("--volume-confirm-mult", type=float, default=0.0,
