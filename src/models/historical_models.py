@@ -212,6 +212,15 @@ class EMACrossoverState(Base):
     retest2_pending_cross_ts = Column(BigInteger)
     # Tuning: count ALERT3 locks per cycle (capped via config.max_alert3_locks_per_cycle).
     alert3_locks_count = Column(Integer, nullable=False, default=0)
+    # v1.4 sustain (single-bar edge cross): track previous bar's close per
+    # retest level so the next bar can detect prev<=level<curr (edge).
+    retest1_last_close = Column(Float)
+    retest2_last_close = Column(Float)
+    # v1.4 sideways check: count bars since retest candle locked; if price
+    # breaks retest.low before retest.high within `sideways_check_bars` bars,
+    # the retest is sideways → skip ENTRY1, advance to next stage.
+    retest1_bars_since_lock = Column(Integer, nullable=False, default=0)
+    retest2_bars_since_lock = Column(Integer, nullable=False, default=0)
 
     last_evaluated_ts = Column(BigInteger)
     created_at = Column(DateTime, default=datetime.utcnow)

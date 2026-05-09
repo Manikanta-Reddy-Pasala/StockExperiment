@@ -117,19 +117,21 @@ class StrategyConfig:
     partial_pct_entry2_sell: float = DEFAULT_PARTIAL_PCT_ENTRY2_SELL
     partial_qty_frac: float = DEFAULT_PARTIAL_QTY_FRAC
     re_entry_cap: int = DEFAULT_RE_ENTRY_CAP        # max attempts per alert
-    sustain_minutes: int = DEFAULT_SUSTAIN_MINUTES
-    # Optional: override sustain wait for SELL side only. None = same as
-    # sustain_minutes. Backtest evidence: BUY benefits from fast (15m), SELL
-    # benefits from slow (~75m) sustain confirmation on 1H bars.
-    sell_sustain_minutes: Optional[int] = None
     ema_fast_period: int = 200
     ema_slow_period: int = 400
 
     # ---- Spec-strict guards (default ON; turn OFF for legacy behavior) ----
-    # Strategy-1 retest-candle definition: "price moves towards EMA from upside
-    # (above EMA)". Lock retest only on a true transition — prev bar must have
-    # been above the EMA. Eliminates phantom alerts when price was already below.
+    # Strategy-1 v1.4 retest-candle definition:
+    #   "Retest @ EMA — previous candle HIGH is above EMA and price close
+    #    below EMA" (BUY mirror for SELL: prev candle LOW below EMA).
+    # Lock retest only on a true transition — prev bar's HIGH must have
+    # crossed the EMA. Eliminates phantom alerts when price was already below.
     require_retest_from_upside: bool = True
+    # Strategy-1 v1.4 sideways check: "if price cross the retest candle low
+    # before high break for next 4 candles" — counts bars after retest1 lock.
+    # If price breaks retest1.low (BUY) before retest1.high within window, the
+    # retest is sideways → skip ENTRY1, advance to Stage 4. 0 disables.
+    sideways_check_bars: int = 4
     # Sanity guard: if state.trend disagrees with current EMA200/EMA400 ordering
     # for more than `trend_inversion_grace_bars` consecutive bars (without a
     # true crossover edge), force end-cycle. Catches cases where the cross was
@@ -141,16 +143,21 @@ class StrategyConfig:
     # ewm(adjust=False) drifts vs Fyers chart for hundreds of bars.
     sma_seed_ema: bool = True
 
-    # ---- Sustain check ----
-    # When True, ENTRY fires after `sustain_minutes` measured on 15m bars
-    # (true 15min spec). When False, falls back to next 1H close (60min wait).
-    # Production runner / backtest harness fetch 15m data accordingly.
+    # ---- Sustain check (Strategy-1 v1.4) ----
+    # When True (default), ENTRY fires on the first 15m candle whose CLOSE
+    # crosses above retest1.high (BUY) or below retest1.low (SELL).
+    # Per v1.4 spec: "If price cross the 2nd Alert candle high AND close in
+    # 15 min candle, take entry at market price." No wait period, no wick
+    # tolerance — single edge-cross-and-close on 15m fires entry.
+    # When False: same logic but resolved on 1H bar (next 1H close above level).
     use_15m_sustain: bool = True
-    # During the sustain wait after a retest break, price must hold near the
-    # break level — no wick below (BUY) or above (SELL). Tolerance allows
-    # small intra-bar noise. 0 = strict (any wick beyond level cancels).
-    # 0.005 = 0.5% (default). E.g. BUY break level=100 -> low must stay > 99.5.
-    sustain_wick_tolerance_pct: float = 0.005
+    # Spec v1.4 simplified sustain to a single bar close. The legacy fields
+    # below are kept for backwards compat with v1.1 strict-sustain mode but
+    # are NOT consulted unless legacy_sustain_mode = True.
+    legacy_sustain_mode: bool = False
+    sustain_minutes: int = 15            # legacy: wait after edge cross
+    sell_sustain_minutes: Optional[int] = None
+    sustain_wick_tolerance_pct: float = 0.005   # legacy
 
     # ---- Quality filters ----
     # Minimum EMA200/EMA400 separation at crossover as fraction of price.
@@ -407,70 +414,76 @@ class EMACrossoverStrategy:
     # 15m intra-bar sustain check (entry confirmation only)
     # ------------------------------------------------------------------
     def _intra_bar_sustain_15m_synth(self, state, synth) -> List[dict]:
-        """Same as _intra_bar_sustain_15m but caller already built the synth
-        row (used by the historical 15m walk in evaluate)."""
+        """v1.4: 15m bar arrives. Run sideways check + edge-cross-and-close
+        entry firing using the same helpers as the 1H state machine."""
         if state.trend not in ("BUY", "SELL"):
             return []
         signals: List[dict] = []
-        if state.trend == "BUY":
-            if state.stage == 3 and state.retest1_pending_cross_ts and state.retest1_high is not None:
-                def _r1_buy_cap():
+        direction = state.trend
+
+        if state.stage == 3 and state.retest1_high is not None and state.retest1_low is not None:
+            state.retest1_bars_since_lock = (state.retest1_bars_since_lock or 0) + 1
+            sw_level = float(state.retest1_low) if direction == "BUY" else float(state.retest1_high)
+            if self._check_sideways(state, synth,
+                                     level_low_or_high=sw_level,
+                                     bars_attr="retest1_bars_since_lock",
+                                     attempts_attr="retest1_attempts",
+                                     direction=direction):
+                signals.append(self._make_signal(
+                    synth, "ALERT2_SIDEWAYS", direction,
+                    note=f"Sideways (15m bar) within {self.config.sideways_check_bars} candles — skip ENTRY1"
+                ))
+                if self.config.skip_retest2:
+                    self._reset_state(state, "NONE", synth)
+                    return signals
+                state.stage = 4
+            else:
+                def _r1_cap():
                     if self.config.skip_retest2:
                         self._reset_state(state, "NONE", synth)
                     else:
                         state.stage = 4
-                signals.extend(self._resolve_pending_15m_buy(
+                level = float(state.retest1_high) if direction == "BUY" else float(state.retest1_low)
+                signals.extend(self._try_v14_entry(
                     state, synth,
-                    level=float(state.retest1_high),
-                    pending_attr="retest1_pending_cross_ts",
+                    level=level,
+                    last_close_attr="retest1_last_close",
                     attempts_attr="retest1_attempts",
                     entry_signal="ENTRY1",
                     entry_alert="retest1",
                     sl=float(synth["ema_400"]),
                     sl_type="ema400",
-                    on_cap_reached=_r1_buy_cap,
+                    on_cap_reached=_r1_cap,
+                    direction=direction,
                 ))
-            if state.stage == 5 and state.retest2_pending_cross_ts and state.retest2_high is not None:
-                signals.extend(self._resolve_pending_15m_buy(
+
+        if state.stage == 5 and state.retest2_high is not None and state.retest2_low is not None:
+            state.retest2_bars_since_lock = (state.retest2_bars_since_lock or 0) + 1
+            sw_level = float(state.retest2_low) if direction == "BUY" else float(state.retest2_high)
+            if self._check_sideways(state, synth,
+                                     level_low_or_high=sw_level,
+                                     bars_attr="retest2_bars_since_lock",
+                                     attempts_attr="retest2_attempts",
+                                     direction=direction):
+                signals.append(self._make_signal(
+                    synth, "ALERT3_SIDEWAYS", direction,
+                    note=f"Sideways (15m bar) within {self.config.sideways_check_bars} candles — back to Stage 4"
+                ))
+                state.stage = 4
+            else:
+                level = float(state.retest2_high) if direction == "BUY" else float(state.retest2_low)
+                static_sl = float(state.retest2_low) if direction == "BUY" else float(state.retest2_high)
+                signals.extend(self._try_v14_entry(
                     state, synth,
-                    level=float(state.retest2_high),
-                    pending_attr="retest2_pending_cross_ts",
+                    level=level,
+                    last_close_attr="retest2_last_close",
                     attempts_attr="retest2_attempts",
                     entry_signal="ENTRY2",
                     entry_alert="retest2",
-                    sl=float(state.retest2_low),
+                    sl=static_sl,
                     sl_type="static",
                     on_cap_reached=lambda: setattr(state, "stage", 4),
-                ))
-        else:
-            if state.stage == 3 and state.retest1_pending_cross_ts and state.retest1_low is not None:
-                def _r1_sell_cap():
-                    if self.config.skip_retest2:
-                        self._reset_state(state, "NONE", synth)
-                    else:
-                        state.stage = 4
-                signals.extend(self._resolve_pending_15m_sell(
-                    state, synth,
-                    level=float(state.retest1_low),
-                    pending_attr="retest1_pending_cross_ts",
-                    attempts_attr="retest1_attempts",
-                    entry_signal="ENTRY1",
-                    entry_alert="retest1",
-                    sl=float(synth["ema_400"]),
-                    sl_type="ema400",
-                    on_cap_reached=_r1_sell_cap,
-                ))
-            if state.stage == 5 and state.retest2_pending_cross_ts and state.retest2_low is not None:
-                signals.extend(self._resolve_pending_15m_sell(
-                    state, synth,
-                    level=float(state.retest2_low),
-                    pending_attr="retest2_pending_cross_ts",
-                    attempts_attr="retest2_attempts",
-                    entry_signal="ENTRY2",
-                    entry_alert="retest2",
-                    sl=float(state.retest2_high),
-                    sl_type="static",
-                    on_cap_reached=lambda: setattr(state, "stage", 4),
+                    direction=direction,
                 ))
         return signals
 
@@ -818,6 +831,75 @@ class EMACrossoverStrategy:
         return signals
 
     # ------------------------------------------------------------------
+    def _try_v14_entry(self, state, row, *, level, last_close_attr,
+                        attempts_attr, entry_signal, entry_alert,
+                        sl, sl_type, on_cap_reached, direction) -> List[dict]:
+        """v1.4 single-bar sustain. Detects close-edge cross of `level` using
+        the previous close stored on state. Fires ENTRY at row close on edge.
+        Updates last_close every bar (regardless of edge)."""
+        prev_close = getattr(state, last_close_attr, None)
+        curr_close = float(row["close"])
+        if direction == "BUY":
+            edge = (prev_close is not None and prev_close <= level and curr_close > level)
+        else:
+            edge = (prev_close is not None and prev_close >= level and curr_close < level)
+        # Always advance the per-bar tracker (even if no edge fired).
+        setattr(state, last_close_attr, curr_close)
+        if not edge:
+            return []
+        attempts = getattr(state, attempts_attr, 0) or 0
+        if attempts >= self.config.re_entry_cap:
+            on_cap_reached()
+            return []
+        if not self._volume_ok(row):
+            return [self._make_signal(
+                row, "ENTRY_SKIP", direction,
+                note=f"{entry_signal} volume filter: vol below "
+                     f"{self.config.volume_confirm_mult}x avg"
+            )]
+        setattr(state, attempts_attr, attempts + 1)
+        new_attempts = attempts + 1
+        pos = self._open_position(row, trend=direction, entry_alert=entry_alert,
+                                  sl=sl, sl_type=sl_type)
+        self._append_position(state, pos)
+        state.entries_count = (state.entries_count or 0) + 1
+        if entry_signal == "ENTRY1" and state.entry1_price is None:
+            state.entry1_price = pos["entry_price"]
+            state.entry1_time = pos["entry_time"]
+        if entry_signal == "ENTRY2" and state.entry2_price is None:
+            state.entry2_price = pos["entry_price"]
+            state.entry2_time = pos["entry_time"]
+        state.stop_loss = pos["sl"]
+        state.target_price = pos["target"]
+        state.position_active = True
+        sig = self._make_signal(
+            row, entry_signal, direction, price=pos["entry_price"],
+            note=f"{direction} {entry_signal} attempt {new_attempts}/{self.config.re_entry_cap} "
+                 f"(v1.4 edge cross+close)"
+        )
+        sig["sl"] = pos["sl"]
+        sig["target"] = pos["target"]
+        if new_attempts >= self.config.re_entry_cap:
+            on_cap_reached()
+        return [sig]
+
+    def _check_sideways(self, state, row, *, level_low_or_high,
+                          bars_attr, attempts_attr, direction) -> bool:
+        """v1.4 sideways check. BUY: True if bar.low <= retest.low before any
+        entry within sideways_check_bars window. SELL mirror on high.
+        Caller increments bars_attr separately."""
+        if self.config.sideways_check_bars <= 0:
+            return False
+        attempts = getattr(state, attempts_attr, 0) or 0
+        if attempts > 0:
+            return False
+        bars = getattr(state, bars_attr, 0) or 0
+        if bars > self.config.sideways_check_bars:
+            return False
+        if direction == "BUY":
+            return float(row["low"]) <= level_low_or_high
+        return float(row["high"]) >= level_low_or_high
+
     def _step_buy(self, state, row, prev) -> List[dict]:
         signals: List[dict] = []
         ema200 = row["ema_200"]
@@ -842,7 +924,7 @@ class EMACrossoverStrategy:
                 # prev bar must close above EMA200 (or be NaN-warmup tolerated).
                 prev_ema200 = prev["ema_200"]
                 if pd.notna(prev_ema200):
-                    from_upside = prev["close"] > prev_ema200
+                    from_upside = prev["high"] > prev_ema200    # v1.4: prev candle HIGH
             if cross_below_200 and from_upside:
                 state.retest1_ts = int(row["timestamp"])
                 state.retest1_high = float(row["high"])
@@ -850,44 +932,67 @@ class EMACrossoverStrategy:
                 state.retest1_attempts = 0
                 state.retest1_invalidated = False
                 state.retest1_pending_cross_ts = None
+                # v1.4 seed: retest candle's close < EMA200 < retest.high so
+                # last_close starts below the level (retest1.high). First
+                # subsequent bar that closes above retest1.high = edge cross.
+                state.retest1_last_close = float(row["close"])
+                state.retest1_bars_since_lock = 0
                 state.stage = 3
                 signals.append(self._make_signal(row, "ALERT2", "BUY",
                                                  note="EMA200 retest candle locked (from upside)"))
 
-        # Stage 3: retest1 armed.
+        # Stage 3: retest1 armed. v1.4: when use_15m_sustain=True, 15m bars
+        # do the bar counting, sideways check, and entry firing. 1H bars only
+        # check EMA400 invalidate.
         if state.stage == 3 and state.retest1_high is not None:
-            # 3a) EMA400 touch behavior depends on whether ENTRY1 already taken:
-            #     - 0 entries -> spec invalidates retest1 path ("Omit 1st entry")
-            #     - >=1 entry -> SL handled per-position; advance to retest2 watch
-            #     Either way we advance to stage 4 so ALERT3 fires same bar.
+            on_15m = getattr(self, "_has_15m_data", False)
+            if not on_15m:
+                state.retest1_bars_since_lock = (state.retest1_bars_since_lock or 0) + 1
+            # 3a) EMA400 touch BEFORE first entry — spec: "Omit 1st entry if
+            #     price touches 400 EMA before breaking 2nd Alert candle high"
             if row["low"] <= ema400:
                 if (state.retest1_attempts or 0) == 0:
                     state.retest1_invalidated = True
                     signals.append(self._make_signal(row, "ALERT2_SKIP", "BUY",
                                                      note="EMA400 touched before retest1 break — omit ENTRY1"))
-                state.retest1_pending_cross_ts = None  # abandon any pending retest1 sustain
+                state.retest1_pending_cross_ts = None
                 if self.config.skip_retest2:
                     self._reset_state(state, "NONE", row)
                     return signals
                 state.stage = 4
-            else:
-                # 3b) Cross + sustain logic on retest1.high
-                def _r1_buy_cap():
+            # 3b/c) Sideways + entry: only on 1H when 15m not feeding
+            elif not on_15m:
+                if self._check_sideways(state, row,
+                                         level_low_or_high=float(state.retest1_low),
+                                         bars_attr="retest1_bars_since_lock",
+                                         attempts_attr="retest1_attempts",
+                                         direction="BUY"):
+                    signals.append(self._make_signal(
+                        row, "ALERT2_SIDEWAYS", "BUY",
+                        note=f"Sideways: bar.low <= retest1.low within {self.config.sideways_check_bars} candles — skip ENTRY1"
+                    ))
                     if self.config.skip_retest2:
                         self._reset_state(state, "NONE", row)
-                    else:
-                        state.stage = 4
-                signals.extend(self._handle_retest_break_buy(
-                    state, row, prev,
-                    level=state.retest1_high,
-                    pending_attr="retest1_pending_cross_ts",
-                    attempts_attr="retest1_attempts",
-                    entry_signal="ENTRY1",
-                    entry_alert="retest1",
-                    sl=float(ema400),
-                    sl_type="ema400",
-                    on_cap_reached=_r1_buy_cap,
-                ))
+                        return signals
+                    state.stage = 4
+                else:
+                    def _r1_buy_cap():
+                        if self.config.skip_retest2:
+                            self._reset_state(state, "NONE", row)
+                        else:
+                            state.stage = 4
+                    signals.extend(self._try_v14_entry(
+                        state, row,
+                        level=float(state.retest1_high),
+                        last_close_attr="retest1_last_close",
+                        attempts_attr="retest1_attempts",
+                        entry_signal="ENTRY1",
+                        entry_alert="retest1",
+                        sl=float(ema400),
+                        sl_type="ema400",
+                        on_cap_reached=_r1_buy_cap,
+                        direction="BUY",
+                    ))
         # Stage 4 -> ALERT3: EMA400 touch / cross below. Spec note: "price moves
         # towards 400 EMA from upside (above 400 EMA)" — require prior bar to
         # have been ABOVE EMA400 before locking retest2 candle.
@@ -897,7 +1002,7 @@ class EMACrossoverStrategy:
             if self.config.require_retest_from_upside:
                 prev_ema400 = prev["ema_400"]
                 if pd.notna(prev_ema400):
-                    from_upside = prev["close"] > prev_ema400
+                    from_upside = prev["high"] > prev_ema400    # v1.4: prev candle HIGH
             if touch_400 and from_upside:
                 cap_n = self.config.max_alert3_locks_per_cycle
                 cur = state.alert3_locks_count or 0
@@ -914,24 +1019,41 @@ class EMACrossoverStrategy:
                 state.retest2_low = float(row["low"])
                 state.retest2_attempts = 0
                 state.retest2_pending_cross_ts = None
+                state.retest2_last_close = float(row["close"])    # v1.4
+                state.retest2_bars_since_lock = 0
                 state.alert3_locks_count = cur + 1
                 state.stage = 5
                 signals.append(self._make_signal(row, "ALERT3", "BUY",
                                                  note="EMA400 retest candle locked (from upside)"))
 
-        # Stage 5: retest2 armed
+        # Stage 5: retest2 armed (1H side gated by 15m flag)
         if state.stage == 5 and state.retest2_high is not None:
-            signals.extend(self._handle_retest_break_buy(
-                state, row, prev,
-                level=state.retest2_high,
-                pending_attr="retest2_pending_cross_ts",
-                attempts_attr="retest2_attempts",
-                entry_signal="ENTRY2",
-                entry_alert="retest2",
-                sl=float(state.retest2_low),
-                sl_type="static",
-                on_cap_reached=lambda: setattr(state, "stage", 4),
-            ))
+            on_15m = getattr(self, "_has_15m_data", False)
+            if not on_15m:
+                state.retest2_bars_since_lock = (state.retest2_bars_since_lock or 0) + 1
+                if self._check_sideways(state, row,
+                                         level_low_or_high=float(state.retest2_low),
+                                         bars_attr="retest2_bars_since_lock",
+                                         attempts_attr="retest2_attempts",
+                                         direction="BUY"):
+                    signals.append(self._make_signal(
+                        row, "ALERT3_SIDEWAYS", "BUY",
+                        note=f"Sideways: bar.low <= retest2.low within {self.config.sideways_check_bars} candles — back to Stage 4"
+                    ))
+                    state.stage = 4
+                else:
+                    signals.extend(self._try_v14_entry(
+                        state, row,
+                        level=float(state.retest2_high),
+                        last_close_attr="retest2_last_close",
+                        attempts_attr="retest2_attempts",
+                        entry_signal="ENTRY2",
+                        entry_alert="retest2",
+                        sl=float(state.retest2_low),
+                        sl_type="static",
+                        on_cap_reached=lambda: setattr(state, "stage", 4),
+                        direction="BUY",
+                    ))
         return signals
 
     # ------------------------------------------------------------------
@@ -954,7 +1076,7 @@ class EMACrossoverStrategy:
             if self.config.require_retest_from_upside:
                 prev_ema200 = prev["ema_200"]
                 if pd.notna(prev_ema200):
-                    from_downside = prev["close"] < prev_ema200
+                    from_downside = prev["low"] < prev_ema200    # v1.4: prev candle LOW
             if cross_above_200 and from_downside:
                 state.retest1_ts = int(row["timestamp"])
                 state.retest1_high = float(row["high"])
@@ -962,11 +1084,16 @@ class EMACrossoverStrategy:
                 state.retest1_attempts = 0
                 state.retest1_invalidated = False
                 state.retest1_pending_cross_ts = None
+                state.retest1_last_close = float(row["close"])    # v1.4
+                state.retest1_bars_since_lock = 0
                 state.stage = 3
                 signals.append(self._make_signal(row, "ALERT2", "SELL",
                                                  note="EMA200 retest candle locked (from downside)"))
 
         if state.stage == 3 and state.retest1_low is not None:
+            on_15m = getattr(self, "_has_15m_data", False)
+            if not on_15m:
+                state.retest1_bars_since_lock = (state.retest1_bars_since_lock or 0) + 1
             if row["high"] >= ema400:
                 if (state.retest1_attempts or 0) == 0:
                     state.retest1_invalidated = True
@@ -977,23 +1104,38 @@ class EMACrossoverStrategy:
                     self._reset_state(state, "NONE", row)
                     return signals
                 state.stage = 4
-            else:
-                def _r1_sell_cap():
+            elif not on_15m:
+                if self._check_sideways(state, row,
+                                         level_low_or_high=float(state.retest1_high),
+                                         bars_attr="retest1_bars_since_lock",
+                                         attempts_attr="retest1_attempts",
+                                         direction="SELL"):
+                    signals.append(self._make_signal(
+                        row, "ALERT2_SIDEWAYS", "SELL",
+                        note=f"Sideways: bar.high >= retest1.high within {self.config.sideways_check_bars} candles — skip ENTRY1"
+                    ))
                     if self.config.skip_retest2:
                         self._reset_state(state, "NONE", row)
-                    else:
-                        state.stage = 4
-                signals.extend(self._handle_retest_break_sell(
-                    state, row, prev,
-                    level=state.retest1_low,
-                    pending_attr="retest1_pending_cross_ts",
-                    attempts_attr="retest1_attempts",
-                    entry_signal="ENTRY1",
-                    entry_alert="retest1",
-                    sl=float(ema400),
-                    sl_type="ema400",
-                    on_cap_reached=_r1_sell_cap,
-                ))
+                        return signals
+                    state.stage = 4
+                else:
+                    def _r1_sell_cap():
+                        if self.config.skip_retest2:
+                            self._reset_state(state, "NONE", row)
+                        else:
+                            state.stage = 4
+                    signals.extend(self._try_v14_entry(
+                        state, row,
+                        level=float(state.retest1_low),
+                        last_close_attr="retest1_last_close",
+                        attempts_attr="retest1_attempts",
+                        entry_signal="ENTRY1",
+                        entry_alert="retest1",
+                        sl=float(ema400),
+                        sl_type="ema400",
+                        on_cap_reached=_r1_sell_cap,
+                        direction="SELL",
+                    ))
 
         # SELL mirror retest2: require prior bar BELOW EMA400.
         if state.stage == 4:
@@ -1002,7 +1144,7 @@ class EMACrossoverStrategy:
             if self.config.require_retest_from_upside:
                 prev_ema400 = prev["ema_400"]
                 if pd.notna(prev_ema400):
-                    from_downside = prev["close"] < prev_ema400
+                    from_downside = prev["low"] < prev_ema400    # v1.4: prev candle LOW
             if touch_400 and from_downside:
                 cap_n = self.config.max_alert3_locks_per_cycle
                 cur = state.alert3_locks_count or 0
@@ -1018,23 +1160,40 @@ class EMACrossoverStrategy:
                 state.retest2_low = float(row["low"])
                 state.retest2_attempts = 0
                 state.retest2_pending_cross_ts = None
+                state.retest2_last_close = float(row["close"])    # v1.4
+                state.retest2_bars_since_lock = 0
                 state.alert3_locks_count = cur + 1
                 state.stage = 5
                 signals.append(self._make_signal(row, "ALERT3", "SELL",
                                                  note="EMA400 retest candle locked (from downside)"))
 
         if state.stage == 5 and state.retest2_low is not None:
-            signals.extend(self._handle_retest_break_sell(
-                state, row, prev,
-                level=state.retest2_low,
-                pending_attr="retest2_pending_cross_ts",
-                attempts_attr="retest2_attempts",
-                entry_signal="ENTRY2",
-                entry_alert="retest2",
-                sl=float(state.retest2_high),
-                sl_type="static",
-                on_cap_reached=lambda: setattr(state, "stage", 4),
-            ))
+            on_15m = getattr(self, "_has_15m_data", False)
+            if not on_15m:
+                state.retest2_bars_since_lock = (state.retest2_bars_since_lock or 0) + 1
+                if self._check_sideways(state, row,
+                                         level_low_or_high=float(state.retest2_high),
+                                         bars_attr="retest2_bars_since_lock",
+                                         attempts_attr="retest2_attempts",
+                                         direction="SELL"):
+                    signals.append(self._make_signal(
+                        row, "ALERT3_SIDEWAYS", "SELL",
+                        note=f"Sideways: bar.high >= retest2.high within {self.config.sideways_check_bars} candles — back to Stage 4"
+                    ))
+                    state.stage = 4
+                else:
+                    signals.extend(self._try_v14_entry(
+                        state, row,
+                        level=float(state.retest2_low),
+                        last_close_attr="retest2_last_close",
+                        attempts_attr="retest2_attempts",
+                        entry_signal="ENTRY2",
+                        entry_alert="retest2",
+                        sl=float(state.retest2_high),
+                        sl_type="static",
+                        on_cap_reached=lambda: setattr(state, "stage", 4),
+                        direction="SELL",
+                    ))
         return signals
 
     # ------------------------------------------------------------------
@@ -1448,6 +1607,10 @@ class EMACrossoverStrategy:
         state.retest1_pending_cross_ts = None
         state.retest2_pending_cross_ts = None
         state.alert3_locks_count = 0
+        state.retest1_last_close = None
+        state.retest2_last_close = None
+        state.retest1_bars_since_lock = 0
+        state.retest2_bars_since_lock = 0
         self._save_positions(state, [])
 
     # ------------------------------------------------------------------

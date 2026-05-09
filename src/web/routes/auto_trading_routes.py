@@ -222,8 +222,12 @@ _EMA_FIELDS = [
 
     # ===== Spec-strict guards =====
     ('require_retest_from_upside', 'bool', True, 'spec_guards',
-     'Lock retest candle only on a true transition from above (BUY) / below '
-     '(SELL) the EMA. Eliminates phantom alerts.'),
+     'Lock retest candle only on a true transition. v1.4: prev candle HIGH '
+     '> EMA (BUY) / LOW < EMA (SELL). Eliminates phantom alerts.'),
+    ('sideways_check_bars', 'int', 4, 'spec_guards',
+     'v1.4 sideways check window. If price breaks retest.low (BUY) before '
+     'retest.high within N candles after lock, skip ENTRY1 → advance stage. '
+     '0 disables.'),
     ('sanity_flip_trend', 'bool', True, 'spec_guards',
      'Force end-cycle when EMA200/EMA400 ordering disagrees with state.trend '
      '(catches missed crossovers on gaps / slow drift).'),
