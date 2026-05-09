@@ -782,6 +782,10 @@ def main() -> int:
                         help="Pending-cross sustain wait in minutes. On 1H bars "
                              "values <60 fire on next 1H close, 60-119 fire after "
                              "1 bar, 120+ fire after 2 bars. Default 15.")
+    parser.add_argument("--sustain-wick-tolerance-pct", type=float, default=0.005,
+                        help="Wick tolerance during sustain wait. BUY cancels if "
+                             "bar.low < level × (1-tol). 0=strict (any wick cancels), "
+                             "0.005=0.5%% (default).")
     parser.add_argument("--sell-sustain-minutes", type=int, default=None,
                         help="Override sustain wait for SELL side only. Default "
                              "(None) = same as --sustain-minutes. Backtest evidence "
@@ -875,6 +879,7 @@ def main() -> int:
         buy_slope_min_pct=args.buy_slope_min_pct,
         sustain_minutes=args.sustain_minutes,
         sell_sustain_minutes=args.sell_sustain_minutes,
+        sustain_wick_tolerance_pct=args.sustain_wick_tolerance_pct,
     )
     print(f"Config: target_pct={config.target_pct} "
           f"partial1={config.partial_pct_entry1} "

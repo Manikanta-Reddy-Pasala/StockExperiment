@@ -141,6 +141,13 @@ class StrategyConfig:
     # ewm(adjust=False) drifts vs Fyers chart for hundreds of bars.
     sma_seed_ema: bool = True
 
+    # ---- Sustain check ----
+    # During the sustain wait after a retest break, price must hold near the
+    # break level — no wick below (BUY) or above (SELL). Tolerance allows
+    # small intra-bar noise. 0 = strict (any wick beyond level cancels).
+    # 0.005 = 0.5% (default). E.g. BUY break level=100 -> low must stay > 99.5.
+    sustain_wick_tolerance_pct: float = 0.005
+
     # ---- Quality filters ----
     # Minimum EMA200/EMA400 separation at crossover as fraction of price.
     # Touching EMAs (gap below threshold) whipsaw; filter them.
@@ -457,11 +464,14 @@ class EMACrossoverStrategy:
         cap = attempts < self.config.re_entry_cap
 
         elapsed_min = (int(row["timestamp"]) - int(pending_ts)) / 60.0
-        if row["close"] <= level:
+        wick_floor = level * (1.0 - self.config.sustain_wick_tolerance_pct)
+        if row["close"] <= level or float(row["low"]) <= wick_floor:
             setattr(state, pending_attr, None)
+            reason = ("close back below level" if row["close"] <= level
+                      else f"wick below {wick_floor:.2f} (level={level:.2f}, tol={self.config.sustain_wick_tolerance_pct*100:.2f}%)")
             signals.append(self._make_signal(
                 row, "PENDING_CANCEL", "BUY",
-                note=f"{entry_signal} sustain failed after {elapsed_min:.0f}m (15m)"
+                note=f"{entry_signal} sustain failed after {elapsed_min:.0f}m (15m): {reason}"
             ))
             return signals
         if elapsed_min < self._sustain_minutes_for("BUY"):
@@ -520,11 +530,14 @@ class EMACrossoverStrategy:
         cap = attempts < self.config.re_entry_cap
 
         elapsed_min = (int(row["timestamp"]) - int(pending_ts)) / 60.0
-        if row["close"] >= level:
+        wick_ceiling = level * (1.0 + self.config.sustain_wick_tolerance_pct)
+        if row["close"] >= level or float(row["high"]) >= wick_ceiling:
             setattr(state, pending_attr, None)
+            reason = ("close back above level" if row["close"] >= level
+                      else f"wick above {wick_ceiling:.2f} (level={level:.2f}, tol={self.config.sustain_wick_tolerance_pct*100:.2f}%)")
             signals.append(self._make_signal(
                 row, "PENDING_CANCEL", "SELL",
-                note=f"{entry_signal} sustain failed after {elapsed_min:.0f}m (15m)"
+                note=f"{entry_signal} sustain failed after {elapsed_min:.0f}m (15m): {reason}"
             ))
             return signals
         if elapsed_min < self._sustain_minutes_for("SELL"):
@@ -952,12 +965,15 @@ class EMACrossoverStrategy:
         # 1) Resolve any existing pending first
         if pending_ts is not None:
             elapsed_min = (int(row["timestamp"]) - int(pending_ts)) / 60.0
-            if row["close"] <= level:
+            wick_floor = level * (1.0 - self.config.sustain_wick_tolerance_pct)
+            if row["close"] <= level or float(row["low"]) <= wick_floor:
                 # Failed sustain — cancel pending. Allow re-arm via next edge.
                 setattr(state, pending_attr, None)
+                reason = ("close back below level" if row["close"] <= level
+                          else f"wick below {wick_floor:.2f}")
                 signals.append(self._make_signal(
                     row, "PENDING_CANCEL", "BUY",
-                    note=f"{entry_signal} sustain failed after {elapsed_min:.0f}m"
+                    note=f"{entry_signal} sustain failed after {elapsed_min:.0f}m: {reason}"
                 ))
             elif elapsed_min >= self._sustain_minutes_for("BUY"):
                 # Sustained — fire ENTRY (after volume gate)
@@ -1025,11 +1041,14 @@ class EMACrossoverStrategy:
 
         if pending_ts is not None:
             elapsed_min = (int(row["timestamp"]) - int(pending_ts)) / 60.0
-            if row["close"] >= level:
+            wick_ceiling = level * (1.0 + self.config.sustain_wick_tolerance_pct)
+            if row["close"] >= level or float(row["high"]) >= wick_ceiling:
                 setattr(state, pending_attr, None)
+                reason = ("close back above level" if row["close"] >= level
+                          else f"wick above {wick_ceiling:.2f}")
                 signals.append(self._make_signal(
                     row, "PENDING_CANCEL", "SELL",
-                    note=f"{entry_signal} sustain failed after {elapsed_min:.0f}m"
+                    note=f"{entry_signal} sustain failed after {elapsed_min:.0f}m: {reason}"
                 ))
             elif elapsed_min >= self._sustain_minutes_for("SELL"):
                 if cap and not self._volume_ok(row):

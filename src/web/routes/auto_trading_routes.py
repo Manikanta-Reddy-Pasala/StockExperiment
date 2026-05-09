@@ -207,6 +207,10 @@ _EMA_FIELDS = [
      '1 initial + 3 re-entries at each of 2nd / 3rd alert.'),
     ('sustain_minutes', 'int', 15, 'profit',
      'Sustain wait after a retest break before firing ENTRY.'),
+    ('sustain_wick_tolerance_pct', 'float', 0.005, 'profit',
+     'Wick tolerance during sustain wait. BUY: cancel if bar.low < level × (1-tol). '
+     'SELL: cancel if bar.high > level × (1+tol). 0=any wick cancels, '
+     '0.005=0.5% (default), 0.01=1%.'),
     # group: target_mode
     # group: spec_guards
     ('require_retest_from_upside', 'bool', True, 'spec_guards',
