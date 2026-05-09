@@ -2,7 +2,7 @@
 
 ## Backtest Summary
 
-- **Window:** 2025-05-09 09:15:00 → 2026-05-08 15:15:00 (1731 bars)
+- **Window:** 2024-04-04 09:15:00 → 2026-05-08 15:15:00 (3612 bars)
 - **Last close:** 1760.00
 - **Strategy:** EMA 200/400 1H crossover (Strategy-1 spec)
 - **Target:** entry × (1 ± 10%)
@@ -14,11 +14,11 @@
 
 | Signal | Count |
 |--------|-------|
-| CROSSOVER | 0 |
-| ALERT1 | 0 |
-| ALERT2 | 0 |
-| ALERT2_SKIP | 0 |
-| ALERT3 | 0 |
+| CROSSOVER | 1 |
+| ALERT1 | 1 |
+| ALERT2 | 1 |
+| ALERT2_SKIP | 1 |
+| ALERT3 | 1 |
 | PENDING | 0 |
 | PENDING_CANCEL | 0 |
 | ENTRY1 | 0 |
@@ -56,4 +56,16 @@ Each cycle begins at a CROSSOVER (trend flip) and walks through the
 configured stages: Trend ID → First Alert → Second Alert (Retest 1)
 → First Entry → Third Alert (Retest 2) → Second Entry → Exit.
 
-_No CROSSOVER signals fired in window._
+### Cycle 1 — BUY (started 2026-02-09 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2026-02-09 10:15:00 | 1562.90 | 1456.70 | 1456.22 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2026-02-09 11:15:00 | 1568.50 | 1457.81 | 1456.78 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2026-03-02 09:15:00 | 1481.00 | 1510.47 | 1490.33 | EMA200 retest candle locked (from upside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2026-03-02 09:15:00 | 1481.00 | 1510.47 | 1490.33 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-03-02 09:15:00 | 1481.00 | 1510.47 | 1490.33 | EMA400 retest candle locked (from upside) |
+| CROSSOVER_SKIP | 2026-03-13 11:15:00 | 1362.40 | 1476.01 | 1476.20 | min_gap filter: gap=0.014% < 0.030% |
+| TREND_RESET | 2026-03-13 11:15:00 | 1362.40 | 1476.01 | 1476.20 | EMA inversion without crossover edge (EMA200=1476.01 EMA400=1476.20) — end cycle |
+| CROSSOVER_SKIP | 2026-04-20 15:15:00 | 1572.10 | 1449.50 | 1449.16 | min_gap filter: gap=0.022% < 0.030% |
+

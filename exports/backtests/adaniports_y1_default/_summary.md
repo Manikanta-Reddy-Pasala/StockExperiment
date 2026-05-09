@@ -1,6 +1,6 @@
 # EMA 200/400 1H Crossover — Backtest Summary
 
-_Generated: 2026-05-09T03:22:49_
+_Generated: 2026-05-09T11:42:59_
 
 ## Headline (combined BUY+SELL)
 
@@ -29,4 +29,4 @@ _Generated: 2026-05-09T03:22:49_
 
 | Symbol | Bars | Sig | Legs | BUY legs | BUY avg% | BUY sum% | SELL legs | SELL avg% | SELL sum% | Tot avg% | Tot sum% |
 |--------|------|-----|------|---------|---------|---------|-----------|----------|----------|---------|---------|
-| NSE:ADANIPORTS-EQ | 1731 | 6 | 0 | 0 | 0.00% | 0.0% | 0 | 0.00% | 0.0% | 0.00% | 0.0% |
+| NSE:ADANIPORTS-EQ | 3612 | 11 | 0 | 0 | 0.00% | 0.0% | 0 | 0.00% | 0.0% | 0.00% | 0.0% |

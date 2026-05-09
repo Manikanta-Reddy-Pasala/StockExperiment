@@ -2,7 +2,7 @@
 
 ## Backtest Summary
 
-- **Window:** 2025-05-09 09:15:00 → 2026-05-08 15:15:00 (1731 bars)
+- **Window:** 2024-04-04 09:15:00 → 2026-05-08 15:15:00 (3612 bars)
 - **Last close:** 313.90
 - **Strategy:** EMA 200/400 1H crossover (Strategy-1 spec)
 - **Target:** entry × (1 ± 10%)
@@ -60,7 +60,7 @@ configured stages: Trend ID → First Alert → Second Alert (Retest 1)
 
 | Stage | Time | Price | EMA200 | EMA400 | Note |
 |-------|------|-------|--------|--------|------|
-| Trend Identification (BUY) | 2026-02-10 11:15:00 | 292.80 | 269.48 | 269.36 | EMA200 above EMA400 |
+| Trend Identification (BUY) | 2026-02-10 11:15:00 | 292.80 | 269.48 | 269.37 | EMA200 above EMA400 |
 | First Alert — break + close above crossover candle high | 2026-02-10 13:15:00 | 293.80 | 269.95 | 269.60 | Break + close above crossover candle high |
 | Second Alert (Retest 1) — EMA200 retest from above | 2026-03-09 09:15:00 | 289.75 | 290.18 | 282.80 | EMA200 retest candle locked (from upside) |
 | Cross detected — sustain check pending | 2026-03-09 11:15:00 | 293.25 | 290.22 | 282.89 | ENTRY1 cross detected — sustain check pending (15m) |

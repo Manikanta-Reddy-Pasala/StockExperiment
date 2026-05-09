@@ -2,7 +2,7 @@
 
 ## Backtest Summary
 
-- **Window:** 2025-05-09 09:15:00 → 2026-05-08 15:15:00 (1731 bars)
+- **Window:** 2024-04-04 09:15:00 → 2026-05-08 15:15:00 (3612 bars)
 - **Last close:** 313.90
 - **Strategy:** EMA 200/400 1H crossover (Strategy-1 spec)
 - **Target:** entry × (1 ± 10%)
@@ -14,41 +14,41 @@
 
 | Signal | Count |
 |--------|-------|
-| CROSSOVER | 4 |
-| ALERT1 | 3 |
-| ALERT2 | 3 |
-| ALERT2_SKIP | 0 |
-| ALERT3 | 3 |
-| PENDING | 18 |
-| PENDING_CANCEL | 5 |
-| ENTRY1 | 6 |
-| ENTRY2 | 6 |
+| CROSSOVER | 6 |
+| ALERT1 | 5 |
+| ALERT2 | 5 |
+| ALERT2_SKIP | 2 |
+| ALERT3 | 6 |
+| PENDING | 25 |
+| PENDING_CANCEL | 6 |
+| ENTRY1 | 7 |
+| ENTRY2 | 11 |
 | PARTIAL | 4 |
 | TARGET_HIT | 2 |
-| STOP_HIT | 10 |
+| STOP_HIT | 16 |
 | EXIT | 0 |
 
 ## P&L (combined)
 
-- **Closed legs:** 16 (incl. partial bookings)
+- **Closed legs:** 22 (incl. partial bookings)
 - **Trades open at end:** 0
-- **Winners / losers:** 10 / 6
-- **Target hits / Stop hits / Partials:** 2 / 10 / 4
-- **Avg / median % per leg:** 2.03% / 2.06%
-- **Sum % (uncompounded):** 32.41%
+- **Winners / losers:** 10 / 12
+- **Target hits / Stop hits / Partials:** 2 / 16 / 4
+- **Avg / median % per leg:** 0.82% / -1.40%
+- **Sum % (uncompounded):** 18.03%
 
 ## Direction × Alert breakdown
 
 | Bucket | Legs | Win | Win% | Tgt | SL | Prt | Avg % | Sum % |
 |--------|------|-----|------|-----|----|-----|-------|-------|
-| BUY (all) | 5 | 2 | 40.0% | 2 | 3 | 0 | 2.04% | 10.2% |
-| BUY @ 2nd Alert (retest1) | 3 | 0 | 0.0% | 0 | 3 | 0 | -3.26% | -9.8% |
-| BUY @ 3rd Alert (retest2) | 2 | 2 | 100.0% | 2 | 0 | 0 | 10.00% | 20.0% |
+| BUY (all) | 11 | 2 | 18.2% | 2 | 9 | 0 | -0.38% | -4.2% |
+| BUY @ 2nd Alert (retest1) | 4 | 0 | 0.0% | 0 | 4 | 0 | -3.51% | -14.0% |
+| BUY @ 3rd Alert (retest2) | 7 | 2 | 28.6% | 2 | 5 | 0 | 1.41% | 9.9% |
 | SELL (all) | 11 | 8 | 72.7% | 0 | 7 | 4 | 2.02% | 22.2% |
 | SELL @ 2nd Alert (retest1) | 6 | 6 | 100.0% | 0 | 3 | 3 | 3.22% | 19.3% |
 | SELL @ 3rd Alert (retest2) | 5 | 2 | 40.0% | 0 | 4 | 1 | 0.58% | 2.9% |
-| retest1 (combined) | 9 | 6 | 66.7% | 0 | 6 | 3 | 1.06% | 9.5% |
-| retest2 (combined) | 7 | 4 | 57.1% | 2 | 4 | 1 | 3.27% | 22.9% |
+| retest1 (combined) | 10 | 6 | 60.0% | 0 | 7 | 3 | 0.53% | 5.3% |
+| retest2 (combined) | 12 | 4 | 33.3% | 2 | 9 | 1 | 1.06% | 12.8% |
 
 ## Strategy Cycles
 
@@ -56,68 +56,94 @@ Each cycle begins at a CROSSOVER (trend flip) and walks through the
 configured stages: Trend ID → First Alert → Second Alert (Retest 1)
 → First Entry → Third Alert (Retest 2) → Second Entry → Exit.
 
-### Cycle 1 — SELL (started 2025-08-04 14:15:00)
+### Cycle 1 — SELL (started 2025-06-17 12:15:00)
 
 | Stage | Time | Price | EMA200 | EMA400 | Note |
 |-------|------|-------|--------|--------|------|
-| Trend Identification (SELL) | 2025-08-04 14:15:00 | 288.00 | 294.62 | 294.65 | EMA200 below EMA400 |
-| First Alert — break + close below crossover candle low | 2025-08-05 09:15:00 | 286.50 | 294.47 | 294.57 | Break + close below crossover candle low |
-| Second Alert (Retest 1) — EMA200 retest from below | 2025-08-18 13:15:00 | 291.15 | 291.01 | 292.52 | EMA200 retest candle locked (from downside) |
-| Cross detected — sustain check pending | 2025-08-18 14:15:00 | 290.30 | 291.00 | 292.51 | ENTRY1 cross detected — sustain check pending (15m) |
-| Sustain check cancelled (price retraced) | 2025-08-18 15:15:00 | 290.70 | 291.00 | 292.50 | ENTRY1 sustain failed after 60m |
-| Cross detected — sustain check pending | 2025-08-19 09:15:00 | 289.50 | 290.98 | 292.49 | ENTRY1 cross detected — sustain check pending (15m) |
-| First Entry (SELL) — retest1 break (cap 3 attempts) | 2025-08-19 10:15:00 | 289.15 | 290.96 | 292.47 | SELL ENTRY1 attempt 1/4 (retest1 break sustained 60m) |
-| Partial book — 50% qty, trail SL → EMA200 | 2025-08-28 14:15:00 | 274.69 | 288.06 | 290.59 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest1 |
-| Stop hit — per-position SL triggered | 2025-09-02 10:15:00 | 287.15 | 286.56 | 289.59 | SL hit (close>ema200) qty=0.50 sl=286.56 alert=retest1 |
-| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-09-11 12:15:00 | 288.30 | 285.77 | 288.47 | EMA400 retest candle locked (from downside) |
-| Cross detected — sustain check pending | 2025-09-25 14:15:00 | 284.00 | 286.95 | 288.32 | ENTRY2 cross detected — sustain check pending (15m) |
-| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-09-25 15:15:00 | 284.20 | 286.92 | 288.30 | SELL ENTRY2 attempt 1/4 (retest2 break sustained 60m) |
-| Stop hit — per-position SL triggered | 2025-10-03 14:15:00 | 289.45 | 285.66 | 287.39 | SL hit (close>static) qty=1.00 sl=288.70 alert=retest2 |
-| Cross detected — sustain check pending | 2025-10-06 09:15:00 | 285.15 | 285.68 | 287.39 | ENTRY2 cross detected — sustain check pending (15m) |
-| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-10-06 10:15:00 | 285.55 | 285.68 | 287.38 | SELL ENTRY2 attempt 2/4 (retest2 break sustained 60m) |
-| Stop hit — per-position SL triggered | 2025-10-07 09:15:00 | 289.55 | 285.75 | 287.36 | SL hit (close>static) qty=1.00 sl=288.70 alert=retest2 |
-| Cross detected — sustain check pending | 2025-10-08 10:15:00 | 285.55 | 285.98 | 287.42 | ENTRY2 cross detected — sustain check pending (15m) |
-| Sustain check cancelled (price retraced) | 2025-10-08 11:15:00 | 285.80 | 285.98 | 287.41 | ENTRY2 sustain failed after 60m |
-| Cross detected — sustain check pending | 2025-10-08 13:15:00 | 284.70 | 285.96 | 287.39 | ENTRY2 cross detected — sustain check pending (15m) |
-| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-10-08 14:15:00 | 285.25 | 285.96 | 287.38 | SELL ENTRY2 attempt 3/4 (retest2 break sustained 60m) |
-| Cross detected — sustain check pending | 2025-10-09 13:15:00 | 285.40 | 285.91 | 287.31 | ENTRY2 cross detected — sustain check pending (15m) |
-| Sustain check cancelled (price retraced) | 2025-10-09 14:15:00 | 286.05 | 285.92 | 287.31 | ENTRY2 sustain failed after 60m |
-| Stop hit — per-position SL triggered | 2025-10-10 09:15:00 | 290.20 | 285.96 | 287.32 | SL hit (close>static) qty=1.00 sl=288.70 alert=retest2 |
-| Cross detected — sustain check pending | 2025-10-13 13:15:00 | 285.60 | 286.16 | 287.35 | ENTRY2 cross detected — sustain check pending (15m) |
-| Sustain check cancelled (price retraced) | 2025-10-13 14:15:00 | 285.75 | 286.15 | 287.34 | ENTRY2 sustain failed after 60m |
+| Trend Identification (SELL) | 2025-06-17 12:15:00 | 288.10 | 294.84 | 294.85 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-06-18 10:15:00 | 287.05 | 294.51 | 294.68 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-06-26 14:15:00 | 293.95 | 292.68 | 293.62 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-06-26 14:15:00 | 293.95 | 292.68 | 293.62 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-06-26 14:15:00 | 293.95 | 292.68 | 293.62 | EMA400 retest candle locked (from downside) |
 
-### Cycle 2 — BUY (started 2025-10-29 13:15:00)
+### Cycle 2 — BUY (started 2025-07-09 10:15:00)
 
 | Stage | Time | Price | EMA200 | EMA400 | Note |
 |-------|------|-------|--------|--------|------|
-| Trend Identification (BUY) | 2025-10-29 13:15:00 | 294.40 | 288.17 | 288.15 | EMA200 above EMA400 |
+| Trend Identification (BUY) | 2025-07-09 10:15:00 | 299.15 | 294.37 | 294.36 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-07-09 12:15:00 | 299.50 | 294.46 | 294.41 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-07-18 13:15:00 | 294.15 | 295.80 | 295.19 | EMA200 retest candle locked (from upside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-07-18 13:15:00 | 294.15 | 295.80 | 295.19 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-18 13:15:00 | 294.15 | 295.80 | 295.19 | EMA400 retest candle locked (from upside) |
+| Cross detected — sustain check pending | 2025-07-21 11:15:00 | 296.30 | 295.76 | 295.18 | ENTRY2 cross detected — sustain check pending (15m) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-07-21 12:15:00 | 297.00 | 295.77 | 295.19 | BUY ENTRY2 attempt 1/4 (retest2 break sustained 60m) |
+| Cross detected — sustain check pending | 2025-07-22 11:15:00 | 297.15 | 295.82 | 295.23 | ENTRY2 cross detected — sustain check pending (15m) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-07-22 12:15:00 | 297.75 | 295.84 | 295.24 | BUY ENTRY2 attempt 2/4 (retest2 break sustained 60m) |
+| Stop hit — per-position SL triggered | 2025-07-25 13:15:00 | 292.20 | 296.15 | 295.48 | SL hit (close<static) qty=1.00 sl=293.95 alert=retest2 |
+| Stop hit — per-position SL triggered | 2025-07-25 13:15:00 | 292.20 | 296.15 | 295.48 | SL hit (close<static) qty=1.00 sl=293.95 alert=retest2 |
 
-### Cycle 3 — SELL (started 2025-11-04 13:15:00)
+### Cycle 3 — SELL (started 2025-08-01 15:15:00)
 
 | Stage | Time | Price | EMA200 | EMA400 | Note |
 |-------|------|-------|--------|--------|------|
-| Trend Identification (SELL) | 2025-11-04 13:15:00 | 278.50 | 288.17 | 288.17 | EMA200 below EMA400 |
-| First Alert — break + close below crossover candle low | 2025-11-06 09:15:00 | 271.35 | 287.82 | 288.00 | Break + close below crossover candle low |
+| Trend Identification (SELL) | 2025-08-01 15:15:00 | 290.40 | 294.92 | 294.92 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-08-04 09:15:00 | 287.15 | 294.84 | 294.89 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-08-18 13:15:00 | 291.15 | 290.96 | 292.59 | EMA200 retest candle locked (from downside) |
+| Cross detected — sustain check pending | 2025-08-18 14:15:00 | 290.30 | 290.96 | 292.57 | ENTRY1 cross detected — sustain check pending (15m) |
+| Sustain check cancelled (price retraced) | 2025-08-18 15:15:00 | 290.70 | 290.95 | 292.56 | ENTRY1 sustain failed after 60m |
+| Cross detected — sustain check pending | 2025-08-19 09:15:00 | 289.50 | 290.94 | 292.55 | ENTRY1 cross detected — sustain check pending (15m) |
+| First Entry (SELL) — retest1 break (cap 3 attempts) | 2025-08-19 10:15:00 | 289.15 | 290.92 | 292.53 | SELL ENTRY1 attempt 1/4 (retest1 break sustained 60m) |
+| Partial book — 50% qty, trail SL → EMA200 | 2025-08-28 14:15:00 | 274.69 | 288.03 | 290.64 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest1 |
+| Stop hit — per-position SL triggered | 2025-09-02 10:15:00 | 287.15 | 286.53 | 289.64 | SL hit (close>ema200) qty=0.50 sl=286.53 alert=retest1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-09-11 12:15:00 | 288.30 | 285.75 | 288.51 | EMA400 retest candle locked (from downside) |
+| Cross detected — sustain check pending | 2025-09-25 14:15:00 | 284.00 | 286.95 | 288.35 | ENTRY2 cross detected — sustain check pending (15m) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-09-25 15:15:00 | 284.20 | 286.92 | 288.32 | SELL ENTRY2 attempt 1/4 (retest2 break sustained 60m) |
+| Stop hit — per-position SL triggered | 2025-10-03 14:15:00 | 289.45 | 285.66 | 287.41 | SL hit (close>static) qty=1.00 sl=288.70 alert=retest2 |
+| Cross detected — sustain check pending | 2025-10-06 09:15:00 | 285.15 | 285.68 | 287.41 | ENTRY2 cross detected — sustain check pending (15m) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-10-06 10:15:00 | 285.55 | 285.67 | 287.40 | SELL ENTRY2 attempt 2/4 (retest2 break sustained 60m) |
+| Stop hit — per-position SL triggered | 2025-10-07 09:15:00 | 289.55 | 285.75 | 287.38 | SL hit (close>static) qty=1.00 sl=288.70 alert=retest2 |
+| Cross detected — sustain check pending | 2025-10-08 10:15:00 | 285.55 | 285.97 | 287.44 | ENTRY2 cross detected — sustain check pending (15m) |
+| Sustain check cancelled (price retraced) | 2025-10-08 11:15:00 | 285.80 | 285.97 | 287.43 | ENTRY2 sustain failed after 60m |
+| Cross detected — sustain check pending | 2025-10-08 13:15:00 | 284.70 | 285.96 | 287.41 | ENTRY2 cross detected — sustain check pending (15m) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-10-08 14:15:00 | 285.25 | 285.95 | 287.40 | SELL ENTRY2 attempt 3/4 (retest2 break sustained 60m) |
+| Cross detected — sustain check pending | 2025-10-09 13:15:00 | 285.40 | 285.91 | 287.33 | ENTRY2 cross detected — sustain check pending (15m) |
+| Sustain check cancelled (price retraced) | 2025-10-09 14:15:00 | 286.05 | 285.91 | 287.33 | ENTRY2 sustain failed after 60m |
+| Stop hit — per-position SL triggered | 2025-10-10 09:15:00 | 290.20 | 285.96 | 287.33 | SL hit (close>static) qty=1.00 sl=288.70 alert=retest2 |
+| Cross detected — sustain check pending | 2025-10-13 13:15:00 | 285.60 | 286.15 | 287.36 | ENTRY2 cross detected — sustain check pending (15m) |
+| Sustain check cancelled (price retraced) | 2025-10-13 14:15:00 | 285.75 | 286.15 | 287.35 | ENTRY2 sustain failed after 60m |
+
+### Cycle 4 — BUY (started 2025-10-29 13:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-10-29 13:15:00 | 294.40 | 288.17 | 288.16 | EMA200 above EMA400 |
+
+### Cycle 5 — SELL (started 2025-11-04 13:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-11-04 13:15:00 | 278.50 | 288.17 | 288.18 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-11-06 09:15:00 | 271.35 | 287.82 | 288.01 | Break + close below crossover candle low |
 | Second Alert (Retest 1) — EMA200 retest from below | 2025-12-23 11:15:00 | 268.65 | 268.51 | 274.00 | EMA200 retest candle locked (from downside) |
 | Cross detected — sustain check pending | 2025-12-23 14:15:00 | 267.10 | 268.49 | 273.91 | ENTRY1 cross detected — sustain check pending (15m) |
 | First Entry (SELL) — retest1 break (cap 3 attempts) | 2025-12-23 15:15:00 | 267.00 | 268.48 | 273.87 | SELL ENTRY1 attempt 1/4 (retest1 break sustained 60m) |
 | Cross detected — sustain check pending | 2025-12-26 12:15:00 | 267.50 | 268.45 | 273.57 | ENTRY1 cross detected — sustain check pending (15m) |
 | First Entry (SELL) — retest1 break (cap 3 attempts) | 2025-12-26 13:15:00 | 266.80 | 268.44 | 273.54 | SELL ENTRY1 attempt 2/4 (retest1 break sustained 60m) |
-| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-01-02 11:15:00 | 269.10 | 267.18 | 272.06 | EMA400 retest candle locked (from downside) |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-01-02 11:15:00 | 269.10 | 267.18 | 272.07 | EMA400 retest candle locked (from downside) |
 | Cross detected — sustain check pending | 2026-01-06 11:15:00 | 267.40 | 267.61 | 271.96 | ENTRY2 cross detected — sustain check pending (15m) |
 | Second Entry (SELL) — retest2 break (cap 3 attempts) | 2026-01-06 12:15:00 | 268.05 | 267.62 | 271.94 | SELL ENTRY2 attempt 1/4 (retest2 break sustained 60m) |
 | Partial book — 50% qty, trail SL → EMA200 | 2026-01-12 09:15:00 | 254.65 | 266.35 | 270.77 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest2 |
-| Partial book — 50% qty, trail SL → EMA200 | 2026-01-20 14:15:00 | 253.65 | 263.47 | 268.39 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest1 |
-| Partial book — 50% qty, trail SL → EMA200 | 2026-01-20 14:15:00 | 253.46 | 263.47 | 268.39 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest1 |
+| Partial book — 50% qty, trail SL → EMA200 | 2026-01-20 14:15:00 | 253.65 | 263.47 | 268.40 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest1 |
+| Partial book — 50% qty, trail SL → EMA200 | 2026-01-20 14:15:00 | 253.46 | 263.47 | 268.40 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest1 |
 | Stop hit — per-position SL triggered | 2026-01-29 15:15:00 | 261.50 | 261.21 | 266.18 | SL hit (close>ema200) qty=0.50 sl=261.21 alert=retest1 |
 | Stop hit — per-position SL triggered | 2026-01-29 15:15:00 | 261.50 | 261.21 | 266.18 | SL hit (close>ema200) qty=0.50 sl=261.21 alert=retest1 |
 | Stop hit — per-position SL triggered | 2026-01-29 15:15:00 | 261.50 | 261.21 | 266.18 | SL hit (close>ema200) qty=0.50 sl=261.21 alert=retest2 |
 
-### Cycle 4 — BUY (started 2026-02-10 11:15:00)
+### Cycle 6 — BUY (started 2026-02-10 11:15:00)
 
 | Stage | Time | Price | EMA200 | EMA400 | Note |
 |-------|------|-------|--------|--------|------|
-| Trend Identification (BUY) | 2026-02-10 11:15:00 | 292.80 | 269.48 | 269.36 | EMA200 above EMA400 |
+| Trend Identification (BUY) | 2026-02-10 11:15:00 | 292.80 | 269.48 | 269.37 | EMA200 above EMA400 |
 | First Alert — break + close above crossover candle high | 2026-02-10 13:15:00 | 293.80 | 269.95 | 269.60 | Break + close above crossover candle high |
 | Second Alert (Retest 1) — EMA200 retest from above | 2026-03-09 09:15:00 | 289.75 | 290.18 | 282.80 | EMA200 retest candle locked (from upside) |
 | Cross detected — sustain check pending | 2026-03-09 11:15:00 | 293.25 | 290.22 | 282.89 | ENTRY1 cross detected — sustain check pending (15m) |
@@ -145,6 +171,12 @@ configured stages: Trend ID → First Alert → Second Alert (Retest 1)
 
 | Trend | Alert | Entry Time | Entry | Exit Time | Exit | Reason | Qty | % |
 |-------|-------|-----------|-------|-----------|------|--------|-----|---|
+| BUY | retest1 | 2025-05-12 10:15:00 | 308.00 | 2025-05-14 12:15:00 | 294.95 | STOP_HIT | 1.00 | -4.24% |
+| BUY | retest2 | 2025-05-15 14:15:00 | 299.45 | 2025-05-22 09:15:00 | 289.35 | STOP_HIT | 1.00 | -3.37% |
+| BUY | retest2 | 2025-05-23 12:15:00 | 298.05 | 2025-05-27 09:15:00 | 293.25 | STOP_HIT | 1.00 | -1.61% |
+| BUY | retest2 | 2025-06-09 13:15:00 | 300.15 | 2025-06-11 13:15:00 | 295.10 | STOP_HIT | 1.00 | -1.68% |
+| BUY | retest2 | 2025-07-21 12:15:00 | 297.00 | 2025-07-25 13:15:00 | 292.20 | STOP_HIT | 1.00 | -1.62% |
+| BUY | retest2 | 2025-07-22 12:15:00 | 297.75 | 2025-07-25 13:15:00 | 292.20 | STOP_HIT | 1.00 | -1.86% |
 | SELL | retest1 | 2025-08-19 10:15:00 | 289.15 | 2025-08-28 14:15:00 | 274.69 | PARTIAL | 0.50 | 5.00% |
 | SELL | retest1 | 2025-08-19 10:15:00 | 289.15 | 2025-09-02 10:15:00 | 287.15 | STOP_HIT | 0.50 | 0.69% |
 | SELL | retest2 | 2025-09-25 15:15:00 | 284.20 | 2025-10-03 14:15:00 | 289.45 | STOP_HIT | 1.00 | -1.85% |

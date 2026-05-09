@@ -1,6 +1,6 @@
 # EMA 200/400 1H Crossover — Backtest Summary
 
-_Generated: 2026-05-09T03:26:34_
+_Generated: 2026-05-09T11:43:13_
 
 ## Headline (combined BUY+SELL)
 
@@ -29,4 +29,4 @@ _Generated: 2026-05-09T03:26:34_
 
 | Symbol | Bars | Sig | Legs | BUY legs | BUY avg% | BUY sum% | SELL legs | SELL avg% | SELL sum% | Tot avg% | Tot sum% |
 |--------|------|-----|------|---------|---------|---------|-----------|----------|----------|---------|---------|
-| NSE:POWERGRID-EQ | 1731 | 25 | 5 | 5 | 2.04% | 10.2% | 0 | 0.00% | 0.0% | 2.04% | 10.2% |
+| NSE:POWERGRID-EQ | 3612 | 27 | 5 | 5 | 2.04% | 10.2% | 0 | 0.00% | 0.0% | 2.04% | 10.2% |

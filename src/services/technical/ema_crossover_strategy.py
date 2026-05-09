@@ -288,6 +288,7 @@ class EMACrossoverStrategy:
         symbol: str,
         candles: List[HistoricalData1H],
         latest_15m_bar: Optional[HistoricalData15M] = None,
+        eval_from_ts: Optional[int] = None,
     ) -> List[dict]:
         if len(candles) < self.config.ema_slow_period + 5:
             logger.debug(
@@ -324,12 +325,19 @@ class EMACrossoverStrategy:
             else:
                 start_idx = len(df)
 
+        # EMA convergence buffer: pure SMA-seed EMA needs ~5 × span bars after
+        # seed to drop seed-weight below 1%. For EMA400 that's 2000 bars; if
+        # caller hasn't fetched that much history, signals fired during
+        # warmup will drift vs Fyers chart values. eval_from_ts (UNIX seconds)
+        # lets the caller suppress signal emission until EMAs have converged
+        # — strategy still walks every bar to keep state consistent.
         for i in range(max(start_idx, self.config.ema_slow_period), len(df)):
             row = df.iloc[i]
             prev = df.iloc[i - 1]
             new_signals = self._step_machine(state, row, prev, df, i)
-            for sig in new_signals:
-                signals.append(sig)
+            if eval_from_ts is None or int(row["timestamp"]) >= eval_from_ts:
+                for sig in new_signals:
+                    signals.append(sig)
             state.last_evaluated_ts = int(row["timestamp"])
 
         # Intra-bar 15m sustain pass: if a retest break is pending and the

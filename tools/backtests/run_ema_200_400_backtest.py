@@ -722,6 +722,10 @@ def render_md(symbol: str, name: str, df: pd.DataFrame,
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--warmup-days", type=int, default=400,
+                        help="Extra calendar days of history fetched BEFORE the report "
+                             "window so EMA200/400 fully converge. 400d ~ 5×EMA400 span "
+                             "in trading bars. Set 0 to disable (EMAs may drift).")
     parser.add_argument("--days", type=int, default=720,
                         help="History window in calendar days")
     parser.add_argument("--out", type=Path,
@@ -887,11 +891,20 @@ def main() -> int:
           f"skip_retest2={config.skip_retest2}")
     strat = OfflineStrategy(config)
 
+    # EMA convergence requires ~5×span bars of warmup AFTER the SMA seed.
+    # For EMA400 that's 2000 bars beyond the seed (roughly 285 trading days =
+    # 400 calendar days). Fetch the user's report window PLUS this warmup.
+    # Strategy still walks every bar (so state is consistent) but only emits
+    # signals for bars whose timestamp falls inside the report window.
+    warmup_days = max(args.warmup_days, 0)
+    fetch_days = args.days + warmup_days
+    print(f"Window: {args.days}d report + {warmup_days}d EMA warmup = {fetch_days}d fetched")
+
     aggregate = []
     source_counts = {"fyers": 0, "none": 0}
     for symbol, name in symbols_list:
         print(f"--- {symbol} ---", flush=True)
-        df, src = fetch_1h_data(symbol, days=args.days, user_id=args.user_id, source=args.source)
+        df, src = fetch_1h_data(symbol, days=fetch_days, user_id=args.user_id, source=args.source)
         source_counts[src if not df.empty else "none"] = \
             source_counts.get(src if not df.empty else "none", 0) + 1
         print(f"  source={src}, bars={len(df)}", flush=True) if df.empty else None
@@ -909,7 +922,15 @@ def main() -> int:
             print(f"  only {len(candles)} bars, need {config.ema_slow_period + 5}+")
             continue
 
-        signals = strat.evaluate(user_id=1, symbol=symbol, candles=candles)
+        # Suppress signal emission during warmup. eval_from_ts = first
+        # candle that's inside the user's report window.
+        from datetime import timedelta as _td
+        eval_from_ts = None
+        if warmup_days > 0:
+            cutoff_dt = datetime.now() - _td(days=args.days)
+            eval_from_ts = int(cutoff_dt.timestamp())
+        signals = strat.evaluate(user_id=1, symbol=symbol, candles=candles,
+                                  eval_from_ts=eval_from_ts)
         pnl = simulate_pnl(
             signals, df, symbol,
             partial_qty_frac=config.partial_qty_frac,
