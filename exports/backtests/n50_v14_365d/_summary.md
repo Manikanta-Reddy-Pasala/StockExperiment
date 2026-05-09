@@ -1,6 +1,6 @@
 # EMA 200/400 1H Crossover — Backtest Summary
 
-_Generated: 2026-05-10T00:35:24_
+_Generated: 2026-05-10T01:05:49_
 
 ## Headline (combined BUY+SELL)
 

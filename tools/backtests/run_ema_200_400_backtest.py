@@ -342,6 +342,11 @@ class StrategyState:
     retest1_pending_cross_ts: Optional[int] = None
     retest2_pending_cross_ts: Optional[int] = None
     alert3_locks_count: int = 0
+    # v1.4 single-bar sustain + sideways check
+    retest1_last_close: Optional[float] = None
+    retest2_last_close: Optional[float] = None
+    retest1_bars_since_lock: int = 0
+    retest2_bars_since_lock: int = 0
     positions_json: list = None  # mutable; init in __post_init__
 
     def __post_init__(self):
