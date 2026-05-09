@@ -1654,9 +1654,15 @@ class EMACrossoverStrategy:
                     retest1_attempts=0, retest2_attempts=0,
                     retest1_invalidated=False, positions_json=[],
                     alert3_locks_count=0,
+                    retest1_bars_since_lock=0, retest2_bars_since_lock=0,
                 )
                 session.add(state)
                 session.commit()
+            # session.commit() expires loaded attrs (expire_on_commit=True
+            # default). Refresh before expunge so the detached instance
+            # has every attribute eagerly loaded — accessing any attribute
+            # later would otherwise trigger a refresh and fail.
+            session.refresh(state)
             session.expunge(state)
         return state
 
