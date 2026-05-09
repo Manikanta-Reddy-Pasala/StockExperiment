@@ -296,6 +296,7 @@ class EMACrossoverStrategy:
         candles: List[HistoricalData1H],
         latest_15m_bar: Optional[HistoricalData15M] = None,
         eval_from_ts: Optional[int] = None,
+        candles_15m: Optional[List[HistoricalData15M]] = None,
     ) -> List[dict]:
         if len(candles) < self.config.ema_slow_period + 5:
             logger.debug(
@@ -332,25 +333,64 @@ class EMACrossoverStrategy:
             else:
                 start_idx = len(df)
 
+        # Build 15m series if provided. When present, 15m sustain check is
+        # the ONLY entry-firing path; 1H bars only arm PENDING and detect
+        # cancels (no fallback ENTRY at 1H close).
+        df_15m = None
+        if candles_15m is not None and len(candles_15m) > 0:
+            df_15m = pd.DataFrame({
+                "timestamp": [c.timestamp for c in candles_15m],
+                "candle_time": [c.candle_time for c in candles_15m],
+                "open": [c.open for c in candles_15m],
+                "high": [c.high for c in candles_15m],
+                "low": [c.low for c in candles_15m],
+                "close": [c.close for c in candles_15m],
+            }).sort_values("timestamp").reset_index(drop=True)
+        # Strategy needs to know during _handle_retest_break_* whether 15m
+        # bars will resolve sustain. Set a transient instance flag.
+        self._has_15m_data = df_15m is not None
+
         # EMA convergence buffer: pure SMA-seed EMA needs ~5 × span bars after
         # seed to drop seed-weight below 1%. For EMA400 that's 2000 bars; if
         # caller hasn't fetched that much history, signals fired during
         # warmup will drift vs Fyers chart values. eval_from_ts (UNIX seconds)
         # lets the caller suppress signal emission until EMAs have converged
         # — strategy still walks every bar to keep state consistent.
-        for i in range(max(start_idx, self.config.ema_slow_period), len(df)):
+        n = len(df)
+        for i in range(max(start_idx, self.config.ema_slow_period), n):
             row = df.iloc[i]
             prev = df.iloc[i - 1]
             new_signals = self._step_machine(state, row, prev, df, i)
             if eval_from_ts is None or int(row["timestamp"]) >= eval_from_ts:
                 for sig in new_signals:
                     signals.append(sig)
+
+            # Weave 15m bars in (row.ts, next_1h.ts] window so PENDING set on
+            # this 1H bar can fire ENTRY at the next 15m bar (true 15min
+            # sustain). Bars use this 1H bar's EMA values for SL/level context.
+            if df_15m is not None:
+                bar_end = int(df.iloc[i + 1]["timestamp"]) if i + 1 < n else int(row["timestamp"]) + 3600
+                mask15 = (df_15m["timestamp"] > int(row["timestamp"])) & (df_15m["timestamp"] <= bar_end)
+                for _, b15 in df_15m[mask15].iterrows():
+                    synth = pd.Series({
+                        "timestamp": int(b15["timestamp"]),
+                        "candle_time": b15["candle_time"],
+                        "open": float(b15["open"]),
+                        "high": float(b15["high"]),
+                        "low": float(b15["low"]),
+                        "close": float(b15["close"]),
+                        "ema_200": float(row["ema_200"]),
+                        "ema_400": float(row["ema_400"]),
+                    })
+                    res15 = self._intra_bar_sustain_15m_synth(state, synth)
+                    if eval_from_ts is None or int(b15["timestamp"]) >= eval_from_ts:
+                        signals.extend(res15)
+
             state.last_evaluated_ts = int(row["timestamp"])
 
-        # Intra-bar 15m sustain pass: if a retest break is pending and the
-        # latest 15m close still holds beyond the level for >= sustain_minutes,
-        # fire ENTRY now instead of waiting for the next 1H close.
-        if latest_15m_bar is not None and len(df) > 0:
+        # Production single-bar fallback (when caller passed latest_15m_bar
+        # instead of full series) — only used in incremental online mode.
+        if df_15m is None and latest_15m_bar is not None and len(df) > 0:
             last_1h_row = df.iloc[-1]
             signals.extend(self._intra_bar_sustain_15m(state, last_1h_row, latest_15m_bar))
 
@@ -362,6 +402,74 @@ class EMACrossoverStrategy:
     # ------------------------------------------------------------------
     # 15m intra-bar sustain check (entry confirmation only)
     # ------------------------------------------------------------------
+    def _intra_bar_sustain_15m_synth(self, state, synth) -> List[dict]:
+        """Same as _intra_bar_sustain_15m but caller already built the synth
+        row (used by the historical 15m walk in evaluate)."""
+        if state.trend not in ("BUY", "SELL"):
+            return []
+        signals: List[dict] = []
+        if state.trend == "BUY":
+            if state.stage == 3 and state.retest1_pending_cross_ts and state.retest1_high is not None:
+                def _r1_buy_cap():
+                    if self.config.skip_retest2:
+                        self._reset_state(state, "NONE", synth)
+                    else:
+                        state.stage = 4
+                signals.extend(self._resolve_pending_15m_buy(
+                    state, synth,
+                    level=float(state.retest1_high),
+                    pending_attr="retest1_pending_cross_ts",
+                    attempts_attr="retest1_attempts",
+                    entry_signal="ENTRY1",
+                    entry_alert="retest1",
+                    sl=float(synth["ema_400"]),
+                    sl_type="ema400",
+                    on_cap_reached=_r1_buy_cap,
+                ))
+            if state.stage == 5 and state.retest2_pending_cross_ts and state.retest2_high is not None:
+                signals.extend(self._resolve_pending_15m_buy(
+                    state, synth,
+                    level=float(state.retest2_high),
+                    pending_attr="retest2_pending_cross_ts",
+                    attempts_attr="retest2_attempts",
+                    entry_signal="ENTRY2",
+                    entry_alert="retest2",
+                    sl=float(state.retest2_low),
+                    sl_type="static",
+                    on_cap_reached=lambda: setattr(state, "stage", 4),
+                ))
+        else:
+            if state.stage == 3 and state.retest1_pending_cross_ts and state.retest1_low is not None:
+                def _r1_sell_cap():
+                    if self.config.skip_retest2:
+                        self._reset_state(state, "NONE", synth)
+                    else:
+                        state.stage = 4
+                signals.extend(self._resolve_pending_15m_sell(
+                    state, synth,
+                    level=float(state.retest1_low),
+                    pending_attr="retest1_pending_cross_ts",
+                    attempts_attr="retest1_attempts",
+                    entry_signal="ENTRY1",
+                    entry_alert="retest1",
+                    sl=float(synth["ema_400"]),
+                    sl_type="ema400",
+                    on_cap_reached=_r1_sell_cap,
+                ))
+            if state.stage == 5 and state.retest2_pending_cross_ts and state.retest2_low is not None:
+                signals.extend(self._resolve_pending_15m_sell(
+                    state, synth,
+                    level=float(state.retest2_low),
+                    pending_attr="retest2_pending_cross_ts",
+                    attempts_attr="retest2_attempts",
+                    entry_signal="ENTRY2",
+                    entry_alert="retest2",
+                    sl=float(state.retest2_high),
+                    sl_type="static",
+                    on_cap_reached=lambda: setattr(state, "stage", 4),
+                ))
+        return signals
+
     def _intra_bar_sustain_15m(self, state, last_1h_row, bar15m) -> List[dict]:
         """Resolve any pending retest break against the latest 15m bar.
 
@@ -975,6 +1083,9 @@ class EMACrossoverStrategy:
                     row, "PENDING_CANCEL", "BUY",
                     note=f"{entry_signal} sustain failed after {elapsed_min:.0f}m: {reason}"
                 ))
+            elif getattr(self, "_has_15m_data", False):
+                # 15m data resolves sustain — 1H bars don't fire ENTRY.
+                pass
             elif elapsed_min >= self._sustain_minutes_for("BUY"):
                 # Sustained — fire ENTRY (after volume gate)
                 if cap and not self._volume_ok(row):
@@ -1050,6 +1161,9 @@ class EMACrossoverStrategy:
                     row, "PENDING_CANCEL", "SELL",
                     note=f"{entry_signal} sustain failed after {elapsed_min:.0f}m: {reason}"
                 ))
+            elif getattr(self, "_has_15m_data", False):
+                # 15m data resolves sustain — 1H bars don't fire ENTRY.
+                pass
             elif elapsed_min >= self._sustain_minutes_for("SELL"):
                 if cap and not self._volume_ok(row):
                     setattr(state, pending_attr, None)

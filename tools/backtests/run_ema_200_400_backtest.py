@@ -145,9 +145,11 @@ def to_fyers_symbol(sym: str) -> str:
     return f"NSE:{s.replace('.NS', '')}-EQ"
 
 
-def fetch_1h_fyers(symbol: str, days: int = 720,
-                   user_id: int = 1) -> pd.DataFrame:
-    """Pull Fyers 1H candles, chunking 95-day windows to respect API caps."""
+def _fetch_fyers_interval(symbol: str, days: int, user_id: int,
+                          interval: str, chunk_days: int = 95) -> pd.DataFrame:
+    """Generic Fyers history fetcher — chunks the requested window into
+    ``chunk_days`` slices to respect the API cap. ``interval`` follows the
+    Fyers convention (e.g. ``1h``, ``15m``)."""
     svc = _fyers_service()
     if svc is None:
         return pd.DataFrame()
@@ -158,13 +160,13 @@ def fetch_1h_fyers(symbol: str, days: int = 720,
     cursor = start_dt
     all_candles: List[List] = []
     while cursor < end_dt:
-        chunk_end = min(cursor + timedelta(days=95), end_dt)
+        chunk_end = min(cursor + timedelta(days=chunk_days), end_dt)
         try:
             res = svc.history(
                 user_id=user_id,
                 symbol=fyers_sym,
                 exchange="NSE",
-                interval="1h",
+                interval=interval,
                 start_date=cursor.strftime("%Y-%m-%d"),
                 end_date=chunk_end.strftime("%Y-%m-%d"),
             )
@@ -202,6 +204,16 @@ def fetch_1h_fyers(symbol: str, days: int = 720,
     df["timestamp"] = df["timestamp"].astype("int64")
     return df[["timestamp", "candle_time", "open", "high", "low",
                "close", "volume"]]
+
+
+def fetch_1h_fyers(symbol: str, days: int = 720, user_id: int = 1) -> pd.DataFrame:
+    """1H candles."""
+    return _fetch_fyers_interval(symbol, days, user_id, interval="1h", chunk_days=95)
+
+
+def fetch_15m_fyers(symbol: str, days: int = 30, user_id: int = 1) -> pd.DataFrame:
+    """15m candles. Fyers caps intraday at ~30-day chunks for 15m granularity."""
+    return _fetch_fyers_interval(symbol, days, user_id, interval="15m", chunk_days=30)
 
 
 YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
@@ -274,6 +286,12 @@ def fetch_1h_data(symbol: str, days: int = 720, user_id: int = 1,
     if not df.empty:
         return df, "fyers"
     return fetch_1h_yahoo(symbol, days), "yahoo"
+
+
+def fetch_15m_data(symbol: str, days: int, user_id: int = 1) -> pd.DataFrame:
+    """Pull 15m candles from Fyers for the given window. Yahoo doesn't expose
+    reliable historical 15m, so this is Fyers-only."""
+    return fetch_15m_fyers(symbol, days, user_id)
 
 
 def df_to_candles(df: pd.DataFrame) -> List[SimpleNamespace]:
@@ -782,6 +800,11 @@ def main() -> int:
                         help="Pending-cross sustain wait in minutes. On 1H bars "
                              "values <60 fire on next 1H close, 60-119 fire after "
                              "1 bar, 120+ fire after 2 bars. Default 15.")
+    parser.add_argument("--use-15m", action="store_true", default=True,
+                        help="Fetch 15m bars and use them for sustain check (true 15min). "
+                             "Default ON. Disable with --no-use-15m for 1H-only fallback.")
+    parser.add_argument("--no-use-15m", dest="use_15m", action="store_false",
+                        help="Fall back to 1H sustain (60min wait, not strict 15min).")
     parser.add_argument("--sustain-wick-tolerance-pct", type=float, default=0.005,
                         help="Wick tolerance during sustain wait. BUY cancels if "
                              "bar.low < level × (1-tol). 0=strict (any wick cancels), "
@@ -934,7 +957,24 @@ def main() -> int:
         if warmup_days > 0:
             cutoff_dt = datetime.now() - _td(days=args.days)
             eval_from_ts = int(cutoff_dt.timestamp())
+
+        # Fetch 15m bars covering the report window so sustain check fires
+        # in true 15min (not next 1H close). 30 days extra buffer.
+        candles_15m = None
+        if args.use_15m and src == "fyers":
+            df15 = fetch_15m_data(symbol, days=args.days + 30, user_id=args.user_id)
+            if not df15.empty:
+                candles_15m = [
+                    SimpleNamespace(timestamp=int(r.timestamp), candle_time=r.candle_time,
+                                    open=float(r.open), high=float(r.high),
+                                    low=float(r.low), close=float(r.close),
+                                    volume=int(r.volume or 0))
+                    for r in df15.itertuples(index=False)
+                ]
+                print(f"  15m bars: {len(candles_15m)}")
+
         signals = strat.evaluate(user_id=1, symbol=symbol, candles=candles,
+                                  candles_15m=candles_15m,
                                   eval_from_ts=eval_from_ts)
         pnl = simulate_pnl(
             signals, df, symbol,
