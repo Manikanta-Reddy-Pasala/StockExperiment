@@ -192,7 +192,7 @@ def update_settings():
 # Field metadata — name, type, default, group, help text.
 # Used by the GET endpoint (UI rendering) and the PUT validator.
 _EMA_FIELDS = [
-    # group: profit
+    # ===== Profit / Partial =====
     ('target_pct', 'float', 0.10, 'profit',
      'Take-profit as fraction of entry. Spec: 0.10 / 0.15 / 0.20.'),
     ('partial_pct_entry1', 'float', 0.05, 'profit',
@@ -205,32 +205,50 @@ _EMA_FIELDS = [
      'Fraction of qty booked at partial. 0.5 = book 50%.'),
     ('re_entry_cap', 'int', 4, 'profit',
      '1 initial + 3 re-entries at each of 2nd / 3rd alert.'),
-    ('sustain_minutes', 'int', 15, 'profit',
-     'Sustain wait after a retest break before firing ENTRY.'),
-    ('sustain_wick_tolerance_pct', 'float', 0.005, 'profit',
+
+    # ===== Sustain check =====
+    ('use_15m_sustain', 'bool', True, 'sustain',
+     'When ON, ENTRY fires after sustain_minutes measured on 15m bars '
+     '(true 15min spec). When OFF, falls back to next 1H close (60min wait). '
+     'Production runner / backtest harness fetch 15m data accordingly.'),
+    ('sustain_minutes', 'int', 15, 'sustain',
+     'Sustain wait after a retest break before firing ENTRY. Spec = 15.'),
+    ('sell_sustain_minutes', 'int', None, 'sustain',
+     'Override sustain wait for SELL side only. Empty = same as sustain_minutes.'),
+    ('sustain_wick_tolerance_pct', 'float', 0.005, 'sustain',
      'Wick tolerance during sustain wait. BUY: cancel if bar.low < level × (1-tol). '
      'SELL: cancel if bar.high > level × (1+tol). 0=any wick cancels, '
      '0.005=0.5% (default), 0.01=1%.'),
-    # group: target_mode
-    # group: spec_guards
+
+    # ===== Spec-strict guards =====
     ('require_retest_from_upside', 'bool', True, 'spec_guards',
      'Lock retest candle only on a true transition from above (BUY) / below '
      '(SELL) the EMA. Eliminates phantom alerts.'),
     ('sanity_flip_trend', 'bool', True, 'spec_guards',
      'Force end-cycle when EMA200/EMA400 ordering disagrees with state.trend '
      '(catches missed crossovers on gaps / slow drift).'),
+    ('trend_inversion_grace_bars', 'int', 1, 'spec_guards',
+     'Bars to wait before sanity_flip_trend triggers. 1 = immediate.'),
     ('sma_seed_ema', 'bool', True, 'spec_guards',
      'SMA-seeded EMA (Fyers / TradingView Pine convention). Off = raw ewm '
      '(drifts vs Fyers chart at <365d backfill).'),
-    # group: quality
+
+    # ===== EMA periods =====
+    ('ema_fast_period', 'int', 200, 'ema_periods',
+     'Fast EMA span (default 200). Changing this requires longer warmup.'),
+    ('ema_slow_period', 'int', 400, 'ema_periods',
+     'Slow EMA span (default 400). Drives backfill window size.'),
+
+    # ===== Quality filters =====
     ('min_crossover_gap_pct', 'float', 0.0003, 'quality',
      'Minimum EMA200/400 gap at the crossover bar (fraction of price). '
-     '0.0003 = elbow on Nifty50 1y sweep. Set 0 for spec-strict.'),
+     '0.0003 = elbow on Nifty50 1y sweep. Set 0 for spec-strict (no filter).'),
     ('volume_confirm_bars', 'int', 20, 'quality',
      'Window for volume SMA used by entry confirmation.'),
     ('volume_confirm_mult', 'float', 0.0, 'quality',
      'Required break-bar volume as multiple of avg. 0 = disabled.'),
-    # group: htf_filter
+
+    # ===== Higher-timeframe filter =====
     ('htf_filter_enabled', 'bool', True, 'htf_filter',
      'Higher-timeframe trend gate at the crossover bar.'),
     ('htf_buy_period_bars', 'int', 1400, 'htf_filter',
@@ -238,25 +256,31 @@ _EMA_FIELDS = [
     ('htf_sell_period_bars', 'int', 1400, 'htf_filter',
      'SELL HTF SMA period (1H bars).'),
     ('htf_buy_margin_pct', 'float', 0.0, 'htf_filter',
-     'Require close > htf_sma * (1 + margin). 0 = simple comparison.'),
+     'Require close > htf_sma × (1 + margin). 0 = simple comparison.'),
     ('htf_sell_margin_pct', 'float', 0.0, 'htf_filter',
-     'Require close < htf_sma * (1 - margin).'),
-    # group: tuning
-    ('sell_slope_bars', 'int', 350, 'tuning',
+     'Require close < htf_sma × (1 - margin).'),
+
+    # ===== Slope filters =====
+    ('buy_slope_bars', 'int', 0, 'slope',
+     'EMA200 slope window (1H bars) for BUY confirmation. 0 = disabled.'),
+    ('buy_slope_min_pct', 'float', 0.005, 'slope',
+     'Min EMA200 % rise over slope window for BUY.'),
+    ('sell_slope_bars', 'int', 350, 'slope',
      '50d EMA200 slope confirmation window for SELL crossovers (1H bars).'),
-    ('sell_slope_min_pct', 'float', 0.005, 'tuning',
+    ('sell_slope_min_pct', 'float', 0.005, 'slope',
      'Min EMA200 % drop over slope window for SELL. 0.005 = 0.5%.'),
-    ('buy_slope_bars', 'int', 0, 'tuning',
-     'Same for BUY. 0 = disabled.'),
-    ('buy_slope_min_pct', 'float', 0.005, 'tuning', 'Min EMA200 rise.'),
+
+    # ===== Direction toggles =====
+    ('skip_buy', 'bool', False, 'direction', 'Skip BUY trends entirely.'),
+    ('skip_sell', 'bool', False, 'direction', 'Skip SELL trends entirely.'),
+    ('skip_retest2', 'bool', False, 'direction',
+     'Skip ENTRY2 phase entirely (only ENTRY1 fires).'),
+
+    # ===== Advanced tuning =====
     ('max_alert3_locks_per_cycle', 'int', 0, 'tuning',
      'Cap retest2 re-locks per cycle. 0 = unlimited.'),
     ('retest2_sl_cap_pct', 'float', 0.0, 'tuning',
      'Tighten ENTRY2 SL — cap distance from entry. 0 = use spec retest2.low/high.'),
-    ('skip_retest2', 'bool', False, 'tuning',
-     'Skip ENTRY2 phase entirely.'),
-    ('skip_buy', 'bool', False, 'tuning', 'Skip BUY trends.'),
-    ('skip_sell', 'bool', False, 'tuning', 'Skip SELL trends.'),
 ]
 
 

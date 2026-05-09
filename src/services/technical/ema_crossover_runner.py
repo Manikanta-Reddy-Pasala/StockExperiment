@@ -209,11 +209,14 @@ class EMACrossoverRunner:
                 # 1. Refresh data — auto-extends backfill if local history is short
                 self._ensure_data_sufficient(user_id, symbol, effective)
                 self.candles.update_latest(user_id, symbol, lookback_days=backfill_days)
-                # Lightweight 15m refresh — only needed for the sustain check.
-                try:
-                    self.candles_15m.update_latest(user_id, symbol, lookback_days=2)
-                except Exception as e:
-                    logger.warning(f"{symbol}: 15m refresh failed: {e}")
+                # 15m refresh — only fetched when the user enabled 15m sustain.
+                latest_15m = None
+                if effective.use_15m_sustain:
+                    try:
+                        self.candles_15m.update_latest(user_id, symbol, lookback_days=2)
+                        latest_15m = self.candles_15m.latest_candle(symbol)
+                    except Exception as e:
+                        logger.warning(f"{symbol}: 15m refresh failed: {e}")
 
                 # 2. Load candles (window sized to active config requirements)
                 window = self.candles.load_candles(symbol, limit=load_limit)
@@ -221,7 +224,6 @@ class EMACrossoverRunner:
                     logger.debug(f"{symbol}: insufficient 1H data "
                                  f"({len(window)} < {need_bars})")
                     continue
-                latest_15m = self.candles_15m.latest_candle(symbol)
 
                 # 3. Evaluate strategy
                 signals = self.strategy.evaluate(user_id, symbol, window, latest_15m_bar=latest_15m)

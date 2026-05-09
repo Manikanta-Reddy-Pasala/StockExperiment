@@ -960,8 +960,10 @@ def main() -> int:
 
         # Fetch 15m bars covering the report window so sustain check fires
         # in true 15min (not next 1H close). 30 days extra buffer.
+        # CLI --no-use-15m forces off; otherwise honor StrategyConfig flag.
         candles_15m = None
-        if args.use_15m and src == "fyers":
+        use_15m = args.use_15m and getattr(config, "use_15m_sustain", True)
+        if use_15m and src == "fyers":
             df15 = fetch_15m_data(symbol, days=args.days + 30, user_id=args.user_id)
             if not df15.empty:
                 candles_15m = [

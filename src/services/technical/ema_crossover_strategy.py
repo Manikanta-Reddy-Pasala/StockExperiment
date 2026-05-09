@@ -142,6 +142,10 @@ class StrategyConfig:
     sma_seed_ema: bool = True
 
     # ---- Sustain check ----
+    # When True, ENTRY fires after `sustain_minutes` measured on 15m bars
+    # (true 15min spec). When False, falls back to next 1H close (60min wait).
+    # Production runner / backtest harness fetch 15m data accordingly.
+    use_15m_sustain: bool = True
     # During the sustain wait after a retest break, price must hold near the
     # break level — no wick below (BUY) or above (SELL). Tolerance allows
     # small intra-bar noise. 0 = strict (any wick beyond level cancels).

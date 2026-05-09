@@ -381,11 +381,15 @@
 // EMA 200/400 strategy parameters — load + save
 // ----------------------------------------------------------------------
 const EMA_GROUP_LABELS = {
-    profit:      'Profit / Partial / Sustain',
+    profit:      'Profit / Partial Booking',
+    sustain:     'Sustain Check (entry confirmation)',
     spec_guards: 'Spec-strict Guards',
+    ema_periods: 'EMA Periods',
     quality:     'Quality Filters',
     htf_filter:  'Higher-timeframe Filter',
-    tuning:      'Opt-in Tuning Toggles',
+    slope:       'EMA200 Slope Confirmation',
+    direction:   'Direction Toggles',
+    tuning:      'Advanced Tuning',
 };
 
 function emaRenderField(f) {
