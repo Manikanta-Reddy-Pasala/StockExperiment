@@ -847,6 +847,10 @@ def main() -> int:
     parser.add_argument("--volume-confirm-mult", type=float, default=0.0,
                         help="Required break-bar volume as multiple of avg. "
                              "0=disabled (default). Recommended 0.8.")
+    parser.add_argument("--ema-fast", type=int, default=200,
+                        help="Fast EMA period in bars. Default 200.")
+    parser.add_argument("--ema-slow", type=int, default=400,
+                        help="Slow EMA period in bars. Default 400.")
     args = parser.parse_args()
     _FYERS_CACHE["user_id"] = args.user_id
 
@@ -880,6 +884,8 @@ def main() -> int:
         print(f"Universe: smoke ({len(symbols_list)} symbols)")
 
     config = StrategyConfig(
+        ema_fast_period=args.ema_fast,
+        ema_slow_period=args.ema_slow,
         target_pct=args.target_pct,
         partial_pct_entry1=args.partial_pct_entry1,
         partial_pct_entry2_buy=args.partial_pct_entry2_buy,
