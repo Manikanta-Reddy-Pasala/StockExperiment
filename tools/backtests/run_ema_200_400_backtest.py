@@ -582,7 +582,9 @@ STAGE_LABELS_SELL = {
 
 
 def build_cycles(signals: List[Dict]) -> List[Dict]:
-    """Group signals into cycles. New cycle on each CROSSOVER."""
+    """Group signals into cycles. New cycle on each CROSSOVER. For
+    strategies that don't emit CROSSOVER (swing pullback, ORB), start a
+    new cycle on each ENTRY1 with no active cycle."""
     cycles: List[Dict] = []
     current: Optional[Dict] = None
     for s in signals:
@@ -590,8 +592,14 @@ def build_cycles(signals: List[Dict]) -> List[Dict]:
             if current:
                 cycles.append(current)
             current = {"trend": s["trend"], "events": [s]}
+        elif s["signal_type"] == "ENTRY1" and current is None:
+            current = {"trend": s["trend"], "events": [s]}
         elif current:
             current["events"].append(s)
+            # Close cycle on terminal event so next ENTRY1 starts a fresh one.
+            if s["signal_type"] in ("TARGET_HIT", "STOP_HIT"):
+                cycles.append(current)
+                current = None
     if current:
         cycles.append(current)
     return cycles
