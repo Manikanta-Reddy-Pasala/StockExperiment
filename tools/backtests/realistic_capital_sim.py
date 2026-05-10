@@ -13,7 +13,7 @@ Constraints
   - Cash from closes returns to pool (compounding)
 
 Usage
-  python realistic_capital_sim.py <case_dir> [max_concurrent ...]
+  python realistic_capital_sim.py <case_dir> [--capital N] [max_concurrent ...]
 """
 from __future__ import annotations
 
@@ -213,17 +213,23 @@ def main() -> int:
     if len(sys.argv) < 2:
         print(__doc__)
         return 1
-    case_dir = sys.argv[1]
-    caps = [int(x) for x in sys.argv[2:]] if len(sys.argv) > 2 else [3, 5, 10, 20, 50]
+    args = sys.argv[1:]
+    capital = CAPITAL
+    if "--capital" in args:
+        i = args.index("--capital")
+        capital = int(args[i + 1])
+        del args[i:i + 2]
+    case_dir = args[0]
+    caps = [int(x) for x in args[1:]] if len(args) > 1 else [2, 3, 5, 8, 10, 15, 20, 30, 50]
     print(f"Case: {case_dir}")
-    print(f"Capital: INR {CAPITAL:,}")
+    print(f"Capital: INR {capital:,}")
     print()
-    print(f"{'Max':>4}  {'Taken':>6}  {'Skip':>6}  {'Final':>10}  {'ROI%':>7}  {'MaxDD%':>7}  {'OpenEnd':>7}")
-    print("-" * 70)
+    print(f"{'Max':>4}  {'Taken':>6}  {'Skip':>6}  {'Final':>12}  {'ROI%':>7}  {'MaxDD%':>7}  {'OpenEnd':>7}")
+    print("-" * 72)
     for cap in caps:
-        r = simulate(case_dir, cap)
+        r = simulate(case_dir, cap, capital=capital)
         print(f"{cap:>4}  {r['taken_entries']:>6}  {r['skipped_entries']:>6}  "
-              f"{r['final_equity']:>10,.0f}  {r['roi_pct']:>+7.2f}  "
+              f"{r['final_equity']:>12,.0f}  {r['roi_pct']:>+7.2f}  "
               f"{r['max_drawdown_pct']:>7.2f}  {r['open_at_end']:>7}")
     return 0
 
