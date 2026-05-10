@@ -34,8 +34,9 @@ from tools.backtests.run_ema_200_400_backtest import (  # noqa: E402
 )
 
 
-def _fetch_daily_fyers(symbol: str, days: int, user_id: int = 1,
-                       chunk_days: int = 365) -> pd.DataFrame:
+def _fetch_daily_fyers_raw(symbol: str, days: int, user_id: int = 1,
+                            chunk_days: int = 365) -> pd.DataFrame:
+    """Inner Fyers daily fetcher (no cache). Wrapped by _fetch_daily_fyers below."""
     svc = _fyers_service()
     if svc is None:
         return pd.DataFrame()
@@ -83,6 +84,16 @@ def _fetch_daily_fyers(symbol: str, days: int, user_id: int = 1,
     return df[["timestamp", "candle_time", "open", "high", "low", "close", "volume"]]
 
 
+def _fetch_daily_fyers(symbol: str, days: int, user_id: int = 1) -> pd.DataFrame:
+    """Postgres-cached daily fetcher."""
+    try:
+        from tools.backtests.ohlcv_cache import get_or_fetch
+    except Exception:
+        return _fetch_daily_fyers_raw(symbol, days, user_id)
+    return get_or_fetch(symbol, "D", days,
+                        lambda s, d: _fetch_daily_fyers_raw(s, d, user_id))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--universe", choices=["smoke", "nifty50", "nifty500", "indices"],
@@ -91,6 +102,11 @@ def main() -> int:
     parser.add_argument("--warmup-days", type=int, default=250,
                         help="Daily bars need EMA200 warmup → ~250 trading days "
                              "= ~365 calendar days. Adjust if shorter EMAs used.")
+    parser.add_argument("--from", dest="date_from", type=str, default=None,
+                        help="Start date YYYY-MM-DD (overrides --days). Strategy "
+                             "evaluation gated to >= this date.")
+    parser.add_argument("--to", dest="date_to", type=str, default=None,
+                        help="End date YYYY-MM-DD (defaults to today when --from given).")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--user-id", type=int, default=1)
     parser.add_argument("--out", type=Path,
@@ -140,9 +156,22 @@ def main() -> int:
           f"RSI[{config.rsi_min},{config.rsi_max}] vol≥{config.volume_mult}x "
           f"SL={config.sl_atr_mult}×ATR T1={config.tp1_atr_mult}×ATR(50%)")
 
+    # Resolve report window. --from/--to override --days.
+    if args.date_from:
+        from_dt = datetime.strptime(args.date_from, "%Y-%m-%d")
+        to_dt = datetime.strptime(args.date_to, "%Y-%m-%d") if args.date_to else datetime.now()
+        # Fetch enough days to cover [from .. now] (strategy walks every bar)
+        # and the warmup buffer; evaluation is gated by eval_from_ts.
+        args.days = max(1, (datetime.now() - from_dt).days)
+        cutoff_dt = from_dt
+        eval_from_ts = int(from_dt.timestamp())
+        eval_to_ts = int(to_dt.timestamp())
+        print(f"Date range: {from_dt.date()} → {to_dt.date()} ({args.days} days)")
+    else:
+        cutoff_dt = datetime.now() - timedelta(days=args.days)
+        eval_from_ts = int(cutoff_dt.timestamp())
+        eval_to_ts = None
     fetch_days = args.days + args.warmup_days
-    cutoff_dt = datetime.now() - timedelta(days=args.days)
-    eval_from_ts = int(cutoff_dt.timestamp())
 
     aggregate = []
     for symbol, name in symbols_list:
@@ -157,6 +186,8 @@ def main() -> int:
             continue
         signals = strat.evaluate(user_id=1, symbol=symbol, candles=candles,
                                   eval_from_ts=eval_from_ts)
+        if eval_to_ts is not None:
+            signals = [s for s in signals if int(s.get("candle_ts", 0)) <= eval_to_ts]
         pnl = simulate_pnl(signals, df, symbol,
                            partial_qty_frac=config.tp1_qty_frac)
         path = render_md(symbol, name, df, signals, pnl, args.out, config=None)

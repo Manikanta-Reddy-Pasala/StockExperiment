@@ -31,8 +31,9 @@ from tools.backtests.run_ema_200_400_backtest import (  # noqa: E402
 )
 
 
-def _fetch_5m_fyers(symbol: str, days: int, user_id: int = 1,
-                    chunk_days: int = 30) -> pd.DataFrame:
+def _fetch_5m_fyers_raw(symbol: str, days: int, user_id: int = 1,
+                         chunk_days: int = 30) -> pd.DataFrame:
+    """Inner Fyers 5m fetcher (no cache). Wrapped by _fetch_5m_fyers below."""
     svc = _fyers_service()
     if svc is None:
         return pd.DataFrame()
@@ -80,12 +81,27 @@ def _fetch_5m_fyers(symbol: str, days: int, user_id: int = 1,
     return df[["timestamp", "candle_time", "open", "high", "low", "close", "volume"]]
 
 
+def _fetch_5m_fyers(symbol: str, days: int, user_id: int = 1) -> pd.DataFrame:
+    """Postgres-cached 5m fetcher."""
+    try:
+        from tools.backtests.ohlcv_cache import get_or_fetch
+    except Exception:
+        return _fetch_5m_fyers_raw(symbol, days, user_id)
+    return get_or_fetch(symbol, "5m", days,
+                        lambda s, d: _fetch_5m_fyers_raw(s, d, user_id))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--universe", choices=["smoke", "nifty50", "nifty500", "indices"],
                         default="nifty50")
     parser.add_argument("--days", type=int, default=90,
                         help="Calendar days of 5m history. ORB needs no warmup.")
+    parser.add_argument("--from", dest="date_from", type=str, default=None,
+                        help="Start date YYYY-MM-DD (overrides --days). Strategy "
+                             "evaluation gated to >= this date.")
+    parser.add_argument("--to", dest="date_to", type=str, default=None,
+                        help="End date YYYY-MM-DD (defaults to today when --from given).")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--user-id", type=int, default=1)
     parser.add_argument("--out", type=Path,
@@ -128,6 +144,17 @@ def main() -> int:
           f"VWAP={'on' if config.require_vwap else 'off'} "
           f"long={config.enable_long} short={config.enable_short}")
 
+    # Resolve report window. --from/--to override --days.
+    eval_from_ts: Optional[int] = None
+    eval_to_ts: Optional[int] = None
+    if args.date_from:
+        from_dt = datetime.strptime(args.date_from, "%Y-%m-%d")
+        to_dt = datetime.strptime(args.date_to, "%Y-%m-%d") if args.date_to else datetime.now()
+        args.days = max(1, (datetime.now() - from_dt).days)
+        eval_from_ts = int(from_dt.timestamp())
+        eval_to_ts = int(to_dt.timestamp())
+        print(f"Date range: {from_dt.date()} → {to_dt.date()} ({args.days} days)")
+
     aggregate = []
     for symbol, name in symbols_list:
         print(f"--- {symbol} ---", flush=True)
@@ -137,7 +164,9 @@ def main() -> int:
             continue
         candles = df_to_candles(df)
         signals = strat.evaluate(user_id=1, symbol=symbol, candles=candles,
-                                  eval_from_ts=None)
+                                  eval_from_ts=eval_from_ts)
+        if eval_to_ts is not None:
+            signals = [s for s in signals if int(s.get("candle_ts", 0)) <= eval_to_ts]
         pnl = simulate_pnl(signals, df, symbol,
                            partial_qty_frac=config.tp1_qty_frac)
         path = render_md(symbol, name, df, signals, pnl, args.out, config=None)

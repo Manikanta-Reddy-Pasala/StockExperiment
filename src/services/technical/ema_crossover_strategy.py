@@ -119,6 +119,9 @@ class StrategyConfig:
     re_entry_cap: int = DEFAULT_RE_ENTRY_CAP        # max attempts per alert
     ema_fast_period: int = 200
     ema_slow_period: int = 400
+    # Penny stock filter — refuse entries on stocks priced below this at
+    # the entry bar. Indian retail standard: ₹50 cutoff.
+    min_price: float = 50.0
 
     # ---- Spec-strict guards (default ON; turn OFF for legacy behavior) ----
     # Strategy-1 v1.4 retest-candle definition:
@@ -310,6 +313,14 @@ class EMACrossoverStrategy:
         if len(candles) < self.config.ema_slow_period + 5:
             logger.debug(
                 f"{symbol}: only {len(candles)} candles, need >={self.config.ema_slow_period + 5}"
+            )
+            return []
+
+        # Penny stock filter — skip entire symbol if last close below floor.
+        if candles and float(candles[-1].close) < self.config.min_price:
+            logger.debug(
+                f"{symbol}: penny filter ({float(candles[-1].close):.2f} < "
+                f"{self.config.min_price})"
             )
             return []
 

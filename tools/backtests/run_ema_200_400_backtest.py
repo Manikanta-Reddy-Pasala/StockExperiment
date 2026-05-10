@@ -207,13 +207,25 @@ def _fetch_fyers_interval(symbol: str, days: int, user_id: int,
 
 
 def fetch_1h_fyers(symbol: str, days: int = 720, user_id: int = 1) -> pd.DataFrame:
-    """1H candles."""
-    return _fetch_fyers_interval(symbol, days, user_id, interval="1h", chunk_days=95)
+    """1H candles. Postgres-cached — only calls Fyers on cache miss."""
+    try:
+        from tools.backtests.ohlcv_cache import get_or_fetch
+    except Exception:
+        return _fetch_fyers_interval(symbol, days, user_id, interval="1h", chunk_days=95)
+    return get_or_fetch(symbol, "1h", days,
+                        lambda s, d: _fetch_fyers_interval(s, d, user_id,
+                                                            interval="1h", chunk_days=95))
 
 
 def fetch_15m_fyers(symbol: str, days: int = 30, user_id: int = 1) -> pd.DataFrame:
-    """15m candles. Fyers caps intraday at ~30-day chunks for 15m granularity."""
-    return _fetch_fyers_interval(symbol, days, user_id, interval="15m", chunk_days=30)
+    """15m candles. Fyers caps intraday at ~30-day chunks. Postgres-cached."""
+    try:
+        from tools.backtests.ohlcv_cache import get_or_fetch
+    except Exception:
+        return _fetch_fyers_interval(symbol, days, user_id, interval="15m", chunk_days=30)
+    return get_or_fetch(symbol, "15m", days,
+                        lambda s, d: _fetch_fyers_interval(s, d, user_id,
+                                                            interval="15m", chunk_days=30))
 
 
 YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"

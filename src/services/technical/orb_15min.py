@@ -58,6 +58,9 @@ class ORBConfig:
     enable_long: bool = True
     enable_short: bool = True
 
+    # Penny stock filter — skip entries when close < min_price
+    min_price: float = 50.0
+
 
 @dataclass
 class ORBPosition:
@@ -280,6 +283,9 @@ class ORB15MinStrategy:
             vol_ok = row["volume"] >= cfg.volume_mult * row["vol_sma"]
             atr_v = float(row["atr"]) if pd.notna(row["atr"]) else 0.0
             if atr_v <= 0:
+                continue
+
+            if close < cfg.min_price:
                 continue
 
             if cfg.enable_long and close > orb_h and (not cfg.require_vwap or close > vwap) and vol_ok:
