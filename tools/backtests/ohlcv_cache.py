@@ -170,12 +170,12 @@ def _expected_bars(interval: str, days: int) -> int:
 
 def get_or_fetch(symbol: str, interval: str, days: int,
                  fyers_fetcher: Callable[[str, int], pd.DataFrame],
-                 min_coverage_frac: float = 0.85) -> pd.DataFrame:
+                 min_coverage_frac: float = 0.50) -> pd.DataFrame:
     """Return OHLCV for the last ``days`` days.
 
     1. Read cached rows from the existing prod table.
-    2. If cache covers >= min_coverage_frac of expected AND newest row
-       within 2 trading days of now -> return cache.
+    2. If cache covers >= min_coverage_frac of expected -> return cache
+       (no freshness check — once prefetched, the cache is authoritative).
     3. Otherwise call ``fyers_fetcher(symbol, days)``, upsert into the
        cache table, return the fresh fetch.
     """
@@ -187,9 +187,7 @@ def get_or_fetch(symbol: str, interval: str, days: int,
     expected = _expected_bars(interval, days)
     have = len(cached)
     if have >= int(expected * min_coverage_frac) and have > 0:
-        newest_ts = int(cached["timestamp"].max())
-        if (to_ts - newest_ts) < (2 * 86400):
-            return cached
+        return cached
     fresh = fyers_fetcher(symbol, days)
     if fresh is None or fresh.empty:
         return cached

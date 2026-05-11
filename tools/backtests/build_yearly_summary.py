@@ -23,6 +23,26 @@ from typing import Dict, List, Tuple
 MODELS = ["ema_200_400", "ema_9_21", "swing_pullback", "orb_15min"]
 
 
+def count_data_coverage(dir_path: Path) -> Dict:
+    """Count per-symbol .md files (excluding _summary, _monthly) + flag
+    those with 'No 1H data available' placeholder."""
+    if not dir_path.exists():
+        return {"with_data": 0, "no_data": 0}
+    total = 0
+    no_data = 0
+    for f in dir_path.glob("*.md"):
+        if f.name.startswith("_"):
+            continue
+        total += 1
+        try:
+            head = f.read_text()[:500]
+        except Exception:
+            continue
+        if "No 1H data available" in head or "_No data_" in head:
+            no_data += 1
+    return {"with_data": total - no_data, "no_data": no_data}
+
+
 def parse_capital_sim(txt_path: Path, max_concurrent: int) -> Dict:
     """Parse `_capital_sim.txt` for the row matching max_concurrent.
     Returns {} if file missing or row absent."""
@@ -80,10 +100,16 @@ def main() -> int:
         "",
         f"Capital: ₹{args.capital:,}, max_concurrent: {cap}",
         "",
+        "## Data coverage",
+        "",
+        "Number of universe stocks that produced backtest output per model-year.",
+        "Missing = recent IPOs, ticker reconstitutions, or insufficient bar history",
+        "(e.g. Fyers 5m bars capped to ~6mo back; EMA 200/400 needs ~400d warmup).",
+        "",
         "## Yearly Headlines",
         "",
-        "| Model | Year | Window | Taken | Skip | Final₹ | ROI% | MaxDD% |",
-        "|-------|------|--------|------:|-----:|-------:|-----:|-------:|",
+        "| Model | Year | Window | WithData | Taken | Skip | Final₹ | ROI% | MaxDD% |",
+        "|-------|------|--------|--------:|------:|-----:|-------:|-----:|-------:|",
     ]
 
     # Per-model aggregate accumulators
@@ -95,15 +121,17 @@ def main() -> int:
     for model in MODELS:
         for label, d in find_year_dirs(root, args.universe, model):
             cs = parse_capital_sim(d / "_capital_sim.txt", cap)
+            cov = count_data_coverage(d)
+            with_data = cov["with_data"]
             if not cs:
                 lines.append(
-                    f"| {model} | {label} | _missing_ | | | | | |"
+                    f"| {model} | {label} | _missing_ | {with_data} | | | | | |"
                 )
                 continue
             yr_from, yr_to = label.split("_")
             window = f"{yr_from}-05-11..{yr_to}-05-11"
             lines.append(
-                f"| {model} | {label} | {window} | {cs['taken']} | {cs['skip']} | "
+                f"| {model} | {label} | {window} | {with_data} | {cs['taken']} | {cs['skip']} | "
                 f"{cs['final']:,} | {cs['roi_pct']:+.2f} | {cs['max_dd_pct']:.2f} |"
             )
             a = agg[model]
