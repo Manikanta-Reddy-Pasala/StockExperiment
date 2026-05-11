@@ -124,6 +124,9 @@ def main() -> int:
     parser.add_argument("--time-stop-bars", type=int, default=10)
     parser.add_argument("--min-adv-inr", type=float, default=5_00_00_000,
                         help="Min avg-daily-value INR. Default ₹5cr.")
+    parser.add_argument("--min-price", type=float, default=50.0,
+                        help="Penny filter — skip entries on stocks priced "
+                             "below this. Default ₹50. Set 0 to disable.")
     args = parser.parse_args()
     _FYERS_CACHE["user_id"] = args.user_id
 
@@ -149,6 +152,7 @@ def main() -> int:
         sl_atr_mult=args.sl_atr_mult, tp1_atr_mult=args.tp1_atr_mult,
         time_stop_bars=args.time_stop_bars,
         min_adv_inr=args.min_adv_inr,
+        min_price=args.min_price,
     )
     strat = EMAPullbackBreakoutStrategy(config)
     print(f"Universe: {args.universe} ({len(symbols_list)})")

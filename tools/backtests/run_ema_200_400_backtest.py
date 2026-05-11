@@ -871,6 +871,9 @@ def main() -> int:
                         help="Fast EMA period in bars. Default 200.")
     parser.add_argument("--ema-slow", type=int, default=400,
                         help="Slow EMA period in bars. Default 400.")
+    parser.add_argument("--min-price", type=float, default=50.0,
+                        help="Penny filter — skip symbol if last close < this. "
+                             "Default ₹50. Set 0 to disable.")
     args = parser.parse_args()
     _FYERS_CACHE["user_id"] = args.user_id
 
@@ -906,6 +909,7 @@ def main() -> int:
     config = StrategyConfig(
         ema_fast_period=args.ema_fast,
         ema_slow_period=args.ema_slow,
+        min_price=args.min_price,
         target_pct=args.target_pct,
         partial_pct_entry1=args.partial_pct_entry1,
         partial_pct_entry2_buy=args.partial_pct_entry2_buy,

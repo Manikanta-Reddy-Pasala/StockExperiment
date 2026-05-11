@@ -116,6 +116,9 @@ def main() -> int:
                         help="Skip VWAP confirmation (looser entries)")
     parser.add_argument("--long-only", action="store_true",
                         help="Disable SELL side (Indian retail default)")
+    parser.add_argument("--min-price", type=float, default=50.0,
+                        help="Penny filter — skip entries when close < this. "
+                             "Default ₹50. Set 0 to disable.")
     args = parser.parse_args()
     _FYERS_CACHE["user_id"] = args.user_id
 
@@ -137,6 +140,7 @@ def main() -> int:
         orb_range_max_pct=args.orb_range_max_pct,
         sl_atr_mult=args.sl_atr_mult, tp1_r_mult=args.tp1_r_mult,
         enable_long=True, enable_short=not args.long_only,
+        min_price=args.min_price,
     )
     strat = ORB15MinStrategy(config)
     print(f"Universe: {args.universe} ({len(symbols_list)})")

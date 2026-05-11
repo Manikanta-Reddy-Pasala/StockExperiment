@@ -114,7 +114,8 @@ def year_windows(end_date: datetime, years: int, start_from: Optional[int] = Non
 
 # ---- Subprocess wrappers -------------------------------------------
 def run_harness(model_key: str, model_info: Dict, universe: str,
-                 from_date: str, to_date: str, out_dir: Path) -> int:
+                 from_date: str, to_date: str, out_dir: Path,
+                 min_price: Optional[float] = None) -> int:
     cmd = [
         sys.executable,
         str(ROOT / model_info["harness_script"]),
@@ -124,6 +125,8 @@ def run_harness(model_key: str, model_info: Dict, universe: str,
         "--out", str(out_dir),
     ]
     cmd += list(model_info.get("extra_args", []))
+    if min_price is not None:
+        cmd += ["--min-price", str(min_price)]
     print(f"  $ {' '.join(cmd)}", flush=True)
     try:
         r = subprocess.run(cmd, cwd=str(ROOT), check=False)
@@ -223,6 +226,9 @@ def main() -> int:
                         help="Concurrency cap used for headline ROI/MDD parse.")
     parser.add_argument("--out-root", type=Path,
                         default=ROOT / "exports" / "backtests" / "yearly")
+    parser.add_argument("--min-price", type=float, default=None,
+                        help="Penny filter override applied to all harnesses. "
+                             "Set 0 to disable. If None, harness defaults (₹50) apply.")
     args = parser.parse_args()
 
     end_date = datetime.strptime(args.end_date, "%Y-%m-%d") if args.end_date else datetime.now()
@@ -258,7 +264,8 @@ def main() -> int:
             print(f"  window: {from_d} .. {to_d}")
             yr = YearResult(model=model_key, year_label=label, from_date=from_d,
                              to_date=to_d, out_dir=out_dir)
-            rc = run_harness(model_key, info, args.universe, from_d, to_d, out_dir)
+            rc = run_harness(model_key, info, args.universe, from_d, to_d, out_dir,
+                              min_price=args.min_price)
             yr.harness_rc = rc
             if rc != 0:
                 print(f"  harness exit={rc} — skipping post-processing")
