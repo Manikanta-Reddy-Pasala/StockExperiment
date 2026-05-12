@@ -1,0 +1,181 @@
+{
+  "generated_at": "2026-05-13",
+  "method": "walk-forward N50 minus prior-year worst-N",
+  "prior_year_dir": "/app/exports/backtests/multiyear_n50/nifty50_ema_200_400_2023_2024",
+  "drop_bottom_n": 15,
+  "drops": [
+    "NSE:HINDALCO-EQ",
+    "NSE:TATASTEEL-EQ",
+    "NSE:INDUSINDBK-EQ",
+    "NSE:GRASIM-EQ",
+    "NSE:ULTRACEMCO-EQ",
+    "NSE:BAJAJFINSV-EQ",
+    "NSE:POWERGRID-EQ",
+    "NSE:CIPLA-EQ",
+    "NSE:COALINDIA-EQ",
+    "NSE:DIVISLAB-EQ",
+    "NSE:UPL-EQ",
+    "NSE:ADANIENT-EQ",
+    "NSE:ASIANPAINT-EQ",
+    "NSE:SHRIRAMFIN-EQ",
+    "NSE:INFY-EQ"
+  ],
+  "stocks": [
+    {
+      "symbol": "NSE:ADANIPORTS-EQ",
+      "name": "Adani Ports"
+    },
+    {
+      "symbol": "NSE:APOLLOHOSP-EQ",
+      "name": "Apollo Hospitals"
+    },
+    {
+      "symbol": "NSE:AXISBANK-EQ",
+      "name": "Axis Bank"
+    },
+    {
+      "symbol": "NSE:BAJAJ-AUTO-EQ",
+      "name": "Bajaj Auto"
+    },
+    {
+      "symbol": "NSE:BAJFINANCE-EQ",
+      "name": "Bajaj Finance"
+    },
+    {
+      "symbol": "NSE:BEL-EQ",
+      "name": "BEL"
+    },
+    {
+      "symbol": "NSE:BHARTIARTL-EQ",
+      "name": "Bharti Airtel"
+    },
+    {
+      "symbol": "NSE:BPCL-EQ",
+      "name": "BPCL"
+    },
+    {
+      "symbol": "NSE:BRITANNIA-EQ",
+      "name": "Britannia"
+    },
+    {
+      "symbol": "NSE:DRREDDY-EQ",
+      "name": "Dr Reddys"
+    },
+    {
+      "symbol": "NSE:EICHERMOT-EQ",
+      "name": "Eicher Motors"
+    },
+    {
+      "symbol": "NSE:ETERNAL-EQ",
+      "name": "Eternal"
+    },
+    {
+      "symbol": "NSE:HCLTECH-EQ",
+      "name": "HCL Tech"
+    },
+    {
+      "symbol": "NSE:HDFCBANK-EQ",
+      "name": "HDFC Bank"
+    },
+    {
+      "symbol": "NSE:HDFCLIFE-EQ",
+      "name": "HDFC Life"
+    },
+    {
+      "symbol": "NSE:HEROMOTOCO-EQ",
+      "name": "Hero MotoCorp"
+    },
+    {
+      "symbol": "NSE:HINDUNILVR-EQ",
+      "name": "Hindustan Unilever"
+    },
+    {
+      "symbol": "NSE:ICICIBANK-EQ",
+      "name": "ICICI Bank"
+    },
+    {
+      "symbol": "NSE:ITC-EQ",
+      "name": "ITC"
+    },
+    {
+      "symbol": "NSE:JIOFIN-EQ",
+      "name": "Jio Financial"
+    },
+    {
+      "symbol": "NSE:JSWSTEEL-EQ",
+      "name": "JSW Steel"
+    },
+    {
+      "symbol": "NSE:KOTAKBANK-EQ",
+      "name": "Kotak Bank"
+    },
+    {
+      "symbol": "NSE:LT-EQ",
+      "name": "Larsen"
+    },
+    {
+      "symbol": "NSE:M&M-EQ",
+      "name": "M&M"
+    },
+    {
+      "symbol": "NSE:MARUTI-EQ",
+      "name": "Maruti"
+    },
+    {
+      "symbol": "NSE:NESTLEIND-EQ",
+      "name": "Nestle"
+    },
+    {
+      "symbol": "NSE:NTPC-EQ",
+      "name": "NTPC"
+    },
+    {
+      "symbol": "NSE:ONGC-EQ",
+      "name": "ONGC"
+    },
+    {
+      "symbol": "NSE:RELIANCE-EQ",
+      "name": "Reliance"
+    },
+    {
+      "symbol": "NSE:SBILIFE-EQ",
+      "name": "SBI Life"
+    },
+    {
+      "symbol": "NSE:SBIN-EQ",
+      "name": "SBI"
+    },
+    {
+      "symbol": "NSE:SUNPHARMA-EQ",
+      "name": "Sun Pharma"
+    },
+    {
+      "symbol": "NSE:TATACONSUM-EQ",
+      "name": "Tata Consumer"
+    },
+    {
+      "symbol": "NSE:TATAMOTORS-EQ",
+      "name": "Tata Motors"
+    },
+    {
+      "symbol": "NSE:TCS-EQ",
+      "name": "TCS"
+    },
+    {
+      "symbol": "NSE:TECHM-EQ",
+      "name": "Tech Mahindra"
+    },
+    {
+      "symbol": "NSE:TITAN-EQ",
+      "name": "Titan"
+    },
+    {
+      "symbol": "NSE:TRENT-EQ",
+      "name": "Trent"
+    },
+    {
+      "symbol": "NSE:WIPRO-EQ",
+      "name": "Wipro"
+    }
+  ]
+}
