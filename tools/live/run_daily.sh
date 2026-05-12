@@ -111,8 +111,8 @@ case "$cmd" in
     ;;
 
   *)
-    echo "Usage: $0 {prefetch|signals|paper|live|monitor|report|full}"
-    echo "Env: CAPITAL_INR (default 200000), MAX_CONCURRENT (2), MIN_PRICE (50),"
+    echo "Usage: $0 {selector|prefetch|signals|paper|live|monitor|report|full}"
+    echo "Env: CAPITAL_INR (default 1000000 = ₹10L), MAX_CONCURRENT (2), MIN_PRICE (50),"
     echo "     MAX_DAILY_LOSS_PCT (-5.0), LIVE_TRADING (false), USER_ID (1),"
     echo "     UNIVERSE (nifty50), PYTHON (python)"
     exit 1

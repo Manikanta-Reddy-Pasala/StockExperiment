@@ -20,7 +20,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--date", default=datetime.now().strftime("%Y-%m-%d"))
     ap.add_argument("--ledger", default=None)
-    ap.add_argument("--capital", type=int, default=200_000)
+    ap.add_argument("--capital", type=int, default=1_000_000)
     args = ap.parse_args()
 
     ledger_path = Path(args.ledger) if args.ledger else (

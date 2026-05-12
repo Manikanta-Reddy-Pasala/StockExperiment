@@ -29,10 +29,10 @@ log = logging.getLogger("risk_manager")
 
 @dataclass
 class RiskConfig:
-    capital_inr: int = 200_000
+    capital_inr: int = 1_000_000        # ₹10L locked-in pool
     max_concurrent: int = 2
-    max_per_trade_inr: int = 100_000   # capital / max_concurrent
-    max_daily_loss_pct: float = -5.0   # kill switch
+    max_per_trade_inr: int = 500_000    # capital / max_concurrent
+    max_daily_loss_pct: float = -5.0    # kill switch
     min_price: float = 50.0
     enable_short: bool = False
 
@@ -54,10 +54,10 @@ class RiskManager:
     @classmethod
     def from_env(cls):
         cfg = RiskConfig(
-            capital_inr=int(os.environ.get("CAPITAL_INR", 200_000)),
+            capital_inr=int(os.environ.get("CAPITAL_INR", 1_000_000)),
             max_concurrent=int(os.environ.get("MAX_CONCURRENT", 2)),
             max_per_trade_inr=int(os.environ.get("MAX_PER_TRADE_INR",
-                int(os.environ.get("CAPITAL_INR", 200_000)) //
+                int(os.environ.get("CAPITAL_INR", 1_000_000)) //
                 int(os.environ.get("MAX_CONCURRENT", 2)))),
             max_daily_loss_pct=float(os.environ.get("MAX_DAILY_LOSS_PCT", -5.0)),
             min_price=float(os.environ.get("MIN_PRICE", 50.0)),

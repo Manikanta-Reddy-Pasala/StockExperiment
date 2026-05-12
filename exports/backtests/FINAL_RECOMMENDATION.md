@@ -4,13 +4,17 @@ _Generated: 2026-05-12_
 
 ## TL;DR
 
-**Recommended config: EMA 200/400 + Selector top-10 N500 + max_concurrent=2 + ₹2L**
+**Recommended config: EMA 200/400 + Selector top-10 N500 + max_concurrent=2 + ₹10L**
 
 Backtest result (May 2025 → May 2026):
-- **ROI: +21.30%**
-- **MaxDD: 9.60%**
+- **ROI: +21.85%** (₹12.18L from ₹10L)
+- **MaxDD: 9.58%** (~₹96K worst dip)
 - 28 trades over 1 year
 - Win rate target: ~50%+
+
+ROI% is invariant to capital within ₹2L–₹50L sweet spot. ₹10L gives
++21.85% (₹2.18L profit) on the exact same trade ledger as ₹2L base.
+See [SCALE_10L.md](SCALE_10L.md).
 
 Source: [SELECTOR_RESULTS.md](SELECTOR_RESULTS.md)
 
