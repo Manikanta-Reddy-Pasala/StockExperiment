@@ -1,0 +1,4764 @@
+{
+  "generated_at": "2026-05-12T17:16:15.762102",
+  "start": "2025-05-12",
+  "end": "2026-05-12",
+  "lookback_days": 60,
+  "top_n": 2,
+  "bottom_n": 2,
+  "summary_top_pct": {
+    "BANK": 17,
+    "INFRA": 1,
+    "PSE": 18,
+    "ENERGY": 17,
+    "REALTY": 18,
+    "AUTO": 33,
+    "METAL": 67,
+    "IT": 17,
+    "PHARMA": 6,
+    "FMCG": 1
+  },
+  "summary_bottom_pct": {
+    "REALTY": 54,
+    "IT": 58,
+    "PHARMA": 17,
+    "FMCG": 38,
+    "METAL": 6,
+    "PSE": 9,
+    "BANK": 8,
+    "ENERGY": 6,
+    "AUTO": 0
+  },
+  "daily": [
+    {
+      "date": "2025-05-12",
+      "top": [
+        "BANK",
+        "INFRA"
+      ],
+      "top_rs": {
+        "BANK": 0.0433,
+        "INFRA": 0.0326
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.1042,
+        "IT": -0.1661
+      }
+    },
+    {
+      "date": "2025-05-13",
+      "top": [
+        "BANK",
+        "INFRA"
+      ],
+      "top_rs": {
+        "BANK": 0.0521,
+        "INFRA": 0.033
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0992,
+        "IT": -0.1729
+      }
+    },
+    {
+      "date": "2025-05-14",
+      "top": [
+        "PSE",
+        "BANK"
+      ],
+      "top_rs": {
+        "PSE": 0.0531,
+        "BANK": 0.0415
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0654,
+        "IT": -0.1663
+      }
+    },
+    {
+      "date": "2025-05-15",
+      "top": [
+        "PSE",
+        "INFRA"
+      ],
+      "top_rs": {
+        "PSE": 0.0644,
+        "INFRA": 0.0431
+      },
+      "bottom": [
+        "PHARMA",
+        "IT"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0674,
+        "IT": -0.1738
+      }
+    },
+    {
+      "date": "2025-05-16",
+      "top": [
+        "PSE",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "PSE": 0.0916,
+        "ENERGY": 0.0531
+      },
+      "bottom": [
+        "PHARMA",
+        "IT"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0625,
+        "IT": -0.1758
+      }
+    },
+    {
+      "date": "2025-05-19",
+      "top": [
+        "PSE",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "PSE": 0.0887,
+        "ENERGY": 0.0577
+      },
+      "bottom": [
+        "PHARMA",
+        "IT"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0685,
+        "IT": -0.176
+      }
+    },
+    {
+      "date": "2025-05-20",
+      "top": [
+        "PSE",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "PSE": 0.1113,
+        "ENERGY": 0.0825
+      },
+      "bottom": [
+        "PHARMA",
+        "IT"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0456,
+        "IT": -0.174
+      }
+    },
+    {
+      "date": "2025-05-21",
+      "top": [
+        "PSE",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "PSE": 0.1142,
+        "ENERGY": 0.079
+      },
+      "bottom": [
+        "PHARMA",
+        "IT"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.05,
+        "IT": -0.1668
+      }
+    },
+    {
+      "date": "2025-05-22",
+      "top": [
+        "PSE",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "PSE": 0.1098,
+        "ENERGY": 0.0736
+      },
+      "bottom": [
+        "PHARMA",
+        "IT"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0462,
+        "IT": -0.179
+      }
+    },
+    {
+      "date": "2025-05-23",
+      "top": [
+        "PSE",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "PSE": 0.0918,
+        "ENERGY": 0.0586
+      },
+      "bottom": [
+        "PHARMA",
+        "IT"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0542,
+        "IT": -0.1698
+      }
+    },
+    {
+      "date": "2025-05-26",
+      "top": [
+        "PSE",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "PSE": 0.0671,
+        "ENERGY": 0.0383
+      },
+      "bottom": [
+        "PHARMA",
+        "IT"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0567,
+        "IT": -0.1665
+      }
+    },
+    {
+      "date": "2025-05-27",
+      "top": [
+        "PSE",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "PSE": 0.0751,
+        "ENERGY": 0.0467
+      },
+      "bottom": [
+        "PHARMA",
+        "IT"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0332,
+        "IT": -0.1641
+      }
+    },
+    {
+      "date": "2025-05-28",
+      "top": [
+        "PSE",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "PSE": 0.0847,
+        "ENERGY": 0.0513
+      },
+      "bottom": [
+        "PHARMA",
+        "IT"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0483,
+        "IT": -0.1477
+      }
+    },
+    {
+      "date": "2025-05-29",
+      "top": [
+        "PSE",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "PSE": 0.0923,
+        "ENERGY": 0.0589
+      },
+      "bottom": [
+        "FMCG",
+        "IT"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0408,
+        "IT": -0.1366
+      }
+    },
+    {
+      "date": "2025-05-30",
+      "top": [
+        "PSE",
+        "REALTY"
+      ],
+      "top_rs": {
+        "PSE": 0.094,
+        "REALTY": 0.0751
+      },
+      "bottom": [
+        "PHARMA",
+        "IT"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0364,
+        "IT": -0.1396
+      }
+    },
+    {
+      "date": "2025-06-02",
+      "top": [
+        "PSE",
+        "REALTY"
+      ],
+      "top_rs": {
+        "PSE": 0.1111,
+        "REALTY": 0.1001
+      },
+      "bottom": [
+        "PHARMA",
+        "IT"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0374,
+        "IT": -0.124
+      }
+    },
+    {
+      "date": "2025-06-03",
+      "top": [
+        "REALTY",
+        "PSE"
+      ],
+      "top_rs": {
+        "REALTY": 0.107,
+        "PSE": 0.0902
+      },
+      "bottom": [
+        "PHARMA",
+        "IT"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0354,
+        "IT": -0.1308
+      }
+    },
+    {
+      "date": "2025-06-04",
+      "top": [
+        "REALTY",
+        "PSE"
+      ],
+      "top_rs": {
+        "REALTY": 0.0919,
+        "PSE": 0.0736
+      },
+      "bottom": [
+        "PHARMA",
+        "IT"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0367,
+        "IT": -0.124
+      }
+    },
+    {
+      "date": "2025-06-05",
+      "top": [
+        "REALTY",
+        "PSE"
+      ],
+      "top_rs": {
+        "REALTY": 0.092,
+        "PSE": 0.0476
+      },
+      "bottom": [
+        "METAL",
+        "IT"
+      ],
+      "bottom_rs": {
+        "METAL": -0.0452,
+        "IT": -0.1334
+      }
+    },
+    {
+      "date": "2025-06-06",
+      "top": [
+        "REALTY",
+        "BANK"
+      ],
+      "top_rs": {
+        "REALTY": 0.1493,
+        "BANK": 0.0545
+      },
+      "bottom": [
+        "METAL",
+        "IT"
+      ],
+      "bottom_rs": {
+        "METAL": -0.0508,
+        "IT": -0.1313
+      }
+    },
+    {
+      "date": "2025-06-09",
+      "top": [
+        "REALTY",
+        "BANK"
+      ],
+      "top_rs": {
+        "REALTY": 0.1586,
+        "BANK": 0.0589
+      },
+      "bottom": [
+        "METAL",
+        "IT"
+      ],
+      "bottom_rs": {
+        "METAL": -0.0515,
+        "IT": -0.1171
+      }
+    },
+    {
+      "date": "2025-06-10",
+      "top": [
+        "REALTY",
+        "PSE"
+      ],
+      "top_rs": {
+        "REALTY": 0.1656,
+        "PSE": 0.0664
+      },
+      "bottom": [
+        "METAL",
+        "IT"
+      ],
+      "bottom_rs": {
+        "METAL": -0.0432,
+        "IT": -0.1003
+      }
+    },
+    {
+      "date": "2025-06-11",
+      "top": [
+        "REALTY",
+        "BANK"
+      ],
+      "top_rs": {
+        "REALTY": 0.1221,
+        "BANK": 0.0623
+      },
+      "bottom": [
+        "METAL",
+        "IT"
+      ],
+      "bottom_rs": {
+        "METAL": -0.0502,
+        "IT": -0.0805
+      }
+    },
+    {
+      "date": "2025-06-12",
+      "top": [
+        "REALTY",
+        "BANK"
+      ],
+      "top_rs": {
+        "REALTY": 0.1272,
+        "BANK": 0.0594
+      },
+      "bottom": [
+        "IT",
+        "METAL"
+      ],
+      "bottom_rs": {
+        "IT": -0.0484,
+        "METAL": -0.0518
+      }
+    },
+    {
+      "date": "2025-06-13",
+      "top": [
+        "REALTY",
+        "BANK"
+      ],
+      "top_rs": {
+        "REALTY": 0.1549,
+        "BANK": 0.0517
+      },
+      "bottom": [
+        "METAL",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "METAL": -0.0488,
+        "FMCG": -0.0526
+      }
+    },
+    {
+      "date": "2025-06-16",
+      "top": [
+        "REALTY",
+        "BANK"
+      ],
+      "top_rs": {
+        "REALTY": 0.1717,
+        "BANK": 0.0487
+      },
+      "bottom": [
+        "FMCG",
+        "METAL"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0484,
+        "METAL": -0.0503
+      }
+    },
+    {
+      "date": "2025-06-17",
+      "top": [
+        "REALTY",
+        "BANK"
+      ],
+      "top_rs": {
+        "REALTY": 0.1443,
+        "BANK": 0.0413
+      },
+      "bottom": [
+        "PHARMA",
+        "METAL"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0608,
+        "METAL": -0.0673
+      }
+    },
+    {
+      "date": "2025-06-18",
+      "top": [
+        "REALTY",
+        "BANK"
+      ],
+      "top_rs": {
+        "REALTY": 0.1103,
+        "BANK": 0.0401
+      },
+      "bottom": [
+        "PHARMA",
+        "METAL"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0622,
+        "METAL": -0.0821
+      }
+    },
+    {
+      "date": "2025-06-19",
+      "top": [
+        "REALTY",
+        "BANK"
+      ],
+      "top_rs": {
+        "REALTY": 0.0928,
+        "BANK": 0.041
+      },
+      "bottom": [
+        "PHARMA",
+        "METAL"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0644,
+        "METAL": -0.0922
+      }
+    },
+    {
+      "date": "2025-06-20",
+      "top": [
+        "REALTY",
+        "BANK"
+      ],
+      "top_rs": {
+        "REALTY": 0.0994,
+        "BANK": 0.0364
+      },
+      "bottom": [
+        "PHARMA",
+        "METAL"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0761,
+        "METAL": -0.0825
+      }
+    },
+    {
+      "date": "2025-06-23",
+      "top": [
+        "REALTY",
+        "BANK"
+      ],
+      "top_rs": {
+        "REALTY": 0.1005,
+        "BANK": 0.0287
+      },
+      "bottom": [
+        "PHARMA",
+        "METAL"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0622,
+        "METAL": -0.0625
+      }
+    },
+    {
+      "date": "2025-06-24",
+      "top": [
+        "REALTY",
+        "BANK"
+      ],
+      "top_rs": {
+        "REALTY": 0.1169,
+        "BANK": 0.0359
+      },
+      "bottom": [
+        "METAL",
+        "PHARMA"
+      ],
+      "bottom_rs": {
+        "METAL": -0.0408,
+        "PHARMA": -0.0521
+      }
+    },
+    {
+      "date": "2025-06-25",
+      "top": [
+        "REALTY",
+        "BANK"
+      ],
+      "top_rs": {
+        "REALTY": 0.1219,
+        "BANK": 0.0308
+      },
+      "bottom": [
+        "METAL",
+        "PHARMA"
+      ],
+      "bottom_rs": {
+        "METAL": -0.0494,
+        "PHARMA": -0.0541
+      }
+    },
+    {
+      "date": "2025-06-26",
+      "top": [
+        "REALTY",
+        "AUTO"
+      ],
+      "top_rs": {
+        "REALTY": 0.0861,
+        "AUTO": 0.0307
+      },
+      "bottom": [
+        "FMCG",
+        "PHARMA"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0484,
+        "PHARMA": -0.0579
+      }
+    },
+    {
+      "date": "2025-06-27",
+      "top": [
+        "REALTY",
+        "AUTO"
+      ],
+      "top_rs": {
+        "REALTY": 0.0775,
+        "AUTO": 0.0373
+      },
+      "bottom": [
+        "PHARMA",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0526,
+        "FMCG": -0.0617
+      }
+    },
+    {
+      "date": "2025-06-30",
+      "top": [
+        "REALTY",
+        "BANK"
+      ],
+      "top_rs": {
+        "REALTY": 0.0945,
+        "BANK": 0.0261
+      },
+      "bottom": [
+        "METAL",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "METAL": -0.0441,
+        "FMCG": -0.0679
+      }
+    },
+    {
+      "date": "2025-07-01",
+      "top": [
+        "REALTY",
+        "INFRA"
+      ],
+      "top_rs": {
+        "REALTY": 0.0569,
+        "INFRA": 0.0259
+      },
+      "bottom": [
+        "PHARMA",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0427,
+        "FMCG": -0.0798
+      }
+    },
+    {
+      "date": "2025-07-02",
+      "top": [
+        "REALTY",
+        "AUTO"
+      ],
+      "top_rs": {
+        "REALTY": 0.0414,
+        "AUTO": 0.0345
+      },
+      "bottom": [
+        "PHARMA",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0627,
+        "FMCG": -0.083
+      }
+    },
+    {
+      "date": "2025-07-03",
+      "top": [
+        "REALTY",
+        "AUTO"
+      ],
+      "top_rs": {
+        "REALTY": 0.061,
+        "AUTO": 0.0565
+      },
+      "bottom": [
+        "PHARMA",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0292,
+        "FMCG": -0.0965
+      }
+    },
+    {
+      "date": "2025-07-04",
+      "top": [
+        "REALTY",
+        "METAL"
+      ],
+      "top_rs": {
+        "REALTY": 0.1033,
+        "METAL": 0.0721
+      },
+      "bottom": [
+        "PHARMA",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0294,
+        "FMCG": -0.1208
+      }
+    },
+    {
+      "date": "2025-07-07",
+      "top": [
+        "REALTY",
+        "METAL"
+      ],
+      "top_rs": {
+        "REALTY": 0.0932,
+        "METAL": 0.0656
+      },
+      "bottom": [
+        "PHARMA",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0323,
+        "FMCG": -0.1049
+      }
+    },
+    {
+      "date": "2025-07-08",
+      "top": [
+        "REALTY",
+        "METAL"
+      ],
+      "top_rs": {
+        "REALTY": 0.1195,
+        "METAL": 0.0734
+      },
+      "bottom": [
+        "PHARMA",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0298,
+        "FMCG": -0.1351
+      }
+    },
+    {
+      "date": "2025-07-09",
+      "top": [
+        "REALTY",
+        "IT"
+      ],
+      "top_rs": {
+        "REALTY": 0.1088,
+        "IT": 0.0654
+      },
+      "bottom": [
+        "PHARMA",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0306,
+        "FMCG": -0.1123
+      }
+    },
+    {
+      "date": "2025-07-10",
+      "top": [
+        "REALTY",
+        "IT"
+      ],
+      "top_rs": {
+        "REALTY": 0.0808,
+        "IT": 0.0664
+      },
+      "bottom": [
+        "PHARMA",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0312,
+        "FMCG": -0.0917
+      }
+    },
+    {
+      "date": "2025-07-11",
+      "top": [
+        "REALTY",
+        "IT"
+      ],
+      "top_rs": {
+        "REALTY": 0.0721,
+        "IT": 0.059
+      },
+      "bottom": [
+        "PSE",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "PSE": -0.0141,
+        "FMCG": -0.0808
+      }
+    },
+    {
+      "date": "2025-07-14",
+      "top": [
+        "REALTY",
+        "IT"
+      ],
+      "top_rs": {
+        "REALTY": 0.1036,
+        "IT": 0.0653
+      },
+      "bottom": [
+        "BANK",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "BANK": -0.006,
+        "FMCG": -0.063
+      }
+    },
+    {
+      "date": "2025-07-15",
+      "top": [
+        "REALTY",
+        "IT"
+      ],
+      "top_rs": {
+        "REALTY": 0.0943,
+        "IT": 0.052
+      },
+      "bottom": [
+        "BANK",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "BANK": -0.0136,
+        "FMCG": -0.039
+      }
+    },
+    {
+      "date": "2025-07-16",
+      "top": [
+        "REALTY",
+        "IT"
+      ],
+      "top_rs": {
+        "REALTY": 0.0741,
+        "IT": 0.0664
+      },
+      "bottom": [
+        "BANK",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "BANK": -0.0159,
+        "FMCG": -0.0521
+      }
+    },
+    {
+      "date": "2025-07-17",
+      "top": [
+        "REALTY",
+        "METAL"
+      ],
+      "top_rs": {
+        "REALTY": 0.0842,
+        "METAL": 0.0464
+      },
+      "bottom": [
+        "BANK",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "BANK": -0.0058,
+        "FMCG": -0.0436
+      }
+    },
+    {
+      "date": "2025-07-18",
+      "top": [
+        "REALTY",
+        "METAL"
+      ],
+      "top_rs": {
+        "REALTY": 0.1012,
+        "METAL": 0.0508
+      },
+      "bottom": [
+        "BANK",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "BANK": -0.0102,
+        "FMCG": -0.0365
+      }
+    },
+    {
+      "date": "2025-07-21",
+      "top": [
+        "REALTY",
+        "METAL"
+      ],
+      "top_rs": {
+        "REALTY": 0.1272,
+        "METAL": 0.0713
+      },
+      "bottom": [
+        "IT",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "IT": -0.0024,
+        "FMCG": -0.0492
+      }
+    },
+    {
+      "date": "2025-07-22",
+      "top": [
+        "REALTY",
+        "METAL"
+      ],
+      "top_rs": {
+        "REALTY": 0.1128,
+        "METAL": 0.067
+      },
+      "bottom": [
+        "PHARMA",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0119,
+        "FMCG": -0.041
+      }
+    },
+    {
+      "date": "2025-07-23",
+      "top": [
+        "REALTY",
+        "METAL"
+      ],
+      "top_rs": {
+        "REALTY": 0.0798,
+        "METAL": 0.0766
+      },
+      "bottom": [
+        "IT",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "IT": -0.0076,
+        "FMCG": -0.0499
+      }
+    },
+    {
+      "date": "2025-07-24",
+      "top": [
+        "METAL",
+        "REALTY"
+      ],
+      "top_rs": {
+        "METAL": 0.0867,
+        "REALTY": 0.0539
+      },
+      "bottom": [
+        "IT",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "IT": -0.0204,
+        "FMCG": -0.054
+      }
+    },
+    {
+      "date": "2025-07-25",
+      "top": [
+        "METAL",
+        "REALTY"
+      ],
+      "top_rs": {
+        "METAL": 0.0863,
+        "REALTY": 0.0582
+      },
+      "bottom": [
+        "IT",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "IT": -0.0276,
+        "FMCG": -0.0499
+      }
+    },
+    {
+      "date": "2025-07-28",
+      "top": [
+        "METAL",
+        "PHARMA"
+      ],
+      "top_rs": {
+        "METAL": 0.0743,
+        "PHARMA": 0.0363
+      },
+      "bottom": [
+        "IT",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "IT": -0.0262,
+        "FMCG": -0.0477
+      }
+    },
+    {
+      "date": "2025-07-29",
+      "top": [
+        "METAL",
+        "REALTY"
+      ],
+      "top_rs": {
+        "METAL": 0.0857,
+        "REALTY": 0.0648
+      },
+      "bottom": [
+        "IT",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "IT": -0.0319,
+        "FMCG": -0.0531
+      }
+    },
+    {
+      "date": "2025-07-30",
+      "top": [
+        "METAL",
+        "PHARMA"
+      ],
+      "top_rs": {
+        "METAL": 0.0739,
+        "PHARMA": 0.057
+      },
+      "bottom": [
+        "IT",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "IT": -0.0303,
+        "FMCG": -0.0458
+      }
+    },
+    {
+      "date": "2025-07-31",
+      "top": [
+        "METAL",
+        "REALTY"
+      ],
+      "top_rs": {
+        "METAL": 0.0813,
+        "REALTY": 0.0609
+      },
+      "bottom": [
+        "FMCG",
+        "IT"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0241,
+        "IT": -0.0398
+      }
+    },
+    {
+      "date": "2025-08-01",
+      "top": [
+        "REALTY",
+        "METAL"
+      ],
+      "top_rs": {
+        "REALTY": 0.0647,
+        "METAL": 0.0578
+      },
+      "bottom": [
+        "FMCG",
+        "IT"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0131,
+        "IT": -0.0575
+      }
+    },
+    {
+      "date": "2025-08-04",
+      "top": [
+        "PHARMA",
+        "METAL"
+      ],
+      "top_rs": {
+        "PHARMA": 0.0579,
+        "METAL": 0.0545
+      },
+      "bottom": [
+        "FMCG",
+        "IT"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0087,
+        "IT": -0.0723
+      }
+    },
+    {
+      "date": "2025-08-05",
+      "top": [
+        "METAL",
+        "REALTY"
+      ],
+      "top_rs": {
+        "METAL": 0.0539,
+        "REALTY": 0.0451
+      },
+      "bottom": [
+        "FMCG",
+        "IT"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0136,
+        "IT": -0.065
+      }
+    },
+    {
+      "date": "2025-08-06",
+      "top": [
+        "METAL",
+        "AUTO"
+      ],
+      "top_rs": {
+        "METAL": 0.031,
+        "AUTO": 0.0205
+      },
+      "bottom": [
+        "FMCG",
+        "IT"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0161,
+        "IT": -0.0868
+      }
+    },
+    {
+      "date": "2025-08-07",
+      "top": [
+        "METAL",
+        "BANK"
+      ],
+      "top_rs": {
+        "METAL": 0.0295,
+        "BANK": 0.0216
+      },
+      "bottom": [
+        "PSE",
+        "IT"
+      ],
+      "bottom_rs": {
+        "PSE": -0.006,
+        "IT": -0.0746
+      }
+    },
+    {
+      "date": "2025-08-08",
+      "top": [
+        "METAL",
+        "BANK"
+      ],
+      "top_rs": {
+        "METAL": 0.0203,
+        "BANK": 0.0199
+      },
+      "bottom": [
+        "PSE",
+        "IT"
+      ],
+      "bottom_rs": {
+        "PSE": -0.0169,
+        "IT": -0.0679
+      }
+    },
+    {
+      "date": "2025-08-11",
+      "top": [
+        "BANK",
+        "METAL"
+      ],
+      "top_rs": {
+        "BANK": 0.0161,
+        "METAL": 0.0127
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0314,
+        "IT": -0.0638
+      }
+    },
+    {
+      "date": "2025-08-12",
+      "top": [
+        "PHARMA",
+        "AUTO"
+      ],
+      "top_rs": {
+        "PHARMA": 0.0218,
+        "AUTO": 0.0218
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0342,
+        "IT": -0.062
+      }
+    },
+    {
+      "date": "2025-08-13",
+      "top": [
+        "PHARMA",
+        "AUTO"
+      ],
+      "top_rs": {
+        "PHARMA": 0.0265,
+        "AUTO": 0.0257
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0483,
+        "IT": -0.068
+      }
+    },
+    {
+      "date": "2025-08-14",
+      "top": [
+        "PHARMA",
+        "AUTO"
+      ],
+      "top_rs": {
+        "PHARMA": 0.0284,
+        "AUTO": 0.0272
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0598,
+        "IT": -0.0607
+      }
+    },
+    {
+      "date": "2025-08-18",
+      "top": [
+        "AUTO",
+        "PHARMA"
+      ],
+      "top_rs": {
+        "AUTO": 0.0676,
+        "PHARMA": 0.032
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0419,
+        "IT": -0.075
+      }
+    },
+    {
+      "date": "2025-08-19",
+      "top": [
+        "AUTO",
+        "PHARMA"
+      ],
+      "top_rs": {
+        "AUTO": 0.0721,
+        "PHARMA": 0.0271
+      },
+      "bottom": [
+        "PSE",
+        "IT"
+      ],
+      "bottom_rs": {
+        "PSE": -0.0439,
+        "IT": -0.0793
+      }
+    },
+    {
+      "date": "2025-08-20",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.0703,
+        "METAL": 0.0128
+      },
+      "bottom": [
+        "PSE",
+        "IT"
+      ],
+      "bottom_rs": {
+        "PSE": -0.05,
+        "IT": -0.0573
+      }
+    },
+    {
+      "date": "2025-08-21",
+      "top": [
+        "AUTO",
+        "PHARMA"
+      ],
+      "top_rs": {
+        "AUTO": 0.0694,
+        "PHARMA": 0.0233
+      },
+      "bottom": [
+        "PSE",
+        "IT"
+      ],
+      "bottom_rs": {
+        "PSE": -0.0596,
+        "IT": -0.0599
+      }
+    },
+    {
+      "date": "2025-08-22",
+      "top": [
+        "AUTO",
+        "PHARMA"
+      ],
+      "top_rs": {
+        "AUTO": 0.0738,
+        "PHARMA": 0.0298
+      },
+      "bottom": [
+        "PSE",
+        "IT"
+      ],
+      "bottom_rs": {
+        "PSE": -0.0526,
+        "IT": -0.0627
+      }
+    },
+    {
+      "date": "2025-08-25",
+      "top": [
+        "AUTO",
+        "PHARMA"
+      ],
+      "top_rs": {
+        "AUTO": 0.0812,
+        "PHARMA": 0.0342
+      },
+      "bottom": [
+        "ENERGY",
+        "PSE"
+      ],
+      "bottom_rs": {
+        "ENERGY": -0.0474,
+        "PSE": -0.0494
+      }
+    },
+    {
+      "date": "2025-08-26",
+      "top": [
+        "AUTO",
+        "PHARMA"
+      ],
+      "top_rs": {
+        "AUTO": 0.0856,
+        "PHARMA": 0.028
+      },
+      "bottom": [
+        "PSE",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "PSE": -0.06,
+        "REALTY": -0.0773
+      }
+    },
+    {
+      "date": "2025-08-28",
+      "top": [
+        "AUTO",
+        "PHARMA"
+      ],
+      "top_rs": {
+        "AUTO": 0.084,
+        "PHARMA": 0.023
+      },
+      "bottom": [
+        "PSE",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "PSE": -0.0573,
+        "REALTY": -0.1005
+      }
+    },
+    {
+      "date": "2025-08-29",
+      "top": [
+        "AUTO",
+        "PHARMA"
+      ],
+      "top_rs": {
+        "AUTO": 0.0776,
+        "PHARMA": 0.0281
+      },
+      "bottom": [
+        "PSE",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "PSE": -0.0579,
+        "REALTY": -0.1
+      }
+    },
+    {
+      "date": "2025-09-01",
+      "top": [
+        "AUTO",
+        "FMCG"
+      ],
+      "top_rs": {
+        "AUTO": 0.1061,
+        "FMCG": 0.0148
+      },
+      "bottom": [
+        "PSE",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "PSE": -0.048,
+        "REALTY": -0.109
+      }
+    },
+    {
+      "date": "2025-09-02",
+      "top": [
+        "AUTO",
+        "FMCG"
+      ],
+      "top_rs": {
+        "AUTO": 0.0982,
+        "FMCG": 0.0349
+      },
+      "bottom": [
+        "BANK",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "BANK": -0.0346,
+        "REALTY": -0.1307
+      }
+    },
+    {
+      "date": "2025-09-03",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.0995,
+        "METAL": 0.0365
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0428,
+        "REALTY": -0.1276
+      }
+    },
+    {
+      "date": "2025-09-04",
+      "top": [
+        "AUTO",
+        "FMCG"
+      ],
+      "top_rs": {
+        "AUTO": 0.1088,
+        "FMCG": 0.0308
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0677,
+        "REALTY": -0.1251
+      }
+    },
+    {
+      "date": "2025-09-05",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1216,
+        "METAL": 0.0355
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.091,
+        "REALTY": -0.1347
+      }
+    },
+    {
+      "date": "2025-09-08",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.166,
+        "METAL": 0.0441
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.1033,
+        "REALTY": -0.1244
+      }
+    },
+    {
+      "date": "2025-09-09",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1592,
+        "METAL": 0.0453
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0896,
+        "REALTY": -0.1382
+      }
+    },
+    {
+      "date": "2025-09-10",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1472,
+        "METAL": 0.0418
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.075,
+        "REALTY": -0.1349
+      }
+    },
+    {
+      "date": "2025-09-11",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1453,
+        "METAL": 0.0555
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0913,
+        "REALTY": -0.1343
+      }
+    },
+    {
+      "date": "2025-09-12",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1403,
+        "METAL": 0.067
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.087,
+        "REALTY": -0.1356
+      }
+    },
+    {
+      "date": "2025-09-15",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1308,
+        "METAL": 0.083
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0826,
+        "REALTY": -0.0989
+      }
+    },
+    {
+      "date": "2025-09-16",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1414,
+        "METAL": 0.0863
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0763,
+        "REALTY": -0.102
+      }
+    },
+    {
+      "date": "2025-09-17",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.149,
+        "METAL": 0.0644
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0656,
+        "REALTY": -0.1067
+      }
+    },
+    {
+      "date": "2025-09-18",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.143,
+        "METAL": 0.0563
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0586,
+        "REALTY": -0.1096
+      }
+    },
+    {
+      "date": "2025-09-19",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1391,
+        "METAL": 0.0676
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0665,
+        "REALTY": -0.0976
+      }
+    },
+    {
+      "date": "2025-09-22",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1468,
+        "METAL": 0.0643
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0736,
+        "IT": -0.0761
+      }
+    },
+    {
+      "date": "2025-09-23",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1563,
+        "METAL": 0.0758
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0628,
+        "IT": -0.0738
+      }
+    },
+    {
+      "date": "2025-09-24",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1494,
+        "METAL": 0.0731
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0792,
+        "IT": -0.0835
+      }
+    },
+    {
+      "date": "2025-09-25",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1487,
+        "METAL": 0.0796
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0846,
+        "IT": -0.0849
+      }
+    },
+    {
+      "date": "2025-09-26",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1395,
+        "METAL": 0.0509
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0747,
+        "IT": -0.1018
+      }
+    },
+    {
+      "date": "2025-09-29",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1316,
+        "METAL": 0.0615
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0615,
+        "IT": -0.1025
+      }
+    },
+    {
+      "date": "2025-09-30",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1402,
+        "METAL": 0.0812
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.074,
+        "IT": -0.1073
+      }
+    },
+    {
+      "date": "2025-10-01",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1425,
+        "METAL": 0.0845
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0737,
+        "IT": -0.1031
+      }
+    },
+    {
+      "date": "2025-10-03",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1462,
+        "METAL": 0.1044
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0835,
+        "IT": -0.1045
+      }
+    },
+    {
+      "date": "2025-10-06",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1373,
+        "METAL": 0.101
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0729,
+        "IT": -0.0867
+      }
+    },
+    {
+      "date": "2025-10-07",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1359,
+        "METAL": 0.0875
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0754,
+        "IT": -0.0858
+      }
+    },
+    {
+      "date": "2025-10-08",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.133,
+        "METAL": 0.0845
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0612,
+        "REALTY": -0.0867
+      }
+    },
+    {
+      "date": "2025-10-09",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1249,
+        "METAL": 0.0968
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0481,
+        "REALTY": -0.1006
+      }
+    },
+    {
+      "date": "2025-10-10",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1142,
+        "METAL": 0.0867
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0521,
+        "REALTY": -0.0923
+      }
+    },
+    {
+      "date": "2025-10-13",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1113,
+        "METAL": 0.0909
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0625,
+        "REALTY": -0.0937
+      }
+    },
+    {
+      "date": "2025-10-14",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1086,
+        "METAL": 0.0722
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0532,
+        "REALTY": -0.114
+      }
+    },
+    {
+      "date": "2025-10-15",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1036,
+        "METAL": 0.0661
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0611,
+        "REALTY": -0.0987
+      }
+    },
+    {
+      "date": "2025-10-16",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1047,
+        "METAL": 0.0569
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0602,
+        "REALTY": -0.0927
+      }
+    },
+    {
+      "date": "2025-10-17",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1145,
+        "METAL": 0.044
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0777,
+        "REALTY": -0.0884
+      }
+    },
+    {
+      "date": "2025-10-20",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1043,
+        "METAL": 0.0393
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0577,
+        "IT": -0.0696
+      }
+    },
+    {
+      "date": "2025-10-21",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.0983,
+        "METAL": 0.0357
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0553,
+        "REALTY": -0.0558
+      }
+    },
+    {
+      "date": "2025-10-23",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.1021,
+        "METAL": 0.0442
+      },
+      "bottom": [
+        "PHARMA",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0505,
+        "REALTY": -0.0544
+      }
+    },
+    {
+      "date": "2025-10-24",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.099,
+        "METAL": 0.0655
+      },
+      "bottom": [
+        "ENERGY",
+        "PHARMA"
+      ],
+      "bottom_rs": {
+        "ENERGY": -0.0279,
+        "PHARMA": -0.0629
+      }
+    },
+    {
+      "date": "2025-10-27",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.0952,
+        "METAL": 0.0663
+      },
+      "bottom": [
+        "ENERGY",
+        "PHARMA"
+      ],
+      "bottom_rs": {
+        "ENERGY": -0.0357,
+        "PHARMA": -0.0792
+      }
+    },
+    {
+      "date": "2025-10-28",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.0998,
+        "METAL": 0.0838
+      },
+      "bottom": [
+        "ENERGY",
+        "PHARMA"
+      ],
+      "bottom_rs": {
+        "ENERGY": -0.0368,
+        "PHARMA": -0.0792
+      }
+    },
+    {
+      "date": "2025-10-29",
+      "top": [
+        "METAL",
+        "AUTO"
+      ],
+      "top_rs": {
+        "METAL": 0.1088,
+        "AUTO": 0.0873
+      },
+      "bottom": [
+        "FMCG",
+        "PHARMA"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0375,
+        "PHARMA": -0.0668
+      }
+    },
+    {
+      "date": "2025-10-30",
+      "top": [
+        "METAL",
+        "AUTO"
+      ],
+      "top_rs": {
+        "METAL": 0.1253,
+        "AUTO": 0.0926
+      },
+      "bottom": [
+        "PHARMA",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0404,
+        "FMCG": -0.0508
+      }
+    },
+    {
+      "date": "2025-10-31",
+      "top": [
+        "METAL",
+        "AUTO"
+      ],
+      "top_rs": {
+        "METAL": 0.0973,
+        "AUTO": 0.0866
+      },
+      "bottom": [
+        "FMCG",
+        "PHARMA"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0392,
+        "PHARMA": -0.0394
+      }
+    },
+    {
+      "date": "2025-11-03",
+      "top": [
+        "METAL",
+        "AUTO"
+      ],
+      "top_rs": {
+        "METAL": 0.0959,
+        "AUTO": 0.079
+      },
+      "bottom": [
+        "IT",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "IT": -0.0275,
+        "FMCG": -0.0376
+      }
+    },
+    {
+      "date": "2025-11-04",
+      "top": [
+        "METAL",
+        "AUTO"
+      ],
+      "top_rs": {
+        "METAL": 0.0874,
+        "AUTO": 0.0788
+      },
+      "bottom": [
+        "IT",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "IT": -0.017,
+        "FMCG": -0.0311
+      }
+    },
+    {
+      "date": "2025-11-06",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.0812,
+        "METAL": 0.0672
+      },
+      "bottom": [
+        "IT",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "IT": -0.0196,
+        "FMCG": -0.0297
+      }
+    },
+    {
+      "date": "2025-11-07",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.0944,
+        "METAL": 0.0936
+      },
+      "bottom": [
+        "IT",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "IT": -0.0254,
+        "FMCG": -0.0366
+      }
+    },
+    {
+      "date": "2025-11-10",
+      "top": [
+        "METAL",
+        "AUTO"
+      ],
+      "top_rs": {
+        "METAL": 0.1,
+        "AUTO": 0.092
+      },
+      "bottom": [
+        "IT",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "IT": -0.0071,
+        "FMCG": -0.0398
+      }
+    },
+    {
+      "date": "2025-11-11",
+      "top": [
+        "METAL",
+        "AUTO"
+      ],
+      "top_rs": {
+        "METAL": 0.0947,
+        "AUTO": 0.0887
+      },
+      "bottom": [
+        "PHARMA",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.021,
+        "FMCG": -0.0404
+      }
+    },
+    {
+      "date": "2025-11-12",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.0884,
+        "METAL": 0.077
+      },
+      "bottom": [
+        "PHARMA",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0301,
+        "FMCG": -0.0416
+      }
+    },
+    {
+      "date": "2025-11-13",
+      "top": [
+        "METAL",
+        "AUTO"
+      ],
+      "top_rs": {
+        "METAL": 0.0982,
+        "AUTO": 0.0847
+      },
+      "bottom": [
+        "PHARMA",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0265,
+        "FMCG": -0.0399
+      }
+    },
+    {
+      "date": "2025-11-14",
+      "top": [
+        "METAL",
+        "AUTO"
+      ],
+      "top_rs": {
+        "METAL": 0.0764,
+        "AUTO": 0.0425
+      },
+      "bottom": [
+        "PHARMA",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0108,
+        "FMCG": -0.0369
+      }
+    },
+    {
+      "date": "2025-11-17",
+      "top": [
+        "METAL",
+        "AUTO"
+      ],
+      "top_rs": {
+        "METAL": 0.0684,
+        "AUTO": 0.0378
+      },
+      "bottom": [
+        "PHARMA",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "PHARMA": -0.0051,
+        "FMCG": -0.0451
+      }
+    },
+    {
+      "date": "2025-11-18",
+      "top": [
+        "METAL",
+        "AUTO"
+      ],
+      "top_rs": {
+        "METAL": 0.059,
+        "AUTO": 0.0402
+      },
+      "bottom": [
+        "IT",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "IT": -0.0263,
+        "FMCG": -0.0573
+      }
+    },
+    {
+      "date": "2025-11-19",
+      "top": [
+        "METAL",
+        "AUTO"
+      ],
+      "top_rs": {
+        "METAL": 0.0552,
+        "AUTO": 0.0424
+      },
+      "bottom": [
+        "REALTY",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0313,
+        "FMCG": -0.055
+      }
+    },
+    {
+      "date": "2025-11-20",
+      "top": [
+        "METAL",
+        "AUTO"
+      ],
+      "top_rs": {
+        "METAL": 0.0546,
+        "AUTO": 0.0347
+      },
+      "bottom": [
+        "REALTY",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0387,
+        "FMCG": -0.0587
+      }
+    },
+    {
+      "date": "2025-11-21",
+      "top": [
+        "AUTO",
+        "METAL"
+      ],
+      "top_rs": {
+        "AUTO": 0.0391,
+        "METAL": 0.0307
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0473,
+        "REALTY": -0.0559
+      }
+    },
+    {
+      "date": "2025-11-24",
+      "top": [
+        "AUTO",
+        "BANK"
+      ],
+      "top_rs": {
+        "AUTO": 0.0333,
+        "BANK": 0.0301
+      },
+      "bottom": [
+        "REALTY",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0605,
+        "FMCG": -0.0691
+      }
+    },
+    {
+      "date": "2025-11-25",
+      "top": [
+        "METAL",
+        "BANK"
+      ],
+      "top_rs": {
+        "METAL": 0.0372,
+        "BANK": 0.0364
+      },
+      "bottom": [
+        "REALTY",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0351,
+        "FMCG": -0.0666
+      }
+    },
+    {
+      "date": "2025-11-26",
+      "top": [
+        "METAL",
+        "AUTO"
+      ],
+      "top_rs": {
+        "METAL": 0.0502,
+        "AUTO": 0.0368
+      },
+      "bottom": [
+        "REALTY",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0261,
+        "FMCG": -0.0853
+      }
+    },
+    {
+      "date": "2025-11-27",
+      "top": [
+        "BANK",
+        "METAL"
+      ],
+      "top_rs": {
+        "BANK": 0.0416,
+        "METAL": 0.0395
+      },
+      "bottom": [
+        "REALTY",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0361,
+        "FMCG": -0.0771
+      }
+    },
+    {
+      "date": "2025-11-28",
+      "top": [
+        "BANK",
+        "METAL"
+      ],
+      "top_rs": {
+        "BANK": 0.0475,
+        "METAL": 0.0308
+      },
+      "bottom": [
+        "REALTY",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0469,
+        "FMCG": -0.0874
+      }
+    },
+    {
+      "date": "2025-12-01",
+      "top": [
+        "BANK",
+        "AUTO"
+      ],
+      "top_rs": {
+        "BANK": 0.0447,
+        "AUTO": 0.0269
+      },
+      "bottom": [
+        "REALTY",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0543,
+        "FMCG": -0.0849
+      }
+    },
+    {
+      "date": "2025-12-02",
+      "top": [
+        "BANK",
+        "AUTO"
+      ],
+      "top_rs": {
+        "BANK": 0.0437,
+        "AUTO": 0.0239
+      },
+      "bottom": [
+        "REALTY",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0419,
+        "FMCG": -0.0825
+      }
+    },
+    {
+      "date": "2025-12-03",
+      "top": [
+        "BANK",
+        "IT"
+      ],
+      "top_rs": {
+        "BANK": 0.0464,
+        "IT": 0.0418
+      },
+      "bottom": [
+        "REALTY",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0356,
+        "FMCG": -0.0742
+      }
+    },
+    {
+      "date": "2025-12-04",
+      "top": [
+        "IT",
+        "BANK"
+      ],
+      "top_rs": {
+        "IT": 0.0671,
+        "BANK": 0.0433
+      },
+      "bottom": [
+        "REALTY",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0354,
+        "FMCG": -0.068
+      }
+    },
+    {
+      "date": "2025-12-05",
+      "top": [
+        "BANK",
+        "IT"
+      ],
+      "top_rs": {
+        "BANK": 0.0496,
+        "IT": 0.0448
+      },
+      "bottom": [
+        "ENERGY",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "ENERGY": -0.0319,
+        "FMCG": -0.0759
+      }
+    },
+    {
+      "date": "2025-12-08",
+      "top": [
+        "BANK",
+        "IT"
+      ],
+      "top_rs": {
+        "BANK": 0.0467,
+        "IT": 0.027
+      },
+      "bottom": [
+        "REALTY",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0646,
+        "FMCG": -0.0803
+      }
+    },
+    {
+      "date": "2025-12-09",
+      "top": [
+        "BANK",
+        "IT"
+      ],
+      "top_rs": {
+        "BANK": 0.0499,
+        "IT": 0.0257
+      },
+      "bottom": [
+        "REALTY",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0491,
+        "FMCG": -0.0762
+      }
+    },
+    {
+      "date": "2025-12-10",
+      "top": [
+        "BANK",
+        "IT"
+      ],
+      "top_rs": {
+        "BANK": 0.0501,
+        "IT": 0.0209
+      },
+      "bottom": [
+        "REALTY",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0456,
+        "FMCG": -0.0619
+      }
+    },
+    {
+      "date": "2025-12-11",
+      "top": [
+        "BANK",
+        "IT"
+      ],
+      "top_rs": {
+        "BANK": 0.0457,
+        "IT": 0.0281
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0672,
+        "REALTY": -0.0689
+      }
+    },
+    {
+      "date": "2025-12-12",
+      "top": [
+        "BANK",
+        "IT"
+      ],
+      "top_rs": {
+        "BANK": 0.0449,
+        "IT": 0.025
+      },
+      "bottom": [
+        "REALTY",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0635,
+        "FMCG": -0.0658
+      }
+    },
+    {
+      "date": "2025-12-15",
+      "top": [
+        "BANK",
+        "METAL"
+      ],
+      "top_rs": {
+        "BANK": 0.044,
+        "METAL": 0.036
+      },
+      "bottom": [
+        "PSE",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "PSE": -0.0557,
+        "REALTY": -0.0634
+      }
+    },
+    {
+      "date": "2025-12-16",
+      "top": [
+        "BANK",
+        "METAL"
+      ],
+      "top_rs": {
+        "BANK": 0.0422,
+        "METAL": 0.034
+      },
+      "bottom": [
+        "PSE",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "PSE": -0.0535,
+        "REALTY": -0.0647
+      }
+    },
+    {
+      "date": "2025-12-17",
+      "top": [
+        "BANK",
+        "METAL"
+      ],
+      "top_rs": {
+        "BANK": 0.0431,
+        "METAL": 0.0307
+      },
+      "bottom": [
+        "PSE",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "PSE": -0.0594,
+        "REALTY": -0.0802
+      }
+    },
+    {
+      "date": "2025-12-18",
+      "top": [
+        "IT",
+        "BANK"
+      ],
+      "top_rs": {
+        "IT": 0.0639,
+        "BANK": 0.0413
+      },
+      "bottom": [
+        "ENERGY",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "ENERGY": -0.0668,
+        "REALTY": -0.0799
+      }
+    },
+    {
+      "date": "2025-12-19",
+      "top": [
+        "IT",
+        "BANK"
+      ],
+      "top_rs": {
+        "IT": 0.066,
+        "BANK": 0.0325
+      },
+      "bottom": [
+        "REALTY",
+        "PSE"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0628,
+        "PSE": -0.065
+      }
+    },
+    {
+      "date": "2025-12-22",
+      "top": [
+        "IT",
+        "BANK"
+      ],
+      "top_rs": {
+        "IT": 0.0839,
+        "BANK": 0.0314
+      },
+      "bottom": [
+        "ENERGY",
+        "PSE"
+      ],
+      "bottom_rs": {
+        "ENERGY": -0.0581,
+        "PSE": -0.0639
+      }
+    },
+    {
+      "date": "2025-12-23",
+      "top": [
+        "IT",
+        "BANK"
+      ],
+      "top_rs": {
+        "IT": 0.0822,
+        "BANK": 0.027
+      },
+      "bottom": [
+        "ENERGY",
+        "PSE"
+      ],
+      "bottom_rs": {
+        "ENERGY": -0.0528,
+        "PSE": -0.0559
+      }
+    },
+    {
+      "date": "2025-12-24",
+      "top": [
+        "IT",
+        "BANK"
+      ],
+      "top_rs": {
+        "IT": 0.0961,
+        "BANK": 0.0278
+      },
+      "bottom": [
+        "PSE",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "PSE": -0.0546,
+        "FMCG": -0.0555
+      }
+    },
+    {
+      "date": "2025-12-26",
+      "top": [
+        "IT",
+        "METAL"
+      ],
+      "top_rs": {
+        "IT": 0.0877,
+        "METAL": 0.0319
+      },
+      "bottom": [
+        "ENERGY",
+        "PSE"
+      ],
+      "bottom_rs": {
+        "ENERGY": -0.0574,
+        "PSE": -0.0585
+      }
+    },
+    {
+      "date": "2025-12-29",
+      "top": [
+        "IT",
+        "BANK"
+      ],
+      "top_rs": {
+        "IT": 0.0834,
+        "BANK": 0.0246
+      },
+      "bottom": [
+        "ENERGY",
+        "PSE"
+      ],
+      "bottom_rs": {
+        "ENERGY": -0.0578,
+        "PSE": -0.0637
+      }
+    },
+    {
+      "date": "2025-12-30",
+      "top": [
+        "IT",
+        "METAL"
+      ],
+      "top_rs": {
+        "IT": 0.0763,
+        "METAL": 0.0462
+      },
+      "bottom": [
+        "ENERGY",
+        "PSE"
+      ],
+      "bottom_rs": {
+        "ENERGY": -0.0548,
+        "PSE": -0.0593
+      }
+    },
+    {
+      "date": "2025-12-31",
+      "top": [
+        "IT",
+        "METAL"
+      ],
+      "top_rs": {
+        "IT": 0.0663,
+        "METAL": 0.037
+      },
+      "bottom": [
+        "ENERGY",
+        "PSE"
+      ],
+      "bottom_rs": {
+        "ENERGY": -0.051,
+        "PSE": -0.0571
+      }
+    },
+    {
+      "date": "2026-01-01",
+      "top": [
+        "METAL",
+        "IT"
+      ],
+      "top_rs": {
+        "METAL": 0.0625,
+        "IT": 0.0567
+      },
+      "bottom": [
+        "PSE",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "PSE": -0.0442,
+        "FMCG": -0.0669
+      }
+    },
+    {
+      "date": "2026-01-02",
+      "top": [
+        "METAL",
+        "IT"
+      ],
+      "top_rs": {
+        "METAL": 0.076,
+        "IT": 0.0554
+      },
+      "bottom": [
+        "REALTY",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0406,
+        "FMCG": -0.0794
+      }
+    },
+    {
+      "date": "2026-01-05",
+      "top": [
+        "METAL",
+        "AUTO"
+      ],
+      "top_rs": {
+        "METAL": 0.0855,
+        "AUTO": 0.0413
+      },
+      "bottom": [
+        "ENERGY",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "ENERGY": -0.0206,
+        "FMCG": -0.0673
+      }
+    },
+    {
+      "date": "2026-01-06",
+      "top": [
+        "METAL",
+        "AUTO"
+      ],
+      "top_rs": {
+        "METAL": 0.0732,
+        "AUTO": 0.0482
+      },
+      "bottom": [
+        "ENERGY",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "ENERGY": -0.0224,
+        "FMCG": -0.0605
+      }
+    },
+    {
+      "date": "2026-01-07",
+      "top": [
+        "METAL",
+        "IT"
+      ],
+      "top_rs": {
+        "METAL": 0.0892,
+        "IT": 0.0527
+      },
+      "bottom": [
+        "ENERGY",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "ENERGY": -0.0234,
+        "FMCG": -0.0606
+      }
+    },
+    {
+      "date": "2026-01-08",
+      "top": [
+        "METAL",
+        "IT"
+      ],
+      "top_rs": {
+        "METAL": 0.0638,
+        "IT": 0.0475
+      },
+      "bottom": [
+        "ENERGY",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "ENERGY": -0.0416,
+        "FMCG": -0.0526
+      }
+    },
+    {
+      "date": "2026-01-09",
+      "top": [
+        "METAL",
+        "IT"
+      ],
+      "top_rs": {
+        "METAL": 0.0753,
+        "IT": 0.0585
+      },
+      "bottom": [
+        "ENERGY",
+        "FMCG"
+      ],
+      "bottom_rs": {
+        "ENERGY": -0.0402,
+        "FMCG": -0.0541
+      }
+    },
+    {
+      "date": "2026-01-12",
+      "top": [
+        "METAL",
+        "IT"
+      ],
+      "top_rs": {
+        "METAL": 0.089,
+        "IT": 0.0546
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.055,
+        "REALTY": -0.0753
+      }
+    },
+    {
+      "date": "2026-01-13",
+      "top": [
+        "METAL",
+        "IT"
+      ],
+      "top_rs": {
+        "METAL": 0.0981,
+        "IT": 0.0704
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0644,
+        "REALTY": -0.086
+      }
+    },
+    {
+      "date": "2026-01-14",
+      "top": [
+        "METAL",
+        "IT"
+      ],
+      "top_rs": {
+        "METAL": 0.1451,
+        "IT": 0.0839
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0752,
+        "REALTY": -0.0879
+      }
+    },
+    {
+      "date": "2026-01-16",
+      "top": [
+        "METAL",
+        "IT"
+      ],
+      "top_rs": {
+        "METAL": 0.1439,
+        "IT": 0.1133
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.073,
+        "REALTY": -0.0851
+      }
+    },
+    {
+      "date": "2026-01-19",
+      "top": [
+        "METAL",
+        "IT"
+      ],
+      "top_rs": {
+        "METAL": 0.1439,
+        "IT": 0.113
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0618,
+        "REALTY": -0.0972
+      }
+    },
+    {
+      "date": "2026-01-20",
+      "top": [
+        "METAL",
+        "IT"
+      ],
+      "top_rs": {
+        "METAL": 0.136,
+        "IT": 0.0815
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0637,
+        "REALTY": -0.1293
+      }
+    },
+    {
+      "date": "2026-01-21",
+      "top": [
+        "METAL",
+        "IT"
+      ],
+      "top_rs": {
+        "METAL": 0.1302,
+        "IT": 0.0805
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.063,
+        "REALTY": -0.1375
+      }
+    },
+    {
+      "date": "2026-01-22",
+      "top": [
+        "METAL",
+        "IT"
+      ],
+      "top_rs": {
+        "METAL": 0.1318,
+        "IT": 0.0862
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0528,
+        "REALTY": -0.1543
+      }
+    },
+    {
+      "date": "2026-01-23",
+      "top": [
+        "METAL",
+        "IT"
+      ],
+      "top_rs": {
+        "METAL": 0.1174,
+        "IT": 0.1005
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0451,
+        "REALTY": -0.1651
+      }
+    },
+    {
+      "date": "2026-01-27",
+      "top": [
+        "METAL",
+        "IT"
+      ],
+      "top_rs": {
+        "METAL": 0.1313,
+        "IT": 0.1023
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0593,
+        "REALTY": -0.1673
+      }
+    },
+    {
+      "date": "2026-01-28",
+      "top": [
+        "METAL",
+        "IT"
+      ],
+      "top_rs": {
+        "METAL": 0.149,
+        "IT": 0.0992
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0744,
+        "REALTY": -0.1682
+      }
+    },
+    {
+      "date": "2026-01-29",
+      "top": [
+        "METAL",
+        "IT"
+      ],
+      "top_rs": {
+        "METAL": 0.1876,
+        "IT": 0.0879
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0893,
+        "REALTY": -0.1687
+      }
+    },
+    {
+      "date": "2026-01-30",
+      "top": [
+        "METAL",
+        "IT"
+      ],
+      "top_rs": {
+        "METAL": 0.1275,
+        "IT": 0.084
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0708,
+        "REALTY": -0.1745
+      }
+    },
+    {
+      "date": "2026-02-01",
+      "top": [
+        "IT",
+        "METAL"
+      ],
+      "top_rs": {
+        "IT": 0.1146,
+        "METAL": 0.1111
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0733,
+        "REALTY": -0.1732
+      }
+    },
+    {
+      "date": "2026-02-02",
+      "top": [
+        "METAL",
+        "IT"
+      ],
+      "top_rs": {
+        "METAL": 0.141,
+        "IT": 0.094
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0748,
+        "REALTY": -0.1616
+      }
+    },
+    {
+      "date": "2026-02-03",
+      "top": [
+        "METAL",
+        "IT"
+      ],
+      "top_rs": {
+        "METAL": 0.1314,
+        "IT": 0.0903
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0928,
+        "REALTY": -0.1478
+      }
+    },
+    {
+      "date": "2026-02-04",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.1409,
+        "PSE": 0.042
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0876,
+        "REALTY": -0.1347
+      }
+    },
+    {
+      "date": "2026-02-05",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.131,
+        "PSE": 0.0377
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0843,
+        "REALTY": -0.1284
+      }
+    },
+    {
+      "date": "2026-02-06",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.1399,
+        "PSE": 0.0421
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0586,
+        "REALTY": -0.1135
+      }
+    },
+    {
+      "date": "2026-02-09",
+      "top": [
+        "METAL",
+        "BANK"
+      ],
+      "top_rs": {
+        "METAL": 0.146,
+        "BANK": 0.0396
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0574,
+        "REALTY": -0.101
+      }
+    },
+    {
+      "date": "2026-02-10",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.1642,
+        "PSE": 0.0408
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.0627,
+        "REALTY": -0.0985
+      }
+    },
+    {
+      "date": "2026-02-11",
+      "top": [
+        "METAL",
+        "AUTO"
+      ],
+      "top_rs": {
+        "METAL": 0.1719,
+        "AUTO": 0.0411
+      },
+      "bottom": [
+        "FMCG",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "FMCG": -0.061,
+        "REALTY": -0.0935
+      }
+    },
+    {
+      "date": "2026-02-12",
+      "top": [
+        "METAL",
+        "AUTO"
+      ],
+      "top_rs": {
+        "METAL": 0.1865,
+        "AUTO": 0.0455
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0743,
+        "REALTY": -0.0876
+      }
+    },
+    {
+      "date": "2026-02-13",
+      "top": [
+        "METAL",
+        "AUTO"
+      ],
+      "top_rs": {
+        "METAL": 0.1657,
+        "AUTO": 0.0515
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0864,
+        "IT": -0.0955
+      }
+    },
+    {
+      "date": "2026-02-16",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.1705,
+        "PSE": 0.0586
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0739,
+        "IT": -0.0968
+      }
+    },
+    {
+      "date": "2026-02-17",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.1794,
+        "PSE": 0.0653
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0657,
+        "IT": -0.0902
+      }
+    },
+    {
+      "date": "2026-02-18",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.2018,
+        "PSE": 0.0753
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0484,
+        "IT": -0.1126
+      }
+    },
+    {
+      "date": "2026-02-19",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.1922,
+        "PSE": 0.0726
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.076,
+        "IT": -0.1058
+      }
+    },
+    {
+      "date": "2026-02-20",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.1905,
+        "PSE": 0.0777
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0754,
+        "IT": -0.1193
+      }
+    },
+    {
+      "date": "2026-02-23",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.1836,
+        "PSE": 0.0775
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0756,
+        "IT": -0.1383
+      }
+    },
+    {
+      "date": "2026-02-24",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.2027,
+        "PSE": 0.101
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0863,
+        "IT": -0.1668
+      }
+    },
+    {
+      "date": "2026-02-25",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.2241,
+        "PSE": 0.1026
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0821,
+        "IT": -0.1606
+      }
+    },
+    {
+      "date": "2026-02-26",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.2273,
+        "PSE": 0.1027
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0841,
+        "IT": -0.1655
+      }
+    },
+    {
+      "date": "2026-02-27",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.2235,
+        "PSE": 0.1183
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0872,
+        "IT": -0.1598
+      }
+    },
+    {
+      "date": "2026-03-02",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.2394,
+        "PSE": 0.1186
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0923,
+        "IT": -0.166
+      }
+    },
+    {
+      "date": "2026-03-04",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.2043,
+        "PSE": 0.1106
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.1017,
+        "IT": -0.1518
+      }
+    },
+    {
+      "date": "2026-03-05",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.2341,
+        "PSE": 0.1376
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0745,
+        "IT": -0.1733
+      }
+    },
+    {
+      "date": "2026-03-06",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.2404,
+        "PSE": 0.1422
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0932,
+        "IT": -0.1558
+      }
+    },
+    {
+      "date": "2026-03-09",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.2177,
+        "PSE": 0.1295
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0873,
+        "IT": -0.1347
+      }
+    },
+    {
+      "date": "2026-03-10",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.2192,
+        "PSE": 0.134
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0846,
+        "IT": -0.1487
+      }
+    },
+    {
+      "date": "2026-03-11",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.2057,
+        "PSE": 0.1436
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0913,
+        "IT": -0.1416
+      }
+    },
+    {
+      "date": "2026-03-12",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.216,
+        "PSE": 0.1674
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0963,
+        "IT": -0.1377
+      }
+    },
+    {
+      "date": "2026-03-13",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.1839,
+        "PSE": 0.1668
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0838,
+        "IT": -0.1315
+      }
+    },
+    {
+      "date": "2026-03-16",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.1723,
+        "PSE": 0.1406
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.1012,
+        "IT": -0.1458
+      }
+    },
+    {
+      "date": "2026-03-17",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.1932,
+        "PSE": 0.1476
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0962,
+        "IT": -0.169
+      }
+    },
+    {
+      "date": "2026-03-18",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.1893,
+        "PSE": 0.1381
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0899,
+        "IT": -0.1517
+      }
+    },
+    {
+      "date": "2026-03-19",
+      "top": [
+        "METAL",
+        "PSE"
+      ],
+      "top_rs": {
+        "METAL": 0.1755,
+        "PSE": 0.1401
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0847,
+        "IT": -0.1551
+      }
+    },
+    {
+      "date": "2026-03-20",
+      "top": [
+        "METAL",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "METAL": 0.1809,
+        "ENERGY": 0.1367
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0949,
+        "IT": -0.1376
+      }
+    },
+    {
+      "date": "2026-03-23",
+      "top": [
+        "METAL",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "METAL": 0.1501,
+        "ENERGY": 0.1316
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.1117,
+        "IT": -0.1133
+      }
+    },
+    {
+      "date": "2026-03-24",
+      "top": [
+        "METAL",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "METAL": 0.1436,
+        "ENERGY": 0.1209
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.1112,
+        "REALTY": -0.1167
+      }
+    },
+    {
+      "date": "2026-03-25",
+      "top": [
+        "METAL",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "METAL": 0.1529,
+        "ENERGY": 0.1213
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.1094,
+        "IT": -0.1233
+      }
+    },
+    {
+      "date": "2026-03-27",
+      "top": [
+        "METAL",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "METAL": 0.1342,
+        "ENERGY": 0.1318
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.1023,
+        "REALTY": -0.1093
+      }
+    },
+    {
+      "date": "2026-03-30",
+      "top": [
+        "METAL",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "METAL": 0.1427,
+        "ENERGY": 0.1319
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0875,
+        "REALTY": -0.113
+      }
+    },
+    {
+      "date": "2026-04-01",
+      "top": [
+        "METAL",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "METAL": 0.1465,
+        "ENERGY": 0.1297
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0901,
+        "REALTY": -0.1162
+      }
+    },
+    {
+      "date": "2026-04-02",
+      "top": [
+        "METAL",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "METAL": 0.1404,
+        "ENERGY": 0.1104
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0683,
+        "REALTY": -0.1149
+      }
+    },
+    {
+      "date": "2026-04-06",
+      "top": [
+        "METAL",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "METAL": 0.1331,
+        "ENERGY": 0.1067
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0639,
+        "REALTY": -0.126
+      }
+    },
+    {
+      "date": "2026-04-07",
+      "top": [
+        "METAL",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "METAL": 0.1374,
+        "ENERGY": 0.1091
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0564,
+        "REALTY": -0.1193
+      }
+    },
+    {
+      "date": "2026-04-08",
+      "top": [
+        "METAL",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "METAL": 0.1302,
+        "ENERGY": 0.1017
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0983,
+        "IT": -0.1021
+      }
+    },
+    {
+      "date": "2026-04-09",
+      "top": [
+        "METAL",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "METAL": 0.1798,
+        "ENERGY": 0.1399
+      },
+      "bottom": [
+        "IT",
+        "REALTY"
+      ],
+      "bottom_rs": {
+        "IT": -0.0845,
+        "REALTY": -0.0871
+      }
+    },
+    {
+      "date": "2026-04-10",
+      "top": [
+        "METAL",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "METAL": 0.1773,
+        "ENERGY": 0.1439
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0677,
+        "IT": -0.1204
+      }
+    },
+    {
+      "date": "2026-04-13",
+      "top": [
+        "METAL",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "METAL": 0.1651,
+        "ENERGY": 0.1545
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0474,
+        "IT": -0.1171
+      }
+    },
+    {
+      "date": "2026-04-15",
+      "top": [
+        "METAL",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "METAL": 0.1634,
+        "ENERGY": 0.1623
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0365,
+        "IT": -0.1168
+      }
+    },
+    {
+      "date": "2026-04-16",
+      "top": [
+        "ENERGY",
+        "METAL"
+      ],
+      "top_rs": {
+        "ENERGY": 0.1601,
+        "METAL": 0.1497
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0257,
+        "IT": -0.1015
+      }
+    },
+    {
+      "date": "2026-04-17",
+      "top": [
+        "ENERGY",
+        "METAL"
+      ],
+      "top_rs": {
+        "ENERGY": 0.1842,
+        "METAL": 0.1625
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0253,
+        "IT": -0.134
+      }
+    },
+    {
+      "date": "2026-04-20",
+      "top": [
+        "ENERGY",
+        "METAL"
+      ],
+      "top_rs": {
+        "ENERGY": 0.1963,
+        "METAL": 0.1544
+      },
+      "bottom": [
+        "REALTY",
+        "IT"
+      ],
+      "bottom_rs": {
+        "REALTY": -0.0168,
+        "IT": -0.1404
+      }
+    },
+    {
+      "date": "2026-04-21",
+      "top": [
+        "ENERGY",
+        "METAL"
+      ],
+      "top_rs": {
+        "ENERGY": 0.2052,
+        "METAL": 0.1544
+      },
+      "bottom": [
+        "BANK",
+        "IT"
+      ],
+      "bottom_rs": {
+        "BANK": -0.0082,
+        "IT": -0.1412
+      }
+    },
+    {
+      "date": "2026-04-22",
+      "top": [
+        "ENERGY",
+        "METAL"
+      ],
+      "top_rs": {
+        "ENERGY": 0.2266,
+        "METAL": 0.158
+      },
+      "bottom": [
+        "BANK",
+        "IT"
+      ],
+      "bottom_rs": {
+        "BANK": 0.0025,
+        "IT": -0.1663
+      }
+    },
+    {
+      "date": "2026-04-23",
+      "top": [
+        "ENERGY",
+        "METAL"
+      ],
+      "top_rs": {
+        "ENERGY": 0.2294,
+        "METAL": 0.1489
+      },
+      "bottom": [
+        "BANK",
+        "IT"
+      ],
+      "bottom_rs": {
+        "BANK": -0.0047,
+        "IT": -0.1693
+      }
+    },
+    {
+      "date": "2026-04-24",
+      "top": [
+        "ENERGY",
+        "METAL"
+      ],
+      "top_rs": {
+        "ENERGY": 0.2516,
+        "METAL": 0.1565
+      },
+      "bottom": [
+        "AUTO",
+        "IT"
+      ],
+      "bottom_rs": {
+        "AUTO": 0.003,
+        "IT": -0.2079
+      }
+    },
+    {
+      "date": "2026-04-27",
+      "top": [
+        "ENERGY",
+        "PSE"
+      ],
+      "top_rs": {
+        "ENERGY": 0.2594,
+        "PSE": 0.1415
+      },
+      "bottom": [
+        "BANK",
+        "IT"
+      ],
+      "bottom_rs": {
+        "BANK": -0.0067,
+        "IT": -0.2009
+      }
+    },
+    {
+      "date": "2026-04-28",
+      "top": [
+        "ENERGY",
+        "METAL"
+      ],
+      "top_rs": {
+        "ENERGY": 0.2349,
+        "METAL": 0.1308
+      },
+      "bottom": [
+        "BANK",
+        "IT"
+      ],
+      "bottom_rs": {
+        "BANK": -0.0173,
+        "IT": -0.199
+      }
+    },
+    {
+      "date": "2026-04-29",
+      "top": [
+        "ENERGY",
+        "PHARMA"
+      ],
+      "top_rs": {
+        "ENERGY": 0.2081,
+        "PHARMA": 0.1275
+      },
+      "bottom": [
+        "BANK",
+        "IT"
+      ],
+      "bottom_rs": {
+        "BANK": -0.0271,
+        "IT": -0.1902
+      }
+    },
+    {
+      "date": "2026-04-30",
+      "top": [
+        "ENERGY",
+        "METAL"
+      ],
+      "top_rs": {
+        "ENERGY": 0.2126,
+        "METAL": 0.1373
+      },
+      "bottom": [
+        "BANK",
+        "IT"
+      ],
+      "bottom_rs": {
+        "BANK": -0.0274,
+        "IT": -0.176
+      }
+    },
+    {
+      "date": "2026-05-04",
+      "top": [
+        "ENERGY",
+        "METAL"
+      ],
+      "top_rs": {
+        "ENERGY": 0.2315,
+        "METAL": 0.1715
+      },
+      "bottom": [
+        "BANK",
+        "IT"
+      ],
+      "bottom_rs": {
+        "BANK": -0.0321,
+        "IT": -0.2115
+      }
+    },
+    {
+      "date": "2026-05-05",
+      "top": [
+        "ENERGY",
+        "METAL"
+      ],
+      "top_rs": {
+        "ENERGY": 0.2263,
+        "METAL": 0.1656
+      },
+      "bottom": [
+        "BANK",
+        "IT"
+      ],
+      "bottom_rs": {
+        "BANK": -0.0274,
+        "IT": -0.1934
+      }
+    },
+    {
+      "date": "2026-05-06",
+      "top": [
+        "ENERGY",
+        "METAL"
+      ],
+      "top_rs": {
+        "ENERGY": 0.1987,
+        "METAL": 0.1582
+      },
+      "bottom": [
+        "BANK",
+        "IT"
+      ],
+      "bottom_rs": {
+        "BANK": -0.0133,
+        "IT": -0.1877
+      }
+    },
+    {
+      "date": "2026-05-07",
+      "top": [
+        "ENERGY",
+        "METAL"
+      ],
+      "top_rs": {
+        "ENERGY": 0.1874,
+        "METAL": 0.1493
+      },
+      "bottom": [
+        "BANK",
+        "IT"
+      ],
+      "bottom_rs": {
+        "BANK": -0.0133,
+        "IT": -0.1447
+      }
+    },
+    {
+      "date": "2026-05-08",
+      "top": [
+        "ENERGY",
+        "METAL"
+      ],
+      "top_rs": {
+        "ENERGY": 0.1832,
+        "METAL": 0.152
+      },
+      "bottom": [
+        "BANK",
+        "IT"
+      ],
+      "bottom_rs": {
+        "BANK": -0.0219,
+        "IT": -0.1295
+      }
+    },
+    {
+      "date": "2026-05-11",
+      "top": [
+        "PHARMA",
+        "ENERGY"
+      ],
+      "top_rs": {
+        "PHARMA": 0.1737,
+        "ENERGY": 0.1716
+      },
+      "bottom": [
+        "BANK",
+        "IT"
+      ],
+      "bottom_rs": {
+        "BANK": -0.0214,
+        "IT": -0.1033
+      }
+    },
+    {
+      "date": "2026-05-12",
+      "top": [
+        "ENERGY",
+        "PHARMA"
+      ],
+      "top_rs": {
+        "ENERGY": 0.1772,
+        "PHARMA": 0.1657
+      },
+      "bottom": [
+        "BANK",
+        "IT"
+      ],
+      "bottom_rs": {
+        "BANK": -0.0211,
+        "IT": -0.1111
+      }
+    }
+  ]
+}
