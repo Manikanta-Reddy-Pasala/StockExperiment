@@ -34,14 +34,21 @@ min_adv_lakh:    100
 kill_switch:     -5% daily loss
 ```
 
-## Backtest comparison
+## Backtest comparison (3 years, N50, ₹10L)
 
-| Config | Period | ROI% | DD% | Win% | Trades |
-|--------|--------|-----:|----:|-----:|-------:|
-| EMA 200/400 N50 simple | 2023-24 | **+98.13** | 13.06 | n/a | 179 |
-| EMA 200/400 N50 simple | 2024-25 | **+54.88** | 13.06 | n/a | 125 |
-| EMA 200/400 N50 simple | 2025-26 | +6.77 | 13.01 | n/a | 54 |
-| EMA 9/21 selector top-10 (Phase 7) | 2025-26 only | +33.32 | 8.20 | 59.7 | 140 |
+| Config | 2023-24 ROI | 2024-25 ROI | 2025-26 ROI | Avg/yr | Trades |
+|--------|------------:|------------:|------------:|-------:|-------:|
+| **EMA 200/400 raw** ⭐ | **+98.13** | **+54.88** | +6.77 | **+53.26** | 358 |
+| EMA 200/400 + filters | 0 (over-filter) | 0 | 0 | 0 | 0 |
+| EMA 9/21 raw | -0.94 | -20.21 | -7.10 | -9.42 | 1163 |
+| EMA 9/21 + filters | +18.08 | +8.24 | -6.46 | +6.62 | 110 |
+| ORB-60 day trading | (impl broken) | - | - | - | 0 |
+
+**Filters HURT slow EMA (200/400) but HELP fast EMA (9/21).**
+
+EMA 200/400 raw remains multi-year winner. Filters block legitimate
+slow-EMA signals. Retest1/retest2 state machine already filters
+false alarms by construction.
 
 ## Universe options
 
