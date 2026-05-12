@@ -1,0 +1,1846 @@
+# Himadri Speciality Chemical Ltd. (HSCL)
+
+## Backtest Summary
+
+- **Window:** 2024-03-13 09:15:00 → 2026-05-08 15:15:00 (3710 bars)
+- **Last close:** 631.60
+- **Strategy:** EMA 200/400 1H crossover (Strategy-1 spec)
+- **Target:** entry × (1 ± 10%)
+- **Partial:** 50% qty @ 5% (ENTRY1) / BUY-ENTRY2 15% / SELL-ENTRY2 5%, trail SL → EMA200
+- **SL:** ENTRY1 = EMA400 close-based; ENTRY2 = retest2 candle low/high
+- **Re-entry cap:** 1 initial + 3 re-entries at each of 2nd / 3rd alert
+
+## Signal Counts
+
+| Signal | Count |
+|--------|-------|
+| CROSSOVER | 131 |
+| ALERT1 | 96 |
+| ALERT2 | 92 |
+| ALERT2_SKIP | 40 |
+| ALERT3 | 231 |
+| PENDING | 0 |
+| PENDING_CANCEL | 0 |
+| ENTRY1 | 4 |
+| ENTRY2 | 125 |
+| PARTIAL | 20 |
+| TARGET_HIT | 8 |
+| STOP_HIT | 122 |
+| EXIT | 0 |
+
+## P&L (combined)
+
+- **Closed legs:** 148 (incl. partial bookings)
+- **Trades open at end:** 0
+- **Winners / losers:** 68 / 80
+- **Target hits / Stop hits / Partials:** 8 / 121 / 19
+- **Avg / median % per leg:** 0.61% / -0.34%
+- **Sum % (uncompounded):** 90.63%
+
+## Direction × Alert breakdown
+
+| Bucket | Legs | Win | Win% | Tgt | SL | Prt | Avg % | Sum % |
+|--------|------|-----|------|-----|----|-----|-------|-------|
+| BUY (all) | 62 | 22 | 35.5% | 6 | 56 | 0 | 0.50% | 31.2% |
+| BUY @ 2nd Alert (retest1) | 4 | 0 | 0.0% | 0 | 4 | 0 | -0.64% | -2.6% |
+| BUY @ 3rd Alert (retest2) | 58 | 22 | 37.9% | 6 | 52 | 0 | 0.58% | 33.8% |
+| SELL (all) | 86 | 46 | 53.5% | 2 | 65 | 19 | 0.69% | 59.4% |
+| SELL @ 2nd Alert (retest1) | 0 | 0 | 0.0% | 0 | 0 | 0 | 0.00% | 0.0% |
+| SELL @ 3rd Alert (retest2) | 86 | 46 | 53.5% | 2 | 65 | 19 | 0.69% | 59.4% |
+| retest1 (combined) | 4 | 0 | 0.0% | 0 | 4 | 0 | -0.64% | -2.6% |
+| retest2 (combined) | 144 | 68 | 47.2% | 8 | 117 | 19 | 0.65% | 93.2% |
+
+## Strategy Cycles
+
+Each cycle begins at a CROSSOVER (trend flip) and walks through the
+configured stages: Trend ID → First Alert → Second Alert (Retest 1)
+→ First Entry → Third Alert (Retest 2) → Second Entry → Exit.
+
+### Cycle 1 — BUY (started 2024-05-14 13:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2024-05-14 13:15:00 | 350.25 | 346.35 | 345.97 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2024-05-15 09:15:00 | 357.50 | 349.94 | 347.82 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2024-05-15 15:15:00 | 354.15 | 354.30 | 351.43 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2024-05-16 09:15:00 | 353.95 | 354.30 | 351.43 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-05-16 10:15:00 | 349.30 | 353.11 | 351.37 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-05-16 11:00:00 | 349.30 | 353.11 | 351.37 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-05-16 11:15:00 | 349.00 | 352.29 | 351.16 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2024-05-16 12:15:00 | 350.80 | 352.29 | 351.16 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2024-05-16 13:45:00 | 350.15 | 351.30 | 350.88 | BUY ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2024-05-16 14:15:00 | 349.60 | 351.30 | 350.88 | BUY ENTRY2 attempt 3/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2024-05-16 15:15:00 | 349.80 | 350.72 | 350.66 | BUY ENTRY2 attempt 4/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2024-05-16 15:15:00 | 349.80 | 350.54 | 350.58 | Force close (CROSSOVER_FLIP) qty=1.00 alert=retest2 |
+
+### Cycle 2 — SELL (started 2024-05-16 15:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2024-05-16 15:15:00 | 349.80 | 350.54 | 350.58 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2024-05-17 13:15:00 | 346.70 | 349.34 | 349.95 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2024-05-17 14:15:00 | 349.50 | 349.37 | 349.91 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2024-05-17 15:00:00 | 349.50 | 349.37 | 349.91 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-05-17 15:15:00 | 349.00 | 349.30 | 349.82 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2024-05-18 09:15:00 | 353.00 | 349.30 | 349.82 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 3 — BUY (started 2024-05-18 09:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2024-05-18 09:15:00 | 355.00 | 350.44 | 350.29 | EMA200 above EMA400 |
+
+### Cycle 4 — SELL (started 2024-05-21 11:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2024-05-21 11:15:00 | 348.00 | 350.07 | 350.30 | EMA200 below EMA400 |
+
+### Cycle 5 — BUY (started 2024-05-21 13:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2024-05-21 13:15:00 | 356.05 | 351.10 | 350.72 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2024-05-21 14:15:00 | 363.10 | 353.50 | 351.84 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2024-05-22 14:15:00 | 362.05 | 363.40 | 358.94 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2024-05-22 14:30:00 | 362.75 | 363.40 | 358.94 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-05-23 10:15:00 | 359.40 | 362.39 | 359.57 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-05-23 11:00:00 | 359.40 | 362.39 | 359.57 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-05-23 11:15:00 | 359.55 | 361.82 | 359.57 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-05-23 11:45:00 | 359.45 | 361.82 | 359.57 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-05-23 12:15:00 | 359.30 | 361.32 | 359.54 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-05-23 12:45:00 | 359.65 | 361.32 | 359.54 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-05-23 13:15:00 | 356.60 | 360.37 | 359.27 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-05-23 13:45:00 | 356.60 | 360.37 | 359.27 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-05-23 14:15:00 | 355.85 | 359.47 | 358.96 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-05-23 14:45:00 | 355.65 | 359.47 | 358.96 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 6 — SELL (started 2024-05-23 15:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2024-05-23 15:15:00 | 355.00 | 358.58 | 358.60 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2024-05-24 11:15:00 | 353.00 | 356.56 | 357.59 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2024-05-29 09:15:00 | 346.60 | 342.58 | 345.90 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2024-05-29 09:15:00 | 346.60 | 342.58 | 345.90 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-05-29 09:15:00 | 346.60 | 342.58 | 345.90 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2024-05-29 10:00:00 | 346.60 | 342.58 | 345.90 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-05-29 10:15:00 | 345.80 | 343.22 | 345.89 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2024-05-29 13:15:00 | 344.55 | 344.09 | 345.84 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2024-05-29 14:00:00 | 344.25 | 344.12 | 345.70 | SELL ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2024-06-03 14:15:00 | 340.00 | 338.98 | 338.96 | Force close (CROSSOVER_FLIP) qty=1.00 alert=retest2 |
+
+### Cycle 7 — BUY (started 2024-06-03 14:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2024-06-03 14:15:00 | 340.00 | 338.98 | 338.96 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2024-06-03 15:15:00 | 342.60 | 339.70 | 339.29 | Break + close above crossover candle high |
+
+### Cycle 8 — SELL (started 2024-06-04 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2024-06-04 10:15:00 | 323.90 | 336.58 | 337.94 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2024-06-05 09:15:00 | 307.70 | 323.98 | 330.36 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2024-06-05 10:15:00 | 326.45 | 324.48 | 330.00 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2024-06-05 11:00:00 | 326.45 | 324.48 | 330.00 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-06-05 11:15:00 | 326.65 | 324.91 | 329.70 | EMA400 retest candle locked (from downside) |
+
+### Cycle 9 — BUY (started 2024-06-06 11:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2024-06-06 11:15:00 | 336.30 | 331.31 | 330.71 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2024-06-07 13:15:00 | 340.60 | 338.10 | 335.32 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2024-06-11 12:15:00 | 354.55 | 355.75 | 350.33 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2024-06-11 12:45:00 | 353.85 | 355.75 | 350.33 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-06-13 11:15:00 | 359.60 | 360.18 | 357.35 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2024-06-13 12:15:00 | 361.55 | 360.18 | 357.35 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Target hit | 2024-06-20 09:15:00 | 397.71 | 381.93 | 373.63 | Target hit (10%) qty=1.00 alert=retest2 |
+
+### Cycle 10 — SELL (started 2024-06-27 09:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2024-06-27 09:15:00 | 390.65 | 395.33 | 395.50 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2024-06-27 13:15:00 | 382.80 | 390.66 | 393.07 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2024-06-28 13:15:00 | 390.85 | 389.06 | 390.89 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2024-06-28 13:15:00 | 390.85 | 389.06 | 390.89 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-06-28 13:15:00 | 390.85 | 389.06 | 390.89 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2024-06-28 14:00:00 | 390.85 | 389.06 | 390.89 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-06-28 14:15:00 | 394.05 | 390.06 | 391.18 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2024-06-28 14:30:00 | 398.00 | 390.06 | 391.18 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-06-28 15:15:00 | 390.40 | 390.12 | 391.11 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2024-07-01 09:15:00 | 398.30 | 390.12 | 391.11 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 11 — BUY (started 2024-07-01 09:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2024-07-01 09:15:00 | 399.40 | 391.98 | 391.86 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2024-07-02 09:15:00 | 406.70 | 398.01 | 395.33 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2024-07-02 12:15:00 | 399.10 | 399.57 | 396.85 | EMA200 retest candle locked (from upside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2024-07-02 12:15:00 | 399.10 | 399.57 | 396.85 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-07-02 12:15:00 | 399.10 | 399.57 | 396.85 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-07-02 13:00:00 | 399.10 | 399.57 | 396.85 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-07-04 10:15:00 | 405.00 | 405.24 | 402.61 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-07-04 10:30:00 | 403.10 | 405.24 | 402.61 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-07-04 13:15:00 | 403.25 | 405.01 | 403.18 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-07-04 13:45:00 | 403.50 | 405.01 | 403.18 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-07-04 14:15:00 | 402.35 | 404.48 | 403.10 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-07-04 15:00:00 | 402.35 | 404.48 | 403.10 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-07-04 15:15:00 | 404.00 | 404.38 | 403.19 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-07-05 09:15:00 | 402.50 | 404.38 | 403.19 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-07-05 09:15:00 | 400.80 | 403.67 | 402.97 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-07-05 09:45:00 | 400.15 | 403.67 | 402.97 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-07-05 10:15:00 | 400.50 | 403.03 | 402.74 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-07-05 10:30:00 | 400.60 | 403.03 | 402.74 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-07-05 12:15:00 | 405.00 | 403.41 | 402.96 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2024-07-09 09:15:00 | 414.55 | 404.74 | 404.07 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2024-07-12 15:15:00 | 422.05 | 424.49 | 424.51 | Force close (CROSSOVER_FLIP) qty=1.00 alert=retest2 |
+
+### Cycle 12 — SELL (started 2024-07-12 15:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2024-07-12 15:15:00 | 422.05 | 424.49 | 424.51 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2024-07-15 09:15:00 | 414.90 | 422.57 | 423.64 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2024-07-16 09:15:00 | 422.35 | 420.28 | 421.60 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2024-07-16 09:15:00 | 422.35 | 420.28 | 421.60 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-07-16 09:15:00 | 422.35 | 420.28 | 421.60 | EMA400 retest candle locked (from downside) |
+
+### Cycle 13 — BUY (started 2024-07-16 14:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2024-07-16 14:15:00 | 431.95 | 423.98 | 423.03 | EMA200 above EMA400 |
+
+### Cycle 14 — SELL (started 2024-07-18 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2024-07-18 10:15:00 | 415.90 | 422.72 | 422.79 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2024-07-18 15:15:00 | 414.00 | 418.84 | 420.76 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2024-07-22 09:15:00 | 410.60 | 405.86 | 410.98 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2024-07-22 09:15:00 | 410.60 | 405.86 | 410.98 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-07-22 09:15:00 | 410.60 | 405.86 | 410.98 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2024-07-22 09:45:00 | 407.55 | 405.86 | 410.98 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-07-22 10:15:00 | 409.60 | 406.61 | 410.86 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2024-07-22 10:30:00 | 414.95 | 406.61 | 410.86 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-07-23 09:15:00 | 406.25 | 405.84 | 408.55 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2024-07-23 12:15:00 | 391.00 | 407.20 | 408.74 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2024-07-24 09:15:00 | 413.00 | 408.14 | 408.45 | SL hit (close>static) qty=1.00 sl=412.00 alert=retest2 |
+
+### Cycle 15 — BUY (started 2024-07-24 13:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2024-07-24 13:15:00 | 409.85 | 408.73 | 408.68 | EMA200 above EMA400 |
+
+### Cycle 16 — SELL (started 2024-07-25 09:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2024-07-25 09:15:00 | 404.90 | 408.22 | 408.48 | EMA200 below EMA400 |
+
+### Cycle 17 — BUY (started 2024-07-26 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2024-07-26 10:15:00 | 419.40 | 408.43 | 407.96 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2024-07-26 12:15:00 | 422.55 | 413.24 | 410.35 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2024-07-29 12:15:00 | 417.85 | 419.24 | 415.63 | EMA200 retest candle locked (from upside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2024-07-29 15:15:00 | 419.80 | 418.85 | 416.30 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-07-29 15:15:00 | 419.80 | 418.85 | 416.30 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2024-07-30 09:15:00 | 429.05 | 418.85 | 416.30 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Target hit | 2024-08-06 09:15:00 | 471.96 | 455.45 | 450.75 | Target hit (10%) qty=1.00 alert=retest2 |
+
+### Cycle 18 — SELL (started 2024-08-09 12:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2024-08-09 12:15:00 | 460.70 | 466.29 | 467.02 | EMA200 below EMA400 |
+
+### Cycle 19 — BUY (started 2024-08-09 14:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2024-08-09 14:15:00 | 477.00 | 468.48 | 467.90 | EMA200 above EMA400 |
+
+### Cycle 20 — SELL (started 2024-08-13 11:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2024-08-13 11:15:00 | 461.25 | 468.12 | 468.87 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2024-08-13 12:15:00 | 459.00 | 466.30 | 467.97 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2024-08-14 11:15:00 | 455.80 | 455.76 | 461.16 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2024-08-14 12:00:00 | 455.80 | 455.76 | 461.16 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-08-14 13:15:00 | 456.65 | 455.99 | 460.33 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2024-08-14 13:45:00 | 458.85 | 455.99 | 460.33 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-08-14 14:15:00 | 462.65 | 457.32 | 460.54 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2024-08-14 14:45:00 | 464.55 | 457.32 | 460.54 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-08-14 15:15:00 | 465.00 | 458.86 | 460.95 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2024-08-16 09:15:00 | 462.00 | 458.86 | 460.95 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-08-16 10:15:00 | 460.85 | 459.26 | 460.77 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2024-08-16 10:45:00 | 462.70 | 459.26 | 460.77 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-08-16 11:15:00 | 468.40 | 461.08 | 461.46 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2024-08-16 12:00:00 | 468.40 | 461.08 | 461.46 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 21 — BUY (started 2024-08-16 12:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2024-08-16 12:15:00 | 467.55 | 462.38 | 462.01 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2024-08-19 09:15:00 | 482.00 | 467.46 | 464.64 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2024-08-21 09:15:00 | 482.75 | 483.04 | 478.73 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2024-08-21 10:00:00 | 482.75 | 483.04 | 478.73 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-08-22 12:15:00 | 484.70 | 484.40 | 482.15 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-08-22 13:00:00 | 484.70 | 484.40 | 482.15 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-08-22 14:15:00 | 483.20 | 484.90 | 482.81 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-08-22 14:45:00 | 483.05 | 484.90 | 482.81 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-08-23 09:15:00 | 486.00 | 484.86 | 483.14 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-08-23 09:45:00 | 483.30 | 484.86 | 483.14 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-08-23 10:15:00 | 483.10 | 484.51 | 483.14 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-08-23 11:00:00 | 483.10 | 484.51 | 483.14 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-08-23 11:15:00 | 483.80 | 484.37 | 483.20 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-08-23 11:45:00 | 483.90 | 484.37 | 483.20 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-08-23 12:15:00 | 517.80 | 491.05 | 486.34 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2024-08-23 13:15:00 | 524.35 | 491.05 | 486.34 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2024-08-23 13:45:00 | 525.50 | 497.94 | 489.90 | BUY ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2024-08-26 11:00:00 | 520.95 | 511.70 | 499.99 | BUY ENTRY2 attempt 3/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2024-08-29 12:30:00 | 522.60 | 524.65 | 523.81 | BUY ENTRY2 attempt 4/4 (v1.4 edge cross+close) |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-08-29 13:15:00 | 524.45 | 524.61 | 523.87 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-08-29 14:00:00 | 524.45 | 524.61 | 523.87 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-08-29 14:15:00 | 525.50 | 524.79 | 524.02 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-08-29 14:30:00 | 522.45 | 524.79 | 524.02 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-08-29 15:15:00 | 524.50 | 524.73 | 524.06 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-08-30 09:15:00 | 523.00 | 524.73 | 524.06 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-08-30 09:15:00 | 519.50 | 523.68 | 523.65 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-08-30 09:45:00 | 520.35 | 523.68 | 523.65 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Stop hit — per-position SL triggered | 2024-08-30 10:15:00 | 518.65 | 522.68 | 523.19 | Force close (CROSSOVER_FLIP) qty=1.00 alert=retest2 |
+
+### Cycle 22 — SELL (started 2024-08-30 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2024-08-30 10:15:00 | 518.65 | 522.68 | 523.19 | EMA200 below EMA400 |
+
+### Cycle 23 — BUY (started 2024-09-02 09:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2024-09-02 09:15:00 | 549.80 | 527.00 | 524.52 | EMA200 above EMA400 |
+
+### Cycle 24 — SELL (started 2024-09-06 15:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2024-09-06 15:15:00 | 530.00 | 532.95 | 533.32 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2024-09-09 09:15:00 | 517.70 | 529.90 | 531.90 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2024-09-09 12:15:00 | 528.95 | 528.68 | 530.75 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2024-09-09 13:00:00 | 528.95 | 528.68 | 530.75 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-09-09 13:15:00 | 531.60 | 529.26 | 530.83 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2024-09-09 14:00:00 | 531.60 | 529.26 | 530.83 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-09-09 14:15:00 | 529.55 | 529.32 | 530.71 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2024-09-09 15:15:00 | 531.90 | 529.32 | 530.71 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-09-09 15:15:00 | 531.90 | 529.84 | 530.82 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2024-09-10 09:15:00 | 535.80 | 529.84 | 530.82 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-09-10 09:15:00 | 532.80 | 530.43 | 531.00 | EMA400 retest candle locked (from downside) |
+
+### Cycle 25 — BUY (started 2024-09-10 11:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2024-09-10 11:15:00 | 538.15 | 532.51 | 531.88 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2024-09-10 12:15:00 | 549.75 | 535.96 | 533.51 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2024-09-12 09:15:00 | 552.85 | 558.89 | 551.89 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2024-09-12 09:45:00 | 554.50 | 558.89 | 551.89 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-09-12 10:15:00 | 553.85 | 557.88 | 552.06 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2024-09-12 14:15:00 | 559.95 | 554.96 | 552.01 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Target hit | 2024-09-17 10:15:00 | 615.95 | 594.96 | 581.47 | Target hit (10%) qty=1.00 alert=retest2 |
+
+### Cycle 26 — SELL (started 2024-10-03 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2024-10-03 10:15:00 | 644.35 | 656.98 | 657.55 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2024-10-03 11:15:00 | 640.40 | 653.66 | 655.99 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2024-10-04 09:15:00 | 649.50 | 647.31 | 651.23 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2024-10-04 10:00:00 | 649.50 | 647.31 | 651.23 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-10-04 10:15:00 | 641.55 | 646.16 | 650.35 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2024-10-04 12:30:00 | 639.25 | 644.51 | 648.87 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Partial book — 50% qty, trail SL → EMA200 | 2024-10-07 09:15:00 | 607.29 | 634.42 | 642.47 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest2 |
+| Stop hit — per-position SL triggered | 2024-10-08 10:15:00 | 606.60 | 606.05 | 620.30 | SL hit (close>ema200) qty=0.50 sl=606.05 alert=retest2 |
+
+### Cycle 27 — BUY (started 2024-10-09 12:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2024-10-09 12:15:00 | 632.90 | 621.77 | 620.42 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2024-10-10 09:15:00 | 639.00 | 628.57 | 624.44 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2024-10-10 13:15:00 | 629.65 | 629.69 | 626.38 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2024-10-10 14:15:00 | 628.15 | 629.69 | 626.38 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-10-10 14:15:00 | 631.45 | 630.04 | 626.84 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-10-10 14:30:00 | 628.95 | 630.04 | 626.84 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-10-11 09:15:00 | 631.05 | 629.85 | 627.28 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2024-10-11 13:15:00 | 640.90 | 629.68 | 627.78 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2024-10-14 13:45:00 | 634.30 | 632.55 | 630.93 | BUY ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2024-10-15 10:30:00 | 635.30 | 633.52 | 632.01 | BUY ENTRY2 attempt 3/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2024-10-15 11:15:00 | 638.45 | 633.52 | 632.01 | BUY ENTRY2 attempt 4/4 (v1.4 edge cross+close) |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-10-15 11:15:00 | 640.00 | 634.82 | 632.74 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2024-10-15 12:30:00 | 643.45 | 636.05 | 633.48 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2024-10-15 14:00:00 | 644.55 | 637.75 | 634.49 | BUY ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2024-10-17 10:15:00 | 628.80 | 646.85 | 644.28 | SL hit (close<static) qty=1.00 sl=632.50 alert=retest2 |
+
+### Cycle 28 — SELL (started 2024-10-17 12:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2024-10-17 12:15:00 | 623.05 | 638.77 | 640.85 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2024-10-17 13:15:00 | 620.00 | 635.02 | 638.95 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2024-10-18 12:15:00 | 626.50 | 626.01 | 631.86 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2024-10-18 13:00:00 | 626.50 | 626.01 | 631.86 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-10-18 13:15:00 | 621.10 | 625.03 | 630.88 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2024-10-18 15:00:00 | 620.60 | 624.15 | 629.95 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2024-10-21 10:45:00 | 619.50 | 621.23 | 627.04 | SELL ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Partial book — 50% qty, trail SL → EMA200 | 2024-10-22 10:15:00 | 589.57 | 606.41 | 616.03 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest2 |
+| Partial book — 50% qty, trail SL → EMA200 | 2024-10-22 10:15:00 | 588.52 | 606.41 | 616.03 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest2 |
+| Target hit | 2024-10-23 09:15:00 | 558.54 | 588.68 | 601.52 | Target hit (10%) qty=0.50 alert=retest2 |
+
+### Cycle 29 — BUY (started 2024-10-30 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2024-10-30 10:15:00 | 572.80 | 569.55 | 569.13 | EMA200 above EMA400 |
+
+### Cycle 30 — SELL (started 2024-10-30 15:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2024-10-30 15:15:00 | 566.00 | 568.66 | 568.90 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2024-10-31 13:15:00 | 565.40 | 567.57 | 568.29 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2024-10-31 14:15:00 | 572.85 | 568.63 | 568.71 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2024-10-31 14:15:00 | 572.85 | 568.63 | 568.71 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-10-31 14:15:00 | 572.85 | 568.63 | 568.71 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2024-10-31 14:45:00 | 570.15 | 568.63 | 568.71 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 31 — BUY (started 2024-10-31 15:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2024-10-31 15:15:00 | 574.90 | 569.88 | 569.27 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2024-11-01 17:15:00 | 579.55 | 571.82 | 570.20 | Break + close above crossover candle high |
+
+### Cycle 32 — SELL (started 2024-11-04 09:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2024-11-04 09:15:00 | 555.70 | 569.40 | 569.43 | EMA200 below EMA400 |
+
+### Cycle 33 — BUY (started 2024-11-05 12:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2024-11-05 12:15:00 | 573.70 | 567.75 | 567.18 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2024-11-05 13:15:00 | 588.65 | 571.93 | 569.13 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2024-11-07 09:15:00 | 582.25 | 585.20 | 580.23 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2024-11-07 10:00:00 | 582.25 | 585.20 | 580.23 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-11-07 10:15:00 | 582.20 | 584.60 | 580.41 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-11-07 10:30:00 | 579.95 | 584.60 | 580.41 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-11-07 11:15:00 | 579.40 | 583.56 | 580.32 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-11-07 12:00:00 | 579.40 | 583.56 | 580.32 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-11-07 12:15:00 | 580.40 | 582.93 | 580.33 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-11-07 13:00:00 | 580.40 | 582.93 | 580.33 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-11-07 13:15:00 | 580.20 | 582.38 | 580.31 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-11-07 13:30:00 | 578.20 | 582.38 | 580.31 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-11-07 14:15:00 | 577.05 | 581.32 | 580.02 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-11-07 15:00:00 | 577.05 | 581.32 | 580.02 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-11-07 15:15:00 | 576.00 | 580.25 | 579.65 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-11-08 09:15:00 | 573.85 | 580.25 | 579.65 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 34 — SELL (started 2024-11-08 09:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2024-11-08 09:15:00 | 572.50 | 578.70 | 579.00 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2024-11-08 11:15:00 | 561.30 | 573.30 | 576.38 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2024-11-12 10:15:00 | 548.90 | 548.63 | 556.34 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2024-11-12 11:00:00 | 548.90 | 548.63 | 556.34 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-11-19 09:15:00 | 510.70 | 503.43 | 509.25 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2024-11-19 14:15:00 | 499.25 | 503.69 | 507.65 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2024-11-19 14:45:00 | 497.35 | 501.60 | 506.34 | SELL ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2024-11-25 09:30:00 | 497.00 | 488.14 | 491.02 | SELL ENTRY2 attempt 3/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2024-11-26 13:15:00 | 496.85 | 492.77 | 492.24 | Force close (CROSSOVER_FLIP) qty=1.00 alert=retest2 |
+
+### Cycle 35 — BUY (started 2024-11-26 13:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2024-11-26 13:15:00 | 496.85 | 492.77 | 492.24 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2024-11-26 14:15:00 | 499.45 | 494.11 | 492.90 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2024-11-28 14:15:00 | 522.80 | 524.79 | 516.55 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2024-11-28 15:00:00 | 522.80 | 524.79 | 516.55 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-11-29 09:15:00 | 516.00 | 523.08 | 517.21 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-11-29 09:45:00 | 520.50 | 523.08 | 517.21 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-11-29 10:15:00 | 517.35 | 521.94 | 517.22 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2024-11-29 13:45:00 | 523.00 | 521.58 | 518.15 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Target hit | 2024-12-05 13:15:00 | 575.30 | 559.49 | 550.15 | Target hit (10%) qty=1.00 alert=retest2 |
+
+### Cycle 36 — SELL (started 2024-12-10 11:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2024-12-10 11:15:00 | 557.85 | 564.86 | 564.94 | EMA200 below EMA400 |
+
+### Cycle 37 — BUY (started 2024-12-11 13:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2024-12-11 13:15:00 | 568.90 | 564.91 | 564.58 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2024-12-11 14:15:00 | 569.75 | 565.88 | 565.05 | Break + close above crossover candle high |
+
+### Cycle 38 — SELL (started 2024-12-12 09:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2024-12-12 09:15:00 | 557.90 | 564.48 | 564.57 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2024-12-12 11:15:00 | 555.25 | 561.89 | 563.33 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2024-12-12 14:15:00 | 565.00 | 561.66 | 562.78 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2024-12-12 14:15:00 | 565.00 | 561.66 | 562.78 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-12-12 14:15:00 | 565.00 | 561.66 | 562.78 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2024-12-12 14:45:00 | 565.00 | 561.66 | 562.78 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-12-12 15:15:00 | 563.00 | 561.93 | 562.80 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2024-12-13 09:15:00 | 558.70 | 561.93 | 562.80 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2024-12-13 12:15:00 | 561.40 | 559.42 | 561.19 | SELL ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2024-12-13 14:30:00 | 562.10 | 560.99 | 561.57 | SELL ENTRY2 attempt 3/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2024-12-13 15:00:00 | 561.85 | 560.99 | 561.57 | SELL ENTRY2 attempt 4/4 (v1.4 edge cross+close) |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-12-13 15:15:00 | 560.05 | 560.80 | 561.43 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2024-12-16 09:15:00 | 564.15 | 560.80 | 561.43 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-12-16 09:15:00 | 560.70 | 560.78 | 561.36 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2024-12-16 11:00:00 | 557.15 | 560.06 | 560.98 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2024-12-16 14:00:00 | 559.00 | 559.19 | 560.29 | SELL ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2024-12-17 11:30:00 | 558.90 | 557.88 | 559.10 | SELL ENTRY2 attempt 3/4 (v1.4 edge cross+close) |
+| Partial book — 50% qty, trail SL → EMA200 | 2024-12-19 09:15:00 | 530.76 | 546.45 | 551.14 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest2 |
+| Partial book — 50% qty, trail SL → EMA200 | 2024-12-19 09:15:00 | 533.33 | 546.45 | 551.14 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest2 |
+| Partial book — 50% qty, trail SL → EMA200 | 2024-12-19 09:15:00 | 534.00 | 546.45 | 551.14 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest2 |
+| Partial book — 50% qty, trail SL → EMA200 | 2024-12-19 09:15:00 | 533.76 | 546.45 | 551.14 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest2 |
+| Partial book — 50% qty, trail SL → EMA200 | 2024-12-19 09:15:00 | 531.05 | 546.45 | 551.14 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest2 |
+| Partial book — 50% qty, trail SL → EMA200 | 2024-12-19 09:15:00 | 530.95 | 546.45 | 551.14 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest2 |
+| Stop hit — per-position SL triggered | 2024-12-20 10:15:00 | 544.45 | 542.04 | 545.72 | SL hit (close>ema200) qty=0.50 sl=542.04 alert=retest2 |
+
+### Cycle 39 — BUY (started 2024-12-23 15:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2024-12-23 15:15:00 | 552.65 | 546.88 | 546.41 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2024-12-24 10:15:00 | 556.80 | 549.77 | 547.86 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2024-12-24 14:15:00 | 552.10 | 552.10 | 549.73 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2024-12-24 15:00:00 | 552.10 | 552.10 | 549.73 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-12-31 09:15:00 | 573.20 | 578.36 | 573.39 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-12-31 10:00:00 | 573.20 | 578.36 | 573.39 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-12-31 10:15:00 | 573.80 | 577.45 | 573.42 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-12-31 10:45:00 | 571.90 | 577.45 | 573.42 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2024-12-31 11:15:00 | 578.75 | 577.71 | 573.91 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2024-12-31 11:30:00 | 574.60 | 577.71 | 573.91 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-01-01 09:15:00 | 582.00 | 581.98 | 577.81 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-01-01 09:45:00 | 581.05 | 581.98 | 577.81 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-01-01 15:15:00 | 578.80 | 582.18 | 579.95 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-01-02 09:45:00 | 587.00 | 583.24 | 580.63 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2025-01-06 09:15:00 | 577.80 | 589.20 | 587.61 | SL hit (close<static) qty=1.00 sl=578.10 alert=retest2 |
+
+### Cycle 40 — SELL (started 2025-01-06 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-01-06 10:15:00 | 570.10 | 585.38 | 586.02 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-01-06 15:15:00 | 561.95 | 573.77 | 579.58 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-01-07 12:15:00 | 571.75 | 570.88 | 576.12 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2025-01-07 12:45:00 | 568.50 | 570.88 | 576.12 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-01-08 09:15:00 | 567.10 | 569.93 | 574.02 | EMA400 retest candle locked (from downside) |
+
+### Cycle 41 — BUY (started 2025-01-09 12:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-01-09 12:15:00 | 582.00 | 574.58 | 573.80 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-01-09 13:15:00 | 584.65 | 576.60 | 574.79 | Break + close above crossover candle high |
+
+### Cycle 42 — SELL (started 2025-01-10 09:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-01-10 09:15:00 | 561.10 | 574.06 | 574.15 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-01-13 14:15:00 | 550.35 | 559.46 | 565.02 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-01-14 15:15:00 | 549.80 | 548.27 | 554.68 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2025-01-15 09:15:00 | 554.25 | 548.27 | 554.68 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-01-15 09:15:00 | 551.20 | 548.86 | 554.36 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-01-15 13:15:00 | 546.35 | 550.20 | 553.71 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-01-16 11:00:00 | 548.25 | 546.72 | 550.22 | SELL ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-01-16 11:45:00 | 547.70 | 546.72 | 549.91 | SELL ENTRY2 attempt 3/4 (v1.4 edge cross+close) |
+| Partial book — 50% qty, trail SL → EMA200 | 2025-01-22 09:15:00 | 519.03 | 532.06 | 536.36 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest2 |
+| Partial book — 50% qty, trail SL → EMA200 | 2025-01-22 09:15:00 | 520.84 | 532.06 | 536.36 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest2 |
+| Partial book — 50% qty, trail SL → EMA200 | 2025-01-22 09:15:00 | 520.32 | 532.06 | 536.36 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest2 |
+| Stop hit — per-position SL triggered | 2025-01-22 14:15:00 | 532.20 | 529.78 | 533.29 | SL hit (close>ema200) qty=0.50 sl=529.78 alert=retest2 |
+
+### Cycle 43 — BUY (started 2025-01-30 15:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-01-30 15:15:00 | 487.05 | 484.78 | 484.57 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-01-31 09:15:00 | 490.00 | 485.82 | 485.06 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-01-31 13:15:00 | 488.70 | 489.06 | 487.14 | EMA200 retest candle locked (from upside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-01-31 13:15:00 | 488.70 | 489.06 | 487.14 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-01-31 13:15:00 | 488.70 | 489.06 | 487.14 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-01-31 14:00:00 | 488.70 | 489.06 | 487.14 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-01-31 14:15:00 | 493.85 | 490.02 | 487.75 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-01-31 15:15:00 | 494.80 | 490.02 | 487.75 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2025-02-01 12:15:00 | 483.90 | 490.56 | 489.16 | SL hit (close<static) qty=1.00 sl=487.50 alert=retest2 |
+
+### Cycle 44 — SELL (started 2025-02-03 11:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-02-03 11:15:00 | 478.80 | 487.35 | 488.47 | EMA200 below EMA400 |
+
+### Cycle 45 — BUY (started 2025-02-04 14:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-02-04 14:15:00 | 490.45 | 487.48 | 487.36 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-02-05 09:15:00 | 501.75 | 490.74 | 488.89 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-02-06 10:15:00 | 504.00 | 505.54 | 499.53 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2025-02-06 11:00:00 | 504.00 | 505.54 | 499.53 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-02-06 13:15:00 | 498.90 | 503.49 | 500.03 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-02-06 14:00:00 | 498.90 | 503.49 | 500.03 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-02-06 14:15:00 | 502.40 | 503.27 | 500.25 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-02-06 14:30:00 | 499.25 | 503.27 | 500.25 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-02-07 09:15:00 | 496.90 | 501.70 | 500.04 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-02-07 09:45:00 | 495.10 | 501.70 | 500.04 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-02-07 10:15:00 | 500.80 | 501.52 | 500.11 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-02-07 11:15:00 | 502.20 | 501.52 | 500.11 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2025-02-07 13:15:00 | 491.90 | 498.43 | 498.94 | Force close (CROSSOVER_FLIP) qty=1.00 alert=retest2 |
+
+### Cycle 46 — SELL (started 2025-02-07 13:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-02-07 13:15:00 | 491.90 | 498.43 | 498.94 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-02-10 09:15:00 | 481.65 | 493.45 | 496.41 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-02-13 09:15:00 | 445.45 | 440.59 | 452.15 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2025-02-13 10:00:00 | 445.45 | 440.59 | 452.15 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-02-13 10:15:00 | 447.55 | 441.98 | 451.73 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-02-13 10:30:00 | 449.55 | 441.98 | 451.73 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-02-18 09:15:00 | 408.90 | 413.62 | 421.15 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-02-18 10:15:00 | 406.85 | 413.62 | 421.15 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-02-18 12:45:00 | 408.35 | 409.47 | 417.08 | SELL ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-02-18 13:15:00 | 405.10 | 409.47 | 417.08 | SELL ENTRY2 attempt 3/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2025-02-19 09:15:00 | 432.30 | 415.89 | 417.74 | SL hit (close>static) qty=1.00 sl=421.35 alert=retest2 |
+
+### Cycle 47 — BUY (started 2025-02-19 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-02-19 10:15:00 | 434.70 | 419.65 | 419.28 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-02-19 12:15:00 | 445.80 | 427.53 | 423.09 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-02-21 10:15:00 | 443.60 | 445.31 | 439.07 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2025-02-21 11:00:00 | 443.60 | 445.31 | 439.07 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-02-24 09:15:00 | 444.50 | 450.48 | 445.02 | EMA400 retest candle locked (from upside) |
+
+### Cycle 48 — SELL (started 2025-02-25 13:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-02-25 13:15:00 | 439.15 | 444.86 | 445.12 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-02-25 14:15:00 | 434.95 | 442.88 | 444.19 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-03-03 12:15:00 | 401.85 | 401.17 | 412.21 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2025-03-03 13:00:00 | 401.85 | 401.17 | 412.21 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-03-04 09:15:00 | 410.45 | 402.42 | 409.24 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-03-04 09:45:00 | 412.75 | 402.42 | 409.24 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-03-04 10:15:00 | 407.55 | 403.45 | 409.08 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-03-04 13:15:00 | 404.80 | 404.64 | 408.69 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2025-03-05 09:15:00 | 419.45 | 409.53 | 409.86 | SL hit (close>static) qty=1.00 sl=412.70 alert=retest2 |
+
+### Cycle 49 — BUY (started 2025-03-05 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-03-05 10:15:00 | 426.90 | 413.00 | 411.41 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-03-05 13:15:00 | 432.30 | 420.70 | 415.66 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-03-06 15:15:00 | 435.50 | 435.69 | 428.71 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2025-03-07 09:15:00 | 437.55 | 435.69 | 428.71 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-03-07 09:15:00 | 441.85 | 436.92 | 429.90 | EMA400 retest candle locked (from upside) |
+
+### Cycle 50 — SELL (started 2025-03-10 11:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-03-10 11:15:00 | 420.45 | 430.41 | 430.61 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-03-10 12:15:00 | 417.85 | 427.90 | 429.45 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-03-13 09:15:00 | 411.50 | 406.82 | 410.79 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-03-13 09:15:00 | 411.50 | 406.82 | 410.79 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-03-13 09:15:00 | 411.50 | 406.82 | 410.79 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-03-13 14:15:00 | 402.55 | 405.46 | 408.85 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-03-17 13:00:00 | 403.00 | 404.97 | 407.01 | SELL ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-03-17 15:00:00 | 402.25 | 404.34 | 406.36 | SELL ENTRY2 attempt 3/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2025-03-18 09:15:00 | 416.65 | 406.37 | 406.91 | SL hit (close>static) qty=1.00 sl=412.10 alert=retest2 |
+
+### Cycle 51 — BUY (started 2025-03-18 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-03-18 10:15:00 | 415.80 | 408.26 | 407.72 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-03-18 13:15:00 | 419.50 | 412.73 | 410.09 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-03-20 14:15:00 | 426.80 | 429.61 | 425.31 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2025-03-20 15:00:00 | 426.80 | 429.61 | 425.31 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-03-20 15:15:00 | 427.10 | 429.11 | 425.47 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-03-21 09:15:00 | 433.50 | 429.11 | 425.47 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2025-03-25 15:15:00 | 431.50 | 438.29 | 439.14 | Force close (CROSSOVER_FLIP) qty=1.00 alert=retest2 |
+
+### Cycle 52 — SELL (started 2025-03-25 15:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-03-25 15:15:00 | 431.50 | 438.29 | 439.14 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-03-26 11:15:00 | 428.85 | 434.61 | 437.10 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-03-27 10:15:00 | 430.15 | 429.35 | 432.78 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2025-03-27 10:45:00 | 430.75 | 429.35 | 432.78 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-03-27 13:15:00 | 429.05 | 428.48 | 431.46 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-03-27 13:30:00 | 431.55 | 428.48 | 431.46 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-03-27 15:15:00 | 432.15 | 428.70 | 431.01 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-03-28 09:15:00 | 433.95 | 428.70 | 431.01 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-03-28 09:15:00 | 435.35 | 430.03 | 431.40 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-03-28 12:15:00 | 428.80 | 430.68 | 431.49 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-03-28 13:00:00 | 427.80 | 430.11 | 431.15 | SELL ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2025-04-01 12:15:00 | 435.25 | 430.98 | 430.71 | Force close (CROSSOVER_FLIP) qty=1.00 alert=retest2 |
+
+### Cycle 53 — BUY (started 2025-04-01 12:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-04-01 12:15:00 | 435.25 | 430.98 | 430.71 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-04-01 13:15:00 | 437.35 | 432.25 | 431.31 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-04-02 09:15:00 | 427.45 | 432.33 | 431.68 | EMA200 retest candle locked (from upside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-04-02 09:15:00 | 427.45 | 432.33 | 431.68 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-04-02 09:15:00 | 427.45 | 432.33 | 431.68 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-04-02 12:00:00 | 436.85 | 433.38 | 432.28 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-04-04 10:30:00 | 438.20 | 449.45 | 447.24 | BUY ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2025-04-04 12:15:00 | 434.00 | 444.32 | 445.17 | Force close (CROSSOVER_FLIP) qty=1.00 alert=retest2 |
+
+### Cycle 54 — SELL (started 2025-04-04 12:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-04-04 12:15:00 | 434.00 | 444.32 | 445.17 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-04-04 13:15:00 | 432.30 | 441.92 | 444.00 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-04-08 09:15:00 | 416.65 | 416.08 | 425.19 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-04-08 09:15:00 | 416.65 | 416.08 | 425.19 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-04-08 09:15:00 | 416.65 | 416.08 | 425.19 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-04-08 10:30:00 | 414.20 | 415.86 | 424.26 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-04-08 14:45:00 | 414.25 | 415.39 | 421.39 | SELL ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2025-04-11 10:15:00 | 433.70 | 418.46 | 418.06 | Force close (CROSSOVER_FLIP) qty=1.00 alert=retest2 |
+
+### Cycle 55 — BUY (started 2025-04-11 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-04-11 10:15:00 | 433.70 | 418.46 | 418.06 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-04-11 13:15:00 | 438.45 | 425.95 | 421.89 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-04-16 12:15:00 | 444.95 | 445.70 | 439.56 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2025-04-16 13:00:00 | 444.95 | 445.70 | 439.56 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-04-23 09:15:00 | 470.00 | 477.89 | 471.48 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-04-23 10:00:00 | 470.00 | 477.89 | 471.48 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-04-23 10:15:00 | 469.50 | 476.21 | 471.30 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-04-23 10:45:00 | 468.50 | 476.21 | 471.30 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-04-23 11:15:00 | 466.70 | 474.31 | 470.88 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-04-23 12:00:00 | 466.70 | 474.31 | 470.88 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-04-24 10:15:00 | 468.80 | 469.55 | 469.52 | EMA400 retest candle locked (from upside) |
+
+### Cycle 56 — SELL (started 2025-04-24 11:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-04-24 11:15:00 | 467.65 | 469.17 | 469.35 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-04-24 12:15:00 | 466.55 | 468.64 | 469.10 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-04-25 14:15:00 | 455.65 | 455.61 | 460.67 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2025-04-25 14:45:00 | 457.00 | 455.61 | 460.67 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-04-28 09:15:00 | 459.00 | 456.35 | 460.13 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-04-28 10:00:00 | 459.00 | 456.35 | 460.13 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-04-29 09:15:00 | 453.00 | 454.60 | 457.37 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-04-29 10:15:00 | 451.35 | 454.60 | 457.37 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2025-04-29 12:15:00 | 460.15 | 455.83 | 457.22 | SL hit (close>static) qty=1.00 sl=458.50 alert=retest2 |
+
+### Cycle 57 — BUY (started 2025-04-29 15:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-04-29 15:15:00 | 462.00 | 458.62 | 458.29 | EMA200 above EMA400 |
+
+### Cycle 58 — SELL (started 2025-04-30 09:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-04-30 09:15:00 | 454.55 | 457.81 | 457.95 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-04-30 10:15:00 | 450.80 | 456.41 | 457.30 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-05-05 10:15:00 | 435.70 | 435.62 | 441.60 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-05-05 10:15:00 | 435.70 | 435.62 | 441.60 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-05-05 10:15:00 | 435.70 | 435.62 | 441.60 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-05-05 10:30:00 | 440.35 | 435.62 | 441.60 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-05-05 14:15:00 | 440.50 | 437.17 | 440.45 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-05-05 15:15:00 | 441.00 | 437.17 | 440.45 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-05-05 15:15:00 | 441.00 | 437.93 | 440.50 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-05-06 09:15:00 | 438.70 | 437.93 | 440.50 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-05-06 09:15:00 | 431.50 | 436.65 | 439.68 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-05-06 10:15:00 | 429.80 | 436.65 | 439.68 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-05-08 11:30:00 | 430.30 | 429.53 | 430.70 | SELL ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-05-08 14:00:00 | 430.25 | 430.05 | 430.76 | SELL ENTRY2 attempt 3/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-05-08 14:45:00 | 424.15 | 430.50 | 430.90 | SELL ENTRY2 attempt 4/4 (v1.4 edge cross+close) |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-05-08 15:15:00 | 423.00 | 429.00 | 430.18 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-05-09 09:15:00 | 415.00 | 429.00 | 430.18 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2025-05-12 09:15:00 | 432.80 | 420.98 | 423.76 | SL hit (close>static) qty=1.00 sl=432.60 alert=retest2 |
+
+### Cycle 59 — BUY (started 2025-05-12 12:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-05-12 12:15:00 | 433.20 | 426.82 | 426.04 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-05-12 14:15:00 | 440.80 | 430.65 | 427.98 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-05-19 15:15:00 | 462.80 | 463.39 | 458.42 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2025-05-20 09:15:00 | 460.50 | 463.39 | 458.42 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-05-20 09:15:00 | 459.75 | 462.66 | 458.54 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-05-20 09:45:00 | 458.85 | 462.66 | 458.54 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-05-20 10:15:00 | 460.70 | 462.27 | 458.73 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-05-20 14:45:00 | 461.95 | 461.91 | 459.61 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-05-21 10:00:00 | 463.25 | 462.35 | 460.22 | BUY ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-05-21 12:45:00 | 461.65 | 461.46 | 460.29 | BUY ENTRY2 attempt 3/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-05-21 13:45:00 | 462.20 | 462.20 | 460.73 | BUY ENTRY2 attempt 4/4 (v1.4 edge cross+close) |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-05-23 10:15:00 | 474.15 | 471.53 | 467.89 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-05-23 11:30:00 | 475.10 | 472.22 | 468.54 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-05-23 12:00:00 | 475.00 | 472.22 | 468.54 | BUY ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-05-26 09:15:00 | 479.60 | 473.52 | 470.41 | BUY ENTRY2 attempt 3/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-05-26 11:00:00 | 475.10 | 474.17 | 471.26 | BUY ENTRY2 attempt 4/4 (v1.4 edge cross+close) |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-05-27 12:15:00 | 474.30 | 476.08 | 474.31 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-05-27 13:00:00 | 474.30 | 476.08 | 474.31 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-05-27 13:15:00 | 479.30 | 476.72 | 474.77 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-05-27 14:45:00 | 480.10 | 477.08 | 475.10 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-05-28 09:15:00 | 481.20 | 477.46 | 475.46 | BUY ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-05-28 10:15:00 | 479.50 | 477.84 | 475.81 | BUY ENTRY2 attempt 3/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2025-05-29 15:15:00 | 476.00 | 476.39 | 476.42 | Force close (CROSSOVER_FLIP) qty=1.00 alert=retest2 |
+
+### Cycle 60 — SELL (started 2025-05-29 15:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-05-29 15:15:00 | 476.00 | 476.39 | 476.42 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-05-30 09:15:00 | 471.10 | 475.34 | 475.93 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-06-03 09:15:00 | 481.20 | 470.47 | 471.60 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-06-03 09:15:00 | 481.20 | 470.47 | 471.60 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-06-03 09:15:00 | 481.20 | 470.47 | 471.60 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-06-03 10:00:00 | 481.20 | 470.47 | 471.60 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-06-03 10:15:00 | 476.50 | 471.68 | 472.04 | EMA400 retest candle locked (from downside) |
+
+### Cycle 61 — BUY (started 2025-06-03 11:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-06-03 11:15:00 | 480.75 | 473.49 | 472.83 | EMA200 above EMA400 |
+
+### Cycle 62 — SELL (started 2025-06-04 12:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-06-04 12:15:00 | 471.80 | 472.80 | 472.89 | EMA200 below EMA400 |
+
+### Cycle 63 — BUY (started 2025-06-04 13:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-06-04 13:15:00 | 475.50 | 473.34 | 473.13 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-06-04 14:15:00 | 482.00 | 475.07 | 473.94 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-06-06 14:15:00 | 496.55 | 497.26 | 491.13 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2025-06-06 15:00:00 | 496.55 | 497.26 | 491.13 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-06-09 09:15:00 | 496.50 | 496.52 | 491.82 | EMA400 retest candle locked (from upside) |
+
+### Cycle 64 — SELL (started 2025-06-10 13:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-06-10 13:15:00 | 490.00 | 492.97 | 493.08 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-06-11 11:15:00 | 489.25 | 491.40 | 492.19 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-06-12 09:15:00 | 490.15 | 489.14 | 490.58 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-06-12 09:15:00 | 490.15 | 489.14 | 490.58 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-06-12 09:15:00 | 490.15 | 489.14 | 490.58 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-06-12 09:45:00 | 493.30 | 489.14 | 490.58 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-06-12 10:15:00 | 487.05 | 488.72 | 490.26 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-06-12 11:15:00 | 486.50 | 488.72 | 490.26 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Partial book — 50% qty, trail SL → EMA200 | 2025-06-13 09:15:00 | 462.17 | 480.16 | 484.96 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest2 |
+| Stop hit — per-position SL triggered | 2025-06-16 14:15:00 | 469.50 | 467.63 | 472.74 | SL hit (close>ema200) qty=0.50 sl=467.63 alert=retest2 |
+
+### Cycle 65 — BUY (started 2025-06-25 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-06-25 10:15:00 | 450.40 | 444.88 | 444.39 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-06-27 09:15:00 | 456.00 | 450.74 | 448.98 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-07-01 09:15:00 | 504.45 | 509.11 | 494.88 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2025-07-01 09:30:00 | 507.55 | 509.11 | 494.88 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-02 09:15:00 | 496.00 | 503.21 | 498.48 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-07-02 09:45:00 | 495.10 | 503.21 | 498.48 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-02 10:15:00 | 495.60 | 501.69 | 498.22 | EMA400 retest candle locked (from upside) |
+
+### Cycle 66 — SELL (started 2025-07-03 09:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-07-03 09:15:00 | 496.20 | 496.86 | 496.88 | EMA200 below EMA400 |
+
+### Cycle 67 — BUY (started 2025-07-03 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-07-03 10:15:00 | 497.10 | 496.91 | 496.90 | EMA200 above EMA400 |
+
+### Cycle 68 — SELL (started 2025-07-07 09:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-07-07 09:15:00 | 493.40 | 498.19 | 498.72 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-07-07 12:15:00 | 492.85 | 496.13 | 497.57 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-07-08 14:15:00 | 493.15 | 490.71 | 493.09 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-07-08 14:15:00 | 493.15 | 490.71 | 493.09 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-08 14:15:00 | 493.15 | 490.71 | 493.09 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-07-08 14:45:00 | 494.45 | 490.71 | 493.09 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-08 15:15:00 | 491.15 | 490.80 | 492.91 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-07-09 09:15:00 | 496.65 | 490.80 | 492.91 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-09 09:15:00 | 505.80 | 493.80 | 494.08 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-07-09 10:00:00 | 505.80 | 493.80 | 494.08 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 69 — BUY (started 2025-07-09 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-07-09 10:15:00 | 508.00 | 496.64 | 495.35 | EMA200 above EMA400 |
+
+### Cycle 70 — SELL (started 2025-07-11 13:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-07-11 13:15:00 | 500.35 | 504.21 | 504.40 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-07-11 15:15:00 | 497.40 | 502.31 | 503.46 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-07-14 09:15:00 | 506.15 | 503.07 | 503.71 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-07-14 09:15:00 | 506.15 | 503.07 | 503.71 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-14 09:15:00 | 506.15 | 503.07 | 503.71 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-07-14 10:00:00 | 506.15 | 503.07 | 503.71 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-14 10:15:00 | 507.80 | 504.02 | 504.08 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-07-14 10:30:00 | 510.55 | 504.02 | 504.08 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 71 — BUY (started 2025-07-14 11:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-07-14 11:15:00 | 507.55 | 504.73 | 504.39 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-07-14 13:15:00 | 509.40 | 505.81 | 504.95 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-07-15 14:15:00 | 514.25 | 519.70 | 514.34 | EMA200 retest candle locked (from upside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-07-15 14:15:00 | 514.25 | 519.70 | 514.34 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-15 14:15:00 | 514.25 | 519.70 | 514.34 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-07-15 15:00:00 | 514.25 | 519.70 | 514.34 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-15 15:15:00 | 512.00 | 518.16 | 514.13 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-07-16 09:15:00 | 516.25 | 518.16 | 514.13 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-07-16 10:30:00 | 515.75 | 516.10 | 513.85 | BUY ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-07-16 13:00:00 | 515.30 | 515.43 | 513.90 | BUY ENTRY2 attempt 3/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-07-17 09:15:00 | 521.95 | 514.53 | 513.81 | BUY ENTRY2 attempt 4/4 (v1.4 edge cross+close) |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-17 10:15:00 | 515.85 | 514.95 | 514.13 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-07-17 10:45:00 | 514.75 | 514.95 | 514.13 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-17 12:15:00 | 514.30 | 515.18 | 514.40 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-07-17 13:00:00 | 514.30 | 515.18 | 514.40 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-17 13:15:00 | 517.50 | 515.64 | 514.68 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-07-17 13:30:00 | 518.30 | 515.64 | 514.68 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-18 09:15:00 | 515.60 | 516.00 | 515.13 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-07-18 09:30:00 | 514.65 | 516.00 | 515.13 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-18 10:15:00 | 513.85 | 515.57 | 515.01 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-07-18 10:30:00 | 513.20 | 515.57 | 515.01 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-18 11:15:00 | 514.35 | 515.33 | 514.95 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-07-18 11:45:00 | 514.85 | 515.33 | 514.95 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-18 12:15:00 | 513.85 | 515.03 | 514.85 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-07-18 12:30:00 | 513.30 | 515.03 | 514.85 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Stop hit — per-position SL triggered | 2025-07-18 13:15:00 | 512.85 | 514.60 | 514.67 | Force close (CROSSOVER_FLIP) qty=1.00 alert=retest2 |
+
+### Cycle 72 — SELL (started 2025-07-18 13:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-07-18 13:15:00 | 512.85 | 514.60 | 514.67 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-07-21 09:15:00 | 508.20 | 513.18 | 514.00 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-07-21 10:15:00 | 514.45 | 513.44 | 514.04 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-07-21 10:15:00 | 514.45 | 513.44 | 514.04 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-21 10:15:00 | 514.45 | 513.44 | 514.04 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-07-21 10:30:00 | 514.20 | 513.44 | 514.04 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-21 11:15:00 | 512.30 | 513.21 | 513.88 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-07-21 12:45:00 | 511.50 | 512.69 | 513.58 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-07-21 13:30:00 | 511.40 | 512.27 | 513.31 | SELL ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-07-22 09:45:00 | 510.50 | 511.12 | 512.47 | SELL ENTRY2 attempt 3/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-07-22 13:00:00 | 511.50 | 511.30 | 512.21 | SELL ENTRY2 attempt 4/4 (v1.4 edge cross+close) |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-22 13:15:00 | 511.00 | 511.24 | 512.10 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-07-22 14:15:00 | 509.25 | 511.24 | 512.10 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2025-07-22 14:15:00 | 513.75 | 511.74 | 512.25 | SL hit (close>static) qty=1.00 sl=512.35 alert=retest2 |
+
+### Cycle 73 — BUY (started 2025-07-23 15:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-07-23 15:15:00 | 515.40 | 512.26 | 512.14 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-07-24 09:15:00 | 517.80 | 513.37 | 512.65 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-07-24 12:15:00 | 513.20 | 514.19 | 513.30 | EMA200 retest candle locked (from upside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-07-24 12:15:00 | 513.20 | 514.19 | 513.30 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-24 12:15:00 | 513.20 | 514.19 | 513.30 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-07-24 13:00:00 | 513.20 | 514.19 | 513.30 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-24 13:15:00 | 513.00 | 513.95 | 513.27 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-07-24 14:30:00 | 514.50 | 513.78 | 513.26 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2025-07-25 09:15:00 | 508.75 | 512.54 | 512.77 | Force close (CROSSOVER_FLIP) qty=1.00 alert=retest2 |
+
+### Cycle 74 — SELL (started 2025-07-25 09:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-07-25 09:15:00 | 508.75 | 512.54 | 512.77 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-07-25 10:15:00 | 503.25 | 510.68 | 511.90 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-07-29 13:15:00 | 485.75 | 485.28 | 491.80 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2025-07-29 14:00:00 | 485.75 | 485.28 | 491.80 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-07-30 09:15:00 | 484.30 | 485.49 | 490.31 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-07-30 11:00:00 | 482.85 | 484.96 | 489.63 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Partial book — 50% qty, trail SL → EMA200 | 2025-08-04 09:15:00 | 458.71 | 467.46 | 472.81 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest2 |
+| Stop hit — per-position SL triggered | 2025-08-04 11:15:00 | 467.55 | 467.20 | 471.75 | SL hit (close>ema200) qty=0.50 sl=467.20 alert=retest2 |
+
+### Cycle 75 — BUY (started 2025-08-12 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-08-12 10:15:00 | 462.65 | 453.93 | 453.45 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-08-12 12:15:00 | 475.80 | 460.27 | 456.54 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-08-13 15:15:00 | 471.80 | 472.01 | 466.91 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2025-08-14 09:15:00 | 474.50 | 472.01 | 466.91 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-08-14 13:15:00 | 467.20 | 469.86 | 467.71 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-08-14 14:00:00 | 467.20 | 469.86 | 467.71 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-08-14 14:15:00 | 467.45 | 469.38 | 467.69 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-08-14 14:30:00 | 467.05 | 469.38 | 467.69 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-08-14 15:15:00 | 466.00 | 468.70 | 467.54 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-08-18 09:15:00 | 472.00 | 468.70 | 467.54 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2025-08-22 11:15:00 | 470.95 | 475.68 | 476.09 | Force close (CROSSOVER_FLIP) qty=1.00 alert=retest2 |
+
+### Cycle 76 — SELL (started 2025-08-22 11:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-08-22 11:15:00 | 470.95 | 475.68 | 476.09 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-08-22 15:15:00 | 467.95 | 472.67 | 474.41 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-09-01 09:15:00 | 452.90 | 450.65 | 454.43 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-09-01 09:15:00 | 452.90 | 450.65 | 454.43 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-09-01 09:15:00 | 452.90 | 450.65 | 454.43 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-09-01 09:45:00 | 455.40 | 450.65 | 454.43 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-09-01 13:15:00 | 454.15 | 451.48 | 453.64 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-09-01 14:00:00 | 454.15 | 451.48 | 453.64 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-09-01 14:15:00 | 452.20 | 451.62 | 453.51 | EMA400 retest candle locked (from downside) |
+
+### Cycle 77 — BUY (started 2025-09-02 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-09-02 10:15:00 | 462.50 | 455.56 | 454.96 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-09-02 12:15:00 | 466.50 | 458.99 | 456.70 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-09-04 10:15:00 | 462.50 | 463.52 | 461.51 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2025-09-04 11:00:00 | 462.50 | 463.52 | 461.51 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-09-04 11:15:00 | 461.20 | 463.06 | 461.48 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-09-04 11:45:00 | 461.95 | 463.06 | 461.48 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-09-04 12:15:00 | 461.10 | 462.67 | 461.45 | EMA400 retest candle locked (from upside) |
+
+### Cycle 78 — SELL (started 2025-09-04 15:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-09-04 15:15:00 | 457.90 | 460.56 | 460.71 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-09-05 10:15:00 | 454.85 | 458.78 | 459.83 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-09-05 13:15:00 | 457.25 | 456.89 | 458.55 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2025-09-05 13:45:00 | 458.05 | 456.89 | 458.55 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-09-08 09:15:00 | 459.20 | 457.04 | 458.16 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-09-08 10:00:00 | 459.20 | 457.04 | 458.16 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-09-08 10:15:00 | 458.50 | 457.34 | 458.19 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-09-08 12:15:00 | 456.10 | 457.52 | 458.20 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-09-08 13:15:00 | 456.30 | 457.44 | 458.10 | SELL ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-09-08 14:30:00 | 455.75 | 456.03 | 457.32 | SELL ENTRY2 attempt 3/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2025-09-10 09:15:00 | 483.50 | 458.84 | 457.21 | Force close (CROSSOVER_FLIP) qty=1.00 alert=retest2 |
+
+### Cycle 79 — BUY (started 2025-09-10 09:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-09-10 09:15:00 | 483.50 | 458.84 | 457.21 | EMA200 above EMA400 |
+
+### Cycle 80 — SELL (started 2025-09-15 14:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-09-15 14:15:00 | 465.85 | 467.13 | 467.22 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-09-16 09:15:00 | 463.95 | 466.39 | 466.86 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-09-17 09:15:00 | 471.20 | 465.98 | 466.14 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-09-17 09:15:00 | 471.20 | 465.98 | 466.14 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-09-17 09:15:00 | 471.20 | 465.98 | 466.14 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-09-17 09:45:00 | 473.00 | 465.98 | 466.14 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 81 — BUY (started 2025-09-17 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-09-17 10:15:00 | 472.00 | 467.19 | 466.68 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-09-18 09:15:00 | 472.25 | 468.56 | 467.69 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-09-18 12:15:00 | 469.30 | 469.88 | 468.61 | EMA200 retest candle locked (from upside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-09-18 12:15:00 | 469.30 | 469.88 | 468.61 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-09-18 12:15:00 | 469.30 | 469.88 | 468.61 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-09-18 13:00:00 | 469.30 | 469.88 | 468.61 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-09-18 13:15:00 | 469.55 | 469.82 | 468.69 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-09-18 14:15:00 | 468.55 | 469.82 | 468.69 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-09-18 14:15:00 | 469.75 | 469.80 | 468.79 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-09-18 14:30:00 | 468.75 | 469.80 | 468.79 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-09-19 12:15:00 | 469.30 | 470.59 | 469.65 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-09-19 13:00:00 | 469.30 | 470.59 | 469.65 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-09-19 13:15:00 | 470.00 | 470.47 | 469.69 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-09-19 13:30:00 | 468.75 | 470.47 | 469.69 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-09-19 14:15:00 | 467.45 | 469.87 | 469.48 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-09-19 15:00:00 | 467.45 | 469.87 | 469.48 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-09-19 15:15:00 | 467.85 | 469.46 | 469.33 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-09-22 09:15:00 | 464.00 | 469.46 | 469.33 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 82 — SELL (started 2025-09-22 09:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-09-22 09:15:00 | 463.30 | 468.23 | 468.79 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-09-22 11:15:00 | 461.05 | 465.84 | 467.54 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-09-24 10:15:00 | 461.10 | 456.41 | 459.23 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-09-24 10:15:00 | 461.10 | 456.41 | 459.23 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-09-24 10:15:00 | 461.10 | 456.41 | 459.23 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-09-24 11:00:00 | 461.10 | 456.41 | 459.23 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-09-24 11:15:00 | 471.35 | 459.40 | 460.33 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-09-24 12:00:00 | 471.35 | 459.40 | 460.33 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 83 — BUY (started 2025-09-24 12:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-09-24 12:15:00 | 487.65 | 465.05 | 462.81 | EMA200 above EMA400 |
+
+### Cycle 84 — SELL (started 2025-09-25 14:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-09-25 14:15:00 | 461.65 | 463.83 | 463.96 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-09-26 09:15:00 | 456.05 | 461.90 | 463.04 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-09-29 09:15:00 | 456.00 | 455.63 | 458.61 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2025-09-29 10:00:00 | 456.00 | 455.63 | 458.61 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-10-01 11:15:00 | 449.15 | 446.26 | 449.14 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-10-01 12:00:00 | 449.15 | 446.26 | 449.14 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-10-01 12:15:00 | 446.75 | 446.36 | 448.92 | EMA400 retest candle locked (from downside) |
+
+### Cycle 85 — BUY (started 2025-10-03 14:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-10-03 14:15:00 | 451.30 | 449.70 | 449.56 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-10-06 11:15:00 | 463.30 | 452.91 | 451.12 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-10-08 13:15:00 | 462.00 | 462.15 | 459.28 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2025-10-08 14:00:00 | 462.00 | 462.15 | 459.28 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-10-08 15:15:00 | 458.80 | 461.53 | 459.50 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-10-09 09:15:00 | 458.85 | 461.53 | 459.50 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-10-09 09:15:00 | 458.75 | 460.98 | 459.43 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-10-09 09:30:00 | 457.80 | 460.98 | 459.43 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-10-09 10:15:00 | 460.10 | 460.80 | 459.49 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-10-09 10:30:00 | 458.00 | 460.80 | 459.49 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-10-09 11:15:00 | 456.35 | 459.91 | 459.21 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-10-09 11:45:00 | 455.80 | 459.91 | 459.21 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-10-09 12:15:00 | 455.45 | 459.02 | 458.87 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-10-09 12:30:00 | 455.85 | 459.02 | 458.87 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 86 — SELL (started 2025-10-09 13:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-10-09 13:15:00 | 456.05 | 458.43 | 458.61 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-10-09 14:15:00 | 452.30 | 457.20 | 458.04 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-10-10 14:15:00 | 455.40 | 454.86 | 456.16 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-10-10 14:15:00 | 455.40 | 454.86 | 456.16 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-10-10 14:15:00 | 455.40 | 454.86 | 456.16 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-10-10 14:30:00 | 457.40 | 454.86 | 456.16 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-10-10 15:15:00 | 455.00 | 454.89 | 456.05 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-10-13 09:15:00 | 456.80 | 454.89 | 456.05 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-10-13 09:15:00 | 453.25 | 454.56 | 455.80 | EMA400 retest candle locked (from downside) |
+
+### Cycle 87 — BUY (started 2025-10-13 13:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-10-13 13:15:00 | 465.25 | 457.98 | 457.09 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-10-13 15:15:00 | 468.00 | 461.44 | 458.91 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-10-14 15:15:00 | 464.00 | 464.61 | 462.22 | EMA200 retest candle locked (from upside) |
+| First Entry (BUY) — retest1 break (cap 3 attempts) | 2025-10-15 09:15:00 | 469.00 | 464.61 | 462.22 | BUY ENTRY1 attempt 1/4 (v1.4 edge cross+close) |
+| First Entry (BUY) — retest1 break (cap 3 attempts) | 2025-10-15 10:30:00 | 470.70 | 466.61 | 463.57 | BUY ENTRY1 attempt 2/4 (v1.4 edge cross+close) |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-10-16 10:15:00 | 467.75 | 469.30 | 466.80 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-10-16 10:45:00 | 467.80 | 469.30 | 466.80 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-10-16 14:15:00 | 467.50 | 469.43 | 467.75 | EMA400 retest candle locked (from upside) |
+| Stop hit — per-position SL triggered | 2025-10-16 14:15:00 | 467.50 | 469.43 | 467.75 | SL hit (close<ema400) qty=1.00 sl=467.75 alert=retest1 |
+
+### Cycle 88 — SELL (started 2025-10-17 11:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-10-17 11:15:00 | 461.70 | 466.02 | 466.57 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-10-17 12:15:00 | 459.00 | 464.62 | 465.88 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-10-20 12:15:00 | 461.20 | 458.99 | 461.63 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-10-20 12:15:00 | 461.20 | 458.99 | 461.63 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-10-20 12:15:00 | 461.20 | 458.99 | 461.63 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-10-20 14:15:00 | 456.50 | 459.18 | 461.48 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2025-10-21 13:15:00 | 469.65 | 461.74 | 462.10 | SL hit (close>static) qty=1.00 sl=463.00 alert=retest2 |
+
+### Cycle 89 — BUY (started 2025-10-21 14:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-10-21 14:15:00 | 467.25 | 462.84 | 462.57 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-10-23 11:15:00 | 470.45 | 465.79 | 464.12 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-10-24 12:15:00 | 469.40 | 469.93 | 467.62 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2025-10-24 13:00:00 | 469.40 | 469.93 | 467.62 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-10-24 13:15:00 | 467.25 | 469.40 | 467.58 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-10-24 13:45:00 | 466.70 | 469.40 | 467.58 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-10-24 14:15:00 | 471.55 | 469.83 | 467.94 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-10-24 14:30:00 | 467.15 | 469.83 | 467.94 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-10-27 09:15:00 | 468.30 | 469.84 | 468.29 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-10-27 09:45:00 | 469.45 | 469.84 | 468.29 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-10-27 10:15:00 | 471.50 | 470.17 | 468.59 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-10-28 10:30:00 | 474.85 | 472.20 | 470.42 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-10-28 11:00:00 | 474.80 | 472.20 | 470.42 | BUY ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-10-28 11:30:00 | 475.55 | 472.61 | 470.77 | BUY ENTRY2 attempt 3/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-10-28 12:45:00 | 475.00 | 472.69 | 470.97 | BUY ENTRY2 attempt 4/4 (v1.4 edge cross+close) |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-10-31 10:15:00 | 486.55 | 485.41 | 482.27 | EMA400 retest candle locked (from upside) |
+| Stop hit — per-position SL triggered | 2025-11-03 11:15:00 | 480.00 | 481.73 | 481.85 | Force close (CROSSOVER_FLIP) qty=1.00 alert=retest2 |
+
+### Cycle 90 — SELL (started 2025-11-03 11:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-11-03 11:15:00 | 480.00 | 481.73 | 481.85 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-11-03 12:15:00 | 478.30 | 481.04 | 481.53 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-11-10 10:15:00 | 455.40 | 454.66 | 458.67 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2025-11-10 11:00:00 | 455.40 | 454.66 | 458.67 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-11-11 11:15:00 | 459.50 | 454.45 | 456.17 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-11-11 11:45:00 | 460.90 | 454.45 | 456.17 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-11-11 12:15:00 | 461.00 | 455.76 | 456.60 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-11-11 13:00:00 | 461.00 | 455.76 | 456.60 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 91 — BUY (started 2025-11-11 15:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-11-11 15:15:00 | 461.00 | 457.62 | 457.31 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-11-13 09:15:00 | 463.35 | 460.23 | 459.09 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-11-13 12:15:00 | 458.50 | 460.41 | 459.51 | EMA200 retest candle locked (from upside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-11-13 12:15:00 | 458.50 | 460.41 | 459.51 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-11-13 12:15:00 | 458.50 | 460.41 | 459.51 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-11-13 12:45:00 | 458.50 | 460.41 | 459.51 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-11-13 13:15:00 | 457.20 | 459.77 | 459.30 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-11-13 14:00:00 | 457.20 | 459.77 | 459.30 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 92 — SELL (started 2025-11-13 15:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-11-13 15:15:00 | 456.20 | 458.48 | 458.76 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-11-14 09:15:00 | 454.30 | 457.65 | 458.36 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-11-17 09:15:00 | 456.55 | 455.71 | 456.78 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-11-17 09:15:00 | 456.55 | 455.71 | 456.78 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-11-17 09:15:00 | 456.55 | 455.71 | 456.78 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-11-17 09:30:00 | 456.50 | 455.71 | 456.78 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-11-17 10:15:00 | 455.55 | 455.68 | 456.67 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-11-17 13:15:00 | 455.50 | 455.77 | 456.54 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-11-18 09:15:00 | 455.25 | 455.99 | 456.45 | SELL ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Partial book — 50% qty, trail SL → EMA200 | 2025-11-24 10:15:00 | 432.72 | 438.90 | 443.73 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest2 |
+| Partial book — 50% qty, trail SL → EMA200 | 2025-11-24 10:15:00 | 432.49 | 438.90 | 443.73 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest2 |
+| Stop hit — per-position SL triggered | 2025-11-25 09:15:00 | 445.60 | 432.30 | 437.14 | SL hit (close>ema200) qty=0.50 sl=432.30 alert=retest2 |
+
+### Cycle 93 — BUY (started 2025-11-26 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-11-26 10:15:00 | 443.35 | 439.59 | 439.17 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-11-26 11:15:00 | 444.30 | 440.53 | 439.64 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-11-27 12:15:00 | 444.50 | 445.44 | 443.20 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2025-11-27 13:00:00 | 444.50 | 445.44 | 443.20 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-11-27 13:15:00 | 443.35 | 445.02 | 443.21 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-11-27 13:30:00 | 443.45 | 445.02 | 443.21 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-11-27 14:15:00 | 445.45 | 445.10 | 443.41 | EMA400 retest candle locked (from upside) |
+
+### Cycle 94 — SELL (started 2025-11-28 13:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-11-28 13:15:00 | 439.95 | 442.69 | 442.86 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-11-28 14:15:00 | 436.85 | 441.52 | 442.31 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-12-03 09:15:00 | 440.15 | 436.15 | 437.64 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-12-03 09:15:00 | 440.15 | 436.15 | 437.64 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-12-03 09:15:00 | 440.15 | 436.15 | 437.64 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-12-03 09:30:00 | 444.00 | 436.15 | 437.64 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-12-03 10:15:00 | 442.75 | 437.47 | 438.11 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-12-03 10:30:00 | 441.55 | 437.47 | 438.11 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 95 — BUY (started 2025-12-03 11:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-12-03 11:15:00 | 445.45 | 439.07 | 438.77 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-12-03 13:15:00 | 447.65 | 441.83 | 440.14 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-12-05 15:15:00 | 471.40 | 472.29 | 463.33 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2025-12-08 09:15:00 | 470.70 | 472.29 | 463.33 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-12-08 12:15:00 | 462.75 | 469.73 | 464.93 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-12-08 13:00:00 | 462.75 | 469.73 | 464.93 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-12-08 13:15:00 | 461.00 | 467.98 | 464.57 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-12-08 13:30:00 | 460.40 | 467.98 | 464.57 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-12-08 15:15:00 | 461.30 | 465.72 | 464.08 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-12-09 09:15:00 | 455.50 | 465.72 | 464.08 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 96 — SELL (started 2025-12-09 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-12-09 10:15:00 | 457.45 | 462.62 | 462.86 | EMA200 below EMA400 |
+
+### Cycle 97 — BUY (started 2025-12-10 11:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-12-10 11:15:00 | 466.30 | 462.56 | 462.20 | EMA200 above EMA400 |
+
+### Cycle 98 — SELL (started 2025-12-11 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-12-11 10:15:00 | 457.60 | 461.67 | 462.12 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-12-11 12:15:00 | 456.00 | 460.15 | 461.32 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-12-11 15:15:00 | 464.25 | 460.78 | 461.31 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-12-11 15:15:00 | 464.25 | 460.78 | 461.31 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-12-11 15:15:00 | 464.25 | 460.78 | 461.31 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2025-12-12 09:15:00 | 467.70 | 460.78 | 461.31 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 99 — BUY (started 2025-12-12 09:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-12-12 09:15:00 | 465.30 | 461.68 | 461.67 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-12-12 11:15:00 | 469.45 | 464.02 | 462.78 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-12-16 10:15:00 | 471.45 | 471.51 | 468.64 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2025-12-16 10:30:00 | 471.10 | 471.51 | 468.64 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-12-16 15:15:00 | 470.00 | 470.79 | 469.35 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-12-17 09:15:00 | 470.15 | 470.79 | 469.35 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-12-17 09:15:00 | 468.60 | 470.35 | 469.28 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-12-17 10:15:00 | 467.45 | 470.35 | 469.28 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-12-17 10:15:00 | 466.00 | 469.48 | 468.98 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2025-12-17 11:00:00 | 466.00 | 469.48 | 468.98 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 100 — SELL (started 2025-12-17 12:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-12-17 12:15:00 | 465.60 | 468.24 | 468.47 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2025-12-18 09:15:00 | 464.45 | 466.60 | 467.54 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2025-12-19 09:15:00 | 465.45 | 464.40 | 465.70 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-12-19 09:15:00 | 465.45 | 464.40 | 465.70 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-12-19 09:15:00 | 465.45 | 464.40 | 465.70 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2025-12-19 11:45:00 | 461.30 | 463.67 | 465.14 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2025-12-19 13:15:00 | 468.15 | 464.00 | 465.00 | SL hit (close>static) qty=1.00 sl=467.05 alert=retest2 |
+
+### Cycle 101 — BUY (started 2025-12-19 14:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-12-19 14:15:00 | 478.40 | 466.88 | 466.22 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-12-22 14:15:00 | 484.20 | 475.31 | 471.46 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-12-23 13:15:00 | 480.40 | 481.01 | 476.64 | EMA200 retest candle locked (from upside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2025-12-24 09:15:00 | 480.80 | 480.80 | 477.62 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2025-12-24 09:15:00 | 480.80 | 480.80 | 477.62 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-12-26 09:15:00 | 490.55 | 481.10 | 479.09 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2025-12-26 13:15:00 | 485.45 | 484.42 | 481.57 | BUY ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2025-12-29 13:15:00 | 480.45 | 481.08 | 481.16 | Force close (CROSSOVER_FLIP) qty=1.00 alert=retest2 |
+
+### Cycle 102 — SELL (started 2025-12-29 13:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2025-12-29 13:15:00 | 480.45 | 481.08 | 481.16 | EMA200 below EMA400 |
+
+### Cycle 103 — BUY (started 2025-12-30 14:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2025-12-30 14:15:00 | 488.45 | 481.63 | 481.10 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2025-12-30 15:15:00 | 491.20 | 483.54 | 482.02 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2025-12-31 15:15:00 | 485.40 | 486.79 | 484.87 | EMA200 retest candle locked (from upside) |
+| First Entry (BUY) — retest1 break (cap 3 attempts) | 2026-01-01 09:15:00 | 489.20 | 486.79 | 484.87 | BUY ENTRY1 attempt 1/4 (v1.4 edge cross+close) |
+| First Entry (BUY) — retest1 break (cap 3 attempts) | 2026-01-01 11:00:00 | 489.30 | 487.15 | 485.36 | BUY ENTRY1 attempt 2/4 (v1.4 edge cross+close) |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-01-01 12:15:00 | 485.40 | 486.66 | 485.44 | EMA400 retest candle locked (from upside) |
+| Stop hit — per-position SL triggered | 2026-01-01 12:15:00 | 485.40 | 486.66 | 485.44 | SL hit (close<ema400) qty=1.00 sl=485.44 alert=retest1 |
+
+### Cycle 104 — SELL (started 2026-01-06 09:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2026-01-06 09:15:00 | 481.75 | 488.78 | 488.94 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2026-01-06 10:15:00 | 481.40 | 487.31 | 488.26 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2026-01-07 09:15:00 | 484.30 | 483.21 | 485.35 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2026-01-07 10:00:00 | 484.30 | 483.21 | 485.35 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-01-07 11:15:00 | 485.00 | 483.70 | 485.21 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2026-01-07 12:00:00 | 485.00 | 483.70 | 485.21 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-01-07 12:15:00 | 483.55 | 483.67 | 485.06 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2026-01-07 13:15:00 | 482.30 | 483.67 | 485.06 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2026-01-08 10:00:00 | 483.00 | 482.62 | 484.03 | SELL ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Partial book — 50% qty, trail SL → EMA200 | 2026-01-12 11:15:00 | 458.19 | 468.27 | 473.12 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest2 |
+| Partial book — 50% qty, trail SL → EMA200 | 2026-01-12 11:15:00 | 458.85 | 468.27 | 473.12 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest2 |
+| Stop hit — per-position SL triggered | 2026-01-12 14:15:00 | 471.85 | 468.59 | 472.03 | SL hit (close>ema200) qty=0.50 sl=468.59 alert=retest2 |
+
+### Cycle 105 — BUY (started 2026-01-13 13:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2026-01-13 13:15:00 | 475.25 | 473.43 | 473.36 | EMA200 above EMA400 |
+
+### Cycle 106 — SELL (started 2026-01-14 12:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2026-01-14 12:15:00 | 473.25 | 473.46 | 473.46 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2026-01-14 14:15:00 | 471.55 | 472.95 | 473.22 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2026-01-16 09:15:00 | 474.10 | 472.77 | 473.07 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2026-01-16 09:15:00 | 474.10 | 472.77 | 473.07 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-01-16 09:15:00 | 474.10 | 472.77 | 473.07 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2026-01-16 10:15:00 | 480.40 | 472.77 | 473.07 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 107 — BUY (started 2026-01-16 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2026-01-16 10:15:00 | 475.55 | 473.33 | 473.29 | EMA200 above EMA400 |
+
+### Cycle 108 — SELL (started 2026-01-16 11:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2026-01-16 11:15:00 | 472.30 | 473.12 | 473.20 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2026-01-16 12:15:00 | 471.25 | 472.75 | 473.03 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2026-01-21 14:15:00 | 451.85 | 448.75 | 454.74 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2026-01-21 15:00:00 | 451.85 | 448.75 | 454.74 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-01-21 15:15:00 | 457.90 | 450.58 | 455.03 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2026-01-22 09:15:00 | 467.70 | 450.58 | 455.03 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-01-22 09:15:00 | 461.20 | 452.70 | 455.59 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2026-01-22 10:15:00 | 459.45 | 452.70 | 455.59 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2026-01-23 10:00:00 | 459.40 | 456.08 | 456.09 | SELL ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2026-01-23 10:15:00 | 457.70 | 456.40 | 456.24 | Force close (CROSSOVER_FLIP) qty=1.00 alert=retest2 |
+
+### Cycle 109 — BUY (started 2026-01-23 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2026-01-23 10:15:00 | 457.70 | 456.40 | 456.24 | EMA200 above EMA400 |
+
+### Cycle 110 — SELL (started 2026-01-23 12:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2026-01-23 12:15:00 | 452.95 | 455.61 | 455.90 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2026-01-23 13:15:00 | 450.40 | 454.57 | 455.40 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2026-01-27 14:15:00 | 449.60 | 447.12 | 450.20 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2026-01-27 15:00:00 | 449.60 | 447.12 | 450.20 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-01-28 09:15:00 | 451.30 | 448.42 | 450.28 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2026-01-28 10:00:00 | 451.30 | 448.42 | 450.28 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-01-28 10:15:00 | 451.10 | 448.95 | 450.36 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2026-01-28 10:45:00 | 453.60 | 448.95 | 450.36 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-01-28 11:15:00 | 450.70 | 449.30 | 450.39 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2026-01-28 12:30:00 | 449.50 | 449.38 | 450.33 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2026-01-29 09:45:00 | 449.15 | 448.78 | 449.73 | SELL ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2026-01-29 12:00:00 | 447.20 | 448.41 | 449.39 | SELL ENTRY2 attempt 3/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2026-01-29 13:45:00 | 449.45 | 448.68 | 449.37 | SELL ENTRY2 attempt 4/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2026-01-29 14:15:00 | 455.65 | 450.08 | 449.94 | Force close (CROSSOVER_FLIP) qty=1.00 alert=retest2 |
+
+### Cycle 111 — BUY (started 2026-01-29 14:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2026-01-29 14:15:00 | 455.65 | 450.08 | 449.94 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2026-01-29 15:15:00 | 470.50 | 454.16 | 451.81 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2026-02-01 09:15:00 | 459.00 | 459.20 | 456.37 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2026-02-01 10:00:00 | 459.00 | 459.20 | 456.37 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-02-01 11:15:00 | 456.60 | 458.85 | 456.71 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2026-02-01 12:00:00 | 456.60 | 458.85 | 456.71 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-02-01 12:15:00 | 453.15 | 457.71 | 456.38 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2026-02-01 12:30:00 | 453.20 | 457.71 | 456.38 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-02-01 13:15:00 | 452.40 | 456.65 | 456.02 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2026-02-01 14:00:00 | 452.40 | 456.65 | 456.02 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 112 — SELL (started 2026-02-01 14:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2026-02-01 14:15:00 | 447.75 | 454.87 | 455.27 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2026-02-01 15:15:00 | 446.00 | 453.09 | 454.43 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2026-02-02 11:15:00 | 454.45 | 451.70 | 453.31 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2026-02-02 11:15:00 | 454.45 | 451.70 | 453.31 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-02-02 11:15:00 | 454.45 | 451.70 | 453.31 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2026-02-02 12:00:00 | 454.45 | 451.70 | 453.31 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 113 — BUY (started 2026-02-02 12:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2026-02-02 12:15:00 | 469.50 | 455.26 | 454.78 | EMA200 above EMA400 |
+
+### Cycle 114 — SELL (started 2026-02-05 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2026-02-05 10:15:00 | 455.95 | 458.98 | 459.34 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2026-02-05 11:15:00 | 453.15 | 457.81 | 458.78 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2026-02-05 12:15:00 | 461.20 | 458.49 | 459.00 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2026-02-05 12:15:00 | 461.20 | 458.49 | 459.00 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-02-05 12:15:00 | 461.20 | 458.49 | 459.00 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2026-02-05 12:30:00 | 460.75 | 458.49 | 459.00 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-02-05 13:15:00 | 457.15 | 458.22 | 458.83 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2026-02-05 13:30:00 | 459.40 | 458.22 | 458.83 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-02-06 09:15:00 | 454.50 | 457.07 | 458.12 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2026-02-06 10:15:00 | 452.70 | 457.07 | 458.12 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2026-02-06 12:30:00 | 453.50 | 455.86 | 457.25 | SELL ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2026-02-09 10:15:00 | 461.05 | 456.48 | 456.96 | SL hit (close>static) qty=1.00 sl=458.75 alert=retest2 |
+
+### Cycle 115 — BUY (started 2026-02-09 12:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2026-02-09 12:15:00 | 460.70 | 457.90 | 457.55 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2026-02-09 13:15:00 | 461.60 | 458.64 | 457.92 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2026-02-09 15:15:00 | 453.20 | 458.04 | 457.80 | EMA200 retest candle locked (from upside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2026-02-09 15:15:00 | 453.20 | 458.04 | 457.80 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-02-09 15:15:00 | 453.20 | 458.04 | 457.80 | EMA400 retest candle locked (from upside) |
+
+### Cycle 116 — SELL (started 2026-02-10 09:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2026-02-10 09:15:00 | 455.00 | 457.43 | 457.55 | EMA200 below EMA400 |
+
+### Cycle 117 — BUY (started 2026-02-10 14:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2026-02-10 14:15:00 | 461.50 | 457.81 | 457.57 | EMA200 above EMA400 |
+
+### Cycle 118 — SELL (started 2026-02-11 14:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2026-02-11 14:15:00 | 455.45 | 457.43 | 457.56 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2026-02-12 09:15:00 | 452.75 | 456.18 | 456.95 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2026-02-13 10:15:00 | 452.35 | 452.27 | 454.02 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2026-02-13 10:45:00 | 452.15 | 452.27 | 454.02 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-02-13 12:15:00 | 454.60 | 452.94 | 454.03 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2026-02-13 12:30:00 | 454.90 | 452.94 | 454.03 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-02-13 13:15:00 | 453.30 | 453.01 | 453.97 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2026-02-13 13:30:00 | 456.90 | 453.01 | 453.97 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-02-13 14:15:00 | 450.15 | 452.44 | 453.62 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2026-02-16 09:15:00 | 449.05 | 452.05 | 453.34 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2026-02-16 10:15:00 | 459.50 | 453.48 | 453.76 | SL hit (close>static) qty=1.00 sl=453.65 alert=retest2 |
+
+### Cycle 119 — BUY (started 2026-02-16 12:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2026-02-16 12:15:00 | 456.05 | 454.06 | 453.98 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2026-02-16 14:15:00 | 473.00 | 457.96 | 455.77 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2026-02-18 12:15:00 | 467.00 | 468.79 | 465.25 | EMA200 retest candle locked (from upside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2026-02-18 12:15:00 | 467.00 | 468.79 | 465.25 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-02-18 12:15:00 | 467.00 | 468.79 | 465.25 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2026-02-18 13:00:00 | 467.00 | 468.79 | 465.25 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-02-18 15:15:00 | 467.25 | 469.89 | 466.74 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2026-02-19 09:30:00 | 480.15 | 474.36 | 469.06 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2026-02-20 09:15:00 | 478.20 | 476.79 | 473.08 | BUY ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2026-02-20 11:45:00 | 477.75 | 475.95 | 473.54 | BUY ENTRY2 attempt 3/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2026-02-25 15:15:00 | 483.30 | 486.45 | 486.47 | Force close (CROSSOVER_FLIP) qty=1.00 alert=retest2 |
+
+### Cycle 120 — SELL (started 2026-02-25 15:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2026-02-25 15:15:00 | 483.30 | 486.45 | 486.47 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2026-02-26 09:15:00 | 480.50 | 485.26 | 485.92 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2026-02-26 15:15:00 | 485.00 | 482.44 | 483.82 | EMA200 retest candle locked (from downside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2026-02-26 15:15:00 | 485.00 | 482.44 | 483.82 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-02-26 15:15:00 | 485.00 | 482.44 | 483.82 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2026-03-02 09:15:00 | 472.10 | 483.26 | 483.50 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Partial book — 50% qty, trail SL → EMA200 | 2026-03-04 09:15:00 | 448.50 | 459.99 | 469.58 | Partial book 0.50 @ 5%; trail SL->EMA200 alert=retest2 |
+| Stop hit — per-position SL triggered | 2026-03-05 09:15:00 | 448.50 | 446.72 | 456.48 | SL hit (close>ema200) qty=0.50 sl=446.72 alert=retest2 |
+
+### Cycle 121 — BUY (started 2026-03-10 15:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2026-03-10 15:15:00 | 451.45 | 445.25 | 444.98 | EMA200 above EMA400 |
+
+### Cycle 122 — SELL (started 2026-03-12 09:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2026-03-12 09:15:00 | 435.65 | 443.79 | 444.59 | EMA200 below EMA400 |
+
+### Cycle 123 — BUY (started 2026-03-12 15:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2026-03-12 15:15:00 | 449.50 | 445.27 | 444.71 | EMA200 above EMA400 |
+
+### Cycle 124 — SELL (started 2026-03-13 09:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2026-03-13 09:15:00 | 437.85 | 443.79 | 444.08 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2026-03-13 10:15:00 | 436.55 | 442.34 | 443.40 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2026-03-13 14:15:00 | 439.65 | 439.33 | 441.38 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2026-03-13 14:45:00 | 440.55 | 439.33 | 441.38 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-03-13 15:15:00 | 437.00 | 438.87 | 440.99 | EMA400 retest candle locked (from downside) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2026-03-16 09:15:00 | 427.20 | 438.87 | 440.99 | SELL ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (SELL) — retest2 break (cap 3 attempts) | 2026-03-17 09:15:00 | 429.80 | 434.90 | 436.90 | SELL ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2026-03-17 13:15:00 | 446.30 | 439.33 | 438.40 | Force close (CROSSOVER_FLIP) qty=1.00 alert=retest2 |
+
+### Cycle 125 — BUY (started 2026-03-17 13:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2026-03-17 13:15:00 | 446.30 | 439.33 | 438.40 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2026-03-18 09:15:00 | 450.80 | 443.61 | 440.76 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2026-03-19 09:15:00 | 438.05 | 448.35 | 445.53 | EMA200 retest candle locked (from upside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2026-03-19 09:15:00 | 438.05 | 448.35 | 445.53 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-03-19 09:15:00 | 438.05 | 448.35 | 445.53 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2026-03-19 12:45:00 | 446.70 | 445.83 | 444.88 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Stop hit — per-position SL triggered | 2026-03-23 09:15:00 | 432.50 | 448.07 | 448.16 | Force close (CROSSOVER_FLIP) qty=1.00 alert=retest2 |
+
+### Cycle 126 — SELL (started 2026-03-23 09:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2026-03-23 09:15:00 | 432.50 | 448.07 | 448.16 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2026-03-23 12:15:00 | 430.30 | 440.00 | 444.05 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2026-03-23 13:15:00 | 440.50 | 440.10 | 443.73 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2026-03-23 14:00:00 | 440.50 | 440.10 | 443.73 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-03-24 09:15:00 | 432.00 | 437.19 | 441.40 | EMA400 retest candle locked (from downside) |
+
+### Cycle 127 — BUY (started 2026-03-24 14:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2026-03-24 14:15:00 | 450.20 | 442.77 | 442.55 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2026-03-25 09:15:00 | 461.15 | 446.49 | 444.28 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2026-03-27 09:15:00 | 457.50 | 458.16 | 452.73 | EMA200 retest candle locked (from upside) |
+| Retest1 invalidated — EMA400 touched before ENTRY1 | 2026-03-27 10:15:00 | 454.20 | 457.37 | 452.86 | EMA400 touched before retest1 break — omit ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-03-27 10:15:00 | 454.20 | 457.37 | 452.86 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2026-03-27 10:45:00 | 454.40 | 457.37 | 452.86 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-03-27 11:15:00 | 452.50 | 456.39 | 452.83 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2026-03-27 12:00:00 | 452.50 | 456.39 | 452.83 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-03-27 12:15:00 | 451.35 | 455.38 | 452.69 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2026-03-27 12:45:00 | 451.15 | 455.38 | 452.69 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-03-27 14:15:00 | 445.30 | 452.55 | 451.82 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2026-03-27 15:00:00 | 445.30 | 452.55 | 451.82 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 128 — SELL (started 2026-03-27 15:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2026-03-27 15:15:00 | 442.00 | 450.44 | 450.93 | EMA200 below EMA400 |
+| First Alert — break + close below crossover candle low | 2026-03-30 09:15:00 | 430.90 | 446.53 | 449.11 | Break + close below crossover candle low |
+| Second Alert (Retest 1) — EMA200 retest from below | 2026-03-30 14:15:00 | 441.25 | 439.84 | 444.16 | EMA200 retest candle locked (from downside) |
+| ALERT2_SIDEWAYS | 2026-03-30 15:00:00 | 441.25 | 439.84 | 444.16 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-03-30 15:15:00 | 443.40 | 440.55 | 444.09 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2026-04-01 09:15:00 | 462.35 | 440.55 | 444.09 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-04-01 09:15:00 | 458.60 | 444.16 | 445.41 | EMA400 retest candle locked (from downside) |
+| ALERT3_SIDEWAYS | 2026-04-01 10:15:00 | 454.95 | 444.16 | 445.41 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+
+### Cycle 129 — BUY (started 2026-04-01 10:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2026-04-01 10:15:00 | 457.60 | 446.85 | 446.52 | EMA200 above EMA400 |
+
+### Cycle 130 — SELL (started 2026-04-02 09:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (SELL) | 2026-04-02 09:15:00 | 432.05 | 445.45 | 446.56 | EMA200 below EMA400 |
+
+### Cycle 131 — BUY (started 2026-04-06 14:15:00)
+
+| Stage | Time | Price | EMA200 | EMA400 | Note |
+|-------|------|-------|--------|--------|------|
+| Trend Identification (BUY) | 2026-04-06 14:15:00 | 451.95 | 445.01 | 444.16 | EMA200 above EMA400 |
+| First Alert — break + close above crossover candle high | 2026-04-08 09:15:00 | 471.40 | 453.80 | 449.33 | Break + close above crossover candle high |
+| Second Alert (Retest 1) — EMA200 retest from above | 2026-04-08 15:15:00 | 463.50 | 465.12 | 458.22 | EMA200 retest candle locked (from upside) |
+| ALERT2_SIDEWAYS | 2026-04-09 09:15:00 | 463.75 | 465.12 | 458.22 | Sideways (15m bar) within 4 candles — skip ENTRY1 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-04-09 09:15:00 | 458.00 | 463.70 | 458.20 | EMA400 retest candle locked (from upside) |
+| ALERT3_SIDEWAYS | 2026-04-09 10:00:00 | 458.00 | 463.70 | 458.20 | Sideways (15m bar) within 4 candles — back to Stage 4 |
+| Third Alert (Retest 2) — price touches/crosses EMA400 | 2026-04-09 10:15:00 | 459.75 | 462.91 | 458.34 | EMA400 retest candle locked (from upside) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2026-04-09 14:00:00 | 461.20 | 461.28 | 458.62 | BUY ENTRY2 attempt 1/4 (v1.4 edge cross+close) |
+| Second Entry (BUY) — retest2 break (cap 3 attempts) | 2026-04-09 14:30:00 | 465.60 | 461.82 | 459.11 | BUY ENTRY2 attempt 2/4 (v1.4 edge cross+close) |
+| Target hit | 2026-04-21 10:15:00 | 507.32 | 495.66 | 490.89 | Target hit (10%) qty=1.00 alert=retest2 |
+
+
+## Closed Legs
+
+| Trend | Alert | Entry Time | Entry | Exit Time | Exit | Reason | Qty | % |
+|-------|-------|-----------|-------|-----------|------|--------|-----|---|
+| BUY | retest2 | 2024-05-16 12:15:00 | 350.80 | 2024-05-16 15:15:00 | 349.80 | STOP_HIT | 1.00 | -0.29% |
+| BUY | retest2 | 2024-05-16 13:45:00 | 350.15 | 2024-05-16 15:15:00 | 349.80 | STOP_HIT | 1.00 | -0.10% |
+| BUY | retest2 | 2024-05-16 14:15:00 | 349.60 | 2024-05-16 15:15:00 | 349.80 | STOP_HIT | 1.00 | 0.06% |
+| BUY | retest2 | 2024-05-16 15:15:00 | 349.80 | 2024-05-16 15:15:00 | 349.80 | STOP_HIT | 1.00 | 0.00% |
+| SELL | retest2 | 2024-05-29 13:15:00 | 344.55 | 2024-06-03 14:15:00 | 340.00 | STOP_HIT | 1.00 | 1.32% |
+| SELL | retest2 | 2024-05-29 14:00:00 | 344.25 | 2024-06-03 14:15:00 | 340.00 | STOP_HIT | 1.00 | 1.23% |
+| BUY | retest2 | 2024-06-13 12:15:00 | 361.55 | 2024-06-20 09:15:00 | 397.71 | TARGET_HIT | 1.00 | 10.00% |
+| BUY | retest2 | 2024-07-09 09:15:00 | 414.55 | 2024-07-12 15:15:00 | 422.05 | STOP_HIT | 1.00 | 1.81% |
+| SELL | retest2 | 2024-07-23 12:15:00 | 391.00 | 2024-07-24 09:15:00 | 413.00 | STOP_HIT | 1.00 | -5.63% |
+| BUY | retest2 | 2024-07-30 09:15:00 | 429.05 | 2024-08-06 09:15:00 | 471.96 | TARGET_HIT | 1.00 | 10.00% |
+| BUY | retest2 | 2024-08-23 13:15:00 | 524.35 | 2024-08-30 10:15:00 | 518.65 | STOP_HIT | 1.00 | -1.09% |
+| BUY | retest2 | 2024-08-23 13:45:00 | 525.50 | 2024-08-30 10:15:00 | 518.65 | STOP_HIT | 1.00 | -1.30% |
+| BUY | retest2 | 2024-08-26 11:00:00 | 520.95 | 2024-08-30 10:15:00 | 518.65 | STOP_HIT | 1.00 | -0.44% |
+| BUY | retest2 | 2024-08-29 12:30:00 | 522.60 | 2024-08-30 10:15:00 | 518.65 | STOP_HIT | 1.00 | -0.76% |
+| BUY | retest2 | 2024-09-12 14:15:00 | 559.95 | 2024-09-17 10:15:00 | 615.95 | TARGET_HIT | 1.00 | 10.00% |
+| SELL | retest2 | 2024-10-04 12:30:00 | 639.25 | 2024-10-07 09:15:00 | 607.29 | PARTIAL | 0.50 | 5.00% |
+| SELL | retest2 | 2024-10-04 12:30:00 | 639.25 | 2024-10-08 10:15:00 | 606.60 | STOP_HIT | 0.50 | 5.11% |
+| BUY | retest2 | 2024-10-11 13:15:00 | 640.90 | 2024-10-17 10:15:00 | 628.80 | STOP_HIT | 1.00 | -1.89% |
+| BUY | retest2 | 2024-10-14 13:45:00 | 634.30 | 2024-10-17 10:15:00 | 628.80 | STOP_HIT | 1.00 | -0.87% |
+| BUY | retest2 | 2024-10-15 10:30:00 | 635.30 | 2024-10-17 12:15:00 | 623.05 | STOP_HIT | 1.00 | -1.93% |
+| BUY | retest2 | 2024-10-15 11:15:00 | 638.45 | 2024-10-17 12:15:00 | 623.05 | STOP_HIT | 1.00 | -2.41% |
+| BUY | retest2 | 2024-10-15 12:30:00 | 643.45 | 2024-10-17 12:15:00 | 623.05 | STOP_HIT | 1.00 | -3.17% |
+| BUY | retest2 | 2024-10-15 14:00:00 | 644.55 | 2024-10-17 12:15:00 | 623.05 | STOP_HIT | 1.00 | -3.34% |
+| SELL | retest2 | 2024-10-18 15:00:00 | 620.60 | 2024-10-22 10:15:00 | 589.57 | PARTIAL | 0.50 | 5.00% |
+| SELL | retest2 | 2024-10-21 10:45:00 | 619.50 | 2024-10-22 10:15:00 | 588.52 | PARTIAL | 0.50 | 5.00% |
+| SELL | retest2 | 2024-10-18 15:00:00 | 620.60 | 2024-10-23 09:15:00 | 558.54 | TARGET_HIT | 0.50 | 10.00% |
+| SELL | retest2 | 2024-10-21 10:45:00 | 619.50 | 2024-10-23 09:15:00 | 557.55 | TARGET_HIT | 0.50 | 10.00% |
+| SELL | retest2 | 2024-11-19 14:15:00 | 499.25 | 2024-11-26 13:15:00 | 496.85 | STOP_HIT | 1.00 | 0.48% |
+| SELL | retest2 | 2024-11-19 14:45:00 | 497.35 | 2024-11-26 13:15:00 | 496.85 | STOP_HIT | 1.00 | 0.10% |
+| SELL | retest2 | 2024-11-25 09:30:00 | 497.00 | 2024-11-26 13:15:00 | 496.85 | STOP_HIT | 1.00 | 0.03% |
+| BUY | retest2 | 2024-11-29 13:45:00 | 523.00 | 2024-12-05 13:15:00 | 575.30 | TARGET_HIT | 1.00 | 10.00% |
+| SELL | retest2 | 2024-12-13 09:15:00 | 558.70 | 2024-12-19 09:15:00 | 530.76 | PARTIAL | 0.50 | 5.00% |
+| SELL | retest2 | 2024-12-13 12:15:00 | 561.40 | 2024-12-19 09:15:00 | 533.33 | PARTIAL | 0.50 | 5.00% |
+| SELL | retest2 | 2024-12-13 14:30:00 | 562.10 | 2024-12-19 09:15:00 | 534.00 | PARTIAL | 0.50 | 5.00% |
+| SELL | retest2 | 2024-12-13 15:00:00 | 561.85 | 2024-12-19 09:15:00 | 533.76 | PARTIAL | 0.50 | 5.00% |
+| SELL | retest2 | 2024-12-16 11:00:00 | 557.15 | 2024-12-19 09:15:00 | 531.05 | PARTIAL | 0.50 | 4.68% |
+| SELL | retest2 | 2024-12-16 14:00:00 | 559.00 | 2024-12-19 09:15:00 | 530.95 | PARTIAL | 0.50 | 5.02% |
+| SELL | retest2 | 2024-12-13 09:15:00 | 558.70 | 2024-12-20 10:15:00 | 544.45 | STOP_HIT | 0.50 | 2.55% |
+| SELL | retest2 | 2024-12-13 12:15:00 | 561.40 | 2024-12-20 10:15:00 | 544.45 | STOP_HIT | 0.50 | 3.02% |
+| SELL | retest2 | 2024-12-13 14:30:00 | 562.10 | 2024-12-20 10:15:00 | 544.45 | STOP_HIT | 0.50 | 3.14% |
+| SELL | retest2 | 2024-12-13 15:00:00 | 561.85 | 2024-12-20 10:15:00 | 544.45 | STOP_HIT | 0.50 | 3.10% |
+| SELL | retest2 | 2024-12-16 11:00:00 | 557.15 | 2024-12-20 10:15:00 | 544.45 | STOP_HIT | 0.50 | 2.28% |
+| SELL | retest2 | 2024-12-16 14:00:00 | 559.00 | 2024-12-20 10:15:00 | 544.45 | STOP_HIT | 0.50 | 2.60% |
+| SELL | retest2 | 2024-12-17 11:30:00 | 558.90 | 2024-12-23 15:15:00 | 552.65 | STOP_HIT | 1.00 | 1.12% |
+| BUY | retest2 | 2025-01-02 09:45:00 | 587.00 | 2025-01-06 09:15:00 | 577.80 | STOP_HIT | 1.00 | -1.57% |
+| BUY | retest2 | 2025-01-06 09:30:00 | 584.45 | 2025-01-06 10:15:00 | 570.10 | STOP_HIT | 1.00 | -2.46% |
+| SELL | retest2 | 2025-01-15 13:15:00 | 546.35 | 2025-01-22 09:15:00 | 519.03 | PARTIAL | 0.50 | 5.00% |
+| SELL | retest2 | 2025-01-16 11:00:00 | 548.25 | 2025-01-22 09:15:00 | 520.84 | PARTIAL | 0.50 | 5.00% |
+| SELL | retest2 | 2025-01-16 11:45:00 | 547.70 | 2025-01-22 09:15:00 | 520.32 | PARTIAL | 0.50 | 5.00% |
+| SELL | retest2 | 2025-01-15 13:15:00 | 546.35 | 2025-01-22 14:15:00 | 532.20 | STOP_HIT | 0.50 | 2.59% |
+| SELL | retest2 | 2025-01-16 11:00:00 | 548.25 | 2025-01-22 14:15:00 | 532.20 | STOP_HIT | 0.50 | 2.93% |
+| SELL | retest2 | 2025-01-16 11:45:00 | 547.70 | 2025-01-22 14:15:00 | 532.20 | STOP_HIT | 0.50 | 2.83% |
+| BUY | retest2 | 2025-01-31 15:15:00 | 494.80 | 2025-02-01 12:15:00 | 483.90 | STOP_HIT | 1.00 | -2.20% |
+| BUY | retest2 | 2025-02-01 14:00:00 | 494.05 | 2025-02-03 09:15:00 | 486.95 | STOP_HIT | 1.00 | -1.44% |
+| BUY | retest2 | 2025-02-01 14:45:00 | 497.75 | 2025-02-03 09:15:00 | 486.95 | STOP_HIT | 1.00 | -2.17% |
+| BUY | retest2 | 2025-02-07 11:15:00 | 502.20 | 2025-02-07 13:15:00 | 491.90 | STOP_HIT | 1.00 | -2.05% |
+| SELL | retest2 | 2025-02-18 10:15:00 | 406.85 | 2025-02-19 09:15:00 | 432.30 | STOP_HIT | 1.00 | -6.26% |
+| SELL | retest2 | 2025-02-18 12:45:00 | 408.35 | 2025-02-19 09:15:00 | 432.30 | STOP_HIT | 1.00 | -5.87% |
+| SELL | retest2 | 2025-02-18 13:15:00 | 405.10 | 2025-02-19 09:15:00 | 432.30 | STOP_HIT | 1.00 | -6.71% |
+| SELL | retest2 | 2025-03-04 13:15:00 | 404.80 | 2025-03-05 09:15:00 | 419.45 | STOP_HIT | 1.00 | -3.62% |
+| SELL | retest2 | 2025-03-13 14:15:00 | 402.55 | 2025-03-18 09:15:00 | 416.65 | STOP_HIT | 1.00 | -3.50% |
+| SELL | retest2 | 2025-03-17 13:00:00 | 403.00 | 2025-03-18 09:15:00 | 416.65 | STOP_HIT | 1.00 | -3.39% |
+| SELL | retest2 | 2025-03-17 15:00:00 | 402.25 | 2025-03-18 09:15:00 | 416.65 | STOP_HIT | 1.00 | -3.58% |
+| BUY | retest2 | 2025-03-21 09:15:00 | 433.50 | 2025-03-25 15:15:00 | 431.50 | STOP_HIT | 1.00 | -0.46% |
+| SELL | retest2 | 2025-03-28 12:15:00 | 428.80 | 2025-04-01 12:15:00 | 435.25 | STOP_HIT | 1.00 | -1.50% |
+| SELL | retest2 | 2025-03-28 13:00:00 | 427.80 | 2025-04-01 12:15:00 | 435.25 | STOP_HIT | 1.00 | -1.74% |
+| BUY | retest2 | 2025-04-02 12:00:00 | 436.85 | 2025-04-04 12:15:00 | 434.00 | STOP_HIT | 1.00 | -0.65% |
+| BUY | retest2 | 2025-04-04 10:30:00 | 438.20 | 2025-04-04 12:15:00 | 434.00 | STOP_HIT | 1.00 | -0.96% |
+| SELL | retest2 | 2025-04-08 10:30:00 | 414.20 | 2025-04-11 10:15:00 | 433.70 | STOP_HIT | 1.00 | -4.71% |
+| SELL | retest2 | 2025-04-08 14:45:00 | 414.25 | 2025-04-11 10:15:00 | 433.70 | STOP_HIT | 1.00 | -4.70% |
+| SELL | retest2 | 2025-04-29 10:15:00 | 451.35 | 2025-04-29 12:15:00 | 460.15 | STOP_HIT | 1.00 | -1.95% |
+| SELL | retest2 | 2025-05-06 10:15:00 | 429.80 | 2025-05-12 09:15:00 | 432.80 | STOP_HIT | 1.00 | -0.70% |
+| SELL | retest2 | 2025-05-08 11:30:00 | 430.30 | 2025-05-12 12:15:00 | 433.20 | STOP_HIT | 1.00 | -0.67% |
+| SELL | retest2 | 2025-05-08 14:00:00 | 430.25 | 2025-05-12 12:15:00 | 433.20 | STOP_HIT | 1.00 | -0.69% |
+| SELL | retest2 | 2025-05-08 14:45:00 | 424.15 | 2025-05-12 12:15:00 | 433.20 | STOP_HIT | 1.00 | -2.13% |
+| SELL | retest2 | 2025-05-09 09:15:00 | 415.00 | 2025-05-12 12:15:00 | 433.20 | STOP_HIT | 1.00 | -4.39% |
+| BUY | retest2 | 2025-05-20 14:45:00 | 461.95 | 2025-05-29 15:15:00 | 476.00 | STOP_HIT | 1.00 | 3.04% |
+| BUY | retest2 | 2025-05-21 10:00:00 | 463.25 | 2025-05-29 15:15:00 | 476.00 | STOP_HIT | 1.00 | 2.75% |
+| BUY | retest2 | 2025-05-21 12:45:00 | 461.65 | 2025-05-29 15:15:00 | 476.00 | STOP_HIT | 1.00 | 3.11% |
+| BUY | retest2 | 2025-05-21 13:45:00 | 462.20 | 2025-05-29 15:15:00 | 476.00 | STOP_HIT | 1.00 | 2.99% |
+| BUY | retest2 | 2025-05-23 11:30:00 | 475.10 | 2025-05-29 15:15:00 | 476.00 | STOP_HIT | 1.00 | 0.19% |
+| BUY | retest2 | 2025-05-23 12:00:00 | 475.00 | 2025-05-29 15:15:00 | 476.00 | STOP_HIT | 1.00 | 0.21% |
+| BUY | retest2 | 2025-05-26 09:15:00 | 479.60 | 2025-05-29 15:15:00 | 476.00 | STOP_HIT | 1.00 | -0.75% |
+| BUY | retest2 | 2025-05-26 11:00:00 | 475.10 | 2025-05-29 15:15:00 | 476.00 | STOP_HIT | 1.00 | 0.19% |
+| BUY | retest2 | 2025-05-27 14:45:00 | 480.10 | 2025-05-29 15:15:00 | 476.00 | STOP_HIT | 1.00 | -0.85% |
+| BUY | retest2 | 2025-05-28 09:15:00 | 481.20 | 2025-05-29 15:15:00 | 476.00 | STOP_HIT | 1.00 | -1.08% |
+| BUY | retest2 | 2025-05-28 10:15:00 | 479.50 | 2025-05-29 15:15:00 | 476.00 | STOP_HIT | 1.00 | -0.73% |
+| SELL | retest2 | 2025-06-12 11:15:00 | 486.50 | 2025-06-13 09:15:00 | 462.17 | PARTIAL | 0.50 | 5.00% |
+| SELL | retest2 | 2025-06-12 11:15:00 | 486.50 | 2025-06-16 14:15:00 | 469.50 | STOP_HIT | 0.50 | 3.49% |
+| BUY | retest2 | 2025-07-16 09:15:00 | 516.25 | 2025-07-18 13:15:00 | 512.85 | STOP_HIT | 1.00 | -0.66% |
+| BUY | retest2 | 2025-07-16 10:30:00 | 515.75 | 2025-07-18 13:15:00 | 512.85 | STOP_HIT | 1.00 | -0.56% |
+| BUY | retest2 | 2025-07-16 13:00:00 | 515.30 | 2025-07-18 13:15:00 | 512.85 | STOP_HIT | 1.00 | -0.48% |
+| BUY | retest2 | 2025-07-17 09:15:00 | 521.95 | 2025-07-18 13:15:00 | 512.85 | STOP_HIT | 1.00 | -1.74% |
+| SELL | retest2 | 2025-07-21 12:45:00 | 511.50 | 2025-07-22 14:15:00 | 513.75 | STOP_HIT | 1.00 | -0.44% |
+| SELL | retest2 | 2025-07-21 13:30:00 | 511.40 | 2025-07-23 09:15:00 | 513.15 | STOP_HIT | 1.00 | -0.34% |
+| SELL | retest2 | 2025-07-22 09:45:00 | 510.50 | 2025-07-23 14:15:00 | 514.50 | STOP_HIT | 1.00 | -0.78% |
+| SELL | retest2 | 2025-07-22 13:00:00 | 511.50 | 2025-07-23 14:15:00 | 514.50 | STOP_HIT | 1.00 | -0.59% |
+| SELL | retest2 | 2025-07-22 14:15:00 | 509.25 | 2025-07-23 15:15:00 | 515.40 | STOP_HIT | 1.00 | -1.21% |
+| SELL | retest2 | 2025-07-23 09:15:00 | 510.05 | 2025-07-23 15:15:00 | 515.40 | STOP_HIT | 1.00 | -1.05% |
+| SELL | retest2 | 2025-07-23 10:30:00 | 510.20 | 2025-07-23 15:15:00 | 515.40 | STOP_HIT | 1.00 | -1.02% |
+| SELL | retest2 | 2025-07-23 11:15:00 | 509.75 | 2025-07-23 15:15:00 | 515.40 | STOP_HIT | 1.00 | -1.11% |
+| BUY | retest2 | 2025-07-24 14:30:00 | 514.50 | 2025-07-25 09:15:00 | 508.75 | STOP_HIT | 1.00 | -1.12% |
+| SELL | retest2 | 2025-07-30 11:00:00 | 482.85 | 2025-08-04 09:15:00 | 458.71 | PARTIAL | 0.50 | 5.00% |
+| SELL | retest2 | 2025-07-30 11:00:00 | 482.85 | 2025-08-04 11:15:00 | 467.55 | STOP_HIT | 0.50 | 3.17% |
+| BUY | retest2 | 2025-08-18 09:15:00 | 472.00 | 2025-08-22 11:15:00 | 470.95 | STOP_HIT | 1.00 | -0.22% |
+| SELL | retest2 | 2025-09-08 12:15:00 | 456.10 | 2025-09-10 09:15:00 | 483.50 | STOP_HIT | 1.00 | -6.01% |
+| SELL | retest2 | 2025-09-08 13:15:00 | 456.30 | 2025-09-10 09:15:00 | 483.50 | STOP_HIT | 1.00 | -5.96% |
+| SELL | retest2 | 2025-09-08 14:30:00 | 455.75 | 2025-09-10 09:15:00 | 483.50 | STOP_HIT | 1.00 | -6.09% |
+| BUY | retest1 | 2025-10-15 09:15:00 | 469.00 | 2025-10-16 14:15:00 | 467.50 | STOP_HIT | 1.00 | -0.32% |
+| BUY | retest1 | 2025-10-15 10:30:00 | 470.70 | 2025-10-16 14:15:00 | 467.50 | STOP_HIT | 1.00 | -0.68% |
+| SELL | retest2 | 2025-10-20 14:15:00 | 456.50 | 2025-10-21 13:15:00 | 469.65 | STOP_HIT | 1.00 | -2.88% |
+| BUY | retest2 | 2025-10-28 10:30:00 | 474.85 | 2025-11-03 11:15:00 | 480.00 | STOP_HIT | 1.00 | 1.08% |
+| BUY | retest2 | 2025-10-28 11:00:00 | 474.80 | 2025-11-03 11:15:00 | 480.00 | STOP_HIT | 1.00 | 1.10% |
+| BUY | retest2 | 2025-10-28 11:30:00 | 475.55 | 2025-11-03 11:15:00 | 480.00 | STOP_HIT | 1.00 | 0.94% |
+| BUY | retest2 | 2025-10-28 12:45:00 | 475.00 | 2025-11-03 11:15:00 | 480.00 | STOP_HIT | 1.00 | 1.05% |
+| SELL | retest2 | 2025-11-17 13:15:00 | 455.50 | 2025-11-24 10:15:00 | 432.72 | PARTIAL | 0.50 | 5.00% |
+| SELL | retest2 | 2025-11-18 09:15:00 | 455.25 | 2025-11-24 10:15:00 | 432.49 | PARTIAL | 0.50 | 5.00% |
+| SELL | retest2 | 2025-11-17 13:15:00 | 455.50 | 2025-11-25 09:15:00 | 445.60 | STOP_HIT | 0.50 | 2.17% |
+| SELL | retest2 | 2025-11-18 09:15:00 | 455.25 | 2025-11-25 09:15:00 | 445.60 | STOP_HIT | 0.50 | 2.12% |
+| SELL | retest2 | 2025-12-19 11:45:00 | 461.30 | 2025-12-19 13:15:00 | 468.15 | STOP_HIT | 1.00 | -1.48% |
+| BUY | retest2 | 2025-12-26 09:15:00 | 490.55 | 2025-12-29 13:15:00 | 480.45 | STOP_HIT | 1.00 | -2.06% |
+| BUY | retest2 | 2025-12-26 13:15:00 | 485.45 | 2025-12-29 13:15:00 | 480.45 | STOP_HIT | 1.00 | -1.03% |
+| BUY | retest1 | 2026-01-01 09:15:00 | 489.20 | 2026-01-01 12:15:00 | 485.40 | STOP_HIT | 1.00 | -0.78% |
+| BUY | retest1 | 2026-01-01 11:00:00 | 489.30 | 2026-01-01 12:15:00 | 485.40 | STOP_HIT | 1.00 | -0.80% |
+| BUY | retest2 | 2026-01-02 09:15:00 | 489.55 | 2026-01-06 09:15:00 | 481.75 | STOP_HIT | 1.00 | -1.59% |
+| SELL | retest2 | 2026-01-07 13:15:00 | 482.30 | 2026-01-12 11:15:00 | 458.19 | PARTIAL | 0.50 | 5.00% |
+| SELL | retest2 | 2026-01-08 10:00:00 | 483.00 | 2026-01-12 11:15:00 | 458.85 | PARTIAL | 0.50 | 5.00% |
+| SELL | retest2 | 2026-01-07 13:15:00 | 482.30 | 2026-01-12 14:15:00 | 471.85 | STOP_HIT | 0.50 | 2.17% |
+| SELL | retest2 | 2026-01-08 10:00:00 | 483.00 | 2026-01-12 14:15:00 | 471.85 | STOP_HIT | 0.50 | 2.31% |
+| SELL | retest2 | 2026-01-22 10:15:00 | 459.45 | 2026-01-23 10:15:00 | 457.70 | STOP_HIT | 1.00 | 0.38% |
+| SELL | retest2 | 2026-01-23 10:00:00 | 459.40 | 2026-01-23 10:15:00 | 457.70 | STOP_HIT | 1.00 | 0.37% |
+| SELL | retest2 | 2026-01-28 12:30:00 | 449.50 | 2026-01-29 14:15:00 | 455.65 | STOP_HIT | 1.00 | -1.37% |
+| SELL | retest2 | 2026-01-29 09:45:00 | 449.15 | 2026-01-29 14:15:00 | 455.65 | STOP_HIT | 1.00 | -1.45% |
+| SELL | retest2 | 2026-01-29 12:00:00 | 447.20 | 2026-01-29 14:15:00 | 455.65 | STOP_HIT | 1.00 | -1.89% |
+| SELL | retest2 | 2026-01-29 13:45:00 | 449.45 | 2026-01-29 14:15:00 | 455.65 | STOP_HIT | 1.00 | -1.38% |
+| SELL | retest2 | 2026-02-06 10:15:00 | 452.70 | 2026-02-09 10:15:00 | 461.05 | STOP_HIT | 1.00 | -1.84% |
+| SELL | retest2 | 2026-02-06 12:30:00 | 453.50 | 2026-02-09 10:15:00 | 461.05 | STOP_HIT | 1.00 | -1.66% |
+| SELL | retest2 | 2026-02-16 09:15:00 | 449.05 | 2026-02-16 10:15:00 | 459.50 | STOP_HIT | 1.00 | -2.33% |
+| BUY | retest2 | 2026-02-19 09:30:00 | 480.15 | 2026-02-25 15:15:00 | 483.30 | STOP_HIT | 1.00 | 0.66% |
+| BUY | retest2 | 2026-02-20 09:15:00 | 478.20 | 2026-02-25 15:15:00 | 483.30 | STOP_HIT | 1.00 | 1.07% |
+| BUY | retest2 | 2026-02-20 11:45:00 | 477.75 | 2026-02-25 15:15:00 | 483.30 | STOP_HIT | 1.00 | 1.16% |
+| SELL | retest2 | 2026-03-02 09:15:00 | 472.10 | 2026-03-04 09:15:00 | 448.50 | PARTIAL | 0.50 | 5.00% |
+| SELL | retest2 | 2026-03-02 09:15:00 | 472.10 | 2026-03-05 09:15:00 | 448.50 | STOP_HIT | 0.50 | 5.00% |
+| SELL | retest2 | 2026-03-16 09:15:00 | 427.20 | 2026-03-17 13:15:00 | 446.30 | STOP_HIT | 1.00 | -4.47% |
+| SELL | retest2 | 2026-03-17 09:15:00 | 429.80 | 2026-03-17 13:15:00 | 446.30 | STOP_HIT | 1.00 | -3.84% |
+| BUY | retest2 | 2026-03-19 12:45:00 | 446.70 | 2026-03-23 09:15:00 | 432.50 | STOP_HIT | 1.00 | -3.18% |
+| BUY | retest2 | 2026-04-09 14:00:00 | 461.20 | 2026-04-21 10:15:00 | 507.32 | TARGET_HIT | 1.00 | 10.00% |
+| BUY | retest2 | 2026-04-09 14:30:00 | 465.60 | 2026-04-21 10:15:00 | 512.16 | TARGET_HIT | 1.00 | 10.00% |
