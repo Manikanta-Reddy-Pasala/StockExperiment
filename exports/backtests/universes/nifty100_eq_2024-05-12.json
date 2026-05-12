@@ -1,0 +1,508 @@
+{
+  "generated_at": "2026-05-13T00:34:11.805955",
+  "end_date": "2024-05-12",
+  "method": "ADV-ranked from Nifty 500",
+  "top_n": 100,
+  "stocks": [
+    {
+      "symbol": "HDFCBANK",
+      "name": "HDFC Bank Ltd.",
+      "adv_lakh": 248538.60299530998
+    },
+    {
+      "symbol": "KOTAKBANK",
+      "name": "Kotak Mahindra Bank Ltd.",
+      "adv_lakh": 214258.97904562505
+    },
+    {
+      "symbol": "IDEA",
+      "name": "Vodafone Idea Ltd.",
+      "adv_lakh": 209562.423405975
+    },
+    {
+      "symbol": "RELIANCE",
+      "name": "Reliance Industries Ltd.",
+      "adv_lakh": 178248.86412275
+    },
+    {
+      "symbol": "ICICIBANK",
+      "name": "ICICI Bank Ltd.",
+      "adv_lakh": 171206.411926825
+    },
+    {
+      "symbol": "SBIN",
+      "name": "State Bank of India",
+      "adv_lakh": 166597.07325515003
+    },
+    {
+      "symbol": "AXISBANK",
+      "name": "Axis Bank Ltd.",
+      "adv_lakh": 139878.077869525
+    },
+    {
+      "symbol": "INFY",
+      "name": "Infosys Ltd.",
+      "adv_lakh": 131181.566684525
+    },
+    {
+      "symbol": "RECLTD",
+      "name": "REC Ltd.",
+      "adv_lakh": 128577.617982225
+    },
+    {
+      "symbol": "BAJFINANCE",
+      "name": "Bajaj Finance Ltd.",
+      "adv_lakh": 114405.17469175
+    },
+    {
+      "symbol": "LT",
+      "name": "Larsen & Toubro Ltd.",
+      "adv_lakh": 109158.3077164
+    },
+    {
+      "symbol": "JIOFIN",
+      "name": "Jio Financial Services Ltd.",
+      "adv_lakh": 108915.170784575
+    },
+    {
+      "symbol": "BHARTIARTL",
+      "name": "Bharti Airtel Ltd.",
+      "adv_lakh": 95991.752838225
+    },
+    {
+      "symbol": "TCS",
+      "name": "Tata Consultancy Services Ltd.",
+      "adv_lakh": 92368.473584725
+    },
+    {
+      "symbol": "BHEL",
+      "name": "Bharat Heavy Electricals Ltd.",
+      "adv_lakh": 89978.868953475
+    },
+    {
+      "symbol": "PFC",
+      "name": "Power Finance Corporation Ltd.",
+      "adv_lakh": 84358.18175842501
+    },
+    {
+      "symbol": "SAIL",
+      "name": "Steel Authority of India Ltd.",
+      "adv_lakh": 83362.08099394999
+    },
+    {
+      "symbol": "TATASTEEL",
+      "name": "Tata Steel Ltd.",
+      "adv_lakh": 82533.77536530001
+    },
+    {
+      "symbol": "HAL",
+      "name": "Hindustan Aeronautics Ltd.",
+      "adv_lakh": 79090.29730852501
+    },
+    {
+      "symbol": "TATAPOWER",
+      "name": "Tata Power Co. Ltd.",
+      "adv_lakh": 76441.590439575
+    },
+    {
+      "symbol": "ETERNAL",
+      "name": "Eternal Ltd.",
+      "adv_lakh": 75142.14646832498
+    },
+    {
+      "symbol": "PNB",
+      "name": "Punjab National Bank",
+      "adv_lakh": 73748.223683575
+    },
+    {
+      "symbol": "EXIDEIND",
+      "name": "Exide Industries Ltd.",
+      "adv_lakh": 73325.83242780001
+    },
+    {
+      "symbol": "MARUTI",
+      "name": "Maruti Suzuki India Ltd.",
+      "adv_lakh": 72578.53952845001
+    },
+    {
+      "symbol": "NHPC",
+      "name": "NHPC Ltd.",
+      "adv_lakh": 72175.715902025
+    },
+    {
+      "symbol": "YESBANK",
+      "name": "Yes Bank Ltd.",
+      "adv_lakh": 71365.06617199999
+    },
+    {
+      "symbol": "ITC",
+      "name": "ITC Ltd.",
+      "adv_lakh": 67474.39147445
+    },
+    {
+      "symbol": "HCLTECH",
+      "name": "HCL Technologies Ltd.",
+      "adv_lakh": 64817.492527525006
+    },
+    {
+      "symbol": "HINDALCO",
+      "name": "Hindalco Industries Ltd.",
+      "adv_lakh": 63341.7179954
+    },
+    {
+      "symbol": "M&M",
+      "name": "Mahindra & Mahindra Ltd.",
+      "adv_lakh": 62431.371328725014
+    },
+    {
+      "symbol": "HINDUNILVR",
+      "name": "Hindustan Unilever Ltd.",
+      "adv_lakh": 62065.379932384996
+    },
+    {
+      "symbol": "BEL",
+      "name": "Bharat Electronics Ltd.",
+      "adv_lakh": 61902.18723665
+    },
+    {
+      "symbol": "ONGC",
+      "name": "Oil & Natural Gas Corporation Ltd.",
+      "adv_lakh": 61887.37610907501
+    },
+    {
+      "symbol": "NTPC",
+      "name": "NTPC Ltd.",
+      "adv_lakh": 61678.521931949996
+    },
+    {
+      "symbol": "COALINDIA",
+      "name": "Coal India Ltd.",
+      "adv_lakh": 60328.2124558
+    },
+    {
+      "symbol": "INDUSTOWER",
+      "name": "Indus Towers Ltd.",
+      "adv_lakh": 60257.31021352499
+    },
+    {
+      "symbol": "IRFC",
+      "name": "Indian Railway Finance Corporation Ltd.",
+      "adv_lakh": 59876.336093475
+    },
+    {
+      "symbol": "TMPV",
+      "name": "Tata Motors Passenger Vehicles Ltd.",
+      "adv_lakh": 59779.334371595
+    },
+    {
+      "symbol": "POWERGRID",
+      "name": "Power Grid Corporation of India Ltd.",
+      "adv_lakh": 57195.088992325
+    },
+    {
+      "symbol": "COCHINSHIP",
+      "name": "Cochin Shipyard Ltd.",
+      "adv_lakh": 57000.785547425
+    },
+    {
+      "symbol": "CDSL",
+      "name": "Central Depository Services (India) Ltd.",
+      "adv_lakh": 56412.642897850004
+    },
+    {
+      "symbol": "TITAN",
+      "name": "Titan Company Ltd.",
+      "adv_lakh": 55753.05851252501
+    },
+    {
+      "symbol": "MCX",
+      "name": "Multi Commodity Exchange of India Ltd.",
+      "adv_lakh": 55089.907812175006
+    },
+    {
+      "symbol": "HINDCOPPER",
+      "name": "Hindustan Copper Ltd.",
+      "adv_lakh": 53996.87968115
+    },
+    {
+      "symbol": "BPCL",
+      "name": "Bharat Petroleum Corporation Ltd.",
+      "adv_lakh": 53107.63517644999
+    },
+    {
+      "symbol": "IREDA",
+      "name": "Indian Renewable Energy Development Agency Ltd.",
+      "adv_lakh": 52935.6059556
+    },
+    {
+      "symbol": "BANKBARODA",
+      "name": "Bank of Baroda",
+      "adv_lakh": 52196.36328567499
+    },
+    {
+      "symbol": "TRENT",
+      "name": "Trent Ltd.",
+      "adv_lakh": 51225.035321075
+    },
+    {
+      "symbol": "BSE",
+      "name": "BSE Ltd.",
+      "adv_lakh": 50934.02672011499
+    },
+    {
+      "symbol": "IOC",
+      "name": "Indian Oil Corporation Ltd.",
+      "adv_lakh": 50047.3235809
+    },
+    {
+      "symbol": "ADANIPORTS",
+      "name": "Adani Ports and Special Economic Zone Ltd.",
+      "adv_lakh": 49996.608202849995
+    },
+    {
+      "symbol": "BHARTIHEXA",
+      "name": "Bharti Hexacom Ltd.",
+      "adv_lakh": 48949.87737049999
+    },
+    {
+      "symbol": "INDUSINDBK",
+      "name": "IndusInd Bank Ltd.",
+      "adv_lakh": 48771.95964335
+    },
+    {
+      "symbol": "CANBK",
+      "name": "Canara Bank",
+      "adv_lakh": 48403.262838
+    },
+    {
+      "symbol": "NMDC",
+      "name": "NMDC Ltd.",
+      "adv_lakh": 46721.509998990005
+    },
+    {
+      "symbol": "GAIL",
+      "name": "GAIL (India) Ltd.",
+      "adv_lakh": 45697.7891679
+    },
+    {
+      "symbol": "BAJAJ-AUTO",
+      "name": "Bajaj Auto Ltd.",
+      "adv_lakh": 45322.18098874999
+    },
+    {
+      "symbol": "HINDPETRO",
+      "name": "Hindustan Petroleum Corporation Ltd.",
+      "adv_lakh": 43442.648499815004
+    },
+    {
+      "symbol": "SUNPHARMA",
+      "name": "Sun Pharmaceutical Industries Ltd.",
+      "adv_lakh": 43399.42326345
+    },
+    {
+      "symbol": "INDIGO",
+      "name": "InterGlobe Aviation Ltd.",
+      "adv_lakh": 43329.1451048
+    },
+    {
+      "symbol": "MAZDOCK",
+      "name": "Mazagoan Dock Shipbuilders Ltd.",
+      "adv_lakh": 42207.28742745
+    },
+    {
+      "symbol": "HUDCO",
+      "name": "Housing & Urban Development Corporation Ltd.",
+      "adv_lakh": 41644.537880674994
+    },
+    {
+      "symbol": "HDFCLIFE",
+      "name": "HDFC Life Insurance Company Ltd.",
+      "adv_lakh": 41345.388717525
+    },
+    {
+      "symbol": "TECHM",
+      "name": "Tech Mahindra Ltd.",
+      "adv_lakh": 39352.13154639999
+    },
+    {
+      "symbol": "HEROMOTOCO",
+      "name": "Hero MotoCorp Ltd.",
+      "adv_lakh": 39124.324619800005
+    },
+    {
+      "symbol": "SHRIRAMFIN",
+      "name": "Shriram Finance Ltd.",
+      "adv_lakh": 38379.38686019999
+    },
+    {
+      "symbol": "ASIANPAINT",
+      "name": "Asian Paints Ltd.",
+      "adv_lakh": 38297.048393475
+    },
+    {
+      "symbol": "ASHOKLEY",
+      "name": "Ashok Leyland Ltd.",
+      "adv_lakh": 37944.99753601
+    },
+    {
+      "symbol": "ADANIENT",
+      "name": "Adani Enterprises Ltd.",
+      "adv_lakh": 37715.399918355
+    },
+    {
+      "symbol": "ULTRACEMCO",
+      "name": "UltraTech Cement Ltd.",
+      "adv_lakh": 37597.33456027499
+    },
+    {
+      "symbol": "ARE&M",
+      "name": "Amara Raja Energy & Mobility Ltd.",
+      "adv_lakh": 37562.055275225015
+    },
+    {
+      "symbol": "EICHERMOT",
+      "name": "Eicher Motors Ltd.",
+      "adv_lakh": 36857.022018525
+    },
+    {
+      "symbol": "NATIONALUM",
+      "name": "National Aluminium Co. Ltd.",
+      "adv_lakh": 36664.64829965
+    },
+    {
+      "symbol": "RVNL",
+      "name": "Rail Vikas Nigam Ltd.",
+      "adv_lakh": 35826.130253074996
+    },
+    {
+      "symbol": "COFORGE",
+      "name": "Coforge Ltd.",
+      "adv_lakh": 35769.405943800004
+    },
+    {
+      "symbol": "VOLTAS",
+      "name": "Voltas Ltd.",
+      "adv_lakh": 35598.8648519
+    },
+    {
+      "symbol": "IDFCFIRSTB",
+      "name": "IDFC First Bank Ltd.",
+      "adv_lakh": 35413.99222587501
+    },
+    {
+      "symbol": "DLF",
+      "name": "DLF Ltd.",
+      "adv_lakh": 34547.344352650005
+    },
+    {
+      "symbol": "BIOCON",
+      "name": "Biocon Ltd.",
+      "adv_lakh": 34207.003689525
+    },
+    {
+      "symbol": "APOLLOHOSP",
+      "name": "Apollo Hospitals Enterprise Ltd.",
+      "adv_lakh": 33183.115158450004
+    },
+    {
+      "symbol": "FEDERALBNK",
+      "name": "Federal Bank Ltd.",
+      "adv_lakh": 31421.849803874997
+    },
+    {
+      "symbol": "VEDL",
+      "name": "Vedanta Ltd.",
+      "adv_lakh": 30949.54367941
+    },
+    {
+      "symbol": "POLYCAB",
+      "name": "Polycab India Ltd.",
+      "adv_lakh": 30763.093235625
+    },
+    {
+      "symbol": "IRCTC",
+      "name": "Indian Railway Catering And Tourism Corporation Ltd.",
+      "adv_lakh": 30665.233483975
+    },
+    {
+      "symbol": "PETRONET",
+      "name": "Petronet LNG Ltd.",
+      "adv_lakh": 30169.659434975
+    },
+    {
+      "symbol": "BHARATFORG",
+      "name": "Bharat Forge Ltd.",
+      "adv_lakh": 30011.7362325
+    },
+    {
+      "symbol": "HINDZINC",
+      "name": "Hindustan Zinc Ltd.",
+      "adv_lakh": 29799.378502174997
+    },
+    {
+      "symbol": "NESTLEIND",
+      "name": "Nestle India Ltd.",
+      "adv_lakh": 29743.235171599998
+    },
+    {
+      "symbol": "OIL",
+      "name": "Oil India Ltd.",
+      "adv_lakh": 28867.319289194995
+    },
+    {
+      "symbol": "GODREJPROP",
+      "name": "Godrej Properties Ltd.",
+      "adv_lakh": 28846.19044745
+    },
+    {
+      "symbol": "GMRAIRPORT",
+      "name": "GMR Airports Ltd.",
+      "adv_lakh": 28759.741455474996
+    },
+    {
+      "symbol": "WIPRO",
+      "name": "Wipro Ltd.",
+      "adv_lakh": 28617.626082629995
+    },
+    {
+      "symbol": "SJVN",
+      "name": "SJVN Ltd.",
+      "adv_lakh": 27964.967886225
+    },
+    {
+      "symbol": "DIXON",
+      "name": "Dixon Technologies (India) Ltd.",
+      "adv_lakh": 27908.525419100002
+    },
+    {
+      "symbol": "VBL",
+      "name": "Varun Beverages Ltd.",
+      "adv_lakh": 27723.596739120003
+    },
+    {
+      "symbol": "TATACONSUM",
+      "name": "Tata Consumer Products Ltd.",
+      "adv_lakh": 27325.523062025004
+    },
+    {
+      "symbol": "DRREDDY",
+      "name": "Dr. Reddy's Laboratories Ltd.",
+      "adv_lakh": 27220.221910625
+    },
+    {
+      "symbol": "BRITANNIA",
+      "name": "Britannia Industries Ltd.",
+      "adv_lakh": 27192.232573024998
+    },
+    {
+      "symbol": "TVSMOTOR",
+      "name": "TVS Motor Company Ltd.",
+      "adv_lakh": 27161.047276025
+    },
+    {
+      "symbol": "ABCAPITAL",
+      "name": "Aditya Birla Capital Ltd.",
+      "adv_lakh": 26597.478703425004
+    }
+  ]
+}
