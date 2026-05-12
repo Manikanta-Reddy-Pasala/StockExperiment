@@ -170,20 +170,25 @@ def _expected_bars(interval: str, days: int) -> int:
 
 def get_or_fetch(symbol: str, interval: str, days: int,
                  fyers_fetcher: Callable[[str, int], pd.DataFrame],
-                 min_coverage_frac: float = 0.50) -> pd.DataFrame:
+                 min_coverage_frac: float = 0.0) -> pd.DataFrame:
     """Return OHLCV for the last ``days`` days.
 
-    1. Read cached rows from the existing prod table.
-    2. If cache covers >= min_coverage_frac of expected -> return cache
-       (no freshness check — once prefetched, the cache is authoritative).
-    3. Otherwise call ``fyers_fetcher(symbol, days)``, upsert into the
-       cache table, return the fresh fetch.
+    Cache-only mode (default min_coverage_frac=0): return whatever the
+    cache has. Never call Fyers during backtest — accept that recent
+    IPOs / sparse symbols have less data, strategy will skip them
+    naturally via len(candles) check.
+
+    Set ``min_coverage_frac=0.50`` to re-enable fallback Fyers fetch on
+    low coverage.
     """
     end_dt = datetime.now()
     start_dt = end_dt - timedelta(days=days)
     from_ts, to_ts = int(start_dt.timestamp()), int(end_dt.timestamp())
 
     cached = read_cached(symbol, interval, from_ts, to_ts)
+    if min_coverage_frac <= 0:
+        # Pure cache mode — no Fyers fallback.
+        return cached
     expected = _expected_bars(interval, days)
     have = len(cached)
     if have >= int(expected * min_coverage_frac) and have > 0:

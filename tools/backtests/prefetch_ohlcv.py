@@ -104,6 +104,10 @@ def main() -> int:
                          "expected rows for the window.")
     ap.add_argument("--max-symbols", type=int, default=None,
                     help="Limit number of symbols (for testing)")
+    ap.add_argument("--sleep", type=float, default=0.0,
+                    help="Seconds to sleep between symbols to avoid Fyers rate-limit.")
+    ap.add_argument("--retry-passes", type=int, default=1,
+                    help="Number of passes to retry partial-coverage stocks.")
     args = ap.parse_args()
 
     universes = [u.strip() for u in args.universe.split(",") if u.strip()]
@@ -163,6 +167,8 @@ def main() -> int:
         print(f"[{n_done}/{len(symbols)}] {sym}: {' '.join(per_interval_summary)} "
               f"(elapsed={elapsed/60:.1f}m, eta={eta/60:.1f}m)",
               flush=True)
+        if args.sleep > 0 and n_done < len(symbols):
+            time.sleep(args.sleep)
     print("---")
     print(f"Prefetch done: {n_done} symbols, "
           f"{n_fetched} fetched, {n_skipped} skipped, "
