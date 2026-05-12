@@ -48,7 +48,9 @@ def run_orb60(df_15m: pd.DataFrame, df_daily: pd.DataFrame,
     if df_15m.empty or df_daily.empty:
         return events
     df_15m = df_15m.sort_values("timestamp").reset_index(drop=True)
-    df_15m["dt"] = pd.to_datetime(df_15m["timestamp"], unit="s")
+    # Bars stored in UTC. NSE market is IST (UTC+5:30).
+    # IST 09:15 = UTC 03:45, IST 15:30 = UTC 10:00
+    df_15m["dt"] = pd.to_datetime(df_15m["timestamp"], unit="s") + pd.Timedelta(hours=5, minutes=30)
     df_15m["date"] = df_15m["dt"].dt.date
     df_15m["hm"] = df_15m["dt"].dt.strftime("%H:%M")
 
