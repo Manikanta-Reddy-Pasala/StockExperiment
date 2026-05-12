@@ -773,6 +773,8 @@ def main() -> int:
                         help="History window in calendar days")
     parser.add_argument("--out", type=Path,
                         default=ROOT / "exports" / "backtests")
+    parser.add_argument("--universe-file", default=None,
+                        help="JSON file with {'stocks':[{'symbol':...}]}. Overrides --universe.")
     parser.add_argument("--universe", choices=["smoke", "nifty50", "nifty500", "indices"],
                         default="smoke",
                         help="smoke=5-stock sanity; nifty50=NIFTY 50 constituents; "
@@ -888,6 +890,14 @@ def main() -> int:
         sym = args.symbol.upper()
         symbols_list = [(sym, sym)]
         print(f"Universe: single symbol ({sym})")
+    elif getattr(args, "universe_file", None):
+        import json as _json
+        with open(args.universe_file) as _f:
+            _data = _json.load(_f)
+        symbols_list = [(s["symbol"], s.get("name", s["symbol"])) for s in _data["stocks"]]
+        if args.limit:
+            symbols_list = symbols_list[:args.limit]
+        print(f"Universe: from file {args.universe_file} ({len(symbols_list)} symbols)")
     elif args.universe == "nifty50":
         symbols_list = NIFTY50_SYMBOLS
         if args.limit:

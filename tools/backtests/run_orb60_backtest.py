@@ -185,6 +185,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--universe", default="nifty50",
                     choices=["nifty50", "nifty500"])
+    ap.add_argument("--universe-file", default=None,
+                    help="JSON file with {'stocks':[{'symbol':...}]}. Overrides --universe.")
     ap.add_argument("--from", dest="date_from", required=True)
     ap.add_argument("--to", dest="date_to", required=True)
     ap.add_argument("--out", required=True)
@@ -195,7 +197,11 @@ def main():
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
 
-    if args.universe == "nifty50":
+    if args.universe_file:
+        with open(args.universe_file) as f:
+            data = json.load(f)
+        symbols = [s["symbol"] for s in data["stocks"]]
+    elif args.universe == "nifty50":
         symbols = [s for s, _ in NIFTY50_SYMBOLS]
     else:
         from tools.backtests.run_ema_200_400_backtest import nifty500_symbols
