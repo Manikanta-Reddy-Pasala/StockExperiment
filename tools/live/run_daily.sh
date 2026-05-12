@@ -31,13 +31,43 @@ case "$cmd" in
     $PYTHON tools/backtests/prefetch_ohlcv.py --universe all --days 2 --intervals 1h,15m,D --sleep 0.2
     ;;
 
+  selector)
+    # Monthly stock picker — outputs top-N to signals/selector_<month>.json
+    MONTH=$(date +%Y-%m)
+    SELECTOR_FILE="signals/selector_${MONTH}.json"
+    if [ -f "$SELECTOR_FILE" ]; then
+      echo "[$DATE] Selector already run for $MONTH: $SELECTOR_FILE"
+    else
+      echo "[$DATE] Running stock selector for $MONTH..."
+      $PYTHON tools/backtests/stock_selector.py --universe nifty500 --top 10 \
+        --out "$SELECTOR_FILE"
+    fi
+    ;;
+
   signals)
     echo "[$DATE] Generating signals for $UNIVERSE..."
     mkdir -p signals
-    for m in "${MODELS[@]}"; do
-      $PYTHON tools/live/signal_generator.py --model "$m" --universe "$UNIVERSE" \
-        --signals-out "signals/${DATE}_${m}_${UNIVERSE}.json"
-    done
+    MONTH=$(date +%Y-%m)
+    SELECTOR_FILE="signals/selector_${MONTH}.json"
+    # If selector file exists (production config), use it for ema_200_400
+    if [ -f "$SELECTOR_FILE" ]; then
+      echo "[$DATE] Using monthly selector universe: $SELECTOR_FILE"
+      for m in "${MODELS[@]}"; do
+        if [ "$m" = "ema_200_400" ]; then
+          $PYTHON tools/live/signal_generator.py --model "$m" \
+            --universe-file "$SELECTOR_FILE" \
+            --signals-out "signals/${DATE}_${m}_selector.json"
+        else
+          $PYTHON tools/live/signal_generator.py --model "$m" --universe "$UNIVERSE" \
+            --signals-out "signals/${DATE}_${m}_${UNIVERSE}.json"
+        fi
+      done
+    else
+      for m in "${MODELS[@]}"; do
+        $PYTHON tools/live/signal_generator.py --model "$m" --universe "$UNIVERSE" \
+          --signals-out "signals/${DATE}_${m}_${UNIVERSE}.json"
+      done
+    fi
     ;;
 
   paper)

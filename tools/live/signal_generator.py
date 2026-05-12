@@ -49,7 +49,16 @@ from src.services.technical.models import get_model  # noqa: E402
 log = logging.getLogger("signal_generator")
 
 
-def load_universe(name: str):
+def load_universe(name: str, universe_file: str = None):
+    """Load universe by name OR from a selector JSON file.
+
+    universe_file: path to selector JSON {"stocks":[{"symbol":...,"name":...}]}
+    Takes precedence over name.
+    """
+    if universe_file:
+        with open(universe_file) as f:
+            data = json.load(f)
+        return [(s["symbol"], s.get("name", s["symbol"])) for s in data["stocks"]]
     if name == "nifty50":
         return NIFTY50_SYMBOLS
     if name == "nifty500":
@@ -85,7 +94,8 @@ def load_bars(symbol: str, interval: str, days: int):
     ]
 
 
-def generate_signals(model_key: str, universe: str) -> List[Dict]:
+def generate_signals(model_key: str, universe: str,
+                      universe_file: str = None) -> List[Dict]:
     info = get_model(model_key)
     StratCls = info["strategy_class"]
     Cfg = info["config_class"]
@@ -93,7 +103,7 @@ def generate_signals(model_key: str, universe: str) -> List[Dict]:
     days = get_window_days(model_key)
 
     strat = StratCls(Cfg())
-    symbols = load_universe(universe)
+    symbols = load_universe(universe, universe_file)
 
     today = datetime.now().date()
     today_ts = int(datetime.combine(today, datetime.min.time()).timestamp())
@@ -135,6 +145,8 @@ def main() -> int:
                     help="Model key: ema_200_400, ema_9_21, swing_pullback, orb_15min")
     ap.add_argument("--universe", default="nifty50",
                     choices=["nifty50", "nifty500"])
+    ap.add_argument("--universe-file", default=None,
+                    help="Path to selector JSON (overrides --universe)")
     ap.add_argument("--signals-out", default=None,
                     help="JSON output path. Default: signals/{date}_{model}_{universe}.json")
     ap.add_argument("--quiet", action="store_true")
@@ -145,8 +157,9 @@ def main() -> int:
         format="%(asctime)s %(levelname)s %(message)s",
     )
 
-    log.info(f"Generating signals: model={args.model} universe={args.universe}")
-    signals = generate_signals(args.model, args.universe)
+    uni_label = args.universe_file or args.universe
+    log.info(f"Generating signals: model={args.model} universe={uni_label}")
+    signals = generate_signals(args.model, args.universe, args.universe_file)
     log.info(f"Emitted {len(signals)} signals")
 
     out_path = args.signals_out
