@@ -1,14 +1,32 @@
 # StockExperiment — Summary
 
-_Updated: 2026-05-12 | Capital: ₹10,00,000 | Backtest window: May 2025 → May 2026_
+_Updated: 2026-05-12 | Capital: ₹10,00,000_
 
-## Production config
+## 🎯 MULTI-YEAR FINDING (3-yr backtest, May 2023 → May 2026)
+
+EMA 200/400 on Nifty 50 large caps **wins long-term**:
+
+| Year | ROI% | MaxDD% | Trades |
+|------|-----:|-------:|-------:|
+| 2023-2024 | **+98.13** | 13.06 | 179 |
+| 2024-2025 | **+54.88** | 13.06 | 125 |
+| 2025-2026 | +6.77 | 13.01 | 54 |
+| **Avg/yr** | **+53.26%** | 13.06 | 119 |
+| **Compound 3-yr** | **+227.64%** | — | 358 total |
+
+vs EMA 9/21 on N50: avg -9.42%/yr (loses all 3 years).
+
+**INVERTED finding:** earlier 1-year Phase 7 favored EMA 9/21 on volatile
+mid-caps (selector top-10). Multi-year shows **EMA 200/400 on stable
+N50 large caps is far more durable**.
+
+## Production config (updated based on multi-year data)
 
 ```yaml
-strategy:        ema_9_21
-universe:        selector_top10    # multi-param ranked N500, monthly refresh
-filters:         sector_RS + calendar (expiry+budget)
-overlay:         vol_sizing 2% per trade
+strategy:        ema_200_400          # 1H crossover (CHANGED back from 9_21)
+universe:        nifty50              # full N50 large caps (simpler than selector)
+filters:         sector_RS + calendar
+overlay:         vol_sizing 2%        # optional, reduces DD
 max_concurrent:  2
 capital_inr:     1_000_000
 min_price:       50
@@ -16,31 +34,40 @@ min_adv_lakh:    100
 kill_switch:     -5% daily loss
 ```
 
-## 1-year backtest result
+## Backtest comparison
 
-| Metric | Value |
-|--------|------:|
-| Final equity | ₹13,33,156 |
-| Profit | +₹3,33,156 |
-| **ROI** | **+33.32%** |
-| **MaxDD** | **8.20%** (~₹82K worst dip) |
-| Trades | 140 |
-| Win rate | 59.7% |
+| Config | Period | ROI% | DD% | Win% | Trades |
+|--------|--------|-----:|----:|-----:|-------:|
+| EMA 200/400 N50 simple | 2023-24 | **+98.13** | 13.06 | n/a | 179 |
+| EMA 200/400 N50 simple | 2024-25 | **+54.88** | 13.06 | n/a | 125 |
+| EMA 200/400 N50 simple | 2025-26 | +6.77 | 13.01 | n/a | 54 |
+| EMA 9/21 selector top-10 (Phase 7) | 2025-26 only | +33.32 | 8.20 | 59.7 | 140 |
 
-## Top-10 watchlist (selector @ 2025-05-12)
+## Universe options
 
-SWIGGY · VMM · AEGISLOG · ANGELONE · SAILIFE · ITI · IKS · AMBER · NTPCGREEN · BSE
+**Option 1 (recommended — multi-year validated):**
+- Full Nifty 50 (53 large-cap stocks)
+- EMA 200/400 fires ~120-180 trades/year
+- 3-year compound +227.64%
 
-## Alternative paths considered
+**Option 2 (selector-based, single-year only):**
+- Monthly selector top-10 from N500
+- EMA 9/21 better here in 2025-26 (+33.32%)
+- Not yet multi-year validated
+- Recent IPOs (SWIGGY, VMM etc.) lack 3-yr history
+
+## Alternative paths (1-year results)
 
 | Path | ROI% | DD% | Win% | Trades | Note |
 |------|-----:|----:|-----:|-------:|------|
-| **B ⭐ prod** | **+33.32** | **8.20** | 60 | 140 | Best risk-adjusted |
-| A Max ROI | +46.87 | 12.56 | 62 | 209 | EMA9/21 raw |
-| D BB Squeeze N50 | +32.73 | 3.24 | 80 | 5 | Lowest DD but low confidence |
-| E EMA200/400+filters | +29.35 | 9.58 | 71 | 24 | Old winner |
+| EMA 200/400 N50 simple 2023-24 | +98.13 | 13.06 | n/a | 179 | Multi-year tested |
+| EMA 200/400 N50 simple 2024-25 | +54.88 | 13.06 | n/a | 125 | Multi-year tested |
+| EMA 9/21 selector top-10 +filters | +33.32 | 8.20 | 60 | 140 | 1-yr only, mid-caps |
+| EMA 9/21 selector raw max=3 | +46.87 | 12.56 | 62 | 209 | 1-yr only |
+| BB Squeeze N50 | +32.73 | 3.24 | 80 | 5 | Low DD, low confidence |
 
-See `path_returns/MASTER_RETURNS.md` for month-by-month.
+See `path_returns/MASTER_RETURNS.md` for 2025-26 month-by-month details.
+See `MULTI_YEAR_REPORT.md` for full 3-year breakdown.
 
 ## Workflow
 
