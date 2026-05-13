@@ -151,11 +151,44 @@ async function sellNow(symbol, qty) {
 
 document.getElementById('btn_preview').addEventListener('click', loadPreview);
 document.getElementById('btn_rebalance').addEventListener('click', async () => {
-  if (!confirm('⚠️ LIVE REBALANCE — real money. Run preview shows scope. Proceed?')) return;
+  // 1. Fetch preview
+  const pr = await fetch('/admin/momrot/rebalance-preview');
+  const p = await pr.json();
+  if (!p.success) { alert('Preview failed: ' + p.error); return; }
+
+  // 2. Build action summary
+  if (p.already_holding_rank_member) {
+    alert(`✓ Already holding rank-1 (or member of top-5).\nRank-1: ${p.rank1.symbol} (${fmtPct(p.rank1.return_60d)})\nNo action needed.`);
+    return;
+  }
+  let msg = "⚠️ LIVE REBALANCE — REAL MONEY\n\n";
+  msg += `Rank-1 right now: ${p.rank1.symbol} (${fmtPct(p.rank1.return_60d)} @ ${fmtINR(p.rank1.price)})\n\n`;
+  if (p.sells && p.sells.length) {
+    msg += "SELL:\n";
+    p.sells.forEach(s => {
+      msg += `  • ${s.symbol} qty=${s.qty} @ ${fmtINR(s.ltp)} = proceeds ${fmtINR(s.proceeds)}\n`;
+    });
+  } else {
+    msg += "SELL: none\n";
+  }
+  if (p.buy) {
+    msg += `\nBUY:\n  • ${p.buy.symbol} qty=${p.buy.qty} @ ${fmtINR(p.buy.price)} = deploy ${fmtINR(p.buy.deploy)}\n  Available cash after sells: ${fmtINR(p.buy.available_cash_after_sells)}\n`;
+    if (p.buy.qty < 1) msg += "  ⚠️ qty=0 — insufficient cash, BUY will be skipped.\n";
+  }
+  msg += "\nConfirm to execute?";
+
+  if (!confirm(msg)) return;
+
+  // 3. Fire run-now
   const r = await fetch('/admin/momrot/run-now', {method:'POST'});
   const d = await r.json();
-  alert(d.success ? 'Rebalance executed. Refreshing.' : 'Failed: ' + d.error);
-  setTimeout(() => { loadState(); loadPreview(); }, 5000);
+  if (d.success) {
+    const lines = (d.actions || []).map(a => `${a.action} ${a.symbol||''} qty=${a.qty||'-'} ${a.reason||''}`);
+    alert('Rebalance executed:\n' + (lines.join('\n') || '(no action)'));
+  } else {
+    alert('Failed: ' + d.error);
+  }
+  setTimeout(() => { loadState(); loadPreview(); }, 3000);
 });
 document.getElementById('btn_buy_rank1').addEventListener('click', async () => {
   if (!confirm('⚠️ LIVE BUY Rank-1 with available cash. Proceed?')) return;
