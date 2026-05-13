@@ -75,17 +75,20 @@
     </div>
     <div class="col-md-7">
       <div class="card mr-card p-3 d-flex flex-row align-items-center gap-2">
-        <button class="btn btn-primary flex-fill" id="btn_run_now">
-          <i class="bi bi-play-circle"></i> Force Rebalance Now
+        <button class="btn btn-danger flex-fill" id="btn_run_now">
+          <i class="bi bi-play-circle"></i> LIVE Rebalance
+        </button>
+        <button class="btn btn-success flex-fill" id="btn_buy_now">
+          <i class="bi bi-cart-plus"></i> Buy Rank-1
         </button>
         <button class="btn btn-outline-secondary flex-fill" id="btn_rebuild">
-          <i class="bi bi-arrow-clockwise"></i> Rebuild N100 Universe
+          <i class="bi bi-arrow-clockwise"></i> Rebuild N100
         </button>
         <button class="btn btn-outline-info flex-fill" id="btn_refresh">
-          <i class="bi bi-arrow-repeat"></i> Refresh Data
+          <i class="bi bi-arrow-repeat"></i> Refresh
         </button>
         <button class="btn btn-outline-success flex-fill" id="btn_tg_test">
-          <i class="bi bi-send"></i> Test Telegram
+          <i class="bi bi-send"></i> Test TG
         </button>
       </div>
     </div>
@@ -297,11 +300,28 @@ async function loadRunLogs() {
 }
 
 document.getElementById('btn_run_now').addEventListener('click', async () => {
-  if (!confirm('Force rebalance NOW (bypass first-week-of-month gate)?')) return;
+  if (!confirm('⚠️ LIVE REBALANCE — real money. Sell all holdings not in top-5, BUY rank-1 with available cash. Proceed?')) return;
   const r = await fetch('/admin/momrot/run-now', {method:'POST'});
   const d = await r.json();
-  alert(d.success ? 'Rebalance triggered. Refreshing in 5s.' : 'Failed: ' + d.error);
-  setTimeout(() => { loadSummary(); loadHistory(); loadRunLogs(); }, 5000);
+  if (d.success) {
+    const lines = (d.actions || []).map(a => `${a.action} ${a.symbol || ''} qty=${a.qty || '-'}`);
+    alert('LIVE rebalance executed:\n' + (lines.join('\n') || '(no action)'));
+  } else {
+    alert('Failed: ' + d.error);
+  }
+  setTimeout(() => { loadSummary(); loadHistory(); loadRunLogs(); loadFyers(); }, 5000);
+});
+
+document.getElementById('btn_buy_now').addEventListener('click', async () => {
+  if (!confirm('⚠️ LIVE BUY — places real market order for rank-1 stock using available Fyers cash. Proceed?')) return;
+  const r = await fetch('/admin/momrot/buy-now', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+  const d = await r.json();
+  if (d.success) {
+    alert(`BUY placed: ${d.symbol} qty=${d.qty} @ ₹${d.price}\nOrder result: ${JSON.stringify(d.result)}`);
+  } else {
+    alert('BUY failed: ' + d.error);
+  }
+  setTimeout(() => { loadSummary(); loadFyers(); }, 3000);
 });
 
 document.getElementById('btn_rebuild').addEventListener('click', async () => {
