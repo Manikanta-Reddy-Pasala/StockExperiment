@@ -55,24 +55,25 @@
         </div>
     </div>
 
-    <!-- Capital (locked) -->
+    <!-- Capital (live from Fyers) -->
     <div class="col-lg-6">
         <div class="card h-100">
-            <div class="card-header"><i class="bi bi-piggy-bank me-2"></i>Capital</div>
+            <div class="card-header"><i class="bi bi-piggy-bank me-2"></i>Capital (Live from Fyers)</div>
             <div class="card-body">
                 <div class="mb-3">
-                    <label class="form-label small">Virtual Capital (locked)</label>
+                    <label class="form-label small">Available Cash + Holdings Value</label>
                     <div class="input-group">
                         <span class="input-group-text">&#8377;</span>
-                        <input type="number" class="form-control" id="virtual-capital" value="1000000" readonly>
+                        <input type="text" class="form-control" id="virtual-capital" value="--" readonly>
                     </div>
-                    <div class="form-text">Fixed at ₹10,00,000 for Momentum Rotation. Backtest 3-yr CAGR +86.93%/yr (realistic live 35-55% CAGR after costs).</div>
+                    <div class="form-text">Real Fyers account NAV. Rebalance + Buy buttons size orders using available cash.</div>
                 </div>
                 <div id="momrot-summary" class="mb-2 small">
-                    <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span class="text-muted">Portfolio Value:</span> <strong id="mr-value">--</strong></div>
-                    <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span class="text-muted">Cash:</span> <strong id="mr-cash">--</strong></div>
+                    <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span class="text-muted">Portfolio Value (NAV):</span> <strong id="mr-value">--</strong></div>
+                    <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span class="text-muted">Available Cash:</span> <strong id="mr-cash">--</strong></div>
+                    <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span class="text-muted">Market Value (holdings):</span> <strong id="mr-mv">--</strong></div>
                     <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span class="text-muted">Open Position:</span> <strong id="mr-pos">--</strong></div>
-                    <div class="d-flex justify-content-between"><span class="text-muted">Total P&L:</span> <strong id="mr-pnl">--</strong></div>
+                    <div class="d-flex justify-content-between"><span class="text-muted">Unrealized P&L:</span> <strong id="mr-pnl">--</strong></div>
                 </div>
                 <a href="/admin/momrot" class="btn btn-primary btn-sm"><i class="bi bi-graph-up-arrow me-1"></i> Open Momentum Rotation Dashboard</a>
             </div>
@@ -176,7 +177,7 @@ async function loadSettings() {
         }
     }
 
-    // Momentum rotation summary
+    // Momentum rotation summary - live from Fyers
     try {
         const mrR = await fetch('/admin/momrot/state');
         const mr = await mrR.json();
@@ -184,8 +185,10 @@ async function loadSettings() {
             const s = mr.data;
             const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractionDigits:2});
             const pnlCls = n => n>0?'text-success':(n<0?'text-danger':'text-muted');
+            document.getElementById('virtual-capital').value = fmtINR(s.total_value).replace('₹','');
             document.getElementById('mr-value').textContent = fmtINR(s.total_value);
             document.getElementById('mr-cash').textContent = fmtINR(s.cash);
+            document.getElementById('mr-mv').textContent = fmtINR(s.market_value);
             document.getElementById('mr-pos').textContent = (s.open_positions && s.open_positions[0])
                 ? `${s.open_positions[0].symbol} (${s.open_positions[0].qty} @ ${fmtINR(s.open_positions[0].entry_price)})`
                 : 'None';
