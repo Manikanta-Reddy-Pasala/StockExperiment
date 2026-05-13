@@ -118,57 +118,74 @@ def _return_60d(symbol: str) -> tuple:
 
 
 def _portfolio_state() -> Dict:
-    """Compute full portfolio state from ledger + history + live prices."""
-    ledger = _load_json(LEDGER_PATH, {"open": [], "closed_today": []})
-    history = _read_history()
+    """Compute portfolio state from LIVE Fyers account (funds + holdings)."""
+    try:
+        from src.services.brokers.fyers_service import FyersService
+        svc = FyersService()
+        funds_resp = svc.funds(1)
+        holdings_resp = svc.holdings(1)
+    except Exception as e:
+        logger.warning(f"Fyers fetch failed: {e}")
+        funds_resp = {"data": {}}
+        holdings_resp = {"data": []}
 
-    realized_pnl = sum(h.get("pnl", 0.0) for h in history)
+    funds = (funds_resp or {}).get("data") or {}
+    cash = float(funds.get("available_cash") or 0)
+    total_margin = float(funds.get("total_margin") or 0)
+    utilized_margin = float(funds.get("utilized_margin") or 0)
+
+    holdings = (holdings_resp or {}).get("data") or []
     open_positions = []
     position_cost = 0.0
     market_value = 0.0
-    day_pnl = 0.0
+    unrealized_total = 0.0
 
-    for p in ledger.get("open", []):
-        sym = p["symbol"]
-        qty = int(p["qty"])
-        entry = float(p["entry_price"])
-        live = _live_price(sym)
-        cost = entry * qty
-        mv = live * qty
-        unreal = mv - cost
-        day_open = live  # without intraday data, approximate with live
+    for p in holdings:
+        sym = (p.get("symbol") or "").replace("NSE:", "").replace("-EQ", "")
+        qty = float(p.get("quantity") or 0)
+        if qty <= 0:
+            continue
+        avg = float(p.get("average_price") or 0)
+        ltp = float(p.get("last_price") or 0)
+        pnl = float(p.get("pnl") or (ltp - avg) * qty)
+        cost = avg * qty
+        mv = ltp * qty
         position_cost += cost
         market_value += mv
+        unrealized_total += pnl
         open_positions.append({
             "symbol": sym,
-            "qty": qty,
-            "entry_price": entry,
-            "live_price": live,
+            "qty": int(qty),
+            "entry_price": avg,
+            "live_price": ltp,
             "cost": cost,
             "market_value": mv,
-            "unrealized_pnl": unreal,
-            "unrealized_pct": (live / entry - 1) * 100 if entry > 0 else 0,
+            "unrealized_pnl": pnl,
+            "unrealized_pct": (ltp / avg - 1) * 100 if avg > 0 else 0,
         })
 
-    cash = STARTING_CAPITAL + realized_pnl - position_cost
     total_value = cash + market_value
     total_pnl = total_value - STARTING_CAPITAL
-    total_pct = (total_value / STARTING_CAPITAL - 1) * 100
+    total_pct = (total_value / STARTING_CAPITAL - 1) * 100 if STARTING_CAPITAL else 0
 
+    history = _read_history()
     return {
+        "source": "fyers",
         "starting_capital": STARTING_CAPITAL,
         "cash": cash,
+        "total_margin": total_margin,
+        "utilized_margin": utilized_margin,
         "position_cost": position_cost,
         "market_value": market_value,
         "total_value": total_value,
-        "realized_pnl": realized_pnl,
-        "unrealized_pnl": market_value - position_cost,
+        "realized_pnl": 0.0,
+        "unrealized_pnl": unrealized_total,
         "total_pnl": total_pnl,
         "total_pct": total_pct,
-        "day_pnl": ledger.get("day_pnl", 0.0),
+        "day_pnl": 0.0,
         "open_positions": open_positions,
         "closed_trades_count": len(history),
-        "ledger_updated_at": ledger.get("updated_at"),
+        "ledger_updated_at": datetime.now().isoformat(),
     }
 
 
