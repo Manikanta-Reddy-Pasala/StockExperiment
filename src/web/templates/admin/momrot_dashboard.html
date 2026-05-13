@@ -322,33 +322,37 @@ async function loadFyers() {
     }
     const data = d.data || {};
 
-    // Funds
-    const funds = data.funds || {};
-    const fl = (funds.fund_limit || funds.s || []);
+    // Funds — shape: data.funds.data.{available_cash, total_margin, utilized_margin}
+    const funds = (data.funds && data.funds.data) || {};
     let fhtml = '';
-    if (Array.isArray(fl) && fl.length > 0) {
-      fl.slice(0,4).forEach(f => {
-        fhtml += `<div class="col-md-3"><div class="card p-2"><div class="small-mute">${f.title || 'fund'}</div><div class="fw-bold">${fmtINR(f.equityAmount || f.commodityAmount || 0)}</div></div></div>`;
+    if (Object.keys(funds).length > 0) {
+      const fields = [
+        ['Available Cash', funds.available_cash],
+        ['Total Margin', funds.total_margin],
+        ['Utilized Margin', funds.utilized_margin],
+      ];
+      fields.forEach(([k, v]) => {
+        fhtml += `<div class="col-md-3"><div class="card p-2"><div class="small-mute">${k}</div><div class="fw-bold">${fmtINR(parseFloat(v||0))}</div></div></div>`;
       });
     } else if (data.funds_error) {
       fhtml = `<div class="col text-warning small">Funds API: ${data.funds_error}</div>`;
     } else {
-      fhtml = `<div class="col text-muted small">No funds payload — raw: <code>${JSON.stringify(funds).slice(0,200)}</code></div>`;
+      fhtml = `<div class="col text-muted small">No funds payload</div>`;
     }
     document.getElementById('fyers_funds').innerHTML = fhtml;
 
-    // Holdings
-    const h = (data.holdings && (data.holdings.holdings || data.holdings.s)) || [];
+    // Holdings — shape: data.holdings.data[] with {average_price, exchange, last_price, pnl, quantity, symbol}
+    const h = (data.holdings && data.holdings.data) || [];
     const tb = document.getElementById('fyers_holdings');
     if (!Array.isArray(h) || h.length === 0) {
       tb.innerHTML = `<tr><td colspan="6" class="text-center text-muted">${data.holdings_error || 'No holdings'}</td></tr>`;
     } else {
       tb.innerHTML = h.map(p => {
-        const sym = (p.symbol || p.fyToken || '').replace('NSE:','').replace('-EQ','');
-        const qty = p.quantity || p.qty || 0;
-        const avg = p.costPrice || p.avgPrice || 0;
-        const ltp = p.ltp || p.marketVal || 0;
-        const pnl = (ltp - avg) * qty;
+        const sym = (p.symbol || '').replace('NSE:','').replace('-EQ','');
+        const qty = parseFloat(p.quantity || 0);
+        const avg = parseFloat(p.average_price || 0);
+        const ltp = parseFloat(p.last_price || 0);
+        const pnl = parseFloat(p.pnl || (ltp - avg) * qty);
         const pct = avg > 0 ? (ltp/avg - 1)*100 : 0;
         return `<tr><td><strong>${sym}</strong></td>
           <td class="text-end">${qty}</td>
@@ -359,13 +363,13 @@ async function loadFyers() {
       }).join('');
     }
 
-    // Positions
-    const pos = (data.positions && (data.positions.netPositions || data.positions.s)) || [];
+    // Positions — shape: data.positions.data[]
+    const pos = (data.positions && data.positions.data) || [];
     const pdiv = document.getElementById('fyers_positions');
     if (!Array.isArray(pos) || pos.length === 0) {
       pdiv.innerHTML = data.positions_error || 'No open positions';
     } else {
-      pdiv.innerHTML = pos.map(p => `<code>${p.symbol||''}: qty=${p.netQty||0} pnl=${fmtINR(p.pl||0)}</code>`).join(' &middot; ');
+      pdiv.innerHTML = pos.map(p => `<code>${p.symbol||''}: qty=${p.quantity||p.netQty||0} pnl=${fmtINR(p.pnl||p.pl||0)}</code>`).join(' &middot; ');
     }
   } catch(e) { console.error(e); }
 }
