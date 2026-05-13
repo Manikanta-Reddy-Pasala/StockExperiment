@@ -22,10 +22,10 @@
   <div class="table-responsive">
     <table class="table table-sm align-middle mb-0">
       <thead>
-        <tr><th>Rank</th><th>Symbol</th><th>Name</th><th class="text-end">60d Return</th><th class="text-end">Price ₹</th><th>Status</th></tr>
+        <tr><th>Rank</th><th>Symbol</th><th>Name</th><th class="text-end">60d Return</th><th class="text-end">Price ₹</th><th>Status</th><th class="text-center">Action</th></tr>
       </thead>
       <tbody id="ranking_body">
-        <tr><td colspan="6" class="text-center text-muted py-3">Loading…</td></tr>
+        <tr><td colspan="7" class="text-center text-muted py-3">Loading…</td></tr>
       </tbody>
     </table>
   </div>
@@ -36,6 +36,10 @@
   <div class="card-body" id="action_body"><div class="text-muted">Loading…</div></div>
 </div>
 
+<div class="alert alert-warning mt-3 py-2 small">
+  <i class="bi bi-exclamation-triangle me-1"></i>
+  <strong>LIVE trading.</strong> "Buy" button places REAL Fyers market order using all available cash. Confirm required.
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -58,32 +62,56 @@ async function load() {
     const body = document.getElementById('ranking_body');
 
     if (!rRank.ranking || rRank.ranking.length === 0) {
-      body.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No data. Open <a href="/admin/momrot">Momentum Rotation</a> and rebuild N100 universe.</td></tr>';
+      body.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No data. Open <a href="/admin/momrot">Momentum Rotation</a> and rebuild N100 universe.</td></tr>';
     } else {
-      body.innerHTML = rRank.ranking.map((r,i) => `
-        <tr class="${held.has(r.symbol)?'row-held':''}">
+      body.innerHTML = rRank.ranking.map((r,i) => {
+        const isHeld = held.has(r.symbol);
+        return `
+        <tr class="${isHeld?'row-held':''}">
           <td>${i===0?'<span class="badge bg-warning text-dark">★ 1</span>':'#'+(i+1)}</td>
           <td><strong>${r.symbol}</strong></td>
           <td class="small text-muted">${r.name||''}</td>
           <td class="text-end ${cls(r.return_60d)}">${fmtPct(r.return_60d)}</td>
           <td class="text-end">${fmtINR(r.price)}</td>
-          <td>${held.has(r.symbol)?'<span class="badge bg-success">HELD</span>':(i<5?'<span class="badge bg-info">TOP-5</span>':'')}</td>
-        </tr>
-      `).join('');
+          <td>${isHeld?'<span class="badge bg-success">HELD</span>':(i<5?'<span class="badge bg-info">TOP-5</span>':'')}</td>
+          <td class="text-center">
+            ${isHeld
+              ? '<button class="btn btn-sm btn-outline-secondary" disabled>Held</button>'
+              : `<button class="btn btn-sm btn-success" onclick="buyNow('${r.symbol}', ${r.price})"><i class="bi bi-cart-plus"></i> Buy</button>`}
+          </td>
+        </tr>`;
+      }).join('');
     }
 
     const top1 = (rRank.ranking||[])[0];
     const heldArr = (rState.data && rState.data.open_positions) || [];
+    const cash = (rState.data && rState.data.cash) || 0;
     const ab = document.getElementById('action_body');
     if (!top1) ab.innerHTML = '<div class="text-muted">No ranking data</div>';
     else if (heldArr.length === 0)
-      ab.innerHTML = `<strong class="pos">BUY</strong> <code>${top1.symbol}</code> @ ${fmtINR(top1.price)} (rank-1, 60d ${fmtPct(top1.return_60d)}) on next rebalance day (${rNext.data.date}).`;
+      ab.innerHTML = `<strong class="pos">BUY</strong> <code>${top1.symbol}</code> @ ${fmtINR(top1.price)} (rank-1, 60d ${fmtPct(top1.return_60d)}). Will deploy approx ${fmtINR(cash)} → qty ${Math.floor(cash/top1.price)}. Next auto-rebalance: ${rNext.data.date}.`;
     else if (heldArr[0].symbol === top1.symbol)
-      ab.innerHTML = `<strong class="neutral">HOLD</strong> <code>${heldArr[0].symbol}</code> — still rank-1. No rotation needed.`;
+      ab.innerHTML = `<strong class="neutral">HOLD</strong> <code>${heldArr[0].symbol}</code> — still rank-1. No action.`;
     else
-      ab.innerHTML = `<strong class="neg">SELL</strong> <code>${heldArr[0].symbol}</code> (no longer rank-1) → <strong class="pos">BUY</strong> <code>${top1.symbol}</code> on next rebalance day (${rNext.data.date}).`;
+      ab.innerHTML = `<strong class="neg">SELL</strong> <code>${heldArr[0].symbol}</code> (no longer rank-1) → <strong class="pos">BUY</strong> <code>${top1.symbol}</code> on next rebalance day (${rNext.data.date}). Or click "Buy" above to do it now.`;
   } catch(e) { console.error(e); }
 }
+
+async function buyNow(symbol, price) {
+  const r1 = await fetch('/admin/momrot/state').then(r=>r.json());
+  const cash = (r1.data && r1.data.cash) || 0;
+  const qty = Math.floor(cash / price);
+  if (qty < 1) { alert(`Insufficient cash. Have ₹${cash.toFixed(2)}, need ≥ ₹${price.toFixed(2)}/share.`); return; }
+  if (!confirm(`⚠️ LIVE BUY ${symbol} qty=${qty} @ ~₹${price.toFixed(2)} = ₹${(qty*price).toLocaleString('en-IN')}. Proceed?`)) return;
+  const r = await fetch('/admin/momrot/buy-now', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({symbol, qty})
+  });
+  const d = await r.json();
+  alert(d.success ? `BUY placed: ${symbol} qty=${qty}` : 'Failed: ' + d.error);
+  setTimeout(load, 3000);
+}
+
 load();
 setInterval(load, 30000);
 </script>

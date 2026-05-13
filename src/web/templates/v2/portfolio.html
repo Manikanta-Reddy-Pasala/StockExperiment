@@ -17,7 +17,7 @@
   </div>
   <div class="col-6 col-lg-3">
     <div class="card summary-card h-100"><div class="card-body py-3 text-center">
-      <div class="text-muted small mb-1">Total P&amp;L</div>
+      <div class="text-muted small mb-1">Unrealized P&amp;L</div>
       <div id="total_pnl" class="fs-4 fw-bold">--</div>
       <div id="total_pct" class="small">--</div>
     </div></div>
@@ -26,35 +26,47 @@
     <div class="card summary-card h-100"><div class="card-body py-3 text-center">
       <div class="text-muted small mb-1">Market Value</div>
       <div id="mv" class="fs-4 fw-bold neutral">--</div>
-      <div class="small text-muted">Unrealized: <span id="unr">--</span></div>
     </div></div>
   </div>
   <div class="col-6 col-lg-3">
     <div class="card summary-card h-100"><div class="card-body py-3 text-center">
-      <div class="text-muted small mb-1">Cash</div>
+      <div class="text-muted small mb-1">Available Cash</div>
       <div id="cash" class="fs-4 fw-bold neutral">--</div>
-      <div class="small text-muted">Realized: <span id="real">--</span></div>
     </div></div>
   </div>
 </div>
 
+<!-- Rebalance Preview -->
+<div class="card mb-3">
+  <div class="card-header bg-light d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-eye"></i> Rebalance Preview — What Happens If You Click "Rebalance"</span>
+    <div>
+      <button class="btn btn-sm btn-outline-primary" id="btn_preview"><i class="bi bi-arrow-repeat"></i> Refresh</button>
+      <button class="btn btn-sm btn-danger" id="btn_rebalance"><i class="bi bi-play-circle"></i> LIVE Rebalance</button>
+      <button class="btn btn-sm btn-success" id="btn_buy_rank1"><i class="bi bi-cart-plus"></i> Buy Rank-1</button>
+    </div>
+  </div>
+  <div class="card-body small" id="preview_body">Loading…</div>
+</div>
+
 <div class="card">
-  <div class="card-header"><i class="bi bi-briefcase me-2"></i>Open Position(s)</div>
+  <div class="card-header"><i class="bi bi-briefcase me-2"></i>Open Position(s) — Live Fyers</div>
   <div class="table-responsive">
     <table class="table table-sm align-middle mb-0">
       <thead><tr>
         <th>Symbol</th><th class="text-end">Qty</th><th class="text-end">Entry</th>
         <th class="text-end">Live</th><th class="text-end">Cost</th>
         <th class="text-end">Market Value</th><th class="text-end">P&amp;L ₹</th><th class="text-end">P&amp;L %</th>
+        <th class="text-center">Action</th>
       </tr></thead>
-      <tbody id="positions"><tr><td colspan="8" class="text-center text-muted py-3">Loading…</td></tr></tbody>
+      <tbody id="positions"><tr><td colspan="9" class="text-center text-muted py-3">Loading…</td></tr></tbody>
     </table>
   </div>
 </div>
 
-<div class="alert alert-info mt-3 py-2 small">
-  <i class="bi bi-info-circle me-1"></i>
-  Portfolio runs Momentum Rotation. Capital ₹10,00,000. Position rotates monthly on first weekday — see <a href="/admin/momrot">Momentum Rotation</a> panel for actions, ranking, history.
+<div class="alert alert-warning mt-3 py-2 small">
+  <i class="bi bi-exclamation-triangle me-1"></i>
+  <strong>LIVE trading active.</strong> Sell + Buy + Rebalance buttons place REAL Fyers orders. Confirm dialog required.
 </div>
 {% endblock %}
 
@@ -64,7 +76,7 @@ const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractio
 const fmtPct = n => (n>=0?"+":"") + Number(n||0).toFixed(2) + "%";
 const cls = n => n>0?"pos":(n<0?"neg":"neutral");
 
-async function load() {
+async function loadState() {
   try {
     const r = await fetch('/admin/momrot/state');
     const d = await r.json();
@@ -76,15 +88,11 @@ async function load() {
     document.getElementById('total_pct').textContent = fmtPct(s.total_pct);
     document.getElementById('total_pct').className = 'small ' + cls(s.total_pct);
     document.getElementById('mv').textContent = fmtINR(s.market_value);
-    document.getElementById('unr').textContent = fmtINR(s.unrealized_pnl);
-    document.getElementById('unr').className = cls(s.unrealized_pnl);
     document.getElementById('cash').textContent = fmtINR(s.cash);
-    document.getElementById('real').textContent = fmtINR(s.realized_pnl);
-    document.getElementById('real').className = cls(s.realized_pnl);
 
     const tb = document.getElementById('positions');
     if (!s.open_positions || s.open_positions.length === 0) {
-      tb.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No open positions</td></tr>';
+      tb.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">No open Fyers positions</td></tr>';
     } else {
       tb.innerHTML = s.open_positions.map(p => `
         <tr>
@@ -96,12 +104,68 @@ async function load() {
           <td class="text-end">${fmtINR(p.market_value)}</td>
           <td class="text-end ${cls(p.unrealized_pnl)}">${fmtINR(p.unrealized_pnl)}</td>
           <td class="text-end ${cls(p.unrealized_pct)}">${fmtPct(p.unrealized_pct)}</td>
+          <td class="text-center"><button class="btn btn-sm btn-outline-danger" onclick="sellNow('${p.symbol}', ${p.qty})"><i class="bi bi-cash"></i> Sell</button></td>
         </tr>
       `).join('');
     }
   } catch(e) { console.error(e); }
 }
-load();
-setInterval(load, 30000);
+
+async function loadPreview() {
+  const body = document.getElementById('preview_body');
+  body.innerHTML = '<div class="text-muted">Loading…</div>';
+  try {
+    const r = await fetch('/admin/momrot/rebalance-preview');
+    const d = await r.json();
+    if (!d.success) { body.innerHTML = '<div class="text-danger">' + d.error + '</div>'; return; }
+    let html = `<div class="row g-2">
+      <div class="col-md-4"><strong>Rule:</strong> top-${d.top_n} from N100, max ${d.max_concurrent} position(s)</div>
+      <div class="col-md-4"><strong>Rank-1:</strong> ${d.rank1.symbol} ${fmtPct(d.rank1.return_60d)} @ ${fmtINR(d.rank1.price)}</div>
+      <div class="col-md-4"><strong>Current Cash:</strong> ${fmtINR(d.current_cash)}</div>
+    </div>`;
+    if (d.sells && d.sells.length) {
+      html += `<hr class="my-2"><strong>SELLS (${d.sells.length}):</strong><ul class="mb-1">` +
+        d.sells.map(s => `<li>${s.symbol} qty=${s.qty} @ ${fmtINR(s.ltp)} = proceeds ${fmtINR(s.proceeds)}</li>`).join('') + '</ul>';
+    } else {
+      html += `<hr class="my-2"><strong>SELLS:</strong> none`;
+    }
+    if (d.buy) {
+      html += `<div class="mt-1"><strong>BUY:</strong> ${d.buy.symbol} qty=${d.buy.qty} @ ${fmtINR(d.buy.price)} = deploy ${fmtINR(d.buy.deploy)} <span class="text-muted small">(cash after sells: ${fmtINR(d.buy.available_cash_after_sells)})</span></div>`;
+    } else {
+      html += `<div class="mt-1 text-muted">No BUY — already holding rank-1 (or all top-5).</div>`;
+    }
+    body.innerHTML = html;
+  } catch(e) { body.innerHTML = '<div class="text-danger">' + e.message + '</div>'; }
+}
+
+async function sellNow(symbol, qty) {
+  if (!confirm(`⚠️ LIVE SELL: ${symbol} qty=${qty} at market. Proceed?`)) return;
+  const r = await fetch('/admin/momrot/sell-now', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({symbol, qty})
+  });
+  const d = await r.json();
+  alert(d.success ? `SELL placed: ${symbol} qty=${qty}` : 'Failed: ' + d.error);
+  setTimeout(() => { loadState(); loadPreview(); }, 3000);
+}
+
+document.getElementById('btn_preview').addEventListener('click', loadPreview);
+document.getElementById('btn_rebalance').addEventListener('click', async () => {
+  if (!confirm('⚠️ LIVE REBALANCE — real money. Run preview shows scope. Proceed?')) return;
+  const r = await fetch('/admin/momrot/run-now', {method:'POST'});
+  const d = await r.json();
+  alert(d.success ? 'Rebalance executed. Refreshing.' : 'Failed: ' + d.error);
+  setTimeout(() => { loadState(); loadPreview(); }, 5000);
+});
+document.getElementById('btn_buy_rank1').addEventListener('click', async () => {
+  if (!confirm('⚠️ LIVE BUY Rank-1 with available cash. Proceed?')) return;
+  const r = await fetch('/admin/momrot/buy-now', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+  const d = await r.json();
+  alert(d.success ? `BUY placed: ${d.symbol} qty=${d.qty} @ ${fmtINR(d.price)}` : 'Failed: ' + d.error);
+  setTimeout(() => { loadState(); loadPreview(); }, 3000);
+});
+
+loadState(); loadPreview();
+setInterval(loadState, 30000);
 </script>
 {% endblock %}

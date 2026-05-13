@@ -464,6 +464,57 @@ def api_buy_now():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@momrot_bp.route("/rebalance-preview")
+def api_rebalance_preview():
+    """Show what /run-now would do WITHOUT executing. Read-only."""
+    try:
+        user_id = int(request.args.get("user_id", 1))
+        ranks = _current_ranking(TOP_N)
+        if not ranks:
+            return jsonify({"success": False, "error": "No ranking — rebuild universe first"}), 400
+        top_syms = {r["symbol"] for r in ranks}
+        rank1 = ranks[0]
+        held = _fyers_holdings(user_id)
+        already = any(((p.get("symbol") or "").replace("NSE:", "").replace("-EQ", "")) in top_syms for p in held)
+        cash = _fyers_available_cash(user_id)
+
+        sells = []
+        for p in held:
+            sym = (p.get("symbol") or "").replace("NSE:", "").replace("-EQ", "")
+            qty = int(float(p.get("quantity") or 0))
+            if sym in top_syms or qty < 1:
+                continue
+            ltp = float(p.get("last_price") or 0)
+            sells.append({"symbol": sym, "qty": qty, "ltp": ltp, "proceeds": qty * ltp})
+
+        buy = None
+        proj_cash = cash + sum(s["proceeds"] for s in sells)
+        if not already:
+            qty_buy = int(proj_cash // rank1["price"]) if rank1["price"] > 0 else 0
+            buy = {
+                "symbol": rank1["symbol"],
+                "price": rank1["price"],
+                "return_60d": rank1["return_60d"],
+                "qty": qty_buy,
+                "deploy": qty_buy * rank1["price"],
+                "available_cash_after_sells": proj_cash,
+            }
+
+        return jsonify({
+            "success": True,
+            "top_n": TOP_N,
+            "max_concurrent": 1,
+            "rank1": rank1,
+            "current_cash": cash,
+            "sells": sells,
+            "buy": buy,
+            "already_holding_rank_member": already,
+        })
+    except Exception as e:
+        logger.exception("rebalance-preview fail")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @momrot_bp.route("/sell-now", methods=["POST"])
 def api_sell_now():
     """Manual sell: place SELL market order for symbol + qty."""
