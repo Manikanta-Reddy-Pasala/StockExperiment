@@ -297,52 +297,192 @@ def api_run_logs():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+def _fyers_place_market(symbol: str, qty: int, side: str, user_id: int = 1) -> Dict:
+    """Place LIVE Fyers market order. Returns {ok, order_id, error}."""
+    from src.services.brokers.fyers_service import FyersService
+    fyers_sym = symbol if symbol.startswith("NSE:") else f"NSE:{symbol}-EQ"
+    payload = {
+        "symbol": fyers_sym,
+        "qty": int(qty),
+        "type": 2,                 # 2 = Market
+        "side": 1 if side == "BUY" else -1,
+        "productType": "CNC",      # delivery (equity)
+        "limitPrice": 0,
+        "stopPrice": 0,
+        "validity": "DAY",
+        "disclosedQty": 0,
+        "offlineOrder": False,
+    }
+    svc = FyersService()
+    try:
+        res = svc.place_order(user_id=user_id, order=payload)
+        return {"ok": res.get("status") in ("success", "ok"), "result": res}
+    except Exception as e:
+        logger.exception(f"place_order fail {symbol}")
+        return {"ok": False, "error": str(e)}
+
+
+def _fyers_available_cash(user_id: int = 1) -> float:
+    """Fetch Fyers available_cash."""
+    try:
+        from src.services.brokers.fyers_service import FyersService
+        svc = FyersService()
+        f = svc.funds(user_id) or {}
+        return float((f.get("data") or {}).get("available_cash") or 0)
+    except Exception:
+        return 0.0
+
+
+def _fyers_holdings(user_id: int = 1) -> List[Dict]:
+    """Fetch active Fyers holdings (qty > 0)."""
+    try:
+        from src.services.brokers.fyers_service import FyersService
+        svc = FyersService()
+        h = svc.holdings(user_id) or {}
+        return [
+            p for p in (h.get("data") or [])
+            if float(p.get("quantity") or 0) > 0
+        ]
+    except Exception:
+        return []
+
+
+def _notify_tg(text: str) -> None:
+    try:
+        from tools.live.telegram_notify import send
+        send(text, "Markdown")
+    except Exception:
+        logger.exception("tg notify fail")
+
+
 @momrot_bp.route("/run-now", methods=["POST"])
 def api_run_now():
-    """Force a rebalance check NOW. Bypasses first-week-of-month gate."""
+    """Force LIVE rebalance: rank N100, sell drop-outs from Fyers, buy new rank-1.
+
+    Real orders placed via Fyers if LIVE_TRADING=true.
+    """
+    if os.environ.get("LIVE_TRADING", "false").lower() != "true":
+        return jsonify({
+            "success": False,
+            "error": "LIVE_TRADING not enabled. Set LIVE_TRADING=true env to place real orders.",
+        }), 403
+
     try:
-        date_str = datetime.now().strftime("%Y-%m-%dT%H%M%S")
-        sig_path = SIGNALS_DIR / f"manual_{date_str}_momrot.json"
+        user_id = int(request.args.get("user_id", 1))
+        actions = []
 
-        def run():
-            try:
-                env = os.environ.copy()
-                env.update({
-                    "CAPITAL_INR": str(STARTING_CAPITAL),
-                    "MAX_CONCURRENT": "1",
-                    "MIN_PRICE": "10",
-                    "MAX_PER_TRADE_INR": str(STARTING_CAPITAL),
-                })
-                # Emit signals (forced)
-                subprocess.run([
-                    "python", "tools/live/momentum_rotation_signal.py",
-                    "--universe-file", str(UNIVERSE_PATH),
-                    "--top-n", str(TOP_N), "--force",
-                    "--ledger", str(LEDGER_PATH),
-                    "--signals-out", str(sig_path),
-                ], check=True, cwd="/app", env=env)
+        # Fetch ranks
+        ranks = _current_ranking(TOP_N)
+        if not ranks:
+            return jsonify({"success": False, "error": "No ranking available — rebuild universe first"}), 400
+        top_syms = {r["symbol"] for r in ranks}
+        rank1 = ranks[0]
 
-                # Execute via paper_executor (only if non-empty)
-                if sig_path.exists() and sig_path.read_text().strip() not in ("[]", ""):
-                    subprocess.run([
-                        "python", "tools/live/paper_executor.py",
-                        "--signals", str(sig_path),
-                        "--ledger", str(LEDGER_PATH),
-                    ], check=True, cwd="/app", env=env)
+        # Fetch current Fyers holdings
+        held = _fyers_holdings(user_id)
+        already_in_top = any(
+            ((p.get("symbol") or "").replace("NSE:", "").replace("-EQ", "")) in top_syms
+            for p in held
+        )
 
-                    # Append closed trades to history
-                    ledger = _load_json(LEDGER_PATH, {})
-                    for c in ledger.get("closed_today", []):
-                        with open(HISTORY_PATH, "a") as fh:
-                            fh.write(json.dumps(c) + "\n")
-            except Exception:
-                logger.exception("run-now thread fail")
+        # 1. Sell holdings not in top-N
+        for p in held:
+            sym = (p.get("symbol") or "").replace("NSE:", "").replace("-EQ", "")
+            if sym in top_syms:
+                continue
+            qty = int(float(p.get("quantity") or 0))
+            if qty < 1:
+                continue
+            res = _fyers_place_market(sym, qty, "SELL", user_id)
+            actions.append({"action": "SELL", "symbol": sym, "qty": qty, "result": res})
 
-        threading.Thread(target=run, daemon=True).start()
-        return jsonify({"success": True, "message": "Rebalance triggered",
-                        "signals_path": str(sig_path)})
+        # 2. Buy rank-1 if not already held
+        if not already_in_top:
+            cash = _fyers_available_cash(user_id)
+            price = rank1["price"]
+            qty = int(cash // price) if price > 0 else 0
+            if qty < 1:
+                actions.append({"action": "BUY_SKIP", "symbol": rank1["symbol"],
+                                "reason": f"insufficient cash ₹{cash:,.0f} for price ₹{price:.2f}"})
+            else:
+                res = _fyers_place_market(rank1["symbol"], qty, "BUY", user_id)
+                actions.append({"action": "BUY", "symbol": rank1["symbol"],
+                                "qty": qty, "price": price, "deploy": qty * price, "result": res})
+
+        # Telegram alert
+        if actions:
+            lines = ["🔴 *LIVE Rebalance*"]
+            for a in actions:
+                lines.append(f"- {a['action']} {a.get('symbol','')} qty={a.get('qty','')}")
+            _notify_tg("\n".join(lines))
+        else:
+            _notify_tg("ℹ️ Rebalance: no action needed (rank-1 already held)")
+
+        return jsonify({"success": True, "actions": actions, "rank1": rank1})
     except Exception as e:
         logger.exception("run-now fail")
+        _notify_tg(f"❌ Rebalance error: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@momrot_bp.route("/buy-now", methods=["POST"])
+def api_buy_now():
+    """Manual buy: place market order for rank-1 (or specified symbol) using available cash."""
+    if os.environ.get("LIVE_TRADING", "false").lower() != "true":
+        return jsonify({"success": False, "error": "LIVE_TRADING not enabled"}), 403
+
+    try:
+        user_id = int(request.args.get("user_id", 1))
+        body = request.get_json(silent=True) or {}
+        symbol = body.get("symbol")
+        if not symbol:
+            ranks = _current_ranking(1)
+            if not ranks:
+                return jsonify({"success": False, "error": "No ranking"}), 400
+            symbol = ranks[0]["symbol"]
+            price = ranks[0]["price"]
+        else:
+            price = _live_price(symbol)
+
+        cash = _fyers_available_cash(user_id)
+        qty = body.get("qty")
+        if qty:
+            qty = int(qty)
+        else:
+            qty = int(cash // price) if price > 0 else 0
+
+        if qty < 1:
+            return jsonify({"success": False, "error": f"qty<1 (cash ₹{cash:,.0f}, price ₹{price:.2f})"}), 400
+
+        res = _fyers_place_market(symbol, qty, "BUY", user_id)
+        _notify_tg(f"🟢 *BUY* {symbol} qty={qty} @ ₹{price:.2f} (₹{qty*price:,.0f})")
+        return jsonify({"success": res["ok"], "symbol": symbol, "qty": qty,
+                        "price": price, "result": res})
+    except Exception as e:
+        logger.exception("buy-now fail")
+        _notify_tg(f"❌ Buy error: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@momrot_bp.route("/sell-now", methods=["POST"])
+def api_sell_now():
+    """Manual sell: place SELL market order for symbol + qty."""
+    if os.environ.get("LIVE_TRADING", "false").lower() != "true":
+        return jsonify({"success": False, "error": "LIVE_TRADING not enabled"}), 403
+
+    try:
+        user_id = int(request.args.get("user_id", 1))
+        body = request.get_json(silent=True) or {}
+        symbol = body.get("symbol")
+        qty = body.get("qty")
+        if not symbol or not qty:
+            return jsonify({"success": False, "error": "symbol + qty required"}), 400
+        qty = int(qty)
+        res = _fyers_place_market(symbol, qty, "SELL", user_id)
+        _notify_tg(f"🔴 *SELL* {symbol} qty={qty}")
+        return jsonify({"success": res["ok"], "symbol": symbol, "qty": qty, "result": res})
+    except Exception as e:
+        logger.exception("sell-now fail")
         return jsonify({"success": False, "error": str(e)}), 500
 
 

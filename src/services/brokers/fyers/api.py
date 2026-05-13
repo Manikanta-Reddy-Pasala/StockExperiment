@@ -537,12 +537,17 @@ class FyersAPI:
                 formatted_holdings = []
                 
                 for holding in holdings:
+                    # Fyers field is 'quantity' (not 'qty'). Fallback to remainingQuantity.
+                    qty = holding.get('quantity')
+                    if qty is None:
+                        qty = holding.get('remainingQuantity', 0)
                     formatted_holding = {
                         'symbol': holding.get('symbol', ''),
-                        'quantity': str(holding.get('qty', 0)),
+                        'quantity': str(qty or 0),
                         'average_price': str(holding.get('costPrice', 0)),
                         'last_price': str(holding.get('ltp', 0)),
                         'pnl': str(holding.get('pl', 0)),
+                        'market_value': str(holding.get('marketVal', 0)),
                         'exchange': self._extract_exchange(holding.get('symbol', ''))
                     }
                     formatted_holdings.append(formatted_holding)
@@ -579,12 +584,18 @@ class FyersAPI:
                     'total_margin': '0'
                 }
                 
+                # Fyers fund_limit titles (verified from prod payload):
+                # 1=Total Balance, 2=Utilized Amount, 3=Clear Balance,
+                # 4=Realized P&L, 5=Collaterals, 6=Fund Transfer,
+                # 7=Receivables, 8=Adhoc Limit, 9=Limit start of day,
+                # 10=Available Balance
                 for fund in fund_data:
-                    if fund.get('title') == 'Available Cash':
+                    title = fund.get('title', '')
+                    if title in ('Available Balance', 'Available Cash'):
                         funds_info['available_cash'] = str(fund.get('equityAmount', 0))
-                    elif fund.get('title') == 'Total Balance':
+                    elif title == 'Total Balance':
                         funds_info['total_margin'] = str(fund.get('equityAmount', 0))
-                    elif fund.get('title') == 'Utilized Margin':
+                    elif title in ('Utilized Amount', 'Utilized Margin'):
                         funds_info['utilized_margin'] = str(fund.get('equityAmount', 0))
                 
                 return {
