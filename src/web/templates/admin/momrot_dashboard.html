@@ -84,6 +84,9 @@
         <button class="btn btn-outline-info flex-fill" id="btn_refresh">
           <i class="bi bi-arrow-repeat"></i> Refresh Data
         </button>
+        <button class="btn btn-outline-success flex-fill" id="btn_tg_test">
+          <i class="bi bi-send"></i> Test Telegram
+        </button>
       </div>
     </div>
   </div>
@@ -376,6 +379,12 @@ async function loadFyers() {
 
 document.getElementById('btn_fyers_refresh').addEventListener('click', loadFyers);
 loadFyers();
+
+document.getElementById('btn_tg_test').addEventListener('click', async () => {
+  const r = await fetch('/admin/momrot/telegram/test', {method: 'POST'});
+  const d = await r.json();
+  alert(d.success ? 'Telegram test sent. Check group.' : 'Failed: ' + (d.error || JSON.stringify(d.result)));
+});
 
 // Initial load + auto-refresh
 loadSummary(); loadHistory(); loadRunLogs();

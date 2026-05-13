@@ -420,3 +420,30 @@ def api_fyers_orderbook():
     except Exception as e:
         logger.exception("fyers orderbook fail")
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ---- Telegram notifications ----------------------------------------------
+
+@momrot_bp.route("/telegram/test", methods=["POST"])
+def api_telegram_test():
+    """Send test message to Telegram chat."""
+    try:
+        from tools.live.telegram_notify import send
+        text = request.json.get("text") if request.is_json else None
+        if not text:
+            text = "🤖 momrot test from UI: bot wired correctly."
+        res = send(text, "Markdown")
+        return jsonify({"success": bool(res.get("ok")), "result": res})
+    except Exception as e:
+        logger.exception("telegram test fail")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@momrot_bp.route("/telegram/status")
+def api_telegram_status():
+    """Check if Telegram credentials are configured."""
+    return jsonify({
+        "success": True,
+        "configured": bool(os.environ.get("TG_BOT_TOKEN") and os.environ.get("TG_CHAT_ID")),
+        "chat_id": os.environ.get("TG_CHAT_ID", ""),
+    })
