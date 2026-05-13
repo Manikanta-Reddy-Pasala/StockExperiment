@@ -139,90 +139,112 @@ async function loadPreview() {
 }
 
 async function sellNow(symbol, qty) {
-  if (!confirm(`⚠️ LIVE SELL: ${symbol} qty=${qty} at market. Proceed?`)) return;
+  const ok = await appModal.confirm('LIVE SELL', `Sell <strong>${symbol}</strong> qty=<strong>${qty}</strong> at market. Real money. Proceed?`,
+                                     {okLabel:'Place SELL', okClass:'btn-danger', headerCls:'bg-danger text-white'});
+  if (!ok) return;
   const r = await fetch('/admin/momrot/sell-now', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({symbol, qty})
   });
   const d = await r.json();
-  alert(d.success ? `SELL placed: ${symbol} qty=${qty}` : 'Failed: ' + d.error);
+  await appModal.alert(d.success ? 'Order Placed' : 'Failed',
+    d.success ? `SELL placed: ${symbol} qty=${qty}` : ('Failed: ' + d.error),
+    d.success ? 'success' : 'danger');
   setTimeout(() => { loadState(); loadPreview(); }, 3000);
 }
 
 document.getElementById('btn_preview').addEventListener('click', loadPreview);
 document.getElementById('btn_rebalance').addEventListener('click', async () => {
-  // 1. Fetch preview
   const pr = await fetch('/admin/momrot/rebalance-preview');
   const p = await pr.json();
-  if (!p.success) { alert('Preview failed: ' + p.error); return; }
+  if (!p.success) { await appModal.alert('Preview Failed', p.error, 'danger'); return; }
 
-  // 2. Build action summary
   if (p.already_holding_rank_member) {
-    alert(`✓ Already holding rank-1 (or member of top-5).\nRank-1: ${p.rank1.symbol} (${fmtPct(p.rank1.return_60d)})\nNo action needed.`);
+    await appModal.alert('No Action Needed',
+      `Already holding rank-1 (or member of top-5).<br><br>Rank-1: <strong>${p.rank1.symbol}</strong> (${fmtPct(p.rank1.return_60d)})`,
+      'info');
     return;
   }
-  let msg = "⚠️ LIVE REBALANCE — REAL MONEY\n\n";
-  msg += `Rank-1 right now: ${p.rank1.symbol} (${fmtPct(p.rank1.return_60d)} @ ${fmtINR(p.rank1.price)})\n\n`;
+
+  let html = `<div class="mb-2"><span class="text-muted small">Rank-1:</span> <strong>${p.rank1.symbol}</strong> ${fmtPct(p.rank1.return_60d)} @ ${fmtINR(p.rank1.price)}</div>`;
+  html += '<table class="table table-sm mb-2"><tbody>';
   if (p.sells && p.sells.length) {
-    msg += "SELL:\n";
     p.sells.forEach(s => {
-      msg += `  • ${s.symbol} qty=${s.qty} @ ${fmtINR(s.ltp)} = proceeds ${fmtINR(s.proceeds)}\n`;
+      html += `<tr><td><span class="badge bg-danger">SELL</span></td><td><strong>${s.symbol}</strong></td><td>qty ${s.qty}</td><td class="text-end">${fmtINR(s.proceeds)}</td></tr>`;
     });
   } else {
-    msg += "SELL: none\n";
+    html += '<tr><td colspan="4" class="text-muted">No sells</td></tr>';
   }
   if (p.buy) {
-    msg += `\nBUY:\n  • ${p.buy.symbol} qty=${p.buy.qty} @ ${fmtINR(p.buy.price)} = deploy ${fmtINR(p.buy.deploy)}\n  Available cash after sells: ${fmtINR(p.buy.available_cash_after_sells)}\n`;
-    if (p.buy.qty < 1) msg += "  ⚠️ qty=0 — insufficient cash, BUY will be skipped.\n";
+    const warn = p.buy.qty < 1 ? '<span class="text-warning small">qty=0 insufficient cash — BUY will skip</span>' : '';
+    html += `<tr><td><span class="badge bg-success">BUY</span></td><td><strong>${p.buy.symbol}</strong></td><td>qty ${p.buy.qty}</td><td class="text-end">${fmtINR(p.buy.deploy)}</td></tr>`;
+    if (warn) html += `<tr><td colspan="4">${warn}</td></tr>`;
   }
-  msg += "\nConfirm to execute?";
+  html += '</tbody></table>';
+  html += `<div class="small text-muted">Available cash after sells: ${fmtINR((p.buy && p.buy.available_cash_after_sells) || p.current_cash)}</div>`;
 
-  if (!confirm(msg)) return;
+  const ok = await appModal.confirm('LIVE Rebalance — Real Money', html,
+    {okLabel:'Execute Rebalance', okClass:'btn-danger', headerCls:'bg-danger text-white'});
+  if (!ok) return;
 
-  // 3. Fire run-now
   const r = await fetch('/admin/momrot/run-now', {method:'POST'});
   const d = await r.json();
   if (d.success) {
-    const lines = (d.actions || []).map(a => `${a.action} ${a.symbol||''} qty=${a.qty||'-'} ${a.reason||''}`);
-    alert('Rebalance executed:\n' + (lines.join('\n') || '(no action)'));
+    const lines = (d.actions || []).map(a =>
+      `<li><span class="badge bg-secondary">${a.action}</span> ${a.symbol||''} ${a.qty?('qty='+a.qty):''} ${a.reason?('('+a.reason+')'):''}</li>`).join('');
+    await appModal.alert('Rebalance Executed',
+      lines ? `<ul class="mb-0">${lines}</ul>` : 'No action',
+      'success');
   } else {
-    alert('Failed: ' + d.error);
+    await appModal.alert('Rebalance Failed', d.error, 'danger');
   }
   setTimeout(() => { loadState(); loadPreview(); }, 3000);
 });
-document.getElementById('btn_buy_rank1').addEventListener('click', async () => {
-  // 1. Get rank-1 + cash
+document.getElementById('btn_buy_rank1').addEventListener('click', () => buyFlow());
+
+async function buyFlow(symOverride, priceOverride) {
   const pr = await fetch('/admin/momrot/rebalance-preview');
   const p = await pr.json();
-  if (!p.success) { alert('Failed to fetch preview: ' + p.error); return; }
-  const sym = p.rank1.symbol;
-  const price = p.rank1.price;
+  if (!p.success) { await appModal.alert('Preview Failed', p.error, 'danger'); return; }
+  const sym = symOverride || p.rank1.symbol;
+  const price = priceOverride || p.rank1.price;
   const cash = p.current_cash;
   const maxQty = Math.floor(cash / price);
 
-  // 2. Insufficient -> refill prompt
   if (maxQty < 1) {
-    alert(`❌ Insufficient balance.\nAvailable: ${fmtINR(cash)}\nNeed ≥ ${fmtINR(price)}/share for ${sym}.\nPlease refill Fyers account and try again.`);
+    await appModal.alert('Insufficient Balance',
+      `Available: <strong>${fmtINR(cash)}</strong><br>Need ≥ <strong>${fmtINR(price)}</strong>/share for <strong>${sym}</strong>.<br><br>Please refill Fyers account and retry.`,
+      'danger');
     return;
   }
 
-  // 3. Ask qty
-  const input = prompt(`BUY ${sym} @ ${fmtINR(price)}\nAvailable cash: ${fmtINR(cash)}\nMax qty: ${maxQty}\n\nHow many shares to buy?`, maxQty);
+  const promptHtml = `<table class="table table-sm mb-2"><tbody>
+    <tr><td>Symbol</td><td class="text-end"><strong>${sym}</strong></td></tr>
+    <tr><td>Price</td><td class="text-end">${fmtINR(price)}</td></tr>
+    <tr><td>Available cash</td><td class="text-end">${fmtINR(cash)}</td></tr>
+    <tr><td>Max qty possible</td><td class="text-end"><strong>${maxQty}</strong></td></tr>
+  </tbody></table>`;
+  const input = await appModal.prompt('Buy ' + sym, promptHtml, maxQty, 'Quantity (shares)');
   if (input === null) return;
   const qty = parseInt(input);
-  if (!qty || qty < 1) { alert('Invalid qty'); return; }
-  if (qty > maxQty) { alert(`qty ${qty} > max ${maxQty} (insufficient cash)`); return; }
+  if (!qty || qty < 1) { await appModal.alert('Invalid', 'Quantity must be positive', 'danger'); return; }
+  if (qty > maxQty) { await appModal.alert('Insufficient', `qty ${qty} > max ${maxQty}`, 'danger'); return; }
 
-  // 4. Confirm + place
-  if (!confirm(`⚠️ LIVE BUY ${sym} qty=${qty} @ ~${fmtINR(price)}\nTotal: ${fmtINR(qty*price)}\n\nProceed?`)) return;
+  const ok = await appModal.confirm('LIVE BUY — Real Money',
+    `Symbol: <strong>${sym}</strong><br>Qty: <strong>${qty}</strong> @ <strong>${fmtINR(price)}</strong><br>Total: <strong>${fmtINR(qty*price)}</strong>`,
+    {okLabel:'Place BUY', okClass:'btn-success', headerCls:'bg-success text-white'});
+  if (!ok) return;
+
   const r = await fetch('/admin/momrot/buy-now', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({symbol: sym, qty})
   });
   const d = await r.json();
-  alert(d.success ? `✓ BUY placed: ${sym} qty=${qty}\nOrder: ${JSON.stringify(d.result)}` : '❌ Failed: ' + d.error);
+  await appModal.alert(d.success ? 'Order Placed' : 'Failed',
+    d.success ? `BUY placed: <strong>${sym}</strong> qty=${qty}` : ('Error: ' + d.error),
+    d.success ? 'success' : 'danger');
   setTimeout(() => { loadState(); loadPreview(); }, 3000);
-});
+}
 
 loadState(); loadPreview();
 setInterval(loadState, 30000);

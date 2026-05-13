@@ -103,23 +103,37 @@ async function buyNow(symbol, price) {
   const maxQty = Math.floor(cash / price);
 
   if (maxQty < 1) {
-    alert(`❌ Insufficient balance.\nAvailable: ₹${cash.toLocaleString('en-IN')}\nNeed ≥ ₹${price.toFixed(2)}/share for ${symbol}.\nPlease refill Fyers account and retry.`);
+    await appModal.alert('Insufficient Balance',
+      `Available: <strong>${fmtINR(cash)}</strong><br>Need ≥ <strong>${fmtINR(price)}</strong>/share for <strong>${symbol}</strong>.<br><br>Please refill Fyers account and retry.`,
+      'danger');
     return;
   }
 
-  const input = prompt(`BUY ${symbol} @ ₹${price.toFixed(2)}\nAvailable cash: ₹${cash.toLocaleString('en-IN')}\nMax qty: ${maxQty}\n\nHow many shares?`, maxQty);
+  const promptHtml = `<table class="table table-sm mb-2"><tbody>
+    <tr><td>Symbol</td><td class="text-end"><strong>${symbol}</strong></td></tr>
+    <tr><td>Price</td><td class="text-end">${fmtINR(price)}</td></tr>
+    <tr><td>Available cash</td><td class="text-end">${fmtINR(cash)}</td></tr>
+    <tr><td>Max qty</td><td class="text-end"><strong>${maxQty}</strong></td></tr>
+  </tbody></table>`;
+  const input = await appModal.prompt('Buy ' + symbol, promptHtml, maxQty, 'Quantity');
   if (input === null) return;
   const qty = parseInt(input);
-  if (!qty || qty < 1) { alert('Invalid qty'); return; }
-  if (qty > maxQty) { alert(`qty ${qty} > max ${maxQty} (insufficient cash)`); return; }
+  if (!qty || qty < 1) { await appModal.alert('Invalid', 'Quantity must be positive', 'danger'); return; }
+  if (qty > maxQty) { await appModal.alert('Insufficient', `qty ${qty} > max ${maxQty}`, 'danger'); return; }
 
-  if (!confirm(`⚠️ LIVE BUY ${symbol} qty=${qty} @ ~₹${price.toFixed(2)}\nTotal: ₹${(qty*price).toLocaleString('en-IN')}\n\nProceed?`)) return;
+  const ok = await appModal.confirm('LIVE BUY — Real Money',
+    `Symbol: <strong>${symbol}</strong><br>Qty: <strong>${qty}</strong> @ <strong>${fmtINR(price)}</strong><br>Total: <strong>${fmtINR(qty*price)}</strong>`,
+    {okLabel:'Place BUY', okClass:'btn-success', headerCls:'bg-success text-white'});
+  if (!ok) return;
+
   const r = await fetch('/admin/momrot/buy-now', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({symbol, qty})
   });
   const d = await r.json();
-  alert(d.success ? `✓ BUY placed: ${symbol} qty=${qty}` : '❌ Failed: ' + d.error);
+  await appModal.alert(d.success ? 'Order Placed' : 'Failed',
+    d.success ? `BUY placed: <strong>${symbol}</strong> qty=${qty}` : 'Error: ' + d.error,
+    d.success ? 'success' : 'danger');
   setTimeout(load, 3000);
 }
 
