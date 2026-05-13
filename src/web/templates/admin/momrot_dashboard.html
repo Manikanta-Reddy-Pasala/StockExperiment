@@ -88,9 +88,33 @@
     </div>
   </div>
 
-  <!-- Open positions -->
+  <!-- Live Fyers Account -->
   <div class="card mr-card mb-4">
-    <div class="card-header bg-light"><i class="bi bi-briefcase"></i> Open Position(s)</div>
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-bank"></i> Live Fyers Account</span>
+      <button class="btn btn-sm btn-outline-primary" id="btn_fyers_refresh"><i class="bi bi-arrow-repeat"></i> Pull</button>
+    </div>
+    <div class="card-body">
+      <div class="row g-3 mb-2" id="fyers_funds">
+        <div class="col text-muted small">Loading funds…</div>
+      </div>
+      <div class="mt-2">
+        <div class="small-mute mb-1">Holdings (real account)</div>
+        <table class="table table-momrot mb-0">
+          <thead><tr><th>Symbol</th><th class="text-end">Qty</th><th class="text-end">Avg</th><th class="text-end">LTP</th><th class="text-end">P&amp;L</th><th class="text-end">%</th></tr></thead>
+          <tbody id="fyers_holdings"><tr><td colspan="6" class="text-center text-muted">Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="mt-3">
+        <div class="small-mute mb-1">Open positions (intraday)</div>
+        <div id="fyers_positions" class="small text-muted">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Open positions (momrot ledger) -->
+  <div class="card mr-card mb-4">
+    <div class="card-header bg-light"><i class="bi bi-briefcase"></i> Momrot Open Position(s)</div>
     <div class="card-body p-0">
       <table class="table table-momrot mb-0">
         <thead>
@@ -285,8 +309,69 @@ document.getElementById('btn_rebuild').addEventListener('click', async () => {
 });
 
 document.getElementById('btn_refresh').addEventListener('click', () => {
-  loadSummary(); loadHistory(); loadRunLogs();
+  loadSummary(); loadHistory(); loadRunLogs(); loadFyers();
 });
+
+async function loadFyers() {
+  try {
+    const r = await fetch('/admin/momrot/fyers/account');
+    const d = await r.json();
+    if (!d.success) {
+      document.getElementById('fyers_funds').innerHTML = `<div class="col text-danger small">${d.error || 'Failed to pull Fyers'}</div>`;
+      return;
+    }
+    const data = d.data || {};
+
+    // Funds
+    const funds = data.funds || {};
+    const fl = (funds.fund_limit || funds.s || []);
+    let fhtml = '';
+    if (Array.isArray(fl) && fl.length > 0) {
+      fl.slice(0,4).forEach(f => {
+        fhtml += `<div class="col-md-3"><div class="card p-2"><div class="small-mute">${f.title || 'fund'}</div><div class="fw-bold">${fmtINR(f.equityAmount || f.commodityAmount || 0)}</div></div></div>`;
+      });
+    } else if (data.funds_error) {
+      fhtml = `<div class="col text-warning small">Funds API: ${data.funds_error}</div>`;
+    } else {
+      fhtml = `<div class="col text-muted small">No funds payload — raw: <code>${JSON.stringify(funds).slice(0,200)}</code></div>`;
+    }
+    document.getElementById('fyers_funds').innerHTML = fhtml;
+
+    // Holdings
+    const h = (data.holdings && (data.holdings.holdings || data.holdings.s)) || [];
+    const tb = document.getElementById('fyers_holdings');
+    if (!Array.isArray(h) || h.length === 0) {
+      tb.innerHTML = `<tr><td colspan="6" class="text-center text-muted">${data.holdings_error || 'No holdings'}</td></tr>`;
+    } else {
+      tb.innerHTML = h.map(p => {
+        const sym = (p.symbol || p.fyToken || '').replace('NSE:','').replace('-EQ','');
+        const qty = p.quantity || p.qty || 0;
+        const avg = p.costPrice || p.avgPrice || 0;
+        const ltp = p.ltp || p.marketVal || 0;
+        const pnl = (ltp - avg) * qty;
+        const pct = avg > 0 ? (ltp/avg - 1)*100 : 0;
+        return `<tr><td><strong>${sym}</strong></td>
+          <td class="text-end">${qty}</td>
+          <td class="text-end">${fmtINR(avg)}</td>
+          <td class="text-end">${fmtINR(ltp)}</td>
+          <td class="text-end ${cls(pnl)}">${fmtINR(pnl)}</td>
+          <td class="text-end ${cls(pct)}">${fmtPct(pct)}</td></tr>`;
+      }).join('');
+    }
+
+    // Positions
+    const pos = (data.positions && (data.positions.netPositions || data.positions.s)) || [];
+    const pdiv = document.getElementById('fyers_positions');
+    if (!Array.isArray(pos) || pos.length === 0) {
+      pdiv.innerHTML = data.positions_error || 'No open positions';
+    } else {
+      pdiv.innerHTML = pos.map(p => `<code>${p.symbol||''}: qty=${p.netQty||0} pnl=${fmtINR(p.pl||0)}</code>`).join(' &middot; ');
+    }
+  } catch(e) { console.error(e); }
+}
+
+document.getElementById('btn_fyers_refresh').addEventListener('click', loadFyers);
+loadFyers();
 
 // Initial load + auto-refresh
 loadSummary(); loadHistory(); loadRunLogs();

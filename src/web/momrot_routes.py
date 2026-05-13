@@ -366,3 +366,57 @@ def api_summary():
     except Exception as e:
         logger.exception("summary fail")
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ---- Fyers live account ---------------------------------------------------
+
+@momrot_bp.route("/fyers/account")
+def api_fyers_account():
+    """Pull live data from real Fyers account: funds + holdings + positions."""
+    try:
+        from src.services.brokers.fyers_service import FyersService
+        user_id = int(request.args.get("user_id", 1))
+        svc = FyersService()
+
+        out = {"user_id": user_id}
+
+        # Funds
+        try:
+            funds = svc.funds(user_id)
+            out["funds"] = funds
+        except Exception as e:
+            out["funds_error"] = str(e)
+
+        # Holdings
+        try:
+            holdings = svc.holdings(user_id)
+            out["holdings"] = holdings
+        except Exception as e:
+            out["holdings_error"] = str(e)
+
+        # Positions
+        try:
+            positions = svc.positions(user_id)
+            out["positions"] = positions
+        except Exception as e:
+            out["positions_error"] = str(e)
+
+        return jsonify({"success": True, "data": out})
+    except Exception as e:
+        logger.exception("fyers account fail")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@momrot_bp.route("/fyers/orderbook")
+def api_fyers_orderbook():
+    """Live order history from Fyers."""
+    try:
+        from src.services.brokers.fyers_service import FyersService
+        user_id = int(request.args.get("user_id", 1))
+        svc = FyersService()
+        ob = svc.orderbook(user_id)
+        tb = svc.tradebook(user_id)
+        return jsonify({"success": True, "orderbook": ob, "tradebook": tb})
+    except Exception as e:
+        logger.exception("fyers orderbook fail")
+        return jsonify({"success": False, "error": str(e)}), 500
