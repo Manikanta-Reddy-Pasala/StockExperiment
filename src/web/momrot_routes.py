@@ -43,7 +43,7 @@ SIGNALS_DIR = ROOT / "signals"
 RUN_LOGS_DIR = ROOT / "run_logs"
 
 STARTING_CAPITAL = 1_000_000  # ₹10L locked
-TOP_N = 5                     # Model 3 winner config
+TOP_N = 5                     # top-N rank from N100 momentum
 LOOKBACK_DAYS = 60
 
 
