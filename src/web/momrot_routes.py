@@ -165,13 +165,16 @@ def _portfolio_state() -> Dict:
         })
 
     total_value = cash + market_value
-    total_pnl = total_value - STARTING_CAPITAL
-    total_pct = (total_value / STARTING_CAPITAL - 1) * 100 if STARTING_CAPITAL else 0
+    # P&L based on ACTUAL invested capital, not hardcoded baseline
+    total_pnl = unrealized_total
+    total_pct = (total_pnl / position_cost * 100) if position_cost > 0 else 0.0
+    has_data = bool(open_positions) or cash > 0 or total_margin > 0
 
     history = _read_history()
     return {
         "source": "fyers",
-        "starting_capital": STARTING_CAPITAL,
+        "has_data": has_data,
+        "starting_capital": STARTING_CAPITAL,  # reference ceiling, not P&L baseline
         "cash": cash,
         "total_margin": total_margin,
         "utilized_margin": utilized_margin,
