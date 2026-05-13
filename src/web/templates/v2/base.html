@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Paper Trading Journal{% endblock %}</title>
+    <title>{% block title %}Momentum Rotation{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -56,10 +56,10 @@
                         <span class="fs-6 fw-semibold">Trading Journal</span>
                     </a>
 
-                    <!-- Mode badge -->
-                    <div class="px-3 mb-3" id="mode-badge-container">
-                        <span id="mode-badge" class="badge bg-warning w-100 py-2 fs-6">
-                            <i class="bi bi-pencil-square me-1"></i> Paper Mode
+                    <!-- Strategy badge -->
+                    <div class="px-3 mb-3">
+                        <span class="badge bg-primary w-100 py-2 fs-6">
+                            <i class="bi bi-graph-up-arrow me-1"></i> Momentum Rotation
                         </span>
                     </div>
 
@@ -145,19 +145,7 @@
                 }
             });
 
-            // Load mode badge
-            Trading.api('/api/mock-trading/status').then(data => {
-                if (data.success) {
-                    const badge = document.getElementById('mode-badge');
-                    if (data.is_mock_trading_mode) {
-                        badge.className = 'badge bg-warning w-100 py-2 fs-6';
-                        badge.innerHTML = '<i class="bi bi-pencil-square me-1"></i> Paper Mode';
-                    } else {
-                        badge.className = 'badge bg-success w-100 py-2 fs-6';
-                        badge.innerHTML = '<i class="bi bi-lightning-charge me-1"></i> Live Mode';
-                    }
-                }
-            });
+            // Strategy badge is static — no mode toggle needed
         });
     </script>
     {% block scripts %}{% endblock %}
