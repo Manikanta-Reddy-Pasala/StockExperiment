@@ -1,0 +1,295 @@
+{% extends "v2/base.html" %}
+
+{% block title %}Momentum Rotation{% endblock %}
+{% block page_title %}Momentum Rotation — Live Paper Portfolio{% endblock %}
+
+{% block content %}
+<style>
+  .mr-card { border-left: 4px solid #5b8def; border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,0.05); }
+  .mr-metric { font-size: 1.7rem; font-weight: 700; }
+  .mr-metric-sub { font-size: 0.78rem; color: #8b95a5; text-transform: uppercase; letter-spacing: 1px; }
+  .pos { color: #15a36b; }
+  .neg { color: #d4453a; }
+  .neutral { color: #4f5868; }
+  .badge-rank-1 { background: #ffd60a; color: #333; }
+  .table-momrot th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6c757d; }
+  .table-momrot td { vertical-align: middle; font-size: 0.92rem; }
+  .row-held { background: #fffbea !important; font-weight: 600; }
+  .log-tail { font-family: monospace; font-size: 0.78rem; background: #1a1a2e; color: #c0d8ff; padding: 10px; border-radius: 4px; white-space: pre-wrap; max-height: 350px; overflow-y: auto; }
+  .strategy-badge { background: linear-gradient(135deg,#667eea,#764ba2); color: white; padding: 4px 12px; border-radius: 16px; font-size: 0.75rem; font-weight: 600; }
+  .countdown { font-variant-numeric: tabular-nums; }
+  .small-mute { font-size: 0.78rem; color: #8b95a5; }
+</style>
+
+<div class="container-fluid pb-5">
+
+  <!-- Strategy badge + last update -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <span class="strategy-badge">Model 3</span>
+      <span class="ms-2 small-mute">N100 top-5 max-concurrent=1 — 60d momentum, monthly rotation</span>
+    </div>
+    <div class="small-mute">Updated: <span id="updated_at">–</span></div>
+  </div>
+
+  <!-- Portfolio summary -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="card mr-card p-3">
+        <div class="mr-metric-sub">Total Portfolio Value</div>
+        <div class="mr-metric" id="total_value">₹–</div>
+        <div class="small-mute">Started: ₹<span id="starting_capital">10,00,000</span></div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card mr-card p-3">
+        <div class="mr-metric-sub">Total P&amp;L</div>
+        <div class="mr-metric" id="total_pnl">₹–</div>
+        <div class="small-mute"><span id="total_pct">–</span>%</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card mr-card p-3">
+        <div class="mr-metric-sub">Market Value</div>
+        <div class="mr-metric neutral" id="market_value">₹–</div>
+        <div class="small-mute">Unrealized: <span id="unrealized_pnl">–</span></div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card mr-card p-3">
+        <div class="mr-metric-sub">Cash</div>
+        <div class="mr-metric neutral" id="cash">₹–</div>
+        <div class="small-mute">Realized: <span id="realized_pnl">–</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Next rebalance + actions -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-5">
+      <div class="card mr-card p-3">
+        <div class="mr-metric-sub">Next Rebalance</div>
+        <div class="mr-metric countdown" id="next_rebalance_date">–</div>
+        <div class="small-mute">in <span id="next_rebalance_days">–</span> days (<span id="next_rebalance_day">–</span>)</div>
+      </div>
+    </div>
+    <div class="col-md-7">
+      <div class="card mr-card p-3 d-flex flex-row align-items-center gap-2">
+        <button class="btn btn-primary flex-fill" id="btn_run_now">
+          <i class="bi bi-play-circle"></i> Force Rebalance Now
+        </button>
+        <button class="btn btn-outline-secondary flex-fill" id="btn_rebuild">
+          <i class="bi bi-arrow-clockwise"></i> Rebuild N100 Universe
+        </button>
+        <button class="btn btn-outline-info flex-fill" id="btn_refresh">
+          <i class="bi bi-arrow-repeat"></i> Refresh Data
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Open positions -->
+  <div class="card mr-card mb-4">
+    <div class="card-header bg-light"><i class="bi bi-briefcase"></i> Open Position(s)</div>
+    <div class="card-body p-0">
+      <table class="table table-momrot mb-0">
+        <thead>
+          <tr>
+            <th>Symbol</th><th>Qty</th><th class="text-end">Entry</th>
+            <th class="text-end">Live</th><th class="text-end">Cost</th>
+            <th class="text-end">Market Value</th><th class="text-end">Unrealized P&amp;L</th>
+            <th class="text-end">%</th>
+          </tr>
+        </thead>
+        <tbody id="positions_body">
+          <tr><td colspan="8" class="text-center text-muted">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Top-10 momentum ranking -->
+  <div class="card mr-card mb-4">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-trophy"></i> Current N100 Momentum Ranking — Top 10 (60d return)</span>
+      <span class="small-mute">Held stocks highlighted</span>
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-momrot mb-0">
+        <thead>
+          <tr><th>#</th><th>Symbol</th><th>Name</th><th class="text-end">60d Return %</th><th class="text-end">Price ₹</th><th>Held</th></tr>
+        </thead>
+        <tbody id="ranking_body">
+          <tr><td colspan="6" class="text-center text-muted">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Closed trades history -->
+  <div class="card mr-card mb-4">
+    <div class="card-header bg-light"><i class="bi bi-clock-history"></i> Trade History</div>
+    <div class="card-body p-0">
+      <table class="table table-momrot mb-0">
+        <thead>
+          <tr>
+            <th>Symbol</th><th>Entry</th><th>Exit</th><th class="text-end">Qty</th>
+            <th class="text-end">P&amp;L ₹</th><th>Reason</th><th>Exit ts</th>
+          </tr>
+        </thead>
+        <tbody id="history_body">
+          <tr><td colspan="7" class="text-center text-muted">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Run logs -->
+  <div class="card mr-card mb-4">
+    <div class="card-header bg-light"><i class="bi bi-terminal"></i> Recent Daily-Run Logs</div>
+    <div class="card-body">
+      <div id="run_logs_container">Loading…</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const fmtINR = n => "₹" + Number(n || 0).toLocaleString('en-IN', {maximumFractionDigits: 2});
+const fmtPct = n => (n >= 0 ? "+" : "") + Number(n || 0).toFixed(2) + "%";
+const cls = n => n > 0 ? "pos" : (n < 0 ? "neg" : "neutral");
+
+async function loadSummary() {
+  try {
+    const r = await fetch('/admin/momrot/summary');
+    const data = await r.json();
+    if (!data.success) { console.error(data.error); return; }
+    renderState(data.state);
+    renderRanking(data.ranking, data.state.open_positions);
+    renderNextRebalance(data.next_rebalance);
+  } catch (e) { console.error(e); }
+}
+
+function renderState(s) {
+  document.getElementById('updated_at').textContent = s.ledger_updated_at || '–';
+  document.getElementById('starting_capital').textContent = Number(s.starting_capital).toLocaleString('en-IN');
+  document.getElementById('total_value').textContent = fmtINR(s.total_value);
+  document.getElementById('total_pnl').textContent = fmtINR(s.total_pnl);
+  document.getElementById('total_pnl').className = 'mr-metric ' + cls(s.total_pnl);
+  document.getElementById('total_pct').textContent = fmtPct(s.total_pct);
+  document.getElementById('total_pct').className = cls(s.total_pct);
+  document.getElementById('market_value').textContent = fmtINR(s.market_value);
+  document.getElementById('unrealized_pnl').textContent = fmtINR(s.unrealized_pnl);
+  document.getElementById('unrealized_pnl').className = cls(s.unrealized_pnl);
+  document.getElementById('cash').textContent = fmtINR(s.cash);
+  document.getElementById('realized_pnl').textContent = fmtINR(s.realized_pnl);
+  document.getElementById('realized_pnl').className = cls(s.realized_pnl);
+
+  const body = document.getElementById('positions_body');
+  if (!s.open_positions || s.open_positions.length === 0) {
+    body.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No open positions</td></tr>';
+  } else {
+    body.innerHTML = s.open_positions.map(p => `
+      <tr>
+        <td><strong>${p.symbol}</strong></td>
+        <td>${p.qty.toLocaleString('en-IN')}</td>
+        <td class="text-end">${fmtINR(p.entry_price)}</td>
+        <td class="text-end">${fmtINR(p.live_price)}</td>
+        <td class="text-end">${fmtINR(p.cost)}</td>
+        <td class="text-end">${fmtINR(p.market_value)}</td>
+        <td class="text-end ${cls(p.unrealized_pnl)}">${fmtINR(p.unrealized_pnl)}</td>
+        <td class="text-end ${cls(p.unrealized_pct)}">${fmtPct(p.unrealized_pct)}</td>
+      </tr>
+    `).join('');
+  }
+}
+
+function renderRanking(ranking, openPositions) {
+  const held = new Set((openPositions || []).map(p => p.symbol));
+  const body = document.getElementById('ranking_body');
+  body.innerHTML = ranking.map((r, i) => `
+    <tr class="${held.has(r.symbol) ? 'row-held' : ''}">
+      <td>${i === 0 ? '<span class="badge badge-rank-1">★ 1</span>' : '#'+(i+1)}</td>
+      <td><strong>${r.symbol}</strong></td>
+      <td>${r.name || ''}</td>
+      <td class="text-end ${cls(r.return_60d)}">${fmtPct(r.return_60d)}</td>
+      <td class="text-end">${fmtINR(r.price)}</td>
+      <td>${held.has(r.symbol) ? '<span class="badge bg-success">HELD</span>' : ''}</td>
+    </tr>
+  `).join('');
+}
+
+function renderNextRebalance(n) {
+  document.getElementById('next_rebalance_date').textContent = n.date;
+  document.getElementById('next_rebalance_days').textContent = n.days_until;
+  document.getElementById('next_rebalance_day').textContent = n.weekday;
+}
+
+async function loadHistory() {
+  try {
+    const r = await fetch('/admin/momrot/history');
+    const d = await r.json();
+    const body = document.getElementById('history_body');
+    if (!d.trades || d.trades.length === 0) {
+      body.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No closed trades yet</td></tr>';
+      return;
+    }
+    body.innerHTML = d.trades.slice().reverse().map(t => `
+      <tr>
+        <td><strong>${t.symbol}</strong></td>
+        <td class="text-end">${fmtINR(t.entry_price)}</td>
+        <td class="text-end">${fmtINR(t.exit_price)}</td>
+        <td class="text-end">${(t.qty_closed||0).toLocaleString('en-IN')}</td>
+        <td class="text-end ${cls(t.pnl)}">${fmtINR(t.pnl)}</td>
+        <td><span class="badge bg-secondary">${t.reason}</span></td>
+        <td class="small-mute">${t.ts || ''}</td>
+      </tr>
+    `).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function loadRunLogs() {
+  try {
+    const r = await fetch('/admin/momrot/run-logs?limit=5');
+    const d = await r.json();
+    const c = document.getElementById('run_logs_container');
+    if (!d.logs || d.logs.length === 0) {
+      c.innerHTML = '<div class="text-muted">No run logs yet.</div>';
+      return;
+    }
+    c.innerHTML = d.logs.map(l => `
+      <div class="mb-3">
+        <div class="d-flex justify-content-between mb-1">
+          <strong>${l.name}</strong>
+          <span class="small-mute">${new Date(l.mtime).toLocaleString()}</span>
+        </div>
+        <pre class="log-tail">${l.tail.join('\n')}</pre>
+      </div>
+    `).join('');
+  } catch(e) { console.error(e); }
+}
+
+document.getElementById('btn_run_now').addEventListener('click', async () => {
+  if (!confirm('Force rebalance NOW (bypass first-week-of-month gate)?')) return;
+  const r = await fetch('/admin/momrot/run-now', {method:'POST'});
+  const d = await r.json();
+  alert(d.success ? 'Rebalance triggered. Refreshing in 5s.' : 'Failed: ' + d.error);
+  setTimeout(() => { loadSummary(); loadHistory(); loadRunLogs(); }, 5000);
+});
+
+document.getElementById('btn_rebuild').addEventListener('click', async () => {
+  if (!confirm('Rebuild N100 universe (takes ~30s)?')) return;
+  const r = await fetch('/admin/momrot/rebuild-universe', {method:'POST'});
+  const d = await r.json();
+  alert(d.success ? 'Universe rebuild triggered.' : 'Failed: ' + d.error);
+});
+
+document.getElementById('btn_refresh').addEventListener('click', () => {
+  loadSummary(); loadHistory(); loadRunLogs();
+});
+
+// Initial load + auto-refresh
+loadSummary(); loadHistory(); loadRunLogs();
+setInterval(loadSummary, 30000);  // every 30s
+</script>
+{% endblock %}

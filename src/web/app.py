@@ -1338,6 +1338,14 @@ def create_app():
         app.logger.warning(f"Admin routes not available: {e}")
         app.logger.warning("Admin dashboard functionality will be disabled")
 
+    # Register momentum rotation paper-trading dashboard
+    try:
+        from .momrot_routes import momrot_bp
+        app.register_blueprint(momrot_bp)
+        app.logger.info("Momentum rotation routes registered successfully")
+    except ImportError as e:
+        app.logger.warning(f"Momentum rotation routes not available: {e}")
+
 
     # Register data management routes (yfinance, data population)
     try:
