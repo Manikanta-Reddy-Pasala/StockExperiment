@@ -63,28 +63,46 @@ def _ret_60d(symbol: str, ts: int) -> float:
 
 
 def _portfolio_nav(ledger: Dict, history: List[Dict], today_ts: int) -> Dict:
-    realized = sum(h.get("pnl", 0.0) for h in history)
+    """Read NAV from LIVE Fyers account (funds + holdings)."""
+    try:
+        from src.services.brokers.fyers_service import FyersService
+        svc = FyersService()
+        funds = (svc.funds(1) or {}).get("data") or {}
+        holdings = (svc.holdings(1) or {}).get("data") or []
+    except Exception:
+        funds = {}
+        holdings = []
+
+    cash = float(funds.get("available_cash") or 0)
     pos_cost = 0.0
     mv = 0.0
     held_str = "None"
     held_pct = 0.0
-    for p in ledger.get("open", []):
-        qty = int(p["qty"])
-        entry = float(p["entry_price"])
-        live = _close(p["symbol"], today_ts)
-        pos_cost += entry * qty
-        mv += live * qty
+    unrealized = 0.0
+
+    for p in holdings:
+        qty = float(p.get("quantity") or 0)
+        if qty <= 0:
+            continue
+        sym = (p.get("symbol") or "").replace("NSE:", "").replace("-EQ", "")
+        avg = float(p.get("average_price") or 0)
+        ltp = float(p.get("last_price") or 0)
+        pnl = float(p.get("pnl") or (ltp - avg) * qty)
+        pos_cost += avg * qty
+        mv += ltp * qty
+        unrealized += pnl
         if held_str == "None":
-            held_str = f"{p['symbol']} ({(live/entry-1)*100:+.1f}%)"
-            held_pct = (live / entry - 1) * 100
-    cash = STARTING_CAPITAL + realized - pos_cost
+            pct = (ltp / avg - 1) * 100 if avg > 0 else 0
+            held_str = f"{sym} ({pct:+.1f}%)"
+            held_pct = pct
+
     total = cash + mv
-    total_pct = (total / STARTING_CAPITAL - 1) * 100
+    total_pct = (unrealized / pos_cost * 100) if pos_cost > 0 else 0.0
     return {
         "nav": total, "total_pct": total_pct,
         "cash": cash, "market_value": mv,
         "held_str": held_str, "held_pct": held_pct,
-        "realized": realized,
+        "realized": 0.0,
     }
 
 
@@ -101,10 +119,10 @@ def _save_nav(nav: float):
         json.dump({"nav": nav, "ts": datetime.now().isoformat()}, f)
 
 
-def _top1(today_ts: int) -> Optional[Dict]:
+def _top_n(today_ts: int, n: int = 5) -> List[Dict]:
     uni = _load(UNIVERSE, {}).get("stocks", [])
     if not uni:
-        return None
+        return []
     rows = []
     for s in uni:
         sym = s["symbol"]
@@ -113,9 +131,9 @@ def _top1(today_ts: int) -> Optional[Dict]:
             rows.append({"symbol": sym, "name": s.get("name", sym),
                          "return_60d": r, "price": _close(sym, today_ts)})
     if not rows:
-        return None
+        return []
     rows.sort(key=lambda r: -r["return_60d"])
-    return rows[0]
+    return rows[:n]
 
 
 def _next_rebalance(today: datetime) -> str:
@@ -148,7 +166,7 @@ def build_message(status: str = "HOLD", detail: str = "") -> str:
     nav = _portfolio_nav(ledger, history, today_ts)
     day_pnl = _day_pnl(nav["nav"])
     _save_nav(nav["nav"])
-    top1 = _top1(today_ts)
+    top5 = _top_n(today_ts, 5)
     next_reb = _next_rebalance(today)
 
     status_emoji = {
@@ -158,18 +176,26 @@ def build_message(status: str = "HOLD", detail: str = "") -> str:
         "NO_DATA": "⚠️",
     }.get(status, "ℹ️")
 
+    # Held symbol now from Fyers (held_str format "SYM (+X%)" or "None")
+    held_sym = nav["held_str"].split(" ")[0] if nav["held_str"] != "None" else ""
+
     lines = [
         f"*Momrot {today.strftime('%Y-%m-%d')}* {status_emoji} {status}",
         f"NAV ₹{nav['nav']:,.0f}  ({nav['total_pct']:+.2f}%)",
         f"Day P&L ₹{day_pnl:+,.0f}",
         f"Hold {nav['held_str']}",
+        f"Next rebalance: {next_reb}",
     ]
-    if top1:
-        held_sym = (ledger.get("open") or [{}])[0].get("symbol", "")
-        marker = "✓" if top1["symbol"] == held_sym else "→"
-        lines.append(f"Top1 {marker} {top1['symbol']} ({top1['return_60d']:+.1f}%)")
-    lines.append(f"Next rebalance: {next_reb}")
+
+    if top5:
+        lines.append("")
+        lines.append("*Top 5 N100 (60d):*")
+        for i, p in enumerate(top5, 1):
+            marker = " ✓" if p["symbol"] == held_sym else ""
+            lines.append(f"{i}. `{p['symbol']}` {p['return_60d']:+.1f}% @ ₹{p['price']:.2f}{marker}")
+
     if detail:
+        lines.append("")
         lines.append(f"_{detail}_")
 
     return "\n".join(lines)
