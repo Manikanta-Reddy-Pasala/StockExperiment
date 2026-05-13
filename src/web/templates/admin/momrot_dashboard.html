@@ -313,14 +313,32 @@ document.getElementById('btn_run_now').addEventListener('click', async () => {
 });
 
 document.getElementById('btn_buy_now').addEventListener('click', async () => {
-  if (!confirm('⚠️ LIVE BUY — places real market order for rank-1 stock using available Fyers cash. Proceed?')) return;
-  const r = await fetch('/admin/momrot/buy-now', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
-  const d = await r.json();
-  if (d.success) {
-    alert(`BUY placed: ${d.symbol} qty=${d.qty} @ ₹${d.price}\nOrder result: ${JSON.stringify(d.result)}`);
-  } else {
-    alert('BUY failed: ' + d.error);
+  const pr = await fetch('/admin/momrot/rebalance-preview');
+  const p = await pr.json();
+  if (!p.success) { alert('Preview failed: ' + p.error); return; }
+  const sym = p.rank1.symbol;
+  const price = p.rank1.price;
+  const cash = p.current_cash;
+  const maxQty = Math.floor(cash / price);
+
+  if (maxQty < 1) {
+    alert(`❌ Insufficient balance.\nAvailable: ${fmtINR(cash)}\nNeed ≥ ${fmtINR(price)}/share for ${sym}.\nPlease refill Fyers account and retry.`);
+    return;
   }
+
+  const input = prompt(`BUY ${sym} @ ${fmtINR(price)}\nAvailable cash: ${fmtINR(cash)}\nMax qty: ${maxQty}\n\nHow many shares to buy?`, maxQty);
+  if (input === null) return;
+  const qty = parseInt(input);
+  if (!qty || qty < 1) { alert('Invalid qty'); return; }
+  if (qty > maxQty) { alert(`qty ${qty} > max ${maxQty} (insufficient cash)`); return; }
+
+  if (!confirm(`⚠️ LIVE BUY ${sym} qty=${qty} @ ~${fmtINR(price)}\nTotal: ${fmtINR(qty*price)}\n\nProceed?`)) return;
+  const r = await fetch('/admin/momrot/buy-now', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({symbol: sym, qty})
+  });
+  const d = await r.json();
+  alert(d.success ? `✓ BUY placed: ${sym} qty=${qty}` : '❌ Failed: ' + d.error);
   setTimeout(() => { loadSummary(); loadFyers(); }, 3000);
 });
 

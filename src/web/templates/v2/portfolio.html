@@ -191,10 +191,36 @@ document.getElementById('btn_rebalance').addEventListener('click', async () => {
   setTimeout(() => { loadState(); loadPreview(); }, 3000);
 });
 document.getElementById('btn_buy_rank1').addEventListener('click', async () => {
-  if (!confirm('⚠️ LIVE BUY Rank-1 with available cash. Proceed?')) return;
-  const r = await fetch('/admin/momrot/buy-now', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+  // 1. Get rank-1 + cash
+  const pr = await fetch('/admin/momrot/rebalance-preview');
+  const p = await pr.json();
+  if (!p.success) { alert('Failed to fetch preview: ' + p.error); return; }
+  const sym = p.rank1.symbol;
+  const price = p.rank1.price;
+  const cash = p.current_cash;
+  const maxQty = Math.floor(cash / price);
+
+  // 2. Insufficient -> refill prompt
+  if (maxQty < 1) {
+    alert(`❌ Insufficient balance.\nAvailable: ${fmtINR(cash)}\nNeed ≥ ${fmtINR(price)}/share for ${sym}.\nPlease refill Fyers account and try again.`);
+    return;
+  }
+
+  // 3. Ask qty
+  const input = prompt(`BUY ${sym} @ ${fmtINR(price)}\nAvailable cash: ${fmtINR(cash)}\nMax qty: ${maxQty}\n\nHow many shares to buy?`, maxQty);
+  if (input === null) return;
+  const qty = parseInt(input);
+  if (!qty || qty < 1) { alert('Invalid qty'); return; }
+  if (qty > maxQty) { alert(`qty ${qty} > max ${maxQty} (insufficient cash)`); return; }
+
+  // 4. Confirm + place
+  if (!confirm(`⚠️ LIVE BUY ${sym} qty=${qty} @ ~${fmtINR(price)}\nTotal: ${fmtINR(qty*price)}\n\nProceed?`)) return;
+  const r = await fetch('/admin/momrot/buy-now', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({symbol: sym, qty})
+  });
   const d = await r.json();
-  alert(d.success ? `BUY placed: ${d.symbol} qty=${d.qty} @ ${fmtINR(d.price)}` : 'Failed: ' + d.error);
+  alert(d.success ? `✓ BUY placed: ${sym} qty=${qty}\nOrder: ${JSON.stringify(d.result)}` : '❌ Failed: ' + d.error);
   setTimeout(() => { loadState(); loadPreview(); }, 3000);
 });
 

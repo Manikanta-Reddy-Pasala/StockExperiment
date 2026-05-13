@@ -100,15 +100,26 @@ async function load() {
 async function buyNow(symbol, price) {
   const r1 = await fetch('/admin/momrot/state').then(r=>r.json());
   const cash = (r1.data && r1.data.cash) || 0;
-  const qty = Math.floor(cash / price);
-  if (qty < 1) { alert(`Insufficient cash. Have ₹${cash.toFixed(2)}, need ≥ ₹${price.toFixed(2)}/share.`); return; }
-  if (!confirm(`⚠️ LIVE BUY ${symbol} qty=${qty} @ ~₹${price.toFixed(2)} = ₹${(qty*price).toLocaleString('en-IN')}. Proceed?`)) return;
+  const maxQty = Math.floor(cash / price);
+
+  if (maxQty < 1) {
+    alert(`❌ Insufficient balance.\nAvailable: ₹${cash.toLocaleString('en-IN')}\nNeed ≥ ₹${price.toFixed(2)}/share for ${symbol}.\nPlease refill Fyers account and retry.`);
+    return;
+  }
+
+  const input = prompt(`BUY ${symbol} @ ₹${price.toFixed(2)}\nAvailable cash: ₹${cash.toLocaleString('en-IN')}\nMax qty: ${maxQty}\n\nHow many shares?`, maxQty);
+  if (input === null) return;
+  const qty = parseInt(input);
+  if (!qty || qty < 1) { alert('Invalid qty'); return; }
+  if (qty > maxQty) { alert(`qty ${qty} > max ${maxQty} (insufficient cash)`); return; }
+
+  if (!confirm(`⚠️ LIVE BUY ${symbol} qty=${qty} @ ~₹${price.toFixed(2)}\nTotal: ₹${(qty*price).toLocaleString('en-IN')}\n\nProceed?`)) return;
   const r = await fetch('/admin/momrot/buy-now', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({symbol, qty})
   });
   const d = await r.json();
-  alert(d.success ? `BUY placed: ${symbol} qty=${qty}` : 'Failed: ' + d.error);
+  alert(d.success ? `✓ BUY placed: ${symbol} qty=${qty}` : '❌ Failed: ' + d.error);
   setTimeout(load, 3000);
 }
 
