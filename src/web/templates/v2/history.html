@@ -1,190 +1,103 @@
 {% extends "v2/base.html" %}
-{% block title %}Trade History - Trading Journal{% endblock %}
+{% block title %}Trade History - Momentum Rotation{% endblock %}
 {% block page_title %}Trade History{% endblock %}
 
 {% block content %}
-<!-- Stats cards -->
-<div class="row g-3 mb-4" id="stats-cards">
-    <div class="col-6 col-md-4 col-xl">
-        <div class="card summary-card h-100"><div class="card-body text-center py-2">
-            <div class="text-muted small">Trades</div>
-            <div id="stat-total" class="fs-5 fw-bold">--</div>
-        </div></div>
-    </div>
-    <div class="col-6 col-md-4 col-xl">
-        <div class="card summary-card h-100"><div class="card-body text-center py-2">
-            <div class="text-muted small">Win Rate</div>
-            <div id="stat-winrate" class="fs-5 fw-bold">--</div>
-        </div></div>
-    </div>
-    <div class="col-6 col-md-4 col-xl">
-        <div class="card summary-card h-100"><div class="card-body text-center py-2">
-            <div class="text-muted small">Avg Win</div>
-            <div id="stat-avg-win" class="fs-5 fw-bold text-success">--</div>
-        </div></div>
-    </div>
-    <div class="col-6 col-md-4 col-xl">
-        <div class="card summary-card h-100"><div class="card-body text-center py-2">
-            <div class="text-muted small">Avg Loss</div>
-            <div id="stat-avg-loss" class="fs-5 fw-bold text-danger">--</div>
-        </div></div>
-    </div>
-    <div class="col-6 col-md-4 col-xl">
-        <div class="card summary-card h-100"><div class="card-body text-center py-2">
-            <div class="text-muted small">Best Trade</div>
-            <div id="stat-best" class="fs-5 fw-bold text-success">--</div>
-        </div></div>
-    </div>
-    <div class="col-6 col-md-4 col-xl">
-        <div class="card summary-card h-100"><div class="card-body text-center py-2">
-            <div class="text-muted small">Worst Trade</div>
-            <div id="stat-worst" class="fs-5 fw-bold text-danger">--</div>
-        </div></div>
-    </div>
-    <div class="col-6 col-md-4 col-xl">
-        <div class="card summary-card h-100"><div class="card-body text-center py-2">
-            <div class="text-muted small">Profit Factor</div>
-            <div id="stat-pf" class="fs-5 fw-bold">--</div>
-        </div></div>
-    </div>
+<style>
+  .pos { color: #15a36b; } .neg { color: #d4453a; } .neutral { color: #4f5868; }
+</style>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card h-100"><div class="card-body py-3 text-center">
+      <div class="text-muted small mb-1">Closed Trades</div>
+      <div id="n_trades" class="fs-4 fw-bold">--</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card h-100"><div class="card-body py-3 text-center">
+      <div class="text-muted small mb-1">Win Rate</div>
+      <div id="win_rate" class="fs-4 fw-bold">--</div>
+      <div id="w_l" class="small text-muted">--</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card h-100"><div class="card-body py-3 text-center">
+      <div class="text-muted small mb-1">Realized P&amp;L</div>
+      <div id="realized" class="fs-4 fw-bold">--</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card h-100"><div class="card-body py-3 text-center">
+      <div class="text-muted small mb-1">Best Trade</div>
+      <div id="best" class="fs-4 fw-bold pos">--</div>
+    </div></div>
+  </div>
 </div>
 
-<!-- Monthly P&L chart -->
-<div class="card mb-4">
-    <div class="card-header">Monthly P&L</div>
-    <div class="card-body" style="height:220px;">
-        <canvas id="monthly-pnl-chart"></canvas>
-    </div>
-</div>
-
-<!-- Filters & table -->
 <div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <span>Closed Trades</span>
-        <div class="d-flex gap-2">
-            <select class="form-select form-select-sm" id="filter-result" style="width:auto;">
-                <option value="all">All</option>
-                <option value="won">Won</option>
-                <option value="lost">Lost</option>
-            </select>
-        </div>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-sm mb-0 align-middle">
-            <thead>
-                <tr>
-                    <th>Symbol</th>
-                    <th>Entry Date</th>
-                    <th>Exit Date</th>
-                    <th class="text-end">Entry</th>
-                    <th class="text-end">Exit</th>
-                    <th class="text-end">P&L %</th>
-                    <th class="text-center">Days</th>
-                    <th>Exit Reason</th>
-                </tr>
-            </thead>
-            <tbody id="history-tbody">
-                <tr><td colspan="8" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm"></div> Loading...</td></tr>
-            </tbody>
-        </table>
-    </div>
+  <div class="card-header"><i class="bi bi-clock-history me-2"></i>Closed Trades (Newest First)</div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr>
+        <th>Exit ts</th><th>Symbol</th><th class="text-end">Entry ₹</th>
+        <th class="text-end">Exit ₹</th><th class="text-end">Qty</th>
+        <th class="text-end">P&amp;L ₹</th><th>Reason</th>
+      </tr></thead>
+      <tbody id="hist"><tr><td colspan="7" class="text-center text-muted py-3">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="alert alert-info mt-3 py-2 small">
+  <i class="bi bi-info-circle me-1"></i>
+  No trades yet means rotation hasn't fired. Initial entry was the only event. Next rotation = first weekday of next month (see <a href="/admin/momrot">Momentum Rotation</a>).
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-let closedTrades = [];
-let monthlyChart = null;
+const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractionDigits:2});
+const cls = n => n>0?"pos":(n<0?"neg":"neutral");
 
-async function loadHistory() {
-    const data = await Trading.api('/api/auto-trading/paper-trading/positions?status=closed');
-    if (!data.success) return;
+async function load() {
+  try {
+    const r = await fetch('/admin/momrot/history');
+    const d = await r.json();
+    if (!d.success) return;
+    const trades = d.trades || [];
 
-    closedTrades = data.positions || [];
+    document.getElementById('n_trades').textContent = trades.length;
+    const wins = trades.filter(t => (t.pnl||0) > 0).length;
+    const losses = trades.filter(t => (t.pnl||0) < 0).length;
+    const wr = trades.length ? (wins/trades.length*100) : 0;
+    document.getElementById('win_rate').textContent = wr.toFixed(1) + '%';
+    document.getElementById('w_l').textContent = `${wins}W / ${losses}L`;
+    const total = trades.reduce((s,t)=>s+(t.pnl||0), 0);
+    document.getElementById('realized').textContent = fmtINR(total);
+    document.getElementById('realized').className = 'fs-4 fw-bold ' + cls(total);
+    const best = trades.reduce((b,t)=>Math.max(b, t.pnl||0), 0);
+    document.getElementById('best').textContent = fmtINR(best);
 
-    // Compute stats
-    const wins = closedTrades.filter(t => (t.realized_pnl || 0) > 0);
-    const losses = closedTrades.filter(t => (t.realized_pnl || 0) < 0);
-    const total = closedTrades.length;
-
-    document.getElementById('stat-total').textContent = total;
-
-    const winRate = total > 0 ? (wins.length / total * 100) : 0;
-    document.getElementById('stat-winrate').textContent = winRate.toFixed(1) + '%';
-    document.getElementById('stat-winrate').className = `fs-5 fw-bold ${winRate >= 50 ? 'text-success' : 'text-danger'}`;
-
-    const avgWin = wins.length > 0 ? wins.reduce((s, t) => s + (t.realized_pnl_pct || 0), 0) / wins.length : 0;
-    const avgLoss = losses.length > 0 ? losses.reduce((s, t) => s + (t.realized_pnl_pct || 0), 0) / losses.length : 0;
-    document.getElementById('stat-avg-win').textContent = Trading.formatPct(avgWin);
-    document.getElementById('stat-avg-loss').textContent = Trading.formatPct(avgLoss);
-
-    const pnls = closedTrades.map(t => t.realized_pnl || 0);
-    const best = pnls.length > 0 ? Math.max(...pnls) : 0;
-    const worst = pnls.length > 0 ? Math.min(...pnls) : 0;
-    document.getElementById('stat-best').textContent = Trading.formatINR(best);
-    document.getElementById('stat-worst').textContent = Trading.formatINR(worst);
-
-    const totalWinAmt = wins.reduce((s, t) => s + (t.realized_pnl || 0), 0);
-    const totalLossAmt = Math.abs(losses.reduce((s, t) => s + (t.realized_pnl || 0), 0));
-    const pf = totalLossAmt > 0 ? (totalWinAmt / totalLossAmt) : (totalWinAmt > 0 ? 999 : 0);
-    document.getElementById('stat-pf').textContent = pf.toFixed(2);
-    document.getElementById('stat-pf').className = `fs-5 fw-bold ${pf >= 1 ? 'text-success' : 'text-danger'}`;
-
-    // Monthly P&L chart
-    const monthly = {};
-    closedTrades.forEach(t => {
-        if (!t.exit_date) return;
-        const key = t.exit_date.substring(0, 7); // YYYY-MM
-        monthly[key] = (monthly[key] || 0) + (t.realized_pnl || 0);
-    });
-    const sortedMonths = Object.keys(monthly).sort();
-    if (monthlyChart) monthlyChart.destroy();
-    if (sortedMonths.length > 0) {
-        monthlyChart = Trading.createMonthlyPnlChart('monthly-pnl-chart',
-            sortedMonths.map(m => m),
-            sortedMonths.map(m => monthly[m])
-        );
+    const body = document.getElementById('hist');
+    if (trades.length === 0) {
+      body.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No closed trades yet</td></tr>';
+    } else {
+      body.innerHTML = trades.slice().reverse().map(t => `
+        <tr>
+          <td class="small text-muted">${t.ts||''}</td>
+          <td><strong>${t.symbol}</strong></td>
+          <td class="text-end">${fmtINR(t.entry_price)}</td>
+          <td class="text-end">${fmtINR(t.exit_price)}</td>
+          <td class="text-end">${(t.qty_closed||0).toLocaleString('en-IN')}</td>
+          <td class="text-end ${cls(t.pnl)}">${fmtINR(t.pnl)}</td>
+          <td><span class="badge bg-secondary">${t.reason||''}</span></td>
+        </tr>
+      `).join('');
     }
-
-    renderTable();
+  } catch(e) { console.error(e); }
 }
-
-function renderTable() {
-    const filter = document.getElementById('filter-result').value;
-    let filtered = closedTrades;
-    if (filter === 'won') filtered = closedTrades.filter(t => (t.realized_pnl || 0) > 0);
-    if (filter === 'lost') filtered = closedTrades.filter(t => (t.realized_pnl || 0) < 0);
-
-    const tbody = document.getElementById('history-tbody');
-    if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No closed trades yet</td></tr>';
-        return;
-    }
-
-    tbody.innerHTML = filtered.map(t => {
-        const sym = (t.symbol || '').replace('NSE:', '').replace('-EQ', '');
-        const pnlPct = t.realized_pnl_pct || 0;
-        const pnl = t.realized_pnl || 0;
-        const reasonBadge = {
-            'manual': 'bg-secondary',
-            'stop_loss': 'bg-danger',
-            'target_hit': 'bg-success'
-        };
-        return `<tr>
-            <td class="fw-medium">${sym}</td>
-            <td class="small">${t.entry_date ? t.entry_date.split('T')[0] : '--'}</td>
-            <td class="small">${t.exit_date ? t.exit_date.split('T')[0] : '--'}</td>
-            <td class="text-end">${Trading.formatPrice(t.entry_price)}</td>
-            <td class="text-end">${Trading.formatPrice(t.exit_price)}</td>
-            <td class="text-end ${Trading.pnlClass(pnl)}">${Trading.formatPct(pnlPct)}<br><span class="small">${Trading.formatINR(pnl)}</span></td>
-            <td class="text-center">${t.days_held || '--'}</td>
-            <td><span class="badge ${reasonBadge[t.exit_reason] || 'bg-secondary'}">${(t.exit_reason || 'N/A').replace('_', ' ')}</span></td>
-        </tr>`;
-    }).join('');
-}
-
-document.getElementById('filter-result').addEventListener('change', renderTable);
-
-loadHistory();
+load();
+setInterval(load, 30000);
 </script>
 {% endblock %}

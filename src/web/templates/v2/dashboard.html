@@ -1,256 +1,145 @@
 {% extends "v2/base.html" %}
-{% block title %}Dashboard - Trading Journal{% endblock %}
+{% block title %}Dashboard - Momentum Rotation{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
+<style>
+  .summary-card { border-left: 4px solid #5b8def; }
+  .pos { color: #15a36b; } .neg { color: #d4453a; } .neutral { color: #4f5868; }
+  .row-held { background: #fffbea !important; font-weight: 600; }
+  .strategy-pill { background: linear-gradient(135deg,#667eea,#764ba2); color:#fff; padding:4px 12px; border-radius:14px; font-size:0.75rem; font-weight:600; }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <span class="strategy-pill">Model 3</span>
+    <span class="ms-2 text-muted small">Monthly Momentum Rotation — N100 top-5 max=1 — 60d lookback</span>
+  </div>
+  <div class="small text-muted">Updated: <span id="updated_at">–</span></div>
+</div>
+
 <!-- Summary cards -->
-<div class="row g-3 mb-4" id="summary-cards">
-    <div class="col-6 col-lg-3">
-        <div class="card summary-card h-100">
-            <div class="card-body text-center py-3">
-                <div class="text-muted small mb-1">Total P&L</div>
-                <div id="total-pnl" class="fs-4 fw-bold">--</div>
-                <div id="total-pnl-pct" class="small">--</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-6 col-lg-3">
-        <div class="card summary-card h-100">
-            <div class="card-body text-center py-3">
-                <div class="text-muted small mb-1">Win Rate</div>
-                <div id="win-rate" class="fs-4 fw-bold">--</div>
-                <div id="win-loss" class="small text-muted">--</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-6 col-lg-3">
-        <div class="card summary-card h-100">
-            <div class="card-body text-center py-3">
-                <div class="text-muted small mb-1">Active Positions</div>
-                <div id="active-count" class="fs-4 fw-bold text-primary">--</div>
-                <div id="positions-value" class="small text-muted">--</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-6 col-lg-3">
-        <div class="card summary-card h-100">
-            <div class="card-body text-center py-3">
-                <div class="text-muted small mb-1">Available Capital</div>
-                <div id="cash-available" class="fs-4 fw-bold">--</div>
-                <div id="initial-capital" class="small text-muted">--</div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Alerts section -->
-<div id="alerts-section" class="mb-4" style="display:none;">
-    <div class="card border-warning">
-        <div class="card-header bg-warning bg-opacity-10 d-flex align-items-center">
-            <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>
-            <strong>Sell Alerts</strong>
-            <span id="alerts-count" class="badge bg-warning ms-2">0</span>
-        </div>
-        <div class="card-body p-0">
-            <div id="alerts-list" class="list-group list-group-flush"></div>
-        </div>
-    </div>
-</div>
-
-<!-- Equity curve & Today's picks -->
 <div class="row g-3 mb-4">
-    <div class="col-lg-8">
-        <div class="card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Equity Curve</span>
-                <div class="btn-group btn-group-sm" id="period-selector">
-                    <button class="btn btn-outline-primary" data-days="7">1W</button>
-                    <button class="btn btn-outline-primary active" data-days="30">1M</button>
-                    <button class="btn btn-outline-primary" data-days="90">3M</button>
-                </div>
-            </div>
-            <div class="card-body" style="height:280px;">
-                <canvas id="equity-chart"></canvas>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-4">
-        <div class="card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Top Picks Today</span>
-                <a href="/picks" class="btn btn-sm btn-outline-primary">View All</a>
-            </div>
-            <div class="card-body p-0" id="top-picks-container">
-                <div class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm"></div> Loading...</div>
-            </div>
-        </div>
-    </div>
+  <div class="col-6 col-lg-3">
+    <div class="card summary-card h-100"><div class="card-body py-3 text-center">
+      <div class="text-muted small mb-1">Portfolio Value</div>
+      <div id="total_value" class="fs-4 fw-bold">--</div>
+      <div class="small text-muted">Start ₹<span id="start_cap">10,00,000</span></div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card summary-card h-100"><div class="card-body py-3 text-center">
+      <div class="text-muted small mb-1">Total P&amp;L</div>
+      <div id="total_pnl" class="fs-4 fw-bold">--</div>
+      <div id="total_pct" class="small">--</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card summary-card h-100"><div class="card-body py-3 text-center">
+      <div class="text-muted small mb-1">Open Position</div>
+      <div id="held_symbol" class="fs-4 fw-bold">--</div>
+      <div id="held_value" class="small text-muted">--</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card summary-card h-100"><div class="card-body py-3 text-center">
+      <div class="text-muted small mb-1">Next Rebalance</div>
+      <div id="next_date" class="fs-4 fw-bold">--</div>
+      <div id="next_days" class="small text-muted">--</div>
+    </div></div>
+  </div>
 </div>
 
-<!-- Active positions mini table -->
-<div class="card mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <span>Active Positions</span>
-        <a href="/portfolio" class="btn btn-sm btn-outline-primary">View All</a>
-    </div>
-    <div class="table-responsive">
+<div class="row g-3 mb-4">
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Top 5 Momentum Picks (N100)</span>
+        <a href="/picks" class="btn btn-sm btn-outline-primary">View All</a>
+      </div>
+      <div class="table-responsive">
         <table class="table table-sm mb-0 align-middle">
-            <thead>
-                <tr>
-                    <th>Symbol</th>
-                    <th class="text-end">Entry</th>
-                    <th class="text-end">Current</th>
-                    <th class="text-end">P&L %</th>
-                    <th class="text-center">Days</th>
-                    <th class="text-center">Status</th>
-                </tr>
-            </thead>
-            <tbody id="positions-tbody">
-                <tr><td colspan="6" class="text-center text-muted py-3"><div class="spinner-border spinner-border-sm"></div> Loading...</td></tr>
-            </tbody>
+          <thead><tr><th>#</th><th>Symbol</th><th>Name</th><th class="text-end">60d %</th><th class="text-end">Price</th><th>Held</th></tr></thead>
+          <tbody id="picks_tbody"><tr><td colspan="6" class="text-center text-muted py-3">Loading…</td></tr></tbody>
         </table>
+      </div>
     </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header">Current Holding</div>
+      <div class="card-body" id="holding_card">
+        <div class="text-muted text-center py-3">Loading…</div>
+      </div>
+    </div>
+  </div>
 </div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
-let equityChart = null;
+const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractionDigits:2});
+const fmtPct = n => (n>=0?"+":"") + Number(n||0).toFixed(2) + "%";
+const cls = n => n>0?"pos":(n<0?"neg":"neutral");
 
-async function loadDashboard() {
-    // Load all data in parallel
-    const [portfolio, positions, picks, alerts] = await Promise.all([
-        Trading.api('/api/auto-trading/paper-trading/portfolio'),
-        Trading.api('/api/auto-trading/paper-trading/positions?status=active'),
-        Trading.api('/api/suggested-stocks?limit=3'),
-        Trading.api('/api/auto-trading/paper-trading/alerts')
-    ]);
+async function load() {
+  try {
+    const r = await fetch('/admin/momrot/summary');
+    const d = await r.json();
+    if (!d.success) return;
+    const s = d.state, n = d.next_rebalance;
 
-    // Summary cards
-    if (portfolio.success) {
-        const totalPnl = (portfolio.realized_pnl || 0) + (portfolio.unrealized_pnl || 0);
-        document.getElementById('total-pnl').className = `fs-4 fw-bold ${Trading.pnlClass(totalPnl)}`;
-        document.getElementById('total-pnl').textContent = Trading.formatINR(totalPnl);
-        document.getElementById('total-pnl-pct').className = `small ${Trading.pnlClass(totalPnl)}`;
-        document.getElementById('total-pnl-pct').textContent = Trading.formatPct(portfolio.total_pnl_pct || 0);
+    document.getElementById('updated_at').textContent = s.ledger_updated_at || '–';
+    document.getElementById('total_value').textContent = fmtINR(s.total_value);
+    document.getElementById('total_pnl').textContent = fmtINR(s.total_pnl);
+    document.getElementById('total_pnl').className = 'fs-4 fw-bold ' + cls(s.total_pnl);
+    document.getElementById('total_pct').textContent = fmtPct(s.total_pct);
+    document.getElementById('total_pct').className = 'small ' + cls(s.total_pct);
+    document.getElementById('start_cap').textContent = Number(s.starting_capital).toLocaleString('en-IN');
 
-        const wr = portfolio.win_rate || 0;
-        document.getElementById('win-rate').textContent = wr.toFixed(1) + '%';
-        document.getElementById('win-rate').className = `fs-4 fw-bold ${wr >= 50 ? 'text-success' : 'text-danger'}`;
-        document.getElementById('win-loss').textContent = `${portfolio.profitable_trades || 0}W / ${portfolio.loss_trades || 0}L`;
-
-        document.getElementById('active-count').textContent = portfolio.active_positions || 0;
-        document.getElementById('positions-value').textContent = Trading.formatINR(portfolio.positions_value);
-
-        document.getElementById('cash-available').textContent = Trading.formatINR(portfolio.cash_available);
-        document.getElementById('initial-capital').textContent = `of ${Trading.formatINR(portfolio.initial_capital)}`;
-    }
-
-    // Alerts
-    if (alerts.success && alerts.alerts && alerts.alerts.length > 0) {
-        document.getElementById('alerts-section').style.display = '';
-        document.getElementById('alerts-count').textContent = alerts.alerts.length;
-        const list = document.getElementById('alerts-list');
-        list.innerHTML = alerts.alerts.map(a => `
-            <div class="list-group-item d-flex justify-content-between align-items-center py-2">
-                <div>
-                    <i class="bi ${a.severity === 'danger' ? 'bi-exclamation-octagon-fill text-danger' : a.severity === 'success' ? 'bi-bullseye text-success' : 'bi-exclamation-triangle text-warning'} me-2"></i>
-                    <strong>${a.symbol}</strong> <span class="text-muted small">${a.message}</span>
-                </div>
-                <a href="/portfolio" class="btn btn-sm btn-outline-${a.severity}">View</a>
-            </div>
-        `).join('');
-    }
-
-    // Active positions table
-    if (positions.success) {
-        const tbody = document.getElementById('positions-tbody');
-        if (!positions.positions || positions.positions.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No active positions. <a href="/picks">Browse picks</a></td></tr>';
-        } else {
-            tbody.innerHTML = positions.positions.slice(0, 8).map(p => {
-                const pnlPct = p.unrealized_pnl_pct || 0;
-                const statusDot = pnlPct > 0 ? 'status-dot status-dot-profit' : pnlPct < 0 ? 'status-dot status-dot-loss' : 'status-dot status-dot-neutral';
-                return `<tr>
-                    <td class="fw-medium">${(p.symbol || '').replace('NSE:','').replace('-EQ','')}</td>
-                    <td class="text-end">${Trading.formatPrice(p.entry_price)}</td>
-                    <td class="text-end">${Trading.formatPrice(p.current_price)}</td>
-                    <td class="text-end ${Trading.pnlClass(pnlPct)}">${Trading.formatPct(pnlPct)}</td>
-                    <td class="text-center">${p.days_held || 0}</td>
-                    <td class="text-center"><span class="${statusDot}"></span></td>
-                </tr>`;
-            }).join('');
-        }
-    }
-
-    // Top picks
-    if (picks.success || picks.stocks) {
-        const stocks = picks.stocks || picks.data || [];
-        const container = document.getElementById('top-picks-container');
-        if (stocks.length === 0) {
-            container.innerHTML = '<div class="text-center text-muted py-4">No picks available today</div>';
-        } else {
-            container.innerHTML = stocks.slice(0, 3).map(s => {
-                const signal = Trading.getSignalStrength(s);
-                return `<div class="list-group-item border-0 border-bottom">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <strong>${s.symbol || s.stock_name || ''}</strong>
-                            <span class="badge ${signal.cls} ms-1">${signal.label}</span>
-                            <div class="small text-muted">${Trading.formatPrice(s.current_price)} &middot; Score: ${(s.selection_score || s.ema_trend_score || 0).toFixed(0)}</div>
-                        </div>
-                        <button class="btn btn-sm btn-success" onclick="quickPaperBuy('${s.symbol}')">
-                            <i class="bi bi-cart-plus"></i>
-                        </button>
-                    </div>
-                </div>`;
-            }).join('');
-        }
-    }
-
-    // Equity chart
-    loadEquityChart(30);
-}
-
-async function loadEquityChart(days) {
-    const data = await Trading.api(`/api/auto-trading/paper-trading/daily-pnl?days=${days}`);
-    if (equityChart) { equityChart.destroy(); equityChart = null; }
-
-    if (data.success && data.daily_pnl && data.daily_pnl.length > 0) {
-        const labels = data.daily_pnl.map(d => d.date);
-        const values = data.daily_pnl.map(d => (data.initial_capital || 100000) + d.pnl);
-        equityChart = Trading.createEquityChart('equity-chart', labels, values);
+    if (s.open_positions && s.open_positions.length > 0) {
+      const p = s.open_positions[0];
+      document.getElementById('held_symbol').textContent = p.symbol;
+      document.getElementById('held_value').textContent = fmtINR(p.market_value);
+      document.getElementById('holding_card').innerHTML = `
+        <div class="d-flex justify-content-between mb-2"><span class="text-muted">Symbol</span><strong>${p.symbol}</strong></div>
+        <div class="d-flex justify-content-between mb-2"><span class="text-muted">Qty</span><strong>${p.qty.toLocaleString('en-IN')}</strong></div>
+        <div class="d-flex justify-content-between mb-2"><span class="text-muted">Entry</span><strong>${fmtINR(p.entry_price)}</strong></div>
+        <div class="d-flex justify-content-between mb-2"><span class="text-muted">Live</span><strong>${fmtINR(p.live_price)}</strong></div>
+        <div class="d-flex justify-content-between mb-2"><span class="text-muted">Cost</span><strong>${fmtINR(p.cost)}</strong></div>
+        <div class="d-flex justify-content-between mb-2"><span class="text-muted">Market Value</span><strong>${fmtINR(p.market_value)}</strong></div>
+        <div class="d-flex justify-content-between mb-2"><span class="text-muted">Unrealized P&amp;L</span><strong class="${cls(p.unrealized_pnl)}">${fmtINR(p.unrealized_pnl)}</strong></div>
+        <div class="d-flex justify-content-between"><span class="text-muted">Return %</span><strong class="${cls(p.unrealized_pct)}">${fmtPct(p.unrealized_pct)}</strong></div>
+      `;
     } else {
-        const ctx = document.getElementById('equity-chart').getContext('2d');
-        ctx.font = '14px Inter';
-        ctx.fillStyle = '#94a3b8';
-        ctx.textAlign = 'center';
-        ctx.fillText('No data yet. Start paper trading to see your equity curve.', ctx.canvas.width / 2, ctx.canvas.height / 2);
+      document.getElementById('held_symbol').textContent = "None";
+      document.getElementById('held_value').textContent = "Cash only";
+      document.getElementById('holding_card').innerHTML = '<div class="text-muted text-center py-3">No open position</div>';
     }
+
+    document.getElementById('next_date').textContent = n.date;
+    document.getElementById('next_days').textContent = `in ${n.days_until}d (${n.weekday})`;
+
+    const held = new Set((s.open_positions||[]).map(p=>p.symbol));
+    const tbody = document.getElementById('picks_tbody');
+    if (!d.ranking || d.ranking.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No data — build N100 universe first</td></tr>';
+    } else {
+      tbody.innerHTML = d.ranking.slice(0,5).map((r,i) => `
+        <tr class="${held.has(r.symbol)?'row-held':''}">
+          <td>${i===0?'<span class="badge bg-warning text-dark">★ 1</span>':'#'+(i+1)}</td>
+          <td><strong>${r.symbol}</strong></td>
+          <td class="small text-muted">${r.name||''}</td>
+          <td class="text-end ${cls(r.return_60d)}">${fmtPct(r.return_60d)}</td>
+          <td class="text-end">${fmtINR(r.price)}</td>
+          <td>${held.has(r.symbol)?'<span class="badge bg-success">HELD</span>':''}</td>
+        </tr>
+      `).join('');
+    }
+  } catch(e) { console.error(e); }
 }
-
-function quickPaperBuy(symbol) {
-    const qty = prompt(`Buy how many shares of ${symbol}?`, '1');
-    if (!qty || isNaN(qty) || parseInt(qty) < 1) return;
-    Trading.paperBuy(symbol, qty).then(res => {
-        if (res.success) {
-            Trading.toast(`Bought ${qty} shares of ${symbol}`, 'success');
-            setTimeout(() => loadDashboard(), 1000);
-        } else {
-            Trading.toast(res.error || 'Order failed', 'danger');
-        }
-    });
-}
-
-// Period selector
-document.getElementById('period-selector').addEventListener('click', e => {
-    const btn = e.target.closest('button[data-days]');
-    if (!btn) return;
-    document.querySelectorAll('#period-selector button').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    loadEquityChart(parseInt(btn.dataset.days));
-});
-
-loadDashboard();
+load();
+setInterval(load, 30000);
 </script>
 {% endblock %}

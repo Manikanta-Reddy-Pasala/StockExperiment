@@ -82,66 +82,52 @@
         </div>
     </div>
 
-    <!-- Paper Trading Capital -->
+    <!-- Paper Trading Capital (locked) -->
     <div class="col-lg-6">
         <div class="card h-100">
             <div class="card-header"><i class="bi bi-piggy-bank me-2"></i>Paper Trading Capital</div>
             <div class="card-body">
                 <div class="mb-3">
-                    <label class="form-label small">Virtual Capital</label>
+                    <label class="form-label small">Virtual Capital (locked)</label>
                     <div class="input-group">
                         <span class="input-group-text">&#8377;</span>
-                        <input type="number" class="form-control" id="virtual-capital" value="100000" min="10000" step="10000">
+                        <input type="number" class="form-control" id="virtual-capital" value="1000000" readonly>
                     </div>
-                    <div class="form-text">Starting capital for paper trading simulations</div>
+                    <div class="form-text">Fixed at ₹10,00,000 for Momentum Rotation Model 3. Backtest 3-yr CAGR +86.93%/yr (realistic live 35-55% CAGR after costs).</div>
                 </div>
-                <div id="portfolio-summary" class="mb-3 small" style="display:none;">
-                    <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span class="text-muted">Current Value:</span> <strong id="port-value">--</strong></div>
-                    <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span class="text-muted">Active Positions:</span> <strong id="port-active">--</strong></div>
-                    <div class="d-flex justify-content-between"><span class="text-muted">Total P&L:</span> <strong id="port-pnl">--</strong></div>
+                <div id="momrot-summary" class="mb-2 small">
+                    <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span class="text-muted">Portfolio Value:</span> <strong id="mr-value">--</strong></div>
+                    <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span class="text-muted">Cash:</span> <strong id="mr-cash">--</strong></div>
+                    <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span class="text-muted">Open Position:</span> <strong id="mr-pos">--</strong></div>
+                    <div class="d-flex justify-content-between"><span class="text-muted">Total P&L:</span> <strong id="mr-pnl">--</strong></div>
                 </div>
-                <div class="d-flex gap-2">
-                    <button class="btn btn-primary btn-sm" onclick="saveCapital()"><i class="bi bi-check me-1"></i> Save</button>
-                    <button class="btn btn-outline-danger btn-sm" onclick="resetPortfolio()"><i class="bi bi-arrow-counterclockwise me-1"></i> Reset Portfolio</button>
-                </div>
+                <a href="/admin/momrot" class="btn btn-primary btn-sm"><i class="bi bi-graph-up-arrow me-1"></i> Open Momentum Rotation Dashboard</a>
             </div>
         </div>
     </div>
 
-    <!-- Auto-trading config -->
+    <!-- Rotation rules (replaces auto-trading) -->
     <div class="col-lg-6">
         <div class="card h-100">
-            <div class="card-header"><i class="bi bi-robot me-2"></i>Auto-Trading</div>
-            <div class="card-body">
-                <div class="form-check form-switch mb-2">
-                    <input class="form-check-input" type="checkbox" id="auto-enabled">
-                    <label class="form-check-label" for="auto-enabled">Enable Auto-Trading</label>
+            <div class="card-header"><i class="bi bi-arrow-repeat me-2"></i>Rotation Rules</div>
+            <div class="card-body small">
+                <div class="row g-2 mb-2">
+                    <div class="col-6"><span class="text-muted">Universe:</span> <strong>Pseudo-N100 by ADV</strong></div>
+                    <div class="col-6"><span class="text-muted">Top-N rank:</span> <strong>5</strong></div>
+                    <div class="col-6"><span class="text-muted">Max concurrent:</span> <strong>1</strong></div>
+                    <div class="col-6"><span class="text-muted">Lookback:</span> <strong>60 days</strong></div>
+                    <div class="col-6"><span class="text-muted">Rebalance:</span> <strong>1st weekday/mo</strong></div>
+                    <div class="col-6"><span class="text-muted">Stop loss:</span> <strong>None</strong></div>
+                    <div class="col-6"><span class="text-muted">Profit target:</span> <strong>None</strong></div>
+                    <div class="col-6"><span class="text-muted">Exit trigger:</span> <strong>Rank drop-out</strong></div>
                 </div>
-                <div id="auto-mode-note" class="alert alert-info small py-1 px-2 mb-3">
-                    <i class="bi bi-info-circle me-1"></i> <span id="auto-mode-text">In paper mode, auto-trading places simulated orders</span>
+                <div class="alert alert-warning py-1 px-2 small mb-2">
+                    Rotation runs automatically. No weekly/daily configurable limits — pure mechanical rule-based.
                 </div>
-                <div class="row g-3">
-                    <div class="col-6">
-                        <label class="form-label small">Max Weekly Amount</label>
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text">&#8377;</span>
-                            <input type="number" class="form-control" id="max-amount" value="10000" min="1000">
-                        </div>
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label small">Max Buys/Week</label>
-                        <input type="number" class="form-control form-control-sm" id="max-buys" value="5" min="1">
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label small">Execution Time</label>
-                        <input type="time" class="form-control form-control-sm" id="exec-time" value="09:20">
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label small">Min Confidence</label>
-                        <input type="number" class="form-control form-control-sm" id="min-confidence" value="0.7" min="0" max="1" step="0.05">
-                    </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button class="btn btn-outline-primary btn-sm" onclick="triggerForceRebalance()"><i class="bi bi-play-circle me-1"></i> Force Rebalance</button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="triggerUniverseRebuild()"><i class="bi bi-arrow-clockwise me-1"></i> Rebuild Universe</button>
                 </div>
-                <button class="btn btn-primary btn-sm mt-3" onclick="saveAutoTrading()"><i class="bi bi-check me-1"></i> Save Settings</button>
             </div>
         </div>
     </div>
@@ -149,16 +135,17 @@
     <!-- Strategy info -->
     <div class="col-lg-6">
         <div class="card h-100">
-            <div class="card-header"><i class="bi bi-info-circle me-2"></i>Strategy: EMA 200/400 1H Crossover</div>
+            <div class="card-header"><i class="bi bi-info-circle me-2"></i>Strategy: Monthly Momentum Rotation (Model 3)</div>
             <div class="card-body small">
                 <ul class="mb-0">
-                    <li><strong>Trend ID:</strong> EMA 200 crosses EMA 400 (above = BUY, below = SELL)</li>
-                    <li><strong>Entry 1:</strong> Break of EMA 200 retest candle (score 100)</li>
-                    <li><strong>Entry 2:</strong> Break of EMA 400 retest candle (score 90, pyramid)</li>
-                    <li><strong>Stop Loss:</strong> 1H close past EMA 400 (closes all entries)</li>
-                    <li><strong>Target:</strong> 5000 pts (index) / 1:3 RR (equity)</li>
-                    <li><strong>Timeframe:</strong> 1H bars (504 NSE Nifty 500)</li>
-                    <li><strong>Backtest:</strong> 31.6% WR, 2.77:1 R:R, +9429 net (Fyers, 720d)</li>
+                    <li><strong>Ranker:</strong> 60-day return descending across N100 universe</li>
+                    <li><strong>Universe:</strong> Top-100 NSE stocks by 20-day average daily value (ADV)</li>
+                    <li><strong>Selection:</strong> Hold rank-1 stock, max 1 concurrent position</li>
+                    <li><strong>Entry:</strong> 1st weekday of month (09:31 IST cron) — fresh rank vs current holding</li>
+                    <li><strong>Exit:</strong> If held stock drops out of top-5 next rebalance — SELL + BUY rank-1</li>
+                    <li><strong>No SL / No target:</strong> Pure ranking-driven exits</li>
+                    <li><strong>Backtest 2023-2026:</strong> +80.87% / +133.78% / +46.14% (avg +86.93%/yr, max DD 10.39%)</li>
+                    <li><strong>Realistic live:</strong> 35-55% CAGR after slippage + STT + STCG + brokerage</li>
                 </ul>
             </div>
         </div>
@@ -185,16 +172,8 @@ async function loadSettings() {
         updateModeUI();
     }
 
-    // Auto-trading settings
-    if (settings.success && settings.settings) {
-        const s = settings.settings;
-        document.getElementById('auto-enabled').checked = s.is_enabled;
-        document.getElementById('max-amount').value = s.max_amount_per_week;
-        document.getElementById('max-buys').value = s.max_buys_per_week;
-        document.getElementById('exec-time').value = s.execution_time || '09:20';
-        document.getElementById('min-confidence').value = s.minimum_confidence_score;
-        document.getElementById('virtual-capital').value = s.virtual_capital || 100000;
-    }
+    // Virtual capital is locked at ₹10L for momentum rotation
+    // (no auto-trading settings to load — replaced by rotation rules)
 
     // Fyers broker + token status
     if (fyers.success) {
@@ -241,15 +220,39 @@ async function loadSettings() {
         }
     }
 
-    // Portfolio summary
-    if (portfolio.success && portfolio.active_positions > 0) {
-        document.getElementById('portfolio-summary').style.display = '';
-        document.getElementById('port-value').textContent = Trading.formatINR(portfolio.current_capital);
-        document.getElementById('port-active').textContent = portfolio.active_positions;
-        const pnl = portfolio.total_pnl || 0;
-        document.getElementById('port-pnl').className = `fw-bold ${Trading.pnlClass(pnl)}`;
-        document.getElementById('port-pnl').textContent = Trading.formatINR(pnl);
-    }
+    // Momentum rotation summary
+    try {
+        const mrR = await fetch('/admin/momrot/state');
+        const mr = await mrR.json();
+        if (mr.success) {
+            const s = mr.data;
+            const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractionDigits:2});
+            const pnlCls = n => n>0?'text-success':(n<0?'text-danger':'text-muted');
+            document.getElementById('mr-value').textContent = fmtINR(s.total_value);
+            document.getElementById('mr-cash').textContent = fmtINR(s.cash);
+            document.getElementById('mr-pos').textContent = (s.open_positions && s.open_positions[0])
+                ? `${s.open_positions[0].symbol} (${s.open_positions[0].qty} @ ${fmtINR(s.open_positions[0].entry_price)})`
+                : 'None';
+            const pnlEl = document.getElementById('mr-pnl');
+            pnlEl.textContent = fmtINR(s.total_pnl) + ' (' + (s.total_pct>=0?'+':'') + s.total_pct.toFixed(2) + '%)';
+            pnlEl.className = pnlCls(s.total_pnl);
+        }
+    } catch(e) { console.error(e); }
+}
+
+async function triggerForceRebalance() {
+    if (!confirm('Force rebalance NOW (bypass first-week-of-month gate)?')) return;
+    const r = await fetch('/admin/momrot/run-now', {method:'POST'});
+    const d = await r.json();
+    alert(d.success ? 'Rebalance triggered. Refresh in 5s.' : 'Failed: ' + d.error);
+    setTimeout(loadSettings, 5000);
+}
+
+async function triggerUniverseRebuild() {
+    if (!confirm('Rebuild N100 universe (~30s)?')) return;
+    const r = await fetch('/admin/momrot/rebuild-universe', {method:'POST'});
+    const d = await r.json();
+    alert(d.success ? 'Universe rebuild triggered.' : 'Failed: ' + d.error);
 }
 
 function updateModeUI() {
