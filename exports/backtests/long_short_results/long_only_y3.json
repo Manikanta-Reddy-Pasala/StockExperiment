@@ -1,0 +1,14 @@
+{
+  "case_dir": "/app/exports/backtests/long_short/long_only_y3",
+  "events_total": 24,
+  "taken": 3,
+  "skipped": 9,
+  "closed_legs": 3,
+  "starting_capital": 1000000,
+  "final_equity": 840380.1,
+  "realized_pnl": -159619.9,
+  "roi_pct": -15.96,
+  "max_drawdown_pct": 15.96,
+  "open_long_end": 0,
+  "open_short_end": 0
+}

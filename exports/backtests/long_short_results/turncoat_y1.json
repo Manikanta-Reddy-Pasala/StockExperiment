@@ -1,0 +1,14 @@
+{
+  "case_dir": "/app/exports/backtests/long_short/turncoat_y1",
+  "events_total": 158,
+  "taken": 18,
+  "skipped": 61,
+  "closed_legs": 18,
+  "starting_capital": 1000000,
+  "final_equity": 1265393.87,
+  "realized_pnl": 265393.87,
+  "roi_pct": 26.54,
+  "max_drawdown_pct": 16.14,
+  "open_long_end": 0,
+  "open_short_end": 0
+}
