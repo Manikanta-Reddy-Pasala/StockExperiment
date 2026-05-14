@@ -118,16 +118,23 @@ def _return_60d(symbol: str) -> tuple:
 
 
 def _portfolio_state() -> Dict:
-    """Compute portfolio state from LIVE Fyers account (funds + holdings)."""
+    """Compute portfolio state from LIVE Fyers account (funds + holdings + CNC positions).
+
+    HFCL etc bought today via algo end up in POSITIONS (CNC, netQty>0) until
+    T+1 settlement, then move to HOLDINGS. We merge both.
+    """
     try:
         from src.services.brokers.fyers_service import FyersService
         svc = FyersService()
         funds_resp = svc.funds(1)
         holdings_resp = svc.holdings(1)
+        # Raw positions has more fields (buyAvg, netQty, pl) than standardized
+        positions_raw = svc._get_api_instance(1)._make_request("GET", "positions") or {}
     except Exception as e:
         logger.warning(f"Fyers fetch failed: {e}")
         funds_resp = {"data": {}}
         holdings_resp = {"data": []}
+        positions_raw = {"data": []}
 
     funds = (funds_resp or {}).get("data") or {}
     cash = float(funds.get("available_cash") or 0)
@@ -135,11 +142,14 @@ def _portfolio_state() -> Dict:
     utilized_margin = float(funds.get("utilized_margin") or 0)
 
     holdings = (holdings_resp or {}).get("data") or []
+    positions = (positions_raw or {}).get("data") or []
     open_positions = []
+    seen_syms = set()
     position_cost = 0.0
     market_value = 0.0
     unrealized_total = 0.0
 
+    # 1. Settled holdings (T+2+)
     for p in holdings:
         sym = (p.get("symbol") or "").replace("NSE:", "").replace("-EQ", "")
         qty = float(p.get("quantity") or 0)
@@ -153,6 +163,7 @@ def _portfolio_state() -> Dict:
         position_cost += cost
         market_value += mv
         unrealized_total += pnl
+        seen_syms.add(sym)
         open_positions.append({
             "symbol": sym,
             "qty": int(qty),
@@ -162,6 +173,39 @@ def _portfolio_state() -> Dict:
             "market_value": mv,
             "unrealized_pnl": pnl,
             "unrealized_pct": (ltp / avg - 1) * 100 if avg > 0 else 0,
+            "source": "holding",
+        })
+
+    # 2. CNC positions (intraday-bought, pending T+1 settlement)
+    for p in positions:
+        sym_full = p.get("symbol") or ""
+        sym = sym_full.replace("NSE:", "").replace("BSE:", "").replace("-EQ", "").replace("-B", "")
+        if p.get("productType") != "CNC":
+            continue
+        net_qty = float(p.get("netQty") or 0)
+        if net_qty <= 0:
+            continue
+        if sym in seen_syms:
+            continue  # already counted as holding
+        avg = float(p.get("buyAvg") or p.get("netAvg") or 0)
+        ltp = float(p.get("ltp") or 0)
+        pnl = float(p.get("unrealized_profit") or p.get("pl") or 0)
+        cost = avg * net_qty
+        mv = ltp * net_qty
+        position_cost += cost
+        market_value += mv
+        unrealized_total += pnl
+        seen_syms.add(sym)
+        open_positions.append({
+            "symbol": sym,
+            "qty": int(net_qty),
+            "entry_price": avg,
+            "live_price": ltp,
+            "cost": cost,
+            "market_value": mv,
+            "unrealized_pnl": pnl,
+            "unrealized_pct": (ltp / avg - 1) * 100 if avg > 0 else 0,
+            "source": "position",   # marker — T+1 pending
         })
 
     total_value = cash + market_value
@@ -363,17 +407,56 @@ def _fyers_available_cash(user_id: int = 1) -> float:
 
 
 def _fyers_holdings(user_id: int = 1) -> List[Dict]:
-    """Fetch active Fyers holdings (qty > 0)."""
+    """Fetch active Fyers holdings (settled + CNC pending T+1).
+
+    Merges holdings/ + positions/ (CNC, netQty>0) into a unified list with
+    standardized keys: symbol, quantity, average_price, last_price, pnl.
+    """
+    out = []
+    seen = set()
     try:
         from src.services.brokers.fyers_service import FyersService
         svc = FyersService()
+        api = svc._get_api_instance(user_id)
+
+        # Settled holdings
         h = svc.holdings(user_id) or {}
-        return [
-            p for p in (h.get("data") or [])
-            if float(p.get("quantity") or 0) > 0
-        ]
+        for p in (h.get("data") or []):
+            qty = float(p.get("quantity") or 0)
+            if qty <= 0:
+                continue
+            sym = (p.get("symbol") or "").replace("NSE:", "").replace("-EQ", "")
+            seen.add(sym)
+            out.append({
+                "symbol": p.get("symbol"),
+                "quantity": qty,
+                "average_price": p.get("average_price"),
+                "last_price": p.get("last_price"),
+                "pnl": p.get("pnl"),
+            })
+
+        # CNC positions pending T+1
+        pos_raw = api._make_request("GET", "positions") or {}
+        for p in (pos_raw.get("data") or []):
+            if p.get("productType") != "CNC":
+                continue
+            net_qty = float(p.get("netQty") or 0)
+            if net_qty <= 0:
+                continue
+            sym_full = p.get("symbol") or ""
+            sym = sym_full.replace("NSE:", "").replace("BSE:", "").replace("-EQ", "").replace("-B", "")
+            if sym in seen:
+                continue
+            out.append({
+                "symbol": sym_full,
+                "quantity": net_qty,
+                "average_price": str(p.get("buyAvg") or p.get("netAvg") or 0),
+                "last_price": str(p.get("ltp") or 0),
+                "pnl": str(p.get("unrealized_profit") or p.get("pl") or 0),
+            })
     except Exception:
-        return []
+        logger.exception("_fyers_holdings fail")
+    return out
 
 
 def _notify_tg(text: str) -> None:
