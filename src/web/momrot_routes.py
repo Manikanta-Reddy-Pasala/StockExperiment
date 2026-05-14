@@ -349,7 +349,35 @@ def api_next_rebalance():
 
 @momrot_bp.route("/history")
 def api_history():
-    return jsonify({"success": True, "trades": _read_history()})
+    """Trade history: Fyers tradebook (real trades) + local override file."""
+    trades = []
+    try:
+        from src.services.brokers.fyers_service import FyersService
+        svc = FyersService()
+        raw = svc._get_api_instance(1)._make_request("GET", "tradebook") or {}
+        for t in (raw.get("data") or []):
+            side = t.get("side")
+            trades.append({
+                "ts": t.get("orderDateTime", ""),
+                "symbol": (t.get("symbol") or "").replace("NSE:", "").replace("BSE:", "").replace("-EQ", "").replace("-B", ""),
+                "side": "BUY" if side == 1 else "SELL",
+                "qty_closed": int(t.get("tradedQty") or 0),
+                "entry_price": 0.0,                       # tradebook = single fill, no entry/exit pair
+                "exit_price": float(t.get("tradePrice") or 0),
+                "value": float(t.get("tradeValue") or 0),
+                "order_id": t.get("orderNumber", ""),
+                "trade_id": t.get("tradeNumber", ""),
+                "reason": "FYERS_FILL",
+                "pnl": 0.0,                               # tradebook doesn't compute realized; needs entry/exit pairing
+                "tag": t.get("orderTag", ""),
+            })
+    except Exception as e:
+        logger.warning(f"tradebook fetch fail: {e}")
+    # Merge local history file (paper or annotated trades)
+    trades.extend(_read_history())
+    # Sort newest first
+    trades.sort(key=lambda r: r.get("ts", ""), reverse=True)
+    return jsonify({"success": True, "trades": trades})
 
 
 @momrot_bp.route("/run-logs")
