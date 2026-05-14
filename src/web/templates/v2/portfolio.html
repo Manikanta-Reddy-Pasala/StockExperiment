@@ -147,9 +147,14 @@ async function sellNow(symbol, qty) {
     body: JSON.stringify({symbol, qty})
   });
   const d = await r.json();
-  await appModal.alert(d.success ? 'Order Placed' : 'Failed',
-    d.success ? `SELL placed: ${symbol} qty=${qty}` : ('Failed: ' + d.error),
-    d.success ? 'success' : 'danger');
+  if (d.success) {
+    const oid = d.order_id || '';
+    await appModal.alert('Order Placed',
+      `SELL placed: <strong>${symbol}</strong> qty=${qty}` + (oid ? `<br><code class="small">order_id: ${oid}</code>` : ''),
+      'success');
+  } else {
+    await appModal.alert('Order Failed', 'Fyers error: <strong>' + (d.error || 'unknown') + '</strong>', 'danger');
+  }
   setTimeout(() => { loadState(); loadPreview(); }, 3000);
 }
 
@@ -189,14 +194,28 @@ document.getElementById('btn_rebalance').addEventListener('click', async () => {
 
   const r = await fetch('/admin/momrot/run-now', {method:'POST'});
   const d = await r.json();
-  if (d.success) {
-    const lines = (d.actions || []).map(a =>
-      `<li><span class="badge bg-secondary">${a.action}</span> ${a.symbol||''} ${a.qty?('qty='+a.qty):''} ${a.reason?('('+a.reason+')'):''}</li>`).join('');
-    await appModal.alert('Rebalance Executed',
-      lines ? `<ul class="mb-0">${lines}</ul>` : 'No action',
-      'success');
+  const lines = (d.actions || []).map(a => {
+    const res = a.result || {};
+    const inner = res.result || {};
+    if (a.action === 'BUY_SKIP') {
+      return `<li><span class="badge bg-warning text-dark">SKIP</span> BUY ${a.symbol||''} <span class="text-muted small">${a.reason||''}</span></li>`;
+    }
+    if (res.ok) {
+      const oid = inner.orderid || inner.id || '';
+      return `<li><span class="badge bg-success">${a.action}</span> <strong>${a.symbol}</strong> qty=${a.qty} ${oid?('<code class=\"small\">'+oid+'</code>'):''}</li>`;
+    }
+    const err = inner.message || res.error || 'unknown';
+    return `<li><span class="badge bg-danger">${a.action} FAIL</span> ${a.symbol||''} qty=${a.qty||'-'} — <span class="text-danger small">${err}</span></li>`;
+  }).join('');
+  const body = lines ? `<ul class="mb-0">${lines}</ul>` : 'No action taken';
+  if (d.all_orders_ok) {
+    await appModal.alert('Rebalance Successful', body, 'success');
+  } else if (d.failures) {
+    await appModal.alert(`Rebalance: ${d.successes} ok, ${d.failures} failed`, body, 'danger');
+  } else if (d.success === false) {
+    await appModal.alert('Rebalance Failed', d.error || body, 'danger');
   } else {
-    await appModal.alert('Rebalance Failed', d.error, 'danger');
+    await appModal.alert('Rebalance Result', body, 'info');
   }
   setTimeout(() => { loadState(); loadPreview(); }, 3000);
 });
@@ -240,9 +259,14 @@ async function buyFlow(symOverride, priceOverride) {
     body: JSON.stringify({symbol: sym, qty})
   });
   const d = await r.json();
-  await appModal.alert(d.success ? 'Order Placed' : 'Failed',
-    d.success ? `BUY placed: <strong>${sym}</strong> qty=${qty}` : ('Error: ' + d.error),
-    d.success ? 'success' : 'danger');
+  if (d.success) {
+    const oid = d.order_id || ((d.result && d.result.result && (d.result.result.orderid || d.result.result.id)) || '');
+    await appModal.alert('Order Placed',
+      `BUY placed: <strong>${sym}</strong> qty=${qty}` + (oid ? `<br><code class="small">order_id: ${oid}</code>` : ''),
+      'success');
+  } else {
+    await appModal.alert('Order Failed', 'Fyers error: <strong>' + (d.error || 'unknown') + '</strong>', 'danger');
+  }
   setTimeout(() => { loadState(); loadPreview(); }, 3000);
 }
 

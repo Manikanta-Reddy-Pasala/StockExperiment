@@ -438,16 +438,41 @@ def api_run_now():
                 actions.append({"action": "BUY", "symbol": rank1["symbol"],
                                 "qty": qty, "price": price, "deploy": qty * price, "result": res})
 
-        # Telegram alert
+        # Aggregate success/fail
+        order_actions = [a for a in actions if a["action"] in ("BUY", "SELL")]
+        successes = [a for a in order_actions if a.get("result", {}).get("ok")]
+        failures = [a for a in order_actions if not a.get("result", {}).get("ok")]
+        all_ok = bool(order_actions) and not failures
+
+        # Telegram alert + UI message
         if actions:
             lines = ["🔴 *LIVE Rebalance*"]
             for a in actions:
-                lines.append(f"- {a['action']} {a.get('symbol','')} qty={a.get('qty','')}")
+                res = a.get("result", {})
+                if a["action"] == "BUY_SKIP":
+                    lines.append(f"- ⏭️ SKIP BUY {a.get('symbol','')} — {a.get('reason','')}")
+                elif res.get("ok"):
+                    order_id = (res.get("result") or {}).get("orderid") or (res.get("result") or {}).get("id") or ""
+                    lines.append(f"- ✅ {a['action']} {a.get('symbol','')} qty={a.get('qty','')} order_id=`{order_id}`")
+                else:
+                    err = (res.get("result") or {}).get("message") or res.get("error") or "unknown"
+                    lines.append(f"- ❌ {a['action']} {a.get('symbol','')} qty={a.get('qty','')} — {err}")
             _notify_tg("\n".join(lines))
         else:
             _notify_tg("ℹ️ Rebalance: no action needed (rank-1 already held)")
 
-        return jsonify({"success": True, "actions": actions, "rank1": rank1})
+        return jsonify({
+            "success": all_ok if order_actions else True,
+            "all_orders_ok": all_ok,
+            "successes": len(successes),
+            "failures": len(failures),
+            "error_summary": "; ".join(
+                ((a.get("result") or {}).get("result") or {}).get("message") or "unknown"
+                for a in failures
+            ) if failures else None,
+            "actions": actions,
+            "rank1": rank1,
+        })
     except Exception as e:
         logger.exception("run-now fail")
         _notify_tg(f"❌ Rebalance error: {e}")
@@ -484,9 +509,16 @@ def api_buy_now():
             return jsonify({"success": False, "error": f"qty<1 (cash ₹{cash:,.0f}, price ₹{price:.2f})"}), 400
 
         res = _fyers_place_market(symbol, qty, "BUY", user_id)
-        _notify_tg(f"🟢 *BUY* {symbol} qty={qty} @ ₹{price:.2f} (₹{qty*price:,.0f})")
-        return jsonify({"success": res["ok"], "symbol": symbol, "qty": qty,
-                        "price": price, "result": res})
+        if res.get("ok"):
+            order_id = (res.get("result") or {}).get("orderid") or (res.get("result") or {}).get("id") or ""
+            _notify_tg(f"✅ *BUY OK* {symbol} qty={qty} @ ₹{price:.2f} (₹{qty*price:,.0f}) order_id=`{order_id}`")
+            return jsonify({"success": True, "symbol": symbol, "qty": qty,
+                            "price": price, "order_id": order_id, "result": res})
+        else:
+            err = (res.get("result") or {}).get("message") or res.get("error") or "unknown error"
+            _notify_tg(f"❌ *BUY FAIL* {symbol} qty={qty} — {err}")
+            return jsonify({"success": False, "symbol": symbol, "qty": qty,
+                            "error": err, "result": res}), 400
     except Exception as e:
         logger.exception("buy-now fail")
         _notify_tg(f"❌ Buy error: {e}")
@@ -559,8 +591,16 @@ def api_sell_now():
             return jsonify({"success": False, "error": "symbol + qty required"}), 400
         qty = int(qty)
         res = _fyers_place_market(symbol, qty, "SELL", user_id)
-        _notify_tg(f"🔴 *SELL* {symbol} qty={qty}")
-        return jsonify({"success": res["ok"], "symbol": symbol, "qty": qty, "result": res})
+        if res.get("ok"):
+            order_id = (res.get("result") or {}).get("orderid") or (res.get("result") or {}).get("id") or ""
+            _notify_tg(f"✅ *SELL OK* {symbol} qty={qty} order_id=`{order_id}`")
+            return jsonify({"success": True, "symbol": symbol, "qty": qty,
+                            "order_id": order_id, "result": res})
+        else:
+            err = (res.get("result") or {}).get("message") or res.get("error") or "unknown error"
+            _notify_tg(f"❌ *SELL FAIL* {symbol} qty={qty} — {err}")
+            return jsonify({"success": False, "symbol": symbol, "qty": qty,
+                            "error": err, "result": res}), 400
     except Exception as e:
         logger.exception("sell-now fail")
         return jsonify({"success": False, "error": str(e)}), 500
