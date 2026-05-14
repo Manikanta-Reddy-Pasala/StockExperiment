@@ -228,7 +228,7 @@ async function buyFlow(symOverride, priceOverride) {
   const sym = symOverride || p.rank1.symbol;
   const price = priceOverride || p.rank1.price;
   const cash = p.current_cash;
-  const maxQty = Math.floor((cash * 0.985) / price);  // 1.5% buffer for brokerage/STT
+  const maxQty = Math.floor((cash * 0.995) / price);  // 0.5% buffer for brokerage/STT/GST
 
   if (maxQty < 1) {
     await appModal.alert('Insufficient Balance',

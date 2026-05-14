@@ -434,6 +434,20 @@ def _fyers_available_cash(user_id: int = 1) -> float:
         return 0.0
 
 
+def _fyers_live_ltp(symbol: str, user_id: int = 1) -> float:
+    """Fetch live LTP for a symbol via Fyers quotes API (real-time)."""
+    try:
+        from src.services.brokers.fyers_service import FyersService
+        svc = FyersService()
+        fyers_sym = symbol if symbol.startswith("NSE:") else f"NSE:{symbol}-EQ"
+        r = svc.quotes_multiple(user_id, [fyers_sym]) or {}
+        data = (r.get("data") or {})
+        q = data.get(fyers_sym) or {}
+        return float(q.get("ltp") or 0)
+    except Exception:
+        return 0.0
+
+
 def _fyers_holdings(user_id: int = 1) -> List[Dict]:
     """Fetch active Fyers holdings (settled + CNC pending T+1).
 
@@ -539,9 +553,11 @@ def api_run_now():
         # 2. Buy rank-1 if not already held
         if not already_in_top:
             cash = _fyers_available_cash(user_id)
-            price = rank1["price"]
-            # Leave 1.5% buffer for brokerage + STT + GST so margin doesn't fall short
-            usable = cash * 0.985
+            # Use LIVE Fyers LTP (not cached) so qty math reflects real fill price
+            live_ltp = _fyers_live_ltp(rank1["symbol"], user_id)
+            price = live_ltp if live_ltp > 0 else rank1["price"]
+            # 0.5% buffer for brokerage + STT + GST (delivery ~0.13% actual)
+            usable = cash * 0.995
             qty = int(usable // price) if price > 0 else 0
             if qty < 1:
                 actions.append({"action": "BUY_SKIP", "symbol": rank1["symbol"],
@@ -611,13 +627,17 @@ def api_buy_now():
         else:
             price = _live_price(symbol)
 
+        # Override `price` with live Fyers LTP for accurate qty
+        live_ltp = _fyers_live_ltp(symbol, user_id)
+        if live_ltp > 0:
+            price = live_ltp
         cash = _fyers_available_cash(user_id)
         qty = body.get("qty")
         if qty:
             qty = int(qty)
         else:
-            # 1.5% buffer for brokerage/STT
-            usable = cash * 0.985
+            # 0.5% buffer for brokerage/STT/GST
+            usable = cash * 0.995
             qty = int(usable // price) if price > 0 else 0
 
         if qty < 1:

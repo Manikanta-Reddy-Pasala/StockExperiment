@@ -337,7 +337,7 @@ document.getElementById('btn_buy_now').addEventListener('click', async () => {
   const p = await pr.json();
   if (!p.success) { await appModal.alert('Preview Failed', p.error, 'danger'); return; }
   const sym = p.rank1.symbol, price = p.rank1.price, cash = p.current_cash;
-  const maxQty = Math.floor((cash * 0.985) / price);  // 1.5% buffer for brokerage/STT
+  const maxQty = Math.floor((cash * 0.995) / price);  // 0.5% buffer
   if (maxQty < 1) {
     await appModal.alert('Insufficient Balance',
       `Available: <strong>${fmtINR(cash)}</strong><br>Need ≥ <strong>${fmtINR(price)}</strong>/share for <strong>${sym}</strong>.<br><br>Please refill Fyers account.`, 'danger');
