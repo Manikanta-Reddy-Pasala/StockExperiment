@@ -454,7 +454,7 @@ def api_run_now():
                 if a["action"] == "BUY_SKIP":
                     lines.append(f"- ⏭️ SKIP BUY {a.get('symbol','')} — {a.get('reason','')}")
                 elif res.get("ok"):
-                    order_id = (res.get("result") or {}).get("orderid") or (res.get("result") or {}).get("id") or ""
+                    order_id = ((res.get("result") or {}).get("data") or {}).get("orderid") or (res.get("result") or {}).get("orderid") or (res.get("result") or {}).get("id") or ""
                     lines.append(f"- ✅ {a['action']} {a.get('symbol','')} qty={a.get('qty','')} order_id=`{order_id}`")
                 else:
                     err = (res.get("result") or {}).get("message") or res.get("error") or "unknown"
@@ -514,7 +514,7 @@ def api_buy_now():
 
         res = _fyers_place_market(symbol, qty, "BUY", user_id)
         if res.get("ok"):
-            order_id = (res.get("result") or {}).get("orderid") or (res.get("result") or {}).get("id") or ""
+            order_id = ((res.get("result") or {}).get("data") or {}).get("orderid") or (res.get("result") or {}).get("orderid") or (res.get("result") or {}).get("id") or ""
             _notify_tg(f"✅ *BUY OK* {symbol} qty={qty} @ ₹{price:.2f} (₹{qty*price:,.0f}) order_id=`{order_id}`")
             return jsonify({"success": True, "symbol": symbol, "qty": qty,
                             "price": price, "order_id": order_id, "result": res})
@@ -596,7 +596,7 @@ def api_sell_now():
         qty = int(qty)
         res = _fyers_place_market(symbol, qty, "SELL", user_id)
         if res.get("ok"):
-            order_id = (res.get("result") or {}).get("orderid") or (res.get("result") or {}).get("id") or ""
+            order_id = ((res.get("result") or {}).get("data") or {}).get("orderid") or (res.get("result") or {}).get("orderid") or (res.get("result") or {}).get("id") or ""
             _notify_tg(f"✅ *SELL OK* {symbol} qty={qty} order_id=`{order_id}`")
             return jsonify({"success": True, "symbol": symbol, "qty": qty,
                             "order_id": order_id, "result": res})
