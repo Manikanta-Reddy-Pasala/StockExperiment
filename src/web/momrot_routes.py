@@ -279,9 +279,11 @@ def api_ranking():
     try:
         top = int(request.args.get("top", 10))
         ranking = _current_ranking(top)
-        # Also tag held symbols
-        ledger = _load_json(LEDGER_PATH, {"open": []})
-        held_syms = {p["symbol"] for p in ledger.get("open", [])}
+        # Tag held symbols from LIVE Fyers (not paper ledger)
+        held_syms = {
+            (p.get("symbol") or "").replace("NSE:", "").replace("-EQ", "")
+            for p in _fyers_holdings()
+        }
         for r in ranking:
             r["held"] = r["symbol"] in held_syms
         return jsonify({"success": True, "ranking": ranking})
