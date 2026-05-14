@@ -327,27 +327,27 @@ def api_run_logs():
 
 
 def _fyers_place_market(symbol: str, qty: int, side: str, user_id: int = 1) -> Dict:
-    """Place LIVE Fyers market order. Returns {ok, order_id, error}."""
+    """Place LIVE Fyers market order via standardized placeorder."""
     from src.services.brokers.fyers_service import FyersService
     fyers_sym = symbol if symbol.startswith("NSE:") else f"NSE:{symbol}-EQ"
-    payload = {
-        "symbol": fyers_sym,
-        "qty": int(qty),
-        "type": 2,                 # 2 = Market
-        "side": 1 if side == "BUY" else -1,
-        "productType": "CNC",      # delivery (equity)
-        "limitPrice": 0,
-        "stopPrice": 0,
-        "validity": "DAY",
-        "disclosedQty": 0,
-        "offlineOrder": False,
-    }
     svc = FyersService()
     try:
-        res = svc.place_order(user_id=user_id, order=payload)
-        return {"ok": res.get("status") in ("success", "ok"), "result": res}
+        res = svc.placeorder(
+            user_id=user_id,
+            symbol=fyers_sym,
+            quantity=str(int(qty)),
+            action=side,                # BUY or SELL
+            product="CNC",              # delivery
+            pricetype="MARKET",
+            price="0",
+            trigger_price="0",
+            validity="DAY",
+            tag="momrot",
+        )
+        ok = (res or {}).get("status") in ("success", "ok") or (res or {}).get("s") == "ok"
+        return {"ok": ok, "result": res}
     except Exception as e:
-        logger.exception(f"place_order fail {symbol}")
+        logger.exception(f"placeorder fail {symbol}")
         return {"ok": False, "error": str(e)}
 
 
