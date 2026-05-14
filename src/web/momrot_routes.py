@@ -429,7 +429,9 @@ def api_run_now():
         if not already_in_top:
             cash = _fyers_available_cash(user_id)
             price = rank1["price"]
-            qty = int(cash // price) if price > 0 else 0
+            # Leave 1.5% buffer for brokerage + STT + GST so margin doesn't fall short
+            usable = cash * 0.985
+            qty = int(usable // price) if price > 0 else 0
             if qty < 1:
                 actions.append({"action": "BUY_SKIP", "symbol": rank1["symbol"],
                                 "reason": f"insufficient cash ₹{cash:,.0f} for price ₹{price:.2f}"})
@@ -503,7 +505,9 @@ def api_buy_now():
         if qty:
             qty = int(qty)
         else:
-            qty = int(cash // price) if price > 0 else 0
+            # 1.5% buffer for brokerage/STT
+            usable = cash * 0.985
+            qty = int(usable // price) if price > 0 else 0
 
         if qty < 1:
             return jsonify({"success": False, "error": f"qty<1 (cash ₹{cash:,.0f}, price ₹{price:.2f})"}), 400

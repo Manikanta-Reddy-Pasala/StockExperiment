@@ -100,7 +100,7 @@ async function load() {
 async function buyNow(symbol, price) {
   const r1 = await fetch('/admin/momrot/state').then(r=>r.json());
   const cash = (r1.data && r1.data.cash) || 0;
-  const maxQty = Math.floor(cash / price);
+  const maxQty = Math.floor((cash * 0.985) / price);  // 1.5% buffer for brokerage/STT
 
   if (maxQty < 1) {
     await appModal.alert('Insufficient Balance',
