@@ -213,7 +213,7 @@ def _next_rebalance() -> Dict:
     return {"date": str(nxt), "days_until": days_to, "weekday": nxt.strftime("%A")}
 
 
-def _current_ranking(top: int = 10) -> List[Dict]:
+def _current_ranking(top: int = 10, live_prices: bool = True) -> List[Dict]:
     universe = _load_json(UNIVERSE_PATH, {"stocks": []}).get("stocks", [])
     rows = []
     for s in universe:
@@ -224,10 +224,37 @@ def _current_ranking(top: int = 10) -> List[Dict]:
                 "symbol": sym,
                 "name": s.get("name", sym),
                 "return_60d": ret,
-                "price": price,
+                "price": price,  # cached close, may be 1 day old
             })
     rows.sort(key=lambda r: -r["return_60d"])
-    return rows[:top]
+    top_rows = rows[:top]
+
+    # Enrich top-N with LIVE Fyers quotes — overrides cached close
+    if live_prices and top_rows:
+        try:
+            from src.services.brokers.fyers_service import FyersService
+            svc = FyersService()
+            fyers_syms = [f"NSE:{r['symbol']}-EQ" for r in top_rows]
+            q = svc.quotes_multiple(1, fyers_syms) or {}
+            quotes = (q.get("data") or {})
+            for r in top_rows:
+                key = f"NSE:{r['symbol']}-EQ"
+                qd = quotes.get(key)
+                if qd:
+                    ltp = float(qd.get("ltp") or 0)
+                    if ltp > 0:
+                        # recompute 60d return using live LTP
+                        if r["price"] > 0:
+                            past_price = r["price"] / (1 + r["return_60d"] / 100)
+                            r["return_60d"] = (ltp / past_price - 1) * 100 if past_price > 0 else r["return_60d"]
+                        r["price"] = ltp
+                        r["live"] = True
+        except Exception as e:
+            logger.warning(f"live quotes enrich fail: {e}")
+
+    # Re-sort after live update
+    top_rows.sort(key=lambda r: -r["return_60d"])
+    return top_rows
 
 
 # ---- Routes ---------------------------------------------------------------
