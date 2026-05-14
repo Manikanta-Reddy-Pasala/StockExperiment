@@ -38,7 +38,7 @@
       <div class="card mr-card p-3">
         <div class="mr-metric-sub">Total Portfolio Value</div>
         <div class="mr-metric" id="total_value">₹–</div>
-        <div class="small-mute">Started: ₹<span id="starting_capital">10,00,000</span></div>
+        <div class="small-mute">Invested: ₹<span id="starting_capital">--</span></div>
       </div>
     </div>
     <div class="col-md-3">
@@ -202,7 +202,7 @@ async function loadSummary() {
 
 function renderState(s) {
   document.getElementById('updated_at').textContent = s.ledger_updated_at || '–';
-  document.getElementById('starting_capital').textContent = Number(s.starting_capital).toLocaleString('en-IN');
+  document.getElementById('starting_capital').textContent = Number(s.position_cost || 0).toLocaleString('en-IN', {maximumFractionDigits: 2});
   document.getElementById('total_value').textContent = fmtINR(s.total_value);
   document.getElementById('total_pnl').textContent = fmtINR(s.total_pnl);
   document.getElementById('total_pnl').className = 'mr-metric ' + cls(s.total_pnl);

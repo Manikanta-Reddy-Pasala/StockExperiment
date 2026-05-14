@@ -537,13 +537,15 @@ class FyersAPI:
                 formatted_holdings = []
                 
                 for holding in holdings:
-                    # Fyers field is 'quantity' (not 'qty'). Fallback to remainingQuantity.
-                    qty = holding.get('quantity')
-                    if qty is None:
-                        qty = holding.get('remainingQuantity', 0)
+                    # remainingQuantity = actual sellable qty after T+1 settlements
+                    # quantity = total demat qty (may include just-sold-pending-debit)
+                    rem = holding.get('remainingQuantity')
+                    qty_field = holding.get('quantity', 0)
+                    qty = rem if rem is not None else qty_field
                     formatted_holding = {
                         'symbol': holding.get('symbol', ''),
                         'quantity': str(qty or 0),
+                        'remaining_quantity': str(rem if rem is not None else qty_field),
                         'average_price': str(holding.get('costPrice', 0)),
                         'last_price': str(holding.get('ltp', 0)),
                         'pnl': str(holding.get('pl', 0)),
