@@ -20,27 +20,47 @@ from urllib import parse, request
 API_BASE = "https://api.telegram.org"
 
 
-def send(text: str, parse_mode: str = "Markdown",
-         token: str = None, chat_id: str = None) -> dict:
-    token = token or os.environ.get("TG_BOT_TOKEN", "")
-    chat_id = chat_id or os.environ.get("TG_CHAT_ID", "")
-    if not token or not chat_id:
-        return {"ok": False, "error": "TG_BOT_TOKEN or TG_CHAT_ID not set"}
-
+def _post(token: str, chat_id: str, text: str, parse_mode: str = None) -> dict:
     url = f"{API_BASE}/bot{token}/sendMessage"
-    data = parse.urlencode({
+    payload = {
         "chat_id": chat_id,
-        "text": text[:4000],   # Telegram limit
-        "parse_mode": parse_mode,
+        "text": text[:4000],
         "disable_web_page_preview": "true",
-    }).encode()
+    }
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
+    data = parse.urlencode(payload).encode()
     try:
         req = request.Request(url, data=data, method="POST")
         with request.urlopen(req, timeout=10) as r:
             import json
             return json.loads(r.read().decode())
     except Exception as e:
-        return {"ok": False, "error": str(e)}
+        # On 400 (Markdown parse error etc), surface body
+        import json
+        try:
+            body = e.read().decode() if hasattr(e, "read") else ""
+        except Exception:
+            body = ""
+        return {"ok": False, "error": str(e), "body": body}
+
+
+def send(text: str, parse_mode: str = "Markdown",
+         token: str = None, chat_id: str = None) -> dict:
+    """Send Telegram message. On Markdown parse failure, retry as plain text."""
+    token = token or os.environ.get("TG_BOT_TOKEN", "")
+    chat_id = chat_id or os.environ.get("TG_CHAT_ID", "")
+    if not token or not chat_id:
+        return {"ok": False, "error": "TG_BOT_TOKEN or TG_CHAT_ID not set"}
+
+    res = _post(token, chat_id, text, parse_mode=parse_mode)
+    if not res.get("ok") and parse_mode:
+        # Likely a Markdown parse error — retry as plain text
+        res2 = _post(token, chat_id, text, parse_mode=None)
+        if res2.get("ok"):
+            return res2
+        return res
+    return res
 
 
 def main():
