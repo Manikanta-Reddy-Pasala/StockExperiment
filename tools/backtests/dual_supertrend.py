@@ -564,6 +564,21 @@ def run() -> Dict:
     }
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+    # Export executed-trade list with full detail
+    trades_dump = []
+    for p in exec_trades:
+        trades_dump.append({
+            "symbol": p.symbol,
+            "entry_date": str(p.entry_date.date() if hasattr(p.entry_date, "date") else p.entry_date),
+            "exit_date": str(p.exit_date.date() if hasattr(p.exit_date, "date") else p.exit_date),
+            "entry_px": float(p.entry_px),
+            "exit_px": float(p.exit_px),
+            "shares": int(getattr(p, "shares", 0) or 0),
+            "deploy": float(getattr(p, "deploy", 0) or (getattr(p, "shares", 0) or 0) * float(p.entry_px)),
+            "pnl_pct": (p.exit_px / p.entry_px - 1.0 - COST_RT) * 100,
+            "hold_days": (p.exit_date - p.entry_date).days,
+        })
+
     out = {
         "config": {
             "start": START_DATE,
@@ -577,6 +592,7 @@ def run() -> Dict:
         },
         "overall": overall,
         "annual": annual,
+        "executed_trades": trades_dump,
         "top10_by_pnl": per_stock_stats[:10],
         "bottom10_by_pnl": per_stock_stats[-10:],
         "all_per_stock": per_stock_stats,
