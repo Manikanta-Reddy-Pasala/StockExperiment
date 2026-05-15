@@ -223,8 +223,11 @@ class FyersTokenRefreshService:
             bearer_token = r3.json()["data"]["access_token"]
 
             # Step 4: Get authorization code (v3 endpoint)
-            app_id = client_id.split("-")[0] if "-" in client_id else client_id
-            logger.info(f"Tier 2 Step 4: Getting auth code...")
+            # Parse client_id format <APP_ID>-<APPTYPE> e.g. M10LT1T9EH-200
+            parts = client_id.split("-")
+            app_id = parts[0]
+            app_type = parts[1] if len(parts) > 1 else "100"
+            logger.info(f"Tier 2 Step 4: Getting auth code (app_id={app_id} appType={app_type})...")
             r4 = s.post(
                 "https://api-t1.fyers.in/api/v3/token",
                 headers={
@@ -235,7 +238,7 @@ class FyersTokenRefreshService:
                     "fyers_id": login_id,
                     "app_id": app_id,
                     "redirect_uri": redirect_uri,
-                    "appType": "100",
+                    "appType": app_type,
                     "code_challenge": "",
                     "state": "None",
                     "scope": "",
