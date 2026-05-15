@@ -175,27 +175,33 @@ class FyersTokenRefreshService:
         try:
             # Step 1: Send login OTP
             fy_id_b64 = base64.b64encode(login_id.encode()).decode()
-            logger.info(f"Tier 2 Step 1: Sending login OTP for user {user_id}...")
+            logger.info(f"Tier 2 Step 1 REQ: fy_id_b64={fy_id_b64[:8]}... raw={login_id} app_id=2")
             r1 = s.post(
                 "https://api-t2.fyers.in/vagator/v2/send_login_otp_v2",
                 json={"fy_id": fy_id_b64, "app_id": "2"},
                 timeout=30
             )
+            logger.info(f"Tier 2 Step 1 RESP: status={r1.status_code} body={r1.text}")
             if r1.status_code != 200 or r1.json().get('s') == 'error':
-                logger.error(f"Step 1 failed: {r1.status_code} {r1.text[:200]}")
+                logger.error(f"Step 1 failed: {r1.status_code} {r1.text[:300]}")
                 return None
             request_key = r1.json()["request_key"]
 
-            # Step 2: Verify OTP using TOTP
+            # Step 2: Verify TOTP — try multiple variants to find which Fyers accepts
             otp_code = _generate_totp(totp_key)
-            logger.info(f"Tier 2 Step 2: Verifying TOTP...")
+            logger.info(f"Tier 2 Step 2 REQ: request_key={request_key[:12]}... otp={otp_code}")
+
+            # Variant A: original (int otp)
             r2 = s.post(
                 "https://api-t2.fyers.in/vagator/v2/verify_otp",
                 json={"request_key": request_key, "otp": int(otp_code)},
                 timeout=30
             )
-            if r2.status_code != 200:
-                logger.error(f"Step 2 failed: {r2.status_code} {r2.text[:200]}")
+            logger.info(f"Tier 2 Step 2 RESP variant_A: status={r2.status_code} body={r2.text}")
+
+            if r2.status_code != 200 or r2.json().get('s') == 'error':
+                # Don't burn more retries — return diagnostic info
+                logger.error(f"Step 2 failed: {r2.status_code} {r2.text[:300]}")
                 return None
             request_key = r2.json()["request_key"]
 

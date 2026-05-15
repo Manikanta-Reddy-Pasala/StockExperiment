@@ -18,30 +18,55 @@
   <div class="small text-muted">Updated: <span id="updated_at">–</span></div>
 </div>
 
-<!-- Summary cards -->
+<!-- Summary cards: NAV, Invested, Market Value, Wallet -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-lg-3">
     <div class="card summary-card h-100"><div class="card-body py-3 text-center">
-      <div class="text-muted small mb-1">Portfolio Value</div>
+      <div class="text-muted small mb-1">Total NAV</div>
       <div id="total_value" class="fs-4 fw-bold">--</div>
-      <div class="small text-muted">Invested ₹<span id="start_cap">--</span></div>
+      <div class="small text-muted">cash + holdings</div>
     </div></div>
   </div>
   <div class="col-6 col-lg-3">
+    <div class="card summary-card h-100"><div class="card-body py-3 text-center">
+      <div class="text-muted small mb-1">Invested</div>
+      <div id="invested" class="fs-4 fw-bold">--</div>
+      <div class="small text-muted">cost basis</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card summary-card h-100"><div class="card-body py-3 text-center">
+      <div class="text-muted small mb-1">Market Value</div>
+      <div id="market_value" class="fs-4 fw-bold">--</div>
+      <div class="small text-muted">live price × qty</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card summary-card h-100"><div class="card-body py-3 text-center">
+      <div class="text-muted small mb-1">Wallet (Cash)</div>
+      <div id="wallet" class="fs-4 fw-bold">--</div>
+      <div class="small text-muted">Fyers available_cash</div>
+    </div></div>
+  </div>
+</div>
+
+<!-- P&L + Open Position + Next Rebalance row -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-4">
     <div class="card summary-card h-100"><div class="card-body py-3 text-center">
       <div class="text-muted small mb-1">Total P&amp;L</div>
       <div id="total_pnl" class="fs-4 fw-bold">--</div>
       <div id="total_pct" class="small">--</div>
     </div></div>
   </div>
-  <div class="col-6 col-lg-3">
+  <div class="col-6 col-lg-4">
     <div class="card summary-card h-100"><div class="card-body py-3 text-center">
       <div class="text-muted small mb-1">Open Position</div>
       <div id="held_symbol" class="fs-4 fw-bold">--</div>
       <div id="held_value" class="small text-muted">--</div>
     </div></div>
   </div>
-  <div class="col-6 col-lg-3">
+  <div class="col-6 col-lg-4">
     <div class="card summary-card h-100"><div class="card-body py-3 text-center">
       <div class="text-muted small mb-1">Next Rebalance</div>
       <div id="next_date" class="fs-4 fw-bold">--</div>
@@ -92,11 +117,13 @@ async function load() {
 
     document.getElementById('updated_at').textContent = s.ledger_updated_at || '–';
     document.getElementById('total_value').textContent = fmtINR(s.total_value);
+    document.getElementById('invested').textContent = fmtINR(s.position_cost || 0);
+    document.getElementById('market_value').textContent = fmtINR(s.market_value || 0);
+    document.getElementById('wallet').textContent = fmtINR(s.cash || 0);
     document.getElementById('total_pnl').textContent = fmtINR(s.total_pnl);
     document.getElementById('total_pnl').className = 'fs-4 fw-bold ' + cls(s.total_pnl);
     document.getElementById('total_pct').textContent = fmtPct(s.total_pct);
     document.getElementById('total_pct').className = 'small ' + cls(s.total_pct);
-    document.getElementById('start_cap').textContent = Number(s.position_cost || 0).toLocaleString('en-IN', {maximumFractionDigits: 2});
 
     if (s.open_positions && s.open_positions.length > 0) {
       const p = s.open_positions[0];

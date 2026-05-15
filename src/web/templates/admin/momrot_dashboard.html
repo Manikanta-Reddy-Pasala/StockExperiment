@@ -36,29 +36,47 @@
   <div class="row g-3 mb-4">
     <div class="col-md-3">
       <div class="card mr-card p-3">
-        <div class="mr-metric-sub">Total Portfolio Value</div>
+        <div class="mr-metric-sub">Total NAV</div>
         <div class="mr-metric" id="total_value">₹–</div>
-        <div class="small-mute">Invested: ₹<span id="starting_capital">--</span></div>
+        <div class="small-mute">cash + holdings</div>
       </div>
     </div>
     <div class="col-md-3">
       <div class="card mr-card p-3">
-        <div class="mr-metric-sub">Total P&amp;L</div>
-        <div class="mr-metric" id="total_pnl">₹–</div>
-        <div class="small-mute"><span id="total_pct">–</span>%</div>
+        <div class="mr-metric-sub">Invested</div>
+        <div class="mr-metric neutral" id="starting_capital">₹--</div>
+        <div class="small-mute">cost basis</div>
       </div>
     </div>
     <div class="col-md-3">
       <div class="card mr-card p-3">
         <div class="mr-metric-sub">Market Value</div>
         <div class="mr-metric neutral" id="market_value">₹–</div>
-        <div class="small-mute">Unrealized: <span id="unrealized_pnl">–</span></div>
+        <div class="small-mute">live price × qty</div>
       </div>
     </div>
     <div class="col-md-3">
       <div class="card mr-card p-3">
-        <div class="mr-metric-sub">Cash</div>
+        <div class="mr-metric-sub">Wallet (Cash)</div>
         <div class="mr-metric neutral" id="cash">₹–</div>
+        <div class="small-mute">Fyers available</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- P&L row -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-6">
+      <div class="card mr-card p-3">
+        <div class="mr-metric-sub">Total P&amp;L</div>
+        <div class="mr-metric" id="total_pnl">₹–</div>
+        <div class="small-mute"><span id="total_pct">–</span>%</div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card mr-card p-3">
+        <div class="mr-metric-sub">Unrealized / Realized</div>
+        <div class="mr-metric neutral" id="unrealized_pnl">₹–</div>
         <div class="small-mute">Realized: <span id="realized_pnl">–</span></div>
       </div>
     </div>
@@ -202,7 +220,7 @@ async function loadSummary() {
 
 function renderState(s) {
   document.getElementById('updated_at').textContent = s.ledger_updated_at || '–';
-  document.getElementById('starting_capital').textContent = Number(s.position_cost || 0).toLocaleString('en-IN', {maximumFractionDigits: 2});
+  document.getElementById('starting_capital').textContent = fmtINR(s.position_cost || 0);
   document.getElementById('total_value').textContent = fmtINR(s.total_value);
   document.getElementById('total_pnl').textContent = fmtINR(s.total_pnl);
   document.getElementById('total_pnl').className = 'mr-metric ' + cls(s.total_pnl);
