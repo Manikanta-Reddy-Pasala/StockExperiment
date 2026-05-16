@@ -225,7 +225,7 @@ def trigger_pipeline():
 
     thread = threading.Thread(
         target=run_function_async,
-        args=(task_id, run_pipeline, 'Data Pipeline (6-step saga)')
+        args=(task_id, run_pipeline, 'Data Pipeline (4-step saga)')
     )
     thread.start()
 

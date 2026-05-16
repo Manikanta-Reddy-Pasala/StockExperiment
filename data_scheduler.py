@@ -80,7 +80,7 @@ def _run_subprocess_with_retry(cmd: list, label: str, timeout: int = 3600, max_r
 def run_data_pipeline():
     """Run complete data pipeline (Daily at 9:00 PM after market close)."""
     logger.info("=" * 80)
-    logger.info("Starting Data Pipeline (6-Step Saga)")
+    logger.info("Starting Data Pipeline (4-Step Saga)")
     logger.info("=" * 80)
     _run_subprocess_with_retry(['python3', 'run_pipeline.py'], 'Data Pipeline', timeout=3600, max_retries=2)
 
@@ -320,7 +320,7 @@ def run_scheduler():
     logger.info("Scheduled Tasks:")
     logger.info("  - Symbol Master Update:    Weekly (Monday) at 06:00 AM")
     logger.info("  - Per-model data jobs registered below")
-    logger.info("  - Data Pipeline (6 steps): Daily at 09:00 PM (after market close)")
+    logger.info("  - Data Pipeline (4 steps): Daily at 09:00 PM (after market close)")
     logger.info("  - CSV Export:              Daily at 10:00 PM")
     logger.info("  - Data Quality Check:      Daily at 10:00 PM (parallel with CSV)")
     logger.info("=" * 80)
@@ -339,7 +339,7 @@ def run_scheduler():
     register_momentum_n100_data(schedule)
     register_finnifty_ic_data(schedule)
 
-    # Legacy 6-step saga (kept for admin UI compat — populates technical_indicators,
+    # Legacy 4-step saga (kept for admin UI compat — populates technical_indicators,
     # stocks.market_cap/PE/PB/ROE used by /admin and /suggested-stocks dashboards).
     # Model 3 needs only step 3 (HISTORICAL_DATA), which is also covered by the
     # per-model data_pull above as a fallback.
