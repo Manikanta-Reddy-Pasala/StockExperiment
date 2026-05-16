@@ -59,6 +59,8 @@ def ensure_models_seeded() -> None:
                 allocated_capital=Decimal(m["default_capital"]),
                 description=m["description"],
             ))
+            # Flush so settings row exists before ledger FK
+            s.flush()
             s.add(ModelLedger(
                 model_name=m["name"],
                 cash=Decimal(m["default_capital"]),
@@ -67,6 +69,7 @@ def ensure_models_seeded() -> None:
                 wins=0,
                 losses=0,
             ))
+            s.flush()
             log.info(f"Seeded ledger for {m['name']} cap={m['default_capital']}")
 
 
