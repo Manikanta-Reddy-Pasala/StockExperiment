@@ -1,6 +1,20 @@
 # momentum_n100_top5_max1
 
+**Category: LARGE-CAP equity (real NSE Nifty 100 constituents)**
+
 Monthly momentum rotation on **REAL NIFTY 100** (NSE constituents). **Production model** — backtest universe matches live universe (no methodology drift).
+
+## Stock universe
+
+| Source | NSE archives `ind_nifty100list.csv` |
+|---|---|
+| Cached at | `src/data/symbols/nifty100.csv` (104 stocks, includes some -EQ alternates) |
+| Refresh script | `python tools/refresh_nifty100.py` (NSE rebalances Mar/Sep) |
+| Selection | All 104 stocks → strategy ranks by 30d return → picks top-1 |
+
+**No filtering**: takes the entire official Nifty 100 list as-is. NSE already curates the constituents (top-100 by free-float market cap, large-cap by definition).
+
+Real Nifty 100 contains: HDFCBANK, RELIANCE, ICICIBANK, TCS, INFY, BHARTIARTL, SBIN, BAJFINANCE, LICI, HINDUNILVR, ITC, LT, KOTAKBANK, AXISBANK, MARUTI, M&M, SUNPHARMA, TITAN, ASIANPAINT, ADANIENT, ADANIPORTS, NTPC, ULTRACEMCO, HCLTECH, COALINDIA, NESTLEIND, POWERGRID, BAJAJFINSV, BEL, HAL, JSWSTEEL, TATAMOTORS, TATASTEEL, BAJAJ-AUTO, EICHERMOT, HEROMOTOCO, NDPS, DABUR, MARICO, etc. — all genuine large-cap names.
 
 ## Strategy
 

@@ -1,5 +1,18 @@
 # finnifty_ic_otm4_w300_lots5
 
+**Category: OPTIONS (FINNIFTY index derivatives, defined-risk Iron Condor)**
+
+## Stock universe
+
+No equity stock list — strategy operates on **FINNIFTY index option chain** (Nifty Financial Services Index futures + options). Universe per cycle = 4 specific strikes derived from spot price each Monday:
+
+- 1 short CE at +4% OTM (rounded to nearest 50-pt strike)
+- 1 short PE at -4% OTM
+- 1 long CE wing at +300 points further (cap upside risk)
+- 1 long PE wing at -300 points further (cap downside risk)
+
+Strike chain auto-selected per Monday from `historical_options` DB table (~1.16M bars pre-fetched from NSE bhav).
+
 ## Strategy
 
 FINNIFTY (Nifty Financial Services Index) monthly Iron Condor.
