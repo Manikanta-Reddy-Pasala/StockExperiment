@@ -8,9 +8,15 @@ scheduler, and docs. Models slot into the main schedulers via a uniform
 
 | Model | Type | Wired? | CAGR | Max DD |
 |---|---|---|---:|---:|
-| `momentum_n100_top5_max1` | Equity monthly rotation N100 | ✅ data + signal + execute | +83.5% | -49% |
-| `midcap_narrow_60d_breakout` | Equity 60-day high swing | ✅ data + signal (exec unwired) | +121.66% | -20.43% |
+| `momentum_n100_top5_max1` | Equity monthly rotation, real NSE Nifty 100 (LIVE) | ✅ data + signal + execute | +80.38% | -29.71% |
 | `finnifty_ic_otm4_w300_lots5` | Option Iron Condor (aggressive) | ✅ data + signal (exec unwired) | +337%/yr | **-13.88%** |
+
+## Removed/archived
+
+- `midcap_narrow_60d_breakout` — strategy broken on real Nifty Midcap 150 (-18.18% CAGR honest, only worked with lookahead pseudo-midcap universe). Deleted 2026-05-17.
+- `momentum_n150_top1` — N100 dominates on every metric. Deleted 2026-05-17.
+- `momentum_n500_top1` — wider universe surfaces speculation pumps, +2.17% CAGR. Deleted 2026-05-17.
+- `n20_daily_30d_mc1_uptrend` — daily-rebalance sweep winner +157% but 50% DD; superseded by monthly N100 (+80% / 30% DD). Deleted 2026-05-17.
 
 ## Per-model folder layout
 
