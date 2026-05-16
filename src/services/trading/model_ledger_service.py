@@ -38,6 +38,11 @@ KNOWN_MODELS = [
         "default_capital": 0,
         "description": "Equity 60d-high swing on midcap_narrow (event-driven)",
     },
+    {
+        "name": "finnifty_ic_otm4_w300_lots5",
+        "default_capital": 0,
+        "description": "FinNifty monthly Iron Condor — OTM 4% / wings 300pt / 5 lots",
+    },
 ]
 
 

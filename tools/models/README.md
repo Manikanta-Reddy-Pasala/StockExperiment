@@ -11,7 +11,6 @@ scheduler, and docs. Models slot into the main schedulers via a uniform
 | `momentum_n100_top5_max1` | Equity monthly rotation N100 | ✅ data + signal + execute | +83.5% | -49% |
 | `midcap_narrow_60d_breakout` | Equity 60-day high swing | ✅ data + signal (exec unwired) | +121.66% | -20.43% |
 | `finnifty_ic_otm4_w300_lots5` | Option Iron Condor (aggressive) | ✅ data + signal (exec unwired) | +337%/yr | **-13.88%** |
-| `finnifty_ic_otm3_w500_lots4` | Option Iron Condor (balanced) | ✅ data + signal (exec unwired) | +193%/yr | **-9.70%** |
 
 ## Per-model folder layout
 
@@ -53,7 +52,6 @@ Results land in `exports/models/<name>/`.
 | `momentum_n100_top5_max1` | ✅ N50+N500 close | — | — | monthly N100 universe refresh |
 | `midcap_narrow_60d_breakout` | ✅ midcap_narrow OHLCV | — | — | midcap_narrow universe (~100 names) |
 | `finnifty_ic_otm4_w300_lots5` | — | ✅ NIFTY50/BN/FN | ✅ NIFTY/BN/FN OPTIDX | — |
-| `finnifty_ic_otm3_w500_lots4` | — | ✅ FN spot | ✅ FN OPTIDX | shares data with otm4_w300 |
 
 ## Saga pipeline (data_scheduler 21:00 daily, admin trigger button)
 
