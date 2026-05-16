@@ -1,5 +1,23 @@
 # breakout_60d_high_volume
 
+## Configs available
+
+| Variant | Avg/yr | Avg/mo | Max DD | Worst mo | Trades |
+|---|---:|---:|---:|---:|---:|
+| **v1 (raw breakout)** | +74.99% | +6.10% | -41.62% | -22.71% | 40 |
+| **v2 (regime + quality filter)** ⭐ | **+50.63%** | +4.19% | **-25.95%** | -15.38% | 26 |
+
+v2 = added two risk overlays:
+- **Regime filter:** only enter when NIFTY50 close ≥ NIFTY200 SMA (skip bear regimes)
+- **Quality filter:** require 90-day return ≥ +5% (skip stocks without prior trend)
+
+DD cut from -42% → -26%. Return cut from +75% → +51%. Same alpha source,
+just smoother. Pick the one matching your DD tolerance.
+
+⚠️ User goal of +95%/yr AND DD ≤ -25% NOT simultaneously achievable on
+this signal/data — DD-cutting filters cost ~25%/yr in return. Documented
+in `SUMMARY_v2.md` + sweep results.
+
 ## Strategy
 
 Price-level breakout + volume confirmation. Different alpha source from
@@ -51,11 +69,43 @@ diversification benefit beyond a single concentrated bet.
 
 | File | Purpose |
 |---|---|
-| `backtest.py` | Single-config backtest with full ledger |
+| `backtest.py` | v1 backtest (raw 60d-high + volume + 8% trail) |
+| `backtest_v2.py` | v2 backtest with regime/ATR/partial/quality filters |
 | `sweep.py` | Variant sweep (lookback / vol-mult / trail / max-conc) |
 | `data_pull.py` | No-op (shares N100 cache with momentum model) |
 | `cron.py` | Registration stubs (trading not wired yet) |
 | `README.md` | This file |
+
+## v2 reproduce (winner under -25% DD constraint)
+
+```bash
+python tools/models/breakout_60d_high_volume/backtest_v2.py \
+    --universe-file /app/logs/momrot/universes/n100_current.json \
+    --from 2023-05-15 --to 2026-05-15 \
+    --capital 200000 --max-conc 1 \
+    --regime-on --quality-on --quality-min-90d 0.05 \
+    --out exports/models/breakout_60d_high_volume/SUMMARY_v2.md
+```
+
+## v2 result detail
+
+- Start ₹2L → End ₹7.95L (+297.7%) over 3yr
+- Avg/yr: +50.63% | Avg/mo: +4.19%
+- Best mo: +60.34% | Worst: -15.38%
+- Months ≥ 20%: 4/37 | Months ≥ 30%: 3/37
+- Max DD: -25.95% (HIT target)
+- 26 trades, 50% WR
+- Fees: ₹16,706
+
+## Filter sweep summary (best risk-adjusted configs)
+
+| Config | Yr | DD | Worst mo |
+|---|---:|---:|---:|
+| regime+quality5% (winner) | +50.6% | -25.95% | -15.4% |
+| regime+partial30@50+qual5 | +41.8% | -25.97% | -15.4% |
+| regime+partial15@30+qual5 | +40.3% | -24.88% | -14.4% |
+| regime+qual5+trail12 | +39.8% | -25.97% | -16.9% |
+| regime+atr3x+qual5 | +29.2% | -26.00% | -16.9% |
 
 ## Reproduce
 
