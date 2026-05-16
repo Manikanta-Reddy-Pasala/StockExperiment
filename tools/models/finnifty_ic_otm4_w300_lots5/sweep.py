@@ -114,7 +114,11 @@ def run_ic(underlying: str, start: str, end: str,
         exp = near_monthly_exp(underlying, sig_d)
         if exp is None or exp in seen_exp:
             continue
-        seen_exp.add(exp)
+        # NOTE: seen_exp.add(exp) deferred until AFTER successful entry below.
+        # Earlier bug: marking expiry as seen before validating strike/bar
+        # availability meant a single failed first-Monday (e.g. wing strike
+        # not yet listed) would skip the entire monthly cycle. Now retries on
+        # subsequent Mondays until entry succeeds.
         spot_close = float(r.close)
         ce_k = round_strike(spot_close * (1 + otm_pct/100), step)
         pe_k = round_strike(spot_close * (1 - otm_pct/100), step)
@@ -179,6 +183,9 @@ def run_ic(underlying: str, start: str, end: str,
             exit_debit = max(0.0, (ic_ce + ic_pe) - (wc + wp)) * (1 + slip)
             exit_d = exp
             exit_reason = "EXPIRY"
+
+        # Entry succeeded → claim expiry so other Mondays in cycle skip
+        seen_exp.add(exp)
 
         pnl_unit = net_credit - exit_debit
         lot_size = lot_size_for(underlying, entry_day)
