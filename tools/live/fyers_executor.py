@@ -121,6 +121,8 @@ def main() -> int:
         ))
 
     def _save_ledger():
+        if args.dry_run:
+            return  # dry-run never mutates real ledger
         with open(LEDGER_FILE, "w") as f:
             json.dump({
                 "updated_at": datetime.now().isoformat(),
@@ -134,6 +136,8 @@ def main() -> int:
             }, f, indent=2, default=str)
 
     def _append_history(rec: dict):
+        if args.dry_run:
+            return  # dry-run never mutates history
         with open(HISTORY_FILE, "a") as f:
             f.write(json.dumps(rec, default=str) + "\n")
 
