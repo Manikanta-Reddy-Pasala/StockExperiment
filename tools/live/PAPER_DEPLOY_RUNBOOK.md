@@ -55,7 +55,7 @@ Cash: ₹55 (idle)
 ```
 1. momrot_daily.sh runs at 09:31 IST
 2. docker exec into trading_system_app
-3. python tools/live/momentum_rotation_signal.py --rebalance-only
+3. python tools/models/momentum_n100_top5_max1/live_signal.py --rebalance-only
    - If day_of_month > 7 or weekend: emit [] (no signals)
    - Else: rank N100 by 60d return, compare to held
      - If held NOT in top-5: emit STOP_HIT for held + ENTRY1 for rank-1
@@ -82,7 +82,7 @@ ssh root@77.42.45.12 'ls -t /opt/trading_system/logs/momrot/run_logs/*.log | hea
 
 # Force rebalance NOW (bypass first-week gate)
 ssh root@77.42.45.12 'docker exec -e CAPITAL_INR=1000000 -e MAX_CONCURRENT=1 -e MIN_PRICE=10 \
-  trading_system_app bash -c "cd /app && python tools/live/momentum_rotation_signal.py \
+  trading_system_app bash -c "cd /app && python tools/models/momentum_n100_top5_max1/live_signal.py \
     --universe-file /app/logs/momrot/universes/n100_current.json --top-n 5 --force \
     --ledger /app/logs/momrot/ledger/momrot_ledger.json \
     --signals-out /app/logs/momrot/signals/manual_$(date +%FT%H%M)_momrot.json"'

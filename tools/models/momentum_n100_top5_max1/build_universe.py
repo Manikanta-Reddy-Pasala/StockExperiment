@@ -10,7 +10,7 @@ approximate by:
 Output: selector JSON compatible with signal_generator --universe-file.
 
 Usage:
-  python tools/backtests/build_universe_by_adv.py --top 100 \
+  python tools/models/momentum_n100_top5_max1/build_universe.py --top 100 \
     --end-date 2025-05-12 \
     --out exports/backtests/universes/nifty100_eq_2025-05-12.json
 """
@@ -29,8 +29,8 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from tools.backtests.ohlcv_cache import read_cached  # noqa: E402
-from tools.backtests.universes import nifty500_symbols  # noqa: E402
+from tools.shared.ohlcv_cache import read_cached  # noqa: E402
+from tools.shared.universes import nifty500_symbols  # noqa: E402
 
 log = logging.getLogger("build_universe")
 

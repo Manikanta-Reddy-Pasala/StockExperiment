@@ -21,7 +21,7 @@ from sqlalchemy import text
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from tools.backtests.ohlcv_cache import _get_engine  # noqa: E402
+from tools.shared.ohlcv_cache import _get_engine  # noqa: E402
 
 SPOT_MAP = {
     "NIFTY": "NSE:NIFTY50-INDEX",

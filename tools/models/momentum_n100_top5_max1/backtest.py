@@ -11,7 +11,7 @@ Rules:
 Outputs cap-sim-compatible cycle .md files.
 
 Usage:
-  python tools/backtests/momentum_rotation_backtest.py \
+  python tools/models/momentum_n100_top5_max1/backtest.py \
     --universe nifty50 --from 2023-05-13 --to 2024-05-12 \
     --out /app/exports/backtests/momrot_n50_2023_2024
 """
@@ -31,8 +31,8 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from tools.backtests.ohlcv_cache import read_cached  # noqa: E402
-from tools.backtests.universes import NIFTY50_SYMBOLS, nifty500_symbols  # noqa: E402
+from tools.shared.ohlcv_cache import read_cached  # noqa: E402
+from tools.shared.universes import NIFTY50_SYMBOLS, nifty500_symbols  # noqa: E402
 
 
 log = logging.getLogger("momrot")

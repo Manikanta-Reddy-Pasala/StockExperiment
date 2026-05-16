@@ -2,7 +2,7 @@
 # Daily live-trading cron wrapper. Idempotent.
 #
 # Only deployed model: Model 3 — N100 monthly momentum rotation (top-5, max=1).
-# Signal generator: tools/live/momentum_rotation_signal.py
+# Signal generator: tools/models/momentum_n100_top5_max1/live_signal.py
 # Universe file: paper_portfolio/universes/n100.json (refresh weekly)
 #
 # Cron suggestions (Indian market hours 09:15-15:30 IST):
@@ -33,14 +33,14 @@ cmd="${1:-help}"
 case "$cmd" in
   prefetch)
     echo "[$DATE] Prefetching today's bars to cache..."
-    $PYTHON tools/backtests/prefetch_ohlcv.py --universe all --days 2 \
+    $PYTHON tools/shared/prefetch_ohlcv.py --universe all --days 2 \
       --intervals 1h,D --sleep 0.2
     ;;
 
   signals)
     echo "[$DATE] Generating Model 3 momentum rotation signals..."
     mkdir -p signals
-    $PYTHON tools/live/momentum_rotation_signal.py \
+    $PYTHON tools/models/momentum_n100_top5_max1/live_signal.py \
       --universe-file "$UNIVERSE_FILE" --top-n 5 --rebalance-only \
       --signals-out "$SIGNAL_FILE"
     ;;
@@ -48,7 +48,7 @@ case "$cmd" in
   signals-force)
     echo "[$DATE] Force-emitting Model 3 signals (ignores rebalance gate)..."
     mkdir -p signals
-    $PYTHON tools/live/momentum_rotation_signal.py \
+    $PYTHON tools/models/momentum_n100_top5_max1/live_signal.py \
       --universe-file "$UNIVERSE_FILE" --top-n 5 --force \
       --signals-out "$SIGNAL_FILE"
     ;;

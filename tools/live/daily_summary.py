@@ -27,7 +27,7 @@ from typing import Dict, List, Optional
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from tools.backtests.ohlcv_cache import read_cached  # noqa: E402
+from tools.shared.ohlcv_cache import read_cached  # noqa: E402
 from tools.live.telegram_notify import send  # noqa: E402
 
 LEDGER = Path("/app/logs/momrot/ledger/momrot_ledger.json")

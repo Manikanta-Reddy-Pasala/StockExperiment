@@ -22,7 +22,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from tools.options.finnifty_ic_sweep import run_ic  # noqa: E402
+from tools.models.finnifty_ic_otm4_w300_lots5.sweep import run_ic  # noqa: E402
 
 
 MODEL_NAME = "FINNIFTY_monthly_IC_OTM4_w300_lots5"

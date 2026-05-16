@@ -18,7 +18,7 @@ Idempotent: each per-symbol fetch upserts via ON CONFLICT DO NOTHING.
 Re-running adds only the missing bars.
 
 Usage:
-  python tools/backtests/prefetch_ohlcv.py --universe n50,n500 \
+  python tools/shared/prefetch_ohlcv.py --universe n50,n500 \
     --days 1500 --intervals 1h,D
 """
 from __future__ import annotations
@@ -34,14 +34,14 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 # Reuse fetcher + writer from existing modules.
-from tools.backtests.ohlcv_cache import (  # noqa: E402
+from tools.shared.ohlcv_cache import (  # noqa: E402
     _get_engine, write_rows, read_cached, _to_fyers_sym,
 )
 
 
 def load_universe(name: str) -> List[Tuple[str, str]]:
     """Return [(plain_ticker, company_name), ...] for the requested universe."""
-    from tools.backtests.universes import (
+    from tools.shared.universes import (
         NIFTY50_SYMBOLS, nifty500_symbols,
     )
     if name in ("n50", "nifty50"):
@@ -53,7 +53,7 @@ def load_universe(name: str) -> List[Tuple[str, str]]:
 
 def fetch_one(symbol: str, interval: str, days: int, user_id: int = 1):
     """Direct Fyers fetch (bypasses cache check). Returns DataFrame."""
-    from tools.backtests.universes import (
+    from tools.shared.universes import (
         _fetch_fyers_interval, _FYERS_CACHE, _fetch_daily_fyers_raw,
     )
     _FYERS_CACHE["user_id"] = user_id

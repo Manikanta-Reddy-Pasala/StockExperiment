@@ -12,7 +12,7 @@ plain tickers (``RELIANCE``); we normalize via ``to_fyers_symbol`` from
 the EMA harness before any DB read/write.
 
 Usage from a fetcher:
-    from tools.backtests.ohlcv_cache import get_or_fetch
+    from tools.shared.ohlcv_cache import get_or_fetch
     df = get_or_fetch("RELIANCE", "1h", days=365,
                       lambda sym, d: raw_fyers_fetch(sym, d, user_id=1))
 """

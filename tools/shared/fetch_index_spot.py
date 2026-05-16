@@ -6,11 +6,11 @@ all share same fetch logic — pass --symbol.
 Idempotent (ON CONFLICT DO NOTHING on (symbol, date)).
 
 Usage:
-    python tools/options/fetch_index_spot.py \
+    python tools/shared/fetch_index_spot.py \
         --symbol NSE:FINNIFTY-INDEX --from 2023-01-01 --to 2026-05-15
-    python tools/options/fetch_index_spot.py \
+    python tools/shared/fetch_index_spot.py \
         --symbol NSE:NIFTY50-INDEX --from 2023-01-01 --to 2026-05-15
-    python tools/options/fetch_index_spot.py \
+    python tools/shared/fetch_index_spot.py \
         --symbol NSE:NIFTYBANK-INDEX --from 2023-01-01 --to 2026-05-15
 """
 from __future__ import annotations
@@ -26,7 +26,7 @@ from sqlalchemy import text
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from tools.backtests.ohlcv_cache import _get_engine  # noqa: E402
+from tools.shared.ohlcv_cache import _get_engine  # noqa: E402
 
 
 def fetch(symbol: str, start: str, end: str) -> pd.DataFrame:

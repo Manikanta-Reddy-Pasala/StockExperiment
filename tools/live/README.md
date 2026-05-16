@@ -20,7 +20,7 @@ backtest harness.
 
 ```bash
 # One-time: ensure OHLCV cache is up to date
-python tools/backtests/prefetch_ohlcv.py --universe nifty50 --days 30 --intervals 1h,15m,D
+python tools/shared/prefetch_ohlcv.py --universe nifty50 --days 30 --intervals 1h,15m,D
 
 # Generate today's signals for one model
 python tools/live/signal_generator.py --model ema_200_400 --universe nifty50
@@ -99,7 +99,7 @@ won't place orders.
                        cron
                          |
                          v
-   tools/backtests/prefetch_ohlcv.py   <-- Fyers historical API
+   tools/shared/prefetch_ohlcv.py   <-- Fyers historical API
                          |
                          v
                   Postgres cache

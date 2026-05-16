@@ -750,7 +750,7 @@ def api_rebuild_universe():
         def run():
             try:
                 subprocess.run([
-                    "python", "tools/backtests/build_universe_by_adv.py",
+                    "python", "tools/models/momentum_n100_top5_max1/build_universe.py",
                     "--top", "100", "--end-date", date_str,
                     "--out", str(out_path),
                 ], check=True, cwd="/app")

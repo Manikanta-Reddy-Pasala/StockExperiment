@@ -3,10 +3,10 @@
 Extends prefetch_bhav.py to support any underlying via --underlying flag.
 
 Usage:
-    python tools/options/prefetch_bhav_universal.py \
+    python tools/shared/prefetch_bhav.py \
         --from 2023-05-15 --to 2026-05-15 \
         --underlying BANKNIFTY --instrument OPTIDX
-    python tools/options/prefetch_bhav_universal.py \
+    python tools/shared/prefetch_bhav.py \
         --from 2023-05-15 --to 2026-05-15 \
         --underlying RELIANCE,TCS,INFY --instrument OPTSTK
 
@@ -31,7 +31,7 @@ from sqlalchemy import text
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from tools.backtests.ohlcv_cache import _get_engine  # noqa: E402
+from tools.shared.ohlcv_cache import _get_engine  # noqa: E402
 
 UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
       "Accept": "*/*"}

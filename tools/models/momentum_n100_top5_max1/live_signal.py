@@ -43,7 +43,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from tools.backtests.ohlcv_cache import read_cached  # noqa: E402
+from tools.shared.ohlcv_cache import read_cached  # noqa: E402
 
 log = logging.getLogger("momrot_signal")
 
