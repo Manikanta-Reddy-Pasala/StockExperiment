@@ -14,6 +14,8 @@
 
 Capital is **defined-risk margin**. With 5 lots × 65 (post Sep 2024) × ₹300 wing = ₹97,500 margin per cycle on ₹2L start. Margin scales with lot size + wing width but never exceeds the equity (refuses to enter otherwise).
 
+**Note on negative Worst-case Loss values**: A handful of months show Worst-case Loss < 0 (e.g. 2023-05 −₹1.45L, 2025-11 −₹2.31L). This happens when the backtest's recorded Premium Collected exceeded the theoretical wing_width × lot × lots. Real-world IC structure caps loss at wing_width − net_credit (always ≥ 0). The negative values are an artifact of close-price entry modeling (mid-of-day prices may overstate filled credit). Treat Worst-case Loss = max(0, value) for live planning.
+
 ## Monthly ledger
 
 | Month | Trades | WR | Margin Locked ₹ | Premium Collected ₹ | Worst-case Loss ₹ | Realized P&L ₹ | ROI on Equity | End-of-Month Equity ₹ |
