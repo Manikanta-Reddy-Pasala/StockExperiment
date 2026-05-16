@@ -34,11 +34,89 @@ All 4 years strongly positive. No down year.
 **Exit** (whichever fires first):
 - **Profit target +60%** from entry
 - **Trailing stop: -15% from peak**, activated after +10% gain
-- **MAX_HOLD 30 trading days** (dominant exit — captures ~30-day midcap runs)
+- **SMA exit**: close < **20-day SMA** (cuts losers fast — avg -8%)
+- **MAX_HOLD 30 trading days** (dominant winner exit — captures ~30-day midcap runs)
 
 **Universe**: `midcap_narrow` (smaller midcap pool, ~100 NSE midcap names).
 
 **Costs modeled**: 10 bps slippage + 0.10% STT on sells + ₹20/order brokerage.
+
+## How rebalance + stock selection works
+
+**This is NOT calendar-rebalanced.** No fixed monthly/weekly cadence. Rebalance is **event-driven**: whenever a position exits (via target / trail / SMA / max-hold), the next trading day scans for a new entry. If no signal, sits in cash until one appears.
+
+### Daily loop (pseudocode)
+
+```
+FOR each trading day D from 2023-05-15 to 2026-05-15:
+
+  # 1. MARK-TO-MARKET — update last close, peak, sma_exit for open position
+  IF position open:
+      refresh close, sma_20, peak with today's bar
+
+  # 2. EXIT CHECK — priority order
+  IF position open:
+      IF return_from_entry >= +60%:           sell at next open  (TARGET)
+      ELIF return_from_entry >= +10%
+           AND drop_from_peak >= -15%:        sell at next open  (TRAIL)
+      ELIF close < 20-day SMA:                sell at next open  (SMA)
+      ELIF days_held >= 30:                   sell at next open  (MAX_HOLD)
+
+  # 3. ENTRY SCAN — only when flat (max_conc=1)
+  IF no position open:
+      candidates = []
+      FOR each symbol S in midcap_narrow universe (~100 stocks):
+          IF S.close TODAY > S.high.rolling(60).max() yesterday   # fresh 60d high
+            AND S.close TODAY > S.SMA_200                          # long-term uptrend
+            AND S.volume TODAY > 2.0 * S.volume.rolling(20).mean(): # 2x volume surge
+              candidates.append(S, vol_ratio = vol / vol_avg20)
+
+      IF candidates non-empty:
+          pick = candidate with HIGHEST vol_ratio                   # tiebreak
+          place buy order: full cash / next_open_price, qty = int()
+          fills at TOMORROW's open + 10 bps slippage
+
+  # 4. RECORD NAV
+  daily_nav[D] = cash + position.qty * position.last_close
+```
+
+### Stock selection criteria — what wins?
+
+Every trading day the strategy scans **all ~100 midcap_narrow names** and asks:
+
+1. **Did the stock break out today?** → close > rolling-60-day high (excluding today). This catches a fresh swing high after a base.
+
+2. **Is it in a long-term uptrend?** → close > 200-day SMA. Filters out stage-1 basing and stage-4 downtrends. Only stage-2 (Minervini) trends qualify.
+
+3. **Is the breakout backed by real volume?** → volume > 2× 20-day average. Weeds out low-conviction false breakouts. Captures institutional accumulation.
+
+If multiple stocks qualify on same day, the one with the **highest volume ratio** wins (vol_today / vol_avg20). This is the "loudest" breakout — typically the most aggressive institutional buying.
+
+### Rebalance trigger examples from backtest
+
+| Date | Event | What happened |
+|---|---|---|
+| 2023-11-08 | Entry scan | HINDPETRO had highest vol_ratio among breakouts → bought next open ₹188.56 |
+| 2023-12-08 | MAX_HOLD exit | HINDPETRO held 30 days, sold at ₹251.42 (+33%) → flat for 1 day |
+| 2023-12-11 | Entry scan | HINDCOPPER topped the candidates → bought ₹186.54 |
+| 2024-06-21 | SMA exit | HINDUNILVR dropped below 20-day SMA after entry → bailed at -3.74% |
+| 2024-06-24 | Entry scan (next day) | KALYANKJIL → bought ₹452.95, exited 30d later at +29.65% |
+
+The strategy spends ~92% of trading days **in a position**. Average days flat between trades ≈ 2-3. Rebalance is opportunistic, not periodic.
+
+### Why this beats monthly momentum
+
+The deployed `momentum_n100_top5_max1` rebalances **only on the 1st of every month**, locked into whatever stock topped the 60-day return ranking on that date. Misses mid-month breakouts.
+
+This model fires on **any day** a fresh 60d high + volume + 200-SMA stack lights up, then rides exactly 30 days. Result: captures the same momentum factor as N100 model but with 3-4× the entry opportunities and a hard 30-day exit that cycles capital faster.
+
+### Position sizing
+
+Always **100% of available cash** into the single pick. No leverage, no margin, no half-positions. Qty = `int(cash / entry_price)`. Cash leftover from rounding sits idle until next exit + re-entry cycle.
+
+### What about no-signal days?
+
+If on day D no candidate passes all three filters, the strategy **stays in cash**. No forced trade. This happened during sideways regimes (e.g., parts of 2025 H1 — note the -10% drawdown weeks in CHENNPETRO + TATAPOWER were forced trades in choppy conditions).
 
 ## How the goal was hit — research journey
 
