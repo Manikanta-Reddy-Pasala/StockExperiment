@@ -488,32 +488,18 @@
     </div>
 </div>
 
-<!-- Run All -->
+<!-- Per-Model Data Status -->
 <div class="row mb-4">
     <div class="col-12">
         <div class="card task-card">
-            <div class="card-header bg-gradient-danger text-white">
-                <h5 class="mb-0"><i class="bi bi-lightning-charge-fill me-2"></i>Execute Complete Pipeline</h5>
-            </div>
-            <div class="card-body">
-                <p class="mb-3">Execute complete data pipeline (6-step saga). Strategy runs hourly via the technical scheduler.</p>
-                <button class="btn btn-danger-trigger w-100" id="runAllBtn" onclick="triggerAll()">
-                    <i class="bi bi-play-fill me-2"></i>Run Data Pipeline
+            <div class="card-header bg-gradient-success text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-bar-chart-line-fill me-2"></i>Per-Model Data Status</h5>
+                <button class="btn btn-sm btn-outline-light" onclick="loadModelStatus()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
                 </button>
             </div>
-        </div>
-    </div>
-</div>
-
-<!-- Active Tasks -->
-<div class="row mb-4" id="activeTasksContainer">
-    <div class="col-12">
-        <div class="card" style="border: none; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border-radius: 12px; overflow: hidden;">
-            <div class="card-header" style="background: linear-gradient(135deg, #ffd93d 0%, #ffb300 100%); color: #333; border: none; padding: 20px;">
-                <h5 class="mb-0" style="font-weight: 700;"><i class="bi bi-hourglass-split me-2"></i>Active Tasks</h5>
-            </div>
-            <div class="card-body" style="padding: 25px; background: #fff;">
-                <div id="activeTasksList"></div>
+            <div class="card-body">
+                <div id="modelStatusList" class="row g-3"></div>
             </div>
         </div>
     </div>
@@ -558,6 +544,78 @@ async function loadSystemStatus() {
     } catch (error) {
         console.error('Error loading status:', error);
         addLog('Error loading system status: ' + error.message, 'error');
+    }
+}
+
+// Load per-model data status
+async function loadModelStatus() {
+    const root = document.getElementById('modelStatusList');
+    root.innerHTML = '<div class="col-12 text-muted">Loading…</div>';
+    try {
+        const response = await fetch('/admin/system/models-status');
+        const data = await response.json();
+        if (!data.success) {
+            root.innerHTML = '<div class="col-12 text-danger">Error: ' + (data.error || 'unknown') + '</div>';
+            return;
+        }
+        root.innerHTML = data.models.map(renderModelCard).join('');
+    } catch (error) {
+        root.innerHTML = '<div class="col-12 text-danger">Error: ' + error.message + '</div>';
+    }
+}
+
+function renderModelCard(m) {
+    const badge = m.data_sufficient
+        ? '<span class="badge bg-success">DATA OK</span>'
+        : '<span class="badge bg-warning text-dark">DATA STALE/MISSING</span>';
+    const wired = m.wired
+        ? '<span class="badge bg-primary ms-1">WIRED</span>'
+        : '<span class="badge bg-secondary ms-1">UNWIRED</span>';
+    const rows = (m.items || []).map(it => {
+        const icon = it.ok
+            ? '<i class="bi bi-check-circle-fill text-success"></i>'
+            : '<i class="bi bi-x-circle-fill text-danger"></i>';
+        const val = (typeof it.value === 'number') ? it.value.toLocaleString() : it.value;
+        const extra = it.extra ? `<span class="text-muted small ms-2">(${it.extra})</span>` : '';
+        return `<tr><td>${icon} ${it.label}</td><td class="text-end"><strong>${val}</strong>${extra}</td><td class="text-muted small">${it.required}</td></tr>`;
+    }).join('');
+    return `
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><strong>${m.name}</strong> <small class="text-muted">(${m.type})</small></span>
+                <span>${badge} ${wired}</span>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr><th>Check</th><th class="text-end">Value</th><th>Required</th></tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+            <div class="card-footer text-end">
+                <button class="btn btn-sm btn-primary" onclick="triggerModelDataPull('${m.name}')">
+                    <i class="bi bi-arrow-down-circle"></i> Pull Data Now
+                </button>
+            </div>
+        </div>
+    </div>`;
+}
+
+async function triggerModelDataPull(modelName) {
+    addLog('Starting data pull for ' + modelName + '...', 'info');
+    try {
+        const r = await fetch('/admin/trigger/model/' + encodeURIComponent(modelName), {method: 'POST'});
+        const d = await r.json();
+        if (d.success) {
+            addLog('✓ Data pull queued (task ' + d.task_id + '): ' + (d.jobs || []).join(', '), 'success');
+            setTimeout(loadModelStatus, 5000);
+        } else {
+            addLog('✗ Failed: ' + (d.error || 'unknown'), 'error');
+        }
+    } catch (e) {
+        addLog('✗ Error: ' + e.message, 'error');
     }
 }
 
@@ -974,8 +1032,11 @@ function closeTask(taskId) {
     updateActiveTasks();
 }
 
-// Update active tasks display
+// Update active tasks display — DOM removed. Kept as no-op so existing
+// callers don't error. Task progress is logged into Task Log instead.
 function updateActiveTasks() {
+    return;
+    /* legacy DOM render disabled
     const container = document.getElementById('activeTasksContainer');
     const list = document.getElementById('activeTasksList');
 
@@ -1049,10 +1110,11 @@ function updateActiveTasks() {
 
         list.appendChild(taskDiv);
     });
+    */
 }
 
-// Load active tasks from database on page load
-async function loadActiveTasks() {
+// Load active tasks from database on page load — DOM removed, no-op.
+async function loadActiveTasks_legacy() {
     try {
         const response = await fetch('/admin/tasks/active');
         const data = await response.json();
@@ -1075,11 +1137,12 @@ async function loadActiveTasks() {
     }
 }
 
-// Auto-refresh system status
-setInterval(loadSystemStatus, 30000); // Every 30 seconds
+// Auto-refresh system status + model status
+setInterval(loadSystemStatus, 30000);
+setInterval(loadModelStatus, 60000);
 
 // Initial load
 loadSystemStatus();
-loadActiveTasks();
+loadModelStatus();
 </script>
 {% endblock %}

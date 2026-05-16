@@ -443,6 +443,193 @@ def retry_failed_steps(task_id):
     })
 
 
+@admin_bp.route('/trigger/model/<model_name>', methods=['POST'])
+def trigger_model_data_pull(model_name):
+    """Trigger data pulls for a specific deployed model.
+
+    model_name: momentum_n100_top5_max1 | finnifty_ic_otm4_w300_lots5
+    """
+    allowed = {
+        "momentum_n100_top5_max1": [
+            ("Equity OHLCV (N50+N500)", "tools.models.momentum_n100_top5_max1.data_pull",
+             "pull_daily_ohlcv"),
+            ("N100 universe refresh", "tools.models.momentum_n100_top5_max1.data_pull",
+             "refresh_universe"),
+        ],
+        "finnifty_ic_otm4_w300_lots5": [
+            ("Index spots (NIFTY/BN/FN)", "tools.models.finnifty_ic_otm4_w300_lots5.data_pull",
+             "fetch_index_spots"),
+            ("Option bhavcopy (NIFTY/BN/FN)", "tools.models.finnifty_ic_otm4_w300_lots5.data_pull",
+             "fetch_option_bhav"),
+        ],
+    }
+    if model_name not in allowed:
+        return jsonify({"success": False, "error": f"Unknown model: {model_name}"}), 400
+
+    task_id = f"model_{model_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    jobs = allowed[model_name]
+
+    def run_model_jobs():
+        import importlib
+        for label, mod_name, func_name in jobs:
+            try:
+                mod = importlib.import_module(mod_name)
+                getattr(mod, func_name)()
+                logger.info(f"  ✅ {label}")
+            except Exception as e:
+                logger.error(f"  ❌ {label}: {e}", exc_info=True)
+
+    thread = threading.Thread(
+        target=run_function_async,
+        args=(task_id, run_model_jobs, f"Model {model_name} data pull"),
+    )
+    thread.start()
+
+    return jsonify({
+        "success": True,
+        "task_id": task_id,
+        "message": f"Data pull started for {model_name}",
+        "jobs": [j[0] for j in jobs],
+    })
+
+
+@admin_bp.route('/system/models-status', methods=['GET'])
+def models_status():
+    """Per-model data status — used by admin dashboard to show whether
+    each deployed model has enough fresh data to run."""
+    try:
+        from src.models.database import get_database_manager
+        from sqlalchemy import text
+        import os
+        from pathlib import Path
+        from datetime import date, timedelta
+
+        today = date.today()
+        max_stale_days = 3  # last data older than this = STALE
+        db_manager = get_database_manager()
+
+        models = []
+        with db_manager.get_session() as session:
+            # --- Model: momentum_n100_top5_max1 (equity) ---
+            eq = session.execute(text("""
+                SELECT COUNT(DISTINCT symbol) syms,
+                       COUNT(*) rows,
+                       MAX(date) latest
+                FROM historical_data
+                WHERE symbol LIKE 'NSE:%-EQ'
+            """)).fetchone()
+
+            universe_file = Path("/app/logs/momrot/universes/n100_current.json")
+            universe_exists = universe_file.exists()
+            universe_age_h = None
+            universe_count = None
+            if universe_exists:
+                import json
+                try:
+                    u = json.loads(universe_file.read_text())
+                    universe_count = len(u.get("stocks") or u.get("universe") or [])
+                except Exception:
+                    universe_count = None
+                universe_age_h = (
+                    (today - date.fromtimestamp(universe_file.stat().st_mtime)).days * 24
+                )
+
+            eq_latest = eq.latest
+            eq_stale_days = ((today - eq_latest).days if eq_latest else 999)
+            eq_ok = (
+                eq.syms >= 100
+                and eq_stale_days <= max_stale_days
+                and universe_exists
+                and (universe_count or 0) >= 50
+            )
+
+            models.append({
+                "name": "momentum_n100_top5_max1",
+                "type": "equity",
+                "wired": True,
+                "data_sufficient": bool(eq_ok),
+                "items": [
+                    {"label": "Equity OHLCV symbols", "value": eq.syms,
+                     "required": ">= 100", "ok": eq.syms >= 100},
+                    {"label": "Historical rows", "value": int(eq.rows),
+                     "required": "any", "ok": eq.rows > 0},
+                    {"label": "Latest data",
+                     "value": eq_latest.isoformat() if eq_latest else "—",
+                     "required": f"<= {max_stale_days}d old",
+                     "ok": eq_stale_days <= max_stale_days,
+                     "extra": f"{eq_stale_days}d old"},
+                    {"label": "N100 universe file",
+                     "value": str(universe_count) + " syms" if universe_count else "missing",
+                     "required": "exists, 100 syms",
+                     "ok": universe_exists and (universe_count or 0) >= 50},
+                ],
+            })
+
+            # --- Model: finnifty_ic_otm4_w300_lots5 (options, exec unwired) ---
+            opt_rows = {}
+            for u in ("NIFTY", "BANKNIFTY", "FINNIFTY"):
+                r = session.execute(text(
+                    "SELECT COUNT(*) c, MAX(candle_time::date) latest "
+                    "FROM historical_options WHERE underlying = :u"
+                ), {"u": u}).fetchone()
+                opt_rows[u] = (r.c if r else 0, r.latest if r else None)
+
+            spot_rows = {}
+            for sym in ("NSE:NIFTY50-INDEX", "NSE:NIFTYBANK-INDEX", "NSE:FINNIFTY-INDEX"):
+                r = session.execute(text(
+                    "SELECT COUNT(*) c, MAX(date) latest "
+                    "FROM historical_data WHERE symbol = :s"
+                ), {"s": sym}).fetchone()
+                spot_rows[sym] = (r.c if r else 0, r.latest if r else None)
+
+            fn_opt_latest = opt_rows["FINNIFTY"][1]
+            fn_spot_latest = spot_rows["NSE:FINNIFTY-INDEX"][1]
+            fn_opt_stale = (today - fn_opt_latest).days if fn_opt_latest else 999
+            fn_spot_stale = (today - fn_spot_latest).days if fn_spot_latest else 999
+            fn_ok = (
+                opt_rows["FINNIFTY"][0] > 0
+                and fn_opt_stale <= max_stale_days
+                and fn_spot_stale <= max_stale_days
+            )
+
+            opt_items = []
+            for u in ("NIFTY", "BANKNIFTY", "FINNIFTY"):
+                c, latest = opt_rows[u]
+                stale = (today - latest).days if latest else 999
+                opt_items.append({
+                    "label": f"{u} option bars",
+                    "value": int(c),
+                    "required": f"<= {max_stale_days}d old",
+                    "ok": c > 0 and stale <= max_stale_days,
+                    "extra": (latest.isoformat() if latest else "—") + f" ({stale}d)",
+                })
+            for sym in ("NSE:NIFTY50-INDEX", "NSE:NIFTYBANK-INDEX", "NSE:FINNIFTY-INDEX"):
+                c, latest = spot_rows[sym]
+                short = sym.replace("NSE:", "").replace("-INDEX", "")
+                stale = (today - latest).days if latest else 999
+                opt_items.append({
+                    "label": f"{short} spot",
+                    "value": int(c),
+                    "required": f"<= {max_stale_days}d old",
+                    "ok": c > 0 and stale <= max_stale_days,
+                    "extra": (latest.isoformat() if latest else "—") + f" ({stale}d)",
+                })
+
+            models.append({
+                "name": "finnifty_ic_otm4_w300_lots5",
+                "type": "options",
+                "wired": False,
+                "data_sufficient": bool(fn_ok),
+                "items": opt_items,
+            })
+
+        return jsonify({"success": True, "models": models, "as_of": today.isoformat()})
+
+    except Exception as e:
+        logger.error(f"Models status error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @admin_bp.route('/system/status', methods=['GET'])
 def system_status():
     """Get system status."""
