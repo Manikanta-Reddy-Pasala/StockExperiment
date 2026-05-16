@@ -11,21 +11,48 @@ FINNIFTY (Nifty Financial Services Index) monthly Iron Condor.
 - Otherwise hold to monthly expiry (last Thursday)
 - **Defined risk:** max loss bounded by wing width → margin ≈ ₹85k-100k for 5 lots
 
-## Backtest result (2023-05 → 2026-05)
+## Backtest result (2023-05-15 → 2026-05-15, 3 years)
 
 | Year | Trades | WR | P&L | ROI on ₹2L |
 |---|---:|---:|---:|---:|
-| 2023 (May-Dec) | 5 | 40% | ₹1,60,142 | +80.07% |
-| 2024 | 8 | 100% | ₹3,97,117 | +198.56% |
-| 2025 | 8 | 75% | ₹6,58,682 | +329.34% |
-| 2026 (Jan-May) | 3 | 67% | ₹5,97,799 | +298.90% |
-| **3-yr total** | **24** | **75%** | **₹18,13,740** | **+906.87%** |
+| 2023 (May-Dec) | 8 | 62.5% | ₹3,43,816 | **+171.91%** |
+| 2024 | 12 | 91.7% | ₹4,34,490 | **+217.25%** |
+| 2025 | 12 | 75.0% | ₹6,49,567 | **+324.78%** |
+| 2026 (Jan-May) | 3 | 66.7% | ₹5,97,799 | **+298.90%** |
+| **3-yr total** | **35** | **77.1%** | **₹20,25,673** | **+1012.84%** |
 
-- Avg/mo: **+41.22%** | Best mo: +316.3% | Worst mo: -42.8%
-- Months ≥20%: 10/22 | Months ≥30%: 9/22
-- Max single-trade loss: ₹81,644 (40.8% of capital, hard-capped by wings)
+- Final NAV: ₹22,25,673 from ₹2L (10.1× growth)
+- Avg/mo: **+30.69%** | Best mo: +316.3% | Worst mo: -42.8%
+- Months ≥20%: 12/33 | Months ≥30%: 10/33
+- Max single-trade loss: ₹96,325 (48.2% of capital, defined-risk by wings)
 
 Full trade ledger + monthly equity curve: `exports/models/finnifty_ic_otm4_w300_lots5/SUMMARY.md`
+
+## Entry/exit logic per cycle
+
+```
+Each Monday d:
+  exp = nearest monthly expiry > d
+  if exp already used → SKIP
+  spot = FINNIFTY close on d
+  CE_strike  = round(spot × 1.04, step=50)
+  PE_strike  = round(spot × 0.96, step=50)
+  wing_CE    = CE_strike + 300
+  wing_PE    = PE_strike − 300
+
+  validate 4 strikes exist in option_universe + have daily bars on d
+    (if wing strike's first bar > d, RETRY next Monday — recovers
+     ~30% of months that earlier versions missed)
+
+  enter on next valid day:
+    SELL CE × 5 lots, SELL PE × 5 lots
+    BUY wing_CE × 5 lots, BUY wing_PE × 5 lots
+    net_credit = (CE_px + PE_px) − (wCE_px + wPE_px)
+
+  hold until:
+    pair_value ≥ 3 × net_credit → STOP exit (buy-back losers)
+    else → hold to expiry Thursday → settle intrinsic
+```
 
 ## Forward applicability
 
@@ -38,11 +65,14 @@ Full trade ledger + monthly equity curve: `exports/models/finnifty_ic_otm4_w300_
 | `schema.sql` | `historical_options` + `option_universe` DDL |
 | `sweep.py` | Iron Condor variant sweep (multiple OTM/width/lots combos) |
 | `run_winner.py` | Run winning config + emit per-trade ledger CSV/MD |
+| `live_signal.py` | Monday entry scan + daily stop monitor + expiry settle (DB ledger) |
+| `data_pull.py` | Daily index spots + monthly option bhavcopy ingest |
+| `cron.py` | Schedule registrations (data + trading) |
 
 ## How to reproduce
 
 ```bash
-# 1. Create tables
+# 1. Create tables (one-time)
 docker exec -i trading_system_db psql -U trader -d trading_system \
     < tools/models/finnifty_ic_otm4_w300_lots5/schema.sql
 
@@ -64,9 +94,23 @@ python tools/models/finnifty_ic_otm4_w300_lots5/sweep.py \
     --from 2023-05-15 --to 2026-05-15 --capital 200000
 ```
 
+## Live signal output
+
+```bash
+# Monday entry scan + daily stop monitor (called by tech_scheduler cron)
+python tools/models/finnifty_ic_otm4_w300_lots5/live_signal.py \
+    --signals-out /app/logs/finnifty_ic_otm4_w300_lots5/signals/$(date +%F).json
+```
+
+Emits 4 ENTRY signals (sell CE+PE, buy wings) on first Monday of new
+monthly cycle. On subsequent days, checks if combined pair value crossed
+stop or if expiry reached → emits 4 EXIT signals.
+
 ## Honest caveats
 
-1. 22 of 36 months had IC entry (some months lacked 4% OTM + 300pt wing data)
-2. 3 months in 22 went -18% to -43% — tail risk real
-3. Single-trade max loss = 40.8% of capital (defined by wings)
-4. Live realistic ≈ 70% of backtest = ~+28-30%/mo, +200-250%/yr
+1. **33 of 36 months** had IC entry — 3 months still missing because OTM 4% + 300pt wing strikes never traded for those expiries.
+2. **3 down months** in 33: 2023-06 (-18%), 2023-10 (-12%), 2023-12 (-43%). Tail risk real.
+3. **Single-trade max loss = 48.2% of capital** (defined by wing width, can't go higher).
+4. **Live realistic ≈ 70% of backtest** = ~+20-22%/mo, +180-220%/yr post-slippage.
+5. **High win-rate trap**: 77% WR but ONE losing month can erase 3+ winners. Position sizing is binary (5 lots all in / out).
+6. **Last 2 years FINNIFTY weekly killed**; monthly cycle untouched.
