@@ -1,0 +1,243 @@
+"""Shared universe data + Fyers fetcher helpers.
+
+Single source of truth for stock universes (NIFTY 50, NIFTY 500) and
+the Fyers history fetch used by momentum rotation backtest + live signal.
+
+Previously embedded inside run_ema_200_400_backtest.py — extracted here
+when the EMA backtest was removed (rejected model).
+"""
+from __future__ import annotations
+
+import sys
+from datetime import datetime, timedelta
+from pathlib import Path
+from types import SimpleNamespace
+from typing import List, Optional, Tuple
+
+import pandas as pd
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from src.services.data.nifty500_universe import (  # noqa: E402
+    load_nifty500_with_meta,
+)
+
+
+# NIFTY 50 constituents (plain NSE tickers, post 2024-2025 reconstitution).
+NIFTY50_BASE = [
+    'ADANIENT', 'ADANIPORTS', 'APOLLOHOSP', 'ASIANPAINT', 'AXISBANK',
+    'BAJAJ-AUTO', 'BAJFINANCE', 'BAJAJFINSV', 'BEL', 'BPCL',
+    'BHARTIARTL', 'BRITANNIA', 'CIPLA', 'COALINDIA', 'DIVISLAB',
+    'DRREDDY', 'EICHERMOT', 'GRASIM', 'HCLTECH', 'HDFCBANK',
+    'HDFCLIFE', 'HEROMOTOCO', 'HINDALCO', 'HINDUNILVR', 'ICICIBANK',
+    'ITC', 'INDUSINDBK', 'INFY', 'JIOFIN', 'JSWSTEEL',
+    'KOTAKBANK', 'LT', 'M&M', 'MARUTI', 'NTPC',
+    'NESTLEIND', 'ONGC', 'POWERGRID', 'RELIANCE', 'SBILIFE',
+    'SBIN', 'SHRIRAMFIN', 'SUNPHARMA', 'TCS', 'TATACONSUM',
+    'TMPV', 'TATASTEEL', 'TECHM', 'TITAN', 'TRENT',
+    'ULTRACEMCO', 'UPL', 'WIPRO',
+]
+NIFTY50_SYMBOLS = [(s, s) for s in NIFTY50_BASE]
+
+
+def nifty500_symbols(limit: Optional[int] = None) -> List[Tuple[str, str]]:
+    """Return [(symbol, company_name)] for the Nifty 500.
+
+    Symbols are plain NSE tickers; fetcher converts to Fyers form.
+    """
+    rows = load_nifty500_with_meta()
+    out = []
+    for fyers_sym, name, _industry in rows:
+        plain = fyers_sym.replace("NSE:", "").replace("-EQ", "")
+        out.append((plain, name))
+    return out[:limit] if limit else out
+
+
+# ---- Fyers symbol normalization ----
+
+def to_fyers_symbol(sym: str) -> str:
+    """Normalize input ticker to Fyers format.
+
+    Plain NSE  ``RELIANCE``     -> ``NSE:RELIANCE-EQ``
+    Yahoo      ``RELIANCE.NS``  -> ``NSE:RELIANCE-EQ``
+    Index      ``^NSEI``        -> ``NSE:NIFTY50-INDEX``
+    Already    ``NSE:RELIANCE-EQ`` (passthrough)
+    """
+    s = sym.upper()
+    if s.startswith("NSE:"):
+        return s
+    if s.startswith("^"):
+        idx_map = {
+            "^NSEI": "NSE:NIFTY50-INDEX",
+            "^NSEBANK": "NSE:NIFTYBANK-INDEX",
+            "^CNXFIN": "NSE:FINNIFTY-INDEX",
+            "^CNXIT": "NSE:NIFTYIT-INDEX",
+            "^CNXAUTO": "NSE:NIFTYAUTO-INDEX",
+        }
+        return idx_map.get(s, s)
+    return f"NSE:{s.replace('.NS', '')}-EQ"
+
+
+# ---- Fyers fetcher (lazy-cached) ----
+
+_FYERS_CACHE = {"service": None, "init_failed": False, "user_id": 1}
+
+
+def _fyers_service():
+    """Lazy-init Fyers service; cache result. Returns None if init fails."""
+    if _FYERS_CACHE["init_failed"]:
+        return None
+    if _FYERS_CACHE["service"] is not None:
+        return _FYERS_CACHE["service"]
+    try:
+        from src.services.brokers.fyers_service import FyersService
+        svc = FyersService()
+        cfg = svc.get_broker_config(_FYERS_CACHE["user_id"])
+        if not cfg or not cfg.get("access_token"):
+            print(f"  fyers: no token for user_id={_FYERS_CACHE['user_id']}")
+            _FYERS_CACHE["init_failed"] = True
+            return None
+        _FYERS_CACHE["service"] = svc
+        return svc
+    except Exception as e:
+        print(f"  fyers init failed: {e}")
+        _FYERS_CACHE["init_failed"] = True
+        return None
+
+
+def _fetch_fyers_interval(symbol: str, days: int, user_id: int,
+                          interval: str, chunk_days: int = 95) -> pd.DataFrame:
+    """Generic Fyers history fetcher — chunks window into chunk_days slices."""
+    svc = _fyers_service()
+    if svc is None:
+        return pd.DataFrame()
+    fyers_sym = to_fyers_symbol(symbol)
+    end_dt = datetime.now()
+    start_dt = end_dt - timedelta(days=days)
+    cursor = start_dt
+    all_candles: List = []
+    while cursor < end_dt:
+        chunk_end = min(cursor + timedelta(days=chunk_days), end_dt)
+        try:
+            res = svc.history(
+                user_id=user_id, symbol=fyers_sym, exchange="NSE",
+                interval=interval,
+                start_date=cursor.strftime("%Y-%m-%d"),
+                end_date=chunk_end.strftime("%Y-%m-%d"),
+            )
+            if res and res.get("status") == "success":
+                all_candles += res.get("data", {}).get("candles", []) or []
+            else:
+                msg = (res or {}).get("message", "no response")
+                print(f"  fyers chunk fail {fyers_sym} "
+                      f"{cursor.date()}..{chunk_end.date()}: {msg}")
+        except Exception as e:
+            print(f"  fyers chunk error {fyers_sym}: {e}")
+        cursor = chunk_end
+    if not all_candles:
+        return pd.DataFrame()
+    if isinstance(all_candles[0], dict):
+        df = pd.DataFrame(all_candles)
+    else:
+        df = pd.DataFrame(all_candles, columns=["timestamp", "open", "high",
+                                                 "low", "close", "volume"])
+    df["timestamp"] = pd.to_numeric(df["timestamp"], errors="coerce").astype("Int64")
+    for col in ("open", "high", "low", "close", "volume"):
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    df = df.dropna(subset=["timestamp", "open", "high", "low", "close"])
+    df = df.drop_duplicates(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
+    df["candle_time"] = pd.to_datetime(df["timestamp"].astype("int64"),
+                                       unit="s", utc=True) \
+        .dt.tz_convert("Asia/Kolkata").dt.tz_localize(None)
+    df["volume"] = df["volume"].fillna(0).astype("int64")
+    df["timestamp"] = df["timestamp"].astype("int64")
+    return df[["timestamp", "candle_time", "open", "high", "low",
+               "close", "volume"]]
+
+
+def fetch_1h_fyers(symbol: str, days: int = 720, user_id: int = 1) -> pd.DataFrame:
+    """1H candles. Postgres-cached — only calls Fyers on cache miss."""
+    try:
+        from tools.backtests.ohlcv_cache import get_or_fetch
+    except Exception:
+        return _fetch_fyers_interval(symbol, days, user_id, interval="1h", chunk_days=95)
+    return get_or_fetch(symbol, "1h", days,
+                        lambda s, d: _fetch_fyers_interval(s, d, user_id,
+                                                            interval="1h", chunk_days=95))
+
+
+def fetch_15m_fyers(symbol: str, days: int = 30, user_id: int = 1) -> pd.DataFrame:
+    """15m candles. Fyers caps intraday at ~30-day chunks. Postgres-cached."""
+    try:
+        from tools.backtests.ohlcv_cache import get_or_fetch
+    except Exception:
+        return _fetch_fyers_interval(symbol, days, user_id, interval="15m", chunk_days=30)
+    return get_or_fetch(symbol, "15m", days,
+                        lambda s, d: _fetch_fyers_interval(s, d, user_id,
+                                                            interval="15m", chunk_days=30))
+
+
+def _fetch_daily_fyers_raw(symbol: str, days: int, user_id: int = 1,
+                            chunk_days: int = 365) -> pd.DataFrame:
+    """Daily candles direct from Fyers (no cache). Used by prefetch."""
+    svc = _fyers_service()
+    if svc is None:
+        return pd.DataFrame()
+    fyers_sym = to_fyers_symbol(symbol)
+    end_dt = datetime.now()
+    start_dt = end_dt - timedelta(days=days)
+    cursor = start_dt
+    all_candles: List = []
+    while cursor < end_dt:
+        chunk_end = min(cursor + timedelta(days=chunk_days), end_dt)
+        try:
+            res = svc.history(
+                user_id=user_id, symbol=fyers_sym, exchange="NSE",
+                interval="D",
+                start_date=cursor.strftime("%Y-%m-%d"),
+                end_date=chunk_end.strftime("%Y-%m-%d"),
+            )
+            if res and res.get("status") == "success":
+                all_candles += res.get("data", {}).get("candles", []) or []
+            else:
+                msg = (res or {}).get("message", "no response")
+                print(f"  fyers daily fail {fyers_sym} "
+                      f"{cursor.date()}..{chunk_end.date()}: {msg}")
+        except Exception as e:
+            print(f"  fyers daily error {fyers_sym}: {e}")
+        cursor = chunk_end
+    if not all_candles:
+        return pd.DataFrame()
+    if isinstance(all_candles[0], dict):
+        df = pd.DataFrame(all_candles)
+    else:
+        df = pd.DataFrame(all_candles, columns=["timestamp", "open", "high",
+                                                 "low", "close", "volume"])
+    df["timestamp"] = pd.to_numeric(df["timestamp"], errors="coerce").astype("Int64")
+    for col in ("open", "high", "low", "close", "volume"):
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    df = df.dropna(subset=["timestamp", "open", "high", "low", "close"])
+    df = df.drop_duplicates(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
+    df["candle_time"] = pd.to_datetime(df["timestamp"].astype("int64"),
+                                       unit="s", utc=True) \
+        .dt.tz_convert("Asia/Kolkata").dt.tz_localize(None)
+    df["volume"] = df["volume"].fillna(0).astype("int64")
+    df["timestamp"] = df["timestamp"].astype("int64")
+    return df[["timestamp", "candle_time", "open", "high", "low", "close", "volume"]]
+
+
+def df_to_candles(df: pd.DataFrame) -> List[SimpleNamespace]:
+    """Lightweight stand-ins for HistoricalData1H rows (no DB needed)."""
+    return [
+        SimpleNamespace(
+            timestamp=int(r.timestamp),
+            candle_time=r.candle_time,
+            open=float(r.open),
+            high=float(r.high),
+            low=float(r.low),
+            close=float(r.close),
+            volume=int(r.volume or 0),
+        )
+        for r in df.itertuples()
+    ]

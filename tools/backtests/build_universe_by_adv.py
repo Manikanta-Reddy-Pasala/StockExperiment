@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from tools.backtests.ohlcv_cache import read_cached  # noqa: E402
-from tools.backtests.run_ema_200_400_backtest import nifty500_symbols  # noqa: E402
+from tools.backtests.universes import nifty500_symbols  # noqa: E402
 
 log = logging.getLogger("build_universe")
 

@@ -16,10 +16,15 @@ from sqlalchemy import text
 
 try:
     from ...models.database import get_database_manager
-    from ..technical.ema_crossover_runner import get_ema_crossover_runner
 except ImportError:
     from src.models.database import get_database_manager
-    from src.services.technical.ema_crossover_runner import get_ema_crossover_runner
+
+# EMA crossover runner removed (rejected model). Stub to keep module importable.
+def get_ema_crossover_runner():
+    raise NotImplementedError(
+        "EMA crossover runner removed. Use Model 3 momentum rotation via "
+        "tools/live/momentum_rotation_signal.py instead."
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -116,10 +121,15 @@ class SuggestedStocksSaga:
 # Orchestrator
 # ----------------------------------------------------------------------
 class SuggestedStocksSagaOrchestrator:
-    """Drives the EMA 200/400 strategy and returns today's picks."""
+    """Drives the EMA 200/400 strategy and returns today's picks.
+
+    DEPRECATED: EMA crossover runner removed (rejected model).
+    Live picks now come from tools/live/momentum_rotation_signal.py.
+    """
 
     def __init__(self):
-        self.runner = get_ema_crossover_runner()
+        # Lazy: only fail when actually used so module imports cleanly.
+        self.runner = None
         self.db = get_database_manager()
 
     def execute_suggested_stocks_saga(

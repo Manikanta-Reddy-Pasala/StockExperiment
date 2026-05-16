@@ -41,7 +41,7 @@ from tools.backtests.ohlcv_cache import (  # noqa: E402
 
 def load_universe(name: str) -> List[Tuple[str, str]]:
     """Return [(plain_ticker, company_name), ...] for the requested universe."""
-    from tools.backtests.run_ema_200_400_backtest import (
+    from tools.backtests.universes import (
         NIFTY50_SYMBOLS, nifty500_symbols,
     )
     if name in ("n50", "nifty50"):
@@ -53,10 +53,9 @@ def load_universe(name: str) -> List[Tuple[str, str]]:
 
 def fetch_one(symbol: str, interval: str, days: int, user_id: int = 1):
     """Direct Fyers fetch (bypasses cache check). Returns DataFrame."""
-    from tools.backtests.run_ema_200_400_backtest import (
-        _fetch_fyers_interval, _FYERS_CACHE,
+    from tools.backtests.universes import (
+        _fetch_fyers_interval, _FYERS_CACHE, _fetch_daily_fyers_raw,
     )
-    from tools.backtests.run_swing_pullback_backtest import _fetch_daily_fyers_raw
     _FYERS_CACHE["user_id"] = user_id
     if interval == "1h":
         return _fetch_fyers_interval(symbol, days, user_id,

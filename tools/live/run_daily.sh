@@ -1,88 +1,68 @@
 #!/bin/bash
 # Daily live-trading cron wrapper. Idempotent.
 #
-# Cron suggestions (Indian market hours 09:15-15:30 IST):
-#   09:00 IST  -- pre-market: refresh data + generate swing signals
-#   09:30 IST  -- 1H bar starts: generate EMA signals + execute
-#   every 5min 09:30-11:15 IST -- ORB signals
-#   every 30min during market -- monitor + exit triggers
-#   15:35 IST  -- post-close: end-of-day report
+# Only deployed model: Model 3 — N100 monthly momentum rotation (top-5, max=1).
+# Signal generator: tools/live/momentum_rotation_signal.py
+# Universe file: paper_portfolio/universes/n100.json (refresh weekly)
 #
-# Usage (manual):
-#   ./run_daily.sh prefetch    # update OHLCV cache
-#   ./run_daily.sh signals     # generate today's signals (all 4 models)
+# Cron suggestions (Indian market hours 09:15-15:30 IST):
+#   1st of month 09:00 IST  -- rebalance: emit ENTRY/STOP_HIT signals
+#   daily 09:30 IST         -- monitor rotation (TARGET / STOP)
+#   every 30min during market -- mark-to-market
+#   15:35 IST               -- post-close daily report
+#
+# Usage:
+#   ./run_daily.sh prefetch    # update OHLCV cache (N100)
+#   ./run_daily.sh signals     # emit momentum rotation signals
 #   ./run_daily.sh paper       # paper-trade today's signals
 #   ./run_daily.sh monitor     # mark-to-market open positions
 #   ./run_daily.sh report      # write daily P&L report
+#   ./run_daily.sh live        # real Fyers orders (requires LIVE_TRADING=true)
 #
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 PYTHON="${PYTHON:-python}"
-UNIVERSE="${UNIVERSE:-nifty50}"
+UNIVERSE_FILE="${UNIVERSE_FILE:-paper_portfolio/universes/n100.json}"
 DATE=$(date +%Y-%m-%d)
-MODELS=(ema_200_400 ema_9_21 swing_pullback orb_15min)
+SIGNAL_FILE="signals/${DATE}_momrot_n100.json"
+LEDGER="paper_portfolio/${DATE}.json"
 
 cmd="${1:-help}"
 
 case "$cmd" in
   prefetch)
     echo "[$DATE] Prefetching today's bars to cache..."
-    $PYTHON tools/backtests/prefetch_ohlcv.py --universe all --days 2 --intervals 1h,15m,D --sleep 0.2
-    ;;
-
-  selector)
-    # Monthly stock picker — outputs top-N to signals/selector_<month>.json
-    MONTH=$(date +%Y-%m)
-    SELECTOR_FILE="signals/selector_${MONTH}.json"
-    if [ -f "$SELECTOR_FILE" ]; then
-      echo "[$DATE] Selector already run for $MONTH: $SELECTOR_FILE"
-    else
-      echo "[$DATE] Running stock selector for $MONTH..."
-      $PYTHON tools/backtests/stock_selector.py --universe nifty500 --top 10 \
-        --out "$SELECTOR_FILE"
-    fi
+    $PYTHON tools/backtests/prefetch_ohlcv.py --universe all --days 2 \
+      --intervals 1h,D --sleep 0.2
     ;;
 
   signals)
-    echo "[$DATE] Generating signals for $UNIVERSE..."
+    echo "[$DATE] Generating Model 3 momentum rotation signals..."
     mkdir -p signals
-    MONTH=$(date +%Y-%m)
-    SELECTOR_FILE="signals/selector_${MONTH}.json"
-    # If selector file exists (production config), use it for ema_200_400
-    if [ -f "$SELECTOR_FILE" ]; then
-      echo "[$DATE] Using monthly selector universe: $SELECTOR_FILE"
-      for m in "${MODELS[@]}"; do
-        if [ "$m" = "ema_200_400" ]; then
-          $PYTHON tools/live/signal_generator.py --model "$m" \
-            --universe-file "$SELECTOR_FILE" \
-            --signals-out "signals/${DATE}_${m}_selector.json"
-        else
-          $PYTHON tools/live/signal_generator.py --model "$m" --universe "$UNIVERSE" \
-            --signals-out "signals/${DATE}_${m}_${UNIVERSE}.json"
-        fi
-      done
-    else
-      for m in "${MODELS[@]}"; do
-        $PYTHON tools/live/signal_generator.py --model "$m" --universe "$UNIVERSE" \
-          --signals-out "signals/${DATE}_${m}_${UNIVERSE}.json"
-      done
-    fi
+    $PYTHON tools/live/momentum_rotation_signal.py \
+      --universe-file "$UNIVERSE_FILE" --top-n 5 --rebalance-only \
+      --signals-out "$SIGNAL_FILE"
+    ;;
+
+  signals-force)
+    echo "[$DATE] Force-emitting Model 3 signals (ignores rebalance gate)..."
+    mkdir -p signals
+    $PYTHON tools/live/momentum_rotation_signal.py \
+      --universe-file "$UNIVERSE_FILE" --top-n 5 --force \
+      --signals-out "$SIGNAL_FILE"
     ;;
 
   paper)
     echo "[$DATE] Paper-trading today's signals..."
     mkdir -p paper_portfolio
-    for m in "${MODELS[@]}"; do
-      f="signals/${DATE}_${m}_${UNIVERSE}.json"
-      [ -f "$f" ] && $PYTHON tools/live/paper_executor.py --signals "$f" \
-        --ledger "paper_portfolio/${DATE}.json"
-    done
+    [ -f "$SIGNAL_FILE" ] && $PYTHON tools/live/paper_executor.py \
+      --signals "$SIGNAL_FILE" --ledger "$LEDGER"
     ;;
 
   monitor)
     echo "[$DATE] Marking open positions to market..."
-    $PYTHON tools/live/position_monitor.py --ledger "paper_portfolio/${DATE}.json"
+    $PYTHON tools/live/position_monitor.py --ledger "$LEDGER"
     ;;
 
   live)
@@ -91,16 +71,14 @@ case "$cmd" in
       exit 1
     fi
     echo "[$DATE] LIVE Fyers execution (LIVE_TRADING=true) — placing real orders"
-    for m in "${MODELS[@]}"; do
-      f="signals/${DATE}_${m}_${UNIVERSE}.json"
-      [ -f "$f" ] && $PYTHON tools/live/fyers_executor.py --signals "$f" --user-id "${USER_ID:-1}"
-    done
+    [ -f "$SIGNAL_FILE" ] && $PYTHON tools/live/fyers_executor.py \
+      --signals "$SIGNAL_FILE" --user-id "${USER_ID:-1}"
     ;;
 
   report)
     echo "[$DATE] Daily report:"
-    $PYTHON tools/live/daily_report.py --date "$DATE" --ledger "paper_portfolio/${DATE}.json" 2>/dev/null || \
-      cat "paper_portfolio/${DATE}.json" | python -m json.tool | head -30
+    $PYTHON tools/live/daily_report.py --date "$DATE" --ledger "$LEDGER" 2>/dev/null || \
+      cat "$LEDGER" 2>/dev/null | python -m json.tool | head -30
     ;;
 
   full)
@@ -111,10 +89,9 @@ case "$cmd" in
     ;;
 
   *)
-    echo "Usage: $0 {selector|prefetch|signals|paper|live|monitor|report|full}"
-    echo "Env: CAPITAL_INR (default 1000000 = ₹10L), MAX_CONCURRENT (2), MIN_PRICE (50),"
-    echo "     MAX_DAILY_LOSS_PCT (-5.0), LIVE_TRADING (false), USER_ID (1),"
-    echo "     UNIVERSE (nifty50), PYTHON (python)"
+    echo "Usage: $0 {prefetch|signals|signals-force|paper|monitor|live|report|full}"
+    echo "Env: UNIVERSE_FILE (default paper_portfolio/universes/n100.json),"
+    echo "     LIVE_TRADING (false), USER_ID (1), PYTHON (python)"
     exit 1
     ;;
 esac
