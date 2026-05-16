@@ -95,20 +95,96 @@ def main() -> int:
     else:
         svc = None
 
-    out_log = ROOT / "order_log" / f"{datetime.now().strftime('%Y-%m-%d')}.jsonl"
-    out_log.parent.mkdir(parents=True, exist_ok=True)
+    # Canonical ledger paths — same as daily_summary.py and momrot_routes.py
+    LEDGER_DIR = Path("/app/logs/momrot/ledger")
+    LEDGER_DIR.mkdir(parents=True, exist_ok=True)
+    LEDGER_FILE = LEDGER_DIR / "momrot_ledger.json"
+    HISTORY_FILE = LEDGER_DIR / "trade_history.jsonl"
 
-    # Use empty open_positions for simplicity; production should track real positions
+    # Load current ledger (open positions)
+    if LEDGER_FILE.exists():
+        try:
+            with open(LEDGER_FILE) as f:
+                ledger = json.load(f)
+        except Exception:
+            ledger = {"open": []}
+    else:
+        ledger = {"open": []}
     open_positions: List[Position] = []
+    for p in ledger.get("open", []):
+        open_positions.append(Position(
+            symbol=p["symbol"], qty=int(p["qty"]),
+            entry_price=float(p["entry_price"]),
+            side=p.get("side", "BUY"),
+            sl=float(p.get("sl", 0) or 0),
+            target=float(p.get("target", 0) or 0),
+        ))
+
+    def _save_ledger():
+        with open(LEDGER_FILE, "w") as f:
+            json.dump({
+                "updated_at": datetime.now().isoformat(),
+                "open": [
+                    {"symbol": p.symbol, "qty": p.qty,
+                     "entry_price": p.entry_price, "side": p.side,
+                     "sl": p.sl, "target": p.target,
+                     "entry_ts": getattr(p, "entry_ts", None)}
+                    for p in open_positions
+                ],
+            }, f, indent=2, default=str)
+
+    def _append_history(rec: dict):
+        with open(HISTORY_FILE, "a") as f:
+            f.write(json.dumps(rec, default=str) + "\n")
+
     placed = 0
+    closed = 0
     skipped = 0
 
     for sig in signals:
-        if sig["signal"] not in ("ENTRY1", "ENTRY2"):
-            continue
+        sig_type = sig.get("signal")
         sym = sig["symbol"]
+        price = float(sig.get("price") or 0)
+
+        # ---- Exit signals: STOP_HIT / TARGET_HIT / FLIP ----
+        if sig_type in ("STOP_HIT", "TARGET_HIT", "EXIT"):
+            held = next((p for p in open_positions if p.symbol == sym), None)
+            if held is None:
+                log.info(f"SKIP exit {sym}: not held")
+                skipped += 1
+                continue
+            order_id = "DRY"
+            status = "dry-run"
+            exit_side = "SELL" if held.side == "BUY" else "BUY"
+            if not args.dry_run:
+                res = place_fyers_order(svc, args.user_id, sym, held.qty, exit_side)
+                status = res.get("s") or res.get("status", "unknown")
+                order_id = res.get("id") or res.get("orderId", "")
+                if status not in ("ok", "success"):
+                    log.error(f"EXIT FAIL {sym}: {res}")
+                    continue
+            pnl = (price - held.entry_price) * held.qty * (1 if held.side == "BUY" else -1)
+            _append_history({
+                "ts": datetime.now().isoformat(),
+                "event": "EXIT", "reason": sig_type,
+                "symbol": sym, "qty": held.qty,
+                "entry_price": held.entry_price, "exit_price": price,
+                "pnl": round(pnl, 2),
+                "order_id": order_id, "status": status,
+                "model": sig.get("model", "momentum_n100_top5_max1"),
+            })
+            open_positions = [p for p in open_positions if p.symbol != sym]
+            _save_ledger()
+            log.info(f"{'DRY-RUN' if args.dry_run else 'CLOSED'} {sym} qty={held.qty} "
+                     f"entry={held.entry_price} exit={price} pnl=₹{pnl:.0f} "
+                     f"reason={sig_type}")
+            closed += 1
+            continue
+
+        # ---- Entry signals ----
+        if sig_type not in ("ENTRY1", "ENTRY2"):
+            continue
         side = sig["side"]
-        price = float(sig["price"])
         ok, reason = rm.can_enter(sym, price, side, open_positions)
         if not ok:
             log.info(f"SKIP {sym}: {reason}")
@@ -130,23 +206,32 @@ def main() -> int:
                 log.error(f"ORDER FAIL {sym}: {res}")
                 continue
 
-        rec = {
-            "ts": datetime.now().isoformat(),
+        entry_ts = datetime.now().isoformat()
+        _append_history({
+            "ts": entry_ts, "event": "ENTRY", "signal": sig_type,
             "symbol": sym, "side": side, "qty": qty, "price": price,
             "sl": sig.get("sl"), "target": sig.get("target"),
             "order_id": order_id, "status": status,
-        }
-        with open(out_log, "a") as f:
-            f.write(json.dumps(rec, default=str) + "\n")
+            "model": sig.get("model", "momentum_n100_top5_max1"),
+        })
         log.info(f"{'DRY-RUN' if args.dry_run else 'PLACED'} {side} {sym} "
                  f"qty={qty} @ {price} status={status}")
         placed += 1
-        open_positions.append(Position(
+        new_pos = Position(
             symbol=sym, qty=qty, entry_price=price, side=side,
-            sl=float(sig.get("sl", 0)), target=float(sig.get("target", 0)),
-        ))
+            sl=float(sig.get("sl", 0) or 0),
+            target=float(sig.get("target", 0) or 0),
+        )
+        # attach entry_ts as an attribute
+        try:
+            object.__setattr__(new_pos, "entry_ts", entry_ts)
+        except Exception:
+            pass
+        open_positions.append(new_pos)
+        _save_ledger()
 
-    log.info(f"Done: placed={placed} skipped={skipped} (live={live}, dry_run={args.dry_run})")
+    log.info(f"Done: placed={placed} closed={closed} skipped={skipped} "
+             f"(live={live}, dry_run={args.dry_run})")
     return 0
 
 
