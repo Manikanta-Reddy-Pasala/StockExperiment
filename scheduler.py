@@ -134,86 +134,9 @@ def check_data_freshness(max_age_days: int = 3) -> dict:
         }
 
 
-def run_model3_signal(force: bool = False):
-    """Emit Model 3 momentum rotation signals.
-
-    By default rebalance-gated (only fires on 1st of month). Set force=True
-    to ignore the gate (e.g. monthly explicit run).
-    """
-    label = "Model 3 momentum signal" + (" (FORCE)" if force else " (rebalance-gated)")
-    logger.info("\n" + "=" * 80)
-    logger.info(f"RUNNING {label}")
-    logger.info("=" * 80)
-
-    universe = os.environ.get(
-        "UNIVERSE_FILE", "/app/logs/momrot/universes/n100_current.json"
-    )
-    today = datetime.now().strftime("%Y-%m-%d")
-    signals_dir = Path("/app/logs/momrot/signals")
-    signals_dir.mkdir(parents=True, exist_ok=True)
-    signals_out = signals_dir / f"{today}_momrot_n100.json"
-
-    cmd = [
-        "python3", "tools/models/momentum_n100_top5_max1/live_signal.py",
-        "--universe-file", universe,
-        "--top-n", "5",
-        "--signals-out", str(signals_out),
-    ]
-    cmd.append("--force" if force else "--rebalance-only")
-
-    try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-        if r.returncode == 0:
-            logger.info(f"✅ Model 3 signal complete -> {signals_out}")
-            if r.stdout:
-                logger.info(r.stdout[-500:])
-        else:
-            logger.error(f"❌ Model 3 signal failed ({r.returncode})")
-            if r.stderr:
-                logger.error(r.stderr[-500:])
-    except subprocess.TimeoutExpired:
-        logger.error("❌ Model 3 signal timeout (600s)")
-    except Exception as e:
-        logger.error(f"❌ Model 3 signal error: {e}", exc_info=True)
-
-
-def run_model3_execute():
-    """Place Fyers orders from today's Model 3 signal file (if exists).
-
-    Gated by LIVE_TRADING=true env var. No-op when off.
-    """
-    if os.environ.get("LIVE_TRADING", "false").lower() != "true":
-        logger.info("Model 3 execute: LIVE_TRADING not 'true', skipping.")
-        return
-
-    today = datetime.now().strftime("%Y-%m-%d")
-    signals_file = Path(f"/app/logs/momrot/signals/{today}_momrot_n100.json")
-    if not signals_file.exists():
-        logger.info(f"Model 3 execute: no signal file at {signals_file}, skipping.")
-        return
-
-    logger.info("\n" + "=" * 80)
-    logger.info("PLACING MODEL 3 FYERS ORDERS")
-    logger.info("=" * 80)
-
-    user_id = os.environ.get("USER_ID", "1")
-    cmd = [
-        "python3", "tools/live/fyers_executor.py",
-        "--signals", str(signals_file),
-        "--user-id", user_id,
-    ]
-    try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-        if r.returncode == 0:
-            logger.info("✅ Model 3 Fyers execute complete")
-            if r.stdout:
-                logger.info(r.stdout[-500:])
-        else:
-            logger.error(f"❌ Model 3 Fyers execute failed ({r.returncode})")
-            if r.stderr:
-                logger.error(r.stderr[-500:])
-    except Exception as e:
-        logger.error(f"❌ Model 3 Fyers execute error: {e}", exc_info=True)
+# Model 3 trading-side jobs are defined in
+# tools/models/momentum_n100_top5_max1/cron.py and registered below in
+# run_scheduler() via register_trading_jobs(schedule).
 
 
 def cleanup_old_snapshots():
@@ -538,11 +461,14 @@ def run_scheduler():
     # End-of-day performance reconciliation at 6:00 PM
     schedule.every().day.at("18:00").do(update_order_performance)
 
-    # Model 3 momentum rotation (the only deployed model).
-    #   09:25 daily: emit signal (rebalance-gated; fires on 1st of month only)
-    #   09:30 daily: place Fyers orders if signal exists (LIVE_TRADING=true required)
-    schedule.every().day.at("09:25").do(run_model3_signal)
-    schedule.every().day.at("09:30").do(run_model3_execute)
+    # Per-model trading-side jobs (signal + execute). Add new models by
+    # creating tools/models/<name>/cron.py with a register_trading_jobs()
+    # function, then add an import + register call below.
+    from tools.models.momentum_n100_top5_max1.cron import (
+        register_trading_jobs as register_momentum_n100_jobs,
+    )
+    register_momentum_n100_jobs(schedule)
+    # FinNifty IC is unwired — no trading jobs registered.
 
     # Schedule weekly cleanup on Sunday at 3:00 AM
     schedule.every().sunday.at("03:00").do(cleanup_old_snapshots)
