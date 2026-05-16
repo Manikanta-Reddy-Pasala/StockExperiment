@@ -1,6 +1,6 @@
 """Model 3 — Momentum Rotation live signal generator.
 
-Ranks the N100 universe by 60d return, picks top-N, emits ENTRY1 /
+Ranks the N100 universe by 30d return, picks top-N, emits ENTRY1 /
 TARGET_HIT / STOP_HIT signals consumed by tools/live/fyers_executor.py.
 
 Strategy:
@@ -11,7 +11,7 @@ Strategy:
 
 Logic per run:
   1. Load current ledger -> currently held symbol (if any)
-  2. Rank universe by 60d return; pick top-N
+  2. Rank universe by 30d return; pick top-N
   3. If held NOT in top-N -> emit STOP_HIT (rotation exit)
   4. Emit ENTRY1 for rank-1 stock if not already held
 
@@ -73,8 +73,8 @@ def get_close_at(symbol: str, target_ts: int) -> float:
 
 
 def rank_universe(stocks: List[Dict], today_ts: int,
-                  lookback_days: int = 60) -> List[tuple]:
-    """Return [(symbol, name, 60d_return%, current_price)] sorted desc."""
+                  lookback_days: int = 30) -> List[tuple]:
+    """Return [(symbol, name, 30d_return%, current_price)] sorted desc."""
     lookback_ts = today_ts - lookback_days * 86400
     rows = []
     for s in stocks:
@@ -138,7 +138,7 @@ def emit_signals(top_picks: List[tuple], held: List[Dict],
             "signal": "ENTRY1",
             "price": float(price),
             "sl": 0.0, "target": 0.0,
-            "note": f"60d momentum rank-1 ({ret:+.2f}%)",
+            "note": f"30d momentum rank-1 ({ret:+.2f}%)",
         })
 
     return signals

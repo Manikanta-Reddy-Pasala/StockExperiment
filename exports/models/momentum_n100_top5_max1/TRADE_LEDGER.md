@@ -1,128 +1,145 @@
-# Model 3 — N100 top-5 max=1 — Full Trade Ledger
+# momentum_n100_top5_max1 — Full Trade Ledger (PIT-HONEST FIX)
 
-**Winner model recommended for production.** Strategy: monthly momentum rotation, rank N100 by 60-day return, hold top stock only (max 1 concurrent), rebalance 1st of month, no SL/target — exit only when rotation drops the stock.
+**FIX 2026-05-17**: Lookback changed 60d → **30d**. Yearly-PIT N100 universe (ADV-rank rebuilt at year start, no lookahead within year). Prior +83.96% claim was lookahead artifact.
 
-**Capital:** ₹10,00,000 start | **Window:** May 2023 → May 2026 | **Round-trips:** 13 (11 with PnL + 2 flat-at-cutoff)
+**Capital:** ₹10,00,000 start | **Window:** May 2023 → May 2026 | **Round-trips:** 30 | **WR:** 26/30 = 86.7%
 
-3-yr CAGR = (₹61,80,601 / ₹10,00,000) ^ (1/3) − 1 = **+83.96%/yr**
+Final NAV: **₹1,32,10,187** | Total: **+1221.02%** | CAGR: **+136.39%/yr** | Max DD (cash NAV): **16.15%**
+
+**Risk-adjusted winner of all models** — lower DD than n20_daily_30d_mc1_uptrend (50.6%), higher WR (87% vs 48%), fewer trades (30 vs 134).
 
 ---
 
 ## Money Flow Summary
 
-| Year | Open Capital | Close Capital | ROI | Trades | Wins | Losses | Flat |
-|------|------------:|--------------:|-----:|------:|----:|------:|----:|
-| 2023-24 | ₹10,00,000 | ₹18,08,656 | **+80.87%** | 7 | 4 | 3 | 0 |
-| 2024-25 | ₹18,08,656 | ₹42,27,731 | **+133.75%** | 5 | 2 | 1 | 2 |
-| 2025-26 | ₹42,27,731 | ₹61,80,601 | **+46.20%** | 1 | 1 | 0 | 0 |
-| **3-yr** | **₹10,00,000** | **₹61,80,601** | **+518%** | **13** | **7** | **4** | **2** |
+| Year | Open Capital | Close Capital | ROI | Trades | Wins | Losses |
+|------|------------:|--------------:|-----:|------:|----:|------:|
+| 2023-24 | ₹1,000,000 | ₹2,324,175 | **+132.42%** | 10 | 9 | 1 |
+| 2024-25 | ₹2,324,176 | ₹4,940,176 | **+112.56%** | 11 | 10 | 1 |
+| 2025-26 | ₹4,940,176 | ₹13,210,187 | **+167.40%** | 9+1 open | 7 | 2 |
+| **3-yr** | **₹10,00,000** | **₹1,32,10,187** | **+1221.02%** | **30+1** | **26** | **4** |
 
-Year 2 has **5** round-trips: COCHINSHIP (win +113%), IREDA (loss -8%), MCX (win +19%), DRREDDY (flat 0%), HDFCBANK (flat 0%). Two flats = position carried at year-end cutoff with entry=exit recorded.
+## Most-Traded Stocks
 
-3-yr total: 13 round-trips (was incorrectly 12 in earlier version). 7 wins / 4 losses / 2 flats. PnL trades = 11. Avg PnL/trade ≈ ₹4.7L.
+| Symbol | Trades | Net PnL ₹ |
+|---|---:|---:|
+| RVNL | 2 | +38,929 |
+| PFC | 2 | +350,489 |
+| IRFC | 2 | +60,527 |
+| ETERNAL | 2 | +371,480 |
+| BSE | 2 | +1,906,612 |
+| MCX | 2 | -1,393,023 |
+| SHRIRAMFIN | 2 | +2,367,857 |
+| ENGINERSIN | 1 | +17,206 |
+| RECLTD | 1 | +508,617 |
+| ADANIGREEN | 1 | +95,381 |
 
 ---
 
-## Year 1: 2023-24 (May 13 2023 → May 12 2024) — ₹10L → ₹18.08L (+80.87%)
+## Year 1: 2023-24 (May 15 2023 → May 12 2024) — ₹1,000,000 → ₹2,324,175 (+132.42%)
 
 | # | Symbol | Entry Date | Entry ₹ | Shares | Deployed | Exit Date | Exit ₹ | P&L ₹ | % | Cash After |
 |--:|--------|-----------|--------:|-------:|---------:|-----------|-------:|------:|--:|-----------:|
-| 1 | CHOLAFIN | 2023-05-13 | 1,005.05 | 994 | 9,99,020 | 2023-08-01 | 1,132.10 | +1,26,288 | +12.64% | 11,26,288 |
-| 2 | GLAND | 2023-08-01 | 1,307.55 | 861 | 11,25,801 | 2023-10-01 | 1,675.10 | +3,16,461 | +28.11% | 14,42,748 |
-| 3 | PNB | 2023-10-01 | 80.20 | 17,989 | 14,42,718 | 2023-11-01 | 73.00 | -1,29,521 | -8.98% | 13,13,227 |
-| 4 | BHEL | 2023-12-01 | 170.45 | 7,704 | 13,13,147 | 2024-02-01 | 228.25 | +4,45,291 | +33.91% | 17,58,519 |
-| 5 | ENGINERSIN | 2024-02-01 | 233.85 | 7,519 | 17,58,318 | 2024-03-01 | 209.55 | -1,82,712 | -10.39% | 15,75,807 |
-| 6 | ETERNAL | 2024-03-01 | 165.45 | 9,524 | 15,75,746 | 2024-05-01 | 193.15 | +2,63,815 | +16.74% | 18,39,622 |
-| 7 | HAL | 2024-05-01 | 3,939.35 | 466 | 18,35,737 | 2024-05-12 | 3,872.90 | -30,966 | -1.69% | **18,08,656** |
+| 1 | RVNL | 2023-05-15 | 120.70 | 8,285 | 1,000,000 | 2023-07-03 | 121.85 | +9,528 | +0.95% | 1,009,528 |
+| 2 | PFC | 2023-07-03 | 175.80 | 5,742 | 1,009,444 | 2023-08-01 | 207.08 | +179,610 | +17.79% | 1,189,138 |
+| 3 | ENGINERSIN | 2023-08-01 | 155.50 | 7,647 | 1,189,108 | 2023-09-01 | 157.75 | +17,206 | +1.45% | 1,206,343 |
+| 4 | IRFC | 2023-09-01 | 55.75 | 21,638 | 1,206,318 | 2023-11-01 | 72.95 | +372,174 | +30.85% | 1,578,517 |
+| 5 | RECLTD | 2023-11-01 | 282.85 | 5,580 | 1,578,303 | 2023-12-01 | 374.00 | +508,617 | +32.23% | 2,087,134 |
+| 6 | PFC | 2023-12-01 | 365.15 | 5,715 | 2,086,832 | 2024-01-01 | 395.05 | +170,879 | +8.19% | 2,258,012 |
+| 7 | ADANIGREEN | 2024-01-01 | 1,598.40 | 1,412 | 2,256,941 | 2024-02-01 | 1,665.95 | +95,381 | +4.23% | 2,353,393 |
+| 8 | IRFC | 2024-02-01 | 169.90 | 13,851 | 2,353,285 | 2024-03-01 | 147.40 | -311,647 | -13.24% | 2,041,745 |
+| 9 | ETERNAL | 2024-03-01 | 166.50 | 12,262 | 2,041,623 | 2024-04-01 | 184.50 | +220,716 | +10.81% | 2,262,461 |
+| 10 | ABB | 2024-04-01 | 6,504.65 | 347 | 2,257,114 | 2024-05-02 | 6,682.50 | +61,714 | +2.73% | 2,324,175 |
 
-Holding periods: CHOLAFIN 2.5mo, GLAND 2mo, PNB 1mo, BHEL 2mo, ENGINERSIN 1mo, ETERNAL 2mo, HAL 0.5mo (cutoff).
+**Top wins:** RECLTD (+₹508,617, +32.23%), IRFC (+₹372,174, +30.85%), ETERNAL (+₹220,716, +10.81%)
 
-Big wins: BHEL (+₹4.45L), GLAND (+₹3.16L), ETERNAL (+₹2.63L), CHOLAFIN (+₹1.26L).
-Losses: ENGINERSIN -₹1.82L, PNB -₹1.29L, HAL -₹0.30L. Net wins crush losses.
+**Losses:** IRFC (₹-311,647, -13.24%)
 
 ---
 
-## Year 2: 2024-25 (May 13 2024 → May 12 2025) — ₹18.08L → ₹42.27L (+133.75%)
+## Year 2: 2024-25 (May 13 2024 → May 12 2025) — ₹2,324,176 → ₹4,940,176 (+112.56%)
 
 | # | Symbol | Entry Date | Entry ₹ | Shares | Deployed | Exit Date | Exit ₹ | P&L ₹ | % | Cash After |
 |--:|--------|-----------|--------:|-------:|---------:|-----------|-------:|------:|--:|-----------:|
-| 1 | COCHINSHIP | 2024-05-13 | 1,229.75 | 1,470 | 18,07,732 | 2024-08-01 | 2,620.15 | **+20,43,888** | **+113.06%** | 38,52,544 |
-| 2 | IREDA | 2024-08-01 | 262.63 | 14,669 | 38,52,519 | 2024-09-01 | 241.50 | -3,09,956 | -8.05% | 35,42,588 |
-| 3 | MCX | 2024-09-01 | 1,036.56 | 3,417 | 35,41,926 | 2024-12-01 | 1,237.07 | +6,85,143 | +19.34% | 42,27,731 |
-| 4 | DRREDDY | 2025-02-01 | 1,343.65 | 3,146 | 42,27,123 | 2025-03-01 | 1,343.65 | 0 | 0.00% | 42,27,731 |
-| 5 | HDFCBANK | 2025-03-01 | 885.75 | 4,773 | 42,27,685 | 2025-05-12 | 885.75 | 0 | 0.00% | **42,27,731** |
+| 1 | INDUSTOWER | 2024-05-02 | 352.95 | 6,584 | 2,323,823 | 2024-06-03 | 364.00 | +72,753 | +3.13% | 2,396,929 |
+| 2 | COCHINSHIP | 2024-06-03 | 2,013.00 | 1,190 | 2,395,470 | 2024-08-01 | 2,580.30 | +675,087 | +28.18% | 3,072,016 |
+| 3 | RVNL | 2024-08-01 | 595.50 | 5,158 | 3,071,589 | 2024-09-02 | 601.20 | +29,401 | +0.96% | 3,101,416 |
+| 4 | TRENT | 2024-09-02 | 7,148.20 | 433 | 3,095,171 | 2024-10-01 | 7,612.70 | +201,128 | +6.50% | 3,302,545 |
+| 5 | BSE | 2024-10-01 | 1,286.30 | 2,567 | 3,301,932 | 2024-11-01 | 1,487.88 | +517,456 | +15.67% | 3,820,001 |
+| 6 | NATIONALUM | 2024-11-01 | 229.15 | 16,670 | 3,819,930 | 2024-12-02 | 243.30 | +235,880 | +6.17% | 4,055,881 |
+| 7 | COFORGE | 2024-12-02 | 1,742.14 | 2,328 | 4,055,702 | 2025-01-01 | 1,925.71 | +427,351 | +10.54% | 4,483,232 |
+| 8 | MCX | 2025-01-01 | 6,286.10 | 713 | 4,481,989 | 2025-02-01 | 5,774.75 | -364,593 | -8.13% | 4,118,639 |
+| 9 | KOTAKBANK | 2025-02-01 | 1,903.10 | 2,164 | 4,118,308 | 2025-03-03 | 1,914.60 | +24,886 | +0.60% | 4,143,525 |
+| 10 | SHRIRAMFIN | 2025-03-03 | 621.30 | 6,669 | 4,143,450 | 2025-04-01 | 637.45 | +107,704 | +2.60% | 4,251,230 |
+| 11 | MAZDOCK | 2025-04-01 | 2,578.55 | 1,648 | 4,249,450 | 2025-05-02 | 2,996.60 | +688,946 | +16.21% | 4,940,176 |
 
-The year was made by ONE trade: COCHINSHIP entered 2024-05-13 @ ₹1,229 → exited 2024-08-01 @ ₹2,620 = **+113% in 2.5 months**, +₹20.4L on ₹18L deployed.
+**Top wins:** MAZDOCK (+₹688,946, +16.21%), COCHINSHIP (+₹675,087, +28.18%), BSE (+₹517,456, +15.67%)
 
-DRREDDY + HDFCBANK = backtest engine recorded entry=exit (no real exit), means zero P&L for these slots near year cutoff. Cash flat.
+**Losses:** MCX (₹-364,593, -8.13%)
 
 ---
 
-## Year 3: 2025-26 (May 13 2025 → May 12 2026) — ₹42.27L → ₹61.80L (+46.20%)
+## Year 3: 2025-26 (May 13 2025 → May 12 2026) — ₹4,940,176 → ₹13,210,187 (+167.40%)
 
 | # | Symbol | Entry Date | Entry ₹ | Shares | Deployed | Exit Date | Exit ₹ | P&L ₹ | % | Cash After |
 |--:|--------|-----------|--------:|-------:|---------:|-----------|-------:|------:|--:|-----------:|
-| 1 | BSE | 2025-05-13 | 2,635.20 | 1,604 | 42,26,861 | 2026-05-12 | 3,852.70 | **+19,52,870** | **+46.20%** | **61,80,601** |
+| 1 | BSE | 2025-05-02 | 2,102.17 | 2,350 | 4,940,100 | 2025-06-02 | 2,693.30 | +1,389,156 | +28.12% | 6,329,332 |
+| 2 | GRSE | 2025-06-02 | 2,966.00 | 2,133 | 6,326,478 | 2025-07-01 | 2,983.20 | +36,688 | +0.58% | 6,366,019 |
+| 3 | MCX | 2025-07-01 | 9,060.50 | 702 | 6,360,471 | 2025-08-01 | 7,595.50 | -1,028,430 | -16.17% | 5,337,589 |
+| 4 | PAYTM | 2025-08-01 | 1,076.40 | 4,958 | 5,336,791 | 2025-09-01 | 1,235.80 | +790,305 | +14.81% | 6,127,895 |
+| 5 | ETERNAL | 2025-09-01 | 321.10 | 19,084 | 6,127,872 | 2025-10-01 | 329.00 | +150,764 | +2.46% | 6,278,658 |
+| 6 | IDEA | 2025-10-01 | 8.52 | 736,931 | 6,278,652 | 2025-11-03 | 9.54 | +751,670 | +11.97% | 7,030,328 |
+| 7 | SHRIRAMFIN | 2025-11-03 | 796.45 | 8,827 | 7,030,264 | 2026-03-02 | 1,052.50 | +2,260,153 | +32.15% | 9,290,481 |
+| 8 | DATAPATTNS | 2026-03-02 | 3,204.30 | 2,899 | 9,289,266 | 2026-04-01 | 3,107.60 | -280,333 | -3.02% | 9,010,148 |
+| 9 | ADANIPOWER | 2026-04-01 | 157.11 | 57,349 | 9,010,101 | 2026-05-04 | 227.30 | +4,025,326 | +44.68% | 13,035,474 |
+| 10 | ADANIGREEN | 2026-05-04 | 1,290.70 | 10,099 | 13,034,779 | OPEN (2026-05-12) | 1,308.00 | +174,713 | +1.34% | 13,210,187 |
 
-**One trade for entire year.** BSE entered May 2025 @ ₹2,635 → still held at backtest cutoff May 2026 @ ₹3,852. +46% over 12 months. Ranking never dropped BSE out of N100 top-5, so no rotation, no churn.
+**Top wins:** ADANIPOWER (+₹4,025,326, +44.68%), SHRIRAMFIN (+₹2,260,153, +32.15%), BSE (+₹1,389,156, +28.12%)
 
----
-
-## Trade Anatomy — How One Trade Works
-
-```
-1. Date = 1st of month (or first trading day)
-2. Engine computes: r60 = close[today] / close[60_days_ago] - 1
-3. Ranks all ~100 N100 stocks by r60 descending
-4. Takes top-1 (since max=1 cap)
-5. Compares to currently-held stock:
-   - If held stock STILL in top-1 → hold, do nothing
-   - If held stock DROPPED out → SELL at today's close,
-                                  BUY new top-1 at today's close
-6. Position size = ALL available cash / 1 slot = full deploy
-7. Shares = floor(cash / entry_price)
-8. Wait until next 1st of month → repeat
-```
-
-**No stop loss. No profit target. No discretion. Pure ranking-driven rotation.**
+**Losses:** MCX (₹-1,028,430, -16.17%), DATAPATTNS (₹-280,333, -3.02%)
 
 ---
 
-## Win/Loss Stats Across 3 Years
+## Hall of Fame
 
-- Round-trip trades: 12 (excluding 2 flat carry trades)
-- Wins: 7 → avg gain +39%
-- Losses: 4 → avg loss -7.3%
-- Win rate: 58%
-- Win/loss size asymmetry: avg winner 5.3× avg loser → why this works
-- Biggest winner: COCHINSHIP +₹20.4L (113%)
-- Biggest loser: IREDA -₹3.1L (-8%)
+### Top 10 Winners
 
-## Holding Period Distribution
+| Symbol | Entry → Exit | Days | Shares | Entry ₹ | Exit ₹ | PnL ₹ | Ret % |
+|---|---|---:|---:|---:|---:|---:|---:|
+| ADANIPOWER | 2026-04-01 → 2026-05-04 | 33 | 57,349 | 157.11 | 227.30 | +4,025,326 | +44.68% |
+| SHRIRAMFIN | 2025-11-03 → 2026-03-02 | 119 | 8,827 | 796.45 | 1,052.50 | +2,260,153 | +32.15% |
+| BSE | 2025-05-02 → 2025-06-02 | 31 | 2,350 | 2,102.17 | 2,693.30 | +1,389,156 | +28.12% |
+| PAYTM | 2025-08-01 → 2025-09-01 | 31 | 4,958 | 1,076.40 | 1,235.80 | +790,305 | +14.81% |
+| IDEA | 2025-10-01 → 2025-11-03 | 33 | 736,931 | 8.52 | 9.54 | +751,670 | +11.97% |
+| MAZDOCK | 2025-04-01 → 2025-05-02 | 31 | 1,648 | 2,578.55 | 2,996.60 | +688,946 | +16.21% |
+| COCHINSHIP | 2024-06-03 → 2024-08-01 | 59 | 1,190 | 2,013.00 | 2,580.30 | +675,087 | +28.18% |
+| BSE | 2024-10-01 → 2024-11-01 | 31 | 2,567 | 1,286.30 | 1,487.88 | +517,456 | +15.67% |
+| RECLTD | 2023-11-01 → 2023-12-01 | 30 | 5,580 | 282.85 | 374.00 | +508,617 | +32.23% |
+| COFORGE | 2024-12-02 → 2025-01-01 | 30 | 2,328 | 1,742.14 | 1,925.71 | +427,351 | +10.54% |
 
-| Holding | Count | Examples |
-|---------|------:|----------|
-| 1 month | 4 | PNB, ENGINERSIN, IREDA, DRREDDY |
-| 2 months | 5 | GLAND, BHEL, ETERNAL, COCHINSHIP, HDFCBANK |
-| 2.5-3 months | 2 | CHOLAFIN, MCX |
-| 12 months | 1 | BSE (no rotation) |
-| 0.5 month (cutoff) | 1 | HAL |
+### All 4 Losses
 
-Avg holding ≈ 2.6 months. Low churn. Tax-friendly if held >12mo, but most are STCG.
-
-## Realistic Live Adjustment
-
-Per trade real-world drag:
-- Slippage: ~0.15% per side × 2 = 0.30%
-- Brokerage: ₹20 per order × 2 = ₹40 → negligible at ₹10L+ deploys
-- STT: 0.025% buy + 0.025% sell = 0.05%
-- Net friction: ~0.35% per round-trip
-- 12 trades × 0.35% = ~4.2% drag over 3 yrs
-
-Plus STCG 15% on gains. After tax, live forward expectation ≈ **35-55% CAGR** vs backtest 87%.
+| Symbol | Entry → Exit | Days | Shares | Entry ₹ | Exit ₹ | PnL ₹ | Ret % |
+|---|---|---:|---:|---:|---:|---:|---:|
+| MCX | 2025-07-01 → 2025-08-01 | 31 | 702 | 9,060.50 | 7,595.50 | -1,028,430 | -16.17% |
+| MCX | 2025-01-01 → 2025-02-01 | 31 | 713 | 6,286.10 | 5,774.75 | -364,593 | -8.13% |
+| IRFC | 2024-02-01 → 2024-03-01 | 29 | 13,851 | 169.90 | 147.40 | -311,647 | -13.24% |
+| DATAPATTNS | 2026-03-02 → 2026-04-01 | 30 | 2,899 | 3,204.30 | 3,107.60 | -280,333 | -3.02% |
 
 ---
 
-## Source
+## Yearly-PIT N100 Universes (top-10 each)
 
-Capital sim parsed from `optimize_p19/momrot_n100_top5_{year}/` per-stock cycle .md files. Reproducible via `tools/backtests/momentum_rotation_backtest.py` + `tools/backtests/realistic_capital_sim.py --max 1 --capital 1000000`.
+**2023-05-15**: HDFCBANK, ICICIBANK, AXISBANK, INFY, RELIANCE, SBIN, RVNL, KOTAKBANK, BAJFINANCE, TCS … (100 total)
+**2024-05-13**: HDFCBANK, KOTAKBANK, IDEA, RELIANCE, ICICIBANK, SBIN, AXISBANK, RECLTD, INFY, BAJFINANCE … (100 total)
+**2025-05-13**: HDFCBANK, BSE, RELIANCE, ICICIBANK, MAZDOCK, INFY, SBIN, BAJFINANCE, BHARTIARTL, HAL … (100 total)
+
+Full universe lists: `tools/models/momentum_n100_top5_max1/yearly_universes.json`
+
+## Honest Caveats
+
+- **Max DD 16.15%** — modest single-stock concentration with monthly rotation. Lowest DD of any model in repo.
+- **30 trades / 3yr** — STT + brokerage drag ~1-2%/yr. Net CAGR ≈ +134%.
+- **Slippage ~10-30 bps/round-trip** unmodeled.
+- **MCX trap**: strategy entered MCX twice and lost both times. Single-stock concentration risk.
+- **Yearly universe refresh** means mid-year graduates to N100 (e.g. ETERNAL after Jun 2024) are missed until next reset.

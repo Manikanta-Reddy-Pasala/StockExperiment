@@ -3,7 +3,7 @@
 Different mode from EMA crossover / ORB / selector approaches.
 
 Rules:
-- 1st of each month, rank N50/N100/N500 stocks by 60-day return
+- 1st of each month, rank N50/N100/N500 stocks by 30-day return
 - Hold top-3 (equal weight) for the month
 - Rebalance: sell stocks no longer in top-3, buy new entrants
 - One-position-per-stock cap
@@ -62,15 +62,15 @@ def get_high_low_during(symbol: str, start_ts: int, end_ts: int,
 
 def rank_momentum(symbols: List[str], rebalance_ts: int,
                    daily_data: Dict[str, pd.DataFrame],
-                   lookback_days: int = 60) -> List[tuple]:
-    """Return [(symbol, 60d_return)] sorted descending."""
+                   lookback_days: int = 30) -> List[tuple]:
+    """Return [(symbol, 30d_return)] sorted descending."""
     lookback_ts = rebalance_ts - lookback_days * 86400
     ranks = []
     for sym in symbols:
         c_now = get_close_at(sym, rebalance_ts, daily_data)
-        c_60d = get_close_at(sym, lookback_ts, daily_data)
-        if c_now > 0 and c_60d > 0:
-            ret = (c_now / c_60d - 1) * 100
+        c_30d = get_close_at(sym, lookback_ts, daily_data)
+        if c_now > 0 and c_30d > 0:
+            ret = (c_now / c_30d - 1) * 100
             ranks.append((sym, ret, c_now))
     ranks.sort(key=lambda x: -x[1])
     return ranks
