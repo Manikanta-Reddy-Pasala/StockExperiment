@@ -9,9 +9,9 @@ scheduler, and docs. Models slot into the main schedulers via a uniform
 | Model | Type | Wired? | CAGR | Max DD |
 |---|---|---|---:|---:|
 | `momentum_n100_top5_max1` | Equity monthly rotation N100 | ✅ data + signal + execute | +83.5% | -49% |
-| `midcap_narrow_60d_breakout` | Equity 60-day high swing | ✅ data only (exec unwired) | +121.66% | -20.43% |
-| `finnifty_ic_otm4_w300_lots5` | Option Iron Condor (aggressive) | ✅ data only (exec unwired) | +231% | -43% |
-| `finnifty_ic_otm3_w500_lots4` | Option Iron Condor (balanced) | ✅ data only (exec unwired) | +102% | -7.93% |
+| `midcap_narrow_60d_breakout` | Equity 60-day high swing | ✅ data + signal (exec unwired) | +121.66% | -20.43% |
+| `finnifty_ic_otm4_w300_lots5` | Option Iron Condor (aggressive) | ✅ data + signal (exec unwired) | +337%/yr | -42.8% |
+| `finnifty_ic_otm3_w500_lots4` | Option Iron Condor (balanced) | ✅ data + signal (exec unwired) | +193%/yr | -9.7% |
 
 ## Per-model folder layout
 
