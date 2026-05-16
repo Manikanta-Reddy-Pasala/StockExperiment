@@ -134,7 +134,7 @@ docker exec trading_system_app python \
 | Model | Avg/yr | Max DD | Calmar | Trades | WR |
 |---|---:|---:|---:|---:|---:|
 | **otm3_w500_lots4** (this) | **+193%** | **-9.7%** | **19.9** | 36 | 83% |
-| otm4_w300_lots5 | +337% avg | -42.8% | 7.9 | 35 | 77% |
+| otm4_w300_lots5 | +337% avg | -13.88% | 24.3 | 35 | 77% |
 
 otm4 has higher raw return but ~5× the DD. **This model is the
 risk-adjusted sweet spot** for the portfolio.

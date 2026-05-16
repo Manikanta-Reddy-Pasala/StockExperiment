@@ -13,6 +13,17 @@ FINNIFTY (Nifty Financial Services Index) monthly Iron Condor.
 
 ## Backtest result (2023-05-15 → 2026-05-15, 3 years)
 
+| Metric | Value |
+|---|---:|
+| Start capital | ₹2,00,000 |
+| Final NAV | ₹22,25,673 |
+| Total return | **+1012.84%** |
+| Avg/yr | **+337.6%** ✅ |
+| **Max DD (portfolio)** | **-13.88%** ✅ (target ≤ 25%) |
+| Calmar | **24.3** ⭐ |
+| Win rate | 77.1% (27W / 8L) |
+| Trades | 35 over 33 months |
+
 | Year | Trades | WR | P&L | ROI on ₹2L |
 |---|---:|---:|---:|---:|
 | 2023 (May-Dec) | 8 | 62.5% | ₹3,43,816 | **+171.91%** |
@@ -23,8 +34,10 @@ FINNIFTY (Nifty Financial Services Index) monthly Iron Condor.
 
 - Final NAV: ₹22,25,673 from ₹2L (10.1× growth)
 - Avg/mo: **+30.69%** | Best mo: +316.3% | Worst mo: -42.8%
+- **Max portfolio DD: -13.88%** (peak-to-trough equity curve)
 - Months ≥20%: 12/33 | Months ≥30%: 10/33
 - Max single-trade loss: ₹96,325 (48.2% of capital, defined-risk by wings)
+- Calmar (Avg-yr/MaxDD): **~24** ⭐
 
 Full trade ledger + monthly equity curve: `exports/models/finnifty_ic_otm4_w300_lots5/SUMMARY.md`
 
