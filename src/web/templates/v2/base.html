@@ -41,7 +41,6 @@
                         <li class="nav-item"><a class="nav-link" href="/settings"><i class="bi bi-gear"></i> Settings</a></li>
                         {% if current_user.is_admin %}
                         <li class="nav-item"><a class="nav-link" href="/admin"><i class="bi bi-sliders"></i> Admin Triggers</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/momrot"><i class="bi bi-graph-up-arrow"></i> Trading Models</a></li>
                         <li class="nav-item"><a class="nav-link" href="/admin/users"><i class="bi bi-people-fill"></i> Manage Users</a></li>
                         {% endif %}
                     </ul>
@@ -55,13 +54,6 @@
                         <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" width="48" height="48" class="me-2" style="object-fit:contain;">
                         <span class="fs-6 fw-semibold">Trading Journal</span>
                     </a>
-
-                    <!-- Strategy badge -->
-                    <div class="px-3 mb-3">
-                        <span class="badge bg-primary w-100 py-2 fs-6">
-                            <i class="bi bi-graph-up-arrow me-1"></i> Trading Models
-                        </span>
-                    </div>
 
                     <ul class="nav flex-column" id="sidebar-nav">
                         <li class="nav-item">
@@ -82,9 +74,6 @@
                         {% if current_user.is_admin %}
                         <li class="nav-item">
                             <a class="nav-link" href="/admin"><i class="bi bi-sliders"></i> Admin Triggers</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/admin/momrot"><i class="bi bi-graph-up-arrow"></i> Trading Models</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="/admin/users"><i class="bi bi-people-fill"></i> Manage Users</a>
