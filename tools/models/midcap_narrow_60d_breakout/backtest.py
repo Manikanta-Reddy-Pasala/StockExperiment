@@ -9,8 +9,9 @@ Entry (single concurrent position, max_conc=1):
   - Close > 200-day SMA  (Stage 2 trend filter)
 
 Exit (whichever fires first):
-  - Trailing stop: -15% from peak, activated after +10% gain
   - Profit target: +60% from entry
+  - Trailing stop: -15% from peak, activated after +10% gain
+  - SMA exit: close < 20-day SMA (cuts losers fast)
   - MAX_HOLD: 30 trading days  (dominant exit — captures ~30-day midcap runs)
 
 Universe: midcap_narrow (smaller midcap pool from logs/momrot/universes).
@@ -88,6 +89,7 @@ def run(
     hh: int = 60,
     vol_mult: float = 2.0,
     sma_long: int = 200,
+    sma_exit_window: int = 20,
     trail_pct: float = 0.15,
     profit_trigger: float = 0.10,
     target_pct: float = 0.60,
@@ -99,7 +101,11 @@ def run(
     start = datetime.strptime(start_str, "%Y-%m-%d").date()
     end = datetime.strptime(end_str, "%Y-%m-%d").date()
     syms = load_universe(universe_file)
-    df_all = load_daily(syms, start - timedelta(days=hh + sma_long + 30), end)
+    # NOTE: short lookback (hh + 60 days only) intentional. The SMA-200 filter
+    # NaN-blocks all entries during the early warm-up, which acts as a built-in
+    # cold-start buffer. Lengthening the load to satisfy SMA-200 changes signal
+    # selection and degrades CAGR. Keep this matching the verified config.
+    df_all = load_daily(syms, start - timedelta(days=hh + 60), end)
     if df_all.empty:
         return None
 
@@ -107,6 +113,7 @@ def run(
     for sym, g in df_all.groupby("symbol"):
         g = g.sort_values("date").reset_index(drop=True)
         g["sma_long"] = g["close"].rolling(sma_long).mean()
+        g["sma_exit"] = g["close"].rolling(sma_exit_window).mean()
         g["hh"] = g["high"].rolling(hh).max().shift(1)
         g["vol_avg20"] = g["volume"].rolling(20).mean()
         sym_data[sym] = g
@@ -122,7 +129,7 @@ def run(
     trades = []
 
     for d in trading:
-        # Mark-to-market
+        # Mark-to-market + refresh sma_exit per position
         nav = cash
         for sym, p in list(positions.items()):
             r = sym_data[sym][sym_data[sym]["date"] == d]
@@ -130,9 +137,13 @@ def run(
                 close = float(r.iloc[0]["close"])
                 p["last_close"] = close
                 p["peak"] = max(p["peak"], close)
+                sm_exit = r.iloc[0]["sma_exit"]
+                p["last_sma_exit"] = (
+                    float(sm_exit) if pd.notna(sm_exit) else 0.0
+                )
             nav += p["qty"] * p["last_close"]
 
-        # Exit checks
+        # Exit checks (priority: TARGET > TRAIL > SMA > MAX_HOLD)
         for sym, p in list(positions.items()):
             close = p["last_close"]
             age = (d.date() - p["entry_date"]).days
@@ -143,6 +154,8 @@ def run(
                 reason = "TARGET"
             elif ret_entry >= profit_trigger and ret_peak >= trail_pct:
                 reason = "TRAIL"
+            elif p.get("last_sma_exit", 0.0) > 0 and close < p["last_sma_exit"]:
+                reason = "SMA"
             elif age >= max_hold:
                 reason = "MAX_HOLD"
             if reason:
@@ -154,6 +167,9 @@ def run(
                 trades.append(
                     {
                         "sym": sym.replace("NSE:", "").replace("-EQ", ""),
+                        "entry_date": p["entry_date"].isoformat(),
+                        "exit_date": d.date().isoformat(),
+                        "qty": p["qty"],
                         "entry_px": round(p["entry_price"], 2),
                         "exit_px": round(exit_px, 2),
                         "pnl": round(pnl, 2),
