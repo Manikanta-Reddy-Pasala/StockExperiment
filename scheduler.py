@@ -368,7 +368,11 @@ def run_scheduler():
     from tools.models.momentum_n100_top5_max1.cron import (
         register_trading_jobs as register_momentum_n100_jobs,
     )
+    from tools.models.midcap_narrow_60d_breakout.cron import (
+        register_trading_jobs as register_midcap_narrow_jobs,
+    )
     register_momentum_n100_jobs(schedule)
+    register_midcap_narrow_jobs(schedule)
     # FinNifty IC is unwired — no trading jobs registered.
 
     # Schedule weekly cleanup on Sunday at 3:00 AM

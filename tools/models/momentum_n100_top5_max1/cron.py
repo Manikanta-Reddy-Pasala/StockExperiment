@@ -73,7 +73,8 @@ def execute_orders():
     log.info("PLACING MODEL 3 FYERS ORDERS")
     user_id = os.environ.get("USER_ID", "1")
     cmd = ["python3", "tools/live/fyers_executor.py",
-           "--signals", str(signals_file), "--user-id", user_id]
+           "--signals", str(signals_file), "--user-id", user_id,
+           "--model-name", "momentum_n100_top5_max1"]
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         if r.returncode == 0:

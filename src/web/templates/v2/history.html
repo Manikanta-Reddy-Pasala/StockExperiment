@@ -1,11 +1,20 @@
 {% extends "v2/base.html" %}
-{% block title %}Trade History - Momentum Rotation{% endblock %}
+{% block title %}Trade History{% endblock %}
 {% block page_title %}Trade History{% endblock %}
 
 {% block content %}
 <style>
   .pos { color: #15a36b; } .neg { color: #d4453a; } .neutral { color: #4f5868; }
 </style>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <label class="form-label small mb-0 me-2">Model:</label>
+    <select id="model_sel" class="form-select form-select-sm d-inline-block" style="width:auto"
+            onchange="load()"></select>
+  </div>
+  <div class="small text-muted">Auto-refresh 30s</div>
+</div>
 
 <div class="row g-3 mb-4">
   <div class="col-6 col-lg-3">
@@ -36,22 +45,18 @@
 </div>
 
 <div class="card">
-  <div class="card-header"><i class="bi bi-clock-history me-2"></i>Closed Trades (Newest First)</div>
+  <div class="card-header"><i class="bi bi-clock-history me-2"></i>Trades (Newest First)</div>
   <div class="table-responsive">
     <table class="table table-sm align-middle mb-0">
       <thead><tr>
-        <th>Exit ts</th><th>Symbol</th><th class="text-end">Entry ₹</th>
-        <th class="text-end">Exit ₹</th><th class="text-end">Qty</th>
-        <th class="text-end">P&amp;L ₹</th><th>Reason</th>
+        <th>Timestamp</th><th>Side</th><th>Symbol</th>
+        <th class="text-end">Qty</th><th class="text-end">Price ₹</th>
+        <th class="text-end">Value ₹</th><th class="text-end">P&amp;L ₹</th>
+        <th>Reason</th>
       </tr></thead>
-      <tbody id="hist"><tr><td colspan="7" class="text-center text-muted py-3">Loading…</td></tr></tbody>
+      <tbody id="hist"><tr><td colspan="8" class="text-center text-muted py-3">Loading…</td></tr></tbody>
     </table>
   </div>
-</div>
-
-<div class="alert alert-info mt-3 py-2 small">
-  <i class="bi bi-info-circle me-1"></i>
-  No trades yet means rotation hasn't fired. Initial entry was the only event. Next rotation = first weekday of next month (see <a href="/admin/momrot">Momentum Rotation</a>).
 </div>
 {% endblock %}
 
@@ -60,44 +65,68 @@
 const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractionDigits:2});
 const cls = n => n>0?"pos":(n<0?"neg":"neutral");
 
-async function load() {
+async function loadModels() {
   try {
-    const r = await fetch('/admin/momrot/history');
+    const r = await fetch('/admin/models/settings');
+    const d = await r.json();
+    if (!d.success) return;
+    const sel = document.getElementById('model_sel');
+    sel.innerHTML = '';
+    (d.settings||[]).forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.model_name;
+      opt.textContent = s.model_name + (s.enabled ? '' : ' (disabled)');
+      sel.appendChild(opt);
+    });
+  } catch(e) { console.error(e); }
+}
+
+async function load() {
+  const model = document.getElementById('model_sel').value;
+  if (!model) return;
+  try {
+    const r = await fetch(`/admin/models/${model}/trades?limit=200`);
     const d = await r.json();
     if (!d.success) return;
     const trades = d.trades || [];
 
-    document.getElementById('n_trades').textContent = trades.length;
-    const wins = trades.filter(t => (t.pnl||0) > 0).length;
-    const losses = trades.filter(t => (t.pnl||0) < 0).length;
-    const wr = trades.length ? (wins/trades.length*100) : 0;
+    const closed = trades.filter(t => t.side === 'SELL');
+    document.getElementById('n_trades').textContent = closed.length;
+    const wins = closed.filter(t => (t.pnl||0) > 0).length;
+    const losses = closed.filter(t => (t.pnl||0) < 0).length;
+    const wr = closed.length ? (wins/closed.length*100) : 0;
     document.getElementById('win_rate').textContent = wr.toFixed(1) + '%';
     document.getElementById('w_l').textContent = `${wins}W / ${losses}L`;
-    const total = trades.reduce((s,t)=>s+(t.pnl||0), 0);
+    const total = closed.reduce((s,t)=>s+(t.pnl||0), 0);
     document.getElementById('realized').textContent = fmtINR(total);
     document.getElementById('realized').className = 'fs-4 fw-bold ' + cls(total);
-    const best = trades.reduce((b,t)=>Math.max(b, t.pnl||0), 0);
+    const best = closed.reduce((b,t)=>Math.max(b, t.pnl||0), 0);
     document.getElementById('best').textContent = fmtINR(best);
 
     const body = document.getElementById('hist');
     if (trades.length === 0) {
-      body.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No closed trades yet</td></tr>';
+      body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No trades yet for this model</td></tr>';
     } else {
-      body.innerHTML = trades.slice().reverse().map(t => `
+      body.innerHTML = trades.map(t => `
         <tr>
-          <td class="small text-muted">${t.ts||''}</td>
+          <td class="small text-muted">${(t.trade_at||'').replace('T',' ').slice(0,19)}</td>
+          <td><span class="badge ${t.side==='BUY'?'bg-primary':'bg-warning text-dark'}">${t.side}</span></td>
           <td><strong>${t.symbol}</strong></td>
-          <td class="text-end">${fmtINR(t.entry_price)}</td>
-          <td class="text-end">${fmtINR(t.exit_price)}</td>
-          <td class="text-end">${(t.qty_closed||0).toLocaleString('en-IN')}</td>
-          <td class="text-end ${cls(t.pnl)}">${fmtINR(t.pnl)}</td>
+          <td class="text-end">${(t.qty||0).toLocaleString('en-IN')}</td>
+          <td class="text-end">${fmtINR(t.price)}</td>
+          <td class="text-end">${fmtINR(t.value)}</td>
+          <td class="text-end ${cls(t.pnl)}">${t.pnl !== null && t.pnl !== undefined ? fmtINR(t.pnl) : '—'}</td>
           <td><span class="badge bg-secondary">${t.reason||''}</span></td>
         </tr>
       `).join('');
     }
   } catch(e) { console.error(e); }
 }
-load();
+
+(async () => {
+  await loadModels();
+  load();
+})();
 setInterval(load, 30000);
 </script>
 {% endblock %}

@@ -89,6 +89,14 @@ def create_app():
     except Exception as e:
         app.logger.warning(f"⚠️ Could not create database tables: {e}")
 
+    # Seed per-model ledger rows (idempotent)
+    try:
+        from ..services.trading.model_ledger_service import ensure_models_seeded
+        ensure_models_seeded()
+        app.logger.info("✅ Model ledgers seeded")
+    except Exception as e:
+        app.logger.warning(f"⚠️ Could not seed model ledgers: {e}")
+
     # Initialize services
     user_service = get_user_service(db_manager, bcrypt)
     broker_service = get_broker_service()

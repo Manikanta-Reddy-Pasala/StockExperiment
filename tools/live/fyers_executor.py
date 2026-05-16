@@ -61,10 +61,37 @@ def place_fyers_order(svc, user_id: int, symbol: str, qty: int,
         return {"status": "error", "message": str(e)}
 
 
+def _record_model_buy(model_name, symbol, qty, price, order_id):
+    """Route BUY through per-model ledger if model_name set."""
+    if not model_name:
+        return
+    try:
+        from src.services.trading.model_ledger_service import record_buy
+        record_buy(model_name, symbol, qty, price, fyers_order_id=order_id)
+        log.info(f"  ledger: recorded BUY for {model_name}")
+    except Exception as e:
+        log.warning(f"  ledger record_buy failed for {model_name}: {e}")
+
+
+def _record_model_sell(model_name, exit_price, reason, order_id):
+    """Route SELL through per-model ledger if model_name set."""
+    if not model_name:
+        return
+    try:
+        from src.services.trading.model_ledger_service import record_sell
+        record_sell(model_name, exit_price, reason, fyers_order_id=order_id)
+        log.info(f"  ledger: recorded SELL for {model_name}")
+    except Exception as e:
+        log.warning(f"  ledger record_sell failed for {model_name}: {e}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--signals", required=True)
     ap.add_argument("--user-id", type=int, default=1)
+    ap.add_argument("--model-name", default=None,
+                    help="Per-model ledger routing. If set, every BUY/SELL is "
+                         "also recorded in model_ledger DB for this model.")
     ap.add_argument("--dry-run", action="store_true",
                     help="Print orders, don't place. Always on if LIVE_TRADING != true.")
     args = ap.parse_args()
@@ -168,6 +195,7 @@ def main() -> int:
                     log.error(f"EXIT FAIL {sym}: {res}")
                     continue
             pnl = (price - held.entry_price) * held.qty * (1 if held.side == "BUY" else -1)
+            model_for_signal = args.model_name or sig.get("model", "momentum_n100_top5_max1")
             _append_history({
                 "ts": datetime.now().isoformat(),
                 "event": "EXIT", "reason": sig_type,
@@ -175,8 +203,11 @@ def main() -> int:
                 "entry_price": held.entry_price, "exit_price": price,
                 "pnl": round(pnl, 2),
                 "order_id": order_id, "status": status,
-                "model": sig.get("model", "momentum_n100_top5_max1"),
+                "model": model_for_signal,
             })
+            if not args.dry_run:
+                _record_model_sell(model_for_signal, price,
+                                   sig.get("reason", sig_type), order_id)
             open_positions = [p for p in open_positions if p.symbol != sym]
             _save_ledger()
             log.info(f"{'DRY-RUN' if args.dry_run else 'CLOSED'} {sym} qty={held.qty} "
@@ -211,13 +242,16 @@ def main() -> int:
                 continue
 
         entry_ts = datetime.now().isoformat()
+        model_for_signal = args.model_name or sig.get("model", "momentum_n100_top5_max1")
         _append_history({
             "ts": entry_ts, "event": "ENTRY", "signal": sig_type,
             "symbol": sym, "side": side, "qty": qty, "price": price,
             "sl": sig.get("sl"), "target": sig.get("target"),
             "order_id": order_id, "status": status,
-            "model": sig.get("model", "momentum_n100_top5_max1"),
+            "model": model_for_signal,
         })
+        if not args.dry_run and side == "BUY":
+            _record_model_buy(model_for_signal, sym, qty, price, order_id)
         log.info(f"{'DRY-RUN' if args.dry_run else 'PLACED'} {side} {sym} "
                  f"qty={qty} @ {price} status={status}")
         placed += 1
