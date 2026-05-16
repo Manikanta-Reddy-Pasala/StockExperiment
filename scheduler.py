@@ -19,7 +19,9 @@ from src.models.database import get_database_manager
 from src.services.trading.auto_trading_service import get_auto_trading_service
 from src.services.trading.order_performance_tracking_service import get_performance_tracking_service
 from src.services.brokers.fyers_token_refresh import FyersTokenRefreshService
-from src.services.technical.ema_crossover_runner import get_ema_crossover_runner
+# EMA crossover runner removed (rejected model). Model 3 momentum rotation
+# is invoked as subprocess via tools/models/momentum_n100_top5_max1/live_signal.py.
+import subprocess
 
 # Configure logging with rotation (max 50MB per file, keep 5 backups)
 import os
@@ -132,45 +134,86 @@ def check_data_freshness(max_age_days: int = 3) -> dict:
         }
 
 
-def run_ema_crossover_strategy():
-    """Run the EMA 200/400 1H crossover strategy for the primary user.
+def run_model3_signal(force: bool = False):
+    """Emit Model 3 momentum rotation signals.
 
-    Refreshes 1H candles via Fyers, advances the per-symbol state machine,
-    and writes today's BUY/SELL picks into ``daily_suggested_stocks``.
+    By default rebalance-gated (only fires on 1st of month). Set force=True
+    to ignore the gate (e.g. monthly explicit run).
     """
+    label = "Model 3 momentum signal" + (" (FORCE)" if force else " (rebalance-gated)")
     logger.info("\n" + "=" * 80)
-    logger.info("RUNNING EMA 200/400 CROSSOVER STRATEGY (1H)")
+    logger.info(f"RUNNING {label}")
     logger.info("=" * 80)
 
+    universe = os.environ.get(
+        "UNIVERSE_FILE", "/app/logs/momrot/universes/n100_current.json"
+    )
+    today = datetime.now().strftime("%Y-%m-%d")
+    signals_dir = Path("/app/logs/momrot/signals")
+    signals_dir.mkdir(parents=True, exist_ok=True)
+    signals_out = signals_dir / f"{today}_momrot_n100.json"
+
+    cmd = [
+        "python3", "tools/models/momentum_n100_top5_max1/live_signal.py",
+        "--universe-file", universe,
+        "--top-n", "5",
+        "--signals-out", str(signals_out),
+    ]
+    cmd.append("--force" if force else "--rebalance-only")
+
     try:
-        runner = get_ema_crossover_runner()
-        result = runner.run_for_user(user_id=1, max_symbols=500, backfill_days=5)
-        logger.info(
-            f"✅ Strategy run: {result.get('symbols_processed', 0)} symbols, "
-            f"{result.get('signals_emitted', 0)} signals emitted, "
-            f"{len(result.get('errors', []))} errors"
-        )
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        if r.returncode == 0:
+            logger.info(f"✅ Model 3 signal complete -> {signals_out}")
+            if r.stdout:
+                logger.info(r.stdout[-500:])
+        else:
+            logger.error(f"❌ Model 3 signal failed ({r.returncode})")
+            if r.stderr:
+                logger.error(r.stderr[-500:])
+    except subprocess.TimeoutExpired:
+        logger.error("❌ Model 3 signal timeout (600s)")
     except Exception as e:
-        logger.error(f"❌ EMA 200/400 strategy run failed: {e}", exc_info=True)
+        logger.error(f"❌ Model 3 signal error: {e}", exc_info=True)
 
 
-def run_ema_pending_sustain_check():
-    """Intra-1H 15m sustain check — fires ENTRY ~15m after a retest break.
+def run_model3_execute():
+    """Place Fyers orders from today's Model 3 signal file (if exists).
 
-    Only processes symbols whose state has a pending cross flagged by the
-    last 1H run. Trend detection and EMA200/400 still come from 1H bars.
+    Gated by LIVE_TRADING=true env var. No-op when off.
     """
+    if os.environ.get("LIVE_TRADING", "false").lower() != "true":
+        logger.info("Model 3 execute: LIVE_TRADING not 'true', skipping.")
+        return
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    signals_file = Path(f"/app/logs/momrot/signals/{today}_momrot_n100.json")
+    if not signals_file.exists():
+        logger.info(f"Model 3 execute: no signal file at {signals_file}, skipping.")
+        return
+
+    logger.info("\n" + "=" * 80)
+    logger.info("PLACING MODEL 3 FYERS ORDERS")
+    logger.info("=" * 80)
+
+    user_id = os.environ.get("USER_ID", "1")
+    cmd = [
+        "python3", "tools/live/fyers_executor.py",
+        "--signals", str(signals_file),
+        "--user-id", user_id,
+    ]
     try:
-        runner = get_ema_crossover_runner()
-        result = runner.run_pending_sustains(user_id=1)
-        if result.get("pending_symbols", 0) > 0:
-            logger.info(
-                f"⏱  15m sustain check: {result.get('pending_symbols', 0)} pending, "
-                f"{result.get('signals_emitted', 0)} signals, "
-                f"{len(result.get('errors', []))} errors"
-            )
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if r.returncode == 0:
+            logger.info("✅ Model 3 Fyers execute complete")
+            if r.stdout:
+                logger.info(r.stdout[-500:])
+        else:
+            logger.error(f"❌ Model 3 Fyers execute failed ({r.returncode})")
+            if r.stderr:
+                logger.error(r.stderr[-500:])
     except Exception as e:
-        logger.error(f"❌ 15m sustain check failed: {e}", exc_info=True)
+        logger.error(f"❌ Model 3 Fyers execute error: {e}", exc_info=True)
 
 
 def cleanup_old_snapshots():
@@ -495,27 +538,11 @@ def run_scheduler():
     # End-of-day performance reconciliation at 6:00 PM
     schedule.every().day.at("18:00").do(update_order_performance)
 
-    # Run EMA 200/400 strategy 1 minute after every NSE 1H candle close.
-    # NSE 1H candles close at 10:15, 11:15, 12:15, 13:15, 14:15, 15:30 IST.
-    for run_time in ['10:16', '11:16', '12:16', '13:16', '14:16', '15:31']:
-        schedule.every().day.at(run_time).do(run_ema_crossover_strategy)
-
-    # 15m sustain check at every NSE 15m close (1m grace) for symbols with
-    # a pending retest break — fires ENTRY ~15m after the level breach
-    # instead of waiting for the next 1H close.
-    sustain_times = [
-        '09:31', '09:46', '10:01',
-        '10:31', '10:46', '11:01',
-        '11:31', '11:46', '12:01',
-        '12:31', '12:46', '13:01',
-        '13:31', '13:46', '14:01',
-        '14:31', '14:46', '15:01', '15:16',
-    ]
-    for t in sustain_times:
-        schedule.every().day.at(t).do(run_ema_pending_sustain_check)
-
-    # Evening backfill catch-up + post-market run for late candles.
-    schedule.every().day.at("22:00").do(run_ema_crossover_strategy)
+    # Model 3 momentum rotation (the only deployed model).
+    #   09:25 daily: emit signal (rebalance-gated; fires on 1st of month only)
+    #   09:30 daily: place Fyers orders if signal exists (LIVE_TRADING=true required)
+    schedule.every().day.at("09:25").do(run_model3_signal)
+    schedule.every().day.at("09:30").do(run_model3_execute)
 
     # Schedule weekly cleanup on Sunday at 3:00 AM
     schedule.every().sunday.at("03:00").do(cleanup_old_snapshots)

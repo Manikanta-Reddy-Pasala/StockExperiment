@@ -9,7 +9,7 @@ import logging
 import schedule
 import time
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 import subprocess
 
 # Add project root to path
@@ -312,6 +312,43 @@ def validate_data_quality():
         logger.error(f"❌ Data quality validation failed: {e}", exc_info=True)
 
 
+def fetch_index_spots():
+    """Daily 18:00 IST — fetch NIFTY50/BANKNIFTY/FINNIFTY index spot OHLCV.
+
+    Required by FinNifty IC option backtest pipeline + future option models.
+    """
+    logger.info("=" * 80)
+    logger.info("Fetching Index Spots (NIFTY50 / BANKNIFTY / FINNIFTY)")
+    logger.info("=" * 80)
+    today = datetime.now().strftime("%Y-%m-%d")
+    start = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+    for sym in ("NSE:NIFTY50-INDEX", "NSE:NIFTYBANK-INDEX", "NSE:FINNIFTY-INDEX"):
+        _run_subprocess_with_retry(
+            ["python3", "tools/shared/fetch_index_spot.py",
+             "--symbol", sym, "--from", start, "--to", today],
+            f"index_spot:{sym}", timeout=300, max_retries=2,
+        )
+
+
+def fetch_option_bhav():
+    """Daily 18:30 IST — ingest NSE FO bhavcopy for NIFTY/BANKNIFTY/FINNIFTY.
+
+    NSE publishes daily derivatives bhav around 17:30 IST. Fetch with buffer.
+    """
+    logger.info("=" * 80)
+    logger.info("Fetching NSE Option Bhavcopy (NIFTY/BANKNIFTY/FINNIFTY)")
+    logger.info("=" * 80)
+    today = datetime.now().strftime("%Y-%m-%d")
+    start = (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d")
+    _run_subprocess_with_retry(
+        ["python3", "tools/shared/prefetch_bhav.py",
+         "--from", start, "--to", today,
+         "--underlying", "NIFTY,BANKNIFTY,FINNIFTY",
+         "--instrument", "OPTIDX"],
+        "option_bhav:index", timeout=900, max_retries=2,
+    )
+
+
 def run_scheduler():
     """Main scheduler loop."""
     logger.info("=" * 80)
@@ -319,6 +356,8 @@ def run_scheduler():
     logger.info("=" * 80)
     logger.info("Scheduled Tasks:")
     logger.info("  - Symbol Master Update:    Weekly (Monday) at 06:00 AM")
+    logger.info("  - Index Spots (Indices):   Daily at 18:00 IST")
+    logger.info("  - Option Bhavcopy (NIFTY/BN/FN): Daily at 18:30 IST")
     logger.info("  - Data Pipeline (6 steps): Daily at 09:00 PM (after market close)")
     logger.info("  - CSV Export:              Daily at 10:00 PM")
     logger.info("  - Data Quality Check:      Daily at 10:00 PM (parallel with CSV)")
@@ -326,6 +365,10 @@ def run_scheduler():
 
     # Weekly symbol master update (Monday 6 AM)
     schedule.every().monday.at("06:00").do(update_symbol_master)
+
+    # Index spots + option bhavcopy (FinNifty IC + future option models)
+    schedule.every().day.at("18:00").do(fetch_index_spots)
+    schedule.every().day.at("18:30").do(fetch_option_bhav)
 
     # Daily data pipeline (9 PM - after market close at 3:30 PM + buffer)
     schedule.every().day.at("21:00").do(run_data_pipeline)
