@@ -158,6 +158,108 @@ def withdraw(model_name: str, amount: float) -> Dict:
         }
 
 
+def auto_bootstrap_from_json_ledger(json_path: str, model_name: str,
+                                    cash_buffer: float = 0.0) -> Dict:
+    """Migrate legacy JSON ledger (e.g. momrot_ledger.json) into model_ledger.
+
+    For each open position in the JSON:
+      - Sets model's allocated_capital = sum(qty * entry_price) + cash_buffer
+      - Adds cash_buffer to ledger.cash (= leftover from last buy)
+      - Seeds model_ledger.open_symbol/qty/entry_px/date
+
+    If the model already has allocated_capital > 0 or open_symbol, refuses
+    unless reset_model was called first.
+
+    Returns the seeded ledger snapshot.
+    """
+    import json
+    from datetime import date as _date
+
+    try:
+        with open(json_path) as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        raise ValueError(f"Legacy ledger file not found: {json_path}")
+
+    open_positions = data.get("open", [])
+    if not open_positions:
+        raise ValueError(f"No open positions in {json_path}")
+
+    db = get_database_manager()
+    with db.get_session() as s:
+        settings = s.query(ModelSettings).filter_by(model_name=model_name).first()
+        ledger = s.query(ModelLedger).filter_by(model_name=model_name).first()
+        if not settings or not ledger:
+            raise ValueError(f"Unknown model: {model_name}")
+        if ledger.open_symbol:
+            raise ValueError(
+                f"{model_name} already has open position {ledger.open_symbol}, "
+                f"reset first"
+            )
+
+        # Take the first open position (mc=1 model)
+        p = open_positions[0]
+        symbol = p["symbol"]
+        qty = int(p["qty"])
+        entry_px = float(p["entry_price"])
+        cost = Decimal(str(qty)) * Decimal(str(entry_px))
+        total_allocated = cost + Decimal(str(cash_buffer))
+
+        # Increase allocated_capital + ledger cash by buffer (cash leftover),
+        # then deduct position cost (it's now in market value).
+        settings.allocated_capital = (settings.allocated_capital or Decimal(0)) + total_allocated
+        ledger.cash = (ledger.cash or Decimal(0)) + total_allocated
+
+        # Seed position (eats cost from cash, leaves cash_buffer)
+        ledger.open_symbol = symbol
+        ledger.open_qty = qty
+        ledger.open_entry_px = Decimal(str(entry_px))
+        # entry_date from JSON if present, else today
+        entry_ts = p.get("entry_ts") or data.get("updated_at")
+        if entry_ts:
+            try:
+                ledger.open_entry_date = datetime.fromisoformat(entry_ts.split("T")[0]).date()
+            except Exception:
+                ledger.open_entry_date = _date.today()
+        else:
+            ledger.open_entry_date = _date.today()
+        ledger.cash = ledger.cash - cost
+
+        # Audit trail
+        s.add(ModelTrade(
+            model_name=model_name,
+            side="DEPOSIT",
+            symbol="-",
+            qty=0,
+            price=Decimal(0),
+            value=total_allocated,
+            reason="BOOTSTRAP_DEPOSIT",
+        ))
+        s.add(ModelTrade(
+            model_name=model_name,
+            side="BUY",
+            symbol=symbol,
+            qty=qty,
+            price=Decimal(str(entry_px)),
+            value=cost,
+            reason="BOOTSTRAP_POSITION",
+        ))
+        log.info(
+            f"Bootstrapped {model_name}: position {symbol} x{qty} @ ₹{entry_px} "
+            f"(cost ₹{float(cost):,.0f}) + cash buffer ₹{cash_buffer:,.0f} "
+            f"= total deposited ₹{float(total_allocated):,.0f}"
+        )
+        return {
+            "settings": _settings_dict(settings),
+            "ledger": _ledger_dict(ledger),
+            "bootstrapped_position": {
+                "symbol": symbol, "qty": qty, "entry_px": entry_px,
+                "cost": float(cost),
+            },
+            "cash_buffer": cash_buffer,
+        }
+
+
 def reset_model(model_name: str) -> Dict:
     """Hard reset: zero allocated_capital, zero cash, zero realized_pnl, clear
     open position, reset counters. Trade audit log is NOT deleted (history kept).

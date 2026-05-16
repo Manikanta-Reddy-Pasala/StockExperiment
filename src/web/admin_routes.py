@@ -1008,6 +1008,42 @@ def withdraw_from_model(model_name):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@admin_bp.route('/models/<model_name>/bootstrap', methods=['POST'])
+def bootstrap_model(model_name):
+    """Auto-migrate legacy JSON ledger (momrot_ledger.json) into model_ledger.
+
+    Body: {cash_buffer: optional float}  — extra liquid cash beyond
+    position cost (e.g. unused balance from last buy).
+
+    For momentum_n100_top5_max1: reads /app/logs/momrot/ledger/momrot_ledger.json
+    """
+    JSON_PATHS = {
+        "momentum_n100_top5_max1": "/app/logs/momrot/ledger/momrot_ledger.json",
+        # Add other model paths here as their legacy ledgers come online
+    }
+    try:
+        from src.services.trading.model_ledger_service import (
+            auto_bootstrap_from_json_ledger,
+        )
+        path = JSON_PATHS.get(model_name)
+        if not path:
+            return jsonify({
+                "success": False,
+                "error": f"No legacy JSON ledger known for {model_name}"
+            }), 400
+        data = request.get_json() or {}
+        cash_buffer = float(data.get("cash_buffer", 0))
+        return jsonify({
+            "success": True,
+            **auto_bootstrap_from_json_ledger(path, model_name, cash_buffer),
+        })
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"bootstrap error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @admin_bp.route('/models/<model_name>/reset', methods=['POST'])
 def reset_model_route(model_name):
     """Hard reset model ledger to zero. Audit trail preserved."""

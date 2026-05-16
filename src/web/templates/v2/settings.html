@@ -390,6 +390,7 @@ async function loadAllocations() {
           ${m.open_symbol
             ? `<button class="btn btn-outline-danger btn-sm" onclick="resetPos('${m.model_name}')">Clear Pos</button>`
             : `<button class="btn btn-outline-primary btn-sm" onclick="openSeed('${m.model_name}')">Seed Pos</button>`}
+          <button class="btn btn-outline-info btn-sm" onclick="bootstrap('${m.model_name}')" title="Auto-import existing position from legacy ledger">Bootstrap</button>
           <button class="btn btn-link btn-sm text-danger" onclick="resetModel('${m.model_name}')">Reset</button>
           <button class="btn btn-link btn-sm" onclick="toggleEnabled('${m.model_name}', ${!m.enabled})">${m.enabled?'Disable':'Enable'}</button>
         </td>
@@ -435,6 +436,23 @@ async function resetModel(model) {
   const d = await r.json();
   if (d.success) { Trading.toast(`${model} reset`, 'success'); loadAllocations(); }
   else Trading.toast(d.error || 'reset failed', 'danger');
+}
+
+async function bootstrap(model) {
+  const cash = prompt(`Auto-import ${model} from legacy JSON ledger. Enter extra cash buffer (idle cash beyond position cost), or 0 if none:`, '0');
+  if (cash === null) return;
+  const r = await fetch(`/admin/models/${model}/bootstrap`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({cash_buffer: parseFloat(cash) || 0})
+  });
+  const d = await r.json();
+  if (d.success) {
+    const p = d.bootstrapped_position || {};
+    Trading.toast(`${model}: imported ${p.symbol} x${p.qty} cost ₹${(p.cost||0).toLocaleString('en-IN')}`, 'success');
+    loadAllocations();
+  } else {
+    Trading.toast(d.error || 'bootstrap failed', 'danger');
+  }
 }
 
 async function toggleEnabled(model, enabled) {
