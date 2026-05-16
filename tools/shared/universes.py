@@ -54,6 +54,29 @@ def nifty500_symbols(limit: Optional[int] = None) -> List[Tuple[str, str]]:
     return out[:limit] if limit else out
 
 
+_NIFTY100_CACHE = ROOT / "src" / "data" / "symbols" / "nifty100.csv"
+
+
+def nifty100_symbols(limit: Optional[int] = None) -> List[Tuple[str, str]]:
+    """Return [(symbol, company_name)] for the real NIFTY 100 (free-float mcap).
+
+    Source: NSE archives ``ind_nifty100list.csv``. Refresh via
+    ``tools/refresh_nifty100.py`` (NSE rebalances Mar/Sep).
+    """
+    import csv
+    if not _NIFTY100_CACHE.exists():
+        return []
+    out: List[Tuple[str, str]] = []
+    with _NIFTY100_CACHE.open(newline="", encoding="utf-8") as fh:
+        for row in csv.DictReader(fh):
+            sym = (row.get("Symbol") or "").strip()
+            series = (row.get("Series") or "EQ").strip()
+            if not sym or series.upper() != "EQ":
+                continue
+            out.append((sym, (row.get("Company Name") or "").strip()))
+    return out[:limit] if limit else out
+
+
 # ---- Fyers symbol normalization ----
 
 def to_fyers_symbol(sym: str) -> str:
