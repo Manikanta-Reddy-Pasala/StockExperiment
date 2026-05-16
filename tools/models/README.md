@@ -51,13 +51,22 @@ Results land in `exports/models/<name>/`.
 | `momentum_n100_top5_max1` | ✅ N50+N500 close | — | — | monthly N100 universe refresh |
 | `finnifty_ic_otm4_w300_lots5` | — | ✅ NIFTY50/BN/FN | ✅ NIFTY/BN/FN OPTIDX | — |
 
-## Legacy saga pipeline (data_scheduler 21:00 daily)
+## Saga pipeline (data_scheduler 21:00 daily, admin trigger button)
 
-The 6-step saga in `src/services/data/pipeline_saga.py` is kept for admin
-UI compat (populates `technical_indicators`, `stocks.market_cap/PE/PB/ROE`).
-**No deployed model depends on steps 4 or 5** — only step 3 (HISTORICAL_DATA)
-is consumed, and the per-model `data_pull.py` already covers that as fallback.
+The saga in `src/services/data/pipeline_saga.py` runs 4 steps:
 
-Candidates for future removal if admin UI deprecated:
-- Step 4 TECHNICAL_INDICATORS (SMA-50/200 unused by Model 3)
-- Step 5 COMPREHENSIVE_METRICS (PE/PB/ROE/volatility unused by any model)
+| Step | Purpose |
+|---|---|
+| 1. SYMBOL_MASTER | Refresh Fyers symbol master |
+| 2. STOCKS | Populate `stocks` table (price, market_cap, sector) |
+| 3. HISTORICAL_DATA | Pull daily OHLCV into `historical_data` (used by Model 3) |
+| 6. PIPELINE_VALIDATION | Row-count quality check |
+
+**Steps 4 (TECHNICAL_INDICATORS) and 5 (COMPREHENSIVE_METRICS) were removed**
+— unused by any deployed model and the consuming admin UI is gone.
+Existing `technical_indicators` table data is harmless residue.
+
+Same saga invoked by:
+- `data_scheduler.py` at 21:00 IST daily (cron)
+- Admin Triggers page POST `/admin/trigger/pipeline` (manual button)
+- Admin Triggers page POST `/admin/trigger/all` (sequential wrapper)
