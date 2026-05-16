@@ -1,11 +1,11 @@
 """Data pulls required by Model 3 — momentum_n100_top5_max1.
 
 Daily (post-market close):
-  - NIFTY 500 daily close OHLCV (cache via prefetch_ohlcv)
-  - Compute pseudo-N100 universe from 20-day ADV ranking
+  - NIFTY 100 daily close OHLCV (cache via prefetch_ohlcv)
 
-Monthly (1st trading day):
-  - Refresh n100_current.json (universe drift across rotations)
+Quarterly (NSE rebalance: Mar/Sep):
+  - Refresh src/data/symbols/nifty100.csv from NSE archives
+  - Rebuild n100_current.json from updated CSV
 """
 from __future__ import annotations
 
@@ -54,13 +54,17 @@ def pull_daily_ohlcv():
 
 
 def refresh_universe():
-    """Rebuild pseudo-N100 universe by 20d ADV. Runs monthly + bootstrap."""
+    """Refresh real Nifty 100 from NSE CSV + rebuild universe file."""
     log.info("=" * 80)
-    log.info("Model 3 universe refresh (pseudo-N100 by ADV)")
+    log.info("Model 3 universe refresh (real NIFTY 100 from NSE)")
     log.info("=" * 80)
     Path(UNIVERSE_OUT).parent.mkdir(parents=True, exist_ok=True)
     _run(
+        ["python3", "tools/refresh_nifty100.py"],
+        "refresh_nifty100_csv", timeout=120,
+    )
+    _run(
         ["python3", "tools/models/momentum_n100_top5_max1/build_universe.py",
-         "--top", "100", "--out", UNIVERSE_OUT],
-        "build_universe", timeout=600,
+         "--out", UNIVERSE_OUT],
+        "build_universe", timeout=120,
     )

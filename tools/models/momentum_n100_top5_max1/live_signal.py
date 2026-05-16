@@ -4,7 +4,7 @@ Ranks the N100 universe by 30d return, picks top-N, emits ENTRY1 /
 TARGET_HIT / STOP_HIT signals consumed by tools/live/fyers_executor.py.
 
 Strategy:
-  - Universe: pseudo-N100 (top-100 by 20-day ADV)
+  - Universe: real NIFTY 100 (NSE constituents from ind_nifty100list.csv)
   - top_n = 5
   - max_concurrent = 1
   - rebalance: 1st of month (or first trading day on/after)
@@ -113,7 +113,7 @@ def emit_signals(top_picks: List[tuple], held: List[Dict],
             kind = "TARGET_HIT" if price >= h["entry_price"] else "STOP_HIT"
             signals.append({
                 "model": "momentum_rotation",
-                "universe": "n100_pseudo",
+                "universe": "n100_real",
                 "symbol": h["symbol"],
                 "company": h["symbol"],
                 "ts": today_str,
