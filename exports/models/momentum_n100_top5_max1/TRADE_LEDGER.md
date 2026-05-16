@@ -12,19 +12,24 @@ Final NAV: **₹5,868,846** | Total: **+486.88%** | CAGR: **+80.38%/yr** | Max D
 
 ---
 
-## Comparison: 3 universe variants
+## Comparison: 4 universe variants
 
 | Variant | CAGR | Final NAV | Max DD | WR | Trades | Universe size |
 |---|---:|---:|---:|---:|---:|---:|
-| Pseudo-N100 (v1, ADV-rank from N500) | +136.39% | ₹1.32 Cr | 16.15% | 86.7% | 30 | 100 |
-| Pseudo-N100 minus `small_cap` (v1.5) | +129.73% | ₹1.21 Cr | 16.15% | 86.7% | 30 | 100 |
-| **Real Nifty 100 NSE (v2, LIVE)** | **+80.38%** | **₹58.69 L** | 29.71% | 74.2% | 31 | 104 |
+| v1 Pseudo-N100 (ADV-rank from N500) | +136.39% | ₹1.32 Cr | 16.15% | 86.7% | 30 | 100 |
+| v1.5 Pseudo-N100 minus `small_cap` | +129.73% | ₹1.21 Cr | 16.15% | 86.7% | 30 | 100 |
+| **v2 Real Nifty 100 NSE (LIVE)** | **+80.38%** | **₹58.69 L** | 29.71% | 74.2% | 31 | 104 |
+| v3 Mid+small only (no large_cap) | +19.61% | ₹17.11 L | 52.28% | 53.3% | 30 | 47 |
 
-**Why v1.5 barely changed v1**: Filter excluded only **IDEA** from top-101 ADV per year (all 3 years). Other "fake N100" stocks (BSE, MAZDOCK, NETWEB, COCHINSHIP, GRSE, ITI, NBCC, PAYTM) are classified `large_cap` or `mid_cap` in our `stocks` table — too generous categorization (1039 large_cap labeled vs NSE's actual ~100 large-caps).
+**Insights:**
 
-**Real-universe truth**: only NSE official Nifty 100 (`src/data/symbols/nifty100.csv`) cuts the fake-100. Pseudo-N100 caught BSE/MAZDOCK/NETWEB/IDEA/ITI/NBCC/COCHINSHIP/PAYTM — stocks not in real index.
+- **v1.5 inert vs v1**: only IDEA excluded by small_cap filter. Other "fake N100" stocks (BSE, MAZDOCK, NETWEB, COCHINSHIP, GRSE, ITI, NBCC, PAYTM) labeled `large_cap`/`mid_cap` in our DB — stocks table category too generous (1039 large_cap rows vs NSE's actual ~100). Filter useless against real-universe drift.
 
-Production deployed on **v2 (real NSE Nifty 100)**. Backtest below is v2 result.
+- **v2 honest truth**: only NSE official CSV (`src/data/symbols/nifty100.csv`) cuts the fake-100. Pseudo-N100 caught BSE/MAZDOCK/NETWEB/IDEA/ITI/NBCC/COCHINSHIP/PAYTM — stocks not in real index. v2 is what real deployable strategy delivers.
+
+- **v3 mid+small = death spiral**: top-1 monthly rotation in mid/small-cap-only universe gets whipsawed. Y1 +95%, **Y2 -22%**, Y3 +13%. Stocks like RPOWER (-28%), IRB (-28%), IFCI (-27%), OLAELEC (-11%) traps. Trade-by-trade volatility breaks momentum signal. Large-cap participation needed for stable returns.
+
+**Production**: deployed on **v2 (real NSE Nifty 100)**. Backtest below is v2 result.
 
 ---
 
