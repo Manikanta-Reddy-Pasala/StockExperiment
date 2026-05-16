@@ -12,17 +12,19 @@ Final NAV: **₹5,868,846** | Total: **+486.88%** | CAGR: **+80.38%/yr** | Max D
 
 ---
 
-## Comparison: Pseudo-N100 (prev) vs Real N100 (now)
+## Comparison: 3 universe variants
 
-| Metric | Pseudo-N100 (v1, ADV-rank) | Real N100 (v2, NSE CSV) | Δ |
-|---|---:|---:|---:|
-| 3-yr CAGR | +136.39% | **+80.38%** | -56pp (no fake-100 winners) |
-| Final NAV | ₹1.32 Cr | **₹58.69 L** | -₹73L |
-| Max DD | 16.15% | 29.71% | +14pp worse |
-| WR | 86.7% | 74.2% | -12pp |
-| Trades | 30 | 31 | ~same |
+| Variant | CAGR | Final NAV | Max DD | WR | Trades | Universe size |
+|---|---:|---:|---:|---:|---:|---:|
+| Pseudo-N100 (v1, ADV-rank from N500) | +136.39% | ₹1.32 Cr | 16.15% | 86.7% | 30 | 100 |
+| Pseudo-N100 minus `small_cap` (v1.5) | +129.73% | ₹1.21 Cr | 16.15% | 86.7% | 30 | 100 |
+| **Real Nifty 100 NSE (v2, LIVE)** | **+80.38%** | **₹58.69 L** | 29.71% | 74.2% | 31 | 104 |
 
-Pseudo-N100 caught BSE/MAZDOCK-pre-N100/IDEA/ITI/NBCC/COCHINSHIP — stocks not in real index. Real N100 is the deployable truth.
+**Why v1.5 barely changed v1**: Filter excluded only **IDEA** from top-101 ADV per year (all 3 years). Other "fake N100" stocks (BSE, MAZDOCK, NETWEB, COCHINSHIP, GRSE, ITI, NBCC, PAYTM) are classified `large_cap` or `mid_cap` in our `stocks` table — too generous categorization (1039 large_cap labeled vs NSE's actual ~100 large-caps).
+
+**Real-universe truth**: only NSE official Nifty 100 (`src/data/symbols/nifty100.csv`) cuts the fake-100. Pseudo-N100 caught BSE/MAZDOCK/NETWEB/IDEA/ITI/NBCC/COCHINSHIP/PAYTM — stocks not in real index.
+
+Production deployed on **v2 (real NSE Nifty 100)**. Backtest below is v2 result.
 
 ---
 
