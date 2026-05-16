@@ -54,7 +54,7 @@ class ModelTrade(Base):
     id = Column(Integer, primary_key=True)
     model_name = Column(String(64), ForeignKey("model_settings.model_name"),
                        nullable=False, index=True)
-    side = Column(String(4), nullable=False)   # BUY | SELL
+    side = Column(String(16), nullable=False)  # BUY | SELL | DEPOSIT | WITHDRAW
     symbol = Column(String(64), nullable=False)
     qty = Column(Integer, nullable=False)
     price = Column(Numeric(14, 4), nullable=False)
