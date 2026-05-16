@@ -339,6 +339,8 @@ def run_scheduler():
     logger.info("Registered models (trading-side):")
     logger.info("  - momentum_n100_top5_max1:    signal 09:25 + execute 09:30 (LIVE_TRADING gated)")
     logger.info("  - midcap_narrow_60d_breakout: signal 09:25 + execute 09:32 + EOD signal 15:25")
+    logger.info("  - finnifty_ic_otm3_w500_lots4: signal 09:25 + 14:30 (Monday entry / daily stop)")
+    logger.info("  - finnifty_ic_otm4_w300_lots5: signal 09:25 + 14:30 (Monday entry / daily stop)")
     logger.info("")
     logger.info("Maintenance:")
     logger.info("  - Cleanup Old Snapshots: Weekly (Sunday) at 03:00 AM")
@@ -362,9 +364,16 @@ def run_scheduler():
     from tools.models.midcap_narrow_60d_breakout.cron import (
         register_trading_jobs as register_midcap_narrow_jobs,
     )
+    from tools.models.finnifty_ic_otm3_w500_lots4.cron import (
+        register_trading_jobs as register_fn_ic_otm3_jobs,
+    )
+    from tools.models.finnifty_ic_otm4_w300_lots5.cron import (
+        register_trading_jobs as register_fn_ic_otm4_jobs,
+    )
     register_momentum_n100_jobs(schedule)
     register_midcap_narrow_jobs(schedule)
-    # FinNifty IC is unwired — no trading jobs registered.
+    register_fn_ic_otm3_jobs(schedule)
+    register_fn_ic_otm4_jobs(schedule)
 
     # Schedule weekly cleanup on Sunday at 3:00 AM
     schedule.every().sunday.at("03:00").do(cleanup_old_snapshots)

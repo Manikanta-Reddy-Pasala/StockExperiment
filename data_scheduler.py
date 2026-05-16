@@ -339,9 +339,13 @@ def run_scheduler():
     from tools.models.finnifty_ic_otm4_w300_lots5.cron import (
         register_data_jobs as register_finnifty_ic_data,
     )
+    from tools.models.finnifty_ic_otm3_w500_lots4.cron import (
+        register_data_jobs as register_finnifty_ic_otm3_data,
+    )
     register_momentum_n100_data(schedule)
     register_midcap_narrow_data(schedule)
     register_finnifty_ic_data(schedule)
+    register_finnifty_ic_otm3_data(schedule)
 
     # Legacy 4-step saga (kept for admin UI compat — populates technical_indicators,
     # stocks.market_cap/PE/PB/ROE used by /admin and /suggested-stocks dashboards).
