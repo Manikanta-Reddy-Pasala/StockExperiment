@@ -2,20 +2,24 @@
 
 **Winner model recommended for production.** Strategy: monthly momentum rotation, rank N100 by 60-day return, hold top stock only (max 1 concurrent), rebalance 1st of month, no SL/target — exit only when rotation drops the stock.
 
-**Capital:** ₹10,00,000 start | **Window:** May 2023 → May 2026 | **Trades total:** 13 round-trips
+**Capital:** ₹10,00,000 start | **Window:** May 2023 → May 2026 | **Round-trips:** 13 (11 with PnL + 2 flat-at-cutoff)
+
+3-yr CAGR = (₹61,80,601 / ₹10,00,000) ^ (1/3) − 1 = **+83.96%/yr**
 
 ---
 
 ## Money Flow Summary
 
-| Year | Open Capital | Close Capital | ROI | Trades | Wins | Losses |
-|------|------------:|--------------:|-----:|------:|----:|------:|
-| 2023-24 | ₹10,00,000 | ₹18,08,656 | **+80.87%** | 7 | 4 | 3 |
-| 2024-25 | ₹18,08,656 | ₹42,27,731 | **+133.75%** | 4 | 2 | 1 (+1 flat) |
-| 2025-26 | ₹42,27,731 | ₹61,80,601 | **+46.20%** | 1 | 1 | 0 |
-| **3-yr** | **₹10,00,000** | **₹61,80,601** | **+518%** | **12** | **7** | **4** (+1 flat) |
+| Year | Open Capital | Close Capital | ROI | Trades | Wins | Losses | Flat |
+|------|------------:|--------------:|-----:|------:|----:|------:|----:|
+| 2023-24 | ₹10,00,000 | ₹18,08,656 | **+80.87%** | 7 | 4 | 3 | 0 |
+| 2024-25 | ₹18,08,656 | ₹42,27,731 | **+133.75%** | 5 | 2 | 1 | 2 |
+| 2025-26 | ₹42,27,731 | ₹61,80,601 | **+46.20%** | 1 | 1 | 0 | 0 |
+| **3-yr** | **₹10,00,000** | **₹61,80,601** | **+518%** | **13** | **7** | **4** | **2** |
 
-3-yr compound: ₹10L → **₹61.8L**. Avg ~₹2L per round-trip realized.
+Year 2 has **5** round-trips: COCHINSHIP (win +113%), IREDA (loss -8%), MCX (win +19%), DRREDDY (flat 0%), HDFCBANK (flat 0%). Two flats = position carried at year-end cutoff with entry=exit recorded.
+
+3-yr total: 13 round-trips (was incorrectly 12 in earlier version). 7 wins / 4 losses / 2 flats. PnL trades = 11. Avg PnL/trade ≈ ₹4.7L.
 
 ---
 

@@ -40,6 +40,16 @@ FINNIFTY (Nifty Financial Services Index) monthly Iron Condor.
 - Calmar (Avg-yr/MaxDD): **~24** ⭐
 
 Full trade ledger + monthly equity curve: `exports/models/finnifty_ic_otm4_w300_lots5/SUMMARY.md`
+Per-month invested capital + credit received: `exports/models/finnifty_ic_otm4_w300_lots5/MONTHLY_INVESTED.md`
+
+## Capital invested per cycle
+
+| Period | Lot size | Margin/cycle (5 lots) | Net credit typical | Defined max loss |
+|---|---:|---:|---:|---:|
+| Pre Sep 2024 | 40 | wing_width × 40 × 5 = ₹60,000 | ~₹15-200k | ₹40-60k |
+| Post Sep 2024 | 65 | wing_width × 65 × 5 = ₹97,500 | ~₹25-280k | ₹65-95k |
+
+Each IC cycle deploys the full margin amount as defined-risk capital. Multiple cycles overlap only when wings drift across expiries — single-trade max loss is bounded by `wing_width × lot × lots − net_credit`.
 
 ## Entry/exit logic per cycle
 

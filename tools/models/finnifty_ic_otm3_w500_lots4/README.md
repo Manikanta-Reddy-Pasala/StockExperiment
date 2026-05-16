@@ -96,8 +96,18 @@ emitter wired in `live_signal.py`, daily cron at 09:25 + 14:30 IST.
 
 `exports/models/finnifty_ic_otm3_w500_lots4/`:
 | `SUMMARY.md` | Full report with every trade + monthly equity curve |
+| `MONTHLY_INVESTED.md` | Monthly P&L with invested margin + credit received per month |
 | `trades.csv` | Per-trade ledger |
 | `monthly.csv` | Monthly stats |
+
+## Capital invested per cycle
+
+| Period | Lot size | Margin/cycle (4 lots) | Net credit typical | Defined max loss |
+|---|---:|---:|---:|---:|
+| Pre Sep 2024 | 40 | wing_width × 40 × 4 = ₹80,000 | ~₹3-200k | ₹50-75k |
+| Post Sep 2024 | 65 | wing_width × 65 × 4 = ₹1,30,000 | ~₹15-180k | ₹80-130k |
+
+Each IC cycle deploys this margin as defined-risk capital. Single-trade max loss = wing_width × lot × lots − net_credit.
 
 ## How to reproduce
 
