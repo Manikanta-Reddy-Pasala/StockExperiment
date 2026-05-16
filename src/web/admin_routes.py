@@ -470,8 +470,13 @@ def trigger_model_data_pull(model_name):
              "fetch_option_bhav"),
         ],
         "finnifty_ic_otm3_w500_lots4": [
-            ("Shares data with otm4_w300_lots5",
-             "tools.models.finnifty_ic_otm3_w500_lots4.data_pull", "noop"),
+            # otm3 shares data with otm4 — call the same fetchers
+            ("Index spots (NIFTY/BN/FN)",
+             "tools.models.finnifty_ic_otm4_w300_lots5.data_pull",
+             "fetch_index_spots"),
+            ("Option bhavcopy (NIFTY/BN/FN)",
+             "tools.models.finnifty_ic_otm4_w300_lots5.data_pull",
+             "fetch_option_bhav"),
         ],
     }
     if model_name not in allowed:
