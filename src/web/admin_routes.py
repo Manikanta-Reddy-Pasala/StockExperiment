@@ -447,7 +447,8 @@ def retry_failed_steps(task_id):
 def trigger_model_data_pull(model_name):
     """Trigger data pulls for a specific deployed model.
 
-    model_name: momentum_n100_top5_max1 | finnifty_ic_otm4_w300_lots5
+    model_name: momentum_n100_top5_max1 | finnifty_ic_otm4_w300_lots5 |
+                finnifty_ic_otm3_w500_lots4
     """
     allowed = {
         "momentum_n100_top5_max1": [
@@ -461,6 +462,10 @@ def trigger_model_data_pull(model_name):
              "fetch_index_spots"),
             ("Option bhavcopy (NIFTY/BN/FN)", "tools.models.finnifty_ic_otm4_w300_lots5.data_pull",
              "fetch_option_bhav"),
+        ],
+        "finnifty_ic_otm3_w500_lots4": [
+            ("Shares data with otm4_w300_lots5",
+             "tools.models.finnifty_ic_otm3_w500_lots4.data_pull", "noop"),
         ],
     }
     if model_name not in allowed:
@@ -510,6 +515,9 @@ def models_status():
       - FINNIFTY option chain: for the *current* monthly expiry, count
         unique strikes within ±5% of last spot. Require >= 5 strikes
         with at least 3 days of bars.
+
+    finnifty_ic_otm3_w500_lots4:
+      - Shares data with otm4. Reports same FN spot + FN option checks.
     """
     try:
         from src.models.database import get_database_manager
@@ -702,6 +710,35 @@ def models_status():
                 "wired": False,
                 "data_sufficient": bool(fn_ok),
                 "items": spot_items + opt_items,
+            })
+
+            # ============================================================
+            # Model 3: finnifty_ic_otm3_w500_lots4 (options) — shares data
+            # ============================================================
+            # Tighter strike-coverage requirement: needs wing strikes at
+            # ±500pts on FINNIFTY which is wider than otm4 IC. Verify FN
+            # option chain alone (NIFTY/BANKNIFTY not used by this model).
+            fn_spot_item = next(
+                (i for i in spot_items if i["label"].startswith("FINNIFTY ")), None
+            )
+            fn_opt_item = next(
+                (i for i in opt_items if i["label"].startswith("FINNIFTY ")), None
+            )
+            otm3_items = []
+            if fn_spot_item:
+                otm3_items.append(fn_spot_item)
+            if fn_opt_item:
+                otm3_items.append(fn_opt_item)
+            otm3_ok = bool(
+                fn_spot_item and fn_spot_item.get("ok")
+                and fn_opt_item and fn_opt_item.get("ok")
+            )
+            models.append({
+                "name": "finnifty_ic_otm3_w500_lots4",
+                "type": "options",
+                "wired": False,
+                "data_sufficient": otm3_ok,
+                "items": otm3_items,
             })
 
         return jsonify({"success": True, "models": models, "as_of": today.isoformat()})

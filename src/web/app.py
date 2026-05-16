@@ -98,15 +98,10 @@ def create_app():
     # Initialize new services
     from ..services.utils.cache_service import get_cache_service
     from ..services.utils.token_manager_service import get_token_manager
-    from ..services.utils.scheduler_service import get_scheduler
-    
+
     cache_service = get_cache_service()
     token_manager = get_token_manager()
-    scheduler = get_scheduler()
-    
-    # Start scheduler service
-    scheduler.start()
-    
+
     # Register FYERS token refresh callback
     try:
         from ..services.brokers.fyers_token_refresh import register_fyers_refresh_callback
@@ -117,12 +112,8 @@ def create_app():
     # Technical indicators system - no ML models needed
     app.logger.info("📊 Using technical indicator system (RS Rating + Wave Indicators)")
 
-    # Initialize stock initialization service with complete flow
+    # Run pipeline saga in background thread (only if data is stale)
     try:
-        from ..services.data.stock_initialization_service import get_stock_initialization_service
-        stock_init_service = get_stock_initialization_service()
-
-        # Run complete stock initialization in background thread (only if data is stale)
         import threading
         def run_complete_stock_initialization():
             try:
@@ -712,18 +703,6 @@ def create_app():
             app.logger.error(f"Error getting FYERS historical data for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
     
-    # Dashboard API Routes - Updated to use unified multi-broker system
-    @app.route('/api/dashboard/metrics', methods=['GET'])
-    @login_required
-    def api_get_dashboard_metrics():
-        """Get dashboard metrics using unified multi-broker system."""
-        try:
-            from .routes.unified_routes import api_get_portfolio_summary
-            return api_get_portfolio_summary()
-        except Exception as e:
-            app.logger.error(f"Error fetching dashboard metrics for user {current_user.id}: {str(e)}")
-            return jsonify({'success': False, 'error': 'Internal server error'}), 500
-
     # Portfolio API Routes (Legacy - keeping for backward compatibility)
     @app.route('/api/portfolio/holdings', methods=['GET'])
     @login_required
@@ -1027,74 +1006,6 @@ def create_app():
                 'source': 'exception'
             }), 500
 
-    @app.route('/api/dashboard/portfolio-holdings', methods=['GET'])
-    @login_required
-    def api_get_portfolio_holdings():
-        """Get portfolio holdings using unified multi-broker system."""
-        try:
-            from .routes.unified_routes import api_get_holdings
-            return api_get_holdings()
-        except Exception as e:
-            app.logger.error(f"Error fetching portfolio holdings: {e}")
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
-
-    @app.route('/api/dashboard/pending-orders', methods=['GET'])
-    @login_required
-    def api_get_pending_orders():
-        """Get pending orders using unified multi-broker system."""
-        try:
-            from .routes.unified_routes import api_get_pending_orders as unified_pending_orders
-            return unified_pending_orders()
-        except Exception as e:
-            app.logger.error(f"Error fetching pending orders: {e}")
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
-
-    @app.route('/api/dashboard/recent-orders', methods=['GET'])
-    @login_required
-    def api_get_recent_orders():
-        """Get recent orders using unified multi-broker system."""
-        try:
-            from .routes.unified_routes import api_get_recent_activity as unified_recent_activity
-            return unified_recent_activity()
-        except Exception as e:
-            app.logger.error(f"Error fetching recent orders: {e}")
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
-
-    @app.route('/api/dashboard/portfolio-performance', methods=['GET'])
-    @login_required
-    def api_get_portfolio_performance():
-        """Get portfolio performance data using unified multi-broker system."""
-        try:
-            from .routes.unified_routes import api_get_performance_metrics
-            return api_get_performance_metrics()
-        except Exception as e:
-            app.logger.error(f"Error fetching portfolio performance: {e}")
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
-
-    # Suggested Stocks API Routes - Read from daily snapshot table (not live saga)
-    @app.route('/api/suggested-stocks', methods=['GET'])
-    @login_required
-    def api_get_suggested_stocks():
-        """Get suggested stocks from pre-calculated daily recommendations."""
-        try:
-            from .routes.suggested_stocks_routes import get_suggested_stocks as get_suggested_stocks_from_db
-            return get_suggested_stocks_from_db()
-        except Exception as e:
-            app.logger.error(f"Error getting suggested stocks for user {current_user.id}: {str(e)}")
-            return jsonify({'success': False, 'error': 'Internal server error'}), 500
-
     # Settings API Routes
     @app.route('/api/settings', methods=['GET'])
     @login_required
@@ -1172,78 +1083,6 @@ def create_app():
             app.logger.error(f"Error getting mock trading status for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
-    @app.route('/api/mock-trading/order', methods=['POST'])
-    @login_required
-    def api_place_mock_order():
-        """Place a mock order."""
-        try:
-            data = request.get_json()
-            symbol = data.get('symbol')
-            quantity = data.get('quantity', 1)
-
-            if not symbol:
-                return jsonify({'success': False, 'error': 'Symbol is required'}), 400
-
-            from ..services.trading.mock_trading_service import get_mock_trading_service
-            with db_manager.get_session() as session:
-                mock_trading_service = get_mock_trading_service(session)
-                result = mock_trading_service.place_mock_order(
-                    user_id=current_user.id,
-                    symbol=symbol,
-                    quantity=quantity
-                )
-
-            if result['success']:
-                app.logger.info(f"Mock order placed: {symbol} x{quantity} for user {current_user.id}")
-                return jsonify(result)
-            else:
-                return jsonify(result), 400
-        except Exception as e:
-            app.logger.error(f"Error placing mock order for user {current_user.id}: {str(e)}", exc_info=True)
-            return jsonify({'success': False, 'error': 'Internal server error'}), 500
-
-    @app.route('/api/mock-trading/orders', methods=['GET'])
-    @login_required
-    def api_get_mock_orders():
-        """Get mock orders for a user."""
-        try:
-            limit = int(request.args.get('limit', 50))
-
-            from ..services.trading.mock_trading_service import get_mock_trading_service
-            with db_manager.get_session() as session:
-                mock_trading_service = get_mock_trading_service(session)
-                orders = mock_trading_service.get_mock_orders(
-                    user_id=current_user.id,
-                    limit=limit
-                )
-
-            return jsonify({
-                'success': True,
-                'orders': orders,
-                'total': len(orders)
-            })
-        except Exception as e:
-            app.logger.error(f"Error getting mock orders for user {current_user.id}: {str(e)}")
-            return jsonify({'success': False, 'error': 'Internal server error'}), 500
-
-    @app.route('/api/mock-trading/performance', methods=['GET'])
-    @login_required
-    def api_get_mock_performance():
-        """Get performance metrics for mock trading."""
-        try:
-            from ..services.trading.mock_trading_service import get_mock_trading_service
-            with db_manager.get_session() as session:
-                mock_trading_service = get_mock_trading_service(session)
-                result = mock_trading_service.calculate_performance(current_user.id)
-
-            if result['success']:
-                return jsonify(result)
-            else:
-                return jsonify(result), 400
-        except Exception as e:
-            app.logger.error(f"Error getting mock performance for user {current_user.id}: {str(e)}")
-            return jsonify({'success': False, 'error': 'Internal server error'}), 500
-
     # Broker Selection API
     @app.route('/api/brokers/current', methods=['GET'])
     @login_required
@@ -1280,54 +1119,10 @@ def create_app():
             app.logger.error(f"Error setting current broker for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
-    # Register unified multi-broker routes
-    try:
-        from .routes.unified_routes import unified_bp
-        app.register_blueprint(unified_bp)
-        app.logger.info("Unified multi-broker routes registered successfully")
-    except ImportError as e:
-        app.logger.warning(f"Unified routes not available: {e}")
-
     # Register broker-specific blueprints
     from .routes.brokers import fyers_bp, zerodha_bp
     app.register_blueprint(fyers_bp)
     app.register_blueprint(zerodha_bp)
-
-
-    # Register strategy blueprints
-    try:
-        from .routes.strategy_routes import strategy_bp
-        app.register_blueprint(strategy_bp)
-        app.logger.info("Strategy routes registered successfully")
-    except ImportError as e:
-        app.logger.warning(f"Strategy routes not available: {e}")
-    
-    # Register strategy settings blueprints
-    try:
-        from .routes.strategy_settings_routes import strategy_settings_bp
-        app.register_blueprint(strategy_settings_bp)
-        app.logger.info("Strategy settings routes registered successfully")
-    except ImportError as e:
-        app.logger.warning(f"Strategy settings routes not available: {e}")
-        app.logger.warning("Strategy functionality will be disabled")
-
-    # Register suggested stocks blueprints
-    try:
-        from .routes.suggested_stocks_routes import suggested_stocks_bp
-        app.register_blueprint(suggested_stocks_bp)
-        app.logger.info("Suggested stocks routes registered successfully")
-    except ImportError as e:
-        app.logger.warning(f"Suggested stocks routes not available: {e}")
-        app.logger.warning("Suggested stocks functionality will be disabled")
-
-    # Register auto-trading blueprints
-    try:
-        from .routes.auto_trading_routes import auto_trading_bp
-        app.register_blueprint(auto_trading_bp)
-        app.logger.info("Auto-trading routes registered successfully")
-    except ImportError as e:
-        app.logger.warning(f"Auto-trading routes not available: {e}")
-        app.logger.warning("Auto-trading functionality will be disabled")
 
     # Register admin routes for manual triggers
     try:
@@ -1346,14 +1141,6 @@ def create_app():
     except ImportError as e:
         app.logger.warning(f"Momentum rotation routes not available: {e}")
 
-
-    # Register data management routes (yfinance, data population)
-    try:
-        from .routes.data_management_routes import data_management_bp
-        app.register_blueprint(data_management_bp)
-        app.logger.info("Data management routes registered successfully")
-    except ImportError as e:
-        app.logger.warning(f"Data management routes not available: {e}")
 
     # Register WebAuthn/Passkey authentication routes
     try:
@@ -1441,20 +1228,6 @@ def create_app():
             app.logger.error(f"Error fetching portfolio with sync service: {e}", exc_info=True)
             return jsonify([]), 500
 
-    @app.route('/api/orders/', methods=['GET'])
-    @login_required
-    def api_get_orders():
-        """Get orders history - redirect to unified endpoint."""
-        try:
-            from .routes.unified_routes import api_get_orders_history
-            return api_get_orders_history()
-        except Exception as e:
-            app.logger.error(f"Error fetching orders: {e}")
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
-
     @app.route('/api/orders', methods=['GET'])
     def api_get_orders_no_slash():
         """Get comprehensive orders data for Orders page using efficient caching."""
@@ -1480,125 +1253,6 @@ def create_app():
         except Exception as e:
             app.logger.error(f"Error fetching orders with sync service: {e}", exc_info=True)
             return jsonify([]), 500
-
-    @app.route('/api/portfolio/positions', methods=['GET'])
-    @login_required
-    def api_get_portfolio_positions_unified():
-        """Get portfolio positions - redirect to unified endpoint."""
-        try:
-            from .routes.unified_routes import api_get_positions
-            return api_get_positions()
-        except Exception as e:
-            app.logger.error(f"Error fetching portfolio positions: {e}")
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
-
-    @app.route('/api/orders/history', methods=['GET'])
-    @login_required
-    def api_get_orders_history_unified():
-        """Get orders history - redirect to unified endpoint."""
-        try:
-            from .routes.unified_routes import api_get_orders_history as unified_orders_history
-            return unified_orders_history()
-        except Exception as e:
-            app.logger.error(f"Error fetching orders history: {e}")
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
-
-    @app.route('/api/reports', methods=['GET'])
-    def api_get_reports():
-        """Get comprehensive reports data using reports sync service with real trade data."""
-        try:
-            # Get user_id - default to 1 for testing (same pattern as other APIs)
-            user_id = getattr(current_user, 'id', None) if current_user and current_user.is_authenticated else 1
-
-            app.logger.info(f"Fetching reports data for user {user_id}")
-
-            from src.services.data.reports_sync_service import get_reports_sync_service
-            reports_sync_service = get_reports_sync_service()
-
-            force_refresh = request.args.get('force_refresh', 'false').lower() == 'true'
-            reports_data = reports_sync_service.get_reports_data(user_id, force_refresh=force_refresh)
-
-            return jsonify(reports_data)
-
-        except Exception as e:
-            app.logger.error(f"Error fetching reports: {e}")
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
-
-    @app.route('/api/reports/summary', methods=['GET'])
-    def api_get_reports_summary():
-        """Get reports summary data for cards display."""
-        try:
-            user_id = getattr(current_user, 'id', None) if current_user and current_user.is_authenticated else 1
-
-            from src.services.data.reports_sync_service import get_reports_sync_service
-            reports_sync_service = get_reports_sync_service()
-
-            force_refresh = request.args.get('force_refresh', 'false').lower() == 'true'
-            reports_data = reports_sync_service.get_reports_data(user_id, force_refresh=force_refresh)
-
-            # Return only the summary data needed for the reports cards
-            return jsonify(reports_data.get('summary', {}))
-
-        except Exception as e:
-            app.logger.error(f"Error fetching reports summary: {e}")
-            return jsonify({
-                'total_pnl': 0.0,
-                'total_trades': 0,
-                'win_rate': 0.0
-            }), 500
-
-    @app.route('/api/reports/performance', methods=['GET'])
-    def api_get_reports_performance():
-        """Get performance summary data for the performance table."""
-        try:
-            user_id = getattr(current_user, 'id', None) if current_user and current_user.is_authenticated else 1
-
-            from src.services.data.reports_sync_service import get_reports_sync_service
-            reports_sync_service = get_reports_sync_service()
-
-            force_refresh = request.args.get('force_refresh', 'false').lower() == 'true'
-            reports_data = reports_sync_service.get_reports_data(user_id, force_refresh=force_refresh)
-
-            return jsonify({
-                'performance_summary': reports_data.get('performance_summary', [])
-            })
-
-        except Exception as e:
-            app.logger.error(f"Error fetching performance data: {e}")
-            return jsonify({'performance_summary': []}), 500
-
-    @app.route('/api/reports/top-performers', methods=['GET'])
-    def api_get_top_performers():
-        """Get top performing stocks data."""
-        try:
-            user_id = getattr(current_user, 'id', None) if current_user and current_user.is_authenticated else 1
-
-            from src.services.data.reports_sync_service import get_reports_sync_service
-            reports_sync_service = get_reports_sync_service()
-
-            force_refresh = request.args.get('force_refresh', 'false').lower() == 'true'
-            reports_data = reports_sync_service.get_reports_data(user_id, force_refresh=force_refresh)
-
-            return jsonify({
-                'top_performers': reports_data.get('top_performers', []),
-                'worst_performers': reports_data.get('worst_performers', [])
-            })
-
-        except Exception as e:
-            app.logger.error(f"Error fetching top performers: {e}")
-            return jsonify({
-                'top_performers': [],
-                'worst_performers': []
-            }), 500
 
     @app.route('/api/orders/sync-broker', methods=['POST'])
     def api_sync_orders_from_broker():

@@ -11,7 +11,6 @@ try:
 except ImportError:
     from src.services.utils.user_settings_service import get_user_settings_service
 from .dashboard_interface import IDashboardProvider
-from .suggested_stocks_interface import ISuggestedStocksProvider
 from .orders_interface import IOrdersProvider
 from .portfolio_interface import IPortfolioProvider
 from .reports_interface import IReportsProvider
@@ -28,7 +27,6 @@ class BrokerFeatureFactory:
     def __init__(self):
         self.user_settings_service = get_user_settings_service()
         self._dashboard_providers: Dict[str, Type[IDashboardProvider]] = {}
-        self._suggested_stocks_providers: Dict[str, Type[ISuggestedStocksProvider]] = {}
         self._orders_providers: Dict[str, Type[IOrdersProvider]] = {}
         self._portfolio_providers: Dict[str, Type[IPortfolioProvider]] = {}
         self._reports_providers: Dict[str, Type[IReportsProvider]] = {}
@@ -41,29 +39,25 @@ class BrokerFeatureFactory:
         # Import and register FYERS providers
         try:
             from ..implementations.fyers_dashboard_provider import FyersDashboardProvider
-            from ..implementations.fyers_suggested_stocks_provider import FyersSuggestedStocksProvider
             from ..implementations.fyers_orders_provider import FyersOrdersProvider
             from ..implementations.fyers_portfolio_provider import FyersPortfolioProvider
             from ..implementations.fyers_reports_provider import FyersReportsProvider
-            
+
             self.register_dashboard_provider('fyers', FyersDashboardProvider)
-            self.register_suggested_stocks_provider('fyers', FyersSuggestedStocksProvider)
             self.register_orders_provider('fyers', FyersOrdersProvider)
             self.register_portfolio_provider('fyers', FyersPortfolioProvider)
             self.register_reports_provider('fyers', FyersReportsProvider)
         except ImportError:
             pass  # FYERS providers not available
-        
+
         # Import and register Zerodha providers
         try:
             from ..implementations.zerodha_dashboard_provider import ZerodhaDashboardProvider
-            from ..implementations.zerodha_suggested_stocks_provider import ZerodhaSuggestedStocksProvider
             from ..implementations.zerodha_orders_provider import ZerodhaOrdersProvider
             from ..implementations.zerodha_portfolio_provider import ZerodhaPortfolioProvider
             from ..implementations.zerodha_reports_provider import ZerodhaReportsProvider
-            
+
             self.register_dashboard_provider('zerodha', ZerodhaDashboardProvider)
-            self.register_suggested_stocks_provider('zerodha', ZerodhaSuggestedStocksProvider)
             self.register_orders_provider('zerodha', ZerodhaOrdersProvider)
             self.register_portfolio_provider('zerodha', ZerodhaPortfolioProvider)
             self.register_reports_provider('zerodha', ZerodhaReportsProvider)
@@ -75,10 +69,6 @@ class BrokerFeatureFactory:
     def register_dashboard_provider(self, broker: str, provider_class: Type[IDashboardProvider]):
         """Register a dashboard provider for a broker."""
         self._dashboard_providers[broker] = provider_class
-    
-    def register_suggested_stocks_provider(self, broker: str, provider_class: Type[ISuggestedStocksProvider]):
-        """Register a suggested stocks provider for a broker."""
-        self._suggested_stocks_providers[broker] = provider_class
     
     def register_orders_provider(self, broker: str, provider_class: Type[IOrdersProvider]):
         """Register an orders provider for a broker."""
@@ -118,12 +108,6 @@ class BrokerFeatureFactory:
         except Exception:
             return False
     
-    def get_suggested_stocks_provider(self, user_id: int) -> Optional[ISuggestedStocksProvider]:
-        """Get suggested stocks provider based on user's broker selection."""
-        broker = self.user_settings_service.get_broker_provider(user_id)
-        provider_class = self._suggested_stocks_providers.get(broker)
-        return provider_class() if provider_class else None
-    
     def get_orders_provider(self, user_id: int) -> Optional[IOrdersProvider]:
         """Get orders provider based on user's broker selection."""
         broker = self.user_settings_service.get_broker_provider(user_id)
@@ -147,15 +131,13 @@ class BrokerFeatureFactory:
         brokers = {}
         all_brokers = set()
         all_brokers.update(self._dashboard_providers.keys())
-        all_brokers.update(self._suggested_stocks_providers.keys())
         all_brokers.update(self._orders_providers.keys())
         all_brokers.update(self._portfolio_providers.keys())
         all_brokers.update(self._reports_providers.keys())
-        
+
         for broker in all_brokers:
             brokers[broker] = {
                 'dashboard': broker in self._dashboard_providers,
-                'suggested_stocks': broker in self._suggested_stocks_providers,
                 'orders': broker in self._orders_providers,
                 'portfolio': broker in self._portfolio_providers,
                 'reports': broker in self._reports_providers

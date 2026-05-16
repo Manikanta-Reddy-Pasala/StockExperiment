@@ -13,7 +13,7 @@ import os
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from ..interfaces import (
-    IDashboardProvider, ISuggestedStocksProvider, IOrdersProvider,
+    IDashboardProvider, IOrdersProvider,
     IPortfolioProvider, IReportsProvider, BrokerFeatureFactory,
     get_broker_feature_factory
 )
@@ -92,65 +92,6 @@ class UnifiedBrokerService:
         if not provider:
             return self._no_provider_error('dashboard')
         return provider.get_watchlist_quotes(user_id, symbols)
-    
-    # Suggested Stocks methods
-    def discover_tradeable_stocks(self, user_id: int, exchange: str = "NSE") -> Dict[str, Any]:
-        """Discover tradeable stocks using user's selected broker."""
-        provider = self.factory.get_suggested_stocks_provider(user_id)
-        if not provider:
-            return self._no_provider_error('suggested_stocks')
-        return provider.discover_tradeable_stocks(user_id, exchange)
-
-    def search_stocks(self, user_id: int, search_term: str, exchange: str = "NSE") -> Dict[str, Any]:
-        """Search stocks using user's selected broker."""
-        provider = self.factory.get_suggested_stocks_provider(user_id)
-        if not provider:
-            return self._no_provider_error('suggested_stocks')
-        return provider.search_stocks(user_id, search_term, exchange)
-
-    def get_suggested_stocks(self, user_id: int, strategies: List[Any] = None,
-                           limit: int = 50) -> Dict[str, Any]:
-        """Get suggested stocks using user's selected broker."""
-        provider = self.factory.get_suggested_stocks_provider(user_id)
-        if not provider:
-            return self._no_provider_error('suggested_stocks')
-        return provider.get_suggested_stocks(user_id, strategies, limit)
-    
-    def get_stock_analysis(self, user_id: int, symbol: str) -> Dict[str, Any]:
-        """Get stock analysis using user's selected broker."""
-        provider = self.factory.get_suggested_stocks_provider(user_id)
-        if not provider:
-            return self._no_provider_error('suggested_stocks')
-        return provider.get_stock_analysis(user_id, symbol)
-    
-    def get_strategy_performance(self, user_id: int, strategy: Any, 
-                               period: str = '1M') -> Dict[str, Any]:
-        """Get strategy performance using user's selected broker."""
-        provider = self.factory.get_suggested_stocks_provider(user_id)
-        if not provider:
-            return self._no_provider_error('suggested_stocks')
-        return provider.get_strategy_performance(user_id, strategy, period)
-    
-    def get_sector_analysis(self, user_id: int) -> Dict[str, Any]:
-        """Get sector analysis using user's selected broker."""
-        provider = self.factory.get_suggested_stocks_provider(user_id)
-        if not provider:
-            return self._no_provider_error('suggested_stocks')
-        return provider.get_sector_analysis(user_id)
-    
-    def get_technical_screener(self, user_id: int, criteria: Dict[str, Any]) -> Dict[str, Any]:
-        """Get technical screener results using user's selected broker."""
-        provider = self.factory.get_suggested_stocks_provider(user_id)
-        if not provider:
-            return self._no_provider_error('suggested_stocks')
-        return provider.get_technical_screener(user_id, criteria)
-    
-    def get_fundamental_screener(self, user_id: int, criteria: Dict[str, Any]) -> Dict[str, Any]:
-        """Get fundamental screener results using user's selected broker."""
-        provider = self.factory.get_suggested_stocks_provider(user_id)
-        if not provider:
-            return self._no_provider_error('suggested_stocks')
-        return provider.get_fundamental_screener(user_id, criteria)
     
     # Orders methods
     def get_orders_history(self, user_id: int, start_date: datetime = None, 

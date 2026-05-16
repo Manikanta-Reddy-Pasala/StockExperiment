@@ -8,7 +8,6 @@ for different brokers like FYERS and Zerodha.
 # FYERS implementations (conditional import)
 try:
     from .fyers_dashboard_provider import FyersDashboardProvider
-    from .fyers_suggested_stocks_provider import FyersSuggestedStocksProvider
     from .fyers_orders_provider import FyersOrdersProvider
     from .fyers_portfolio_provider import FyersPortfolioProvider
     from .fyers_reports_provider import FyersReportsProvider
@@ -26,7 +25,6 @@ __all__ = []
 if FYERS_AVAILABLE:
     __all__.extend([
         'FyersDashboardProvider',
-        'FyersSuggestedStocksProvider',
         'FyersOrdersProvider',
         'FyersPortfolioProvider',
         'FyersReportsProvider'
