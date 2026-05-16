@@ -80,6 +80,52 @@
         </div>
     </div>
 
+    <!-- Per-Model Capital Allocations (multi-model) -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-wallet2 me-2"></i>Model Capital Allocations</div>
+            <div class="card-body">
+                <div class="text-muted small mb-2">
+                    Each model spends only its own cash. Selling a position returns money to the same model. Future models added here automatically.
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead><tr>
+                            <th>Model</th>
+                            <th class="text-end">Allocated ₹</th>
+                            <th class="text-end">Cash ₹</th>
+                            <th>Open Position</th>
+                            <th class="text-end">NAV ₹</th>
+                            <th class="text-end">P&amp;L</th>
+                            <th class="text-end">Actions</th>
+                        </tr></thead>
+                        <tbody id="alloc_tbody"><tr><td colspan="7" class="text-center text-muted">Loading…</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Seed Position modal-like inline form (toggled per row) -->
+    <div class="col-12 d-none" id="seed_panel">
+        <div class="card border-warning">
+            <div class="card-header bg-warning bg-opacity-25">Bootstrap an existing position for <strong id="seed_model_name">--</strong></div>
+            <div class="card-body">
+                <div class="text-muted small mb-2">No Fyers order is placed. Use this only to import an existing live position into the model's ledger so live executor and NAV reflect reality.</div>
+                <div class="row g-2">
+                    <div class="col-md-3"><input class="form-control form-control-sm" id="seed_symbol" placeholder="NSE:RELIANCE-EQ"></div>
+                    <div class="col-md-2"><input class="form-control form-control-sm" id="seed_qty" type="number" placeholder="Qty"></div>
+                    <div class="col-md-2"><input class="form-control form-control-sm" id="seed_entry_px" type="number" step="0.01" placeholder="Entry ₹"></div>
+                    <div class="col-md-2"><input class="form-control form-control-sm" id="seed_entry_date" type="date"></div>
+                    <div class="col-md-3">
+                        <button class="btn btn-warning btn-sm" onclick="submitSeed()">Seed Position</button>
+                        <button class="btn btn-link btn-sm" onclick="document.getElementById('seed_panel').classList.add('d-none')">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Rotation rules (replaces auto-trading) -->
     <div class="col-lg-6">
         <div class="card h-100">
@@ -292,5 +338,109 @@ async function exchangeAuthCode() {
 }
 
 loadSettings();
+
+// ---- Per-model capital allocations ----
+const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractionDigits:2});
+const fmtPct = n => (n>=0?"+":"") + Number(n||0).toFixed(2) + "%";
+
+async function loadAllocations() {
+  try {
+    const r = await fetch('/admin/models/portfolio');
+    const d = await r.json();
+    if (!d.success) return;
+    const tbody = document.getElementById('alloc_tbody');
+    tbody.innerHTML = '';
+    (d.models||[]).forEach(m => {
+      const tr = document.createElement('tr');
+      const posHtml = m.open_symbol
+        ? `${m.open_symbol} x${m.open_qty} @ ${fmtINR(m.open_entry_px)} <span class="text-muted small">(${m.open_entry_date||''})</span>`
+        : '<span class="text-muted">flat</span>';
+      const pnlCls = m.pnl_total >= 0 ? 'text-success' : 'text-danger';
+      tr.innerHTML = `
+        <td><strong>${m.model_name}</strong>${m.enabled ? '' : ' <span class="badge bg-secondary">disabled</span>'}</td>
+        <td class="text-end">
+          <input class="form-control form-control-sm text-end d-inline-block" style="max-width:120px"
+                 type="number" step="1000" value="${m.allocated_capital}"
+                 onchange="saveAllocation('${m.model_name}', this.value)">
+        </td>
+        <td class="text-end">${fmtINR(m.cash)}</td>
+        <td>${posHtml}</td>
+        <td class="text-end"><strong>${fmtINR(m.nav)}</strong></td>
+        <td class="text-end ${pnlCls}">${fmtINR(m.pnl_total)} (${fmtPct(m.return_pct)})</td>
+        <td class="text-end">
+          ${m.open_symbol
+            ? `<button class="btn btn-link btn-sm text-danger" onclick="resetPos('${m.model_name}')">Reset</button>`
+            : `<button class="btn btn-link btn-sm" onclick="openSeed('${m.model_name}')">Seed</button>`}
+          <button class="btn btn-link btn-sm" onclick="toggleEnabled('${m.model_name}', ${!m.enabled})">${m.enabled?'Disable':'Enable'}</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch(e) { console.error('alloc load failed', e); }
+}
+
+async function saveAllocation(model, amount) {
+  const r = await fetch(`/admin/models/${model}/capital`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({amount: parseFloat(amount)})
+  });
+  const d = await r.json();
+  if (d.success) { Trading.toast(`${model}: capital updated`, 'success'); loadAllocations(); }
+  else Trading.toast(d.error || 'update failed', 'danger');
+}
+
+async function toggleEnabled(model, enabled) {
+  const r = await fetch(`/admin/models/${model}/enabled`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({enabled})
+  });
+  const d = await r.json();
+  if (d.success) loadAllocations(); else Trading.toast(d.error || 'toggle failed', 'danger');
+}
+
+async function resetPos(model) {
+  if (!confirm(`Mark ${model} as flat? This does NOT place a Fyers sell — manual reconcile only.`)) return;
+  const r = await fetch(`/admin/models/${model}/reset-position`, {method: 'POST'});
+  const d = await r.json();
+  if (d.success) { Trading.toast(`${model} reset to flat`, 'success'); loadAllocations(); }
+  else Trading.toast(d.error || 'reset failed', 'danger');
+}
+
+function openSeed(model) {
+  document.getElementById('seed_model_name').textContent = model;
+  document.getElementById('seed_panel').classList.remove('d-none');
+  document.getElementById('seed_panel').dataset.model = model;
+  document.getElementById('seed_symbol').value = '';
+  document.getElementById('seed_qty').value = '';
+  document.getElementById('seed_entry_px').value = '';
+  document.getElementById('seed_entry_date').value = new Date().toISOString().slice(0,10);
+}
+
+async function submitSeed() {
+  const model = document.getElementById('seed_panel').dataset.model;
+  const body = {
+    symbol: document.getElementById('seed_symbol').value.trim(),
+    qty: parseInt(document.getElementById('seed_qty').value, 10),
+    entry_px: parseFloat(document.getElementById('seed_entry_px').value),
+    entry_date: document.getElementById('seed_entry_date').value,
+  };
+  if (!body.symbol || !body.qty || !body.entry_px || !body.entry_date) {
+    Trading.toast('Fill all fields', 'warning'); return;
+  }
+  const r = await fetch(`/admin/models/${model}/seed-position`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  const d = await r.json();
+  if (d.success) {
+    Trading.toast(`${model}: position seeded`, 'success');
+    document.getElementById('seed_panel').classList.add('d-none');
+    loadAllocations();
+  } else {
+    Trading.toast(d.error || 'seed failed', 'danger');
+  }
+}
+
+loadAllocations();
 </script>
 {% endblock %}

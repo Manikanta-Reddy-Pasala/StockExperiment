@@ -13,6 +13,9 @@ from .stock_models import (
     SymbolMaster, DailySuggestedStock, Base
 )
 
+# Per-model ledger tables (capital, position, PnL, trades — multi-model ready)
+from .model_ledger_models import ModelSettings, ModelLedger, ModelTrade  # noqa: F401
+
 
 
 class User(UserMixin, Base):

@@ -10,6 +10,33 @@
   .strategy-pill { background: linear-gradient(135deg,#667eea,#764ba2); color:#fff; padding:4px 12px; border-radius:14px; font-size:0.75rem; font-weight:600; }
 </style>
 
+<!-- Portfolio overview: per-model + aggregate (multi-model ready) -->
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <strong>Portfolio (all enabled models)</strong>
+    <a href="/settings" class="btn btn-sm btn-outline-secondary">Manage Allocations</a>
+  </div>
+  <div class="card-body">
+    <div class="row g-3 mb-3" id="portfolio_total_row">
+      <div class="col-6 col-lg-3"><div class="text-muted small">Allocated</div><div class="fs-5 fw-bold" id="pf_alloc">--</div></div>
+      <div class="col-6 col-lg-3"><div class="text-muted small">Current NAV</div><div class="fs-5 fw-bold" id="pf_nav">--</div></div>
+      <div class="col-6 col-lg-3"><div class="text-muted small">Total P&amp;L</div><div class="fs-5 fw-bold" id="pf_pnl">--</div></div>
+      <div class="col-6 col-lg-3"><div class="text-muted small">Realized P&amp;L</div><div class="fs-5 fw-bold" id="pf_realized">--</div></div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr>
+          <th>Model</th><th class="text-end">Allocated</th><th class="text-end">Cash</th>
+          <th>Open Position</th><th class="text-end">Position Val</th>
+          <th class="text-end">NAV</th><th class="text-end">P&amp;L</th>
+          <th class="text-end">Realized</th><th class="text-end">Trades</th>
+        </tr></thead>
+        <tbody id="pf_tbody"><tr><td colspan="9" class="text-center text-muted py-3">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
     <span class="strategy-pill">Momentum Rotation</span>
@@ -108,7 +135,43 @@ const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractio
 const fmtPct = n => (n>=0?"+":"") + Number(n||0).toFixed(2) + "%";
 const cls = n => n>0?"pos":(n<0?"neg":"neutral");
 
+async function loadPortfolio() {
+  try {
+    const r = await fetch('/admin/models/portfolio');
+    const d = await r.json();
+    if (!d.success) return;
+    const t = d.total || {};
+    document.getElementById('pf_alloc').textContent = fmtINR(t.allocated_capital);
+    document.getElementById('pf_nav').textContent = fmtINR(t.nav);
+    const pnlEl = document.getElementById('pf_pnl');
+    pnlEl.textContent = fmtINR(t.pnl_total) + ' (' + fmtPct(t.return_pct) + ')';
+    pnlEl.className = 'fs-5 fw-bold ' + cls(t.pnl_total);
+    document.getElementById('pf_realized').textContent = fmtINR(t.realized_pnl);
+    const tbody = document.getElementById('pf_tbody');
+    tbody.innerHTML = '';
+    (d.models || []).forEach(m => {
+      const tr = document.createElement('tr');
+      const posHtml = m.open_symbol
+        ? `${m.open_symbol} <span class="text-muted small">x${m.open_qty} @ ${fmtINR(m.open_entry_px)}</span>`
+        : '<span class="text-muted">flat</span>';
+      tr.innerHTML = `
+        <td><strong>${m.model_name}</strong>${m.enabled ? '' : ' <span class="badge bg-secondary">disabled</span>'}</td>
+        <td class="text-end">${fmtINR(m.allocated_capital)}</td>
+        <td class="text-end">${fmtINR(m.cash)}</td>
+        <td>${posHtml}</td>
+        <td class="text-end">${fmtINR(m.position_value)}</td>
+        <td class="text-end"><strong>${fmtINR(m.nav)}</strong></td>
+        <td class="text-end ${cls(m.pnl_total)}">${fmtINR(m.pnl_total)} (${fmtPct(m.return_pct)})</td>
+        <td class="text-end ${cls(m.realized_pnl)}">${fmtINR(m.realized_pnl)}</td>
+        <td class="text-end">${m.total_trades} (${m.wins}W/${m.losses}L = ${m.win_rate_pct}%)</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch(e) { console.error('portfolio load failed', e); }
+}
+
 async function load() {
+  loadPortfolio();
   try {
     const r = await fetch('/admin/momrot/summary');
     const d = await r.json();

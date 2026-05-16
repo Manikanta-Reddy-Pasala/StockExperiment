@@ -923,3 +923,137 @@ def system_status():
             'success': False,
             'error': str(e)
         }), 500
+
+
+# =============================================================================
+# Per-model capital ledger (multi-model portfolio tracking)
+# =============================================================================
+
+@admin_bp.route('/models/portfolio', methods=['GET'])
+def get_model_portfolio():
+    """Per-model + aggregate stats: allocated, NAV, cash, position, PnL.
+
+    Used by dashboard cards. Includes MTM if last close available.
+    """
+    try:
+        from src.services.trading.model_ledger_service import (
+            get_portfolio_stats, ensure_models_seeded,
+        )
+        from src.models.database import get_database_manager
+        from sqlalchemy import text
+
+        # Make sure rows exist for all known models
+        ensure_models_seeded()
+
+        # MTM price lookup using historical_data latest close
+        db = get_database_manager()
+        with db.get_session() as session:
+            def lookup(sym):
+                r = session.execute(text(
+                    "SELECT close FROM historical_data "
+                    "WHERE symbol = :s ORDER BY date DESC LIMIT 1"
+                ), {"s": sym}).fetchone()
+                return float(r.close) if r else None
+            stats = get_portfolio_stats(price_lookup=lookup)
+        return jsonify({"success": True, **stats})
+    except Exception as e:
+        logger.error(f"models portfolio error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@admin_bp.route('/models/settings', methods=['GET'])
+def list_model_settings():
+    try:
+        from src.services.trading.model_ledger_service import (
+            get_all_settings, ensure_models_seeded,
+        )
+        ensure_models_seeded()
+        return jsonify({"success": True, "settings": get_all_settings()})
+    except Exception as e:
+        logger.error(f"models settings error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@admin_bp.route('/models/<model_name>/capital', methods=['POST'])
+def update_model_capital(model_name):
+    """Set absolute allocated capital ₹ for a model."""
+    try:
+        from src.services.trading.model_ledger_service import (
+            update_allocated_capital,
+        )
+        data = request.get_json() or {}
+        amount = float(data.get("amount", 0))
+        return jsonify({
+            "success": True,
+            "settings": update_allocated_capital(model_name, amount),
+        })
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"update capital error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@admin_bp.route('/models/<model_name>/enabled', methods=['POST'])
+def toggle_model_enabled(model_name):
+    try:
+        from src.services.trading.model_ledger_service import set_enabled
+        data = request.get_json() or {}
+        return jsonify({
+            "success": True,
+            "settings": set_enabled(model_name, bool(data.get("enabled"))),
+        })
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"toggle enabled error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@admin_bp.route('/models/<model_name>/seed-position', methods=['POST'])
+def seed_model_position(model_name):
+    """Bootstrap a model's open position (no Fyers order).
+
+    Body: {symbol, qty, entry_px, entry_date}
+    """
+    try:
+        from src.services.trading.model_ledger_service import seed_position
+        data = request.get_json() or {}
+        ledger = seed_position(
+            model_name,
+            symbol=data["symbol"],
+            qty=int(data["qty"]),
+            entry_px=float(data["entry_px"]),
+            entry_date_str=data["entry_date"],
+        )
+        return jsonify({"success": True, "ledger": ledger})
+    except (KeyError, ValueError) as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"seed position error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@admin_bp.route('/models/<model_name>/reset-position', methods=['POST'])
+def reset_model_position(model_name):
+    """Mark model as flat. Reconciliation tool — no Fyers order placed."""
+    try:
+        from src.services.trading.model_ledger_service import reset_position
+        return jsonify({"success": True, "ledger": reset_position(model_name)})
+    except Exception as e:
+        logger.error(f"reset position error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@admin_bp.route('/models/<model_name>/trades', methods=['GET'])
+def model_trade_history(model_name):
+    try:
+        from src.services.trading.model_ledger_service import get_trades
+        limit = int(request.args.get("limit", 50))
+        return jsonify({
+            "success": True,
+            "trades": get_trades(model_name, limit=limit),
+        })
+    except Exception as e:
+        logger.error(f"trade history error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
