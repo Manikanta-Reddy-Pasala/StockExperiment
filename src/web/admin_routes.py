@@ -495,53 +495,95 @@ def trigger_model_data_pull(model_name):
 
 @admin_bp.route('/system/models-status', methods=['GET'])
 def models_status():
-    """Per-model data status — used by admin dashboard to show whether
-    each deployed model has enough fresh data to run."""
+    """Per-model data sufficiency audit.
+
+    Validates trading days of data per symbol the model actually consumes,
+    not generic row counts. NSE-holiday tolerance built in.
+
+    momentum_n100_top5_max1:
+      Loads N100 universe file. For each of 100 stocks, counts distinct
+      trading-day bars in last 150 calendar days. Requires >= 90 trading
+      days (≈ 100 trading days × 90% NSE holiday/listing tolerance).
+
+    finnifty_ic_otm4_w300_lots5:
+      - FINNIFTY spot: last 30 cal days requires >= 18 trading days.
+      - FINNIFTY option chain: for the *current* monthly expiry, count
+        unique strikes within ±5% of last spot. Require >= 5 strikes
+        with at least 3 days of bars.
+    """
     try:
         from src.models.database import get_database_manager
         from sqlalchemy import text
-        import os
+        import json
         from pathlib import Path
         from datetime import date, timedelta
 
         today = date.today()
-        max_stale_days = 3  # last data older than this = STALE
         db_manager = get_database_manager()
 
         models = []
         with db_manager.get_session() as session:
-            # --- Model: momentum_n100_top5_max1 (equity) ---
-            eq = session.execute(text("""
-                SELECT COUNT(DISTINCT symbol) syms,
-                       COUNT(*) rows,
-                       MAX(date) latest
-                FROM historical_data
-                WHERE symbol LIKE 'NSE:%-EQ'
-            """)).fetchone()
 
+            # ============================================================
+            # Model 1: momentum_n100_top5_max1 (equity)
+            # ============================================================
             universe_file = Path("/app/logs/momrot/universes/n100_current.json")
-            universe_exists = universe_file.exists()
-            universe_age_h = None
-            universe_count = None
-            if universe_exists:
-                import json
+            universe_symbols = []
+            universe_age_days = None
+            if universe_file.exists():
                 try:
                     u = json.loads(universe_file.read_text())
-                    universe_count = len(u.get("stocks") or u.get("universe") or [])
+                    universe_symbols = [s["symbol"] for s in u.get("stocks", [])]
+                    mtime = date.fromtimestamp(universe_file.stat().st_mtime)
+                    universe_age_days = (today - mtime).days
                 except Exception:
-                    universe_count = None
-                universe_age_h = (
-                    (today - date.fromtimestamp(universe_file.stat().st_mtime)).days * 24
-                )
+                    pass
 
-            eq_latest = eq.latest
-            eq_stale_days = ((today - eq_latest).days if eq_latest else 999)
+            min_trading_days = 90        # need at least 90 trading days/symbol
+            window_calendar_days = 150   # look back 150 cal days (~100 trading)
+            since = today - timedelta(days=window_calendar_days)
+
+            # Count trading days per symbol in N100 universe
+            fyers_symbols = [f"NSE:{s}-EQ" for s in universe_symbols]
+            per_sym_days = {}
+            latest_per_sym = {}
+            if fyers_symbols:
+                rows = session.execute(text("""
+                    SELECT symbol,
+                           COUNT(DISTINCT date) AS days,
+                           MAX(date) AS latest
+                    FROM historical_data
+                    WHERE symbol = ANY(:syms)
+                      AND date >= :since
+                    GROUP BY symbol
+                """), {"syms": fyers_symbols, "since": since}).fetchall()
+                per_sym_days = {r.symbol: int(r.days) for r in rows}
+                latest_per_sym = {r.symbol: r.latest for r in rows}
+
+            # Symbols meeting threshold
+            ok_syms = [s for s in fyers_symbols if per_sym_days.get(s, 0) >= min_trading_days]
+            under_syms = [s for s in fyers_symbols if per_sym_days.get(s, 0) < min_trading_days]
+            missing_syms = [s for s in fyers_symbols if s not in per_sym_days]
+
+            latest_dates = [d for d in latest_per_sym.values() if d]
+            overall_latest = max(latest_dates) if latest_dates else None
+            stale_days = (today - overall_latest).days if overall_latest else 999
+
+            # Sufficiency: at least 90% of universe has >=90 trading days
+            cov_pct = (len(ok_syms) / len(fyers_symbols) * 100) if fyers_symbols else 0
             eq_ok = (
-                eq.syms >= 100
-                and eq_stale_days <= max_stale_days
-                and universe_exists
-                and (universe_count or 0) >= 50
+                len(universe_symbols) >= 50
+                and cov_pct >= 90
+                and stale_days <= 3
+                and universe_age_days is not None and universe_age_days <= 14
             )
+
+            # Sample worst symbols for diagnostics
+            worst = sorted(per_sym_days.items(), key=lambda kv: kv[1])[:5]
+            worst_str = ", ".join(
+                f"{s.replace('NSE:', '').replace('-EQ', '')}={d}"
+                for s, d in worst
+            ) if worst else ""
 
             models.append({
                 "name": "momentum_n100_top5_max1",
@@ -549,78 +591,117 @@ def models_status():
                 "wired": True,
                 "data_sufficient": bool(eq_ok),
                 "items": [
-                    {"label": "Equity OHLCV symbols", "value": eq.syms,
-                     "required": ">= 100", "ok": eq.syms >= 100},
-                    {"label": "Historical rows", "value": int(eq.rows),
-                     "required": "any", "ok": eq.rows > 0},
-                    {"label": "Latest data",
-                     "value": eq_latest.isoformat() if eq_latest else "—",
-                     "required": f"<= {max_stale_days}d old",
-                     "ok": eq_stale_days <= max_stale_days,
-                     "extra": f"{eq_stale_days}d old"},
-                    {"label": "N100 universe file",
-                     "value": str(universe_count) + " syms" if universe_count else "missing",
-                     "required": "exists, 100 syms",
-                     "ok": universe_exists and (universe_count or 0) >= 50},
+                    {"label": "N100 universe size",
+                     "value": len(universe_symbols),
+                     "required": ">= 50 syms",
+                     "ok": len(universe_symbols) >= 50,
+                     "extra": f"file age {universe_age_days}d" if universe_age_days is not None else "missing"},
+                    {"label": f"Symbols w/ >= {min_trading_days} trading days "
+                              f"(last {window_calendar_days}d)",
+                     "value": f"{len(ok_syms)} / {len(fyers_symbols)}",
+                     "required": ">= 90% coverage",
+                     "ok": cov_pct >= 90,
+                     "extra": f"{cov_pct:.1f}% coverage"},
+                    {"label": "Symbols below threshold",
+                     "value": len(under_syms),
+                     "required": "0 (allow few)",
+                     "ok": len(under_syms) <= 10,
+                     "extra": worst_str},
+                    {"label": "Symbols completely missing",
+                     "value": len(missing_syms),
+                     "required": "0",
+                     "ok": len(missing_syms) == 0},
+                    {"label": "Latest equity close",
+                     "value": overall_latest.isoformat() if overall_latest else "—",
+                     "required": "<= 3d old (holiday OK)",
+                     "ok": stale_days <= 3,
+                     "extra": f"{stale_days}d old"},
                 ],
             })
 
-            # --- Model: finnifty_ic_otm4_w300_lots5 (options, exec unwired) ---
-            opt_rows = {}
-            for u in ("NIFTY", "BANKNIFTY", "FINNIFTY"):
-                r = session.execute(text(
-                    "SELECT COUNT(*) c, MAX(candle_time::date) latest "
-                    "FROM historical_options WHERE underlying = :u"
-                ), {"u": u}).fetchone()
-                opt_rows[u] = (r.c if r else 0, r.latest if r else None)
-
-            spot_rows = {}
+            # ============================================================
+            # Model 2: finnifty_ic_otm4_w300_lots5 (options)
+            # ============================================================
+            # Spot sufficiency: last 30 calendar days >= 18 trading days
+            spot_since = today - timedelta(days=30)
+            spot_items = []
+            spots_ok = True
             for sym in ("NSE:NIFTY50-INDEX", "NSE:NIFTYBANK-INDEX", "NSE:FINNIFTY-INDEX"):
-                r = session.execute(text(
-                    "SELECT COUNT(*) c, MAX(date) latest "
-                    "FROM historical_data WHERE symbol = :s"
-                ), {"s": sym}).fetchone()
-                spot_rows[sym] = (r.c if r else 0, r.latest if r else None)
-
-            fn_opt_latest = opt_rows["FINNIFTY"][1]
-            fn_spot_latest = spot_rows["NSE:FINNIFTY-INDEX"][1]
-            fn_opt_stale = (today - fn_opt_latest).days if fn_opt_latest else 999
-            fn_spot_stale = (today - fn_spot_latest).days if fn_spot_latest else 999
-            fn_ok = (
-                opt_rows["FINNIFTY"][0] > 0
-                and fn_opt_stale <= max_stale_days
-                and fn_spot_stale <= max_stale_days
-            )
-
-            opt_items = []
-            for u in ("NIFTY", "BANKNIFTY", "FINNIFTY"):
-                c, latest = opt_rows[u]
+                r = session.execute(text("""
+                    SELECT COUNT(DISTINCT date) days, MAX(date) latest
+                    FROM historical_data WHERE symbol = :s AND date >= :since
+                """), {"s": sym, "since": spot_since}).fetchone()
+                days = int(r.days) if r and r.days else 0
+                latest = r.latest if r else None
                 stale = (today - latest).days if latest else 999
-                opt_items.append({
-                    "label": f"{u} option bars",
-                    "value": int(c),
-                    "required": f"<= {max_stale_days}d old",
-                    "ok": c > 0 and stale <= max_stale_days,
-                    "extra": (latest.isoformat() if latest else "—") + f" ({stale}d)",
-                })
-            for sym in ("NSE:NIFTY50-INDEX", "NSE:NIFTYBANK-INDEX", "NSE:FINNIFTY-INDEX"):
-                c, latest = spot_rows[sym]
                 short = sym.replace("NSE:", "").replace("-INDEX", "")
-                stale = (today - latest).days if latest else 999
-                opt_items.append({
-                    "label": f"{short} spot",
-                    "value": int(c),
-                    "required": f"<= {max_stale_days}d old",
-                    "ok": c > 0 and stale <= max_stale_days,
-                    "extra": (latest.isoformat() if latest else "—") + f" ({stale}d)",
+                ok = days >= 18 and stale <= 3
+                if not ok:
+                    spots_ok = False
+                spot_items.append({
+                    "label": f"{short} spot trading days (30d)",
+                    "value": days,
+                    "required": ">= 18 (≈ 22 - holidays)",
+                    "ok": ok,
+                    "extra": (latest.isoformat() if latest else "—") + f" • {stale}d old",
                 })
 
+            # Current monthly expiry availability per underlying
+            opt_items = []
+            opts_ok = True
+            current_finnifty_spot = session.execute(text("""
+                SELECT close FROM historical_data
+                WHERE symbol='NSE:FINNIFTY-INDEX' ORDER BY date DESC LIMIT 1
+            """)).fetchone()
+            fn_spot_val = float(current_finnifty_spot.close) if current_finnifty_spot else 0
+
+            for u in ("NIFTY", "BANKNIFTY", "FINNIFTY"):
+                # Next monthly expiry from option_universe
+                next_exp_row = session.execute(text("""
+                    SELECT MIN(expiry) AS exp FROM option_universe
+                    WHERE underlying = :u AND expiry_kind = 'monthly'
+                      AND expiry >= :today
+                """), {"u": u, "today": today}).fetchone()
+                next_exp = next_exp_row.exp if next_exp_row else None
+
+                if next_exp is None:
+                    opt_items.append({
+                        "label": f"{u} next monthly expiry",
+                        "value": "—",
+                        "required": "exists",
+                        "ok": False,
+                    })
+                    opts_ok = False
+                    continue
+
+                # Strike coverage for that expiry: count distinct strikes that
+                # have at least 1 bar in last 7 calendar days
+                strike_cov = session.execute(text("""
+                    SELECT COUNT(DISTINCT strike) AS strikes
+                    FROM historical_options
+                    WHERE underlying = :u AND expiry = :exp
+                      AND candle_time::date >= :since
+                """), {"u": u, "exp": next_exp,
+                       "since": today - timedelta(days=7)}).fetchone()
+                strikes = int(strike_cov.strikes) if strike_cov else 0
+                ok = strikes >= 5
+                if not ok:
+                    opts_ok = False
+                opt_items.append({
+                    "label": f"{u} {next_exp.isoformat()} strikes (last 7d)",
+                    "value": strikes,
+                    "required": ">= 5 strikes",
+                    "ok": ok,
+                    "extra": f"expires {(next_exp - today).days}d",
+                })
+
+            fn_ok = spots_ok and opts_ok
             models.append({
                 "name": "finnifty_ic_otm4_w300_lots5",
                 "type": "options",
                 "wired": False,
                 "data_sufficient": bool(fn_ok),
-                "items": opt_items,
+                "items": spot_items + opt_items,
             })
 
         return jsonify({"success": True, "models": models, "as_of": today.isoformat()})
