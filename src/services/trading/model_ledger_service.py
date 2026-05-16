@@ -30,12 +30,12 @@ log = logging.getLogger(__name__)
 KNOWN_MODELS = [
     {
         "name": "momentum_n100_top5_max1",
-        "default_capital": 200000,
+        "default_capital": 0,
         "description": "Equity monthly rotation top-1 from N100 by 60d return",
     },
     {
         "name": "midcap_narrow_60d_breakout",
-        "default_capital": 200000,
+        "default_capital": 0,
         "description": "Equity 60d-high swing on midcap_narrow (event-driven)",
     },
 ]
@@ -82,24 +82,108 @@ def get_all_settings() -> List[Dict]:
         return [_settings_dict(r) for r in rows]
 
 
-def update_allocated_capital(model_name: str, amount: float) -> Dict:
-    """Set absolute ₹ allocation for a model.
+def deposit(model_name: str, amount: float) -> Dict:
+    """Add fresh capital to a model. Adds to both allocated_capital AND cash.
 
-    If position is open + new allocation < current MTM cost, refuse.
+    Use case: monthly top-up from user's bank. Money flows in as new cash
+    and is added to the cost basis. Other models untouched.
     """
-    if amount < 0:
-        raise ValueError("allocated_capital must be >= 0")
+    if amount <= 0:
+        raise ValueError("deposit amount must be > 0")
     db = get_database_manager()
     with db.get_session() as s:
         settings = s.query(ModelSettings).filter_by(model_name=model_name).first()
-        if not settings:
-            raise ValueError(f"Unknown model: {model_name}")
-        settings.allocated_capital = Decimal(str(amount))
-        # If ledger has no trades yet, set cash to the new allocation
         ledger = s.query(ModelLedger).filter_by(model_name=model_name).first()
-        if ledger and ledger.total_trades == 0 and not ledger.open_symbol:
-            ledger.cash = Decimal(str(amount))
-        return _settings_dict(settings)
+        if not settings or not ledger:
+            raise ValueError(f"Unknown model: {model_name}")
+        delta = Decimal(str(amount))
+        settings.allocated_capital = (settings.allocated_capital or Decimal(0)) + delta
+        ledger.cash = (ledger.cash or Decimal(0)) + delta
+        s.add(ModelTrade(
+            model_name=model_name,
+            side="DEPOSIT",
+            symbol="-",
+            qty=0,
+            price=Decimal(0),
+            value=delta,
+            reason="DEPOSIT",
+        ))
+        log.info(f"{model_name}: deposit ₹{amount:,.0f} (allocated now "
+                 f"₹{float(settings.allocated_capital):,.0f}, cash "
+                 f"₹{float(ledger.cash):,.0f})")
+        return {
+            "settings": _settings_dict(settings),
+            "ledger": _ledger_dict(ledger),
+        }
+
+
+def withdraw(model_name: str, amount: float) -> Dict:
+    """Pull cash out of a model. Decreases allocated_capital AND cash.
+
+    Safety: refuses if cash < amount.
+    """
+    if amount <= 0:
+        raise ValueError("withdraw amount must be > 0")
+    db = get_database_manager()
+    with db.get_session() as s:
+        settings = s.query(ModelSettings).filter_by(model_name=model_name).first()
+        ledger = s.query(ModelLedger).filter_by(model_name=model_name).first()
+        if not settings or not ledger:
+            raise ValueError(f"Unknown model: {model_name}")
+        delta = Decimal(str(amount))
+        if ledger.cash < delta:
+            raise ValueError(
+                f"Insufficient cash in {model_name}: have ₹{float(ledger.cash):,.0f}, "
+                f"want to withdraw ₹{amount:,.0f}"
+            )
+        ledger.cash = ledger.cash - delta
+        settings.allocated_capital = max(
+            Decimal(0), (settings.allocated_capital or Decimal(0)) - delta
+        )
+        s.add(ModelTrade(
+            model_name=model_name,
+            side="WITHDRAW",
+            symbol="-",
+            qty=0,
+            price=Decimal(0),
+            value=delta,
+            reason="WITHDRAW",
+        ))
+        log.info(f"{model_name}: withdraw ₹{amount:,.0f} (allocated now "
+                 f"₹{float(settings.allocated_capital):,.0f}, cash "
+                 f"₹{float(ledger.cash):,.0f})")
+        return {
+            "settings": _settings_dict(settings),
+            "ledger": _ledger_dict(ledger),
+        }
+
+
+def reset_model(model_name: str) -> Dict:
+    """Hard reset: zero allocated_capital, zero cash, zero realized_pnl, clear
+    open position, reset counters. Trade audit log is NOT deleted (history kept).
+    Use to start fresh before depositing real cost basis.
+    """
+    db = get_database_manager()
+    with db.get_session() as s:
+        settings = s.query(ModelSettings).filter_by(model_name=model_name).first()
+        ledger = s.query(ModelLedger).filter_by(model_name=model_name).first()
+        if not settings or not ledger:
+            raise ValueError(f"Unknown model: {model_name}")
+        settings.allocated_capital = Decimal(0)
+        ledger.cash = Decimal(0)
+        ledger.realized_pnl = Decimal(0)
+        ledger.total_trades = 0
+        ledger.wins = 0
+        ledger.losses = 0
+        ledger.open_symbol = None
+        ledger.open_qty = None
+        ledger.open_entry_px = None
+        ledger.open_entry_date = None
+        log.info(f"{model_name}: model reset to zero")
+        return {
+            "settings": _settings_dict(settings),
+            "ledger": _ledger_dict(ledger),
+        }
 
 
 def set_enabled(model_name: str, enabled: bool) -> Dict:

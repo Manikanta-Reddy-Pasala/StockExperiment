@@ -75,7 +75,7 @@
                     <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span class="text-muted">Open Position:</span> <strong id="mr-pos">--</strong></div>
                     <div class="d-flex justify-content-between"><span class="text-muted">Unrealized P&L:</span> <strong id="mr-pnl">--</strong></div>
                 </div>
-                <a href="/admin/momrot" class="btn btn-primary btn-sm"><i class="bi bi-graph-up-arrow me-1"></i> Open Momentum Rotation Dashboard</a>
+                <a href="/admin/momrot" class="btn btn-primary btn-sm"><i class="bi bi-graph-up-arrow me-1"></i> Open Trading Models Dashboard</a>
             </div>
         </div>
     </div>
@@ -86,13 +86,13 @@
             <div class="card-header"><i class="bi bi-wallet2 me-2"></i>Model Capital Allocations</div>
             <div class="card-body">
                 <div class="text-muted small mb-2">
-                    Each model spends only its own cash. Selling a position returns money to the same model. Future models added here automatically.
+                    Each model spends only its own cash. Deposits add to that model's pool; withdrawals pull from it. Profits + losses stay within the model. Other models are untouched.
                 </div>
                 <div class="table-responsive">
                     <table class="table table-sm align-middle">
                         <thead><tr>
                             <th>Model</th>
-                            <th class="text-end">Allocated ₹</th>
+                            <th class="text-end">Total Deposited ₹</th>
                             <th class="text-end">Cash ₹</th>
                             <th>Open Position</th>
                             <th class="text-end">NAV ₹</th>
@@ -101,6 +101,27 @@
                         </tr></thead>
                         <tbody id="alloc_tbody"><tr><td colspan="7" class="text-center text-muted">Loading…</td></tr></tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Deposit/Withdraw inline form (toggled per row) -->
+    <div class="col-12 d-none" id="cap_panel">
+        <div class="card border-info">
+            <div class="card-header bg-info bg-opacity-25">
+                <span id="cap_action_label">Deposit</span> for <strong id="cap_model_name">--</strong>
+            </div>
+            <div class="card-body">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label small mb-0">Amount ₹</label>
+                        <input class="form-control form-control-sm" id="cap_amount" type="number" step="100" placeholder="e.g. 29000">
+                    </div>
+                    <div class="col-md-8">
+                        <button class="btn btn-primary btn-sm" onclick="submitCap()">Confirm</button>
+                        <button class="btn btn-link btn-sm" onclick="document.getElementById('cap_panel').classList.add('d-none')">Cancel</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -155,7 +176,7 @@
     <!-- Strategy info -->
     <div class="col-lg-6">
         <div class="card h-100">
-            <div class="card-header"><i class="bi bi-info-circle me-2"></i>Strategy: Monthly Momentum Rotation</div>
+            <div class="card-header"><i class="bi bi-info-circle me-2"></i>Strategy: Monthly Trading Models</div>
             <div class="card-body small">
                 <ul class="mb-0">
                     <li><strong>Ranker:</strong> 60-day return descending across N100 universe</li>
@@ -358,19 +379,18 @@ async function loadAllocations() {
       const pnlCls = m.pnl_total >= 0 ? 'text-success' : 'text-danger';
       tr.innerHTML = `
         <td><strong>${m.model_name}</strong>${m.enabled ? '' : ' <span class="badge bg-secondary">disabled</span>'}</td>
-        <td class="text-end">
-          <input class="form-control form-control-sm text-end d-inline-block" style="max-width:120px"
-                 type="number" step="1000" value="${m.allocated_capital}"
-                 onchange="saveAllocation('${m.model_name}', this.value)">
-        </td>
+        <td class="text-end">${fmtINR(m.allocated_capital)}</td>
         <td class="text-end">${fmtINR(m.cash)}</td>
         <td>${posHtml}</td>
         <td class="text-end"><strong>${fmtINR(m.nav)}</strong></td>
         <td class="text-end ${pnlCls}">${fmtINR(m.pnl_total)} (${fmtPct(m.return_pct)})</td>
         <td class="text-end">
+          <button class="btn btn-success btn-sm" onclick="openCap('${m.model_name}','deposit')">+ Deposit</button>
+          <button class="btn btn-warning btn-sm" onclick="openCap('${m.model_name}','withdraw')">- Withdraw</button>
           ${m.open_symbol
-            ? `<button class="btn btn-link btn-sm text-danger" onclick="resetPos('${m.model_name}')">Reset</button>`
-            : `<button class="btn btn-link btn-sm" onclick="openSeed('${m.model_name}')">Seed</button>`}
+            ? `<button class="btn btn-outline-danger btn-sm" onclick="resetPos('${m.model_name}')">Clear Pos</button>`
+            : `<button class="btn btn-outline-primary btn-sm" onclick="openSeed('${m.model_name}')">Seed Pos</button>`}
+          <button class="btn btn-link btn-sm text-danger" onclick="resetModel('${m.model_name}')">Reset</button>
           <button class="btn btn-link btn-sm" onclick="toggleEnabled('${m.model_name}', ${!m.enabled})">${m.enabled?'Disable':'Enable'}</button>
         </td>
       `;
@@ -379,14 +399,42 @@ async function loadAllocations() {
   } catch(e) { console.error('alloc load failed', e); }
 }
 
-async function saveAllocation(model, amount) {
-  const r = await fetch(`/admin/models/${model}/capital`, {
+function openCap(model, action) {
+  document.getElementById('cap_model_name').textContent = model;
+  document.getElementById('cap_action_label').textContent = action === 'deposit' ? '+ Deposit' : '- Withdraw';
+  document.getElementById('cap_panel').classList.remove('d-none');
+  document.getElementById('cap_panel').dataset.model = model;
+  document.getElementById('cap_panel').dataset.action = action;
+  document.getElementById('cap_amount').value = '';
+  document.getElementById('cap_amount').focus();
+}
+
+async function submitCap() {
+  const panel = document.getElementById('cap_panel');
+  const model = panel.dataset.model;
+  const action = panel.dataset.action;
+  const amount = parseFloat(document.getElementById('cap_amount').value);
+  if (!amount || amount <= 0) { Trading.toast('Enter amount > 0', 'warning'); return; }
+  const r = await fetch(`/admin/models/${model}/${action}`, {
     method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({amount: parseFloat(amount)})
+    body: JSON.stringify({amount})
   });
   const d = await r.json();
-  if (d.success) { Trading.toast(`${model}: capital updated`, 'success'); loadAllocations(); }
-  else Trading.toast(d.error || 'update failed', 'danger');
+  if (d.success) {
+    Trading.toast(`${model}: ${action} ₹${amount.toLocaleString('en-IN')} OK`, 'success');
+    panel.classList.add('d-none');
+    loadAllocations();
+  } else {
+    Trading.toast(d.error || `${action} failed`, 'danger');
+  }
+}
+
+async function resetModel(model) {
+  if (!confirm(`Hard reset ${model}? Zeros allocated/cash/realized/position. Audit trail kept. Use to start fresh.`)) return;
+  const r = await fetch(`/admin/models/${model}/reset`, {method: 'POST'});
+  const d = await r.json();
+  if (d.success) { Trading.toast(`${model} reset`, 'success'); loadAllocations(); }
+  else Trading.toast(d.error || 'reset failed', 'danger');
 }
 
 async function toggleEnabled(model, enabled) {

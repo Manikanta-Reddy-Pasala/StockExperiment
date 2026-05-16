@@ -1,5 +1,5 @@
 {% extends "v2/base.html" %}
-{% block title %}Today's Picks - Momentum Rotation{% endblock %}
+{% block title %}Today's Picks - Trading Models{% endblock %}
 {% block page_title %}Today's Picks{% endblock %}
 
 {% block content %}
@@ -10,7 +10,7 @@
 
 <div class="alert alert-info py-2 mb-3">
   <i class="bi bi-info-circle me-1"></i>
-  <strong>Strategy:</strong> Monthly Momentum Rotation. Ranks Nifty-100 (pseudo) by 60-day return. Holds rank-1 only (max-concurrent=1). Rebalance trigger = first weekday of each month.
+  <strong>Strategy:</strong> Monthly Trading Models. Ranks Nifty-100 (pseudo) by 60-day return. Holds rank-1 only (max-concurrent=1). Rebalance trigger = first weekday of each month.
 </div>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -62,7 +62,7 @@ async function load() {
     const body = document.getElementById('ranking_body');
 
     if (!rRank.ranking || rRank.ranking.length === 0) {
-      body.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No data. Open <a href="/admin/momrot">Momentum Rotation</a> and rebuild N100 universe.</td></tr>';
+      body.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No data. Open <a href="/admin/momrot">Trading Models</a> and rebuild N100 universe.</td></tr>';
     } else {
       body.innerHTML = rRank.ranking.map((r,i) => {
         const isHeld = held.has(r.symbol);

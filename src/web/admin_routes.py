@@ -974,23 +974,48 @@ def list_model_settings():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-@admin_bp.route('/models/<model_name>/capital', methods=['POST'])
-def update_model_capital(model_name):
-    """Set absolute allocated capital ₹ for a model."""
+@admin_bp.route('/models/<model_name>/deposit', methods=['POST'])
+def deposit_to_model(model_name):
+    """Add cash to a model (monthly top-up). Increases allocated + cash."""
     try:
-        from src.services.trading.model_ledger_service import (
-            update_allocated_capital,
-        )
+        from src.services.trading.model_ledger_service import deposit
         data = request.get_json() or {}
-        amount = float(data.get("amount", 0))
         return jsonify({
             "success": True,
-            "settings": update_allocated_capital(model_name, amount),
+            **deposit(model_name, float(data.get("amount", 0))),
         })
     except ValueError as e:
         return jsonify({"success": False, "error": str(e)}), 400
     except Exception as e:
-        logger.error(f"update capital error: {e}", exc_info=True)
+        logger.error(f"deposit error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@admin_bp.route('/models/<model_name>/withdraw', methods=['POST'])
+def withdraw_from_model(model_name):
+    """Pull cash out of a model. Decreases allocated + cash."""
+    try:
+        from src.services.trading.model_ledger_service import withdraw
+        data = request.get_json() or {}
+        return jsonify({
+            "success": True,
+            **withdraw(model_name, float(data.get("amount", 0))),
+        })
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"withdraw error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@admin_bp.route('/models/<model_name>/reset', methods=['POST'])
+def reset_model_route(model_name):
+    """Hard reset model ledger to zero. Audit trail preserved."""
+    try:
+        from src.services.trading.model_ledger_service import reset_model
+        return jsonify({"success": True, **reset_model(model_name)})
+    except Exception as e:
+        logger.error(f"reset model error: {e}", exc_info=True)
         return jsonify({"success": False, "error": str(e)}), 500
 
 
