@@ -447,8 +447,8 @@ def retry_failed_steps(task_id):
 def trigger_model_data_pull(model_name):
     """Trigger data pulls for a specific deployed model.
 
-    model_name: momentum_n100_top5_max1 | finnifty_ic_otm4_w300_lots5 |
-                finnifty_ic_otm3_w500_lots4
+    model_name: momentum_n100_top5_max1 | midcap_narrow_60d_breakout |
+                finnifty_ic_otm4_w300_lots5 | finnifty_ic_otm3_w500_lots4
     """
     allowed = {
         "momentum_n100_top5_max1": [
@@ -456,6 +456,12 @@ def trigger_model_data_pull(model_name):
              "pull_daily_ohlcv"),
             ("N100 universe refresh", "tools.models.momentum_n100_top5_max1.data_pull",
              "refresh_universe"),
+        ],
+        "midcap_narrow_60d_breakout": [
+            ("Equity OHLCV (N500 — covers midcap_narrow)",
+             "tools.models.midcap_narrow_60d_breakout.data_pull", "pull_daily_ohlcv"),
+            ("midcap_narrow universe refresh (skip top-30, take next 100)",
+             "tools.models.midcap_narrow_60d_breakout.data_pull", "refresh_universe"),
         ],
         "finnifty_ic_otm4_w300_lots5": [
             ("Index spots (NIFTY/BN/FN)", "tools.models.finnifty_ic_otm4_w300_lots5.data_pull",
@@ -515,6 +521,11 @@ def models_status():
       - FINNIFTY option chain: for the *current* monthly expiry, count
         unique strikes within ±5% of last spot. Require >= 5 strikes
         with at least 3 days of bars.
+
+    midcap_narrow_60d_breakout:
+      Loads midcap_narrow universe file (~100 NSE midcaps). For each
+      symbol counts distinct trading-day bars in last 150 calendar days,
+      requires >= 70 trading days (60d HH lookback + buffer).
 
     finnifty_ic_otm3_w500_lots4:
       - Shares data with otm4. Reports same FN spot + FN option checks.
@@ -628,7 +639,97 @@ def models_status():
             })
 
             # ============================================================
-            # Model 2: finnifty_ic_otm4_w300_lots5 (options)
+            # Model 2: midcap_narrow_60d_breakout (equity swing)
+            # ============================================================
+            mc_uni_file = Path("/app/logs/momrot/universes/midcap_narrow.json")
+            mc_syms_plain = []
+            mc_uni_age_days = None
+            if mc_uni_file.exists():
+                try:
+                    u = json.loads(mc_uni_file.read_text())
+                    mc_syms_plain = [s["symbol"] for s in u.get("stocks", [])]
+                    mtime = date.fromtimestamp(mc_uni_file.stat().st_mtime)
+                    mc_uni_age_days = (today - mtime).days
+                except Exception:
+                    pass
+
+            mc_fyers_syms = [f"NSE:{s}-EQ" for s in mc_syms_plain]
+            mc_per_sym_days = {}
+            mc_latest_per_sym = {}
+            mc_min_trading_days = 70  # 60-day high needs ~60 + buffer
+            if mc_fyers_syms:
+                rows = session.execute(text("""
+                    SELECT symbol,
+                           COUNT(DISTINCT date) AS days,
+                           MAX(date) AS latest
+                    FROM historical_data
+                    WHERE symbol = ANY(:syms)
+                      AND date >= :since
+                    GROUP BY symbol
+                """), {"syms": mc_fyers_syms, "since": since}).fetchall()
+                mc_per_sym_days = {r.symbol: int(r.days) for r in rows}
+                mc_latest_per_sym = {r.symbol: r.latest for r in rows}
+
+            mc_ok_syms = [s for s in mc_fyers_syms
+                          if mc_per_sym_days.get(s, 0) >= mc_min_trading_days]
+            mc_under_syms = [s for s in mc_fyers_syms
+                             if mc_per_sym_days.get(s, 0) < mc_min_trading_days]
+            mc_missing_syms = [s for s in mc_fyers_syms if s not in mc_per_sym_days]
+            mc_latest_dates = [d for d in mc_latest_per_sym.values() if d]
+            mc_overall_latest = max(mc_latest_dates) if mc_latest_dates else None
+            mc_stale_days = (today - mc_overall_latest).days if mc_overall_latest else 999
+            mc_cov_pct = (
+                len(mc_ok_syms) / len(mc_fyers_syms) * 100
+            ) if mc_fyers_syms else 0
+            mc_ok = (
+                len(mc_syms_plain) >= 80
+                and mc_cov_pct >= 90
+                and mc_stale_days <= 3
+                and mc_uni_age_days is not None and mc_uni_age_days <= 35
+            )
+
+            mc_worst = sorted(mc_per_sym_days.items(), key=lambda kv: kv[1])[:5]
+            mc_worst_str = ", ".join(
+                f"{s.replace('NSE:', '').replace('-EQ', '')}={d}"
+                for s, d in mc_worst
+            ) if mc_worst else ""
+
+            models.append({
+                "name": "midcap_narrow_60d_breakout",
+                "type": "equity",
+                "wired": False,
+                "data_sufficient": bool(mc_ok),
+                "items": [
+                    {"label": "midcap_narrow universe size",
+                     "value": len(mc_syms_plain),
+                     "required": ">= 80 syms",
+                     "ok": len(mc_syms_plain) >= 80,
+                     "extra": f"file age {mc_uni_age_days}d" if mc_uni_age_days is not None else "missing"},
+                    {"label": f"Symbols w/ >= {mc_min_trading_days} trading days "
+                              f"(last {window_calendar_days}d)",
+                     "value": f"{len(mc_ok_syms)} / {len(mc_fyers_syms)}",
+                     "required": ">= 90% coverage",
+                     "ok": mc_cov_pct >= 90,
+                     "extra": f"{mc_cov_pct:.1f}% coverage"},
+                    {"label": "Symbols below threshold",
+                     "value": len(mc_under_syms),
+                     "required": "0 (allow few)",
+                     "ok": len(mc_under_syms) <= 10,
+                     "extra": mc_worst_str},
+                    {"label": "Symbols completely missing",
+                     "value": len(mc_missing_syms),
+                     "required": "0",
+                     "ok": len(mc_missing_syms) == 0},
+                    {"label": "Latest equity close",
+                     "value": mc_overall_latest.isoformat() if mc_overall_latest else "—",
+                     "required": "<= 3d old (holiday OK)",
+                     "ok": mc_stale_days <= 3,
+                     "extra": f"{mc_stale_days}d old"},
+                ],
+            })
+
+            # ============================================================
+            # Model 3: finnifty_ic_otm4_w300_lots5 (options)
             # ============================================================
             # Spot sufficiency: last 30 calendar days >= 18 trading days
             spot_since = today - timedelta(days=30)

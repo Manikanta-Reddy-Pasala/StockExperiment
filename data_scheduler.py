@@ -333,10 +333,14 @@ def run_scheduler():
     from tools.models.momentum_n100_top5_max1.cron import (
         register_data_jobs as register_momentum_n100_data,
     )
+    from tools.models.midcap_narrow_60d_breakout.cron import (
+        register_data_jobs as register_midcap_narrow_data,
+    )
     from tools.models.finnifty_ic_otm4_w300_lots5.cron import (
         register_data_jobs as register_finnifty_ic_data,
     )
     register_momentum_n100_data(schedule)
+    register_midcap_narrow_data(schedule)
     register_finnifty_ic_data(schedule)
 
     # Legacy 4-step saga (kept for admin UI compat — populates technical_indicators,
