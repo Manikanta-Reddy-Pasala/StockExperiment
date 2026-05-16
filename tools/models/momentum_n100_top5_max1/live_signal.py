@@ -1,32 +1,30 @@
-"""Momentum Rotation live signal generator.
+"""Model 3 — Momentum Rotation live signal generator.
 
-Different from tools/live/signal_generator.py (state-machine strategies).
-This is a RANKER: ranks universe by 60d return, picks top-N, emits
-ENTRY1 / TARGET_HIT / STOP_HIT signals compatible with paper_executor.
+Ranks the N100 universe by 60d return, picks top-N, emits ENTRY1 /
+TARGET_HIT / STOP_HIT signals consumed by tools/live/fyers_executor.py.
 
-Strategy = Model 3 (from backtest WINNERS_FOUND.md):
+Strategy:
   - Universe: pseudo-N100 (top-100 by 20-day ADV)
   - top_n = 5
   - max_concurrent = 1
   - rebalance: 1st of month (or first trading day on/after)
 
 Logic per run:
-  1. Load current paper ledger -> currently held symbol (if any)
+  1. Load current ledger -> currently held symbol (if any)
   2. Rank universe by 60d return; pick top-N
   3. If held NOT in top-N -> emit STOP_HIT (rotation exit)
   4. Emit ENTRY1 for rank-1 stock if not already held
 
 Usage:
-  python tools/live/momentum_rotation_signal.py \
-    --universe-file paper_portfolio/universes/n100.json \
-    --top-n 5 \
-    --rebalance-only \
-    --signals-out signals/$(date +%F)_momrot_n100.json
+  python tools/models/momentum_n100_top5_max1/live_signal.py \
+    --universe-file /app/logs/momrot/universes/n100_current.json \
+    --top-n 5 --rebalance-only \
+    --signals-out /app/logs/momrot/signals/$(date +%F)_momrot_n100.json
 
 Flags:
   --rebalance-only       only emit signals on 1st-of-month (or after weekend)
   --force                emit regardless of date
-  --ledger PATH          paper ledger to read current holdings (optional)
+  --ledger PATH          live ledger to read current holdings (optional)
 """
 from __future__ import annotations
 

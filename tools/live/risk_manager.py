@@ -1,6 +1,6 @@
 """Risk manager — enforces capital lock, max concurrent, per-trade cap.
 
-Pure Python. Used by paper_executor + fyers_executor before placing any
+Pure Python. Used by fyers_executor before placing any
 order. Reads current portfolio state, decides if entry is allowed.
 
 Constraints (configurable via env or YAML):

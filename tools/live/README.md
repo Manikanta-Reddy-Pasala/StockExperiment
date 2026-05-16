@@ -1,123 +1,48 @@
-# Live Trading Stack — Python Scripts (no LLM, no cloud)
+# Live Execution Infrastructure
 
-Pure Python scripts for daily signal generation + paper trading + live
-Fyers execution. Built on top of the same strategy modules used in the
-backtest harness.
+Generic broker + execution scripts. Used by Model 3 (momentum_n100_top5_max1)
+for live Fyers order placement. **No paper trading.**
 
-## Scripts
+## Files
 
-| Script | Purpose |
+| File | Purpose |
 |---|---|
-| `signal_generator.py` | Read cached OHLCV → run strategy → emit signals JSON |
-| `risk_manager.py` | Capital lock, max concurrent, position sizing, kill-switch |
-| `paper_executor.py` | Consume signals → simulate portfolio → write daily ledger |
-| `fyers_executor.py` | Place real Fyers orders (requires `LIVE_TRADING=true`) |
-| `position_monitor.py` | Mark-to-market open positions, check SL/T1 triggers |
-| `daily_report.py` | End-of-day P&L summary from ledger |
-| `run_daily.sh` | Cron wrapper combining all of above |
+| `fyers_executor.py` | Real Fyers order placement (gated by `LIVE_TRADING=true`) |
+| `risk_manager.py` | Pre-trade risk check (capital lock, kill-switch) |
+| `daily_summary.py` | Read live ledger from `/app/logs/momrot/ledger/`, emit NAV/P&L |
+| `telegram_notify.py` | Optional Telegram notifications for signals/fills |
+| `run_daily.sh` | Cron wrapper — see `--help` |
 
-## Quickstart (paper mode)
+## Daily flow (cron)
 
+```
+09:00 IST  ./run_daily.sh prefetch        # cache OHLCV (N100)
+09:30 IST  ./run_daily.sh signals         # emit signals (rebalance-gated)
+09:35 IST  LIVE_TRADING=true ./run_daily.sh live    # place Fyers orders
+15:35 IST  ./run_daily.sh summary         # post-close NAV + P&L
+```
+
+## Live trading safety
+
+- `LIVE_TRADING=true` must be set explicitly. Default refuses.
+- `USER_ID` env selects which Fyers session (broker_configurations row).
+- Capital + kill-switch enforced in `risk_manager.py`.
+
+## Bootstrap (one-time)
+
+1. Build the N100 universe snapshot:
+   ```bash
+   python tools/models/momentum_n100_top5_max1/build_universe.py \
+       --top 100 --out /app/logs/momrot/universes/n100_current.json
+   ```
+2. Ensure Fyers token is fresh (`tools/refresh_fyers_token.py`).
+3. Test signals dry-run: `./run_daily.sh signals-force` then inspect JSON.
+4. Enable live: `LIVE_TRADING=true ./run_daily.sh live`.
+
+## Refresh universe
+
+Run weekly (Sunday) or after universe drift:
 ```bash
-# One-time: ensure OHLCV cache is up to date
-python tools/shared/prefetch_ohlcv.py --universe nifty50 --days 30 --intervals 1h,15m,D
-
-# Generate today's signals for one model
-python tools/live/signal_generator.py --model ema_200_400 --universe nifty50
-
-# Paper-trade the signals
-CAPITAL_INR=200000 MAX_CONCURRENT=2 \
-  python tools/live/paper_executor.py \
-  --signals signals/$(date +%F)_ema_200_400_nifty50.json
-
-# Mark-to-market during the day
-python tools/live/position_monitor.py
-
-# End-of-day report
-python tools/live/daily_report.py --date $(date +%F)
-```
-
-## Cron setup (Linux)
-
-```
-# Indian market hours 09:15-15:30 IST = 03:45-10:00 UTC
-# Pre-market: refresh cache + generate swing signals
-0  3 * * 1-5 cd /opt/StockExperiment && tools/live/run_daily.sh prefetch
-30 3 * * 1-5 cd /opt/StockExperiment && UNIVERSE=nifty50 tools/live/run_daily.sh signals
-40 3 * * 1-5 cd /opt/StockExperiment && tools/live/run_daily.sh paper
-
-# Every 5 min during market hours: monitor + exit triggers
-*/5 4-9 * * 1-5 cd /opt/StockExperiment && tools/live/run_daily.sh monitor
-
-# Post-close: end-of-day report
-0 10 * * 1-5 cd /opt/StockExperiment && tools/live/run_daily.sh report
-```
-
-## Configuration (env vars)
-
-| Var | Default | Purpose |
-|---|---|---|
-| `CAPITAL_INR` | 200000 | Locked-in capital pool |
-| `MAX_CONCURRENT` | 2 | Max simultaneous open positions |
-| `MAX_PER_TRADE_INR` | capital / max_concurrent | Per-trade ₹ cap |
-| `MAX_DAILY_LOSS_PCT` | -5.0 | Kill-switch (negative %) |
-| `MIN_PRICE` | 50.0 | Penny filter |
-| `ENABLE_SHORT` | false | Allow SELL entries |
-| `LIVE_TRADING` | false | Set 'true' to enable real Fyers orders |
-| `USER_ID` | 1 | Fyers user_id in broker_configurations |
-| `UNIVERSE` | nifty50 | nifty50 or nifty500 |
-
-## Going Live (Fyers real orders)
-
-⚠️ Real money. Verify:
-1. Backtest results acceptable (see `exports/backtests/WINNERS.md`)
-2. Paper mode for 1-2 weeks with no SEV
-3. Fyers token in `broker_configurations` for `USER_ID`
-4. CAPITAL_INR matches actual ₹ available
-5. `MAX_DAILY_LOSS_PCT` kill-switch set conservatively
-
-Then:
-```bash
-LIVE_TRADING=true CAPITAL_INR=200000 MAX_CONCURRENT=2 \
-  python tools/live/fyers_executor.py --signals signals/...json --user-id 1
-```
-
-Without `LIVE_TRADING=true`, `fyers_executor.py` forces dry-run mode and
-won't place orders.
-
-## Idempotency
-
-- `paper_portfolio/{date}.json` is the single source of truth for the day.
-- Re-running `paper_executor.py` with the same signals appends/skips
-  correctly (each ENTRY checks `already in symbol`).
-- `position_monitor.py` only updates marks; doesn't re-place orders.
-- `signal_generator.py` is read-only (cache + strategy → JSON).
-
-## Architecture
-
-```
-                       cron
-                         |
-                         v
-   tools/shared/prefetch_ohlcv.py   <-- Fyers historical API
-                         |
-                         v
-                  Postgres cache
-              (historical_data_*)
-                         |
-                         v
-   tools/live/signal_generator.py
-                         |
-                         v
-                  signals/<date>_<model>_<universe>.json
-                         |
-              ┌──────────┴──────────┐
-              v                     v
-   tools/live/paper_executor.py    tools/live/fyers_executor.py
-              |                     |
-              v                     v
-   paper_portfolio/<date>.json    Fyers API (real orders)
-              |                     |
-              v                     v
-   tools/live/position_monitor.py (every 5 min) + daily_report.py
+python tools/models/momentum_n100_top5_max1/build_universe.py \
+    --top 100 --out /app/logs/momrot/universes/n100_current.json
 ```

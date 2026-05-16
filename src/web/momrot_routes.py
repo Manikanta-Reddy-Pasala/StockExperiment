@@ -1,6 +1,6 @@
 """Momentum Rotation admin panel routes.
 
-Backend for the Momentum Rotation paper-trading dashboard.
+Backend for the Momentum Rotation live-trading dashboard.
 
 Endpoints:
   GET  /admin/momrot                 → render UI page
@@ -323,7 +323,7 @@ def api_ranking():
     try:
         top = int(request.args.get("top", 10))
         ranking = _current_ranking(top)
-        # Tag held symbols from LIVE Fyers (not paper ledger)
+        # Tag held symbols from LIVE Fyers
         held_syms = {
             (p.get("symbol") or "").replace("NSE:", "").replace("-EQ", "")
             for p in _fyers_holdings()
@@ -373,7 +373,7 @@ def api_history():
             })
     except Exception as e:
         logger.warning(f"tradebook fetch fail: {e}")
-    # Merge local history file (paper or annotated trades)
+    # Merge local history file (annotated trades)
     trades.extend(_read_history())
     # Sort newest first
     trades.sort(key=lambda r: r.get("ts", ""), reverse=True)

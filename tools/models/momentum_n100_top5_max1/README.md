@@ -31,7 +31,7 @@ Full trade ledger: `exports/models/momentum_n100_top5_max1/TRADE_LEDGER.md`
 |---|---|
 | `backtest.py` | 3-year backtest harness |
 | `build_universe.py` | Generate pseudo-N100 by ADV rank (refresh weekly) |
-| `live_signal.py` | Daily live signal emitter (paper/Fyers compatible) |
+| `live_signal.py` | Daily live signal emitter (consumed by Fyers executor) |
 
 ## How to reproduce
 
@@ -42,7 +42,7 @@ python tools/shared/prefetch_ohlcv.py --universe n50,n500 --days 1500 \
 
 # 2. Build pseudo-N100 universe (point-in-time snapshot)
 python tools/models/momentum_n100_top5_max1/build_universe.py \
-    --top 100 --out paper_portfolio/universes/n100.json
+    --top 100 --out /app/logs/momrot/universes/n100_current.json
 
 # 3. Run backtest
 python tools/models/momentum_n100_top5_max1/backtest.py \
@@ -53,8 +53,8 @@ python tools/models/momentum_n100_top5_max1/backtest.py \
 
 ## Live deployment
 
-Cron via `tools/live/run_daily.sh signals` calls `live_signal.py`. Paper-
-trading wired through `tools/live/paper_executor.py`. Real orders via
-`tools/live/fyers_executor.py` (gated by `LIVE_TRADING=true`).
+Cron via `tools/live/run_daily.sh signals` calls `live_signal.py`. Real
+Fyers orders via `tools/live/fyers_executor.py` (gated by `LIVE_TRADING=true`).
+No paper trading.
 
-See `tools/live/PAPER_DEPLOY_RUNBOOK.md` for cron schedule.
+See `tools/live/README.md` for cron schedule + bootstrap.
