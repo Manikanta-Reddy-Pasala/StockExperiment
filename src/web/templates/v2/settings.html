@@ -107,41 +107,54 @@
                   .alloc-table .lookahead-pill { font-size: 0.65rem; padding: 1px 6px; border-radius: 10px; background:#fff3cd; color:#856404; border:1px solid #ffeeba; margin-left:6px; vertical-align: middle; }
                   .alloc-table .universe-tag { font-size: 0.7rem; color:#6c757d; display:block; }
 
-                  /* B1 fix: action-bar dropdown was rendering inside the
-                     .table-responsive overflow container, getting clipped and
-                     overlapping row content. Pin it as a fixed-strategy popper
-                     and lift z-index above the table. Bootstrap 5.3 honours
-                     data-bs-strategy="fixed". The .show variant + bg-white +
-                     shadow keeps it a clean opaque overlay. */
-                  .alloc-table .action-bar .dropdown-menu {
+                  /* B1 fix v2: kebab dropdown menu is detached to <body> on
+                     show.bs.dropdown (see JS at bottom). That escapes ANY
+                     clipping ancestor (.table-responsive, .card-body,
+                     .col-12, etc.) regardless of overflow settings. While
+                     attached to body, it gets the .alloc-menu-floating class
+                     for opaque styling + z-index above everything. */
+                  .alloc-table .action-bar .dropdown-menu,
+                  .alloc-menu-floating {
                     font-size: 0.88rem;
-                    min-width: 220px;
+                    min-width: 230px;
                     padding: 6px 0;
                     background: #ffffff;
                     border: 1px solid #d6dae3;
-                    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+                    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.22);
                     border-radius: 8px;
-                    z-index: 1080;  /* above modal-backdrop (1050) + sticky headers */
                   }
-                  .alloc-table .action-bar .dropdown-item {
+                  .alloc-menu-floating {
+                    position: absolute;        /* coordinates set by JS at show time */
+                    z-index: 3000;             /* above modal-backdrop (1050) + everything */
+                    margin: 0;
+                    list-style: none;
+                  }
+                  .alloc-table .action-bar .dropdown-item,
+                  .alloc-menu-floating .dropdown-item {
                     padding: 8px 14px;
                     white-space: nowrap;
                     line-height: 1.3;
+                    display: block;
+                    color: #212529;
+                    text-decoration: none;
                   }
-                  .alloc-table .action-bar .dropdown-item:hover {
+                  .alloc-table .action-bar .dropdown-item:hover,
+                  .alloc-menu-floating .dropdown-item:hover {
                     background: #f3f5f9;
+                    color: #000;
                   }
-                  .alloc-table .action-bar .dropdown-item.text-danger:hover {
+                  .alloc-table .action-bar .dropdown-item.text-danger,
+                  .alloc-menu-floating .dropdown-item.text-danger { color: #d4453a; }
+                  .alloc-table .action-bar .dropdown-item.text-danger:hover,
+                  .alloc-menu-floating .dropdown-item.text-danger:hover {
                     background: #fff0f0;
+                    color: #a82622;
                   }
-                  /* Allow Popper.js fixed positioning to escape the
-                     .table-responsive overflow:auto box. */
-                  .table-responsive { overflow: visible; }
-                  @media (max-width: 768px) {
-                    /* On narrow screens keep horizontal scroll for the table
-                       itself but let the dropdown still escape via fixed
-                       strategy. */
-                    .table-responsive { overflow-x: auto; overflow-y: visible; }
+                  .alloc-menu-floating .dropdown-divider {
+                    height: 0;
+                    margin: 4px 0;
+                    overflow: hidden;
+                    border-top: 1px solid #e3e6ef;
                   }
 
                   /* B3 fix: disabled-row styling. Mute non-action cells so the
@@ -466,6 +479,14 @@ async function loadAllocations() {
         ? `<button class="btn btn-outline-danger" onclick="resetPos('${m.model_name}')" title="Mark flat (no Fyers order)" aria-label="Clear position"><i class="bi bi-x-circle"></i></button>`
         : `<button class="btn btn-outline-primary" onclick="openSeed('${m.model_name}')" title="Seed existing position into ledger" aria-label="Seed position"><i class="bi bi-bookmark-plus"></i></button>`;
       const dropdownId = `act_${m.model_name}`;
+      // B1 fix v2: build menu HTML separately. Markup is appended to <body>
+      // on click (see openKebabMenu) to escape the .table-responsive clip box.
+      const menuHtml = `
+        <li><a class="dropdown-item" href="#" data-action="bootstrap" data-model="${m.model_name}"><i class="bi bi-arrow-down-square me-2"></i>Bootstrap from legacy ledger</a></li>
+        <li><a class="dropdown-item" href="#" data-action="toggle" data-model="${m.model_name}" data-enabled="${m.enabled ? '1' : '0'}"><i class="bi ${m.enabled ? 'bi-pause-circle text-warning' : 'bi-play-circle text-success'} me-2"></i>${m.enabled ? 'Disable model' : 'Enable model'}</a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item text-danger" href="#" data-action="reset" data-model="${m.model_name}"><i class="bi bi-trash me-2"></i>Hard reset (zero all)</a></li>
+      `;
       tr.innerHTML = `
         <td class="col-model">
           <strong>${m.model_name}</strong>${enabledBadge}${warnBadge}
@@ -484,17 +505,9 @@ async function loadAllocations() {
             <button class="btn btn-success" onclick="openCap('${m.model_name}','deposit')" title="Deposit cash" aria-label="Deposit"><i class="bi bi-plus-lg"></i></button>
             <button class="btn btn-warning" onclick="openCap('${m.model_name}','withdraw')" title="Withdraw cash" aria-label="Withdraw"><i class="bi bi-dash-lg"></i></button>
             ${posBtn}
-            <div class="dropdown">
-              <button class="btn btn-outline-secondary" type="button" id="${dropdownId}" data-bs-toggle="dropdown" data-bs-display="dynamic" data-bs-boundary="viewport" aria-expanded="false" title="More actions" aria-label="More actions">
-                <i class="bi bi-three-dots-vertical"></i>
-              </button>
-              <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="${dropdownId}">
-                <li><a class="dropdown-item" href="#" data-action="bootstrap" data-model="${m.model_name}"><i class="bi bi-arrow-down-square me-2"></i>Bootstrap from legacy ledger</a></li>
-                <li><a class="dropdown-item" href="#" data-action="toggle" data-model="${m.model_name}" data-enabled="${m.enabled ? '1' : '0'}"><i class="bi ${m.enabled ? 'bi-pause-circle text-warning' : 'bi-play-circle text-success'} me-2"></i>${m.enabled ? 'Disable model' : 'Enable model'}</a></li>
-                <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item text-danger" href="#" data-action="reset" data-model="${m.model_name}"><i class="bi bi-trash me-2"></i>Hard reset (zero all)</a></li>
-              </ul>
-            </div>
+            <button class="btn btn-outline-secondary kebab-btn" type="button" id="${dropdownId}" data-menu='${menuHtml.replace(/'/g, "&#39;")}' aria-expanded="false" title="More actions" aria-label="More actions">
+              <i class="bi bi-three-dots-vertical"></i>
+            </button>
           </div>
         </td>
       `;
@@ -633,16 +646,92 @@ async function submitSeed() {
 
 loadAllocations();
 
-// ---- Delegated handler for popover items (data-action attrs) -----------
-// Bound once on document so it survives re-renders of #alloc_tbody.
+// ---- B1 fix v2: body-attached kebab menu --------------------------------
+// Bootstrap dropdown + Popper get clipped by ANY ancestor with overflow set
+// (even `visible` sometimes regresses under sticky-header + transformed
+// .card-body parents). Reliable fix: own the open/close + render the menu
+// directly in <body> using fixed-ish absolute positioning relative to the
+// kebab button rect. Single floating element is reused across rows.
+
+let _floatingMenu = null;
+let _floatingOwner = null;  // the kebab button that opened the current menu
+
+function closeKebabMenu() {
+  if (_floatingMenu && _floatingMenu.parentNode) {
+    _floatingMenu.parentNode.removeChild(_floatingMenu);
+  }
+  if (_floatingOwner) _floatingOwner.setAttribute('aria-expanded', 'false');
+  _floatingMenu = null;
+  _floatingOwner = null;
+}
+
+function openKebabMenu(btn) {
+  closeKebabMenu();
+  const menuHtml = btn.getAttribute('data-menu') || '';
+  const ul = document.createElement('ul');
+  ul.className = 'alloc-menu-floating';
+  ul.innerHTML = menuHtml;
+  document.body.appendChild(ul);
+
+  // Position: align menu's RIGHT edge to button's right edge, drop below.
+  // Use scroll-adjusted page coords so it stays glued when user scrolls.
+  const r = btn.getBoundingClientRect();
+  const menuWidth = ul.offsetWidth || 230;
+  const menuHeight = ul.offsetHeight || 160;
+  const pad = 4;
+
+  // Default: drop below + right-aligned.
+  let top = r.bottom + window.scrollY + pad;
+  let left = r.right + window.scrollX - menuWidth;
+
+  // Flip up if not enough room below.
+  if (r.bottom + menuHeight + pad > window.innerHeight && r.top > menuHeight) {
+    top = r.top + window.scrollY - menuHeight - pad;
+  }
+  // Clamp left so menu doesn't go off-screen on narrow viewports.
+  const minLeft = window.scrollX + 8;
+  if (left < minLeft) left = minLeft;
+
+  ul.style.top = top + 'px';
+  ul.style.left = left + 'px';
+
+  btn.setAttribute('aria-expanded', 'true');
+  _floatingMenu = ul;
+  _floatingOwner = btn;
+}
+
+// Toggle on kebab click; outside-click + Escape + resize/scroll close.
+document.addEventListener('click', function(ev) {
+  const kebab = ev.target.closest('.kebab-btn');
+  if (kebab) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (_floatingOwner === kebab) closeKebabMenu();
+    else openKebabMenu(kebab);
+    return;
+  }
+  // If click landed inside the floating menu, item handler below runs and
+  // we still want the menu to close after.
+  if (_floatingMenu && _floatingMenu.contains(ev.target)) return;
+  closeKebabMenu();
+});
+document.addEventListener('keydown', function(ev) {
+  if (ev.key === 'Escape') closeKebabMenu();
+});
+window.addEventListener('resize', closeKebabMenu);
+window.addEventListener('scroll', closeKebabMenu, true);
+
+// ---- Delegated handler for menu items (data-action attrs) ---------------
+// Bound once on document so it survives re-renders of #alloc_tbody AND
+// works for menus mounted in <body> by openKebabMenu.
 document.addEventListener('click', function(ev) {
   const el = ev.target.closest('[data-action]');
   if (!el) return;
-  // Only handle our dropdown items (avoid hijacking other [data-action]).
   if (!el.classList.contains('dropdown-item')) return;
   ev.preventDefault();
   const action = el.dataset.action;
   const model = el.dataset.model;
+  closeKebabMenu();  // dismiss before running action (modals/prompts can race)
   if (!action || !model) return;
   if (action === 'bootstrap') {
     bootstrap(model);

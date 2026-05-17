@@ -118,13 +118,16 @@ async function loadAggregate() {
     document.getElementById('agg_realized').textContent = fmtINR(t.realized_pnl);
     const tbody = document.getElementById('agg_tbody');
     tbody.innerHTML = '';
+    // Skip-rendering disabled models. Totals strip above stays unchanged because
+    // it uses backend-aggregated d.total which sums ALL models (incl. disabled).
     (d.models||[]).forEach(m => {
+      if (!m.enabled) return;  // hide disabled rows entirely
       const tr = document.createElement('tr');
       const posHtml = m.open_symbol
         ? `${m.open_symbol} <span class="text-muted small">x${m.open_qty} @ ${fmtINR(m.open_entry_px)}</span>`
         : '<span class="text-muted">flat</span>';
       tr.innerHTML = `
-        <td><strong>${m.model_name}</strong>${m.enabled?'':' <span class="badge bg-secondary">disabled</span>'}</td>
+        <td><strong>${m.model_name}</strong></td>
         <td class="text-end">${fmtINR(m.allocated_capital)}</td>
         <td class="text-end">${fmtINR(m.cash)}</td>
         <td>${posHtml}</td>
@@ -135,6 +138,9 @@ async function loadAggregate() {
       `;
       tbody.appendChild(tr);
     });
+    if (!tbody.children.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No enabled models. Visit <a href="/admin/v2/settings">Settings</a> to enable one.</td></tr>';
+    }
   } catch(e) { console.error(e); }
 }
 

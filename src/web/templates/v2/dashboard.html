@@ -15,9 +15,9 @@
   .model-card .card-body { padding: 1rem; }
   .model-card.equity { border-top: 4px solid #5b8def; }
   .model-card.options { border-top: 4px solid #b66dff; }
-  .model-card.disabled { opacity: 0.55; border-top-color: #adb5bd; filter: grayscale(0.35); }
-  .model-card.disabled:hover { opacity: 0.85; }
-  .model-card .disabled-tag { background:#6c757d; color:#fff; font-size:0.62rem; font-weight:700; padding:2px 8px; border-radius:10px; letter-spacing:0.5px; }
+  /* Disabled models are skip-rendered on Dashboard (see loadPortfolio).
+     CSS for `.model-card.disabled` removed — only enabled cards render here.
+     Re-enable via /admin/v2/settings ⋮ menu. */
   .model-card .ttl { font-size: 0.95rem; font-weight: 700; line-height: 1.2; }
   .model-card .uni { font-size: 0.72rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
   .model-card .kv { display:flex; justify-content: space-between; font-size: 0.85rem; padding: 3px 0; }
@@ -234,20 +234,28 @@ async function loadPortfolio() {
     }
 
     if (!pf.success) return;
+    // Totals strip uses backend pf.total which sums ALL models (incl. disabled) —
+    // capital remains allocated even when paused. Do not recompute here.
     renderTotals(pf.total);
 
     // Index models by name; preserve fixed display order regardless of DB order.
+    // Skip-rendering disabled models: user wants them gone from Dashboard, not
+    // greyed out. They remain visible in /admin/v2/settings to be re-enabled,
+    // and in the Admin Triggers "Per-Model Data Status" view.
     const byName = {};
-    (pf.models || []).forEach(m => { byName[m.model_name] = m; });
+    (pf.models || []).forEach(m => {
+      if (!m.enabled) return;  // hide disabled
+      byName[m.model_name] = m;
+    });
     const grid = document.getElementById('model_grid');
     const cards = MODEL_ORDER
       .filter(name => byName[name])
       .map(name => renderModelCard(byName[name], _signalsByModel[name]));
-    // Append any extra models that aren't in MODEL_ORDER (forward-compat).
+    // Append any extra enabled models not in MODEL_ORDER (forward-compat).
     Object.keys(byName).forEach(name => {
       if (!MODEL_ORDER.includes(name)) cards.push(renderModelCard(byName[name], _signalsByModel[name]));
     });
-    grid.innerHTML = cards.length ? cards.join('') : '<div class="col-12 text-center text-muted py-3">No models seeded.</div>';
+    grid.innerHTML = cards.length ? cards.join('') : '<div class="col-12 text-center text-muted py-3">No enabled models. Visit <a href="/admin/v2/settings">Settings</a> to enable one.</div>';
   } catch(e) {
     console.error('portfolio load failed', e);
   }
