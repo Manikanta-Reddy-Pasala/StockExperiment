@@ -15,7 +15,9 @@
   .model-card .card-body { padding: 1rem; }
   .model-card.equity { border-top: 4px solid #5b8def; }
   .model-card.options { border-top: 4px solid #b66dff; }
-  .model-card.disabled { opacity: 0.65; border-top-color: #adb5bd; }
+  .model-card.disabled { opacity: 0.55; border-top-color: #adb5bd; filter: grayscale(0.35); }
+  .model-card.disabled:hover { opacity: 0.85; }
+  .model-card .disabled-tag { background:#6c757d; color:#fff; font-size:0.62rem; font-weight:700; padding:2px 8px; border-radius:10px; letter-spacing:0.5px; }
   .model-card .ttl { font-size: 0.95rem; font-weight: 700; line-height: 1.2; }
   .model-card .uni { font-size: 0.72rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
   .model-card .kv { display:flex; justify-content: space-between; font-size: 0.85rem; padding: 3px 0; }
@@ -78,40 +80,6 @@
   <div class="col-12 text-center text-muted py-3">Loading models…</div>
 </div>
 
-<!-- Top-1 strategy callout (carry-over from prior dashboard) -->
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <div>
-    <span class="strategy-pill">Primary: Monthly N100</span>
-    <span class="ms-2 text-muted small">Live momentum_n100_top5_max1 — top-5 max=1 — 60d lookback</span>
-  </div>
-  <div class="small text-muted">Updated: <span id="updated_at">–</span></div>
-</div>
-
-<div class="row g-3 mb-4">
-  <div class="col-lg-7">
-    <div class="card h-100">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span>Top 5 Momentum Picks (N100)</span>
-        <a href="/picks" class="btn btn-sm btn-outline-primary">View All</a>
-      </div>
-      <div class="table-responsive">
-        <table class="table table-sm mb-0 align-middle">
-          <thead><tr><th>#</th><th>Symbol</th><th>Name</th><th class="text-end">60d %</th><th class="text-end">Price</th><th>Held</th></tr></thead>
-          <tbody id="picks_tbody"><tr><td colspan="6" class="text-center text-muted py-3">Loading…</td></tr></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-  <div class="col-lg-5">
-    <div class="card h-100">
-      <div class="card-header">Current Holding (primary model)</div>
-      <div class="card-body" id="holding_card">
-        <div class="text-muted text-center py-3">Loading…</div>
-      </div>
-    </div>
-  </div>
-</div>
-
 {% endblock %}
 
 {% block scripts %}
@@ -146,17 +114,26 @@ function renderModelCard(m, sig) {
   const cardCls = `model-card ${meta.kind} ${m.enabled ? '' : 'disabled'}`;
   const pnlCls = cls(m.pnl_total);
   const warn = meta.warn ? `<span class="warn-pill" title="Strategy note">${meta.warn}</span>` : '';
+  // B3: prominent DISABLED tag when model_settings.enabled=false.
   const enableBadge = m.enabled
     ? '<span class="enable-pill" style="background:#d4edda;color:#155724;border-color:#c3e6cb">LIVE</span>'
-    : '<span class="enable-pill">disabled</span>';
+    : '<span class="disabled-tag">DISABLED</span>';
   const refOnly = '';
 
-  let sigBadge = '<span class="sig-badge sig-quiet">no signal</span>';
-  if (sig) {
-    if (sig.error) sigBadge = `<span class="sig-badge sig-error" title="${sig.error}">error</span>`;
-    else if (sig.count > 0) sigBadge = `<span class="sig-badge sig-fired">${sig.count} signal${sig.count>1?'s':''}</span>`;
-    else if (sig.has_file) sigBadge = '<span class="sig-badge sig-quiet">quiet</span>';
-    else sigBadge = '<span class="sig-badge sig-quiet" title="No signal file written today">no run</span>';
+  // Signal status is meaningless for a paused model — hide it and show a
+  // muted "paused" pill instead. Capital + open position still display so
+  // the user can see exposure / decide to re-enable.
+  let sigBadge;
+  if (!m.enabled) {
+    sigBadge = '<span class="sig-badge sig-quiet" title="Model paused — scheduled signals do not fire">paused</span>';
+  } else {
+    sigBadge = '<span class="sig-badge sig-quiet">no signal</span>';
+    if (sig) {
+      if (sig.error) sigBadge = `<span class="sig-badge sig-error" title="${sig.error}">error</span>`;
+      else if (sig.count > 0) sigBadge = `<span class="sig-badge sig-fired">${sig.count} signal${sig.count>1?'s':''}</span>`;
+      else if (sig.has_file) sigBadge = '<span class="sig-badge sig-quiet">quiet</span>';
+      else sigBadge = '<span class="sig-badge sig-quiet" title="No signal file written today">no run</span>';
+    }
   }
 
   const posLine = m.open_symbol
@@ -276,52 +253,8 @@ async function loadPortfolio() {
   }
 }
 
-async function loadPrimary() {
-  try {
-    const r = await fetch('/admin/momrot/summary');
-    const d = await r.json();
-    if (!d.success) return;
-    const s = d.state, n = d.next_rebalance;
-    document.getElementById('updated_at').textContent = s.ledger_updated_at || '–';
-
-    if (s.open_positions && s.open_positions.length > 0) {
-      const p = s.open_positions[0];
-      document.getElementById('holding_card').innerHTML = `
-        <div class="d-flex justify-content-between mb-2"><span class="text-muted">Symbol</span><strong>${p.symbol}</strong></div>
-        <div class="d-flex justify-content-between mb-2"><span class="text-muted">Qty</span><strong>${p.qty.toLocaleString('en-IN')}</strong></div>
-        <div class="d-flex justify-content-between mb-2"><span class="text-muted">Entry</span><strong>${fmtINR(p.entry_price)}</strong></div>
-        <div class="d-flex justify-content-between mb-2"><span class="text-muted">Live</span><strong>${fmtINR(p.live_price)}</strong></div>
-        <div class="d-flex justify-content-between mb-2"><span class="text-muted">Cost</span><strong>${fmtINR(p.cost)}</strong></div>
-        <div class="d-flex justify-content-between mb-2"><span class="text-muted">Market Value</span><strong>${fmtINR(p.market_value)}</strong></div>
-        <div class="d-flex justify-content-between mb-2"><span class="text-muted">Unrealized P&amp;L</span><strong class="${cls(p.unrealized_pnl)}">${fmtINR(p.unrealized_pnl)}</strong></div>
-        <div class="d-flex justify-content-between"><span class="text-muted">Return %</span><strong class="${cls(p.unrealized_pct)}">${fmtPct(p.unrealized_pct)}</strong></div>
-      `;
-    } else {
-      document.getElementById('holding_card').innerHTML = '<div class="text-muted text-center py-3">No open position</div>';
-    }
-
-    const held = new Set((s.open_positions||[]).map(p=>p.symbol));
-    const tbody = document.getElementById('picks_tbody');
-    if (!d.ranking || d.ranking.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No data — build N100 universe first</td></tr>';
-    } else {
-      tbody.innerHTML = d.ranking.slice(0,5).map((r,i) => `
-        <tr class="${held.has(r.symbol)?'row-held':''}">
-          <td>${i===0?'<span class="badge bg-warning text-dark">★ 1</span>':'#'+(i+1)}</td>
-          <td><strong>${r.symbol}</strong></td>
-          <td class="small text-muted">${r.name||''}</td>
-          <td class="text-end ${cls(r.return_60d)}">${fmtPct(r.return_60d)}</td>
-          <td class="text-end">${fmtINR(r.price)}</td>
-          <td>${held.has(r.symbol)?'<span class="badge bg-success">HELD</span>':''}</td>
-        </tr>
-      `).join('');
-    }
-  } catch(e) { console.error(e); }
-}
-
 function load() {
   loadPortfolio();
-  loadPrimary();
 }
 load();
 setInterval(load, 30000);

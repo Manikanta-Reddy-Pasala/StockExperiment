@@ -104,9 +104,58 @@
                   .alloc-table .action-bar { display:flex; gap: 3px; flex-wrap: nowrap; justify-content: flex-end; align-items: center; }
                   .alloc-table .action-bar .btn { padding: 0.2rem 0.45rem; font-size: 0.78rem; line-height: 1; min-width: 30px; }
                   .alloc-table .action-bar .btn i { font-size: 0.85rem; }
-                  .alloc-table .action-bar .dropdown-menu { font-size: 0.85rem; }
                   .alloc-table .lookahead-pill { font-size: 0.65rem; padding: 1px 6px; border-radius: 10px; background:#fff3cd; color:#856404; border:1px solid #ffeeba; margin-left:6px; vertical-align: middle; }
                   .alloc-table .universe-tag { font-size: 0.7rem; color:#6c757d; display:block; }
+
+                  /* B1 fix: action-bar dropdown was rendering inside the
+                     .table-responsive overflow container, getting clipped and
+                     overlapping row content. Pin it as a fixed-strategy popper
+                     and lift z-index above the table. Bootstrap 5.3 honours
+                     data-bs-strategy="fixed". The .show variant + bg-white +
+                     shadow keeps it a clean opaque overlay. */
+                  .alloc-table .action-bar .dropdown-menu {
+                    font-size: 0.88rem;
+                    min-width: 220px;
+                    padding: 6px 0;
+                    background: #ffffff;
+                    border: 1px solid #d6dae3;
+                    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+                    border-radius: 8px;
+                    z-index: 1080;  /* above modal-backdrop (1050) + sticky headers */
+                  }
+                  .alloc-table .action-bar .dropdown-item {
+                    padding: 8px 14px;
+                    white-space: nowrap;
+                    line-height: 1.3;
+                  }
+                  .alloc-table .action-bar .dropdown-item:hover {
+                    background: #f3f5f9;
+                  }
+                  .alloc-table .action-bar .dropdown-item.text-danger:hover {
+                    background: #fff0f0;
+                  }
+                  /* Allow Popper.js fixed positioning to escape the
+                     .table-responsive overflow:auto box. */
+                  .table-responsive { overflow: visible; }
+                  @media (max-width: 768px) {
+                    /* On narrow screens keep horizontal scroll for the table
+                       itself but let the dropdown still escape via fixed
+                       strategy. */
+                    .table-responsive { overflow-x: auto; overflow-y: visible; }
+                  }
+
+                  /* B3 fix: disabled-row styling. Mute non-action cells so the
+                     row reads as paused at a glance while keeping action
+                     buttons fully usable for re-enable / deposit / etc. */
+                  .alloc-table tr.row-disabled td.col-model,
+                  .alloc-table tr.row-disabled td.num,
+                  .alloc-table tr.row-disabled td.col-position { opacity: 0.55; }
+                  .alloc-table .disabled-badge {
+                    background: #6c757d; color: #fff;
+                    font-size: 0.62rem; padding: 2px 7px;
+                    border-radius: 10px; vertical-align: middle;
+                    margin-left: 6px; letter-spacing: 0.4px;
+                  }
                 </style>
                 <div class="table-responsive">
                     <table class="table table-sm alloc-table mb-0">
@@ -409,7 +458,8 @@ async function loadAllocations() {
            <div class="text-muted small">${m.open_entry_date||''}</div>`
         : '<span class="text-muted">flat</span>';
       const pnlCls = m.pnl_total >= 0 ? 'text-success' : 'text-danger';
-      const enabledBadge = m.enabled ? '' : ' <span class="badge bg-secondary">disabled</span>';
+      const enabledBadge = m.enabled ? '' : ' <span class="disabled-badge">DISABLED</span>';
+      if (!m.enabled) tr.classList.add('row-disabled');
       const warnBadge = meta.warn ? ` <span class="lookahead-pill" title="Strategy note">${meta.warn}</span>` : '';
       // Position-state-dependent button: clear/sell-mark if holding, seed if flat.
       const posBtn = m.open_symbol
@@ -435,14 +485,14 @@ async function loadAllocations() {
             <button class="btn btn-warning" onclick="openCap('${m.model_name}','withdraw')" title="Withdraw cash" aria-label="Withdraw"><i class="bi bi-dash-lg"></i></button>
             ${posBtn}
             <div class="dropdown">
-              <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="${dropdownId}" data-bs-toggle="dropdown" aria-expanded="false" title="More actions" aria-label="More actions">
+              <button class="btn btn-outline-secondary" type="button" id="${dropdownId}" data-bs-toggle="dropdown" data-bs-display="dynamic" data-bs-boundary="viewport" aria-expanded="false" title="More actions" aria-label="More actions">
                 <i class="bi bi-three-dots-vertical"></i>
               </button>
-              <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="${dropdownId}">
-                <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); bootstrap('${m.model_name}')"><i class="bi bi-arrow-down-square me-2"></i>Bootstrap from legacy ledger</a></li>
-                <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); toggleEnabled('${m.model_name}', ${!m.enabled})"><i class="bi bi-toggle-on me-2"></i>${m.enabled ? 'Disable model' : 'Enable model'}</a></li>
+              <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="${dropdownId}">
+                <li><a class="dropdown-item" href="#" data-action="bootstrap" data-model="${m.model_name}"><i class="bi bi-arrow-down-square me-2"></i>Bootstrap from legacy ledger</a></li>
+                <li><a class="dropdown-item" href="#" data-action="toggle" data-model="${m.model_name}" data-enabled="${m.enabled ? '1' : '0'}"><i class="bi ${m.enabled ? 'bi-pause-circle text-warning' : 'bi-play-circle text-success'} me-2"></i>${m.enabled ? 'Disable model' : 'Enable model'}</a></li>
                 <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item text-danger" href="#" onclick="event.preventDefault(); resetModel('${m.model_name}')"><i class="bi bi-trash me-2"></i>Hard reset (zero all)</a></li>
+                <li><a class="dropdown-item text-danger" href="#" data-action="reset" data-model="${m.model_name}"><i class="bi bi-trash me-2"></i>Hard reset (zero all)</a></li>
               </ul>
             </div>
           </div>
@@ -509,12 +559,33 @@ async function bootstrap(model) {
 }
 
 async function toggleEnabled(model, enabled) {
-  const r = await fetch(`/admin/models/${model}/enabled`, {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({enabled})
-  });
-  const d = await r.json();
-  if (d.success) loadAllocations(); else Trading.toast(d.error || 'toggle failed', 'danger');
+  // Disabling halts scheduled signal + execute jobs for this model. Open
+  // positions are NOT touched. Confirm only on disable (re-enable is harmless).
+  if (!enabled) {
+    const ok = confirm(
+      `Disable ${model}?\n\n` +
+      `Stops scheduled signal + execute jobs. Existing open positions are NOT closed.\n` +
+      `Capital stays allocated. You can re-enable any time.`
+    );
+    if (!ok) return;
+  }
+  try {
+    const r = await fetch(`/admin/models/${model}/enabled`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({enabled})
+    });
+    const d = await r.json();
+    if (d.success) {
+      Trading.toast(`${model} ${enabled ? 'enabled' : 'disabled'}`,
+                    enabled ? 'success' : 'warning');
+      loadAllocations();
+    } else {
+      Trading.toast(d.error || 'toggle failed', 'danger');
+    }
+  } catch (e) {
+    Trading.toast('Network error: ' + e.message, 'danger');
+  }
 }
 
 async function resetPos(model) {
@@ -561,5 +632,26 @@ async function submitSeed() {
 }
 
 loadAllocations();
+
+// ---- Delegated handler for popover items (data-action attrs) -----------
+// Bound once on document so it survives re-renders of #alloc_tbody.
+document.addEventListener('click', function(ev) {
+  const el = ev.target.closest('[data-action]');
+  if (!el) return;
+  // Only handle our dropdown items (avoid hijacking other [data-action]).
+  if (!el.classList.contains('dropdown-item')) return;
+  ev.preventDefault();
+  const action = el.dataset.action;
+  const model = el.dataset.model;
+  if (!action || !model) return;
+  if (action === 'bootstrap') {
+    bootstrap(model);
+  } else if (action === 'toggle') {
+    const wasEnabled = el.dataset.enabled === '1';
+    toggleEnabled(model, !wasEnabled);
+  } else if (action === 'reset') {
+    resetModel(model);
+  }
+});
 </script>
 {% endblock %}

@@ -140,6 +140,33 @@
     </div>
   </div>
 
+  <!-- Per-Model Data Status (all 5 models from /admin/models/portfolio) -->
+  <div class="card mr-card mb-4">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-database"></i> Per-Model Data Status</span>
+      <button class="btn btn-sm btn-outline-secondary" id="btn_datastatus_refresh">
+        <i class="bi bi-arrow-repeat"></i> Refresh
+      </button>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-momrot mb-0">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Enabled</th>
+            <th>Last Signal</th>
+            <th>Last Data Pull</th>
+            <th class="text-end">Universe Size</th>
+            <th class="text-end">Ranking Count</th>
+          </tr>
+        </thead>
+        <tbody id="datastatus_body">
+          <tr><td colspan="6" class="text-center text-muted py-3">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- Live Fyers Account -->
   <div class="card mr-card mb-4">
     <div class="card-header bg-light d-flex justify-content-between align-items-center">
@@ -530,14 +557,15 @@ function _renderTriggerRow(m, st) {
   }
   const enabledBadge = st.enabled
     ? '<span class="badge bg-success">ON</span>'
-    : '<span class="badge bg-secondary">OFF</span>';
+    : '<span class="badge bg-secondary">DISABLED</span>';
+  const rowStyle = st.enabled ? '' : ' style="opacity:0.55;background:#fafbfc;"';
   const pnlCls = cls(st.pnl_pct);
   const pos = st.current_position
     ? `<code>${(st.current_position.sym||'').replace('NSE:','').replace('-EQ','')}</code>` +
       ` <span class="small-mute">x${st.current_position.qty} @ ${fmtINR(st.current_position.entry_px)}</span>`
     : '<span class="small-mute">flat</span>';
 
-  return `<tr>
+  return `<tr${rowStyle}>
     <td>
       <strong>${m.label}</strong><br>
       <span class="small-mute">${m.key}</span>
@@ -642,9 +670,82 @@ async function triggerToggleEnabled(modelName, newVal) {
 
 document.getElementById('btn_triggers_refresh').addEventListener('click', loadTriggers);
 
+// ---------------------------------------------------------------------------
+// Per-Model Data Status — iterates ALL models from /admin/models/portfolio
+// (currently 5 — 4 equity + 1 options). Shows last signal, last data pull,
+// universe size, ranking count. Resilient to missing triggers/ranking
+// endpoints for models not in MODEL_PATHS (e.g. options model).
+// ---------------------------------------------------------------------------
+
+function _dash(v) {
+  return (v === null || v === undefined || v === '' || (typeof v === 'number' && !isFinite(v)))
+    ? '<span class="small-mute">—</span>'
+    : v;
+}
+
+async function _fetchJson(url) {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) {
+    return null;
+  }
+}
+
+async function _loadModelDataStatus(modelName, enabled) {
+  // triggers/status is only wired for models in MODEL_PATHS (4 equity).
+  // Options model returns 400 — fall back gracefully to dashes.
+  const [statusRes, rankingRes] = await Promise.all([
+    _fetchJson(`/admin/models/${modelName}/triggers/status`),
+    _fetchJson(`/admin/${modelName}/ranking?top=999`),
+  ]);
+  const lastSig = statusRes && statusRes.success ? statusRes.last_signal_at : null;
+  const lastExec = statusRes && statusRes.success ? statusRes.last_execution_at : null;
+  let universeSize = null;
+  let rankingCount = null;
+  if (rankingRes && rankingRes.success) {
+    universeSize = rankingRes.universe_size != null ? rankingRes.universe_size : null;
+    rankingCount = Array.isArray(rankingRes.ranking) ? rankingRes.ranking.length : null;
+  }
+  const enabledBadge = enabled
+    ? '<span class="badge bg-success">ON</span>'
+    : '<span class="badge bg-secondary">DISABLED</span>';
+  return `<tr${enabled ? '' : ' style="opacity:0.6;"'}>
+    <td><strong>${modelName}</strong></td>
+    <td>${enabledBadge}</td>
+    <td class="small">${_dash(lastSig ? _ts(lastSig) : null)}</td>
+    <td class="small">${_dash(lastExec ? _ts(lastExec) : null)}</td>
+    <td class="text-end">${_dash(universeSize)}</td>
+    <td class="text-end">${_dash(rankingCount)}</td>
+  </tr>`;
+}
+
+async function loadDataStatus() {
+  const body = document.getElementById('datastatus_body');
+  body.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Loading…</td></tr>';
+  const pf = await _fetchJson('/admin/models/portfolio');
+  if (!pf || !pf.success) {
+    body.innerHTML = '<tr><td colspan="6" class="text-danger small">Failed to load /admin/models/portfolio</td></tr>';
+    return;
+  }
+  const models = pf.models || [];
+  if (models.length === 0) {
+    body.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No models seeded.</td></tr>';
+    return;
+  }
+  const rows = await Promise.all(
+    models.map(m => _loadModelDataStatus(m.model_name, !!m.enabled))
+  );
+  body.innerHTML = rows.join('');
+}
+
+document.getElementById('btn_datastatus_refresh').addEventListener('click', loadDataStatus);
+
 // Initial load + auto-refresh
-loadSummary(); loadHistory(); loadRunLogs(); loadTriggers();
+loadSummary(); loadHistory(); loadRunLogs(); loadTriggers(); loadDataStatus();
 setInterval(loadSummary, 30000);  // every 30s
 setInterval(loadTriggers, 60000); // every 60s
+setInterval(loadDataStatus, 60000); // every 60s
 </script>
 {% endblock %}
