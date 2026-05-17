@@ -536,12 +536,16 @@ document.getElementById('btn_tg_test').addEventListener('click', async () => {
 // toggle-enabled. Does NOT touch /admin/momrot/* legacy routes used above.
 // ---------------------------------------------------------------------------
 
-const TRIGGER_MODELS = [
-  {key: 'momentum_n100_top5_max1',    label: 'N100 Top-5 (mc=1)'},
-  {key: 'n20_daily_large_only',       label: 'N20 Daily ADV ∩ N100'},
-  {key: 'midcap_narrow_60d_breakout', label: 'Midcap 60d Breakout'},
-  {key: 'momentum_pseudo_n100_adv',   label: 'Pseudo-N100 ADV (mc=1)'},
-];
+// Label lookup. TRIGGER_MODELS list is now derived from /admin/models/portfolio
+// at load time so newly-added models surface automatically. This map only
+// provides nicer labels — falls back to model_name if missing.
+const MODEL_LABELS = {
+  'momentum_n100_top5_max1':    'N100 Top-5 (mc=1)',
+  'n20_daily_large_only':       'N20 Daily ADV ∩ N100',
+  'midcap_narrow_60d_breakout': 'Midcap 60d Breakout',
+  'momentum_pseudo_n100_adv':   'Pseudo-N100 ADV (mc=1)',
+  'finnifty_ic_otm4_w300_lots5': 'FinNifty Iron Condor',
+};
 
 function _ts(s) {
   if (!s) return '<span class="small-mute">never</span>';
@@ -553,8 +557,18 @@ function _ts(s) {
 
 function _renderTriggerRow(m, st) {
   if (!st || !st.success) {
-    return `<tr><td><strong>${m.label}</strong></td>
-      <td colspan="6" class="text-danger small">load failed: ${st && st.error || 'n/a'}</td></tr>`;
+    const err = (st && st.error) || 'no response';
+    const isWiringErr = /Unknown model/i.test(err);
+    const cls = isWiringErr ? 'text-warning' : 'text-danger';
+    const tag = isWiringErr
+      ? '<span class="badge bg-warning text-dark">NOT WIRED</span>'
+      : '<span class="badge bg-danger">ERROR</span>';
+    return `<tr style="background:#fff8f0;">
+      <td><strong>${m.label}</strong><br><span class="small-mute">${m.key}</span></td>
+      <td colspan="6" class="small ${cls}">
+        ${tag}
+        ${isWiringErr ? 'Model has no live_signal/executor route (MODEL_PATHS).' : err}
+      </td></tr>`;
   }
   const enabledBadge = st.enabled
     ? '<span class="badge bg-success">ON</span>'
@@ -596,7 +610,29 @@ function _renderTriggerRow(m, st) {
 async function loadTriggers() {
   const body = document.getElementById('triggers_body');
   body.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Loading…</td></tr>`;
-  const fetches = TRIGGER_MODELS.map(async m => {
+  // Discover all models from portfolio endpoint (single source of truth).
+  // No hardcoded model list — finnifty options + future models surface
+  // automatically with NOT WIRED badge if triggers/status returns error.
+  let pfRes;
+  try {
+    pfRes = await (await fetch('/admin/models/portfolio')).json();
+  } catch (e) {
+    body.innerHTML = `<tr><td colspan="7" class="text-danger small">Failed to fetch /admin/models/portfolio: ${e.message}</td></tr>`;
+    return;
+  }
+  if (!pfRes || !pfRes.success) {
+    body.innerHTML = `<tr><td colspan="7" class="text-danger small">/admin/models/portfolio returned error: ${pfRes && pfRes.error || 'unknown'}</td></tr>`;
+    return;
+  }
+  const models = (pfRes.models || []).map(m => ({
+    key: m.model_name,
+    label: MODEL_LABELS[m.model_name] || m.model_name,
+  }));
+  if (models.length === 0) {
+    body.innerHTML = `<tr><td colspan="7" class="text-muted small">No models seeded — check ensure_models_seeded()</td></tr>`;
+    return;
+  }
+  const fetches = models.map(async m => {
     try {
       const r = await fetch(`/admin/models/${m.key}/triggers/status`);
       return {m, st: await r.json()};
