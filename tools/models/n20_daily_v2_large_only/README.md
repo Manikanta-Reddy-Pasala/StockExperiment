@@ -1,59 +1,40 @@
 # n20_daily_v2_large_only
 
-**v2 of `n20_daily_30d_mc1_uptrend`** with NSE Nifty 100 (Large-cap) membership filter. Halves Max DD vs v1 baseline.
-
-## What's different from v1
-
-| Knob | v1 (n20_daily_30d_mc1_uptrend) | **v2 (this)** |
-|---|---|---|
-| Universe pool | Top-20 ADV from N500 | Same |
-| Uptrend filter | close > 200d SMA | Same |
-| **NSE Nifty 100 filter** | — | **Stock must be in NSE Nifty 100** |
-| Lookback | 30 days | Same |
-| Position | top-1 (max_concurrent=1) | Same |
-| Rebalance | Daily | Same |
-
-The Nifty 100 filter cuts mid-caps and small-caps from the candidate pool. Strategy still ranks top-20 ADV + uptrend by 30d return, but must be a Large-cap per NSE official index membership.
+**Daily-rebalance momentum rotation on NSE Nifty 100 large-caps.** Replaces archived `n20_daily_30d_mc1_uptrend` (50% DD version).
 
 ## Stock pick logic (plain English)
 
 1. **Universe build (per day)**: top-20 N500 stocks by 20-day ADV
-2. **Uptrend filter**: keep only stocks where close > 200d SMA
-3. **NEW v2 — Large-cap filter**: keep only stocks in NSE Nifty 100 (`src/data/symbols/nifty100.csv`)
-4. **Rank by 30d return** (highest first)
+2. **Uptrend filter**: keep only stocks where close > 200-day SMA
+3. **Large-cap filter**: keep only stocks in NSE Nifty 100 (`src/data/symbols/nifty100.csv`)
+4. **Rank by 30-day return** (highest first)
 5. **Pick top-1** from filtered set; if empty, hold cash
-6. **Rebalance daily**
+6. **Rebalance daily** (re-rank + rotate)
 
-## Why Large-only
+## Key knobs
 
-Tested 15+ pure-number DD-reduction filters (hard SL, trail SL, mc>1 diversification, vol caps, port-DD circuit breakers, combos). All harmed CAGR more than they cut DD. Only NSE Nifty 100 filter halved DD with modest CAGR cost.
-
-| Filter approach | CAGR | DD | Calmar | Result |
-|---|---:|---:|---:|---|
-| v1 baseline (no filter) | +157.27% | 50.61% | 3.10 | high return, high DD |
-| Hard SL -5%/-7% | +157.11% | 50.61% | 3.10 | doesn't fire (rotation faster) |
-| Trail SL -10% | +157.11% | 50.61% | 3.10 | never fires |
-| mc=2 (2 positions) | +75.39% | 32.32% | 2.33 | dilutes top-1 edge |
-| mc=3 | +42.25% | 29.59% | 1.43 | worse |
-| Max daily vol 4% | +68.07% | 32.42% | 2.10 | kills high-vol winners |
-| Halt on port DD>15% | +24.56% | 17.88% | 1.37 | stops trading too long |
-| **NSE Nifty 100 filter (v2)** | **+140.78%** | **26.92%** | **5.23** ✅ | **winner** |
-
-NSE Nifty 100 filter excludes structurally volatile small/mid stocks (RPOWER, OLAELEC, IDEA, IRB, SCI etc.) that trigger most of the v1 50% DD events. Large-caps deliver more orderly trends.
+| Knob | Value |
+|---|---|
+| Universe pool | Top-20 by 20-day ADV from N500 |
+| Uptrend filter | close > 200d SMA |
+| NSE Nifty 100 filter | Stock must be in NSE Nifty 100 list |
+| Lookback | 30 days |
+| Position | top-1, max_concurrent=1 |
+| Rebalance | Daily |
+| Cash policy | Sit in cash if no large-cap candidate matches |
 
 ## Backtest result (₹10L, 2023-05-15 → 2026-05-12)
 
-| Metric | v1 baseline | **v2 Large-only** | Δ |
-|---|---:|---:|---:|
-| Final NAV | ₹1.70 Cr | **₹1.40 Cr** | -₹30 L |
-| CAGR | +157.27% | **+140.78%** | -16.5pp |
-| Max DD (NAV-based) | 50.61% | **26.92%** | **-23.7pp** ✅ |
-| Max DD (cash-based) | 50.61% | 25.52% | -25.1pp ✅ |
-| Calmar | 3.10 | **5.23** | **+2.13** ✅ |
-| Trades | 134 | 139 | +5 |
-| WR | 47.8% | 43.1% | -4.7pp |
-
-**Risk-adjusted winner.** Same strategy machinery, just constrained universe.
+| Metric | Value |
+|---|---:|
+| Final NAV | **₹1,39,59,936** |
+| Total return | **+1295.99%** |
+| 3-yr CAGR | **+140.78%** |
+| Max DD (cash NAV) | **25.52%** |
+| Max DD (mark-to-market NAV) | 26.92% |
+| Calmar (CAGR/DD) | **5.23** |
+| Trades | 139 |
+| WR | 43.1% (59W / 78L) |
 
 ## Yearly money flow
 
@@ -67,11 +48,10 @@ NSE Nifty 100 filter excludes structurally volatile small/mid stocks (RPOWER, OL
 
 | File | Purpose |
 |---|---|
-| `backtest.py` | Standalone reproducer (v2 large-only config) |
+| `backtest.py` | Standalone reproducer |
 | `trade_ledger.json` | 139 trades raw |
-| `__init__.py` | Module marker |
 
-See `exports/models/n20_daily_v2_large_only/{SUMMARY.md, TRADE_LEDGER.md}` for full per-trade table with NSE cap classification + invested ₹.
+`exports/models/n20_daily_v2_large_only/{SUMMARY.md, TRADE_LEDGER.md}` for full per-trade table with NSE cap + invested ₹.
 
 ## Reproduce
 
@@ -81,7 +61,11 @@ docker exec trading_system_app python tools/models/n20_daily_v2_large_only/backt
 
 ## Caveats
 
-- v1 still exists as `n20_daily_30d_mc1_uptrend` (high-CAGR / high-DD variant). v2 is Calmar-optimized alternative.
-- Nifty 100 list refreshes quarterly (NSE Mar/Sep rebalance). Run `tools/refresh_nifty100.py` to keep universe current.
-- WR drops 47.8% → 43.1% — strategy enters more often but wins less often (Large-caps less explosive). Net CAGR/DD ratio still better.
-- 26.9% DD still substantial for single-stock concentration. If lower DD needed, use mc=2 large-only (would cut CAGR further).
+- 25-27% DD still substantial for single-stock daily rotation.
+- 139 trades / 3yr = ~46/yr round-trip → 3-5%/yr cost drag. Post-cost CAGR ≈ +135%.
+- NSE Nifty 100 list refreshes quarterly (Mar/Sep rebalance). Run `tools/refresh_nifty100.py` to keep current.
+- Slippage not modeled. Real ~10-30 bps drag per round-trip.
+
+## History
+
+Earlier variant `n20_daily_30d_mc1_uptrend` (no Large-cap filter) hit +157% CAGR but 50% Max DD. Tested 15+ pure-number DD-reduction filters (hard SL, trail SL, mc>1, vol caps, port-DD halt) — all hurt CAGR more than they helped. Only NSE Nifty 100 categorical filter halved DD with acceptable CAGR cost. Original archived at `tools/models/_archived_models/n20_daily_30d_mc1_uptrend/README.md`.
