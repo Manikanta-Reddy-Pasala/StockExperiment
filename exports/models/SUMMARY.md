@@ -52,6 +52,46 @@ Initially applied MAX_PRICE filter to all 3 momentum models. Reviewed and remove
 | **Best risk-adjusted CAGR** | `momentum_pseudo_n100_adv` (Calmar 9+, but lookahead caveat) |
 | **Highest absolute CAGR (daily)** | `n20_daily_large_only` |
 
+## Stock Overlap Across Models
+
+Stocks that appear in trade ledgers of 2+ equity models (multi-model conviction signal).
+
+### Large-cap (NSE Nifty 100)
+
+| Stock | n100 | pseudo | midcap | n20 | Total models |
+|---|:-:|:-:|:-:|:-:|:-:|
+| ADANIPOWER | ✓ | ✓ |  | ✓ | 3 |
+| ETERNAL | ✓ | ✓ |  | ✓ | 3 |
+| IRFC | ✓ | ✓ |  | ✓ | 3 |
+| MAZDOCK | ✓ | ✓ |  | ✓ | 3 |
+| PFC | ✓ | ✓ |  | ✓ | 3 |
+| SHRIRAMFIN | ✓ | ✓ |  | ✓ | 3 |
+| ADANIGREEN | ✓ | ✓ |  |  | 2 |
+| BAJFINANCE |  | ✓ |  | ✓ | 2 |
+| HAL | ✓ |  |  | ✓ | 2 |
+| HINDZINC | ✓ |  |  | ✓ | 2 |
+| ONGC |  | ✓ |  | ✓ | 2 |
+| RECLTD |  | ✓ |  | ✓ | 2 |
+| TRENT | ✓ |  |  | ✓ | 2 |
+
+### Mid-cap (NSE Nifty Midcap 150)
+
+| Stock | n100 | pseudo | midcap | n20 | Total models |
+|---|:-:|:-:|:-:|:-:|:-:|
+| BSE |  | ✓ | ✓ |  | 2 |
+| COCHINSHIP |  | ✓ | ✓ |  | 2 |
+| INDUSTOWER |  | ✓ | ✓ |  | 2 |
+
+### Small-cap (NSE Nifty Smallcap 250)
+
+_None._
+
+### Other / outside top-500
+
+_None._
+
+**Interpretation**: stocks appearing in 3+ models are high-conviction across strategies. Used for portfolio concentration decisions.
+
 ## Data integrity
 
 - All data from Fyers production source (cont_flag=1 split-adjusted)
