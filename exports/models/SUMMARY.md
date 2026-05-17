@@ -12,11 +12,13 @@ Hypothetical: deposit ₹10,00,000 on **2023-05-15** in each model, hold full 3-
 |--:|---|---|---:|---:|---:|---:|:-:|
 | 1 | `momentum_n100_top5_max1` | Large-cap (real Nifty 100) | **₹58,68,846** | +486.88% | **+80.38%** | 29.71% | ✅ |
 | 2 | `momentum_pseudo_n100_adv` | Large/mid blend (ADV-rank) | **₹1,32,10,187** | +1221.02% | **+136.39%** | 16.15% | ❌ |
-| 3 | `midcap_narrow_60d_breakout` | Mid-cap (breakout swing) | **₹8,38,11,502** ⚠️ | +8281.15% | **+337.62%** | 6.76% | ❌ |
+| 3 | `midcap_narrow_60d_breakout` ¹ | Mid-cap (breakout swing) | **₹47,92,492** | +379.25% | **+68.60%** ² | 17.83% | ❌ |
 | 4 | `finnifty_ic_otm4_w300_lots5` | Options (Iron Condor, scaled 5×) | **₹1,11,28,365** | +1012.84% | **+123.30%** compound | 13.88% | ❌ |
 | 5 | `n20_daily_30d_mc1_uptrend` | Top-20 ADV daily rotation | **₹1,70,00,000** approx | +1599.57% | **+157.27%** | 50.61% | ❌ |
 
-⚠️ Midcap heavily skewed by single ANGELONE trade (likely corporate-action data anomaly). Real-world deliverable ~30-60% CAGR.
+¹ **ANGELONE excluded** from pseudo-midcap universe (corp-action data anomaly: entry ₹316 → exit ₹2856 = 9x in 2 months, likely unadjusted bonus/split). Full V1 (with ANGELONE) = +337.62% CAGR / ₹8.38 Cr / 13 trades / 6.76% DD but inflated by that one trade.
+
+² Below user's 80% CAGR threshold when ANGELONE removed. Would be discarded per filter rule. See model SUMMARY for ex-ANGELONE detail.
 
 🔹 Finnifty originally backtest at ₹2L → ₹22.26L. Linear-scaled to ₹10L = ₹1.11 Cr assuming margin & defined-risk scale linearly (25 lots vs 5).
 
@@ -144,11 +146,11 @@ Hypothetical: deposit ₹10,00,000 on **2023-05-15** in each model, hold full 3-
 
 | Rank | Model | CAGR | MaxDD | Calmar | Notes |
 |--:|---|---:|---:|---:|---|
-| 1 | midcap_narrow_60d_breakout | +337.62% | 6.76% | **49.94** | ANGELONE-inflated |
-| 2 | momentum_pseudo_n100_adv | +136.39% | 16.15% | **8.44** | Lookahead bias |
-| 3 | finnifty_ic_otm4_w300_lots5 | +123.30% | 13.88% | **8.88** | Honest, defined-risk |
-| 4 | momentum_n100_top5_max1 | +80.38% | 29.71% | **2.71** | LIVE deployable |
-| 5 | n20_daily_30d_mc1_uptrend | +157.27% | 50.61% | **3.11** | High vol, daily rotation |
+| 1 | momentum_pseudo_n100_adv | +136.39% | 16.15% | **8.44** | Lookahead bias |
+| 2 | finnifty_ic_otm4_w300_lots5 | +123.30% | 13.88% | **8.88** | Honest, defined-risk |
+| 3 | n20_daily_30d_mc1_uptrend | +157.27% | 50.61% | **3.11** | High vol, daily rotation |
+| 4 | midcap_narrow_60d_breakout (ex-ANGELONE) | +68.60% | 17.83% | **3.85** | Below 80% threshold |
+| 5 | momentum_n100_top5_max1 | +80.38% | 29.71% | **2.71** | LIVE deployable |
 
 ## Deployment recommendation
 
