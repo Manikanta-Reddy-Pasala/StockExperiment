@@ -2,27 +2,27 @@
 
 3-year backtest window: **2023-05-15 → 2026-05-12** · ₹10L per model · Fyers data (4-yr re-pull 2026-05-17)
 
-5 models (4 equity + 1 options). Each has ONE canonical version. Last refreshed 2026-05-17 with MAX_PRICE filter applied to 3 momentum models.
+5 models (4 equity + 1 options). Each has ONE canonical version. Last refreshed 2026-05-17.
 
 ## Headline — deploy ₹10L per model
 
 | # | Model | Universe | Rebalance | Final NAV | CAGR | Max DD | LIVE |
 |--:|---|---|---|---:|---:|---:|:-:|
-| 1 | `momentum_n100_top5_max1` | Real NSE Nifty 100 + MAX_PRICE≤₹3K | Monthly | ₹6,389,826 | **+85.85%** | 33.89% | ✅ |
+| 1 | `momentum_n100_top5_max1` | Real NSE Nifty 100 (no filter) | Monthly | ₹4,483,692 | **+65.10%** | 37.30% | ✅ |
 | 2 | `momentum_pseudo_n100_adv` | Top-100 ADV from N500 − Small + uptrend + MAX_PRICE≤₹3K | Monthly | ₹15,361,000 | **+149.15%** | **16.17%** | ❌ |
 | 3 | `midcap_narrow_60d_breakout` | Top-100 ADV from N500 − Large | Event-driven | ₹13,456,535 | **+137.85%** | **8.12%** | ❌ |
 | 4 | `finnifty_ic_otm4_w300_lots5` | FINNIFTY options (4 strikes per Mon) | Monthly IC | ₹22,25,673 | **+123.27%** compound | 13.88% | ❌ |
-| 5 | `n20_daily_large_only` | Top-20 ADV + uptrend + NSE Nifty 100 + MAX_PRICE≤₹2.5K | Daily | ₹18,676,864 | **+165.97%** | 24.57% | ❌ |
+| 5 | `n20_daily_large_only` | Top-20 ADV + uptrend + NSE Nifty 100 | Daily | ₹13,655,640 | **+139.55%** | 25.66% | ❌ |
 
 ## Unique stock-filtering approach per model
 
 | Model | Filter mechanism | Why unique |
 |---|---|---|
-| `momentum_n100_top5_max1` | NSE Nifty 100 official list + price ≤ ₹3,000 | Only model using REAL NSE constituents; price cap eliminates mega-priced losers (BAJAJ-AUTO ₹12K, etc.) |
-| `momentum_pseudo_n100_adv` | Top-100 ADV from N500, drop Small, uptrend, price ≤ ₹3,000 | Liquidity-based + trend + price gates; excludes mega-priced (DIXON ₹18K) |
+| `momentum_n100_top5_max1` | NSE Nifty 100 official list (no derived filter) | Only model using REAL NSE constituents — large-cap pure baseline |
+| `momentum_pseudo_n100_adv` | Top-100 ADV from N500, drop Small, uptrend, price ≤ ₹3,000 | Liquidity + trend + price gate; only model retaining MAX_PRICE filter (justified by share-count floor heuristic) |
 | `midcap_narrow_60d_breakout` | Top-100 ADV from N500, drop Large | Highest-liquidity mid/small breakouts; event-driven |
 | `finnifty_ic_otm4_w300_lots5` | Spot-derived 4 strikes (±4% OTM + ±300pt wings) | No equity universe — options chain auto-built per Monday |
-| `n20_daily_large_only` | Top-20 ADV + close>200d SMA + NSE Nifty 100 + price ≤ ₹2,500 | Smallest universe (20); strictest gate; daily rebuild |
+| `n20_daily_large_only` | Top-20 ADV + close>200d SMA + NSE Nifty 100 | Smallest universe (20); strictest gate; daily rebuild |
 
 ## Composite ranking — risk-adjusted Calmar (CAGR / Max DD)
 
@@ -31,20 +31,16 @@
 | 1 | midcap_narrow_60d_breakout | +137.85% | 8.12% | **16.98** |
 | 2 | momentum_pseudo_n100_adv | +149.15% | 16.17% | **9.22** |
 | 3 | finnifty_ic_otm4_w300_lots5 | +123.27% | 13.88% | **8.88** |
-| 4 | n20_daily_large_only | +165.97% | 24.57% | **6.76** |
-| 5 | momentum_n100_top5_max1 | +85.85% | 33.89% | **2.53** |
+| 4 | n20_daily_large_only | +139.55% | 25.66% | **5.44** |
+| 5 | momentum_n100_top5_max1 | +65.10% | 37.30% | **1.74** |
 
-## What changed 2026-05-17 (MAX_PRICE filter)
+## MAX_PRICE filter decision history (2026-05-17)
 
-User observation: high-price stocks (>₹3K) were giving outsized losses in backtest. Verified empirically:
+Initially applied MAX_PRICE filter to all 3 momentum models. Reviewed and removed on N100 + N20 because threshold (₹3K / ₹2.5K) was curve-fit on backtest losses (in-sample bias) — replicates only if next-3-yr losers happen to sit in same price buckets.
 
-| Model | Trades >₹3K killed | PnL recovered | CAGR delta | DD delta |
-|---|---:|---:|---:|---:|
-| `momentum_n100_top5_max1` | BAJAJ-AUTO ₹12,157 (-₹4.84L), ENRIN ₹2,972 (slips threshold) | +21pp | +21pp | -6pp |
-| `momentum_pseudo_n100_adv` | DIXON ₹17,994 (-₹8L), MARUTI ₹12,917 (-₹3.2L) | +28pp | +28pp | -9pp |
-| `n20_daily_large_only` | ₹5K-10K bucket (-₹2.05M aggregate) | +38pp | +38pp | -0.2pp |
+**Kept on PSEUDO** only because pseudo-N100 itself is acknowledged-lookahead (yearly-PIT universe rebuild); model is upper-bound reference, not live-deployable. MAX_PRICE there acts as defensible noise-reduction (1 share ≤ 10% of ₹30K trade capital).
 
-Filter is purely formula-driven (price observable at entry); no future knowledge needed. Live-deployable. Threshold may drift as Nifty levels rise — review annually.
+**Removed on N100 (LIVE)** and **N20** to give honest unfiltered backtest numbers. CAGR drops back to baseline but no hidden tuning.
 
 ## Deployment recommendation
 

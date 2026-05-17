@@ -39,11 +39,10 @@ def cap_segment(sym):
 
 MODELS = {
     "momentum_n100_top5_max1": {
-        "title": "Real NSE Nifty 100 monthly momentum rotation (top-1 by 30d ret) + MAX_PRICE≤₹3,000 filter.",
+        "title": "Real NSE Nifty 100 monthly momentum rotation (top-1 by 30d ret). No price filter — honest baseline.",
         "rebalance": "Monthly (1st trading day)",
         "logic": [
             "Universe: src/data/symbols/nifty100.csv (104 NSE Nifty 100 stocks)",
-            "Filter at entry: close ≤ ₹3,000 (skips mega-priced losers BAJAJ-AUTO etc.)",
             "Rank by 30-day return, pick top-1",
             "Rebalance: 1st trading day of month",
             "Exit: rotation only — sell when not rank-1",
@@ -66,13 +65,12 @@ MODELS = {
         "live": False,
     },
     "n20_daily_large_only": {
-        "title": "Top-20 ADV + uptrend + Nifty 100 + MAX_PRICE≤₹2,500. Daily rotation top-1 by 30d ret.",
+        "title": "Top-20 ADV + uptrend + Nifty 100. Daily rotation top-1 by 30d ret. No price filter — honest baseline.",
         "rebalance": "Daily",
         "logic": [
             "Universe: top-20 by 20-day ADV from N500 (rebuilt daily)",
             "Uptrend filter: close > 200-day SMA",
             "Large-cap filter: stock must be in NSE Nifty 100",
-            "Max-price filter: close ≤ ₹2,500 at entry",
             "Rank by 30-day return, pick top-1",
             "Rebalance: every trading day",
         ],

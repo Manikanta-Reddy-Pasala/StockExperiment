@@ -2,14 +2,12 @@
 
 Strategy:
   Universe: FULL Real NSE Nifty 100 (src/data/symbols/nifty100.csv, 104 stocks)
-  Filter:   close <= MAX_PRICE (skips mega-priced names with poor risk/return,
-            e.g. BAJAJ-AUTO ₹12157 single trade lost ₹484K in backtest)
   Signal:   Rank by 30-day return, pick top-1
   Position: max_concurrent=1
   Rebalance: 1st trading day of each month
 
-Pure NSE-official Nifty 100 list. No ADV narrowing (distinct from
-momentum_pseudo_n100_adv and n20_daily_large_only).
+Pure NSE-official Nifty 100 list. No ADV narrowing, no price filter (distinct
+from momentum_pseudo_n100_adv which retains MAX_PRICE filter).
 """
 import sys, json, csv, argparse
 from pathlib import Path
@@ -21,7 +19,6 @@ from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
 
 LOOKBACK = 30
-MAX_PRICE = 3000  # skip high-px stocks; sweep showed CAGR +21pp / DD -3pp
 N100_CSV = "/app/src/data/symbols/nifty100.csv"
 
 DEFAULT_START = date(2023, 5, 15)
@@ -80,9 +77,8 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
         if di < LOOKBACK:
             continue
 
-        # Universe = present Nifty 100 filtered by MAX_PRICE at this date
-        univ = [s for s in present
-                if pd.notna(cl[s].iloc[di]) and float(cl[s].iloc[di]) <= MAX_PRICE]
+        # Universe = full present Nifty 100 (no filter)
+        univ = [s for s in present if pd.notna(cl[s].iloc[di])]
         if not univ:
             continue
 

@@ -21,7 +21,6 @@ UNIV_SIZE = 20
 LOOKBACK  = 30
 ADV_WIN   = 20
 SMA_LONG  = 200
-MAX_PRICE = 2500  # skip stocks > ₹2500 at entry (high-px buckets net-negative in backtest)
 N100_CSV  = "/app/src/data/symbols/nifty100.csv"
 DEFAULT_START = date(2023, 5, 15)
 DEFAULT_END   = date(2026, 5, 12)
@@ -79,8 +78,6 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
         pit_univ = [s for s in pit_univ if bool(up.get(s, False))]
         # NEW: NSE Nifty 100 filter
         pit_univ = [s for s in pit_univ if s.replace("NSE:","").replace("-EQ","") in n100]
-        # NEW: max-price filter — high-px buckets (>₹2500) historically net-negative
-        pit_univ = [s for s in pit_univ if pd.notna(cl[s].iloc[di]) and float(cl[s].iloc[di]) <= MAX_PRICE]
         if not pit_univ: continue
 
         rets = cl.iloc[di].reindex(pit_univ) / cl.iloc[di - LOOKBACK].reindex(pit_univ) - 1
