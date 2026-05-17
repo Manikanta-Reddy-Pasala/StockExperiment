@@ -1,0 +1,241 @@
+"""momentum_pseudo_n100_adv — monthly live signal generator.
+
+Ranks the pseudo-N100 universe (yearly-PIT top-100 by 20d ADV from N500)
+by 30-day return, picks top-5, emits ENTRY1 / TARGET_HIT / STOP_HIT.
+
+Strategy:
+  - Universe: yearly-PIT pseudo-N100 (read from yearly_universes.json)
+  - top_n = 5
+  - max_concurrent = 1 (rank-1 of top-5)
+  - rebalance: 1st of month (or first trading day on/after)
+  - Filter: skip stocks with price > MAX_PRICE (₹3000)
+
+WARNING — Lookahead bias:
+  yearly_universes.json was built with forward-looking ADV (used end-of-year
+  trading volume to pick which symbols would be liquid). This model is seeded
+  with enabled=False in model_settings. Treat as research/backtest reference
+  only until walk-forward validation builds a true point-in-time universe.
+
+Usage:
+  python tools/models/momentum_pseudo_n100_adv/live_signal.py \
+    --universes-file tools/models/momentum_pseudo_n100_adv/yearly_universes.json \
+    --top-n 5 --rebalance-only \
+    --signals-out /app/logs/momrot_pseudo/signals/$(date +%F)_pseudo_n100.json
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
+
+from tools.shared.ohlcv_cache import read_cached  # noqa: E402
+
+log = logging.getLogger("momrot_pseudo_signal")
+
+MODEL_NAME = "momentum_pseudo_n100_adv"
+MAX_PRICE = 3000.0  # skip very-large priced names that hurt CAGR in backtest
+
+
+# ---- Helpers ----
+
+def is_rebalance_day(today: datetime, last_rotation: datetime = None) -> bool:
+    """True if today is monthly rebalance trigger (1st-7th + weekday)."""
+    if (last_rotation and last_rotation.year == today.year
+            and last_rotation.month == today.month):
+        return False
+    if today.day <= 7 and today.weekday() < 5:
+        return True
+    return False
+
+
+def load_yearly_universes(path: str) -> Dict[str, List[str]]:
+    """Read yearly PIT universe dict {year_start_iso: [symbol, ...]}."""
+    with open(path) as f:
+        return json.load(f)
+
+
+def pick_universe_for(today: datetime,
+                      yearly: Dict[str, List[str]]) -> Tuple[str, List[str]]:
+    """Pick most-recent year_start key <= today. Returns (key, symbols)."""
+    today_d = today.date()
+    chosen_key: Optional[str] = None
+    for key in sorted(yearly.keys()):
+        try:
+            d = datetime.strptime(key, "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        if d <= today_d:
+            chosen_key = key
+    if chosen_key is None:
+        chosen_key = sorted(yearly.keys())[0]
+    return chosen_key, yearly[chosen_key]
+
+
+def get_close_at(symbol: str, target_ts: int) -> float:
+    """Return last close at/before target_ts for symbol (0.0 if missing)."""
+    df = read_cached(symbol, "D", target_ts - 90 * 86400, target_ts)
+    if df.empty:
+        return 0.0
+    return float(df.iloc[-1]["close"])
+
+
+def rank_universe(symbols: List[str], today_ts: int,
+                  lookback_days: int = 30) -> List[tuple]:
+    """Return [(symbol, name, 30d_return_pct, current_price)] sorted desc.
+
+    Filters out names with current_price > MAX_PRICE (high-priced burden).
+    """
+    lookback_ts = today_ts - lookback_days * 86400
+    rows = []
+    for plain_sym in symbols:
+        fyers_sym = f"NSE:{plain_sym}-EQ"
+        c_now = get_close_at(fyers_sym, today_ts)
+        c_past = get_close_at(fyers_sym, lookback_ts)
+        if c_now <= 0 or c_past <= 0:
+            continue
+        if c_now > MAX_PRICE:
+            continue
+        ret = (c_now / c_past - 1) * 100
+        rows.append((fyers_sym, plain_sym, ret, c_now))
+    rows.sort(key=lambda r: -r[2])
+    return rows
+
+
+def get_current_position() -> Optional[Dict]:
+    """Read model's open position from model_ledger."""
+    try:
+        from src.services.trading.model_ledger_service import get_ledger
+        l = get_ledger(MODEL_NAME)
+        if l and l.get("open_symbol"):
+            return l
+    except Exception as e:
+        log.warning(f"ledger read failed: {e}")
+    return None
+
+
+def is_model_enabled() -> bool:
+    """Query model_settings.enabled. Returns True on read errors (fail-open
+    safe is False — we fail-CLOSED to avoid trading a disabled model)."""
+    try:
+        from src.services.trading.model_ledger_service import get_all_settings
+        for s in get_all_settings():
+            if s["model_name"] == MODEL_NAME:
+                return bool(s.get("enabled"))
+        return False
+    except Exception as e:
+        log.warning(f"enabled-flag read failed: {e} — defaulting to DISABLED")
+        return False
+
+
+def emit_signals(top_picks: List[tuple], pos: Optional[Dict],
+                 top_n: int) -> List[Dict]:
+    top_syms = {p[0] for p in top_picks[:top_n]}
+    today_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    signals: List[Dict] = []
+
+    held_sym = pos.get("open_symbol") if pos else None
+    if held_sym and held_sym not in top_syms:
+        price = get_close_at(held_sym, int(datetime.now().timestamp()))
+        entry_px = float(pos.get("open_entry_px") or 0)
+        kind = "TARGET_HIT" if price >= entry_px else "STOP_HIT"
+        signals.append({
+            "model": MODEL_NAME,
+            "universe": "pseudo_n100",
+            "symbol": held_sym,
+            "company": held_sym,
+            "ts": today_str,
+            "side": "SELL",
+            "signal": kind,
+            "price": float(price),
+            "sl": 0.0, "target": 0.0,
+            "note": f"rotation exit (dropped out of top-{top_n})",
+        })
+
+    # Entry: rank-1 if not already held
+    if not held_sym or held_sym not in top_syms:
+        if top_picks:
+            sym, name, ret, price = top_picks[0]
+            signals.append({
+                "model": MODEL_NAME,
+                "universe": "pseudo_n100",
+                "symbol": sym,
+                "company": name,
+                "ts": today_str,
+                "side": "BUY",
+                "signal": "ENTRY1",
+                "price": float(price),
+                "sl": 0.0, "target": 0.0,
+                "note": f"30d momentum rank-1 ({ret:+.2f}%) — pseudo-N100",
+            })
+
+    return signals
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--universes-file", required=True,
+                    help="Path to yearly_universes.json (PIT universe map)")
+    ap.add_argument("--top-n", type=int, default=5)
+    ap.add_argument("--signals-out", required=True)
+    ap.add_argument("--rebalance-only", action="store_true",
+                    help="Skip if today is not rebalance trigger day")
+    ap.add_argument("--force", action="store_true",
+                    help="Bypass rebalance-day + enabled checks")
+    args = ap.parse_args()
+
+    logging.basicConfig(level=logging.INFO,
+                        format="%(asctime)s %(levelname)s %(message)s")
+
+    today = datetime.now()
+    log.info(f"{MODEL_NAME} signal run: today={today.date()} "
+             f"weekday={today.strftime('%A')} day_of_month={today.day}")
+
+    # Enabled-flag gate (skippable via --force)
+    if not args.force and not is_model_enabled():
+        log.warning(f"{MODEL_NAME}: model_settings.enabled is False — "
+                    "writing empty signals file and exiting.")
+        Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.signals_out).write_text(json.dumps([]))
+        return 0
+
+    # Monthly rebalance gate
+    if args.rebalance_only and not args.force:
+        if not is_rebalance_day(today):
+            log.info("Not rebalance day (need day<=7 + weekday). Skipping.")
+            Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.signals_out).write_text(json.dumps([]))
+            return 0
+
+    yearly = load_yearly_universes(args.universes_file)
+    universe_key, symbols = pick_universe_for(today, yearly)
+    log.info(f"PIT universe: {universe_key} → {len(symbols)} symbols")
+
+    pos = get_current_position()
+    log.info(f"Currently held: {pos.get('open_symbol') if pos else 'none'}")
+
+    today_ts = int(today.timestamp())
+    ranks = rank_universe(symbols, today_ts)
+    log.info(f"Ranked {len(ranks)} stocks (after MAX_PRICE={MAX_PRICE} filter). "
+             f"Top-{args.top_n}:")
+    for i, (sym, name, ret, price) in enumerate(ranks[:args.top_n], 1):
+        log.info(f"  {i}. {sym:<20} {ret:+7.2f}%  @ ₹{price:.2f}")
+
+    signals = emit_signals(ranks, pos, args.top_n)
+    log.info(f"Emitting {len(signals)} signals")
+
+    Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
+    with open(args.signals_out, "w") as f:
+        json.dump(signals, f, indent=2, default=str)
+    log.info(f"Wrote {args.signals_out}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

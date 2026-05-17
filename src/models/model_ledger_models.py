@@ -18,12 +18,20 @@ from .stock_models import Base
 
 
 class ModelSettings(Base):
-    """User-controlled per-model settings."""
+    """User-controlled per-model settings.
+
+    Capital model (post 2026-05-17 split):
+      invested_amount — cumulative principal in (deposits − withdrawals).
+                        Used as denominator in return-% calc.
+      current_amount  — latest NAV snapshot (cash + open MTM).
+                        Updated by record_buy / record_sell / MTM refresh.
+    """
     __tablename__ = "model_settings"
 
     model_name = Column(String(64), primary_key=True)
     enabled = Column(Boolean, default=True, nullable=False)
-    allocated_capital = Column(Numeric(14, 2), nullable=False)  # absolute ₹
+    invested_amount = Column(Numeric(14, 2), nullable=False)  # principal in
+    current_amount = Column(Numeric(14, 2), nullable=False, default=0)  # NAV
     description = Column(String(255))
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

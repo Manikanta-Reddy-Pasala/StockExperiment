@@ -338,7 +338,9 @@ def run_scheduler():
     logger.info("=" * 80)
     logger.info("Registered models (trading-side):")
     logger.info("  - momentum_n100_top5_max1:    signal 09:25 + execute 09:30 (LIVE_TRADING gated)")
+    logger.info("  - momentum_pseudo_n100_adv:   signal 09:25 + execute 09:30 (enabled=False default)")
     logger.info("  - midcap_narrow_60d_breakout: signal 09:25 + execute 09:32 + EOD signal 15:25")
+    logger.info("  - n20_daily_large_only:       signal 09:25 + execute 09:30 (daily rotation)")
     logger.info("  - finnifty_ic_otm4_w300_lots5: signal 09:25 + 14:30 (Monday entry / daily stop)")
     logger.info("")
     logger.info("Maintenance:")
@@ -360,14 +362,22 @@ def run_scheduler():
     from tools.models.momentum_n100_top5_max1.cron import (
         register_trading_jobs as register_momentum_n100_jobs,
     )
+    from tools.models.momentum_pseudo_n100_adv.cron import (
+        register_trading_jobs as register_pseudo_n100_jobs,
+    )
     from tools.models.midcap_narrow_60d_breakout.cron import (
         register_trading_jobs as register_midcap_narrow_jobs,
+    )
+    from tools.models.n20_daily_large_only.cron import (
+        register_trading_jobs as register_n20_daily_jobs,
     )
     from tools.models.finnifty_ic_otm4_w300_lots5.cron import (
         register_trading_jobs as register_fn_ic_otm4_jobs,
     )
     register_momentum_n100_jobs(schedule)
+    register_pseudo_n100_jobs(schedule)
     register_midcap_narrow_jobs(schedule)
+    register_n20_daily_jobs(schedule)
     register_fn_ic_otm4_jobs(schedule)
 
     # Schedule weekly cleanup on Sunday at 3:00 AM

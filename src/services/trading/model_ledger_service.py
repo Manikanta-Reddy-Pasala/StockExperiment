@@ -25,22 +25,41 @@ from src.models.model_ledger_models import (
 
 log = logging.getLogger(__name__)
 
-# Models the system knows about. Adding a 3rd later = append here +
-# the settings UI creates the row when user fills the form.
+# Models the system knows about. Adding a new model = append here.
+# `enabled` controls auto-seeding default (per-row UI toggle still wins later).
+# `default_capital` ₹30K = small live test slug; user can deposit more via UI.
 KNOWN_MODELS = [
     {
         "name": "momentum_n100_top5_max1",
-        "default_capital": 0,
-        "description": "Equity monthly rotation top-1 from N100 by 60d return",
+        "default_capital": 30000,
+        "enabled": True,
+        "description": "Equity monthly rotation top-1 from real NSE Nifty 100 by 30d return",
+    },
+    {
+        "name": "momentum_pseudo_n100_adv",
+        "default_capital": 30000,
+        # Disabled by default — strategy uses yearly-PIT universe rebuilt with
+        # FORWARD-looking ADV (small lookahead bias in backtest). Treat as
+        # research-only until live walk-forward is validated.
+        "enabled": False,
+        "description": "Equity monthly rotation top-5 from pseudo-N100 (ADV-rank, yearly PIT). LOOKAHEAD WARNING.",
     },
     {
         "name": "midcap_narrow_60d_breakout",
-        "default_capital": 0,
+        "default_capital": 30000,
+        "enabled": True,
         "description": "Equity 60d-high swing on midcap_narrow (event-driven)",
     },
     {
+        "name": "n20_daily_large_only",
+        "default_capital": 30000,
+        "enabled": True,
+        "description": "Equity daily rotation top-20-ADV ∩ Nifty 100 by 30d return",
+    },
+    {
         "name": "finnifty_ic_otm4_w300_lots5",
-        "default_capital": 0,
+        "default_capital": 30000,
+        "enabled": True,
         "description": "FinNifty monthly Iron Condor — OTM 4% / wings 300pt / 5 lots",
     },
 ]
@@ -60,8 +79,9 @@ def ensure_models_seeded() -> None:
                 continue
             s.add(ModelSettings(
                 model_name=m["name"],
-                enabled=True,
-                allocated_capital=Decimal(m["default_capital"]),
+                enabled=m.get("enabled", True),
+                invested_amount=Decimal(m["default_capital"]),
+                current_amount=Decimal(m["default_capital"]),
                 description=m["description"],
             ))
             # Flush so settings row exists before ledger FK
@@ -75,7 +95,8 @@ def ensure_models_seeded() -> None:
                 losses=0,
             ))
             s.flush()
-            log.info(f"Seeded ledger for {m['name']} cap={m['default_capital']}")
+            log.info(f"Seeded ledger for {m['name']} cap={m['default_capital']} "
+                     f"enabled={m.get('enabled', True)}")
 
 
 # ---- Settings ----
@@ -88,10 +109,14 @@ def get_all_settings() -> List[Dict]:
 
 
 def deposit(model_name: str, amount: float) -> Dict:
-    """Add fresh capital to a model. Adds to both allocated_capital AND cash.
+    """Add fresh capital to a model.
 
-    Use case: monthly top-up from user's bank. Money flows in as new cash
-    and is added to the cost basis. Other models untouched.
+    Effects:
+      invested_amount += amount   (principal in)
+      current_amount  += amount   (NAV, before any market move)
+      cash            += amount   (immediately deployable)
+
+    Use case: monthly top-up from user's bank. Other models untouched.
     """
     if amount <= 0:
         raise ValueError("deposit amount must be > 0")
@@ -102,7 +127,8 @@ def deposit(model_name: str, amount: float) -> Dict:
         if not settings or not ledger:
             raise ValueError(f"Unknown model: {model_name}")
         delta = Decimal(str(amount))
-        settings.allocated_capital = (settings.allocated_capital or Decimal(0)) + delta
+        settings.invested_amount = (settings.invested_amount or Decimal(0)) + delta
+        settings.current_amount = (settings.current_amount or Decimal(0)) + delta
         ledger.cash = (ledger.cash or Decimal(0)) + delta
         s.add(ModelTrade(
             model_name=model_name,
@@ -113,8 +139,9 @@ def deposit(model_name: str, amount: float) -> Dict:
             value=delta,
             reason="DEPOSIT",
         ))
-        log.info(f"{model_name}: deposit ₹{amount:,.0f} (allocated now "
-                 f"₹{float(settings.allocated_capital):,.0f}, cash "
+        log.info(f"{model_name}: deposit ₹{amount:,.0f} (invested now "
+                 f"₹{float(settings.invested_amount):,.0f}, current "
+                 f"₹{float(settings.current_amount):,.0f}, cash "
                  f"₹{float(ledger.cash):,.0f})")
         return {
             "settings": _settings_dict(settings),
@@ -123,7 +150,12 @@ def deposit(model_name: str, amount: float) -> Dict:
 
 
 def withdraw(model_name: str, amount: float) -> Dict:
-    """Pull cash out of a model. Decreases allocated_capital AND cash.
+    """Pull cash out of a model.
+
+    Effects:
+      invested_amount -= amount   (principal out; floored at 0)
+      current_amount  -= amount   (NAV cache)
+      cash            -= amount
 
     Safety: refuses if cash < amount.
     """
@@ -142,8 +174,11 @@ def withdraw(model_name: str, amount: float) -> Dict:
                 f"want to withdraw ₹{amount:,.0f}"
             )
         ledger.cash = ledger.cash - delta
-        settings.allocated_capital = max(
-            Decimal(0), (settings.allocated_capital or Decimal(0)) - delta
+        settings.invested_amount = max(
+            Decimal(0), (settings.invested_amount or Decimal(0)) - delta
+        )
+        settings.current_amount = max(
+            Decimal(0), (settings.current_amount or Decimal(0)) - delta
         )
         s.add(ModelTrade(
             model_name=model_name,
@@ -154,8 +189,9 @@ def withdraw(model_name: str, amount: float) -> Dict:
             value=delta,
             reason="WITHDRAW",
         ))
-        log.info(f"{model_name}: withdraw ₹{amount:,.0f} (allocated now "
-                 f"₹{float(settings.allocated_capital):,.0f}, cash "
+        log.info(f"{model_name}: withdraw ₹{amount:,.0f} (invested now "
+                 f"₹{float(settings.invested_amount):,.0f}, current "
+                 f"₹{float(settings.current_amount):,.0f}, cash "
                  f"₹{float(ledger.cash):,.0f})")
         return {
             "settings": _settings_dict(settings),
@@ -210,9 +246,10 @@ def auto_bootstrap_from_json_ledger(json_path: str, model_name: str,
         cost = Decimal(str(qty)) * Decimal(str(entry_px))
         total_allocated = cost + Decimal(str(cash_buffer))
 
-        # Increase allocated_capital + ledger cash by buffer (cash leftover),
-        # then deduct position cost (it's now in market value).
-        settings.allocated_capital = (settings.allocated_capital or Decimal(0)) + total_allocated
+        # Increase invested_amount + current_amount + ledger cash by buffer
+        # (cash leftover), then deduct position cost (now in market value).
+        settings.invested_amount = (settings.invested_amount or Decimal(0)) + total_allocated
+        settings.current_amount = (settings.current_amount or Decimal(0)) + total_allocated
         ledger.cash = (ledger.cash or Decimal(0)) + total_allocated
 
         # Seed position (eats cost from cash, leaves cash_buffer)
@@ -266,9 +303,9 @@ def auto_bootstrap_from_json_ledger(json_path: str, model_name: str,
 
 
 def reset_model(model_name: str) -> Dict:
-    """Hard reset: zero allocated_capital, zero cash, zero realized_pnl, clear
-    open position, reset counters. Trade audit log is NOT deleted (history kept).
-    Use to start fresh before depositing real cost basis.
+    """Hard reset: zero invested_amount + current_amount, zero cash, zero
+    realized_pnl, clear open position, reset counters. Trade audit log is NOT
+    deleted (history kept). Use to start fresh before depositing real cost basis.
     """
     db = get_database_manager()
     with db.get_session() as s:
@@ -276,7 +313,8 @@ def reset_model(model_name: str) -> Dict:
         ledger = s.query(ModelLedger).filter_by(model_name=model_name).first()
         if not settings or not ledger:
             raise ValueError(f"Unknown model: {model_name}")
-        settings.allocated_capital = Decimal(0)
+        settings.invested_amount = Decimal(0)
+        settings.current_amount = Decimal(0)
         ledger.cash = Decimal(0)
         ledger.realized_pnl = Decimal(0)
         ledger.total_trades = 0
@@ -382,14 +420,24 @@ def reset_position(model_name: str) -> Dict:
 
 def record_buy(model_name: str, symbol: str, qty: int, price: float,
                brokerage: float = 20, fyers_order_id: str = None) -> Dict:
+    """Record a BUY fill.
+
+    Cash flow: cash -= (qty*price + brokerage)
+    NAV flow:  current_amount -= brokerage
+               (qty*price stays as position value, so net NAV moves only by fees)
+    """
     db = get_database_manager()
     with db.get_session() as s:
+        settings = s.query(ModelSettings).filter_by(model_name=model_name).first()
         l = s.query(ModelLedger).filter_by(model_name=model_name).first()
-        if not l:
+        if not l or not settings:
             raise ValueError(f"Unknown model: {model_name}")
         if l.open_symbol:
             raise ValueError(f"{model_name}: already holding {l.open_symbol}")
-        cost = Decimal(str(qty)) * Decimal(str(price)) + Decimal(str(brokerage))
+        qty_d = Decimal(str(qty))
+        price_d = Decimal(str(price))
+        brk_d = Decimal(str(brokerage))
+        cost = qty_d * price_d + brk_d
         if l.cash < cost:
             raise ValueError(
                 f"{model_name}: cash {float(l.cash):,.0f} < cost {float(cost):,.0f}"
@@ -397,14 +445,16 @@ def record_buy(model_name: str, symbol: str, qty: int, price: float,
         l.cash = l.cash - cost
         l.open_symbol = symbol
         l.open_qty = qty
-        l.open_entry_px = Decimal(str(price))
+        l.open_entry_px = price_d
         l.open_entry_date = date.today()
+        # NAV moves only by brokerage at entry (position value = cost minus fees)
+        settings.current_amount = (settings.current_amount or Decimal(0)) - brk_d
         s.add(ModelTrade(
             model_name=model_name,
             side="BUY",
             symbol=symbol,
             qty=qty,
-            price=Decimal(str(price)),
+            price=price_d,
             value=cost,
             reason="ENTRY",
             fyers_order_id=fyers_order_id,
@@ -415,10 +465,17 @@ def record_buy(model_name: str, symbol: str, qty: int, price: float,
 def record_sell(model_name: str, exit_price: float, reason: str,
                 brokerage: float = 20, stt_pct: float = 0.001,
                 fyers_order_id: str = None) -> Dict:
+    """Record a SELL fill.
+
+    Cash flow: cash += (qty*exit_price - fees)
+    NAV flow:  current_amount = cash (position flat, no open MTM)
+               — recomputed from cash because we just realized the trade.
+    """
     db = get_database_manager()
     with db.get_session() as s:
+        settings = s.query(ModelSettings).filter_by(model_name=model_name).first()
         l = s.query(ModelLedger).filter_by(model_name=model_name).first()
-        if not l or not l.open_symbol:
+        if not l or not l.open_symbol or not settings:
             raise ValueError(f"{model_name}: no open position")
         qty = l.open_qty
         entry_px = l.open_entry_px
@@ -438,6 +495,8 @@ def record_sell(model_name: str, exit_price: float, reason: str,
         l.open_qty = None
         l.open_entry_px = None
         l.open_entry_date = None
+        # Position flat — current_amount snaps to cash (no open MTM)
+        settings.current_amount = l.cash
         s.add(ModelTrade(
             model_name=model_name,
             side="SELL",
@@ -500,16 +559,20 @@ def get_portfolio_stats(price_lookup=None) -> Dict:
                     pos_value = Decimal(str(mtm_price)) * Decimal(str(l.open_qty))
 
             nav = cash + pos_value
-            allocated = cfg.allocated_capital if cfg else Decimal(0)
-            pnl_total = nav - allocated
+            invested = cfg.invested_amount if cfg else Decimal(0)
+            current_cache = cfg.current_amount if cfg else Decimal(0)
+            pnl_total = nav - invested
             return_pct = (
-                float(pnl_total / allocated * 100) if allocated > 0 else 0
+                float(pnl_total / invested * 100) if invested > 0 else 0
             )
 
             models.append({
                 "model_name": l.model_name,
                 "enabled": bool(cfg and cfg.enabled),
-                "allocated_capital": float(allocated),
+                "invested_amount": float(invested),
+                "current_amount": float(current_cache),
+                # Legacy alias for any UI still reading old field name
+                "allocated_capital": float(invested),
                 "cash": float(cash),
                 "position_value": float(pos_value),
                 "nav": float(nav),
@@ -529,7 +592,7 @@ def get_portfolio_stats(price_lookup=None) -> Dict:
                 ),
             })
 
-            total_allocated += allocated
+            total_allocated += invested
             total_nav += nav
             total_realized += l.realized_pnl or Decimal(0)
             total_trades += l.total_trades or 0
@@ -542,6 +605,9 @@ def get_portfolio_stats(price_lookup=None) -> Dict:
         return {
             "models": models,
             "total": {
+                "invested_amount": float(total_allocated),
+                "current_amount": float(total_nav),
+                # Legacy aliases
                 "allocated_capital": float(total_allocated),
                 "nav": float(total_nav),
                 "pnl_total": float(total_pnl),
@@ -559,7 +625,10 @@ def _settings_dict(s: ModelSettings) -> Dict:
     return {
         "model_name": s.model_name,
         "enabled": s.enabled,
-        "allocated_capital": float(s.allocated_capital or 0),
+        "invested_amount": float(s.invested_amount or 0),
+        "current_amount": float(s.current_amount or 0),
+        # Legacy alias for any caller still using old field name
+        "allocated_capital": float(s.invested_amount or 0),
         "description": s.description,
         "updated_at": s.updated_at.isoformat() if s.updated_at else None,
     }
