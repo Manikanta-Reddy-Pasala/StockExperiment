@@ -14,7 +14,7 @@ Targets mid + small-cap NSE stocks (rank 31-130 by 20-day ADV, minus Large-caps)
 4. **Skip top-30** (already covered by `momentum_n100_top5_max1`)
 5. **Take next 100** = "pseudo-midcap" pool (~ADV-rank 31-130)
 6. **NEW V2 — Exclude Large-caps**: drop stocks in NSE Nifty 100 (`src/data/symbols/nifty100.csv`)
-7. **Exclude ANGELONE** (corp-action data anomaly — entry ₹316 → exit ₹2856 = unadjusted bonus/split)
+7. **Data fix for ANGELONE** applied at load time (NOT excluded): prices in window 2024-12-23 → 2026-02-25 divided by 10 to fix reverse-split-adjustment inconsistency. With clean data, ANGELONE is fully eligible — it just doesn't qualify for breakout entries naturally.
 
 End-2026 universe first 10: SUZLON, SHRIRAMFIN (no wait — Large), … (Large-cap names filtered out by V2)
 
@@ -26,7 +26,7 @@ End-2026 universe first 10: SUZLON, SHRIRAMFIN (no wait — Large), … (Large-c
 |---|---|---|
 | Universe pool | Pseudo-midcap (skip top-30 ADV, next 100) | same |
 | **Cap filter (NEW)** | **Exclude Nifty 100 (Large)** | NEW |
-| **ANGELONE exclude** | Always | NEW |
+| ANGELONE handling | **Data fix at load** (price ÷10 in corrupted window) — NOT excluded | data integrity, not strategy choice |
 | Breakout window | **40-day high** | was 60d |
 | Volume confirm | ≥ 2× 20-day avg | same |
 | Long-term filter | close > 200-day SMA | same |

@@ -1,6 +1,6 @@
-# midcap_narrow_60d_breakout — Full Trade Ledger (V2: Mid+Small only, ANGELONE excluded)
+# midcap_narrow_60d_breakout — Full Trade Ledger (V2: Mid+Small only, ANGELONE data-fixed)
 
-**Data matches SUMMARY.md** — V2 cap filter (excludes Large from pseudo-midcap pool) + ANGELONE filter applied.
+**Data matches SUMMARY.md** — V2 cap filter (excludes Large from pseudo-midcap pool) + ANGELONE data fix applied (prices ÷10 in 2024-12-23 → 2026-02-25 window for split-adjustment inconsistency).
 
 Capital ₹10L → ₹6,500,421 (+550.04%) · CAGR +86.63% · 12 trades · Max DD 15.15% · Calmar 5.72
 
@@ -41,6 +41,6 @@ All trades Mid + Small (Large filtered by V2 cap rule).
 ## Notes
 
 - V2 = Exclude Large from pseudo-midcap pool. Cap-filter sweep tested 6 variants; V2 wins on all 3 metrics (CAGR, DD, Calmar).
-- ANGELONE still filtered (data anomaly).
-- Universe = pseudo-midcap (N500 skip-30 ADV, take next 100) MINUS NSE Nifty 100 MINUS ANGELONE.
+- ANGELONE data fix applied (prices ÷10 in corrupted window). With clean data, ANGELONE never qualifies for breakout entry — explicit exclusion no longer needed.
+- Universe = pseudo-midcap (N500 skip-30 ADV, take next 100) MINUS NSE Nifty 100 (ANGELONE data fixed, eligible but not picked).
 - Full V1 (all caps + ANGELONE): +337% CAGR / ₹8.38 Cr but inflated by anomaly. See git history for original.

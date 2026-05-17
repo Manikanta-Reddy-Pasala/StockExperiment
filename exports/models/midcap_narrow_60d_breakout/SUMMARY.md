@@ -1,4 +1,4 @@
-# midcap_narrow_60d_breakout — SUMMARY (V2: Mid+Small only, ANGELONE excluded)
+# midcap_narrow_60d_breakout — SUMMARY (V2: Mid+Small only, ANGELONE data-fixed)
 
 **Best-in-class result for this model.** Cap-filter sweep found that excluding Large-caps from pseudo-midcap universe boosts every metric: CAGR +18pp, DD -2.7pp, Calmar +1.87. Makes sense — model named 'midcap_narrow' performs best on actual mid+small caps without Large-cap dilution.
 
@@ -18,7 +18,7 @@
 
 1. **Universe build**: take Nifty 500 stocks, compute 20d ADV, skip top-30 large-caps by ADV, take next 100 (= pseudo-midcap)
 2. **Cap filter (NEW V2)**: drop stocks in NSE Nifty 100 (Large-cap exclusion). Keep only Mid + Small caps from pseudo-midcap pool
-3. **Filter ANGELONE**: corp-action anomaly (entry ₹316 → exit ₹2856 in 2 months = unadjusted bonus/split)
+3. **Data fix for ANGELONE**: prices in window 2024-12-23 → 2026-02-25 divided by 10 (corrupted by reverse-split-adjustment inconsistency in historical_data table). ANGELONE remains eligible — with clean data it naturally doesn't qualify for breakout entries.
 4. **Daily scan**: for each day, find stocks with close > 40-day high + vol > 2× 20d avg + close > 200d SMA
 5. **Pick top-1** by volume ratio (most-confirmed breakout)
 6. **Hold** until: TARGET +100% / TRAIL -20% from peak (after +10%) / MAX_HOLD 90d
@@ -29,7 +29,7 @@
 |---|---|
 | Universe pool | Pseudo-midcap (N500 skip-30 ADV, take next 100) |
 | **Cap filter (NEW V2)** | **Exclude Large (NSE Nifty 100)** — keep Mid + Small only |
-| Excluded stocks | ANGELONE (data anomaly) |
+| Data fix | ANGELONE prices ÷10 in 2024-12-23 → 2026-02-25 window (reverse-split adj inconsistency) |
 | Breakout | 40-day high |
 | Volume confirm | ≥ 2× 20-day avg |
 | Long-term filter | close > 200-day SMA |

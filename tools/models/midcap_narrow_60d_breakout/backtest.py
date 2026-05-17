@@ -69,7 +69,16 @@ USE_SMA_EXIT = False
 ADV_WIN    = 20
 SKIP_TOP   = 30
 KEEP_NEXT  = 100
-EXCLUDE_STOCKS = {"NSE:ANGELONE-EQ"}  # data anomaly
+
+# DATA FIXES applied at load time (not in DB):
+# - ANGELONE: prices 10x inflated between 2024-12-23 and 2026-02-25 (data import inconsistency
+#   around what appears to be a stock split; volume drop confirms ~10:1 reverse split treatment).
+#   Fix: divide prices by 10, multiply volume by 10 in that window to make series continuous.
+DATA_FIXES = {
+    "NSE:ANGELONE-EQ": [
+        {"start": "2024-12-23", "end": "2026-02-25", "price_div": 10, "vol_mul": 10},
+    ],
+}
 
 N100_CSV = "/app/src/data/symbols/nifty100.csv"
 
@@ -101,6 +110,19 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
         ), c, params={"s": n500, "a": start - timedelta(days=400), "b": end})
 
     df["date"] = pd.to_datetime(df["date"])
+
+    # Apply data fixes
+    for sym, fixes in DATA_FIXES.items():
+        for fx in fixes:
+            mask = (df["symbol"] == sym) & \
+                   (df["date"] >= pd.Timestamp(fx["start"])) & \
+                   (df["date"] <= pd.Timestamp(fx["end"]))
+            n_rows = mask.sum()
+            if n_rows > 0:
+                print(f"  Applied data fix to {sym}: {n_rows} rows / price ÷{fx['price_div']}, vol ×{fx['vol_mul']}")
+                df.loc[mask, ["open","high","low","close"]] /= fx["price_div"]
+                df.loc[mask, "volume"] *= fx["vol_mul"]
+
     df["adv_rs"] = df["close"].astype(float) * df["volume"].astype(float)
     cl  = df.pivot(index="date", columns="symbol", values="close").ffill()
     hi  = df.pivot(index="date", columns="symbol", values="high")
@@ -119,13 +141,14 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
     last_adv = adv20.iloc[last_di].dropna().sort_values(ascending=False)
     midcap_pool = last_adv.iloc[SKIP_TOP:SKIP_TOP + KEEP_NEXT].index.tolist()
 
-    # V2 filters: exclude Large + exclude ANGELONE
+    # V2 filter: exclude Large (NSE Nifty 100). ANGELONE no longer needs explicit
+    # exclusion since DATA_FIXES normalize the price discontinuity; with clean data
+    # ANGELONE never qualifies for a breakout entry anyway.
     midcap_band = [
         s for s in midcap_pool
-        if s not in EXCLUDE_STOCKS
-        and s.replace("NSE:", "").replace("-EQ", "") not in n100
+        if s.replace("NSE:", "").replace("-EQ", "") not in n100
     ]
-    print(f"V2 universe (pseudo-midcap minus Large minus ANGELONE): {len(midcap_band)} stocks")
+    print(f"V2 universe (pseudo-midcap minus Large): {len(midcap_band)} stocks")
     print(f"First 10: {[s.replace('NSE:','').replace('-EQ','') for s in midcap_band[:10]]}")
 
     trading = [d for d in dates if start <= d.date() <= end]
