@@ -14,14 +14,6 @@
   .small-mute { font-size: 0.78rem; color: #8b95a5; }
 </style>
 
-<div class="alert alert-info py-2 mb-3">
-  <i class="bi bi-info-circle me-1"></i>
-  <strong>Today's Picks across enabled equity models.</strong>
-  Each card shows the top-5 ranks emitted by the model's latest <code>live_signal.py</code> run.
-  Disabled models are hidden — re-enable from <a href="/admin/v2/settings" class="alert-link">Settings</a> if needed.
-  <span id="hidden_note" class="ms-2 small text-muted"></span>
-</div>
-
 <div id="picks_container">
   <div class="text-muted py-3 text-center">Loading…</div>
 </div>
@@ -133,7 +125,6 @@ function renderCard(m, idx, ranking, status) {
 
 async function load() {
   const container = document.getElementById('picks_container');
-  const noteEl = document.getElementById('hidden_note');
 
   // Use portfolio.enabled as authoritative source for which models render.
   // triggers/status remains useful for ranking page context (NAV, P&L, pos).
@@ -161,12 +152,6 @@ async function load() {
     return !(r.status && r.status.success && r.status.enabled === false);
   };
   const visible = results.filter(isEnabled);
-  const hidden = results.length - visible.length;
-  if (noteEl) {
-    noteEl.textContent = hidden > 0
-      ? `(${hidden} disabled model${hidden > 1 ? 's' : ''} hidden)`
-      : '';
-  }
 
   if (visible.length === 0) {
     container.innerHTML = '<div class="alert alert-warning text-center">' +

@@ -6,9 +6,10 @@
 <style>
   .pos { color: #15a36b; } .neg { color: #d4453a; } .neutral { color: #4f5868; }
   .summary-card { border-left: 4px solid #5b8def; }
+  .row-disabled td { opacity: 0.55; }
 </style>
 
-<!-- Aggregate across all enabled models -->
+<!-- Aggregate across all models -->
 <div class="card mb-4">
   <div class="card-header"><strong>All Models Portfolio</strong></div>
   <div class="card-body">
@@ -25,56 +26,12 @@
           <th>Open Position</th><th class="text-end">Position Val</th>
           <th class="text-end">NAV</th><th class="text-end">P&amp;L</th>
           <th class="text-end">Trades</th>
+          <th class="text-center" style="min-width:140px;">Actions</th>
         </tr></thead>
-        <tbody id="agg_tbody"><tr><td colspan="8" class="text-center text-muted py-3">Loading…</td></tr></tbody>
+        <tbody id="agg_tbody"><tr><td colspan="9" class="text-center text-muted py-3">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
-</div>
-
-<h5 class="mt-4 mb-3">Trading Models Detail</h5>
-<div class="row g-3 mb-4">
-  <div class="col-6 col-lg-3">
-    <div class="card summary-card h-100"><div class="card-body py-3 text-center">
-      <div class="text-muted small mb-1">Total NAV</div>
-      <div id="total_value" class="fs-4 fw-bold">--</div>
-      <div class="small text-muted">cash + holdings</div>
-    </div></div>
-  </div>
-  <div class="col-6 col-lg-3">
-    <div class="card summary-card h-100"><div class="card-body py-3 text-center">
-      <div class="text-muted small mb-1">Unrealized P&amp;L</div>
-      <div id="total_pnl" class="fs-4 fw-bold">--</div>
-      <div id="total_pct" class="small">--</div>
-    </div></div>
-  </div>
-  <div class="col-6 col-lg-3">
-    <div class="card summary-card h-100"><div class="card-body py-3 text-center">
-      <div class="text-muted small mb-1">Market Value</div>
-      <div id="mv" class="fs-4 fw-bold neutral">--</div>
-      <div class="small text-muted">live price × qty</div>
-    </div></div>
-  </div>
-  <div class="col-6 col-lg-3">
-    <div class="card summary-card h-100"><div class="card-body py-3 text-center">
-      <div class="text-muted small mb-1">Wallet (Cash)</div>
-      <div id="cash" class="fs-4 fw-bold neutral">--</div>
-      <div class="small text-muted">Fyers available_cash</div>
-    </div></div>
-  </div>
-</div>
-
-<!-- Rebalance Preview -->
-<div class="card mb-3">
-  <div class="card-header bg-light d-flex justify-content-between align-items-center">
-    <span><i class="bi bi-eye"></i> Rebalance Preview — What Happens If You Click "Rebalance"</span>
-    <div>
-      <button class="btn btn-sm btn-outline-primary" id="btn_preview"><i class="bi bi-arrow-repeat"></i> Refresh</button>
-      <button class="btn btn-sm btn-danger" id="btn_rebalance"><i class="bi bi-play-circle"></i> LIVE Rebalance</button>
-      <button class="btn btn-sm btn-success" id="btn_buy_rank1"><i class="bi bi-cart-plus"></i> Buy Rank-1</button>
-    </div>
-  </div>
-  <div class="card-body small" id="preview_body">Loading…</div>
 </div>
 
 <div class="card">
@@ -94,7 +51,7 @@
 
 <div class="alert alert-warning mt-3 py-2 small">
   <i class="bi bi-exclamation-triangle me-1"></i>
-  <strong>LIVE trading active.</strong> Sell + Buy + Rebalance buttons place REAL Fyers orders. Confirm dialog required.
+  <strong>LIVE trading active.</strong> Sell + Rebalance buttons place REAL Fyers orders. Confirm dialog required.
 </div>
 {% endblock %}
 
@@ -104,8 +61,16 @@ const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractio
 const fmtPct = n => (n>=0?"+":"") + Number(n||0).toFixed(2) + "%";
 const cls = n => n>0?"pos":(n<0?"neg":"neutral");
 
+// Models with wired live_signal + executor (i.e., per-model rebalance works).
+// finnifty options model has different flow; rebalance button hidden for it.
+const WIRED_MODELS = new Set([
+  'momentum_n100_top5_max1',
+  'momentum_pseudo_n100_adv',
+  'midcap_narrow_60d_breakout',
+  'n20_daily_large_only',
+]);
+
 // Symbol -> [model_name] map. Filled by loadAggregate, consumed by loadState.
-// Match both bare (HFCL) and Fyers (NSE:HFCL-EQ) forms.
 const SYMBOL_TO_MODEL = {};
 function _norm(sym) {
   if (!sym) return '';
@@ -122,7 +87,7 @@ function lookupModel(sym) {
 
 async function loadAggregate() {
   try {
-    const r = await fetch('/admin/models/portfolio');
+    const r = await fetch('/admin/models/portfolio', {cache: 'no-store'});
     const d = await r.json();
     if (!d.success) return;
     const t = d.total || {};
@@ -133,7 +98,6 @@ async function loadAggregate() {
     pnlEl.className = 'fs-5 fw-bold ' + cls(t.pnl_total);
     document.getElementById('agg_realized').textContent = fmtINR(t.realized_pnl);
 
-    // Rebuild symbol→model lookup from latest portfolio snapshot.
     Object.keys(SYMBOL_TO_MODEL).forEach(k => delete SYMBOL_TO_MODEL[k]);
     (d.models||[]).forEach(m => {
       if (!m.open_symbol) return;
@@ -143,16 +107,21 @@ async function loadAggregate() {
 
     const tbody = document.getElementById('agg_tbody');
     tbody.innerHTML = '';
-    // Skip-rendering disabled models. Totals strip above stays unchanged because
-    // it uses backend-aggregated d.total which sums ALL models (incl. disabled).
     (d.models||[]).forEach(m => {
-      if (!m.enabled) return;  // hide disabled rows entirely
       const tr = document.createElement('tr');
+      if (!m.enabled) tr.classList.add('row-disabled');
       const posHtml = m.open_symbol
         ? `${m.open_symbol} <span class="text-muted small">x${m.open_qty} @ ${fmtINR(m.open_entry_px)}</span>`
         : '<span class="text-muted">flat</span>';
+      const disabledBadge = m.enabled ? '' : ' <span class="badge bg-secondary">DISABLED</span>';
+      const wired = WIRED_MODELS.has(m.model_name);
+      const rebalBtn = wired
+        ? `<button class="btn btn-sm btn-danger" ${m.enabled ? '' : 'disabled title="Enable model first"'}
+             onclick="rebalanceModel('${m.model_name}')">
+             <i class="bi bi-arrow-repeat"></i> Rebalance</button>`
+        : '<span class="text-muted small">n/a</span>';
       tr.innerHTML = `
-        <td><strong>${m.model_name}</strong></td>
+        <td><strong>${m.model_name}</strong>${disabledBadge}</td>
         <td class="text-end">${fmtINR(m.allocated_capital)}</td>
         <td class="text-end">${fmtINR(m.cash)}</td>
         <td>${posHtml}</td>
@@ -160,30 +129,23 @@ async function loadAggregate() {
         <td class="text-end"><strong>${fmtINR(m.nav)}</strong></td>
         <td class="text-end ${cls(m.pnl_total)}">${fmtINR(m.pnl_total)} (${fmtPct(m.return_pct)})</td>
         <td class="text-end">${m.total_trades} (${m.wins}W/${m.losses}L)</td>
+        <td class="text-center">${rebalBtn}</td>
       `;
       tbody.appendChild(tr);
     });
     if (!tbody.children.length) {
-      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No enabled models. Visit <a href="/admin/v2/settings">Settings</a> to enable one.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">No models seeded.</td></tr>';
     }
   } catch(e) { console.error(e); }
 }
 
 async function loadState() {
-  // Await loadAggregate so SYMBOL_TO_MODEL is populated before rendering positions.
   await loadAggregate();
   try {
-    const r = await fetch('/admin/momrot/state');
+    const r = await fetch('/admin/momrot/state', {cache: 'no-store'});
     const d = await r.json();
     if (!d.success) return;
     const s = d.data;
-    document.getElementById('total_value').textContent = fmtINR(s.total_value);
-    document.getElementById('total_pnl').textContent = fmtINR(s.total_pnl);
-    document.getElementById('total_pnl').className = 'fs-4 fw-bold ' + cls(s.total_pnl);
-    document.getElementById('total_pct').textContent = fmtPct(s.total_pct);
-    document.getElementById('total_pct').className = 'small ' + cls(s.total_pct);
-    document.getElementById('mv').textContent = fmtINR(s.market_value);
-    document.getElementById('cash').textContent = fmtINR(s.cash);
 
     const tb = document.getElementById('positions');
     if (!s.open_positions || s.open_positions.length === 0) {
@@ -207,31 +169,61 @@ async function loadState() {
   } catch(e) { console.error(e); }
 }
 
-async function loadPreview() {
-  const body = document.getElementById('preview_body');
-  body.innerHTML = '<div class="text-muted">Loading…</div>';
+async function rebalanceModel(model) {
+  // Fetch model's latest ranking + position so user sees what will happen.
+  let preview = '';
   try {
-    const r = await fetch('/admin/momrot/rebalance-preview');
-    const d = await r.json();
-    if (!d.success) { body.innerHTML = '<div class="text-danger">' + d.error + '</div>'; return; }
-    let html = `<div class="row g-2">
-      <div class="col-md-4"><strong>Rule:</strong> top-${d.top_n} from N100, max ${d.max_concurrent} position(s)</div>
-      <div class="col-md-4"><strong>Rank-1:</strong> ${d.rank1.symbol} ${fmtPct(d.rank1.return_60d)} @ ${fmtINR(d.rank1.price)}</div>
-      <div class="col-md-4"><strong>Current Cash:</strong> ${fmtINR(d.current_cash)}</div>
-    </div>`;
-    if (d.sells && d.sells.length) {
-      html += `<hr class="my-2"><strong>SELLS (${d.sells.length}):</strong><ul class="mb-1">` +
-        d.sells.map(s => `<li>${s.symbol} qty=${s.qty} @ ${fmtINR(s.ltp)} = proceeds ${fmtINR(s.proceeds)}</li>`).join('') + '</ul>';
+    const [pfRes, rkRes] = await Promise.all([
+      fetch('/admin/models/portfolio', {cache: 'no-store'}).then(r => r.json()),
+      fetch(`/admin/${model}/ranking?top=5`, {cache: 'no-store'}).then(r => r.json()),
+    ]);
+    const m = (pfRes.success && (pfRes.models||[]).find(x => x.model_name === model)) || {};
+    const rank = (rkRes.success && rkRes.ranking) || [];
+    const rank1 = rank[0];
+    const heldNorm = _norm(m.open_symbol);
+    const inTop = rank1 && rank.some(r => _norm(r.symbol) === heldNorm);
+
+    let actionRow;
+    if (!rank1) {
+      actionRow = '<div class="text-warning">No ranking available — run signal first.</div>';
+    } else if (!m.open_symbol) {
+      actionRow = `<div><span class="badge bg-success">BUY</span> <strong>${rank1.symbol}</strong> with cash ${fmtINR(m.cash)}</div>`;
+    } else if (inTop) {
+      actionRow = `<div class="text-muted">Already holding <strong>${m.open_symbol}</strong> (in top-5). No action.</div>`;
     } else {
-      html += `<hr class="my-2"><strong>SELLS:</strong> none`;
+      actionRow = `<div><span class="badge bg-danger">SELL</span> <strong>${m.open_symbol}</strong> → <span class="badge bg-success">BUY</span> <strong>${rank1.symbol}</strong></div>`;
     }
-    if (d.buy) {
-      html += `<div class="mt-1"><strong>BUY:</strong> ${d.buy.symbol} qty=${d.buy.qty} @ ${fmtINR(d.buy.price)} = deploy ${fmtINR(d.buy.deploy)} <span class="text-muted small">(cash after sells: ${fmtINR(d.buy.available_cash_after_sells)})</span></div>`;
-    } else {
-      html += `<div class="mt-1 text-muted">No BUY — already holding rank-1 (or all top-5).</div>`;
-    }
-    body.innerHTML = html;
-  } catch(e) { body.innerHTML = '<div class="text-danger">' + e.message + '</div>'; }
+    preview = `
+      <div class="small mb-2">
+        <div><strong>Model:</strong> ${model}</div>
+        <div><strong>Cash:</strong> ${fmtINR(m.cash)} · <strong>NAV:</strong> ${fmtINR(m.nav)}</div>
+        <div><strong>Current:</strong> ${m.open_symbol ? m.open_symbol + ' x' + m.open_qty : 'flat'}</div>
+        <div><strong>Rank-1:</strong> ${rank1 ? rank1.symbol + ' @ ' + fmtINR(rank1.price) : '—'}</div>
+      </div>
+      ${actionRow}`;
+  } catch(e) {
+    preview = '<div class="text-warning">Could not load preview: ' + e.message + '</div>';
+  }
+
+  const ok = await appModal.confirm('LIVE Rebalance — Real Money',
+    preview + '<hr><div class="small text-muted">Runs live_signal + LIVE fyers_executor. SELL/BUY orders placed on Fyers.</div>',
+    {okLabel: 'Execute Rebalance', okClass: 'btn-danger', headerCls: 'bg-danger text-white'});
+  if (!ok) return;
+
+  const r = await fetch(`/admin/${model}/rebalance`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({dry_run: false}),
+  });
+  const d = await r.json();
+  if (d.success) {
+    await appModal.alert('Rebalance Started',
+      `Model: <strong>${model}</strong><br>Signal task: <code>${d.signal_task_id}</code><br>Execute task: <code>${d.execute_task_id}</code><br><br>Live orders will fire in ~10s. Watch positions table refresh.`,
+      'success');
+  } else {
+    await appModal.alert('Rebalance Failed', 'Error: <strong>' + (d.error || 'unknown') + '</strong>', 'danger');
+  }
+  setTimeout(() => loadState(), 8000);
 }
 
 async function sellNow(symbol, qty) {
@@ -251,122 +243,10 @@ async function sellNow(symbol, qty) {
   } else {
     await appModal.alert('Order Failed', 'Fyers error: <strong>' + (d.error || 'unknown') + '</strong>', 'danger');
   }
-  setTimeout(() => { loadState(); loadPreview(); }, 3000);
+  setTimeout(() => loadState(), 3000);
 }
 
-document.getElementById('btn_preview').addEventListener('click', loadPreview);
-document.getElementById('btn_rebalance').addEventListener('click', async () => {
-  const pr = await fetch('/admin/momrot/rebalance-preview');
-  const p = await pr.json();
-  if (!p.success) { await appModal.alert('Preview Failed', p.error, 'danger'); return; }
-
-  if (p.already_holding_rank_member) {
-    await appModal.alert('No Action Needed',
-      `Already holding rank-1 (or member of top-5).<br><br>Rank-1: <strong>${p.rank1.symbol}</strong> (${fmtPct(p.rank1.return_60d)})`,
-      'info');
-    return;
-  }
-
-  let html = `<div class="mb-2"><span class="text-muted small">Rank-1:</span> <strong>${p.rank1.symbol}</strong> ${fmtPct(p.rank1.return_60d)} @ ${fmtINR(p.rank1.price)}</div>`;
-  html += '<table class="table table-sm mb-2"><tbody>';
-  if (p.sells && p.sells.length) {
-    p.sells.forEach(s => {
-      html += `<tr><td><span class="badge bg-danger">SELL</span></td><td><strong>${s.symbol}</strong></td><td>qty ${s.qty}</td><td class="text-end">${fmtINR(s.proceeds)}</td></tr>`;
-    });
-  } else {
-    html += '<tr><td colspan="4" class="text-muted">No sells</td></tr>';
-  }
-  if (p.buy) {
-    const warn = p.buy.qty < 1 ? '<span class="text-warning small">qty=0 insufficient cash — BUY will skip</span>' : '';
-    html += `<tr><td><span class="badge bg-success">BUY</span></td><td><strong>${p.buy.symbol}</strong></td><td>qty ${p.buy.qty}</td><td class="text-end">${fmtINR(p.buy.deploy)}</td></tr>`;
-    if (warn) html += `<tr><td colspan="4">${warn}</td></tr>`;
-  }
-  html += '</tbody></table>';
-  html += `<div class="small text-muted">Available cash after sells: ${fmtINR((p.buy && p.buy.available_cash_after_sells) || p.current_cash)}</div>`;
-
-  const ok = await appModal.confirm('LIVE Rebalance — Real Money', html,
-    {okLabel:'Execute Rebalance', okClass:'btn-danger', headerCls:'bg-danger text-white'});
-  if (!ok) return;
-
-  const r = await fetch('/admin/momrot/run-now', {method:'POST'});
-  const d = await r.json();
-  const lines = (d.actions || []).map(a => {
-    const res = a.result || {};
-    const inner = res.result || {};
-    if (a.action === 'BUY_SKIP') {
-      return `<li><span class="badge bg-warning text-dark">SKIP</span> BUY ${a.symbol||''} <span class="text-muted small">${a.reason||''}</span></li>`;
-    }
-    if (res.ok) {
-      const oid = inner.orderid || inner.id || '';
-      return `<li><span class="badge bg-success">${a.action}</span> <strong>${a.symbol}</strong> qty=${a.qty} ${oid?('<code class=\"small\">'+oid+'</code>'):''}</li>`;
-    }
-    const err = inner.message || res.error || 'unknown';
-    return `<li><span class="badge bg-danger">${a.action} FAIL</span> ${a.symbol||''} qty=${a.qty||'-'} — <span class="text-danger small">${err}</span></li>`;
-  }).join('');
-  const body = lines ? `<ul class="mb-0">${lines}</ul>` : 'No action taken';
-  if (d.all_orders_ok) {
-    await appModal.alert('Rebalance Successful', body, 'success');
-  } else if (d.failures) {
-    await appModal.alert(`Rebalance: ${d.successes} ok, ${d.failures} failed`, body, 'danger');
-  } else if (d.success === false) {
-    await appModal.alert('Rebalance Failed', d.error || body, 'danger');
-  } else {
-    await appModal.alert('Rebalance Result', body, 'info');
-  }
-  setTimeout(() => { loadState(); loadPreview(); }, 3000);
-});
-document.getElementById('btn_buy_rank1').addEventListener('click', () => buyFlow());
-
-async function buyFlow(symOverride, priceOverride) {
-  const pr = await fetch('/admin/momrot/rebalance-preview');
-  const p = await pr.json();
-  if (!p.success) { await appModal.alert('Preview Failed', p.error, 'danger'); return; }
-  const sym = symOverride || p.rank1.symbol;
-  const price = priceOverride || p.rank1.price;
-  const cash = p.current_cash;
-  const maxQty = Math.floor((cash * 0.995) / price);  // 0.5% buffer for brokerage/STT/GST
-
-  if (maxQty < 1) {
-    await appModal.alert('Insufficient Balance',
-      `Available: <strong>${fmtINR(cash)}</strong><br>Need ≥ <strong>${fmtINR(price)}</strong>/share for <strong>${sym}</strong>.<br><br>Please refill Fyers account and retry.`,
-      'danger');
-    return;
-  }
-
-  const promptHtml = `<table class="table table-sm mb-2"><tbody>
-    <tr><td>Symbol</td><td class="text-end"><strong>${sym}</strong></td></tr>
-    <tr><td>Price</td><td class="text-end">${fmtINR(price)}</td></tr>
-    <tr><td>Available cash</td><td class="text-end">${fmtINR(cash)}</td></tr>
-    <tr><td>Max qty possible</td><td class="text-end"><strong>${maxQty}</strong></td></tr>
-  </tbody></table>`;
-  const input = await appModal.prompt('Buy ' + sym, promptHtml, maxQty, 'Quantity (shares)');
-  if (input === null) return;
-  const qty = parseInt(input);
-  if (!qty || qty < 1) { await appModal.alert('Invalid', 'Quantity must be positive', 'danger'); return; }
-  if (qty > maxQty) { await appModal.alert('Insufficient', `qty ${qty} > max ${maxQty}`, 'danger'); return; }
-
-  const ok = await appModal.confirm('LIVE BUY — Real Money',
-    `Symbol: <strong>${sym}</strong><br>Qty: <strong>${qty}</strong> @ <strong>${fmtINR(price)}</strong><br>Total: <strong>${fmtINR(qty*price)}</strong>`,
-    {okLabel:'Place BUY', okClass:'btn-success', headerCls:'bg-success text-white'});
-  if (!ok) return;
-
-  const r = await fetch('/admin/momrot/buy-now', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({symbol: sym, qty})
-  });
-  const d = await r.json();
-  if (d.success) {
-    const oid = d.order_id || ((d.result && d.result.result && (d.result.result.orderid || d.result.result.id)) || '');
-    await appModal.alert('Order Placed',
-      `BUY placed: <strong>${sym}</strong> qty=${qty}` + (oid ? `<br><code class="small">order_id: ${oid}</code>` : ''),
-      'success');
-  } else {
-    await appModal.alert('Order Failed', 'Fyers error: <strong>' + (d.error || 'unknown') + '</strong>', 'danger');
-  }
-  setTimeout(() => { loadState(); loadPreview(); }, 3000);
-}
-
-loadState(); loadPreview();
+loadState();
 setInterval(loadState, 30000);
 </script>
 {% endblock %}

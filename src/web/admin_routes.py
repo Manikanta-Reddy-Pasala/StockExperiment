@@ -1695,6 +1695,74 @@ def admin_toggle_enabled(model_name):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@admin_bp.route('/<model_name>/rebalance', methods=['POST'])
+def admin_model_rebalance(model_name):
+    """Live per-model rebalance: signal then LIVE execute (real Fyers orders).
+
+    Chains live_signal.py and fyers_executor.py (without --dry-run) for one model.
+    If current position is in fresh top-N: no action. Otherwise: SELL old, BUY rank-1.
+    Capital sized from this model's ledger cash only.
+
+    Body (optional): {dry_run: bool} — defaults False (LIVE).
+    """
+    paths = MODEL_PATHS.get(model_name)
+    if not paths:
+        return jsonify({"success": False,
+                        "error": f"Unknown model: {model_name}"}), 400
+
+    data = request.get_json(silent=True) or {}
+    dry_run = bool(data.get("dry_run", False))
+
+    if not dry_run and os.environ.get("LIVE_TRADING", "false").lower() != "true":
+        return jsonify({
+            "success": False,
+            "error": "LIVE_TRADING not enabled. Set LIVE_TRADING=true env "
+                     "or pass {dry_run: true}.",
+        }), 403
+
+    ts = datetime.now().strftime("%Y%m%dT%H%M%S")
+    signals_out = f"/tmp/rebalance_{model_name}_{ts}.json"
+    signal_task = f"rebal_sig_{model_name}_{ts}"
+    exec_task = f"rebal_exec_{model_name}_{ts}"
+    user_id = os.environ.get("USER_ID", "1")
+
+    signal_cmd = [
+        "python3", paths["live_signal"],
+        *paths["extra_args"],
+        "--signals-out", signals_out,
+        "--force",
+    ]
+    exec_cmd = [
+        "python3", "tools/live/fyers_executor.py",
+        "--signals", signals_out,
+        "--user-id", user_id,
+        "--model-name", model_name,
+    ]
+    if dry_run:
+        exec_cmd.append("--dry-run")
+
+    def runner():
+        run_command_async(signal_task, signal_cmd,
+                          f"Rebalance signal for {model_name}")
+        # Only execute if signal file actually exists
+        if os.path.exists(signals_out):
+            run_command_async(exec_task, exec_cmd,
+                              f"Rebalance {'DRY-RUN' if dry_run else 'LIVE'} "
+                              f"execute for {model_name}")
+
+    threading.Thread(target=runner, daemon=True).start()
+
+    return jsonify({
+        "success": True,
+        "signal_task_id": signal_task,
+        "execute_task_id": exec_task,
+        "signals_out": signals_out,
+        "dry_run": dry_run,
+        "message": (f"Rebalance started for {model_name} "
+                    f"(dry_run={dry_run})"),
+    })
+
+
 @admin_bp.route('/<model_name>/ranking', methods=['GET'])
 def admin_model_ranking(model_name):
     """Read the per-model ranking JSON written by live_signal.py.

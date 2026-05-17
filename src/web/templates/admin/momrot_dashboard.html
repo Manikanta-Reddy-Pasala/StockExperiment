@@ -154,14 +154,15 @@
           <tr>
             <th>Model</th>
             <th>Enabled</th>
+            <th>Wired</th>
             <th>Last Signal</th>
-            <th>Last Data Pull</th>
+            <th>Last Execution</th>
             <th class="text-end">Universe Size</th>
             <th class="text-end">Ranking Count</th>
           </tr>
         </thead>
         <tbody id="datastatus_body">
-          <tr><td colspan="6" class="text-center text-muted py-3">Loading…</td></tr>
+          <tr><td colspan="7" class="text-center text-muted py-3">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -694,14 +695,15 @@ async function _fetchJson(url) {
 }
 
 async function _loadModelDataStatus(modelName, enabled) {
-  // triggers/status is only wired for models in MODEL_PATHS (4 equity).
-  // Options model returns 400 — fall back gracefully to dashes.
+  // triggers/status returns success=true only for models in MODEL_PATHS
+  // (4 equity). Options model returns 400 → wired=false, dashes everywhere.
   const [statusRes, rankingRes] = await Promise.all([
     _fetchJson(`/admin/models/${modelName}/triggers/status`),
     _fetchJson(`/admin/${modelName}/ranking?top=999`),
   ]);
-  const lastSig = statusRes && statusRes.success ? statusRes.last_signal_at : null;
-  const lastExec = statusRes && statusRes.success ? statusRes.last_execution_at : null;
+  const wired = !!(statusRes && statusRes.success);
+  const lastSig = wired ? statusRes.last_signal_at : null;
+  const lastExec = wired ? statusRes.last_execution_at : null;
   let universeSize = null;
   let rankingCount = null;
   if (rankingRes && rankingRes.success) {
@@ -711,9 +713,13 @@ async function _loadModelDataStatus(modelName, enabled) {
   const enabledBadge = enabled
     ? '<span class="badge bg-success">ON</span>'
     : '<span class="badge bg-secondary">DISABLED</span>';
+  const wiredBadge = wired
+    ? '<span class="badge bg-info" title="live_signal + executor wired">WIRED</span>'
+    : '<span class="badge bg-warning text-dark" title="No live_signal/executor route — manual only">NOT WIRED</span>';
   return `<tr${enabled ? '' : ' style="opacity:0.6;"'}>
     <td><strong>${modelName}</strong></td>
     <td>${enabledBadge}</td>
+    <td>${wiredBadge}</td>
     <td class="small">${_dash(lastSig ? _ts(lastSig) : null)}</td>
     <td class="small">${_dash(lastExec ? _ts(lastExec) : null)}</td>
     <td class="text-end">${_dash(universeSize)}</td>
@@ -723,17 +729,18 @@ async function _loadModelDataStatus(modelName, enabled) {
 
 async function loadDataStatus() {
   const body = document.getElementById('datastatus_body');
-  body.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Loading…</td></tr>';
+  body.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Loading…</td></tr>';
   const pf = await _fetchJson('/admin/models/portfolio');
   if (!pf || !pf.success) {
-    body.innerHTML = '<tr><td colspan="6" class="text-danger small">Failed to load /admin/models/portfolio</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" class="text-danger small">Failed to load /admin/models/portfolio</td></tr>';
     return;
   }
   const models = pf.models || [];
   if (models.length === 0) {
-    body.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No models seeded.</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No models seeded.</td></tr>';
     return;
   }
+  // Iterate ALL models — enabled AND disabled — so operators see full picture.
   const rows = await Promise.all(
     models.map(m => _loadModelDataStatus(m.model_name, !!m.enabled))
   );
