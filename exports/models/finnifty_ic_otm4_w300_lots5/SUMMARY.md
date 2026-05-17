@@ -1,5 +1,31 @@
 # FINNIFTY_monthly_IC_OTM4_w300_lots5 — SUMMARY (with option prices & amounts)
 
+## Stock / Option pick logic (plain English)
+
+This model trades **FINNIFTY index options** — there's no equity stock list.
+
+1. **Trigger every Monday**: pick the **nearest monthly expiry** (last Thursday of the month)
+2. **Read spot**: FINNIFTY index closing price on that Monday
+3. **Derive 4 strikes from spot**:
+   - **SELL CE strike** = round(spot × 1.04, nearest 50pt) — 4% OTM call
+   - **SELL PE strike** = round(spot × 0.96, nearest 50pt) — 4% OTM put
+   - **BUY CE wing** = SELL CE + 300pt — protective wing above
+   - **BUY PE wing** = SELL PE - 300pt — protective wing below
+4. **Validate** strikes exist in `historical_options` for that expiry
+5. **Enter** all 4 legs on next valid day, 5 lots each
+6. **Hold** until: pair value ≥ 3× entry credit (SL) OR monthly expiry Thursday (settle intrinsic)
+
+**Unique filter**: no equity universe. Options chain derived per Monday from spot. Each cycle deploys defined-risk capital = wing_width(300) × lot × lots. NSE cap classification N/A (index derivative, not equity).
+
+| Key knob | Value |
+|---|---|
+| Underlying | FINNIFTY (Nifty Financial Services Index) |
+| **Rebalance period** | **Monthly (one Iron Condor per monthly expiry)** |
+| Cycle trigger | Every Monday → pick nearest monthly expiry |
+| Position | 5 lots (4 legs each) |
+| Exit | 3× entry credit SL OR hold to expiry Thursday |
+| Max defined loss | wing_width(300) × lot × lots |
+
 ## Strategy
 
 - **Underlying**: FINNIFTY (Nifty Financial Services Index)
