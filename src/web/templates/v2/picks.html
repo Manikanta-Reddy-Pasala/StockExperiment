@@ -118,6 +118,14 @@ function renderCard(m, idx, ranking, status) {
     ? `<span class="small-mute">${ranking.date}</span>`
     : '';
 
+  // Schedule + next rebalance pill (always visible on every card)
+  const _sched = nextRebalance(m.schedule);
+  const schedPill = _sched.kind === 'event'
+    ? `<span class="badge bg-secondary ms-1" title="Trades only when 60d-high + vol + SMA all fire">event-driven</span>`
+    : `<span class="badge bg-secondary ms-1" title="${_sched.kind} rotation">
+         ${_sched.kind}: ${_sched.label}${_sched.days != null ? ` (in ${_sched.days}d)` : ''}
+       </span>`;
+
   // Top pick summary shown when collapsed — gives operator the most important
   // signal at a glance without needing to expand. Click header to see top-5.
   const isNearMiss = rank1 && rank1.name && rank1.name.includes('near-miss');
@@ -193,7 +201,7 @@ function renderCard(m, idx, ranking, status) {
       <div class="card-header model-card-header d-flex justify-content-between align-items-center"
            data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false">
         <div>
-          <strong>${m.title}</strong>${badges}
+          <strong>${m.title}</strong>${badges}${schedPill}
           <i class="bi bi-chevron-down ms-1 small-mute"></i>
           <div class="small-mute mt-1">${m.desc}</div>
           ${topPickHtml}
