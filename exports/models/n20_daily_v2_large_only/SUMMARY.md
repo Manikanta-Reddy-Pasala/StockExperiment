@@ -1,6 +1,6 @@
 # n20_daily_v2_large_only — SUMMARY
 
-Daily-rebalance momentum rotation on NSE Nifty 100 large-caps. Top-20 ADV pool + uptrend + Nifty 100 filter → top-1 by 30d return → daily rotate.
+**Daily rotation. Top-20 ADV + uptrend + NSE Nifty 100 filter. Top-1 by 30d return.**
 
 ## Backtest window & trade frequency
 
@@ -9,72 +9,41 @@ Daily-rebalance momentum rotation on NSE Nifty 100 large-caps. Top-20 ADV pool +
 | Backtest window | **2023-05-15 → 2026-05-12** (≈3.00 years) |
 | First entry | 2023-05-15 |
 | Last exit | 2026-04-13 |
-| Total trades | 139 |
-| Trades per year | ~46.3 |
-| Strategy class | Daily rotation (top-1 by 30d return) |
+| Total trades | 140 |
+| Trades per year | ~46.7 |
 | Rebalance period | Daily |
 
-## Stock pick logic (plain English)
-
-1. **Universe (per day)**: top-20 N500 stocks by 20-day ADV
-2. **Uptrend filter**: keep stocks where close > 200d SMA
-3. **Large-cap filter**: keep stocks in NSE Nifty 100 (`src/data/symbols/nifty100.csv`)
-4. **Rank by 30d return** (highest first)
-5. **Pick top-1**; sit in cash if no large-cap matches
-6. **Rebalance daily**
-
-## Key knobs
-
-| Knob | Value |
-|---|---|
-| Universe pool | Top-20 by 20-day ADV from N500 |
-| Uptrend filter | close > 200d SMA |
-| Large-cap filter | NSE Nifty 100 membership |
-| Lookback | 30 days |
-| Position | top-1, max_concurrent=1 |
-| Rebalance period | **Daily** |
-| Cash policy | Sit in cash if no candidate matches |
-
-## Headline result (₹10L, 2023-05-15 → 2026-05-12)
+## Headline result (CLEAN DATA, post yfinance restore)
 
 | Metric | Value |
 |---|---:|
-| Final NAV | **₹1,39,59,936** |
-| Total return | **+1295.99%** |
-| **3-yr CAGR** | **+140.78%/yr** |
-| Max DD (cash NAV) | 25.52% |
-| Max DD (mark-to-market) | 26.92% |
-| Trades | 139 |
-| WR | 43.1% (59W / 78L) |
-| Calmar (CAGR/DD) | **5.52** |
+| Final NAV | **₹14,691,291** |
+| Total return | **+1369.13%** |
+| **3-yr CAGR** | **+157.04%/yr** |
+| Max DD (NAV-based) | 27.24% |
+| Calmar | 5.76 |
+| Trades | 140 |
+| WR | 44.9% (62W / 76L) |
 
-## Returns by NSE cap segment
+## Change vs prior result (dirty data)
 
-| Cap | Trades | Wins | Losses | WR | Total PnL ₹ |
-|---|---:|---:|---:|---:|---:|
-| **Large** | 139 | 59 | 78 | 43% | +11,076,686 |
+| Metric | Prior (dirty) | **Clean** | Δ |
+|---|---:|---:|---:|
+| CAGR | +140.78% | **+157.04%** | +16.26pp |
+| Max DD | 26.92% | **27.24%** | +0.32pp |
 
-All trades are Large-cap by construction (NSE Nifty 100 filter enforced).
+Prior result was inflated/distorted by data anomalies in KOTAKBANK, MCX, NUVAMA, VEDL (all jumped 4-5x on 2024-12-23 in raw Fyers data — incremental pull bug). Re-fetched 8 affected stocks via yfinance (split-adjusted) on 2026-05-17.
 
 ## Yearly money flow
 
 | Year | Open | Close | ROI | Trades |
 |---|---:|---:|---:|---:|
-| 2023-24 | ₹1,000,000 | ₹5,558,933 | **+455.89%** | 36 |
-| 2024-25 | ₹5,558,933 | ₹10,791,611 | **+94.13%** | 52 |
-| 2025-26 | ₹10,791,611 | ₹12,076,686 | **+11.91%** | 51 |
+| 2023-24 | ₹1,000,000 | ₹5,989,612 | **+498.96%** | 37 |
+| 2024-25 | ₹5,989,612 | ₹12,051,698 | **+101.21%** | 52 |
+| 2025-26 | ₹12,051,698 | ₹14,691,291 | **+21.90%** | 51 |
 
-## Caveats
+## Returns by NSE cap segment
 
-- WR 43% — strategy enters more often, wins less, but high win sizes compensate.
-- 25-27% Max DD still substantial for single-stock concentration. Plan for 30% DD periods.
-- 139 trades / 3yr = ~46/yr round-trip → ~3-5%/yr cost drag. Post-cost CAGR ≈ +135%.
-- NSE Nifty 100 list refreshes quarterly (Mar/Sep). Run `tools/refresh_nifty100.py` to keep current.
-- Slippage not modeled — real ~10-30 bps drag per round-trip.
-- Survivorship: stocks delisted from N500 mid-period missing.
-
-## History
-
-Earlier `n20_daily_30d_mc1_uptrend` (no Large-cap filter) hit +157% CAGR but 50% DD. Pure-number DD-reduction filter sweep (15+ variants: hard SL, trail SL, mc>1, vol caps, port-DD halt, combos) all harmed CAGR more than helped DD. Only NSE Nifty 100 membership filter (categorical) halved DD with acceptable CAGR cost. Original archived at `tools/models/_archived_models/n20_daily_30d_mc1_uptrend/README.md`.
-
-Full ledger: `TRADE_LEDGER.md`
+| Cap | Trades | Wins | Losses | WR | Total PnL ₹ |
+|---|---:|---:|---:|---:|---:|
+| **Large** | 140 | 62 | 76 | 45% | +13,691,287 |

@@ -120,27 +120,15 @@
     "cap_after": 3484836.0
   },
   {
-    "entry_date": "2025-12-15",
-    "exit_date": "2026-02-01",
-    "sym": "HINDCOPPER",
-    "qty": 9113,
-    "entry_px": 382.38,
-    "exit_px": 598.65,
-    "pnl": 1965382.0,
-    "ret_pct": 56.72,
-    "reason": "TRAIL",
-    "cap_after": 5450197.0
-  },
-  {
-    "entry_date": "2026-02-04",
-    "exit_date": "2026-05-05",
-    "sym": "BHARATFORG",
-    "qty": 3535,
-    "entry_px": 1541.54,
-    "exit_px": 1864.73,
-    "pnl": 1135877.0,
-    "ret_pct": 21.09,
+    "entry_date": "2025-12-11",
+    "exit_date": "2026-03-11",
+    "sym": "AUBANK",
+    "qty": 3548,
+    "entry_px": 981.98,
+    "exit_px": 917.48,
+    "pnl": -232119.0,
+    "ret_pct": -6.47,
     "reason": "MAX_HOLD",
-    "cap_after": 6586054.0
+    "cap_after": 3252696.0
   }
 ]

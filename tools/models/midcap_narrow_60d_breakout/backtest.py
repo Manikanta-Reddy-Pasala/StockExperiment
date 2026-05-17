@@ -70,15 +70,10 @@ ADV_WIN    = 20
 SKIP_TOP   = 30
 KEEP_NEXT  = 100
 
-# DATA FIXES applied at load time (not in DB):
-# - ANGELONE: prices 10x inflated between 2024-12-23 and 2026-02-25 (data import inconsistency
-#   around what appears to be a stock split; volume drop confirms ~10:1 reverse split treatment).
-#   Fix: divide prices by 10, multiply volume by 10 in that window to make series continuous.
-DATA_FIXES = {
-    "NSE:ANGELONE-EQ": [
-        {"start": "2024-12-23", "end": "2026-02-25", "price_div": 10, "vol_mul": 10},
-    ],
-}
+# DATA_FIXES no longer needed for ANGELONE — historical_data was restored
+# from yfinance (split-adjusted) on 2026-05-17. Pattern preserved for future
+# data anomalies if Fyers serves bad data again.
+DATA_FIXES = {}
 
 N100_CSV = "/app/src/data/symbols/nifty100.csv"
 
