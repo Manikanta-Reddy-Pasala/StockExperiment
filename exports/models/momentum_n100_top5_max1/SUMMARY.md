@@ -12,7 +12,7 @@
 | Total trades | 31 |
 | Trades per year | ~10.3 |
 | Rebalance | Monthly |
-| Data source | **Fyers** (498/504 N500, 4-yr re-pull 2026-05-17, cont_flag=1) |
+| Data source | **Fyers** (498/504 N500, 4-yr re-pull, cont_flag=1) |
 
 ## Headline result
 

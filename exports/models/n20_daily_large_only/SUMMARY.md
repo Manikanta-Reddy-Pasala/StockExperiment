@@ -1,6 +1,6 @@
 # n20_daily_large_only — SUMMARY
 
-**Daily rotation. Top-20 ADV + uptrend filter + NSE Nifty 100 filter. Top-1 by 30d return.**
+**Daily rotation. Top-20 ADV + uptrend + NSE Nifty 100 filter. Top-1 by 30d return.**
 
 ## Backtest window & trade frequency
 
@@ -12,7 +12,7 @@
 | Total trades | 138 |
 | Trades per year | ~46.0 |
 | Rebalance | Daily |
-| Data source | **Fyers** (498/504 N500, 4-yr re-pull 2026-05-17, cont_flag=1) |
+| Data source | **Fyers** (498/504 N500, 4-yr re-pull, cont_flag=1) |
 
 ## Headline result
 

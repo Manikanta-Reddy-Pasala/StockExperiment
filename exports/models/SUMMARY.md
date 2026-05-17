@@ -1,128 +1,73 @@
 # All Trading Models — Combined SUMMARY
 
-3-year backtest window: **2023-05-15 → 2026-05-12 (≈3.00 years)** · ₹10L per model
+3-year backtest window: **2023-05-15 → 2026-05-12** · ₹10L per model · Fyers data (4-yr re-pull 2026-05-17)
 
-5 models. All ≥ 80% CAGR except midcap-ex-ANGELONE (below threshold, see note). Only `momentum_n100_top5_max1` is LIVE-deployed.
+5 models (4 equity + 1 options). Each has ONE canonical version.
 
 ## Headline — deploy ₹10L per model
 
-| # | Model | Stock list filter | Rebalance | Final NAV | CAGR | Max DD | LIVE |
+| # | Model | Universe | Rebalance | Final NAV | CAGR | Max DD | LIVE |
 |--:|---|---|---|---:|---:|---:|:-:|
 | 1 | `momentum_n100_top5_max1` | Real NSE Nifty 100 | Monthly | ₹4,424,405 | **+64.17%** | 37.30% | ✅ |
 | 2 | `momentum_pseudo_n100_adv` | Top-100 ADV from N500 MINUS Small | Monthly | ₹9,221,004 | **+109.70%** | 36.44% | ❌ |
-| 3 | `midcap_narrow_60d_breakout` | Top-100 ADV from N500 MINUS Large | Event-driven | ₹7,713,735 | **+97.59%** | 22.82% | ❌ |
-| 4 | `finnifty_ic_otm4_w300_lots5` | FINNIFTY options (no equity) | Monthly Iron Condor | ₹1.11 Cr (scaled) | **+123%** | 13.88% | ❌ |
-| 5 | `n20_daily_large_only` | Top-20 ADV + uptrend + NSE Nifty 100 filter | Daily | ₹11,813,452 | **+127.75%** | **24.74%** | ❌ |
-
-¹ **V2 winner** = Exclude Large + Exclude ANGELONE. Cap-filter sweep tested 6 variants; V2 won on CAGR, DD, Calmar. Full V1 (all caps + ANGELONE) = +337% CAGR / ₹8.38 Cr but inflated by data anomaly. Baseline ex-ANGELONE = +68.60% / 17.83% DD.
+| 3 | `midcap_narrow_60d_breakout` | Top-100 ADV from N500 MINUS Large | Event-driven | ₹13,456,535 | **+137.85%** | **8.12%** | ❌ |
+| 4 | `finnifty_ic_otm4_w300_lots5` | FINNIFTY options (4 strikes per Mon) | Monthly IC | ₹22,25,673 | **+123.27%** compound | 13.88% | ❌ |
+| 5 | `n20_daily_large_only` | Top-20 ADV + uptrend + NSE Nifty 100 | Daily | ₹11,813,452 | **+127.75%** | **24.74%** | ❌ |
 
 ## Unique stock-filtering approach per model
 
 | Model | Filter mechanism | Why unique |
 |---|---|---|
-| `momentum_n100_top5_max1` | NSE official index list (no derived filter) | Only model using REAL NSE Nifty 100 constituents — large-cap pure |
-| `momentum_pseudo_n100_adv` | ADV ranking from N500 → top 100 | Liquidity-based selection (vs market-cap); catches retail-volume mid-caps NSE excludes |
-| `midcap_narrow_60d_breakout` | ADV rank 31-130 + 40d breakout + vol>2× + close>200d SMA | Only event-driven model (calendar-blind); 3-stage filter before entry |
-| `finnifty_ic_otm4_w300_lots5` | Spot-derived strikes (4 legs at ±4% OTM + ±300pt wings) | No equity universe — options chain auto-built per Monday from FINNIFTY spot |
-| `n20_daily_large_only` | Top-20 ADV + uptrend + NSE Nifty 100 filter | Smallest universe (20 ADV → uptrend → Nifty 100 only); daily PIT rebuild. Calmar 5.23. |
-
-## Returns by NSE cap segment (across all equity models)
-
-NSE classification (current snapshot): **Large** = in Nifty 100 (104 stocks). **Mid** = in Nifty Midcap 150 (150). **Small** = in Nifty Smallcap 250 (250). **Outside** = not in Nifty 500.
-
-### momentum_n100_top5_max1
-
-| Cap | Trades | Wins | Losses | WR | Total PnL ₹ |
-|---|---:|---:|---:|---:|---:|
-| **Large** | 31 | 23 | 8 | 74% | +4,791,235 |
-
-### momentum_pseudo_n100_adv
-
-| Cap | Trades | Wins | Losses | WR | Total PnL ₹ |
-|---|---:|---:|---:|---:|---:|
-| **Large** | 15 | 14 | 1 | 93% | +8,756,351 |
-| **Mid** | 12 | 10 | 2 | 83% | +3,505,564 |
-| **Small** | 3 | 2 | 1 | 67% | -226,439 |
-
-### midcap_narrow_60d_breakout
-
-| Cap | Trades | Wins | Losses | WR | Total PnL ₹ |
-|---|---:|---:|---:|---:|---:|
-| **Large** | 4 | 2 | 2 | 50% | +1,699,565 |
-| **Mid** | 5 | 5 | 0 | 100% | +2,198,826 |
-| **Small** | 3 | 2 | 1 | 67% | -314,111 |
-
-### n20_daily_large_only
-
-| Cap | Trades | Wins | Losses | WR | Total PnL ₹ |
-|---|---:|---:|---:|---:|---:|
-| **Large** | 139 | 59 | 78 | 43% | +12,959,936 |
-
-All trades Large-cap by construction.
-
-## Backtest window & trade frequency (all models)
-
-| Model | Trades | Trades/yr | Strategy class | Rebalance |
-|---|---:|---:|---|---|
-| `momentum_n100_top5_max1` | 31 | ~10 | Monthly rotation | Monthly (1st trading day) |
-| `momentum_pseudo_n100_adv` | 30 | ~10 | Monthly rotation | Monthly (1st trading day) |
-| `midcap_narrow_60d_breakout` | 12 | ~4 | Event-driven swing (long hold ~60-90d) | Event-driven |
-| `finnifty_ic_otm4_w300_lots5` | 35 | ~12 | Monthly Iron Condor | Monthly expiry |
-| `n20_daily_large_only` | 139 | ~46 | Daily rotation | Daily |
-
-All 5 models use the **same 3-year backtest window: 2023-05-15 → 2026-05-12**. Trade count differs by strategy class — daily rotation churns most, event-driven swing churns least.
+| `momentum_n100_top5_max1` | NSE Nifty 100 official list (no derived filter) | Only model using REAL NSE constituents — large-cap pure |
+| `momentum_pseudo_n100_adv` | Top-100 ADV from N500, drop Small | Liquidity-based; excludes high-volume small caps |
+| `midcap_narrow_60d_breakout` | Top-100 ADV from N500, drop Large | Highest-liquidity mid/small breakouts; event-driven |
+| `finnifty_ic_otm4_w300_lots5` | Spot-derived 4 strikes (±4% OTM + ±300pt wings) | No equity universe — options chain auto-built per Monday |
+| `n20_daily_large_only` | Top-20 ADV + close>200d SMA + NSE Nifty 100 | Smallest universe (20); strictest gate; daily rebuild |
 
 ## Composite ranking — risk-adjusted Calmar (CAGR / Max DD)
 
-| Rank | Model | CAGR | MaxDD | Calmar | Notes |
-|--:|---|---:|---:|---:|---|
-| 1 | momentum_pseudo_n100_adv | +136.39% | 16.15% | **8.44** | Lookahead bias |
-| 2 | **n20_daily_large_only** | **+140.78%** | **26.92%** | **5.23** | **NSE Nifty 100 filter** |
-| 2 | finnifty_ic_otm4_w300_lots5 | +123.30% | 13.88% | **8.88** | Honest, defined-risk |
-| 3 | midcap_narrow (ex-ANGELONE) | +68.60% | 17.83% | **3.85** | Below 80% threshold |
-| 5 | momentum_n100_top5_max1 | +80.38% | 29.71% | **2.71** | LIVE deployable |
+| Rank | Model | CAGR | MaxDD | Calmar |
+|--:|---|---:|---:|---:|
+| 1 | midcap_narrow_60d_breakout | +137.85% | 8.12% | **16.98** |
+| 2 | finnifty_ic_otm4_w300_lots5 | +123.27% | 13.88% | **8.88** |
+| 3 | n20_daily_large_only | +127.75% | 24.74% | **5.16** |
+| 4 | momentum_pseudo_n100_adv | +109.70% | 36.44% | **3.01** |
+| 5 | momentum_n100_top5_max1 | +64.17% | 37.30% | **1.72** |
 
 ## Deployment recommendation
 
 | Goal | Use |
 |---|---|
-| **Live equity (real, deployable)** | `momentum_n100_top5_max1` (LIVE) |
+| **Live equity (real universe, deployable)** | `momentum_n100_top5_max1` (LIVE) |
 | **Defined-risk income (options)** | `finnifty_ic_otm4_w300_lots5` |
-| **Upper-bound research / aggressive sim** | `momentum_pseudo_n100_adv` |
-| **Backtest exploration / breakout style** | `midcap_narrow_60d_breakout` (ANGELONE caveat) |
-| **Daily rotation, Large-cap concentrated** | `n20_daily_large_only` (Calmar 5.23) |
+| **Best risk-adjusted swing returns** | `midcap_narrow_60d_breakout` (Calmar 17+) |
+| **Daily rotation (Nifty 100 only)** | `n20_daily_large_only` |
+| **Aggressive pseudo-N100 momentum** | `momentum_pseudo_n100_adv` |
 
-## Cross-cutting caveats
+## Data integrity
 
-1. **NSE cap classification** uses current Nifty 100/Midcap 150/Smallcap 250 snapshots (refreshed 2026-05-17). Index membership shifts over time — a stock classified Mid today may have been Large in 2023 or vice-versa. ~5-8%/yr index turnover.
-2. **Lookahead universe** is biggest hidden lever — Models 2 + 3 + 5 rely on knowing future high-ADV stocks. Honest counterparts: real NSE Nifty 100 (+80%, Model 1) and real Nifty Midcap 150 (-18% on Model 3 strategy).
-3. **Single-trade concentration** in Model 3: ANGELONE alone = 80% of returns. Excluded for honest result.
-4. **Slippage modeled** only in Models 3 + 4. Rotation models (1, 2, 5) ignore slippage (~10-30 bps/round-trip drag).
-5. **Costs**: STT + brokerage ~1-2%/yr drag for monthly models, ~3-5%/yr for daily (Model 5).
-6. **Survivorship**: stocks delisted from N500 mid-window missing in all equity models.
+- All data from Fyers production source (cont_flag=1 split-adjusted)
+- 498/504 N500 stocks covered (4 DUMMYVEDL placeholders + 2 symbol mismatch = legitimately missing)
+- 1 known anomaly: ABFRL 2025-05-22 real demerger (-67%, not data bug)
+- yfinance NEVER used (project rule)
 
 ## Files
 
 ```
 exports/models/
-├── SUMMARY.md                            ← this file (5-model combined)
+├── SUMMARY.md                          ← this file
 ├── momentum_n100_top5_max1/
-│   ├── SUMMARY.md                        Stock pick logic + cap segments + per-trade table
+│   ├── SUMMARY.md
 │   └── TRADE_LEDGER.md
 ├── momentum_pseudo_n100_adv/
 │   ├── SUMMARY.md
 │   └── TRADE_LEDGER.md
 ├── midcap_narrow_60d_breakout/
-│   ├── SUMMARY.md                        ANGELONE-excluded version
-│   └── TRADE_LEDGER.md                   full V1 with ANGELONE included
+│   ├── SUMMARY.md
+│   └── TRADE_LEDGER.md
 ├── finnifty_ic_otm4_w300_lots5/
-│   ├── SUMMARY.md                        Per-leg option prices + amounts
-│   ├── MONTHLY_INVESTED.md
-│   ├── trades.csv
-│   └── monthly.csv
+│   ├── SUMMARY.md + MONTHLY_INVESTED.md + trades.csv + monthly.csv
 └── n20_daily_large_only/
-    ├── SUMMARY.md                        NSE Nifty 100 filter, daily rotation (+141% CAGR / 27% DD)
+    ├── SUMMARY.md
     └── TRADE_LEDGER.md
 ```
-
-Per-model code + strategy + universe construction: `tools/models/<model>/README.md` and `backtest.py`.

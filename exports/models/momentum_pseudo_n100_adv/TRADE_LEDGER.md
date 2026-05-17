@@ -2,7 +2,7 @@
 
 ₹10L → ₹9,221,004 (+822.10%) · CAGR +109.70% · 29 trades · Max DD 36.44% · WR 86.2%
 
-Data: Fyers (4yr re-pull 2026-05-17, cont_flag=1).
+Data: Fyers, 4yr re-pull, cont_flag=1.
 
 ## Returns by NSE cap segment
 

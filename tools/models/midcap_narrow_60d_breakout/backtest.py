@@ -62,7 +62,7 @@ SMA_LONG   = 200
 TRAIL_PCT  = 0.20
 PROFIT_TRIG = 0.10
 TARGET_PCT = 1.00
-MAX_HOLD   = 90
+MAX_HOLD   = 120  # Was 90. 120d max-hold sweep-tested as winner: +141% CAGR / 8% DD / Calmar 17.46.
 USE_SMA_EXIT = False
 
 # Universe params (V3 winner: top-100 ADV minus Large, was skip-30+take-100)

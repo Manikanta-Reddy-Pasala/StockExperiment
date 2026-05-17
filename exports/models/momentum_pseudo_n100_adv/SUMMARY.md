@@ -1,6 +1,6 @@
 # momentum_pseudo_n100_adv — SUMMARY
 
-**Pseudo-N100 (top-100 ADV from N500, MINUS NSE Smallcap 250). Monthly rotation, yearly-PIT, top-1 by 30d return.**
+**Pseudo-N100 (top-100 ADV from N500 MINUS NSE Smallcap 250). Monthly rotation, yearly-PIT.**
 
 ## Backtest window & trade frequency
 
@@ -12,7 +12,7 @@
 | Total trades | 29 |
 | Trades per year | ~9.7 |
 | Rebalance | Monthly |
-| Data source | **Fyers** (498/504 N500, 4-yr re-pull 2026-05-17, cont_flag=1) |
+| Data source | **Fyers** (498/504 N500, 4-yr re-pull, cont_flag=1) |
 
 ## Headline result
 
