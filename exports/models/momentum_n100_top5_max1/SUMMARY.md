@@ -12,38 +12,39 @@
 | Total trades | 30 |
 | Trades per year | ~10.0 |
 | Rebalance period | Monthly |
+| Data source | yfinance (full N500 re-pull 2026-05-17, split-adjusted) |
 
-## Headline result (CLEAN DATA, post yfinance restore)
+## Headline result (CLEAN DATA - full N500 yfinance re-pull)
 
 | Metric | Value |
 |---|---:|
-| Final NAV | **₹2,809,994** |
-| Total return | **+181.00%** |
-| **3-yr CAGR** | **+55.35%/yr** |
-| Max DD (NAV-based) | 48.99% |
-| Calmar | 1.13 |
+| Final NAV | **₹3,205,882** |
+| Total return | **+220.59%** |
+| **3-yr CAGR** | **+62.33%/yr** |
+| Max DD (NAV-based) | 42.82% |
+| Calmar | 1.46 |
 | Trades | 30 |
 | WR | 70.0% (21W / 9L) |
 
-## Change vs prior result (dirty data)
+## Data quality journey
 
-| Metric | Prior (dirty) | **Clean** | Δ |
-|---|---:|---:|---:|
-| CAGR | +80.38% | **+55.35%** | -25.03pp |
-| Max DD | 29.71% | **48.99%** | +19.28pp |
+| Stage | CAGR | DD | Notes |
+|---|---:|---:|---|
+| Original Fyers (dirty data) | +80.38% | 29.71% | Inflated by KOTAKBANK +400% fake jump etc. |
+| **Full N500 yfinance (this)** | **+62.33%** | **42.82%** | Clean, split-adjusted, honest |
 
-Prior result was inflated/distorted by data anomalies in KOTAKBANK, MCX, NUVAMA, VEDL (all jumped 4-5x on 2024-12-23 in raw Fyers data — incremental pull bug). Re-fetched 8 affected stocks via yfinance (split-adjusted) on 2026-05-17.
+Data fix: 504 N500 stocks re-pulled from yfinance with auto_adjust=True (handles splits/bonuses). 412,152 rows refreshed 2026-05-17. Only 11 anomalies remain (5 stocks: real demergers ABFRL/VEDL + yfinance Nov 2023 quirks for CGCL/GPIL/MOTILALOFS).
 
 ## Yearly money flow
 
 | Year | Open | Close | ROI | Trades |
 |---|---:|---:|---:|---:|
-| 2023-24 | ₹1,000,000 | ₹2,416,397 | **+141.64%** | 10 |
-| 2024-25 | ₹2,416,397 | ₹1,854,003 | **+-23.27%** | 10 |
-| 2025-26 | ₹1,854,003 | ₹2,809,994 | **+51.56%** | 10 |
+| 2023-24 | ₹1,000,000 | ₹2,437,605 | **+143.76%** | 10 |
+| 2024-25 | ₹2,437,605 | ₹2,098,470 | **+-13.91%** | 10 |
+| 2025-26 | ₹2,098,470 | ₹3,205,882 | **+52.77%** | 10 |
 
 ## Returns by NSE cap segment
 
 | Cap | Trades | Wins | Losses | WR | Total PnL ₹ |
 |---|---:|---:|---:|---:|---:|
-| **Large** | 30 | 21 | 9 | 70% | +1,809,993 |
+| **Large** | 30 | 21 | 9 | 70% | +2,205,881 |

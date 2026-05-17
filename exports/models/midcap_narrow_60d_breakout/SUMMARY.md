@@ -1,6 +1,6 @@
-# midcap_narrow_60d_breakout (V2: Mid+Small) — SUMMARY
+# midcap_narrow_60d_breakout (V2) — SUMMARY
 
-**Mid+Small cap breakout swing. Exclude Large from pseudo-midcap pool. V2 winner of cap-filter sweep.**
+**Mid+Small cap breakout swing. Exclude Large from pseudo-midcap pool.**
 
 ## Backtest window & trade frequency
 
@@ -8,43 +8,44 @@
 |---|---|
 | Backtest window | **2023-05-15 → 2026-05-12** (≈3.00 years) |
 | First entry | 2023-05-17 |
-| Last exit | 2026-03-11 |
-| Total trades | 11 |
-| Trades per year | ~3.7 |
+| Last exit | 2026-05-11 |
+| Total trades | 12 |
+| Trades per year | ~4.0 |
 | Rebalance period | Event-driven (daily breakout scan) |
+| Data source | yfinance (full N500 re-pull 2026-05-17, split-adjusted) |
 
-## Headline result (CLEAN DATA, post yfinance restore)
+## Headline result (CLEAN DATA - full N500 yfinance re-pull)
 
 | Metric | Value |
 |---|---:|
-| Final NAV | **₹3,252,696** |
-| Total return | **+225.27%** |
-| **3-yr CAGR** | **+48.17%/yr** |
-| Max DD (NAV-based) | 15.15% |
-| Calmar | 3.18 |
-| Trades | 11 |
-| WR | 63.6% (7W / 4L) |
+| Final NAV | **₹4,371,284** |
+| Total return | **+337.13%** |
+| **3-yr CAGR** | **+63.51%/yr** |
+| Max DD (NAV-based) | 32.01% |
+| Calmar | 1.98 |
+| Trades | 12 |
+| WR | 66.7% (8W / 4L) |
 
-## Change vs prior result (dirty data)
+## Data quality journey
 
-| Metric | Prior (dirty) | **Clean** | Δ |
-|---|---:|---:|---:|
-| CAGR | +86.63% | **+48.17%** | -38.46pp |
-| Max DD | 15.15% | **15.15%** | +0.00pp |
+| Stage | CAGR | DD | Notes |
+|---|---:|---:|---|
+| Original Fyers (dirty data) | +86.63% | 15.15% | Inflated by KOTAKBANK +400% fake jump etc. |
+| **Full N500 yfinance (this)** | **+63.51%** | **32.01%** | Clean, split-adjusted, honest |
 
-Prior result was inflated/distorted by data anomalies in KOTAKBANK, MCX, NUVAMA, VEDL (all jumped 4-5x on 2024-12-23 in raw Fyers data — incremental pull bug). Re-fetched 8 affected stocks via yfinance (split-adjusted) on 2026-05-17.
+Data fix: 504 N500 stocks re-pulled from yfinance with auto_adjust=True (handles splits/bonuses). 412,152 rows refreshed 2026-05-17. Only 11 anomalies remain (5 stocks: real demergers ABFRL/VEDL + yfinance Nov 2023 quirks for CGCL/GPIL/MOTILALOFS).
 
 ## Yearly money flow
 
 | Year | Open | Close | ROI | Trades |
 |---|---:|---:|---:|---:|
-| 2023-24 | ₹1,000,000 | ₹1,909,855 | **+90.99%** | 3 |
-| 2024-25 | ₹1,909,855 | ₹2,487,636 | **+30.25%** | 4 |
-| 2025-26 | ₹2,487,636 | ₹3,252,696 | **+30.75%** | 4 |
+| 2023-24 | ₹1,000,000 | ₹1,705,124 | **+70.51%** | 3 |
+| 2024-25 | ₹1,705,124 | ₹1,861,734 | **+9.18%** | 4 |
+| 2025-26 | ₹1,861,734 | ₹4,371,284 | **+134.80%** | 5 |
 
 ## Returns by NSE cap segment
 
 | Cap | Trades | Wins | Losses | WR | Total PnL ₹ |
 |---|---:|---:|---:|---:|---:|
-| **Mid** | 3 | 1 | 2 | 33% | +9,593 |
-| **Small** | 8 | 6 | 2 | 75% | +2,243,323 |
+| **Mid** | 6 | 4 | 2 | 67% | +1,452,057 |
+| **Small** | 6 | 4 | 2 | 67% | +1,919,466 |
