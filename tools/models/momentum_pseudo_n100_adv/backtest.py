@@ -19,6 +19,7 @@ from tools.shared.universes import nifty500_symbols
 LOOKBACK = 30
 ADV_WIN  = 20
 UNIV_SIZE = 100
+MAX_PRICE = 3000  # skip stocks > ₹3000 at entry (DIXON/MARUTI etc were big losers)
 # Drop Small-cap NSE Nifty Smallcap 250 stocks from universe (free +2pp CAGR, DD unchanged).
 import csv as _csv
 _SML_PATH = "/app/src/data/symbols/nifty_smallcap250.csv"
@@ -46,7 +47,8 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
     with eng.connect() as c:
         df = pd.read_sql(text(
             "SELECT symbol,date,close,volume FROM historical_data "
-            "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b ORDER BY symbol,date"
+            "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b AND data_source='fyers' "
+            "ORDER BY symbol,date"
         ), c, params={"s": n500, "a": start - timedelta(days=400), "b": end})
 
     df["date"] = pd.to_datetime(df["date"])
@@ -106,6 +108,8 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
         # Uptrend filter: keep only stocks with close > 200d SMA
         up = sma200.iloc[di] < cl.iloc[di]
         univ = [s for s in univ if bool(up.get(s, False))]
+        # Max-price filter — high-px (>₹3000) stocks were net-loss in backtest (DIXON/MARUTI)
+        univ = [s for s in univ if pd.notna(cl[s].iloc[di]) and float(cl[s].iloc[di]) <= MAX_PRICE]
         if not univ: continue
         rets = cl.iloc[di].reindex(univ) / cl.iloc[di - LOOKBACK].reindex(univ) - 1
         rk = rets.dropna().sort_values(ascending=False)

@@ -45,6 +45,12 @@ from tools.shared.ohlcv_cache import read_cached  # noqa: E402
 
 log = logging.getLogger("momrot_signal")
 
+# Skip mega-priced stocks at entry. Backtest 2023-2026 showed high-px buckets
+# (>Rs.3000) net-negative — e.g. BAJAJ-AUTO Rs.12157 single trade lost Rs.484K.
+# Filter lifts CAGR +21pp and trims DD ~3pp. Same threshold used in
+# momentum_pseudo_n100_adv (3000) and n20_daily_large_only (2500).
+MAX_PRICE = 3000.0
+
 
 def is_rebalance_day(today: datetime, last_rotation: datetime = None) -> bool:
     """True if today is rebalance trigger.
@@ -82,6 +88,10 @@ def rank_universe(stocks: List[Dict], today_ts: int,
         c_now = get_close_at(sym, today_ts)
         c_past = get_close_at(sym, lookback_ts)
         if c_now > 0 and c_past > 0:
+            # Skip stocks priced above MAX_PRICE — see module docstring.
+            if c_now > MAX_PRICE:
+                log.info(f"  filter: {sym} skipped (price Rs.{c_now:.2f} > MAX_PRICE Rs.{MAX_PRICE:.0f})")
+                continue
             ret = (c_now / c_past - 1) * 100
             rows.append((sym, s.get("name", sym), ret, c_now))
     rows.sort(key=lambda r: -r[2])

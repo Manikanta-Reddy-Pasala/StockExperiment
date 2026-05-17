@@ -1,57 +1,65 @@
 # momentum_n100_top5_max1 — SUMMARY
 
-**LIVE production. Monthly rotation on Real NSE Nifty 100, narrowed to top-20 most-liquid by ADV. Rank by 30d return, hold top-1.**
+**Real NSE Nifty 100 monthly momentum rotation (top-1 by 30d ret) + MAX_PRICE≤₹3,000 filter.**
 
 ## Backtest window & trade frequency
 
 | Metric | Value |
 |---|---|
-| Backtest window | **2023-05-15 → 2026-05-12** (≈3.00 years) |
+| Backtest window | **2023-05-15 → 2026-05-12** (~3.00 years) |
 | First entry | 2023-05-15 |
 | Last exit | 2026-05-04 |
-| Total trades | 28 |
-| Trades per year | ~9.3 |
+| Total trades | 29 |
+| Trades per year | ~9.7 |
 | Rebalance | Monthly (1st trading day) |
-| Data source | **Fyers** (498/504 N500 incl. all N100, cont_flag=1) |
+| Data source | **Fyers (split-adjusted cont_flag=1)** |
 
 ## Stock pick logic
 
-1. **Universe**: REAL NSE Nifty 100 (104 stocks, `src/data/symbols/nifty100.csv`)
-2. **Liquidity filter**: rank by 20-day ADV, keep top-20 most-liquid
-3. **Rank by 30-day return**, pick top-1
-4. **Rebalance monthly** (1st trading day)
+1. Universe: src/data/symbols/nifty100.csv (104 NSE Nifty 100 stocks)
+2. Filter at entry: close ≤ ₹3,000 (skips mega-priced losers BAJAJ-AUTO etc.)
+3. Rank by 30-day return, pick top-1
+4. Rebalance: 1st trading day of month
+5. Exit: rotation only — sell when not rank-1
 
 ## Headline result
 
 | Metric | Value |
 |---|---:|
-| Final NAV | **₹7,466,720** |
-| Total return | **+646.67%** |
-| **3-yr CAGR** | **+95.45%/yr** |
-| Max DD (cash NAV) | 20.17% |
-| Calmar | 4.73 |
-| Trades | 28 |
-| WR | 71.4% (20W / 8L) |
+| Final NAV | **₹6,305,316** |
+| Total return | **+530.53%** |
+| 3-yr CAGR | **+84.74%** |
+| Max DD (rebal cap_after) | **33.89%** |
+| Calmar (CAGR / Max DD) | **2.50** |
+| Trades | 29 |
+| Wins / Losses | 20 / 9 |
+| Win rate | 69.0% |
+| Live deployment | ✅ YES |
 
-## Yearly money flow
-
-| Year | Open | Close | ROI | Trades |
-|---|---:|---:|---:|---:|
-| 2023-24 | ₹1,000,000 | ₹2,336,509 | **+133.65%** | 10 |
-| 2024-25 | ₹2,336,509 | ₹3,693,698 | **+58.09%** | 9 |
-| 2025-26 | ₹3,693,698 | ₹7,466,720 | **+102.15%** | 9 |
-
-## Returns by NSE cap segment
+## NSE cap segment breakdown
 
 | Cap | Trades | Wins | Losses | WR | Total PnL ₹ |
 |---|---:|---:|---:|---:|---:|
-| **Large** | 28 | 20 | 8 | 71% | +6,466,719 |
+| **Large** | 29 | 20 | 9 | 69% | +5,305,314 |
 
-## Improvement vs prior baseline
+## Top 5 winners
 
-| Variant | CAGR | DD | Calmar |
-|---|---:|---:|---:|
-| Prior baseline (full N100, lb=30) | +64.17% | 37.30% | 1.72 |
-| **Current (top-20 ADV)** | **+95.45%** | **20.17%** | **4.73** |
+| Symbol | Entry → Exit | Entry ₹ | Ret % | PnL ₹ |
+|---|---|---:|---:|---:|
+| ADANIPOWER   | 2026-04-01 → 2026-05-04 | 157.11 | +44.68% | +1,947,071 |
+| SHRIRAMFIN   | 2025-11-03 → 2026-01-01 | 796.45 | +28.03% | +996,811 |
+| MAZDOCK      | 2025-04-01 → 2025-06-02 | 2,578.55 | +31.26% | +697,147 |
+| RECLTD       | 2023-11-01 → 2023-12-01 | 282.85 | +32.23% | +627,568 |
+| MAZDOCK      | 2023-07-03 → 2023-09-01 | 644.55 | +46.39% | +471,491 |
 
-Single change: narrow Nifty 100 (104 stocks) to top-20 most-liquid by 20d ADV. CAGR +32pp, DD -17pp, Calmar 2.8x.
+## Top 5 losses
+
+| Symbol | Entry → Exit | Entry ₹ | Ret % | PnL ₹ |
+|---|---|---:|---:|---:|
+| ENRIN        | 2026-03-02 → 2026-04-01 | 2,972.70 | -12.07% | -598,120 |
+| IRFC         | 2024-02-01 → 2024-03-01 | 169.90 | -13.24% | -384,525 |
+| BAJAJFINSV   | 2024-10-01 → 2024-11-01 | 1,975.25 | -11.17% | -340,088 |
+| HINDZINC     | 2024-11-01 → 2024-12-02 | 558.25 | -9.92% | -268,579 |
+| TATACONSUM   | 2025-02-01 → 2025-03-03 | 1,069.85 | -10.84% | -264,250 |
+
+Full trade-by-trade ledger: see [TRADE_LEDGER.md](TRADE_LEDGER.md).

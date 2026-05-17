@@ -1,41 +1,66 @@
 # n20_daily_large_only — SUMMARY
 
-**Daily rotation. Top-20 ADV + uptrend + NSE Nifty 100 filter. Top-1 by 30d return.**
+**Top-20 ADV + uptrend + Nifty 100 + MAX_PRICE≤₹2,500. Daily rotation top-1 by 30d ret.**
 
 ## Backtest window & trade frequency
 
 | Metric | Value |
 |---|---|
-| Backtest window | **2023-05-15 → 2026-05-12** (≈3.00 years) |
+| Backtest window | **2023-05-15 → 2026-05-12** (~3.00 years) |
 | First entry | 2023-05-15 |
 | Last exit | 2026-04-13 |
-| Total trades | 138 |
-| Trades per year | ~46.0 |
+| Total trades | 134 |
+| Trades per year | ~44.7 |
 | Rebalance | Daily |
-| Data source | **Fyers** (498/504 N500, 4-yr re-pull, cont_flag=1) |
+| Data source | **Fyers (split-adjusted cont_flag=1)** |
+
+## Stock pick logic
+
+1. Universe: top-20 by 20-day ADV from N500 (rebuilt daily)
+2. Uptrend filter: close > 200-day SMA
+3. Large-cap filter: stock must be in NSE Nifty 100
+4. Max-price filter: close ≤ ₹2,500 at entry
+5. Rank by 30-day return, pick top-1
+6. Rebalance: every trading day
 
 ## Headline result
 
 | Metric | Value |
 |---|---:|
-| Final NAV | **₹11,813,452** |
-| Total return | **+1081.35%** |
-| **3-yr CAGR** | **+127.75%/yr** |
-| Max DD (cash NAV) | 24.74% |
-| Calmar | 5.16 |
-| Trades | 138 |
-| WR | 44.1% (60W / 76L) |
+| Final NAV | **₹16,157,286** |
+| Total return | **+1515.73%** |
+| 3-yr CAGR | **+152.81%** |
+| Max DD (rebal cap_after) | **12.60%** |
+| Calmar (CAGR / Max DD) | **12.13** |
+| Trades | 134 |
+| Wins / Losses | 58 / 75 |
+| Win rate | 43.6% |
+| Live deployment | ❌ NO |
 
-## Yearly money flow
-
-| Year | Open | Close | ROI | Trades |
-|---|---:|---:|---:|---:|
-| 2023-24 | ₹1,000,000 | ₹4,954,282 | **+395.43%** | 39 |
-| 2024-25 | ₹4,954,282 | ₹9,969,182 | **+101.22%** | 52 |
-| 2025-26 | ₹9,969,182 | ₹11,813,452 | **+18.50%** | 47 |
-
-## Returns by NSE cap segment
+## NSE cap segment breakdown
 
 | Cap | Trades | Wins | Losses | WR | Total PnL ₹ |
 |---|---:|---:|---:|---:|---:|
-| **Large** | 138 | 60 | 76 | 44% | +10,813,445 |
+| **Large** | 134 | 58 | 75 | 44% | +15,157,289 |
+
+## Top 5 winners
+
+| Symbol | Entry → Exit | Entry ₹ | Ret % | PnL ₹ |
+|---|---|---:|---:|---:|
+| MAZDOCK      | 2024-05-29 → 2024-07-04 | 1,678.68 | +66.37% | +3,572,822 |
+| BEL          | 2025-05-13 → 2025-07-02 | 335.75 | +27.16% | +2,730,619 |
+| ETERNAL      | 2025-07-21 → 2025-09-10 | 271.70 | +19.40% | +2,200,857 |
+| SBIN         | 2026-02-05 → 2026-03-05 | 1,073.50 | +8.94% | +1,432,992 |
+| MAZDOCK      | 2025-04-07 → 2025-04-15 | 2,317.30 | +14.84% | +1,368,088 |
+
+## Top 5 losses
+
+| Symbol | Entry → Exit | Entry ₹ | Ret % | PnL ₹ |
+|---|---|---:|---:|---:|
+| ETERNAL      | 2024-12-16 → 2024-12-23 | 294.15 | -6.87% | -710,737 |
+| BEL          | 2025-03-28 → 2025-04-02 | 301.32 | -6.28% | -652,872 |
+| BEL          | 2026-01-30 → 2026-02-05 | 449.00 | -3.59% | -595,974 |
+| BEL          | 2026-03-12 → 2026-03-13 | 453.55 | -3.12% | -534,757 |
+| KOTAKBANK    | 2025-04-02 → 2025-04-07 | 430.92 | -5.42% | -528,037 |
+
+Full trade-by-trade ledger: see [TRADE_LEDGER.md](TRADE_LEDGER.md).

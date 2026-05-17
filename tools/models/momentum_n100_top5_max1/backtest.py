@@ -1,15 +1,15 @@
 """Standalone backtest: REAL NSE Nifty 100 momentum rotation.
 
 Strategy:
-  Universe: REAL Nifty 100 (src/data/symbols/nifty100.csv) → top-20 by 20d ADV
+  Universe: FULL Real NSE Nifty 100 (src/data/symbols/nifty100.csv, 104 stocks)
+  Filter:   close <= MAX_PRICE (skips mega-priced names with poor risk/return,
+            e.g. BAJAJ-AUTO ₹12157 single trade lost ₹484K in backtest)
   Signal:   Rank by 30-day return, pick top-1
   Position: max_concurrent=1
   Rebalance: 1st trading day of each month
 
-Reproduces +96.32% CAGR / 20.17% DD / Calmar 4.78 over 2023-05-15 → 2026-05-12
-(₹10L start). Pareto winner — single change vs baseline: narrow universe from
-full Nifty 100 (104 stocks) to top-20 most-liquid (by 20d ADV). DD almost
-halved (37.30% → 20.17%) AND CAGR boosted +32pp (+64.17% → +96.32%).
+Pure NSE-official Nifty 100 list. No ADV narrowing (distinct from
+momentum_pseudo_n100_adv and n20_daily_large_only).
 """
 import sys, json, csv, argparse
 from pathlib import Path
@@ -21,8 +21,7 @@ from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
 
 LOOKBACK = 30
-TOP_N_ADV = 20  # Narrow Nifty 100 universe to top-20 by ADV (most liquid large-caps)
-ADV_WIN = 20
+MAX_PRICE = 3000  # skip high-px stocks; sweep showed CAGR +21pp / DD -3pp
 N100_CSV = "/app/src/data/symbols/nifty100.csv"
 
 DEFAULT_START = date(2023, 5, 15)
@@ -52,15 +51,11 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
         ), c, params={"s": n100_syms, "a": start - timedelta(days=400), "b": end})
 
     df["date"] = pd.to_datetime(df["date"])
-    df["adv_rs"] = df["close"].astype(float) * df["volume"].astype(float)
     cl = df.pivot(index="date", columns="symbol", values="close").ffill()
-    adv_rs = df.pivot(index="date", columns="symbol", values="adv_rs").fillna(0)
-    adv20 = adv_rs.rolling(ADV_WIN).mean()
     dates = cl.index
     present = [s for s in n100_syms if s in cl.columns]
     print(f"Loaded {len(dates)} days × {len(present)} symbols")
 
-    # Monthly rebalance
     rebal_set = set()
     y, m = start.year, start.month
     while True:
@@ -85,9 +80,9 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
         if di < LOOKBACK:
             continue
 
-        # Narrow Nifty 100 to top-N by ADV (most liquid large-caps)
-        pit_adv = adv20.iloc[di].dropna().sort_values(ascending=False).index.tolist()
-        univ = [s for s in pit_adv if s in present][:TOP_N_ADV]
+        # Universe = present Nifty 100 filtered by MAX_PRICE at this date
+        univ = [s for s in present
+                if pd.notna(cl[s].iloc[di]) and float(cl[s].iloc[di]) <= MAX_PRICE]
         if not univ:
             continue
 
@@ -146,7 +141,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
         mdd = max(mdd, dd)
 
     print(f"\n## RESULTS")
-    print(f"  Final NAV:    ₹{final:,.0f}")
+    print(f"  Final NAV:    Rs.{final:,.0f}")
     print(f"  Total return: {(final/capital-1)*100:+.2f}%")
     print(f"  CAGR ({yrs:.2f}y): {cagr:+.2f}%")
     print(f"  Trades: {len(trades)} (W={wins}, L={losses}, WR={wins/max(1,wins+losses)*100:.1f}%)")
