@@ -130,27 +130,36 @@ def scan_entry_candidate(df: pd.DataFrame, symbols: List[str]) -> Optional[Dict]
     today = df["date"].max()
     cands = []
     near_miss = []
+    # Min history to compute any near-miss score: 60d HH window + buffer.
+    # Strict qualification still requires SMA_LONG; we just don't gate
+    # near-miss on it (midcap stocks often have <200d history yet).
+    MIN_NEAR_MISS_DAYS = HH_WINDOW + 5
     for sym, g in df.groupby("symbol"):
         g = g.sort_values("date").reset_index(drop=True)
-        if len(g) < SMA_LONG + 5:
+        if len(g) < MIN_NEAR_MISS_DAYS:
             continue
-        g["sma_long"] = g["close"].rolling(SMA_LONG).mean()
+        # Use shorter SMA if not enough history for SMA_LONG
+        sma_window = SMA_LONG if len(g) >= SMA_LONG else max(20, len(g) // 2)
+        g["sma_long"] = g["close"].rolling(sma_window).mean()
         g["hh"] = g["high"].rolling(HH_WINDOW).max().shift(1)
         g["vol_avg20"] = g["volume"].rolling(20).mean()
         row = g[g["date"] == today]
         if row.empty:
             continue
         r = row.iloc[0]
-        if any(pd.isna(r[k]) for k in ["sma_long", "hh", "vol_avg20", "close", "volume"]):
+        if any(pd.isna(r[k]) for k in ["hh", "vol_avg20", "close", "volume"]):
             continue
         close = float(r["close"])
         hh = float(r["hh"])
-        sma_long = float(r["sma_long"])
+        sma_long = float(r["sma_long"]) if pd.notna(r["sma_long"]) else 0.0
         vol_avg = float(r["vol_avg20"])
         vol_ratio = float(r["volume"]) / vol_avg if vol_avg > 0 else 0.0
         hh_ratio = close / hh if hh > 0 else 0.0  # >1 = above prior 60d high
-        sma_ratio = close / sma_long if sma_long > 0 else 0.0  # >1 = above SMA200
-        qualifies = (close > hh and close > sma_long and vol_ratio >= VOL_MULT)
+        sma_ratio = close / sma_long if sma_long > 0 else 0.0  # >1 = above SMA
+        # Strict qualification: needs full SMA_LONG AND all 3 filters
+        has_full_sma = len(g) >= SMA_LONG and pd.notna(r["sma_long"])
+        qualifies = (has_full_sma and close > hh
+                     and close > sma_long and vol_ratio >= VOL_MULT)
         info = {
             "symbol": sym,
             "close": close,
@@ -159,10 +168,11 @@ def scan_entry_candidate(df: pd.DataFrame, symbols: List[str]) -> Optional[Dict]
             "hh_ratio": hh_ratio,
             "sma_ratio": sma_ratio,
             "qualifies": qualifies,
+            "sma_window_used": sma_window,
         }
         if qualifies:
             cands.append(info)
-        # Near-miss score = how close the stock is to ALL 3 conditions firing.
+        # Near-miss score = how close to ALL 3 conditions firing.
         # Higher = closer to a breakout. Below-HH stocks get penalized.
         score = (hh_ratio - 1) * 50 + (sma_ratio - 1) * 20 + (vol_ratio - 1) * 10
         info["near_miss_score"] = score
