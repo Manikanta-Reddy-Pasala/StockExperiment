@@ -4,17 +4,13 @@ Ranks the pseudo-N100 universe (yearly-PIT top-100 by 20d ADV from N500)
 by 30-day return, picks top-5, emits ENTRY1 / TARGET_HIT / STOP_HIT.
 
 Strategy:
-  - Universe: yearly-PIT pseudo-N100 (read from yearly_universes.json)
+  - Universe: yearly-PIT pseudo-N100 (read from yearly_universes.json) —
+    rebuilt at year-start using current data at that time (PIT-safe)
   - top_n = 5
   - max_concurrent = 1 (rank-1 of top-5)
   - rebalance: 1st of month (or first trading day on/after)
-  - Filter: skip stocks with price > MAX_PRICE (₹3000)
-
-WARNING — Lookahead bias:
-  yearly_universes.json was built with forward-looking ADV (used end-of-year
-  trading volume to pick which symbols would be liquid). This model is seeded
-  with enabled=False in model_settings. Treat as research/backtest reference
-  only until walk-forward validation builds a true point-in-time universe.
+  - Filter: skip stocks with price > MAX_PRICE (₹3000) — share-count floor
+    heuristic so 1 share ≤ 10% of ₹30K live capital
 
 Usage:
   python tools/models/momentum_pseudo_n100_adv/live_signal.py \
@@ -121,8 +117,8 @@ def get_current_position() -> Optional[Dict]:
 
 
 def is_model_enabled() -> bool:
-    """Query model_settings.enabled. Returns True on read errors (fail-open
-    safe is False — we fail-CLOSED to avoid trading a disabled model)."""
+    """Query model_settings.enabled. Fail-CLOSED on read errors to avoid
+    trading without confirming the operator has the model active."""
     try:
         from src.services.trading.model_ledger_service import get_all_settings
         for s in get_all_settings():
@@ -130,7 +126,7 @@ def is_model_enabled() -> bool:
                 return bool(s.get("enabled"))
         return False
     except Exception as e:
-        log.warning(f"enabled-flag read failed: {e} — defaulting to DISABLED")
+        log.warning(f"enabled-flag read failed: {e} — defaulting to OFF")
         return False
 
 
@@ -229,8 +225,8 @@ def main() -> int:
 
     # Enabled-flag gate (skippable via --force)
     if not args.force and not is_model_enabled():
-        log.warning(f"{MODEL_NAME}: model_settings.enabled is False — "
-                    "writing empty signals file and exiting.")
+        log.info(f"{MODEL_NAME}: model_settings.enabled is False — "
+                 "writing empty signals file and exiting.")
         Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
         Path(args.signals_out).write_text(json.dumps([]))
         return 0

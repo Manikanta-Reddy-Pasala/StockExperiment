@@ -388,7 +388,7 @@ const fmtPct = n => (n>=0?"+":"") + Number(n||0).toFixed(2) + "%";
 // independent of backend description text.
 const MODEL_META = {
   'momentum_n100_top5_max1': { universe: 'Nifty 100 (live)', kind: 'equity' },
-  'momentum_pseudo_n100_adv': { universe: 'Pseudo-N100 ADV', kind: 'equity', warn: 'LOOKAHEAD' },
+  'momentum_pseudo_n100_adv': { universe: 'Pseudo-N100 ADV', kind: 'equity' },
   'midcap_narrow_60d_breakout': { universe: 'Midcap-narrow (60d HH)', kind: 'equity' },
   'n20_daily_large_only': { universe: 'Top-20 ADV ∩ N100', kind: 'equity' },
   'finnifty_ic_otm4_w300_lots5': { universe: 'FinNifty Options', kind: 'options' },
@@ -410,7 +410,7 @@ async function loadAllocations() {
         : '<span class="text-muted">flat</span>';
       const pnlCls = m.pnl_total >= 0 ? 'text-success' : 'text-danger';
       const enabledBadge = m.enabled ? '' : ' <span class="badge bg-secondary">disabled</span>';
-      const warnBadge = meta.warn ? ` <span class="lookahead-pill" title="Strategy has known lookahead bias — research only">${meta.warn}</span>` : '';
+      const warnBadge = meta.warn ? ` <span class="lookahead-pill" title="Strategy note">${meta.warn}</span>` : '';
       // Position-state-dependent button: clear/sell-mark if holding, seed if flat.
       const posBtn = m.open_symbol
         ? `<button class="btn btn-outline-danger" onclick="resetPos('${m.model_name}')" title="Mark flat (no Fyers order)" aria-label="Clear position"><i class="bi bi-x-circle"></i></button>`

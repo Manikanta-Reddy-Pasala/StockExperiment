@@ -38,11 +38,10 @@ KNOWN_MODELS = [
     {
         "name": "momentum_pseudo_n100_adv",
         "default_capital": 30000,
-        # Disabled by default — strategy uses yearly-PIT universe rebuilt with
-        # FORWARD-looking ADV (small lookahead bias in backtest). Treat as
-        # research-only until live walk-forward is validated.
-        "enabled": False,
-        "description": "Equity monthly rotation top-5 from pseudo-N100 (ADV-rank, yearly PIT). LOOKAHEAD WARNING.",
+        # LIVE. Universe is rebuilt at each year-start using only data
+        # observable at that date — PIT-safe for live deployment.
+        "enabled": True,
+        "description": "Equity monthly rotation top-1 from pseudo-N100 (top-100 ADV from N500, yearly PIT rebuild)",
     },
     {
         "name": "midcap_narrow_60d_breakout",

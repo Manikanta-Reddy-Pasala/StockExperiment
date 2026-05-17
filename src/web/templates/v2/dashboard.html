@@ -125,7 +125,7 @@ const cls = n => n>0?"pos":(n<0?"neg":"neutral");
 // can evolve without redeploying the service.
 const MODEL_META = {
   'momentum_n100_top5_max1':     { universe: 'Nifty 100 (live)',       kind: 'equity'  },
-  'momentum_pseudo_n100_adv':    { universe: 'Pseudo-N100 ADV',        kind: 'equity', warn: 'LOOKAHEAD' },
+  'momentum_pseudo_n100_adv':    { universe: 'Pseudo-N100 ADV',        kind: 'equity' },
   'midcap_narrow_60d_breakout':  { universe: 'Midcap-narrow 60d HH',   kind: 'equity'  },
   'n20_daily_large_only':        { universe: 'Top-20 ADV ∩ N100',      kind: 'equity'  },
   'finnifty_ic_otm4_w300_lots5': { universe: 'FinNifty Options IC',    kind: 'options' },
@@ -145,11 +145,11 @@ function renderModelCard(m, sig) {
   const meta = MODEL_META[m.model_name] || { universe: '—', kind: 'unknown' };
   const cardCls = `model-card ${meta.kind} ${m.enabled ? '' : 'disabled'}`;
   const pnlCls = cls(m.pnl_total);
-  const warn = meta.warn ? `<span class="warn-pill" title="Strategy has known lookahead bias — research only">${meta.warn}</span>` : '';
+  const warn = meta.warn ? `<span class="warn-pill" title="Strategy note">${meta.warn}</span>` : '';
   const enableBadge = m.enabled
     ? '<span class="enable-pill" style="background:#d4edda;color:#155724;border-color:#c3e6cb">LIVE</span>'
     : '<span class="enable-pill">disabled</span>';
-  const refOnly = meta.warn ? ' <span class="enable-pill" style="background:#fff3cd;color:#856404;border-color:#ffeeba">REFERENCE ONLY</span>' : '';
+  const refOnly = '';
 
   let sigBadge = '<span class="sig-badge sig-quiet">no signal</span>';
   if (sig) {

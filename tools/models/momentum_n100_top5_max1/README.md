@@ -1,8 +1,8 @@
 # momentum_n100_top5_max1
 
-**Category: LARGE-CAP equity (real NSE Nifty 100 constituents)**
+**Category: LARGE-CAP equity (real NSE Nifty 100 constituents) — LIVE**
 
-Monthly momentum rotation on **REAL NIFTY 100** (NSE constituents). **Production model** — backtest universe matches live universe (no methodology drift). No price filter — pure ranking on NSE-official list.
+Monthly momentum rotation on **REAL NIFTY 100** (NSE constituents). Backtest universe matches live universe (no methodology drift). No price filter — pure ranking on NSE-official list. Sibling model `momentum_pseudo_n100_adv` is also LIVE and uses an ADV-ranked top-100 from N500 with yearly-PIT rebuild (PIT-safe).
 
 ## Stock universe
 

@@ -338,7 +338,7 @@ def run_scheduler():
     logger.info("=" * 80)
     logger.info("Registered models (trading-side):")
     logger.info("  - momentum_n100_top5_max1:    signal 09:25 + execute 09:30 (LIVE_TRADING gated)")
-    logger.info("  - momentum_pseudo_n100_adv:   signal 09:25 + execute 09:30 (enabled=False default)")
+    logger.info("  - momentum_pseudo_n100_adv:   signal 09:25 + execute 09:30 (monthly rebal)")
     logger.info("  - midcap_narrow_60d_breakout: signal 09:25 + execute 09:32 + EOD signal 15:25")
     logger.info("  - n20_daily_large_only:       signal 09:25 + execute 09:30 (daily rotation)")
     logger.info("  - finnifty_ic_otm4_w300_lots5: signal 09:25 + 14:30 (Monday entry / daily stop)")

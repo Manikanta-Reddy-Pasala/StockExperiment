@@ -6,29 +6,29 @@
 
 | # | Folder | Category | Universe | CAGR (3yr) | Max DD | LIVE |
 |--:|---|---|---|---:|---:|:-:|
-| 1 | `momentum_n100_top5_max1` | Large-cap equity | Real NSE Nifty 100 | **+64.17%** | 37.30% | ✅ |
-| 2 | `momentum_pseudo_n100_adv` | Large/mid blend | Top-100 ADV from N500 MINUS Small | **+109.70%** | 36.44% | ❌ |
-| 3 | `midcap_narrow_60d_breakout` | Mid+small equity | Top-100 ADV from N500 MINUS Large | **+97.59%** | 22.82% | ❌ |
+| 1 | `momentum_n100_top5_max1` | Large-cap equity | Real NSE Nifty 100 | **+65.10%** | 37.30% | ✅ |
+| 2 | `momentum_pseudo_n100_adv` | Large/mid blend | Top-100 ADV from N500 MINUS Small | **+149.15%** | 16.17% | ✅ |
+| 3 | `midcap_narrow_60d_breakout` | Mid+small equity | Top-100 ADV from N500 MINUS Large | **+137.85%** | 8.12% | ✅ |
 | 4 | `finnifty_ic_otm4_w300_lots5` | Options | FINNIFTY 4-strike Iron Condor chain | **+123%** compound | 13.88% | ❌ |
-| 5 | `n20_daily_large_only` | Top-20 ADV + Nifty 100 | Top-20 ADV + uptrend + NSE Nifty 100 | **+127.75%** | **24.74%** | ❌ |
+| 5 | `n20_daily_large_only` | Top-20 ADV + Nifty 100 | Top-20 ADV + uptrend + NSE Nifty 100 | **+139.55%** | 25.66% | ✅ |
 
 ⚠️ Midcap result heavily influenced by single ANGELONE trade (likely corporate-action data anomaly). See model README for details.
 
 ## How universes are constructed (per model)
 
-### 1. momentum_n100_top5_max1 — REAL Nifty 100 (LIVE PRODUCTION)
+### 1. momentum_n100_top5_max1 — REAL Nifty 100 (LIVE)
 - Source: `https://nsearchives.nseindia.com/content/indices/ind_nifty100list.csv`
 - Refresh: `python tools/refresh_nifty100.py` after each NSE Mar/Sep rebalance
 - Cached: `src/data/symbols/nifty100.csv` (104 stocks)
 - Selection: all 104 → rank by 30-day return → pick top-1 monthly
 - **No filter**: NSE already curates the constituents (free-float market cap leaders)
 
-### 2. momentum_pseudo_n100_adv — Pseudo-N100 by ADV
+### 2. momentum_pseudo_n100_adv — Pseudo-N100 by ADV (LIVE)
 - Source: `src/data/symbols/nifty500.csv` (NSE 500)
 - Compute 20-day ADV = avg(close × volume) per stock
 - Sort descending → take top 100 = pseudo-N100
-- Rebuilt at each year-start (yearly-PIT lookahead approximation)
-- Differs from real N100 by 47 stocks: BSE, MAZDOCK, NETWEB, COCHINSHIP, GRSE, IRFC, IDEA, ITI, NBCC, PAYTM, COFORGE, DIXON, COHANCE, HFCL, GROWW etc. (retail-volume mid-caps)
+- Rebuilt at each year-start using current data at that time (PIT-safe)
+- Differs from real N100 by 47 stocks: BSE, MAZDOCK, NETWEB, COCHINSHIP, GRSE, IRFC, IDEA, ITI, NBCC, PAYTM, COFORGE, DIXON, COHANCE, HFCL, GROWW etc. (retail-volume mid-caps captured by ADV but excluded from NSE free-float ranking)
 
 ### 3. midcap_narrow_60d_breakout — Pseudo-midcap by ADV
 - Source: `src/data/symbols/nifty500.csv`

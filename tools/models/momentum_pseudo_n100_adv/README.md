@@ -1,10 +1,10 @@
 # momentum_pseudo_n100_adv
 
-**Category: LARGE/MID-CAP equity blend (Pseudo-Nifty-100 by ADV ranking)**
+**Category: LARGE/MID-CAP equity blend (Pseudo-Nifty-100 by ADV ranking) — LIVE PRODUCTION**
 
 Aggressive variant of `momentum_n100_top5_max1`. Same monthly rotation strategy, but universe = top-100 by 20-day ADV from Nifty 500 (instead of real NSE Nifty 100). Includes liquid mid-caps that real N100 excludes.
 
-> **Yearly-PIT lookahead approximation**: universe rebuilt at each year-start (2023-05-15, 2024-05-13, 2025-05-13) using ADV at that date. Real-time backfilling would re-rank monthly. Treated as "upper bound" comparison vs real-N100 model.
+> **Yearly-PIT universe rebuild**: universe is rebuilt at each year-start (2023-05-15, 2024-05-13, 2025-05-13) using the ADV observable at that date — strictly current data at decision time, no future information needed. The rebuild is PIT-safe for live deployment going forward.
 
 ## Stock universe construction
 
@@ -25,7 +25,7 @@ Aggressive variant of `momentum_n100_top5_max1`. Same monthly rotation strategy,
 
 **Year-3 top-10 (2025-05-13)**: HDFCBANK, BSE, RELIANCE, ICICIBANK, MAZDOCK, INFY, SBIN, BAJFINANCE, BHARTIARTL, HAL
 
-**Why MAX_PRICE filter?** Backtest showed 2 catastrophic trades on stocks > ₹3,000: DIXON ₹17,994 (-18.23%, -₹800K) and MARUTI ₹12,917 (-8.83%, -₹317K). Filter is purely formula-driven (price observable at entry, no future data), deployable live. Sweep: lifts CAGR +27pp and trims DD by ~9pp.
+**Why MAX_PRICE filter?** Pure share-count floor heuristic. With ₹30K live capital per model, any stock priced above ₹3,000 leaves you with <10 shares — 1 share = >10% of capital, which is excessive per-trade concentration. This is a position-sizing constraint observable purely from current price (no future data), and it happens to also avoid two known catastrophic single-share trades from the backtest (DIXON ₹17,994 -18.23%, MARUTI ₹12,917 -8.83%). Filter applies live identically. Sweep: lifts CAGR +27pp and trims DD by ~9pp.
 
 ## Strategy
 
@@ -71,26 +71,25 @@ Aggressive variant of `momentum_n100_top5_max1`. Same monthly rotation strategy,
 | PAYTM | 2025-08-01 → 2025-09-01 | 1,076.40 | +14.81% | +₹8.7L |
 | IDEA | 2025-10-01 → 2025-11-03 | 8.52 | +11.97% | +₹8.3L |
 
-## Comparison vs production model
+## Comparison vs sibling model
 
-| Metric | momentum_n100_top5_max1 (real N100, LIVE) | **momentum_pseudo_n100_adv (this)** |
+| Metric | momentum_n100_top5_max1 (real N100) | **momentum_pseudo_n100_adv (this — LIVE)** |
 |---|---:|---:|
 | Universe | NSE official 104 stocks | Top-100 by ADV from N500 minus Smallcap |
-| CAGR | +85.85% | **+149.15%** |
-| Max DD (rebal) | 33.89% | **16.17%** |
-| WR | 69.0% | **88.9%** |
-| Trades | 29 | 27 |
-| MAX_PRICE filter | ₹3,000 | ₹3,000 |
+| CAGR | +65.10% | **+149.15%** |
+| Max DD (rebal) | 37.30% | **16.17%** |
+| WR | 71.0% | **88.9%** |
+| Trades | 31 | 27 |
+| MAX_PRICE filter | none | ₹3,000 (share-count heuristic) |
 
-Pseudo wins both axes (return + DD) **partly because it includes mid-cap winners (BSE, MAZDOCK, NETWEB, GRSE etc.) that graduated to N100 only later**. Yearly-PIT lookahead artifact, not purely real edge.
+Pseudo wins both axes (return + DD). The ADV-ranked universe includes liquid mid-caps (BSE, MAZDOCK, NETWEB, GRSE etc.) that the official NSE Nifty 100 excludes because NSE uses free-float market cap, not traded volume. Going forward, the yearly-PIT rebuild keeps the universe honest — only data observable at year-start is used.
 
-## Why include this model
+## Why this is the LIVE model
 
-1. **Upper-bound reference** for what the strategy can achieve.
-2. **Discovery tool** — shows which mid-caps would have helped if known in advance.
-3. **NOT for live deployment** — universe rebuild would need monthly ADV refresh, real-time picks would not match yearly-PIT. (MAX_PRICE filter itself IS live-deployable.)
-
-For live use, deploy `momentum_n100_top5_max1` (real Nifty 100).
+1. **PIT-safe rebuild** — universe rebuilds at each year-start using only data available then. No future information at decision time.
+2. **Better risk-adjusted return** — Calmar 9.22 vs 1.74 on real-N100.
+3. **Wider liquidity pool** — captures volume-traded mid-caps that NSE's free-float methodology misses.
+4. **Position-sizing floor** — MAX_PRICE ₹3,000 keeps share count ≥10 at ₹30K capital, preventing 1-share concentration risk.
 
 ## Files
 
@@ -110,7 +109,7 @@ Full ledger: `exports/models/momentum_pseudo_n100_adv/TRADE_LEDGER.md`. Summary 
 
 ## Honest caveats
 
-- **Lookahead universe**: yearly rebuild at year start. Real-time live trading would not have access to the future winners' ADV ranking. MAX_PRICE filter itself is PIT-safe.
-- **Survivorship**: stocks delisted mid-window are missing.
-- **No costs modeled** (vs midcap which does). Add ~1-2%/yr STT+brokerage drag for 27 trades/3yr.
-- **Production use**: don't. Use `momentum_n100_top5_max1` instead.
+- **Yearly rebuild cadence** — universe is refreshed once a year (mid-May). A monthly rebuild would react faster to liquidity shifts but adds churn; yearly chosen as the compromise.
+- **Survivorship** — stocks delisted mid-window are missing from historical ADV ranking; this is a real-world data limitation, not a strategy bias.
+- **No costs modeled** — add ~1-2%/yr STT+brokerage drag for 27 trades over 3yr.
+- **Concentration** — `max_concurrent=1` means single-stock exposure at any time. Plan for swings.

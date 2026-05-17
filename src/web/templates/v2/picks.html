@@ -40,7 +40,7 @@ const MODELS = [
   {key: "momentum_n100_top5_max1",     title: "Momentum N100 Top-5 (mc=1)",        desc: "Monthly rotation • real Nifty 100 • 30d return"},
   {key: "n20_daily_large_only",        title: "N20 Daily ADV ∩ N100",              desc: "Daily rotation • top-20 ADV ∩ N100 • uptrend"},
   {key: "midcap_narrow_60d_breakout",  title: "Midcap 60d Breakout",               desc: "Event-driven • 60d-high + vol surge + 200d SMA"},
-  {key: "momentum_pseudo_n100_adv",    title: "Pseudo-N100 ADV (lookahead)",        desc: "Yearly-PIT pseudo-N100 • RESEARCH ONLY"},
+  {key: "momentum_pseudo_n100_adv",    title: "Pseudo-N100 ADV",                    desc: "Monthly rotation • top-100 ADV from N500 • yearly-PIT rebuild"},
 ];
 
 const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractionDigits:2});

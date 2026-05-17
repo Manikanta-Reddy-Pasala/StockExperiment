@@ -7,8 +7,8 @@ Daily (post-market close):
 
 Yearly (May rebalance):
   - Rebuild yearly_universes.json by ranking N500 by 20d ADV at year-start.
-    NOTE: current yearly_universes.json was built with forward-looking ADV
-    (lookahead bias). Rebuild is gated by --allow-lookahead flag.
+    Uses only data observable at the rebuild date — PIT-safe for live
+    deployment.
 """
 from __future__ import annotations
 

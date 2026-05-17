@@ -1198,7 +1198,7 @@ MODEL_PATHS = {
             "tools/models/momentum_pseudo_n100_adv/yearly_universes.json",
             "--top-n", "5",
         ],
-        "label": "Pseudo-N100 monthly rotation top-5 (DISABLED — lookahead)",
+        "label": "Pseudo-N100 monthly rotation top-5 (mc=1)",
         "universe_path":
             "tools/models/momentum_pseudo_n100_adv/yearly_universes.json",
     },

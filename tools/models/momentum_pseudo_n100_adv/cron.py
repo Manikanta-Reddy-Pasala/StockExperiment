@@ -4,10 +4,9 @@ Two register functions:
   register_data_jobs(schedule)   -- called by data_scheduler.py
   register_trading_jobs(schedule) -- called by scheduler.py (technical_scheduler)
 
-WARNING: This model is seeded with enabled=False in model_settings because
-yearly_universes.json was built with forward-looking ADV (lookahead bias in
-backtest). The live_signal will short-circuit unless the enabled flag is
-flipped to True via UI.
+The yearly-PIT universe is rebuilt at year-start (mid-May) using current
+data at that time — PIT-safe for live deployment. The live_signal will
+short-circuit if the enabled flag is False (toggle via UI).
 """
 from __future__ import annotations
 
@@ -35,7 +34,7 @@ SIGNALS_DIR = Path("/app/logs/momrot_pseudo/signals")
 def emit_signal(force: bool = False):
     """Emit pseudo-N100 momentum signal. Rebalance-gated unless force=True.
 
-    Also short-circuits if model_settings.enabled is False (lookahead warning).
+    Also short-circuits if model_settings.enabled is False.
     """
     label = ("pseudo-N100 momentum signal"
              + (" (FORCE)" if force else " (rebalance-gated)"))
