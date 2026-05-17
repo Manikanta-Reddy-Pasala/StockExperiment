@@ -1,6 +1,6 @@
-# n20_daily_v2_large_only — SUMMARY
+# n20_daily_large_only — SUMMARY
 
-**Daily rotation. Top-20 ADV + uptrend + NSE Nifty 100 filter.**
+**Daily rotation. Top-20 ADV + uptrend filter + NSE Nifty 100 filter. Top-1 by 30d return.**
 
 ## Backtest window & trade frequency
 
@@ -12,17 +12,17 @@
 | Total trades | 138 |
 | Trades per year | ~46.0 |
 | Rebalance | Daily |
-| Data source | **Fyers** (498/504 N500, 4-year re-pull 2026-05-17, cont_flag=1) |
+| Data source | **Fyers** (498/504 N500, 4-yr re-pull 2026-05-17, cont_flag=1) |
 
-## Headline (Fyers production data)
+## Headline result
 
 | Metric | Value |
 |---|---:|
 | Final NAV | **₹11,813,452** |
 | Total return | **+1081.35%** |
-| **3-yr CAGR** | **+139.02%/yr** |
-| Max DD (NAV) | 25.66% |
-| Calmar | 5.42 |
+| **3-yr CAGR** | **+127.75%/yr** |
+| Max DD (cash NAV) | 24.74% |
+| Calmar | 5.16 |
 | Trades | 138 |
 | WR | 44.1% (60W / 76L) |
 

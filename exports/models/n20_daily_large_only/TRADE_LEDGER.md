@@ -1,8 +1,8 @@
-# n20_daily_v2_large_only — Trade Ledger
+# n20_daily_large_only — Trade Ledger
 
-₹10L → ₹11,813,452 · CAGR +139.02% · 138 trades · Max DD 25.66%
+₹10L → ₹11,813,452 (+1081.35%) · CAGR +127.75% · 138 trades · Max DD 24.74% · WR 44.1%
 
-Data: Fyers 498/504 N500 stocks, 4yr re-pull 2026-05-17, cont_flag=1.
+Data: Fyers (4yr re-pull 2026-05-17, cont_flag=1).
 
 ## Returns by NSE cap segment
 

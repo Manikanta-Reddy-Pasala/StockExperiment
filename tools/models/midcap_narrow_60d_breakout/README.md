@@ -1,28 +1,28 @@
-# midcap_narrow_60d_breakout (V2)
+# midcap_narrow_60d_breakout
 
-**Indian mid/small-cap breakout swing strategy.** V2 winner config — Exclude Large-caps + Exclude ANGELONE + 40d breakout + 90d max-hold + no SMA20 exit.
+**Indian mid/small-cap breakout swing strategy.** winner config — Exclude Large-caps + Exclude ANGELONE + 40d breakout + 90d max-hold + no SMA20 exit.
 
 ## Stock category: MID + SMALL CAP
 
-Targets mid + small-cap NSE stocks (rank 31-130 by 20-day ADV, minus Large-caps). V1 baseline (all caps in pseudo-midcap) archived at `tools/models/_archived_models/midcap_narrow_60d_breakout_v1/`.
+Targets mid + small-cap NSE stocks (rank 31-130 by 20-day ADV, minus Large-caps). baseline (all caps in pseudo-midcap) archived at `tools/models/_archived_models/midcap_narrow_60d_breakout_v1/`.
 
-## Universe construction (V2)
+## Universe construction
 
 1. Take all Nifty 500 stocks (`src/data/symbols/nifty500.csv`)
 2. Compute 20-day **average daily ₹ value traded** per stock
 3. Sort descending by ADV
 4. **Skip top-30** (already covered by `momentum_n100_top5_max1`)
 5. **Take next 100** = "pseudo-midcap" pool (~ADV-rank 31-130)
-6. **NEW V2 — Exclude Large-caps**: drop stocks in NSE Nifty 100 (`src/data/symbols/nifty100.csv`)
+6. **NEW — Exclude Large-caps**: drop stocks in NSE Nifty 100 (`src/data/symbols/nifty100.csv`)
 7. **Data fix for ANGELONE** applied at load time (NOT excluded): prices in window 2024-12-23 → 2026-02-25 divided by 10 to fix reverse-split-adjustment inconsistency. With clean data, ANGELONE is fully eligible — it just doesn't qualify for breakout entries naturally.
 
 End-2026 universe first 10: SUZLON, SHRIRAMFIN (no wait — Large), … (Large-cap names filtered out by V2)
 
 **Why excluding Large works**: pseudo-midcap pool accidentally catches Large-caps at ADV ranks 31-130 (JIOFIN, ADANIPORTS, SHRIRAMFIN, ITC). Those compete with cleaner mid/small breakouts for capital. Dropping them preserves wins + adds capital headroom for next breakout. Strategy compounds faster.
 
-## Strategy — V2 winner config
+## Strategy — winner config
 
-| Knob | Value | vs V1 |
+| Knob | Value | vs |
 |---|---|---|
 | Universe pool | Pseudo-midcap (skip top-30 ADV, next 100) | same |
 | **Cap filter (NEW)** | **Exclude Nifty 100 (Large)** | NEW |
@@ -54,21 +54,21 @@ End-2026 universe first 10: SUZLON, SHRIRAMFIN (no wait — Large), … (Large-c
 
 | Variant | CAGR | DD | Calmar | NAV |
 |---|---:|---:|---:|---:|
-| **V2 Exclude Large (this)** | **+86.63%** | **15.15%** | **5.72** | ₹65L |
-| V1 Exclude Small (Large+Mid) | +78.26% | 15.49% | 5.05 | ₹57L |
-| V0 Baseline (all caps) ARCHIVED | +68.60% | 17.83% | 3.85 | ₹48L |
-| V4 Large only | +59.26% | 28.67% | 2.07 | ₹40L |
-| V3 Mid only | +38.71% | 20.01% | 1.93 | ₹27L |
-| V5 Small only | +9.99% | 48.08% | 0.21 | ₹13L |
+| **Exclude Large (this)** | **+86.63%** | **15.15%** | **5.72** | ₹65L |
+| Exclude Small (Large+Mid) | +78.26% | 15.49% | 5.05 | ₹57L |
+| Baseline (all caps) ARCHIVED | +68.60% | 17.83% | 3.85 | ₹48L |
+| Large only | +59.26% | 28.67% | 2.07 | ₹40L |
+| Mid only | +38.71% | 20.01% | 1.93 | ₹27L |
+| Small only | +9.99% | 48.08% | 0.21 | ₹13L |
 
-V2 wins on ALL three metrics (CAGR, DD, Calmar).
+wins on ALL three metrics (CAGR, DD, Calmar).
 
 ## Files
 
 | File | Purpose |
 |---|---|
-| `backtest.py` | V2 standalone reproducer (40d/100%/20%/no-SMA/90d + cap filter) |
-| `build_universe.py` | Pseudo-midcap universe builder (will need V2 cap filter applied at use time) |
+| `backtest.py` | standalone reproducer (40d/100%/20%/no-SMA/90d + cap filter) |
+| `build_universe.py` | Pseudo-midcap universe builder (will need cap filter applied at use time) |
 | `live_signal.py` | Daily breakout signal emitter (not deployed) |
 | `data_pull.py` / `cron.py` | Scheduler registration (not wired) |
 | `trade_ledger.json` | 12 trades + summary |
@@ -83,7 +83,7 @@ Outputs final NAV, CAGR, DD, trade ledger.
 
 ## Historical note
 
-V1 baseline (all caps, no cap filter): +68.60% CAGR, ₹47.92L. Archived at `tools/models/_archived_models/midcap_narrow_60d_breakout_v1/README.md`.
+baseline (all caps, no cap filter): +68.60% CAGR, ₹47.92L. Archived at `tools/models/_archived_models/midcap_narrow_60d_breakout_v1/README.md`.
 
 V1-with-ANGELONE (full lookahead): +337.62% CAGR / ₹8.38 Cr but inflated by single ANGELONE trade that's likely a corp-action data anomaly.
 

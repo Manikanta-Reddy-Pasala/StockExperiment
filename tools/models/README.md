@@ -6,11 +6,11 @@
 
 | # | Folder | Category | Universe | CAGR (3yr) | Max DD | LIVE |
 |--:|---|---|---|---:|---:|:-:|
-| 1 | `momentum_n100_top5_max1` | Large-cap equity | **REAL NSE Nifty 100** (NSE CSV, 104 stocks) | **+80.38%** | 29.71% | ✅ |
-| 2 | `momentum_pseudo_n100_adv` | Large/mid blend equity | Pseudo-N100 (top-100 by 20-day ADV from N500) | **+136.39%** | 16.15% | ❌ |
-| 3 | `midcap_narrow_60d_breakout` | Mid-cap equity | Pseudo-midcap (N500 skip-30 ADV, take next 100) | **+337.62%** ⚠️ | 6.76% | ❌ |
+| 1 | `momentum_n100_top5_max1` | Large-cap equity | Real NSE Nifty 100 | **+64.17%** | 37.30% | ✅ |
+| 2 | `momentum_pseudo_n100_adv` | Large/mid blend | Top-100 ADV from N500 MINUS Small | **+109.70%** | 36.44% | ❌ |
+| 3 | `midcap_narrow_60d_breakout` | Mid+small equity | Top-100 ADV from N500 MINUS Large | **+97.59%** | 22.82% | ❌ |
 | 4 | `finnifty_ic_otm4_w300_lots5` | Options | FINNIFTY 4-strike Iron Condor chain | **+123%** compound | 13.88% | ❌ |
-| 5 | `n20_daily_v2_large_only` | Top-20 ADV + Large-cap daily | Top-20 ADV + uptrend + NSE Nifty 100 filter | **+140.78%** | **26.92%** | ❌ |
+| 5 | `n20_daily_large_only` | Top-20 ADV + Nifty 100 | Top-20 ADV + uptrend + NSE Nifty 100 | **+127.75%** | **24.74%** | ❌ |
 
 ⚠️ Midcap result heavily influenced by single ANGELONE trade (likely corporate-action data anomaly). See model README for details.
 
@@ -105,7 +105,7 @@ exports/models/<name>/
 | `momentum_pseudo_n100_adv` | — | ✅ | — | — | derived (ADV rank from N500) |
 | `midcap_narrow_60d_breakout` | — | ✅ | — | — | derived (N500 skip-30 take-100 ADV) |
 | `finnifty_ic_otm4_w300_lots5` | — | — | ✅ FINNIFTY | ✅ FINNIFTY OPTIDX | — |
-| `n20_daily_v2_large_only` | — | ✅ | — | — | NSE Nifty 100 (quarterly refresh) |
+| `n20_daily_large_only` | — | ✅ | — | — | NSE Nifty 100 (quarterly refresh) |
 
 ## Saga pipeline (data_scheduler 21:00 IST daily, admin trigger button)
 

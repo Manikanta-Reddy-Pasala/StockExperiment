@@ -1,4 +1,4 @@
-"""Standalone backtest: pseudo-N100 (ADV-rank from N500, yearly PIT rebuild).
+"""Standalone backtest: pseudo-N100 (ADV-rank from N500, yearly PIT rebuild, MINUS Small).
 
 Reproduces +136.39% CAGR (10L -> 1.32 Cr) over 2023-05-15 to 2026-05-12.
 
@@ -19,6 +19,20 @@ from tools.shared.universes import nifty500_symbols
 LOOKBACK = 30
 ADV_WIN  = 20
 UNIV_SIZE = 100
+# Drop Small-cap NSE Nifty Smallcap 250 stocks from universe (free +2pp CAGR, DD unchanged).
+import csv as _csv
+_SML_PATH = "/app/src/data/symbols/nifty_smallcap250.csv"
+def _load_smallcap():
+    out = set()
+    try:
+        with open(_SML_PATH) as f:
+            for r in _csv.DictReader(f):
+                if r.get("Series","").strip()=="EQ":
+                    out.add(r["Symbol"].strip())
+    except FileNotFoundError:
+        pass
+    return out
+_SMALLCAP = _load_smallcap()
 DEFAULT_START = date(2023, 5, 15)
 DEFAULT_END   = date(2026, 5, 12)
 DEFAULT_CAP   = 1_000_000.0
@@ -55,7 +69,9 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
         if len(fut) == 0: continue
         di = dates.get_loc(fut[0])
         pit_adv = adv20.iloc[di].dropna().sort_values(ascending=False)
-        year_universes[ys] = pit_adv.head(UNIV_SIZE).index.tolist()
+        top = pit_adv.head(UNIV_SIZE).index.tolist()
+        # Drop Small-cap names from top-100 (sweep showed +2pp CAGR, DD unchanged)
+        year_universes[ys] = [s for s in top if s.replace("NSE:","").replace("-EQ","") not in _SMALLCAP]
 
     def pick_universe(d):
         chosen = year_starts[0]

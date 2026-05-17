@@ -12,17 +12,17 @@
 | Total trades | 31 |
 | Trades per year | ~10.3 |
 | Rebalance | Monthly |
-| Data source | **Fyers** (498/504 N500, 4-year re-pull 2026-05-17, cont_flag=1) |
+| Data source | **Fyers** (498/504 N500, 4-yr re-pull 2026-05-17, cont_flag=1) |
 
-## Headline (Fyers production data)
+## Headline result
 
 | Metric | Value |
 |---|---:|
 | Final NAV | **₹4,424,405** |
 | Total return | **+342.44%** |
-| **3-yr CAGR** | **+64.90%/yr** |
-| Max DD (NAV) | 42.81% |
-| Calmar | 1.52 |
+| **3-yr CAGR** | **+64.17%/yr** |
+| Max DD (cash NAV) | 37.30% |
+| Calmar | 1.72 |
 | Trades | 31 |
 | WR | 71.0% (22W / 9L) |
 

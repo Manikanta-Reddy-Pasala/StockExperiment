@@ -1,4 +1,4 @@
-# n20_daily_v2_large_only
+# n20_daily_large_only
 
 **Daily-rebalance momentum rotation on NSE Nifty 100 large-caps.** Replaces archived `n20_daily_30d_mc1_uptrend` (50% DD version).
 
@@ -51,12 +51,12 @@
 | `backtest.py` | Standalone reproducer |
 | `trade_ledger.json` | 139 trades raw |
 
-`exports/models/n20_daily_v2_large_only/{SUMMARY.md, TRADE_LEDGER.md}` for full per-trade table with NSE cap + invested ₹.
+`exports/models/n20_daily_large_only/{SUMMARY.md, TRADE_LEDGER.md}` for full per-trade table with NSE cap + invested ₹.
 
 ## Reproduce
 
 ```bash
-docker exec trading_system_app python tools/models/n20_daily_v2_large_only/backtest.py
+docker exec trading_system_app python tools/models/n20_daily_large_only/backtest.py
 ```
 
 ## Caveats

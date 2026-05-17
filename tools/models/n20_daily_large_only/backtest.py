@@ -1,4 +1,4 @@
-"""n20_daily_v2_large_only: v1 strategy + NSE Nifty 100 filter.
+"""n20_daily_large_only: v1 strategy + NSE Nifty 100 filter.
 
 Halves Max DD vs v1 baseline by constraining universe to large-cap.
 ₹10L → ₹1.40 Cr (+140.78% CAGR, 26.92% NAV-DD, Calmar 5.23).

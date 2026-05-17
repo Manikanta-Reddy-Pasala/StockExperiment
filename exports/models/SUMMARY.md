@@ -8,11 +8,11 @@
 
 | # | Model | Stock list filter | Rebalance | Final NAV | CAGR | Max DD | LIVE |
 |--:|---|---|---|---:|---:|---:|:-:|
-| 1 | `momentum_n100_top5_max1` | Real NSE Nifty 100 (104) | Monthly | ₹4,483,692 | **+64.90%** | 42.81% | ✅ |
-| 2 | `momentum_pseudo_n100_adv` | Top-100 ADV from N500 (yearly PIT) | Monthly | ₹9,080,597 | **+108.63%** | 36.45% | ❌ |
-| 3 | `midcap_narrow_60d_breakout` (V3) | Top-100 ADV from N500 MINUS Large | Event-driven | ₹7,713,735 | **+97.59%** | 22.82% | ❌ |
+| 1 | `momentum_n100_top5_max1` | Real NSE Nifty 100 | Monthly | ₹4,424,405 | **+64.17%** | 37.30% | ✅ |
+| 2 | `momentum_pseudo_n100_adv` | Top-100 ADV from N500 MINUS Small | Monthly | ₹9,221,004 | **+109.70%** | 36.44% | ❌ |
+| 3 | `midcap_narrow_60d_breakout` | Top-100 ADV from N500 MINUS Large | Event-driven | ₹7,713,735 | **+97.59%** | 22.82% | ❌ |
 | 4 | `finnifty_ic_otm4_w300_lots5` | FINNIFTY options (no equity) | Monthly Iron Condor | ₹1.11 Cr (scaled) | **+123%** | 13.88% | ❌ |
-| 5 | `n20_daily_v2_large_only` | Top-20 ADV + uptrend + Nifty 100 | Daily | ₹13,655,640 | **+139.02%** | **25.66%** | ❌ |
+| 5 | `n20_daily_large_only` | Top-20 ADV + uptrend + NSE Nifty 100 filter | Daily | ₹11,813,452 | **+127.75%** | **24.74%** | ❌ |
 
 ¹ **V2 winner** = Exclude Large + Exclude ANGELONE. Cap-filter sweep tested 6 variants; V2 won on CAGR, DD, Calmar. Full V1 (all caps + ANGELONE) = +337% CAGR / ₹8.38 Cr but inflated by data anomaly. Baseline ex-ANGELONE = +68.60% / 17.83% DD.
 
@@ -24,7 +24,7 @@
 | `momentum_pseudo_n100_adv` | ADV ranking from N500 → top 100 | Liquidity-based selection (vs market-cap); catches retail-volume mid-caps NSE excludes |
 | `midcap_narrow_60d_breakout` | ADV rank 31-130 + 40d breakout + vol>2× + close>200d SMA | Only event-driven model (calendar-blind); 3-stage filter before entry |
 | `finnifty_ic_otm4_w300_lots5` | Spot-derived strikes (4 legs at ±4% OTM + ±300pt wings) | No equity universe — options chain auto-built per Monday from FINNIFTY spot |
-| `n20_daily_v2_large_only` | Top-20 ADV + uptrend + NSE Nifty 100 filter | Smallest universe (20 ADV → uptrend → Nifty 100 only); daily PIT rebuild. Calmar 5.23. |
+| `n20_daily_large_only` | Top-20 ADV + uptrend + NSE Nifty 100 filter | Smallest universe (20 ADV → uptrend → Nifty 100 only); daily PIT rebuild. Calmar 5.23. |
 
 ## Returns by NSE cap segment (across all equity models)
 
@@ -52,7 +52,7 @@ NSE classification (current snapshot): **Large** = in Nifty 100 (104 stocks). **
 | **Mid** | 5 | 5 | 0 | 100% | +2,198,826 |
 | **Small** | 3 | 2 | 1 | 67% | -314,111 |
 
-### n20_daily_v2_large_only
+### n20_daily_large_only
 
 | Cap | Trades | Wins | Losses | WR | Total PnL ₹ |
 |---|---:|---:|---:|---:|---:|
@@ -68,7 +68,7 @@ All trades Large-cap by construction.
 | `momentum_pseudo_n100_adv` | 30 | ~10 | Monthly rotation | Monthly (1st trading day) |
 | `midcap_narrow_60d_breakout` | 12 | ~4 | Event-driven swing (long hold ~60-90d) | Event-driven |
 | `finnifty_ic_otm4_w300_lots5` | 35 | ~12 | Monthly Iron Condor | Monthly expiry |
-| `n20_daily_v2_large_only` | 139 | ~46 | Daily rotation | Daily |
+| `n20_daily_large_only` | 139 | ~46 | Daily rotation | Daily |
 
 All 5 models use the **same 3-year backtest window: 2023-05-15 → 2026-05-12**. Trade count differs by strategy class — daily rotation churns most, event-driven swing churns least.
 
@@ -77,7 +77,7 @@ All 5 models use the **same 3-year backtest window: 2023-05-15 → 2026-05-12**.
 | Rank | Model | CAGR | MaxDD | Calmar | Notes |
 |--:|---|---:|---:|---:|---|
 | 1 | momentum_pseudo_n100_adv | +136.39% | 16.15% | **8.44** | Lookahead bias |
-| 2 | **n20_daily_v2_large_only** | **+140.78%** | **26.92%** | **5.23** | **NSE Nifty 100 filter** |
+| 2 | **n20_daily_large_only** | **+140.78%** | **26.92%** | **5.23** | **NSE Nifty 100 filter** |
 | 2 | finnifty_ic_otm4_w300_lots5 | +123.30% | 13.88% | **8.88** | Honest, defined-risk |
 | 3 | midcap_narrow (ex-ANGELONE) | +68.60% | 17.83% | **3.85** | Below 80% threshold |
 | 5 | momentum_n100_top5_max1 | +80.38% | 29.71% | **2.71** | LIVE deployable |
@@ -90,7 +90,7 @@ All 5 models use the **same 3-year backtest window: 2023-05-15 → 2026-05-12**.
 | **Defined-risk income (options)** | `finnifty_ic_otm4_w300_lots5` |
 | **Upper-bound research / aggressive sim** | `momentum_pseudo_n100_adv` |
 | **Backtest exploration / breakout style** | `midcap_narrow_60d_breakout` (ANGELONE caveat) |
-| **Daily rotation, Large-cap concentrated** | `n20_daily_v2_large_only` (Calmar 5.23) |
+| **Daily rotation, Large-cap concentrated** | `n20_daily_large_only` (Calmar 5.23) |
 
 ## Cross-cutting caveats
 
@@ -120,7 +120,7 @@ exports/models/
 │   ├── MONTHLY_INVESTED.md
 │   ├── trades.csv
 │   └── monthly.csv
-└── n20_daily_v2_large_only/
+└── n20_daily_large_only/
     ├── SUMMARY.md                        NSE Nifty 100 filter, daily rotation (+141% CAGR / 27% DD)
     └── TRADE_LEDGER.md
 ```

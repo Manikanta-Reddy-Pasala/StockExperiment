@@ -71,7 +71,7 @@ For live use, deploy `momentum_n100_top5_max1` (real Nifty 100).
 
 | File | Purpose |
 |---|---|
-| `backtest.py` | Standalone V1 reproducer (yearly-PIT pseudo-N100, lb=30, mc=1, monthly) |
+| `backtest.py` | Standalone reproducer (yearly-PIT pseudo-N100, lb=30, mc=1, monthly) |
 | `build_universe.py` | ADV-rank N500 → top-100 (with end-date param for PIT) |
 | `trade_ledger.json` | 30 trades + open position |
 

@@ -48,8 +48,8 @@ Y2 chop: 3 consecutive losers (BAJAJ-AUTO -19%, HINDZINC -10%, MAZDOCK round-2 -
 | Date | Bug | Fix | Honest CAGR |
 |---|---|---|---:|
 | Pre-2026-05-17 | Universe = "n100_current.json" rebuilt with TODAY's ADV applied retroactively; 60d lookback | — | +518% claimed (lookahead) |
-| 2026-05-17 v1 | Yearly-PIT pseudo-N100 (ADV from N500 at year start); 30d lookback | Drop daily ADV refresh | +136.39% (still pseudo) |
-| 2026-05-17 v2 | Pseudo-N100 had 47/100 stocks NOT in real index (HFCL, BSE, GROWW etc.) | NSE CSV → real N100 | **+80.38%** (honest, deployable) |
+| 2026-05-17 | Yearly-PIT pseudo-N100 (ADV from N500 at year start); 30d lookback | Drop daily ADV refresh | +136.39% (still pseudo) |
+| 2026-05-17| Pseudo-N100 had 47/100 stocks NOT in real index (HFCL, BSE, GROWW etc.) | NSE CSV → real N100 | **+80.38%** (honest, deployable) |
 
 ## Top winners (real N100 trades)
 
