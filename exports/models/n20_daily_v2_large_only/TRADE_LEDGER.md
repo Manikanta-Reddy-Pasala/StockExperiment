@@ -1,16 +1,16 @@
-# n20_daily_v2_large_only — Trade Ledger (Fyers Clean)
+# n20_daily_v2_large_only — Trade Ledger
 
-₹10L → ₹11,453,411 · CAGR +136.57% · 130 trades · Max DD 27.58%
+₹10L → ₹11,813,452 · CAGR +139.02% · 138 trades · Max DD 25.66%
 
-Data: Fyers, 4-year re-pull 2026-05-17, cont_flag=1.
+Data: Fyers 498/504 N500 stocks, 4yr re-pull 2026-05-17, cont_flag=1.
 
 ## Returns by NSE cap segment
 
 | Cap | Trades | Wins | Losses | WR | Total PnL ₹ |
 |---|---:|---:|---:|---:|---:|
-| **Large** | 130 | 59 | 69 | 46% | +10,453,416 |
+| **Large** | 138 | 60 | 76 | 44% | +10,813,445 |
 
-## All 130 trades (top 30 shown)
+## All 138 trades (top 30 shown)
 
 | # | Symbol | Cap | Index | Entry | Entry ₹ | Qty | Invested ₹ | Exit | Exit ₹ | PnL ₹ | Ret % |
 |--:|---|---|---|---|---:|---:|---:|---|---:|---:|---:|

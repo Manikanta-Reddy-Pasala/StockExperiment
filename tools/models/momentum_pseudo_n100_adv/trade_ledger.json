@@ -308,14 +308,25 @@
     "cap_after": 6386263.0
   },
   {
-    "sym": "TEJASNET",
+    "sym": "DATAPATTNS",
     "entry_date": "2026-03-02",
+    "exit_date": "2026-04-01",
+    "qty": 1993,
+    "entry_px": 3204.3,
+    "exit_px": 3107.6,
+    "pnl": -192723.0,
+    "ret_pct": -3.02,
+    "cap_after": 6193540.0
+  },
+  {
+    "sym": "ADANIPOWER",
+    "entry_date": "2026-04-01",
     "exit_date": "2026-05-04",
-    "qty": 13175,
-    "entry_px": 484.7,
-    "exit_px": 420.25,
-    "pnl": -849129.0,
-    "ret_pct": -13.3,
-    "cap_after": 5537134.0
+    "qty": 39421,
+    "entry_px": 157.11,
+    "exit_px": 227.3,
+    "pnl": 2766960.0,
+    "ret_pct": 44.68,
+    "cap_after": 8960500.0
   }
 ]

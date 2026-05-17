@@ -11,18 +11,18 @@
 | Last exit | 2026-05-04 |
 | Total trades | 31 |
 | Trades per year | ~10.3 |
-| Rebalance period | Monthly |
-| Data source | **Fyers** (4-year re-pull 2026-05-17, cont_flag=1, chunked 360d) |
+| Rebalance | Monthly |
+| Data source | **Fyers** (498/504 N500, 4-year re-pull 2026-05-17, cont_flag=1) |
 
-## Headline result (Fyers production data)
+## Headline (Fyers production data)
 
 | Metric | Value |
 |---|---:|
-| Final NAV | **₹4,603,816** |
-| Total return | **+360.38%** |
-| **3-yr CAGR** | **+67.10%/yr** |
-| Max DD (NAV-based) | 42.81% |
-| Calmar | 1.57 |
+| Final NAV | **₹4,424,405** |
+| Total return | **+342.44%** |
+| **3-yr CAGR** | **+64.90%/yr** |
+| Max DD (NAV) | 42.81% |
+| Calmar | 1.52 |
 | Trades | 31 |
 | WR | 71.0% (22W / 9L) |
 
@@ -32,10 +32,10 @@
 |---|---:|---:|---:|---:|
 | 2023-24 | ₹1,000,000 | ₹2,416,397 | **+141.64%** | 10 |
 | 2024-25 | ₹2,416,397 | ₹2,029,655 | **+-16.00%** | 10 |
-| 2025-26 | ₹2,029,655 | ₹4,603,816 | **+126.83%** | 11 |
+| 2025-26 | ₹2,029,655 | ₹4,424,405 | **+117.99%** | 11 |
 
 ## Returns by NSE cap segment
 
 | Cap | Trades | Wins | Losses | WR | Total PnL ₹ |
 |---|---:|---:|---:|---:|---:|
-| **Large** | 31 | 22 | 9 | 71% | +3,603,815 |
+| **Large** | 31 | 22 | 9 | 71% | +3,424,405 |

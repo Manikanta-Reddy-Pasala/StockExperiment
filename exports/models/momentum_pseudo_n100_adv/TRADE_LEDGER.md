@@ -1,18 +1,18 @@
-# momentum_pseudo_n100_adv — Trade Ledger (Fyers Clean)
+# momentum_pseudo_n100_adv — Trade Ledger
 
-₹10L → ₹5,537,134 · CAGR +77.70% · 29 trades · Max DD 36.45%
+₹10L → ₹8,960,500 · CAGR +108.63% · 30 trades · Max DD 36.45%
 
-Data: Fyers, 4-year re-pull 2026-05-17, cont_flag=1.
+Data: Fyers 498/504 N500 stocks, 4yr re-pull 2026-05-17, cont_flag=1.
 
 ## Returns by NSE cap segment
 
 | Cap | Trades | Wins | Losses | WR | Total PnL ₹ |
 |---|---:|---:|---:|---:|---:|
-| **Large** | 13 | 12 | 1 | 92% | +3,703,358 |
+| **Large** | 14 | 13 | 1 | 93% | +6,470,318 |
 | **Mid** | 13 | 10 | 3 | 77% | +1,640,469 |
-| **Small** | 3 | 2 | 1 | 67% | -806,691 |
+| **Small** | 3 | 2 | 1 | 67% | -150,285 |
 
-## All 29 trades
+## All 30 trades
 
 | # | Symbol | Cap | Index | Entry | Entry ₹ | Qty | Invested ₹ | Exit | Exit ₹ | PnL ₹ | Ret % |
 |--:|---|---|---|---|---:|---:|---:|---|---:|---:|---:|
@@ -44,4 +44,5 @@ Data: Fyers, 4-year re-pull 2026-05-17, cont_flag=1.
 | 26 | ETERNAL | **Large** | Nifty 100 | 2025-09-01 | 321.10 | 13,118 | ₹4,212,190 | 2025-10-01 | 329.00 | +103,632 | +2.46% |
 | 27 | IDEA | **Mid** | Nifty Midcap 150 | 2025-10-01 | 8.52 | 506,583 | ₹4,316,087 | 2025-11-03 | 9.54 | +516,715 | +11.97% |
 | 28 | SHRIRAMFIN | **Large** | Nifty 100 | 2025-11-03 | 796.45 | 6,067 | ₹4,832,062 | 2026-03-02 | 1,052.50 | +1,553,455 | +32.15% |
-| 29 | TEJASNET | **Small** | Nifty Smallcap 250 | 2026-03-02 | 484.70 | 13,175 | ₹6,385,922 | 2026-05-04 | 420.25 | -849,129 | -13.30% |
+| 29 | DATAPATTNS | **Small** | Nifty Smallcap 250 | 2026-03-02 | 3,204.30 | 1,993 | ₹6,386,170 | 2026-04-01 | 3,107.60 | -192,723 | -3.02% |
+| 30 | ADANIPOWER | **Large** | Nifty 100 | 2026-04-01 | 157.11 | 39,421 | ₹6,193,433 | 2026-05-04 | 227.30 | +2,766,960 | +44.68% |

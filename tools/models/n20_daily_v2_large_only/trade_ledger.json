@@ -343,1090 +343,1178 @@
   {
     "sym": "ETERNAL",
     "entry_date": "2024-03-19",
-    "exit_date": "2024-04-03",
+    "exit_date": "2024-04-01",
     "qty": 27219,
     "entry_px": 157.95,
-    "exit_px": 178.3,
-    "pnl": 553907.0,
-    "ret_pct": 12.88,
-    "cap_after": 4853192.0
+    "exit_px": 184.5,
+    "pnl": 722664.0,
+    "ret_pct": 16.81,
+    "cap_after": 5021950.0
   },
   {
-    "sym": "BEL",
-    "entry_date": "2024-04-03",
+    "sym": "LT",
+    "entry_date": "2024-04-01",
+    "exit_date": "2024-04-02",
+    "qty": 1308,
+    "entry_px": 3838.0,
+    "exit_px": 3807.4,
+    "pnl": -40025.0,
+    "ret_pct": -0.8,
+    "cap_after": 4981925.0
+  },
+  {
+    "sym": "TATASTEEL",
+    "entry_date": "2024-04-02",
     "exit_date": "2024-04-04",
-    "qty": 21910,
-    "entry_px": 221.5,
-    "exit_px": 220.3,
-    "pnl": -26292.0,
-    "ret_pct": -0.54,
-    "cap_after": 4826900.0
+    "qty": 30257,
+    "entry_px": 164.65,
+    "exit_px": 163.4,
+    "pnl": -37821.0,
+    "ret_pct": -0.76,
+    "cap_after": 4944103.0
   },
   {
     "sym": "ETERNAL",
     "entry_date": "2024-04-04",
     "exit_date": "2024-04-16",
-    "qty": 25812,
+    "qty": 26439,
     "entry_px": 187.0,
     "exit_px": 186.45,
-    "pnl": -14197.0,
+    "pnl": -14541.0,
     "ret_pct": -0.29,
-    "cap_after": 4812703.0
+    "cap_after": 4929562.0
   },
   {
     "sym": "HAL",
     "entry_date": "2024-04-16",
-    "exit_date": "2024-04-23",
-    "qty": 1292,
+    "exit_date": "2024-04-19",
+    "qty": 1324,
     "entry_px": 3722.15,
-    "exit_px": 3795.7,
-    "pnl": 95027.0,
-    "ret_pct": 1.98,
-    "cap_after": 4907730.0
+    "exit_px": 3751.3,
+    "pnl": 38595.0,
+    "ret_pct": 0.78,
+    "cap_after": 4968157.0
   },
   {
     "sym": "BHARTIARTL",
-    "entry_date": "2024-04-23",
+    "entry_date": "2024-04-19",
     "exit_date": "2024-04-24",
-    "qty": 3656,
-    "entry_px": 1342.35,
+    "qty": 3854,
+    "entry_px": 1289.0,
     "exit_px": 1336.4,
-    "pnl": -21753.0,
-    "ret_pct": -0.44,
-    "cap_after": 4885977.0
+    "pnl": 182680.0,
+    "ret_pct": 3.68,
+    "cap_after": 5150836.0
   },
   {
     "sym": "HAL",
     "entry_date": "2024-04-24",
-    "exit_date": "2024-05-29",
-    "qty": 1237,
+    "exit_date": "2024-05-06",
+    "qty": 1305,
     "entry_px": 3946.7,
+    "exit_px": 3816.4,
+    "pnl": -170042.0,
+    "ret_pct": -3.3,
+    "cap_after": 4980795.0
+  },
+  {
+    "sym": "RECLTD",
+    "entry_date": "2024-05-06",
+    "exit_date": "2024-05-10",
+    "qty": 9641,
+    "entry_px": 516.6,
+    "exit_px": 513.85,
+    "pnl": -26513.0,
+    "ret_pct": -0.53,
+    "cap_after": 4954282.0
+  },
+  {
+    "sym": "HAL",
+    "entry_date": "2024-05-10",
+    "exit_date": "2024-05-29",
+    "qty": 1279,
+    "entry_px": 3872.9,
     "exit_px": 5051.75,
-    "pnl": 1366947.0,
-    "ret_pct": 28.0,
-    "cap_after": 6252923.0
+    "pnl": 1507749.0,
+    "ret_pct": 30.44,
+    "cap_after": 6462031.0
   },
   {
     "sym": "MAZDOCK",
     "entry_date": "2024-05-29",
     "exit_date": "2024-08-02",
-    "qty": 3724,
+    "qty": 3849,
     "entry_px": 1678.68,
     "exit_px": 2547.8,
-    "pnl": 3236603.0,
+    "pnl": 3345243.0,
     "ret_pct": 51.77,
-    "cap_after": 9489526.0
+    "cap_after": 9807274.0
   },
   {
     "sym": "ETERNAL",
     "entry_date": "2024-08-02",
     "exit_date": "2024-08-26",
-    "qty": 36172,
+    "qty": 37383,
     "entry_px": 262.34,
     "exit_px": 259.39,
-    "pnl": -106707.0,
+    "pnl": -110280.0,
     "ret_pct": -1.12,
-    "cap_after": 9382819.0
+    "cap_after": 9696994.0
   },
   {
     "sym": "TRENT",
     "entry_date": "2024-08-26",
     "exit_date": "2024-09-09",
-    "qty": 1354,
+    "qty": 1400,
     "entry_px": 6925.6,
     "exit_px": 7136.65,
-    "pnl": 285762.0,
+    "pnl": 295470.0,
     "ret_pct": 3.05,
-    "cap_after": 9668581.0
+    "cap_after": 9992464.0
   },
   {
     "sym": "ETERNAL",
     "entry_date": "2024-09-09",
     "exit_date": "2024-09-16",
-    "qty": 36734,
+    "qty": 37965,
     "entry_px": 263.2,
     "exit_px": 277.7,
-    "pnl": 532643.0,
+    "pnl": 550492.0,
     "ret_pct": 5.51,
-    "cap_after": 10201224.0
+    "cap_after": 10542957.0
   },
   {
     "sym": "INDIGO",
     "entry_date": "2024-09-16",
     "exit_date": "2024-09-18",
-    "qty": 2062,
+    "qty": 2131,
     "entry_px": 4947.1,
     "exit_px": 4924.65,
-    "pnl": -46292.0,
+    "pnl": -47841.0,
     "ret_pct": -0.45,
-    "cap_after": 10154932.0
+    "cap_after": 10495116.0
   },
   {
     "sym": "BAJFINANCE",
     "entry_date": "2024-09-18",
     "exit_date": "2024-09-19",
-    "qty": 13307,
+    "qty": 13753,
     "entry_px": 763.11,
     "exit_px": 759.04,
-    "pnl": -54159.0,
+    "pnl": -55975.0,
     "ret_pct": -0.53,
-    "cap_after": 10100772.0
+    "cap_after": 10439141.0
   },
   {
     "sym": "BHARTIARTL",
     "entry_date": "2024-09-19",
     "exit_date": "2024-09-27",
-    "qty": 6067,
+    "qty": 6270,
     "entry_px": 1664.85,
     "exit_px": 1734.6,
-    "pnl": 423173.0,
+    "pnl": 437332.0,
     "ret_pct": 4.19,
-    "cap_after": 10523945.0
+    "cap_after": 10876473.0
   },
   {
     "sym": "TRENT",
     "entry_date": "2024-09-27",
     "exit_date": "2024-09-30",
-    "qty": 1343,
+    "qty": 1388,
     "entry_px": 7833.7,
     "exit_px": 7574.65,
-    "pnl": -347904.0,
+    "pnl": -359561.0,
     "ret_pct": -3.31,
-    "cap_after": 10176041.0
+    "cap_after": 10516912.0
   },
   {
     "sym": "BAJFINANCE",
     "entry_date": "2024-09-30",
     "exit_date": "2024-10-01",
-    "qty": 13210,
+    "qty": 13653,
     "entry_px": 770.3,
     "exit_px": 770.3,
     "pnl": 0.0,
     "ret_pct": 0.0,
-    "cap_after": 10176041.0
+    "cap_after": 10516912.0
   },
   {
     "sym": "BHARTIARTL",
     "entry_date": "2024-10-01",
     "exit_date": "2024-10-04",
-    "qty": 5990,
+    "qty": 6191,
     "entry_px": 1698.7,
     "exit_px": 1640.9,
-    "pnl": -346222.0,
+    "pnl": -357840.0,
     "ret_pct": -3.4,
-    "cap_after": 9829819.0
+    "cap_after": 10159072.0
   },
   {
     "sym": "M&M",
     "entry_date": "2024-10-04",
     "exit_date": "2024-10-08",
-    "qty": 3257,
+    "qty": 3366,
     "entry_px": 3017.45,
     "exit_px": 3165.85,
-    "pnl": 483339.0,
+    "pnl": 499514.0,
     "ret_pct": 4.92,
-    "cap_after": 10313158.0
+    "cap_after": 10658587.0
   },
   {
     "sym": "TRENT",
     "entry_date": "2024-10-08",
     "exit_date": "2024-10-10",
-    "qty": 1282,
+    "qty": 1325,
     "entry_px": 8041.95,
     "exit_px": 8028.85,
-    "pnl": -16794.0,
+    "pnl": -17358.0,
     "ret_pct": -0.16,
-    "cap_after": 10296364.0
+    "cap_after": 10641229.0
   },
   {
     "sym": "M&M",
     "entry_date": "2024-10-10",
     "exit_date": "2024-10-11",
-    "qty": 3223,
+    "qty": 3331,
     "entry_px": 3194.3,
     "exit_px": 3134.35,
-    "pnl": -193219.0,
+    "pnl": -199693.0,
     "ret_pct": -1.88,
-    "cap_after": 10103145.0
+    "cap_after": 10441536.0
   },
   {
     "sym": "TRENT",
     "entry_date": "2024-10-11",
     "exit_date": "2024-10-15",
-    "qty": 1226,
+    "qty": 1267,
     "entry_px": 8234.95,
     "exit_px": 8124.25,
-    "pnl": -135718.0,
+    "pnl": -140257.0,
     "ret_pct": -1.34,
-    "cap_after": 9967427.0
+    "cap_after": 10301279.0
   },
   {
     "sym": "ETERNAL",
     "entry_date": "2024-10-15",
     "exit_date": "2024-10-16",
-    "qty": 35655,
+    "qty": 36849,
     "entry_px": 279.55,
     "exit_px": 274.25,
-    "pnl": -188972.0,
+    "pnl": -195300.0,
     "ret_pct": -1.9,
-    "cap_after": 9778455.0
+    "cap_after": 10105979.0
   },
   {
     "sym": "BHARTIARTL",
     "entry_date": "2024-10-16",
     "exit_date": "2024-10-17",
-    "qty": 5639,
+    "qty": 5828,
     "entry_px": 1733.95,
     "exit_px": 1701.15,
-    "pnl": -184959.0,
+    "pnl": -191158.0,
     "ret_pct": -1.89,
-    "cap_after": 9593496.0
+    "cap_after": 9914821.0
   },
   {
     "sym": "ETERNAL",
     "entry_date": "2024-10-17",
     "exit_date": "2024-10-18",
-    "qty": 35459,
+    "qty": 36646,
     "entry_px": 270.55,
     "exit_px": 257.45,
-    "pnl": -464513.0,
+    "pnl": -480063.0,
     "ret_pct": -4.84,
-    "cap_after": 9128983.0
+    "cap_after": 9434758.0
   },
   {
     "sym": "BHARTIARTL",
     "entry_date": "2024-10-18",
     "exit_date": "2024-10-21",
-    "qty": 5345,
+    "qty": 5524,
     "entry_px": 1707.85,
     "exit_px": 1692.55,
-    "pnl": -81778.0,
+    "pnl": -84517.0,
     "ret_pct": -0.9,
-    "cap_after": 9047205.0
+    "cap_after": 9350241.0
   },
   {
     "sym": "M&M",
     "entry_date": "2024-10-21",
     "exit_date": "2024-10-22",
-    "qty": 3017,
+    "qty": 3118,
     "entry_px": 2998.2,
     "exit_px": 2887.2,
-    "pnl": -334887.0,
+    "pnl": -346098.0,
     "ret_pct": -3.7,
-    "cap_after": 8712318.0
+    "cap_after": 9004143.0
   },
   {
     "sym": "BHARTIARTL",
     "entry_date": "2024-10-22",
     "exit_date": "2024-10-24",
-    "qty": 5148,
+    "qty": 5320,
     "entry_px": 1692.25,
     "exit_px": 1678.45,
-    "pnl": -71042.0,
+    "pnl": -73416.0,
     "ret_pct": -0.82,
-    "cap_after": 8641275.0
+    "cap_after": 8930727.0
   },
   {
     "sym": "M&M",
     "entry_date": "2024-10-24",
     "exit_date": "2024-10-25",
-    "qty": 3057,
+    "qty": 3159,
     "entry_px": 2826.35,
     "exit_px": 2720.85,
-    "pnl": -322513.0,
+    "pnl": -333274.0,
     "ret_pct": -3.73,
-    "cap_after": 8318762.0
+    "cap_after": 8597452.0
   },
   {
     "sym": "HDFCBANK",
     "entry_date": "2024-10-25",
     "exit_date": "2024-10-29",
-    "qty": 9543,
+    "qty": 9862,
     "entry_px": 871.7,
     "exit_px": 875.93,
-    "pnl": 40367.0,
+    "pnl": 41716.0,
     "ret_pct": 0.49,
-    "cap_after": 8359129.0
+    "cap_after": 8639169.0
   },
   {
     "sym": "SBIN",
     "entry_date": "2024-10-29",
     "exit_date": "2024-11-18",
-    "qty": 10038,
+    "qty": 10374,
     "entry_px": 832.7,
     "exit_px": 814.3,
-    "pnl": -184699.0,
+    "pnl": -190882.0,
     "ret_pct": -2.21,
-    "cap_after": 8174429.0
+    "cap_after": 8448287.0
   },
   {
     "sym": "HDFCBANK",
     "entry_date": "2024-11-18",
     "exit_date": "2024-11-25",
-    "qty": 9588,
+    "qty": 9909,
     "entry_px": 852.55,
     "exit_px": 892.8,
-    "pnl": 385917.0,
+    "pnl": 398837.0,
     "ret_pct": 4.72,
-    "cap_after": 8560346.0
+    "cap_after": 8847124.0
   },
   {
     "sym": "LT",
     "entry_date": "2024-11-25",
     "exit_date": "2024-11-26",
-    "qty": 2280,
+    "qty": 2357,
     "entry_px": 3753.0,
     "exit_px": 3702.6,
-    "pnl": -114912.0,
+    "pnl": -118793.0,
     "ret_pct": -1.34,
-    "cap_after": 8445434.0
+    "cap_after": 8728332.0
   },
   {
     "sym": "HDFCBANK",
     "entry_date": "2024-11-26",
     "exit_date": "2024-11-27",
-    "qty": 9459,
+    "qty": 9776,
     "entry_px": 892.78,
     "exit_px": 906.15,
-    "pnl": 126467.0,
+    "pnl": 130705.0,
     "ret_pct": 1.5,
-    "cap_after": 8571901.0
+    "cap_after": 8859037.0
   },
   {
     "sym": "BEL",
     "entry_date": "2024-11-27",
     "exit_date": "2024-11-28",
-    "qty": 27889,
+    "qty": 28823,
     "entry_px": 307.35,
     "exit_px": 305.75,
-    "pnl": -44622.0,
+    "pnl": -46117.0,
     "ret_pct": -0.52,
-    "cap_after": 8527279.0
+    "cap_after": 8812920.0
   },
   {
     "sym": "HDFCBANK",
     "entry_date": "2024-11-28",
     "exit_date": "2024-11-29",
-    "qty": 9510,
+    "qty": 9829,
     "entry_px": 896.58,
     "exit_px": 898.03,
-    "pnl": 13789.0,
+    "pnl": 14252.0,
     "ret_pct": 0.16,
-    "cap_after": 8541068.0
+    "cap_after": 8827172.0
   },
   {
     "sym": "MAZDOCK",
     "entry_date": "2024-11-29",
     "exit_date": "2024-12-02",
-    "qty": 3718,
+    "qty": 3842,
     "entry_px": 2297.07,
     "exit_px": 2272.63,
-    "pnl": -90868.0,
+    "pnl": -93898.0,
     "ret_pct": -1.06,
-    "cap_after": 8450201.0
+    "cap_after": 8733273.0
   },
   {
     "sym": "HDFCBANK",
     "entry_date": "2024-12-02",
     "exit_date": "2024-12-03",
-    "qty": 9364,
+    "qty": 9678,
     "entry_px": 902.35,
     "exit_px": 913.15,
-    "pnl": 101131.0,
+    "pnl": 104522.0,
     "ret_pct": 1.2,
-    "cap_after": 8551332.0
+    "cap_after": 8837796.0
   },
   {
     "sym": "ETERNAL",
     "entry_date": "2024-12-03",
-    "exit_date": "2024-12-04",
-    "qty": 30556,
-    "entry_px": 279.85,
-    "exit_px": 286.25,
-    "pnl": 195558.0,
-    "ret_pct": 2.29,
-    "cap_after": 8746890.0
-  },
-  {
-    "sym": "BEL",
-    "entry_date": "2024-12-04",
     "exit_date": "2024-12-05",
-    "qty": 27958,
-    "entry_px": 312.85,
-    "exit_px": 314.5,
-    "pnl": 46131.0,
-    "ret_pct": 0.53,
-    "cap_after": 8793021.0
+    "qty": 31580,
+    "entry_px": 279.85,
+    "exit_px": 299.35,
+    "pnl": 615810.0,
+    "ret_pct": 6.97,
+    "cap_after": 9453606.0
   },
   {
     "sym": "MAZDOCK",
     "entry_date": "2024-12-05",
     "exit_date": "2024-12-09",
-    "qty": 3617,
+    "qty": 3889,
     "entry_px": 2430.78,
     "exit_px": 2444.1,
-    "pnl": 48178.0,
+    "pnl": 51801.0,
     "ret_pct": 0.55,
-    "cap_after": 8841199.0
+    "cap_after": 9505407.0
   },
   {
     "sym": "ETERNAL",
     "entry_date": "2024-12-09",
     "exit_date": "2024-12-10",
-    "qty": 29939,
+    "qty": 32188,
     "entry_px": 295.3,
     "exit_px": 295.85,
-    "pnl": 16466.0,
+    "pnl": 17703.0,
     "ret_pct": 0.19,
-    "cap_after": 8857666.0
+    "cap_after": 9523111.0
   },
   {
     "sym": "MAZDOCK",
     "entry_date": "2024-12-10",
     "exit_date": "2024-12-20",
-    "qty": 3634,
+    "qty": 3907,
     "entry_px": 2436.85,
     "exit_px": 2362.05,
-    "pnl": -271823.0,
+    "pnl": -292244.0,
     "ret_pct": -3.07,
-    "cap_after": 8585842.0
+    "cap_after": 9230867.0
   },
   {
     "sym": "ETERNAL",
     "entry_date": "2024-12-20",
     "exit_date": "2024-12-23",
-    "qty": 30435,
+    "qty": 32721,
     "entry_px": 282.1,
     "exit_px": 273.95,
-    "pnl": -248045.0,
+    "pnl": -266676.0,
     "ret_pct": -2.89,
-    "cap_after": 8337797.0
+    "cap_after": 8964191.0
   },
   {
     "sym": "MAZDOCK",
     "entry_date": "2024-12-23",
     "exit_date": "2025-01-02",
-    "qty": 3567,
+    "qty": 3835,
     "entry_px": 2337.07,
     "exit_px": 2253.8,
-    "pnl": -297024.0,
+    "pnl": -319340.0,
     "ret_pct": -3.56,
-    "cap_after": 8040773.0
+    "cap_after": 8644851.0
   },
   {
     "sym": "BAJFINANCE",
     "entry_date": "2025-01-02",
     "exit_date": "2025-01-22",
-    "qty": 10881,
+    "qty": 11699,
     "entry_px": 738.92,
     "exit_px": 739.72,
-    "pnl": 8705.0,
+    "pnl": 9359.0,
     "ret_pct": 0.11,
-    "cap_after": 8049478.0
+    "cap_after": 8654210.0
   },
   {
     "sym": "KOTAKBANK",
     "entry_date": "2025-01-22",
     "exit_date": "2025-01-28",
-    "qty": 20989,
+    "qty": 22566,
     "entry_px": 383.5,
     "exit_px": 377.55,
-    "pnl": -124885.0,
+    "pnl": -134268.0,
     "ret_pct": -1.55,
-    "cap_after": 7924593.0
+    "cap_after": 8519942.0
   },
   {
     "sym": "BAJFINANCE",
     "entry_date": "2025-01-28",
     "exit_date": "2025-03-19",
-    "qty": 10418,
+    "qty": 11200,
     "entry_px": 760.66,
     "exit_px": 873.16,
-    "pnl": 1172025.0,
+    "pnl": 1260000.0,
     "ret_pct": 14.79,
-    "cap_after": 9096618.0
+    "cap_after": 9779942.0
   },
   {
     "sym": "TATASTEEL",
     "entry_date": "2025-03-19",
     "exit_date": "2025-03-20",
-    "qty": 57355,
+    "qty": 61664,
     "entry_px": 158.6,
     "exit_px": 159.04,
-    "pnl": 25236.0,
+    "pnl": 27132.0,
     "ret_pct": 0.28,
-    "cap_after": 9121855.0
+    "cap_after": 9807074.0
   },
   {
     "sym": "MAZDOCK",
     "entry_date": "2025-03-20",
     "exit_date": "2025-04-21",
-    "qty": 3464,
+    "qty": 3724,
     "entry_px": 2633.1,
     "exit_px": 2764.6,
-    "pnl": 455516.0,
+    "pnl": 489706.0,
     "ret_pct": 4.99,
-    "cap_after": 9577371.0
+    "cap_after": 10296780.0
   },
   {
     "sym": "HAL",
     "entry_date": "2025-04-21",
     "exit_date": "2025-04-22",
-    "qty": 2222,
+    "qty": 2389,
     "entry_px": 4309.1,
     "exit_px": 4286.0,
-    "pnl": -51328.0,
+    "pnl": -55186.0,
     "ret_pct": -0.54,
-    "cap_after": 9526042.0
+    "cap_after": 10241594.0
   },
   {
     "sym": "MAZDOCK",
     "entry_date": "2025-04-22",
     "exit_date": "2025-04-23",
-    "qty": 3457,
+    "qty": 3716,
     "entry_px": 2755.4,
     "exit_px": 2765.9,
-    "pnl": 36298.0,
+    "pnl": 39018.0,
     "ret_pct": 0.38,
-    "cap_after": 9562341.0
+    "cap_after": 10280612.0
   },
   {
     "sym": "HAL",
     "entry_date": "2025-04-23",
     "exit_date": "2025-04-25",
-    "qty": 2220,
+    "qty": 2386,
     "entry_px": 4307.0,
     "exit_px": 4196.4,
-    "pnl": -245532.0,
+    "pnl": -263892.0,
     "ret_pct": -2.57,
-    "cap_after": 9316809.0
+    "cap_after": 10016721.0
   },
   {
     "sym": "ICICIBANK",
     "entry_date": "2025-04-25",
     "exit_date": "2025-04-28",
-    "qty": 6632,
+    "qty": 7130,
     "entry_px": 1404.8,
     "exit_px": 1428.8,
-    "pnl": 159168.0,
+    "pnl": 171120.0,
     "ret_pct": 1.71,
-    "cap_after": 9475977.0
+    "cap_after": 10187841.0
   },
   {
     "sym": "HAL",
     "entry_date": "2025-04-28",
     "exit_date": "2025-04-29",
-    "qty": 2140,
+    "qty": 2301,
     "entry_px": 4426.3,
     "exit_px": 4609.3,
-    "pnl": 391620.0,
+    "pnl": 421083.0,
     "ret_pct": 4.13,
-    "cap_after": 9867597.0
+    "cap_after": 10608924.0
   },
   {
     "sym": "MAZDOCK",
     "entry_date": "2025-04-29",
     "exit_date": "2025-05-02",
-    "qty": 3258,
+    "qty": 3503,
     "entry_px": 3027.9,
     "exit_px": 2996.6,
-    "pnl": -101975.0,
+    "pnl": -109644.0,
     "ret_pct": -1.03,
-    "cap_after": 9765622.0
+    "cap_after": 10499280.0
   },
   {
     "sym": "HAL",
     "entry_date": "2025-05-02",
     "exit_date": "2025-05-05",
-    "qty": 2173,
+    "qty": 2337,
     "entry_px": 4492.4,
     "exit_px": 4590.8,
-    "pnl": 213823.0,
+    "pnl": 229961.0,
     "ret_pct": 2.19,
-    "cap_after": 9979445.0
+    "cap_after": 10729241.0
   },
   {
     "sym": "MAZDOCK",
     "entry_date": "2025-05-05",
     "exit_date": "2025-05-06",
-    "qty": 3219,
+    "qty": 3461,
     "entry_px": 3099.5,
     "exit_px": 2972.6,
-    "pnl": -408491.0,
+    "pnl": -439201.0,
     "ret_pct": -4.09,
-    "cap_after": 9570954.0
+    "cap_after": 10290040.0
   },
   {
     "sym": "HAL",
     "entry_date": "2025-05-06",
     "exit_date": "2025-05-12",
-    "qty": 2123,
+    "qty": 2282,
     "entry_px": 4507.5,
     "exit_px": 4439.7,
-    "pnl": -143939.0,
+    "pnl": -154720.0,
     "ret_pct": -1.5,
-    "cap_after": 9427014.0
+    "cap_after": 10135320.0
   },
   {
     "sym": "M&M",
     "entry_date": "2025-05-12",
     "exit_date": "2025-05-13",
-    "qty": 3036,
+    "qty": 3264,
     "entry_px": 3104.7,
     "exit_px": 3053.8,
-    "pnl": -154532.0,
+    "pnl": -166138.0,
     "ret_pct": -1.64,
-    "cap_after": 9272482.0
+    "cap_after": 9969182.0
   },
   {
     "sym": "HAL",
     "entry_date": "2025-05-13",
     "exit_date": "2025-05-14",
-    "qty": 2011,
+    "qty": 2162,
     "entry_px": 4609.8,
     "exit_px": 4768.0,
-    "pnl": 318140.0,
+    "pnl": 342028.0,
     "ret_pct": 3.43,
-    "cap_after": 9590622.0
+    "cap_after": 10311211.0
   },
   {
     "sym": "MAZDOCK",
     "entry_date": "2025-05-14",
     "exit_date": "2025-05-20",
-    "qty": 3115,
+    "qty": 3349,
     "entry_px": 3078.2,
     "exit_px": 3330.3,
-    "pnl": 785292.0,
+    "pnl": 844283.0,
     "ret_pct": 8.19,
-    "cap_after": 10375914.0
+    "cap_after": 11155494.0
   },
   {
     "sym": "BEL",
     "entry_date": "2025-05-20",
     "exit_date": "2025-05-22",
-    "qty": 28520,
+    "qty": 30663,
     "entry_px": 363.8,
     "exit_px": 383.4,
-    "pnl": 558992.0,
+    "pnl": 600995.0,
     "ret_pct": 5.39,
-    "cap_after": 10934906.0
+    "cap_after": 11756489.0
   },
   {
     "sym": "MAZDOCK",
     "entry_date": "2025-05-22",
     "exit_date": "2025-05-30",
-    "qty": 3124,
+    "qty": 3358,
     "entry_px": 3500.0,
     "exit_px": 3478.2,
-    "pnl": -68103.0,
+    "pnl": -73204.0,
     "ret_pct": -0.62,
-    "cap_after": 10866802.0
+    "cap_after": 11683284.0
   },
   {
     "sym": "BEL",
     "entry_date": "2025-05-30",
     "exit_date": "2025-07-02",
-    "qty": 28254,
+    "qty": 30377,
     "entry_px": 384.6,
     "exit_px": 426.95,
-    "pnl": 1196557.0,
+    "pnl": 1286466.0,
     "ret_pct": 11.01,
-    "cap_after": 12063359.0
+    "cap_after": 12969750.0
   },
   {
     "sym": "TRENT",
     "entry_date": "2025-07-02",
     "exit_date": "2025-07-04",
-    "qty": 1938,
+    "qty": 2084,
     "entry_px": 6222.5,
     "exit_px": 5456.0,
-    "pnl": -1485477.0,
+    "pnl": -1597386.0,
     "ret_pct": -12.32,
-    "cap_after": 10577882.0
+    "cap_after": 11372364.0
   },
   {
     "sym": "BEL",
     "entry_date": "2025-07-04",
     "exit_date": "2025-07-07",
-    "qty": 24740,
+    "qty": 26598,
     "entry_px": 427.55,
     "exit_px": 417.1,
-    "pnl": -258533.0,
+    "pnl": -277949.0,
     "ret_pct": -2.44,
-    "cap_after": 10319349.0
-  },
-  {
-    "sym": "ETERNAL",
-    "entry_date": "2025-07-07",
-    "exit_date": "2025-07-08",
-    "qty": 39912,
-    "entry_px": 258.55,
-    "exit_px": 263.5,
-    "pnl": 197564.0,
-    "ret_pct": 1.91,
-    "cap_after": 10516914.0
+    "cap_after": 11094415.0
   },
   {
     "sym": "BHARTIARTL",
-    "entry_date": "2025-07-08",
+    "entry_date": "2025-07-07",
     "exit_date": "2025-07-10",
-    "qty": 5180,
-    "entry_px": 2030.0,
+    "qty": 5454,
+    "entry_px": 2033.9,
     "exit_px": 1964.5,
-    "pnl": -339290.0,
-    "ret_pct": -3.23,
-    "cap_after": 10177624.0
+    "pnl": -378508.0,
+    "ret_pct": -3.41,
+    "cap_after": 10715907.0
   },
   {
-    "sym": "INDIGO",
+    "sym": "RELIANCE",
     "entry_date": "2025-07-10",
     "exit_date": "2025-07-11",
-    "qty": 1742,
-    "entry_px": 5840.0,
-    "exit_px": 5917.5,
-    "pnl": 135005.0,
-    "ret_pct": 1.33,
-    "cap_after": 10312629.0
+    "qty": 7062,
+    "entry_px": 1517.2,
+    "exit_px": 1495.2,
+    "pnl": -155364.0,
+    "ret_pct": -1.45,
+    "cap_after": 10560543.0
   },
   {
     "sym": "KOTAKBANK",
     "entry_date": "2025-07-11",
     "exit_date": "2025-07-14",
-    "qty": 23220,
+    "qty": 23778,
     "entry_px": 444.12,
     "exit_px": 440.76,
-    "pnl": -78019.0,
+    "pnl": -79894.0,
     "ret_pct": -0.76,
-    "cap_after": 10234609.0
+    "cap_after": 10480649.0
   },
   {
     "sym": "ETERNAL",
     "entry_date": "2025-07-14",
     "exit_date": "2025-07-16",
-    "qty": 37821,
+    "qty": 38731,
     "entry_px": 270.6,
     "exit_px": 262.35,
-    "pnl": -312023.0,
+    "pnl": -319531.0,
     "ret_pct": -3.05,
-    "cap_after": 9922586.0
+    "cap_after": 10161119.0
   },
   {
     "sym": "INDIGO",
     "entry_date": "2025-07-16",
     "exit_date": "2025-07-17",
-    "qty": 1667,
+    "qty": 1707,
     "entry_px": 5950.0,
     "exit_px": 5796.5,
-    "pnl": -255884.0,
+    "pnl": -262024.0,
     "ret_pct": -2.58,
-    "cap_after": 9666702.0
+    "cap_after": 9899094.0
   },
   {
     "sym": "KOTAKBANK",
     "entry_date": "2025-07-17",
     "exit_date": "2025-07-18",
-    "qty": 22265,
+    "qty": 22800,
     "entry_px": 434.16,
     "exit_px": 428.1,
-    "pnl": -134926.0,
+    "pnl": -138168.0,
     "ret_pct": -1.4,
-    "cap_after": 9531776.0
+    "cap_after": 9760926.0
   },
   {
     "sym": "INDIGO",
     "entry_date": "2025-07-18",
     "exit_date": "2025-07-21",
-    "qty": 1626,
+    "qty": 1665,
     "entry_px": 5861.0,
     "exit_px": 5878.0,
-    "pnl": 27642.0,
+    "pnl": 28305.0,
     "ret_pct": 0.29,
-    "cap_after": 9559418.0
+    "cap_after": 9789231.0
   },
   {
     "sym": "ETERNAL",
     "entry_date": "2025-07-21",
     "exit_date": "2025-08-26",
-    "qty": 35183,
+    "qty": 36029,
     "entry_px": 271.7,
     "exit_px": 317.9,
-    "pnl": 1625455.0,
+    "pnl": 1664540.0,
     "ret_pct": 17.0,
-    "cap_after": 11184872.0
+    "cap_after": 11453771.0
   },
   {
     "sym": "MARUTI",
     "entry_date": "2025-08-26",
     "exit_date": "2025-08-28",
-    "qty": 760,
+    "qty": 778,
     "entry_px": 14714.0,
     "exit_px": 14752.0,
-    "pnl": 28880.0,
+    "pnl": 29564.0,
     "ret_pct": 0.26,
-    "cap_after": 11213752.0
+    "cap_after": 11483335.0
   },
   {
     "sym": "ETERNAL",
     "entry_date": "2025-08-28",
     "exit_date": "2025-09-03",
-    "qty": 35542,
+    "qty": 36397,
     "entry_px": 315.5,
     "exit_px": 326.1,
-    "pnl": 376745.0,
+    "pnl": 385808.0,
     "ret_pct": 3.36,
-    "cap_after": 11590498.0
+    "cap_after": 11869143.0
   },
   {
     "sym": "MARUTI",
     "entry_date": "2025-09-03",
     "exit_date": "2025-09-22",
-    "qty": 776,
+    "qty": 795,
     "entry_px": 14927.0,
     "exit_px": 15816.0,
-    "pnl": 689864.0,
+    "pnl": 706755.0,
     "ret_pct": 5.96,
-    "cap_after": 12280362.0
+    "cap_after": 12575898.0
   },
   {
     "sym": "ADANIPOWER",
     "entry_date": "2025-09-22",
     "exit_date": "2025-09-24",
-    "qty": 72131,
+    "qty": 73867,
     "entry_px": 170.25,
     "exit_px": 144.5,
-    "pnl": -1857373.0,
+    "pnl": -1902075.0,
     "ret_pct": -15.12,
-    "cap_after": 10422988.0
+    "cap_after": 10673823.0
   },
   {
     "sym": "MARUTI",
     "entry_date": "2025-09-24",
     "exit_date": "2025-09-29",
-    "qty": 641,
+    "qty": 656,
     "entry_px": 16249.0,
     "exit_px": 15984.0,
-    "pnl": -169865.0,
+    "pnl": -173840.0,
     "ret_pct": -1.63,
-    "cap_after": 10253123.0
+    "cap_after": 10499983.0
   },
   {
     "sym": "ADANIPOWER",
     "entry_date": "2025-09-29",
     "exit_date": "2025-11-06",
-    "qty": 69915,
+    "qty": 71598,
     "entry_px": 146.65,
     "exit_px": 153.17,
-    "pnl": 455846.0,
+    "pnl": 466819.0,
     "ret_pct": 4.45,
-    "cap_after": 10708969.0
+    "cap_after": 10966802.0
   },
   {
     "sym": "SBIN",
     "entry_date": "2025-11-06",
-    "exit_date": "2025-11-10",
-    "qty": 11146,
+    "exit_date": "2025-11-12",
+    "qty": 11414,
     "entry_px": 960.75,
-    "exit_px": 951.15,
-    "pnl": -107002.0,
-    "ret_pct": -1.0,
-    "cap_after": 10601968.0
+    "exit_px": 957.15,
+    "pnl": -41090.0,
+    "ret_pct": -0.37,
+    "cap_after": 10925711.0
   },
   {
     "sym": "SHRIRAMFIN",
-    "entry_date": "2025-11-10",
-    "exit_date": "2025-12-16",
-    "qty": 12911,
-    "entry_px": 821.1,
-    "exit_px": 848.4,
-    "pnl": 352470.0,
-    "ret_pct": 3.32,
-    "cap_after": 10954438.0
+    "entry_date": "2025-11-12",
+    "exit_date": "2025-11-14",
+    "qty": 13283,
+    "entry_px": 822.5,
+    "exit_px": 809.3,
+    "pnl": -175336.0,
+    "ret_pct": -1.6,
+    "cap_after": 10750376.0
+  },
+  {
+    "sym": "BHARTIARTL",
+    "entry_date": "2025-11-14",
+    "exit_date": "2025-11-18",
+    "qty": 5117,
+    "entry_px": 2100.7,
+    "exit_px": 2149.2,
+    "pnl": 248174.0,
+    "ret_pct": 2.31,
+    "cap_after": 10998550.0
+  },
+  {
+    "sym": "SHRIRAMFIN",
+    "entry_date": "2025-11-18",
+    "exit_date": "2025-11-25",
+    "qty": 13409,
+    "entry_px": 820.2,
+    "exit_px": 838.25,
+    "pnl": 242032.0,
+    "ret_pct": 2.2,
+    "cap_after": 11240583.0
+  },
+  {
+    "sym": "SBIN",
+    "entry_date": "2025-11-25",
+    "exit_date": "2025-11-26",
+    "qty": 11428,
+    "entry_px": 983.6,
+    "exit_px": 983.9,
+    "pnl": 3428.0,
+    "ret_pct": 0.03,
+    "cap_after": 11244011.0
+  },
+  {
+    "sym": "SHRIRAMFIN",
+    "entry_date": "2025-11-26",
+    "exit_date": "2025-12-02",
+    "qty": 13126,
+    "entry_px": 856.6,
+    "exit_px": 843.4,
+    "pnl": -173263.0,
+    "ret_pct": -1.54,
+    "cap_after": 11070748.0
+  },
+  {
+    "sym": "RELIANCE",
+    "entry_date": "2025-12-02",
+    "exit_date": "2025-12-03",
+    "qty": 7159,
+    "entry_px": 1546.3,
+    "exit_px": 1538.8,
+    "pnl": -53692.0,
+    "ret_pct": -0.49,
+    "cap_after": 11017055.0
+  },
+  {
+    "sym": "SHRIRAMFIN",
+    "entry_date": "2025-12-03",
+    "exit_date": "2025-12-05",
+    "qty": 13304,
+    "entry_px": 828.1,
+    "exit_px": 854.9,
+    "pnl": 356547.0,
+    "ret_pct": 3.24,
+    "cap_after": 11373603.0
+  },
+  {
+    "sym": "SBIN",
+    "entry_date": "2025-12-05",
+    "exit_date": "2025-12-08",
+    "qty": 11707,
+    "entry_px": 971.5,
+    "exit_px": 956.4,
+    "pnl": -176776.0,
+    "ret_pct": -1.55,
+    "cap_after": 11196827.0
+  },
+  {
+    "sym": "RELIANCE",
+    "entry_date": "2025-12-08",
+    "exit_date": "2025-12-09",
+    "qty": 7256,
+    "entry_px": 1543.0,
+    "exit_px": 1529.4,
+    "pnl": -98682.0,
+    "ret_pct": -0.88,
+    "cap_after": 11098145.0
   },
   {
     "sym": "INFY",
-    "entry_date": "2025-12-16",
-    "exit_date": "2025-12-19",
-    "qty": 6877,
-    "entry_px": 1592.9,
-    "exit_px": 1638.7,
-    "pnl": 314967.0,
-    "ret_pct": 2.88,
-    "cap_after": 11269404.0
+    "entry_date": "2025-12-09",
+    "exit_date": "2025-12-22",
+    "qty": 6940,
+    "entry_px": 1599.0,
+    "exit_px": 1689.6,
+    "pnl": 628764.0,
+    "ret_pct": 5.67,
+    "cap_after": 11726909.0
   },
   {
     "sym": "HINDZINC",
-    "entry_date": "2025-12-19",
+    "entry_date": "2025-12-22",
     "exit_date": "2026-01-30",
-    "qty": 19141,
-    "entry_px": 588.75,
+    "qty": 19335,
+    "entry_px": 606.5,
     "exit_px": 628.5,
-    "pnl": 760855.0,
-    "ret_pct": 6.75,
-    "cap_after": 12030259.0
+    "pnl": 425370.0,
+    "ret_pct": 3.63,
+    "cap_after": 12152279.0
   },
   {
     "sym": "BEL",
     "entry_date": "2026-01-30",
     "exit_date": "2026-02-05",
-    "qty": 26793,
+    "qty": 27065,
     "entry_px": 449.0,
     "exit_px": 432.9,
-    "pnl": -431367.0,
+    "pnl": -435746.0,
     "ret_pct": -3.59,
-    "cap_after": 11598892.0
+    "cap_after": 11716533.0
   },
   {
     "sym": "SBIN",
     "entry_date": "2026-02-05",
     "exit_date": "2026-03-05",
-    "qty": 10804,
+    "qty": 10914,
     "entry_px": 1073.5,
     "exit_px": 1169.5,
-    "pnl": 1037184.0,
+    "pnl": 1047744.0,
     "ret_pct": 8.94,
-    "cap_after": 12636076.0
+    "cap_after": 12764277.0
   },
   {
     "sym": "BEL",
     "entry_date": "2026-03-05",
     "exit_date": "2026-03-11",
-    "qty": 27469,
+    "qty": 27748,
     "entry_px": 460.0,
     "exit_px": 454.1,
-    "pnl": -162067.0,
+    "pnl": -163713.0,
     "ret_pct": -1.28,
-    "cap_after": 12474009.0
+    "cap_after": 12600564.0
   },
   {
     "sym": "SBIN",
     "entry_date": "2026-03-11",
     "exit_date": "2026-03-12",
-    "qty": 11432,
+    "qty": 11548,
     "entry_px": 1091.1,
     "exit_px": 1085.2,
-    "pnl": -67449.0,
+    "pnl": -68133.0,
     "ret_pct": -0.54,
-    "cap_after": 12406560.0
+    "cap_after": 12532430.0
   },
   {
     "sym": "BEL",
     "entry_date": "2026-03-12",
     "exit_date": "2026-03-13",
-    "qty": 27354,
+    "qty": 27631,
     "entry_px": 453.55,
     "exit_px": 439.4,
-    "pnl": -387059.0,
+    "pnl": -390979.0,
     "ret_pct": -3.12,
-    "cap_after": 12019501.0
+    "cap_after": 12141452.0
   },
   {
     "sym": "ONGC",
     "entry_date": "2026-03-13",
     "exit_date": "2026-03-16",
-    "qty": 45511,
+    "qty": 45972,
     "entry_px": 264.1,
     "exit_px": 260.45,
-    "pnl": -166115.0,
+    "pnl": -167798.0,
     "ret_pct": -1.38,
-    "cap_after": 11853386.0
+    "cap_after": 11973654.0
   },
   {
     "sym": "SBIN",
     "entry_date": "2026-03-16",
     "exit_date": "2026-03-17",
-    "qty": 11112,
+    "qty": 11224,
     "entry_px": 1066.7,
     "exit_px": 1064.7,
-    "pnl": -22224.0,
+    "pnl": -22448.0,
     "ret_pct": -0.19,
-    "cap_after": 11831162.0
+    "cap_after": 11951206.0
   },
   {
     "sym": "ONGC",
     "entry_date": "2026-03-17",
     "exit_date": "2026-03-18",
-    "qty": 44688,
+    "qty": 45141,
     "entry_px": 264.75,
     "exit_px": 265.0,
-    "pnl": 11172.0,
+    "pnl": 11285.0,
     "ret_pct": 0.09,
-    "cap_after": 11842334.0
+    "cap_after": 11962491.0
   },
   {
-    "sym": "TATASTEEL",
+    "sym": "BEL",
     "entry_date": "2026-03-18",
     "exit_date": "2026-03-19",
-    "qty": 60602,
-    "entry_px": 195.41,
-    "exit_px": 190.51,
-    "pnl": -296950.0,
-    "ret_pct": -2.51,
-    "cap_after": 11545384.0
-  },
-  {
-    "sym": "ONGC",
-    "entry_date": "2026-03-19",
-    "exit_date": "2026-03-20",
-    "qty": 42903,
-    "entry_px": 269.1,
-    "exit_px": 265.4,
-    "pnl": -158741.0,
-    "ret_pct": -1.37,
-    "cap_after": 11386643.0
+    "qty": 27027,
+    "entry_px": 442.6,
+    "exit_px": 430.8,
+    "pnl": -318919.0,
+    "ret_pct": -2.67,
+    "cap_after": 11643573.0
   },
   {
     "sym": "SBIN",
-    "entry_date": "2026-03-20",
+    "entry_date": "2026-03-19",
     "exit_date": "2026-03-24",
-    "qty": 10762,
-    "entry_px": 1058.0,
+    "qty": 11100,
+    "entry_px": 1048.9,
     "exit_px": 1030.8,
-    "pnl": -292726.0,
-    "ret_pct": -2.57,
-    "cap_after": 11093916.0
+    "pnl": -200910.0,
+    "ret_pct": -1.73,
+    "cap_after": 11442663.0
   },
   {
     "sym": "BEL",
     "entry_date": "2026-03-24",
     "exit_date": "2026-03-27",
-    "qty": 26767,
+    "qty": 27609,
     "entry_px": 414.45,
     "exit_px": 404.75,
-    "pnl": -259640.0,
+    "pnl": -267807.0,
     "ret_pct": -2.34,
-    "cap_after": 10834277.0
+    "cap_after": 11174855.0
   },
   {
     "sym": "SBIN",
     "entry_date": "2026-03-27",
     "exit_date": "2026-04-01",
-    "qty": 10627,
+    "qty": 10961,
     "entry_px": 1019.5,
     "exit_px": 1017.8,
-    "pnl": -18066.0,
+    "pnl": -18634.0,
     "ret_pct": -0.17,
-    "cap_after": 10816211.0
+    "cap_after": 11156222.0
   },
   {
     "sym": "BEL",
     "entry_date": "2026-04-01",
     "exit_date": "2026-04-10",
-    "qty": 25832,
+    "qty": 26644,
     "entry_px": 418.7,
     "exit_px": 442.45,
-    "pnl": 613510.0,
+    "pnl": 632795.0,
     "ret_pct": 5.67,
-    "cap_after": 11429721.0
+    "cap_after": 11789017.0
   },
   {
     "sym": "AXISBANK",
     "entry_date": "2026-04-10",
     "exit_date": "2026-04-13",
-    "qty": 8461,
+    "qty": 8727,
     "entry_px": 1350.8,
     "exit_px": 1353.6,
-    "pnl": 23691.0,
+    "pnl": 24436.0,
     "ret_pct": 0.21,
-    "cap_after": 11453411.0
+    "cap_after": 11813452.0
   }
 ]

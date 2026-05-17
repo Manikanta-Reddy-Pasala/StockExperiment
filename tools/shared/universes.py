@@ -202,8 +202,17 @@ def fetch_15m_fyers(symbol: str, days: int = 30, user_id: int = 1) -> pd.DataFra
 
 
 def _fetch_daily_fyers_raw(symbol: str, days: int, user_id: int = 1,
-                            chunk_days: int = 365) -> pd.DataFrame:
-    """Daily candles direct from Fyers (no cache). Used by prefetch."""
+                            chunk_days: int = 360) -> pd.DataFrame:
+    """Daily candles direct from Fyers (no cache). Used by prefetch.
+
+    chunk_days=360 stays safely under Fyers's 366-day max-per-request limit
+    (cursor → cursor+chunk_days = 361-day span). chunk_days=365 was hitting
+    the limit intermittently with -50 'Invalid input' errors.
+
+    Robustness: each chunk has try/except + cursor advance; so recent IPOs
+    that have no data for early chunks still get later chunks pulled
+    successfully (don't abort the symbol on first chunk failure).
+    """
     svc = _fyers_service()
     if svc is None:
         return pd.DataFrame()

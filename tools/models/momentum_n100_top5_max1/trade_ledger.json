@@ -297,47 +297,47 @@
     "cap_after": 3194999.0
   },
   {
-    "sym": "HINDZINC",
+    "sym": "TMCV",
     "entry_date": "2026-01-01",
     "exit_date": "2026-02-01",
-    "qty": 5221,
-    "entry_px": 611.95,
-    "exit_px": 570.1,
-    "pnl": -218499.0,
-    "ret_pct": -6.84,
-    "cap_after": 2976501.0
+    "qty": 7469,
+    "entry_px": 427.75,
+    "exit_px": 441.3,
+    "pnl": 101205.0,
+    "ret_pct": 3.17,
+    "cap_after": 3296204.0
   },
   {
     "sym": "SHRIRAMFIN",
     "entry_date": "2026-02-01",
     "exit_date": "2026-03-02",
-    "qty": 2983,
+    "qty": 3304,
     "entry_px": 997.6,
     "exit_px": 1052.5,
-    "pnl": 163767.0,
+    "pnl": 181390.0,
     "ret_pct": 5.5,
-    "cap_after": 3140267.0
+    "cap_after": 3477594.0
   },
   {
-    "sym": "ABB",
+    "sym": "ENRIN",
     "entry_date": "2026-03-02",
     "exit_date": "2026-04-01",
-    "qty": 524,
-    "entry_px": 5983.0,
-    "exit_px": 6063.0,
-    "pnl": 41920.0,
-    "ret_pct": 1.34,
-    "cap_after": 3182187.0
+    "qty": 1169,
+    "entry_px": 2972.7,
+    "exit_px": 2613.9,
+    "pnl": -419437.0,
+    "ret_pct": -12.07,
+    "cap_after": 3058157.0
   },
   {
     "sym": "ADANIPOWER",
     "entry_date": "2026-04-01",
     "exit_date": "2026-05-04",
-    "qty": 20254,
+    "qty": 19465,
     "entry_px": 157.11,
     "exit_px": 227.3,
-    "pnl": 1421628.0,
+    "pnl": 1366248.0,
     "ret_pct": 44.68,
-    "cap_after": 4603816.0
+    "cap_after": 4424405.0
   }
 ]
