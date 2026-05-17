@@ -1,22 +1,30 @@
-# midcap_narrow_60d_breakout — Full Trade Ledger (V1 WINNER, with ANGELONE)
+# midcap_narrow_60d_breakout — Full Trade Ledger (ANGELONE EXCLUDED)
 
-**Pseudo-midcap (N500 skip-30 ADV, take next 100), V1 winner config (hh=40, vm=2.0, tg=+100%, tr=20%, mh=90d, NO SMA20).**
+**Data matches SUMMARY.md** — ANGELONE filtered from pseudo-midcap universe (data anomaly).
 
-Capital ₹10L → ₹83,811,502 (+8281.15%) · CAGR +337.62% · 13 trades
+Capital ₹10L → ₹4,792,492 (+379.25%) · CAGR +68.60% · 12 trades · Max DD 17.83% · WR 75.0%
 
-⚠️ Trade #7 ANGELONE = +802% in 2 months, likely corp-action data anomaly. See SUMMARY.md for ex-ANGELONE numbers.
+**Full V1 with ANGELONE included** (historical reference, NOT shown below): CAGR +337.62%, NAV ₹8.38 Cr, 13 trades, WR 92.3%. Single ANGELONE trade (entry ₹316 → exit ₹2856 = 9x in 2 months) added ₹4.42 Cr — likely corporate-action data anomaly. Excluded for honest result.
 
-## Returns by NSE cap segment
+## Returns by NSE cap segment (ANGELONE excluded)
 
-| Cap | Trades | Wins | Losses | WR | Total PnL ₹ |
-|---|---:|---:|---:|---:|---:|
-| **Large** | 4 | 3 | 1 | 75% | +2,922,197 |
-| **Mid** | 5 | 5 | 0 | 100% | +22,691,016 |
-| **Small** | 4 | 4 | 0 | 100% | +58,302,640 |
+| Cap | Trades | Wins | Losses | WR | Total PnL ₹ | Avg PnL/trade ₹ |
+|---|---:|---:|---:|---:|---:|---:|
+| **Large** | 4 | 2 | 2 | 50% | +1,699,565 | +424,891 |
+| **Mid** | 5 | 5 | 0 | 100% | +2,198,826 | +439,765 |
+| **Small** | 3 | 2 | 1 | 67% | -314,111 | -104,704 |
 
-## All trades
+## Yearly money flow
 
-| # | Symbol | **Cap** | NSE Index | Entry Date | Entry ₹ | Qty | Invested ₹ | Exit Date | Exit ₹ | PnL ₹ | Ret % | Reason |
+| Year | Open | Close | ROI | Trades |
+|---|---:|---:|---:|---:|
+| 2023-24 | ₹1,000,000 | ₹3,343,026 | **+234.30%** | 4 |
+| 2024-25 | ₹3,343,026 | ₹5,073,918 | **+51.78%** | 4 |
+| 2025-26 | ₹5,073,918 | ₹4,792,492 | **-5.55%** | 4 |
+
+## All 12 trades (ANGELONE filtered)
+
+| # | Symbol | Cap | Index | Entry Date | Entry ₹ | Qty | Invested ₹ | Exit Date | Exit ₹ | PnL ₹ | Ret % | Reason |
 |--:|---|---|---|---|---:|---:|---:|---|---:|---:|---:|---|
 | 1 | MAZDOCK | **Large** | Nifty 100 | 2023-05-17 | 407.39 | 2,454 | ₹999,735 | 2023-07-12 | 865.06 | +1,120,997 | +112.56% | TARGET |
 | 2 | INDIANB | **Mid** | Nifty Midcap 150 | 2023-07-13 | 325.32 | 6,519 | ₹2,120,761 | 2023-10-11 | 422.73 | +632,187 | +30.07% | MAX_HOLD |
@@ -24,11 +32,16 @@ Capital ₹10L → ₹83,811,502 (+8281.15%) · CAGR +337.62% · 13 trades
 | 4 | CHENNPETRO | **Small** | Nifty Smallcap 250 | 2024-01-12 | 848.75 | 3,739 | ₹3,173,476 | 2024-04-12 | 894.90 | +169,212 | +5.54% | MAX_HOLD |
 | 5 | HINDZINC | **Large** | Nifty 100 | 2024-04-15 | 425.42 | 7,858 | ₹3,342,950 | 2024-07-15 | 659.04 | +1,830,550 | +55.07% | MAX_HOLD |
 | 6 | OFSS | **Mid** | Nifty Midcap 150 | 2024-07-16 | 10,960.95 | 471 | ₹5,162,607 | 2024-10-14 | 11,719.72 | +351,840 | +7.03% | MAX_HOLD |
-| 7 | ANGELONE | **Small** | Nifty Smallcap 250 | 2024-10-16 | 316.82 | 17,440 | ₹5,525,341 | 2024-12-23 | 2,856.69 | +44,245,561 | +802.59% | TARGET |
-| 8 | INDIGO | **Large** | Nifty 100 | 2024-12-26 | 4,657.60 | 10,685 | ₹49,766,456 | 2025-03-26 | 5,020.12 | +3,819,886 | +7.89% | MAX_HOLD |
-| 9 | FEDERALBNK | **Mid** | Nifty Midcap 150 | 2025-03-28 | 197.19 | 271,776 | ₹53,591,509 | 2025-06-26 | 209.81 | +3,373,584 | +6.51% | MAX_HOLD |
-| 10 | HDFCLIFE | **Large** | Nifty 100 | 2025-06-30 | 809.81 | 70,342 | ₹56,963,655 | 2025-09-29 | 755.84 | -3,849,236 | -6.57% | MAX_HOLD |
-| 11 | HINDPETRO | **Mid** | Nifty Midcap 150 | 2025-09-30 | 442.49 | 120,036 | ₹53,114,730 | 2025-12-29 | 473.68 | +3,686,300 | +7.15% | MAX_HOLD |
-| 12 | HINDCOPPER | **Small** | Nifty Smallcap 250 | 2025-12-30 | 483.43 | 117,495 | ₹56,800,608 | 2026-02-01 | 598.65 | +13,467,157 | +23.96% | TRAIL |
-| 13 | BHARATFORG | **Mid** | Nifty Midcap 150 | 2026-02-04 | 1,541.54 | 45,583 | ₹70,268,018 | 2026-05-05 | 1,864.73 | +14,647,105 | +21.09% | MAX_HOLD |
-| 14 | WOCKPHARMA | **Small** | Nifty Smallcap 250 | 2026-05-06 | 1,566.26 | 54,215 | ₹84,914,786 | OPEN | 1,545.90 | -1,104,072 | -1.30% | OPEN |
+| 7 | HDFCAMC | **Large** | Nifty 100 | 2024-10-16 | 2,282.28 | 2,420 | ₹5,523,118 | 2025-01-14 | 1,930.60 | -855,764 | -15.32% | MAX_HOLD |
+| 8 | INDUSTOWER | **Mid** | Nifty Midcap 150 | 2025-01-21 | 374.27 | 12,476 | ₹4,669,393 | 2025-04-21 | 407.09 | +404,346 | +8.88% | MAX_HOLD |
+| 9 | TATACONSUM | **Large** | Nifty 100 | 2025-04-25 | 1,161.36 | 4,368 | ₹5,072,820 | 2025-07-24 | 1,071.73 | -396,218 | -7.63% | MAX_HOLD |
+| 10 | PAYTM | **Mid** | Nifty Midcap 150 | 2025-07-25 | 1,101.10 | 4,248 | ₹4,677,473 | 2025-10-23 | 1,282.82 | +766,460 | +16.62% | MAX_HOLD |
+| 11 | SCI | **Small** | Nifty Smallcap 250 | 2025-10-24 | 248.25 | 21,930 | ₹5,444,122 | 2026-01-22 | 207.23 | -904,033 | -16.44% | MAX_HOLD |
+| 12 | INDIANB | **Mid** | Nifty Midcap 150 | 2026-01-23 | 904.35 | 5,020 | ₹4,539,837 | 2026-04-23 | 914.04 | +43,993 | +1.17% | MAX_HOLD |
+
+## Notes
+
+- This ledger reflects the **ANGELONE-excluded V1** result that matches SUMMARY.md headline.
+- The original V1 (with ANGELONE included) achieved +337.62% CAGR but is treated as an inflated upper bound due to suspected data anomaly.
+- Universe = pseudo-midcap (N500 skip-30 ADV, take next 100) MINUS ANGELONE
+- Strategy = 40d breakout + vol>2× + close>200d SMA, exits TARGET +100% / TRAIL -20% / MAX_HOLD 90d, NO SMA20 exit
