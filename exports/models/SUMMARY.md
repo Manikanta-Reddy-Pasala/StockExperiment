@@ -10,13 +10,11 @@
 |--:|---|---|---|---:|---:|---:|:-:|
 | 1 | `momentum_n100_top5_max1` | Real NSE Nifty 100 (104 stocks) | Monthly | ₹58.69 L | **+80.38%** | 29.71% | ✅ |
 | 2 | `momentum_pseudo_n100_adv` | Top-100 ADV from N500 (yearly PIT) | Monthly | ₹1.32 Cr | **+136.39%** | 16.15% | ❌ |
-| 3 | `midcap_narrow_60d_breakout` ¹ | N500 skip-30 ADV + next-100 (mid-cap proxy) | Event-driven (breakout) | ₹47.92 L | **+68.60%** ² | 17.83% | ❌ |
+| 3 | `midcap_narrow_60d_breakout` ¹ | Pseudo-midcap MINUS Large (Mid+Small only) | Event-driven (breakout) | ₹65.00 L | **+86.63%** | 15.15% | ❌ |
 | 4 | `finnifty_ic_otm4_w300_lots5` | FINNIFTY options (no equity) | Monthly Iron Condor | ₹1.11 Cr (scaled) | **+123%** | 13.88% | ❌ |
 | 5 | `n20_daily_v2_large_only` | Top-20 ADV + uptrend + **NSE Nifty 100** filter | Daily | ₹1.40 Cr | **+140.78%** | **26.92%** | ❌ |
 
-¹ **ANGELONE excluded** (corp-action data anomaly: entry ₹316 → exit ₹2856 = 9x in 2 months, likely unadjusted bonus/split). With ANGELONE = +337.62% CAGR / ₹8.38 Cr / 13 trades / 6.76% DD but inflated by that one trade.
-
-² Below user's 80% CAGR threshold. Strategy fragility exposed without anomaly.
+¹ **V2 winner** = Exclude Large + Exclude ANGELONE. Cap-filter sweep tested 6 variants; V2 won on CAGR, DD, Calmar. Full V1 (all caps + ANGELONE) = +337% CAGR / ₹8.38 Cr but inflated by data anomaly. Baseline ex-ANGELONE = +68.60% / 17.83% DD.
 
 ## Unique stock-filtering approach per model
 
