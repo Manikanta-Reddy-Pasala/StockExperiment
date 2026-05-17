@@ -56,7 +56,10 @@ def load_universe(uf: str) -> List[str]:
 def load_daily(symbols: List[str], days_back: int = 90) -> pd.DataFrame:
     eng = _get_engine()
     end = datetime.now().date()
-    start = end - timedelta(days=days_back + 60)
+    # Calendar days → trading days ratio is ~5/7 minus holidays.
+    # Bump buffer to ensure days_back trading days are returned even after
+    # weekend/holiday gaps. 1.6x covers worst case + buffer for SMA warmup.
+    start = end - timedelta(days=int(days_back * 1.6) + 60)
     with eng.connect() as c:
         df = pd.read_sql(
             text(
@@ -200,7 +203,9 @@ def main() -> int:
 
     syms = load_universe(args.universe_file)
     log.info(f"Universe: {len(syms)} midcap_narrow symbols")
-    df = load_daily(syms, days_back=SMA_LONG + 30)
+    # SMA200 needs >=200 trading days. Pull 365 to be safe across weekends/
+    # holidays + give breakout/HH a clean lookback.
+    df = load_daily(syms, days_back=max(SMA_LONG + 60, 365))
     if df.empty:
         log.error("No historical data — cannot emit signals")
         Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
