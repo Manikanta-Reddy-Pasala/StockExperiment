@@ -10,7 +10,8 @@
 | 2 | `momentum_pseudo_n100_adv` | Large/mid blend equity | Pseudo-N100 (top-100 by 20-day ADV from N500) | **+136.39%** | 16.15% | ❌ |
 | 3 | `midcap_narrow_60d_breakout` | Mid-cap equity | Pseudo-midcap (N500 skip-30 ADV, take next 100) | **+337.62%** ⚠️ | 6.76% | ❌ |
 | 4 | `finnifty_ic_otm4_w300_lots5` | Options | FINNIFTY 4-strike Iron Condor chain | **+123%** compound | 13.88% | ❌ |
-| 5 | `n20_daily_30d_mc1_uptrend` | Top-20 concentrated equity | Top-20 by ADV + uptrend filter (PIT-strict) | **+157.27%** | 50.61% | ❌ |
+| 5 | `n20_daily_30d_mc1_uptrend` (v1) | Top-20 concentrated equity | Top-20 by ADV + uptrend filter (PIT-strict) | **+157.27%** | 50.61% | ❌ |
+| 6 | `n20_daily_v2_large_only` (v2) | Top-20 + Large-cap filter | v1 universe + NSE Nifty 100 membership filter | **+140.78%** | **26.92%** | ❌ |
 
 ⚠️ Midcap result heavily influenced by single ANGELONE trade (likely corporate-action data anomaly). See model README for details.
 
