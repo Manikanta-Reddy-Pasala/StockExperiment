@@ -82,12 +82,12 @@
   <div class="table-responsive">
     <table class="table table-sm align-middle mb-0">
       <thead><tr>
-        <th>Symbol</th><th class="text-end">Qty</th><th class="text-end">Entry</th>
+        <th>Symbol</th><th>Model</th><th class="text-end">Qty</th><th class="text-end">Entry</th>
         <th class="text-end">Live</th><th class="text-end">Cost</th>
         <th class="text-end">Market Value</th><th class="text-end">P&amp;L ₹</th><th class="text-end">P&amp;L %</th>
         <th class="text-center">Action</th>
       </tr></thead>
-      <tbody id="positions"><tr><td colspan="9" class="text-center text-muted py-3">Loading…</td></tr></tbody>
+      <tbody id="positions"><tr><td colspan="10" class="text-center text-muted py-3">Loading…</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -104,6 +104,22 @@ const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractio
 const fmtPct = n => (n>=0?"+":"") + Number(n||0).toFixed(2) + "%";
 const cls = n => n>0?"pos":(n<0?"neg":"neutral");
 
+// Symbol -> [model_name] map. Filled by loadAggregate, consumed by loadState.
+// Match both bare (HFCL) and Fyers (NSE:HFCL-EQ) forms.
+const SYMBOL_TO_MODEL = {};
+function _norm(sym) {
+  if (!sym) return '';
+  return sym.toUpperCase().replace(/^NSE:/, '').replace(/-EQ$/, '');
+}
+function lookupModel(sym) {
+  const key = _norm(sym);
+  const models = SYMBOL_TO_MODEL[key] || [];
+  if (!models.length) return '<span class="text-muted small">untracked</span>';
+  return models.map(m =>
+    `<a href="/admin/models/${m}/detail" class="badge bg-primary text-decoration-none">${m}</a>`
+  ).join(' ');
+}
+
 async function loadAggregate() {
   try {
     const r = await fetch('/admin/models/portfolio');
@@ -116,6 +132,15 @@ async function loadAggregate() {
     pnlEl.textContent = fmtINR(t.pnl_total) + ' (' + fmtPct(t.return_pct) + ')';
     pnlEl.className = 'fs-5 fw-bold ' + cls(t.pnl_total);
     document.getElementById('agg_realized').textContent = fmtINR(t.realized_pnl);
+
+    // Rebuild symbol→model lookup from latest portfolio snapshot.
+    Object.keys(SYMBOL_TO_MODEL).forEach(k => delete SYMBOL_TO_MODEL[k]);
+    (d.models||[]).forEach(m => {
+      if (!m.open_symbol) return;
+      const key = _norm(m.open_symbol);
+      (SYMBOL_TO_MODEL[key] = SYMBOL_TO_MODEL[key] || []).push(m.model_name);
+    });
+
     const tbody = document.getElementById('agg_tbody');
     tbody.innerHTML = '';
     // Skip-rendering disabled models. Totals strip above stays unchanged because
@@ -145,7 +170,8 @@ async function loadAggregate() {
 }
 
 async function loadState() {
-  loadAggregate();
+  // Await loadAggregate so SYMBOL_TO_MODEL is populated before rendering positions.
+  await loadAggregate();
   try {
     const r = await fetch('/admin/momrot/state');
     const d = await r.json();
@@ -161,11 +187,12 @@ async function loadState() {
 
     const tb = document.getElementById('positions');
     if (!s.open_positions || s.open_positions.length === 0) {
-      tb.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">No open Fyers positions</td></tr>';
+      tb.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-3">No open Fyers positions</td></tr>';
     } else {
       tb.innerHTML = s.open_positions.map(p => `
         <tr>
           <td><strong>${p.symbol}</strong></td>
+          <td>${lookupModel(p.symbol)}</td>
           <td class="text-end">${p.qty.toLocaleString('en-IN')}</td>
           <td class="text-end">${fmtINR(p.entry_price)}</td>
           <td class="text-end">${fmtINR(p.live_price)}</td>
