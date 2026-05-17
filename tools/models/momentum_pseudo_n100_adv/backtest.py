@@ -149,23 +149,57 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
                     entry_date = d.date().isoformat()
 
     final = cap
+    open_pos = None
     if hold:
         last = float(cl[hold].iloc[-1])
         final = cap + qty * last
+        open_pos = {
+            "sym": hold.replace("NSE:", "").replace("-EQ", ""),
+            "qty": qty,
+            "entry_px": round(entry_px, 2),
+            "entry_date": entry_date,
+            "last_px": round(last, 2),
+            "mtm_value": round(qty * last, 0),
+            "unrealized_pnl": round(qty * (last - entry_px), 0),
+        }
 
     wins   = sum(1 for t in trades if t["pnl"] > 0)
     losses = sum(1 for t in trades if t["pnl"] < 0)
     yrs    = (end - start).days / 365.25
     cagr   = ((final / capital) ** (1 / yrs) - 1) * 100
 
-    print(f"\nFinal NAV: ₹{final:,.0f}")
+    # Rebal-day cap_after DD (realized only; matches old reporting)
+    peak = capital; mdd = 0.0
+    for t in trades:
+        peak = max(peak, t["cap_after"])
+        dd = (peak - t["cap_after"]) / peak * 100
+        mdd = max(mdd, dd)
+    calmar = cagr / max(0.01, mdd)
+
+    print(f"\nFinal NAV: Rs.{final:,.0f}")
     print(f"Total: {(final/capital-1)*100:+.2f}%  CAGR: {cagr:+.2f}%")
     print(f"Trades: {len(trades)} (W={wins} L={losses}, WR={wins/max(1,wins+losses)*100:.1f}%)")
+    print(f"Max DD (rebal cap_after): {mdd:.2f}%  Calmar: {calmar:.2f}")
 
     if out_dir:
         out_dir = Path(out_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / "trade_ledger.json").write_text(json.dumps(trades, indent=2))
+        summary = {
+            "model": "momentum_pseudo_n100_adv",
+            "start": start.isoformat(), "end": end.isoformat(),
+            "years": round(yrs, 3),
+            "capital": capital, "final_nav": round(final, 0),
+            "total_return_pct": round((final / capital - 1) * 100, 2),
+            "cagr_pct": round(cagr, 2),
+            "max_dd_pct": round(mdd, 2),
+            "calmar": round(calmar, 2),
+            "trades": len(trades),
+            "wins": wins, "losses": losses,
+            "win_rate_pct": round(wins / max(1, wins + losses) * 100, 1),
+            "open_position": open_pos,
+        }
+        (out_dir / "summary.json").write_text(json.dumps(summary, indent=2))
 
     return final, cagr, trades
 

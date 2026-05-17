@@ -27,19 +27,20 @@
 
 | Metric | Value |
 |---|---:|
-| Final NAV | **₹16,157,286** |
-| Total return | **+1515.73%** |
-| 3-yr CAGR | **+152.81%** |
-| Max DD (rebal cap_after) | **12.60%** |
-| Calmar (CAGR / Max DD) | **12.13** |
-| Trades | 134 |
+| Final NAV (cap + open MTM) | **Rs.18,676,864** |
+| Total return | **+1767.69%** |
+| 2.99-yr CAGR | **+165.97%** |
+| Max DD | **24.57%** |
+| Calmar (CAGR / Max DD) | **6.76** |
+| Trades closed | 134 |
 | Wins / Losses | 58 / 75 |
 | Win rate | 43.6% |
-| Live deployment | ❌ NO |
+| Live deployment | NO |
+| Open position | **ADANIPOWER** qty 89,094 entry Rs.181.35 (2026-04-13) last Rs.209.63 unrealized +2,519,578 |
 
 ## NSE cap segment breakdown
 
-| Cap | Trades | Wins | Losses | WR | Total PnL ₹ |
+| Cap | Trades | Wins | Losses | WR | Total PnL Rs. |
 |---|---:|---:|---:|---:|---:|
 | **Large** | 134 | 58 | 75 | 44% | +15,157,289 |
 

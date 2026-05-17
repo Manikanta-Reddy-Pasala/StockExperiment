@@ -1,6 +1,6 @@
 # momentum_n100_top5_max1 — Trade Ledger
 
-₹10L → ₹6,305,316 (+530.53%) · CAGR +84.74% · 29 trades · Max DD 33.89% · WR 69.0%
+₹10L → ₹6,389,826 (+538.98%) · CAGR +85.85% · 29 trades · Max DD 33.89% · WR 69.0%
 
 Data: Fyers (split-adjusted cont_flag=1). Real NSE Nifty 100 monthly momentum rotation (top-1 by 30d ret) + MAX_PRICE≤₹3,000 filter.
 

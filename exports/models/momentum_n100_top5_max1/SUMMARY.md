@@ -26,19 +26,20 @@
 
 | Metric | Value |
 |---|---:|
-| Final NAV | **₹6,305,316** |
-| Total return | **+530.53%** |
-| 3-yr CAGR | **+84.74%** |
-| Max DD (rebal cap_after) | **33.89%** |
-| Calmar (CAGR / Max DD) | **2.50** |
-| Trades | 29 |
+| Final NAV (cap + open MTM) | **Rs.6,389,826** |
+| Total return | **+538.98%** |
+| 2.99-yr CAGR | **+85.85%** |
+| Max DD | **33.89%** |
+| Calmar (CAGR / Max DD) | **2.53** |
+| Trades closed | 29 |
 | Wins / Losses | 20 / 9 |
 | Win rate | 69.0% |
-| Live deployment | ✅ YES |
+| Live deployment | YES |
+| Open position | **ADANIGREEN** qty 4,885 entry Rs.1,290.70 (2026-05-04) last Rs.1,308.00 unrealized +84,510 |
 
 ## NSE cap segment breakdown
 
-| Cap | Trades | Wins | Losses | WR | Total PnL ₹ |
+| Cap | Trades | Wins | Losses | WR | Total PnL Rs. |
 |---|---:|---:|---:|---:|---:|
 | **Large** | 29 | 20 | 9 | 69% | +5,305,314 |
 

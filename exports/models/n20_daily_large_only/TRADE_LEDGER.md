@@ -1,6 +1,6 @@
 # n20_daily_large_only — Trade Ledger
 
-₹10L → ₹16,157,286 (+1515.73%) · CAGR +152.81% · 134 trades · Max DD 12.60% · WR 43.6%
+₹10L → ₹18,676,864 (+1767.69%) · CAGR +165.97% · 134 trades · Max DD 24.57% · WR 43.6%
 
 Data: Fyers (split-adjusted cont_flag=1). Top-20 ADV + uptrend + Nifty 100 + MAX_PRICE≤₹2,500. Daily rotation top-1 by 30d ret.
 

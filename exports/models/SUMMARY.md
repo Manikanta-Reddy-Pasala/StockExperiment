@@ -31,7 +31,7 @@
 | 1 | midcap_narrow_60d_breakout | +137.85% | 8.12% | **16.98** |
 | 2 | momentum_pseudo_n100_adv | +149.15% | 16.17% | **9.22** |
 | 3 | finnifty_ic_otm4_w300_lots5 | +123.27% | 13.88% | **8.88** |
-| 4 | n20_daily_large_only | +165.97% | 24.57% | **6.75** |
+| 4 | n20_daily_large_only | +165.97% | 24.57% | **6.76** |
 | 5 | momentum_n100_top5_max1 | +85.85% | 33.89% | **2.53** |
 
 ## What changed 2026-05-17 (MAX_PRICE filter)

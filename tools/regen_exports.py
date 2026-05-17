@@ -82,30 +82,39 @@ MODELS = {
 }
 
 
-def stats(trades):
+def stats(trades, summary=None):
+    """Prefer authoritative metrics from summary.json (final NAV includes
+    open-position MTM). Fall back to ledger-only computation if absent."""
     pnls = [t["pnl"] for t in trades]
     wins = sum(1 for p in pnls if p > 0)
     losses = sum(1 for p in pnls if p < 0)
-    total_pnl = sum(pnls)
-    final_cap = trades[-1]["cap_after"] if trades else 1_000_000
-    peak = 1_000_000
-    mdd = 0
-    for t in trades:
-        peak = max(peak, t["cap_after"])
-        dd = (peak - t["cap_after"]) / peak * 100
-        mdd = max(mdd, dd)
-    yrs = 3.00
-    cagr = ((final_cap / 1_000_000) ** (1 / yrs) - 1) * 100
+    if summary:
+        final = summary["final_nav"]
+        cagr = summary["cagr_pct"]
+        mdd = summary["max_dd_pct"]
+        calmar = summary["calmar"]
+        yrs = summary["years"]
+    else:
+        final = trades[-1]["cap_after"] if trades else 1_000_000
+        peak = 1_000_000; mdd = 0
+        for t in trades:
+            peak = max(peak, t["cap_after"])
+            dd = (peak - t["cap_after"]) / peak * 100
+            mdd = max(mdd, dd)
+        yrs = 3.00
+        cagr = ((final / 1_000_000) ** (1 / yrs) - 1) * 100
+        calmar = cagr / max(0.01, mdd)
     return {
         "n": len(trades),
-        "wins": wins,
-        "losses": losses,
+        "wins": wins, "losses": losses,
         "wr": wins / max(1, wins + losses) * 100,
-        "final": final_cap,
-        "total_pnl": total_pnl,
+        "final": final,
+        "total_pnl": sum(pnls),
         "cagr": cagr,
         "mdd": mdd,
-        "calmar": cagr / max(0.01, mdd),
+        "calmar": calmar,
+        "years": yrs,
+        "open_position": summary.get("open_position") if summary else None,
     }
 
 
@@ -121,8 +130,8 @@ def cap_breakdown(trades):
     return buckets
 
 
-def write_summary(model_dir, meta, trades):
-    s = stats(trades)
+def write_summary(model_dir, meta, trades, summary=None):
+    s = stats(trades, summary)
     out_path = ROOT / "exports/models" / model_dir / "SUMMARY.md"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     first_entry = trades[0].get("entry_date") or trades[0].get("entry", "?")
@@ -153,19 +162,24 @@ def write_summary(model_dir, meta, trades):
 
 | Metric | Value |
 |---|---:|
-| Final NAV | **₹{s['final']:,.0f}** |
+| Final NAV (cap + open MTM) | **Rs.{s['final']:,.0f}** |
 | Total return | **{(s['final']/1_000_000 - 1)*100:+.2f}%** |
-| 3-yr CAGR | **{s['cagr']:+.2f}%** |
-| Max DD (rebal cap_after) | **{s['mdd']:.2f}%** |
+| {s['years']:.2f}-yr CAGR | **{s['cagr']:+.2f}%** |
+| Max DD | **{s['mdd']:.2f}%** |
 | Calmar (CAGR / Max DD) | **{s['calmar']:.2f}** |
-| Trades | {s['n']} |
+| Trades closed | {s['n']} |
 | Wins / Losses | {s['wins']} / {s['losses']} |
 | Win rate | {s['wr']:.1f}% |
-| Live deployment | {'✅ YES' if meta['live'] else '❌ NO'} |
-
+| Live deployment | {'YES' if meta['live'] else 'NO'} |
+"""
+    op = s.get('open_position')
+    if op:
+        md += (f"| Open position | **{op['sym']}** qty {op['qty']:,} entry Rs.{op['entry_px']:,.2f} "
+               f"({op['entry_date']}) last Rs.{op['last_px']:,.2f} unrealized {op['unrealized_pnl']:+,.0f} |\n")
+    md += """
 ## NSE cap segment breakdown
 
-| Cap | Trades | Wins | Losses | WR | Total PnL ₹ |
+| Cap | Trades | Wins | Losses | WR | Total PnL Rs. |
 |---|---:|---:|---:|---:|---:|
 """
     for seg in ["Large", "Mid", "Small", "Other"]:
@@ -192,8 +206,8 @@ def write_summary(model_dir, meta, trades):
     print(f"  wrote {out_path}")
 
 
-def write_ledger(model_dir, meta, trades):
-    s = stats(trades)
+def write_ledger(model_dir, meta, trades, summary=None):
+    s = stats(trades, summary)
     out_path = ROOT / "exports/models" / model_dir / "TRADE_LEDGER.md"
     md = f"""# {model_dir} — Trade Ledger
 
@@ -240,9 +254,16 @@ def main():
         if not trades:
             print(f"SKIP {model}: empty ledger")
             continue
-        print(f"{model}: {len(trades)} trades")
-        write_summary(model, meta, trades)
-        write_ledger(model, meta, trades)
+        summary_path = ROOT / "tools/models" / model / "summary.json"
+        summary = None
+        if summary_path.exists():
+            with open(summary_path) as f:
+                summary = json.load(f)
+        else:
+            print(f"  WARN: no summary.json for {model} — falling back to ledger-only metrics")
+        print(f"{model}: {len(trades)} trades, summary={'yes' if summary else 'no'}")
+        write_summary(model, meta, trades, summary)
+        write_ledger(model, meta, trades, summary)
 
 
 if __name__ == "__main__":

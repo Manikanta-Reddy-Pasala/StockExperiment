@@ -1,6 +1,6 @@
 # momentum_pseudo_n100_adv — Trade Ledger
 
-₹10L → ₹15,157,847 (+1415.78%) · CAGR +147.48% · 27 trades · Max DD 16.17% · WR 88.9%
+₹10L → ₹15,361,000 (+1436.10%) · CAGR +149.15% · 27 trades · Max DD 16.17% · WR 88.9%
 
 Data: Fyers (split-adjusted cont_flag=1). Pseudo-N100 (top-100 ADV from N500 − Smallcap) + uptrend + MAX_PRICE≤₹3,000. Monthly rotation top-1 by 30d ret.
 

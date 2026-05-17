@@ -1,0 +1,26 @@
+{
+  "model": "n20_daily_large_only",
+  "start": "2023-05-15",
+  "end": "2026-05-12",
+  "years": 2.992,
+  "capital": 1000000.0,
+  "final_nav": 18676864.0,
+  "total_return_pct": 1767.69,
+  "cagr_pct": 165.97,
+  "max_dd_pct": 24.57,
+  "max_dd_realized_pct": 12.6,
+  "calmar": 6.76,
+  "trades": 134,
+  "wins": 58,
+  "losses": 75,
+  "win_rate_pct": 43.6,
+  "open_position": {
+    "sym": "ADANIPOWER",
+    "qty": 89094,
+    "entry_px": 181.35,
+    "entry_date": "2026-04-13",
+    "last_px": 209.63,
+    "mtm_value": 18676775.0,
+    "unrealized_pnl": 2519578.0
+  }
+}
