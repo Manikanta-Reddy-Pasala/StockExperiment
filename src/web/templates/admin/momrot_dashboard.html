@@ -154,7 +154,7 @@
           <tr>
             <th>Model</th>
             <th>Enabled</th>
-            <th>Wired</th>
+            <th>Data Pulled</th>
             <th>Last Signal</th>
             <th>Last Execution</th>
             <th class="text-end">Universe Size</th>
@@ -694,33 +694,58 @@ async function _fetchJson(url) {
   }
 }
 
+function _dataPulledBadge(lastSig, rankingCount) {
+  // Determine per-model "data pulled" state:
+  //   NO     — never ran (no signal file, no ranking)
+  //   STALE  — last signal > 2 days ago (model not running regularly)
+  //   YES    — signal in last 2 days AND ranking populated
+  if (!lastSig && (rankingCount == null || rankingCount === 0)) {
+    return '<span class="badge bg-danger" title="No signal file or ranking found">NO</span>';
+  }
+  if (lastSig) {
+    const ageMs = Date.now() - new Date(lastSig).getTime();
+    const ageDays = ageMs / 86400000;
+    if (ageDays > 2) {
+      return `<span class="badge bg-warning text-dark" title="Last signal ${ageDays.toFixed(1)}d ago">STALE</span>`;
+    }
+    return `<span class="badge bg-success" title="Fresh — last signal ${ageDays.toFixed(1)}d ago">YES</span>`;
+  }
+  // Ranking exists but no signal-file timestamp resolved
+  if (rankingCount && rankingCount > 0) {
+    return '<span class="badge bg-info" title="Ranking present, signal timestamp unresolved">PARTIAL</span>';
+  }
+  return '<span class="badge bg-danger">NO</span>';
+}
+
 async function _loadModelDataStatus(modelName, enabled) {
-  // triggers/status returns success=true only for models in MODEL_PATHS
-  // (4 equity). Options model returns 400 → wired=false, dashes everywhere.
+  // triggers/status only succeeds for models in MODEL_PATHS (4 equity).
+  // Options model returns 400 — fall back to ranking endpoint alone.
   const [statusRes, rankingRes] = await Promise.all([
     _fetchJson(`/admin/models/${modelName}/triggers/status`),
     _fetchJson(`/admin/${modelName}/ranking?top=999`),
   ]);
-  const wired = !!(statusRes && statusRes.success);
-  const lastSig = wired ? statusRes.last_signal_at : null;
-  const lastExec = wired ? statusRes.last_execution_at : null;
+  const statusOk = !!(statusRes && statusRes.success);
+  const lastSig = statusOk ? statusRes.last_signal_at : null;
+  const lastExec = statusOk ? statusRes.last_execution_at : null;
   let universeSize = null;
   let rankingCount = null;
+  let rankingGenAt = null;
   if (rankingRes && rankingRes.success) {
     universeSize = rankingRes.universe_size != null ? rankingRes.universe_size : null;
     rankingCount = Array.isArray(rankingRes.ranking) ? rankingRes.ranking.length : null;
+    rankingGenAt = rankingRes.generated_at || rankingRes.date || null;
   }
+  // Fall back to ranking generated_at if triggers/status didn't give a signal time
+  const effectiveLastSig = lastSig || rankingGenAt;
   const enabledBadge = enabled
     ? '<span class="badge bg-success">ON</span>'
     : '<span class="badge bg-secondary">DISABLED</span>';
-  const wiredBadge = wired
-    ? '<span class="badge bg-info" title="live_signal + executor wired">WIRED</span>'
-    : '<span class="badge bg-warning text-dark" title="No live_signal/executor route — manual only">NOT WIRED</span>';
+  const dataPulledBadge = _dataPulledBadge(effectiveLastSig, rankingCount);
   return `<tr${enabled ? '' : ' style="opacity:0.6;"'}>
     <td><strong>${modelName}</strong></td>
     <td>${enabledBadge}</td>
-    <td>${wiredBadge}</td>
-    <td class="small">${_dash(lastSig ? _ts(lastSig) : null)}</td>
+    <td>${dataPulledBadge}</td>
+    <td class="small">${_dash(effectiveLastSig ? _ts(effectiveLastSig) : null)}</td>
     <td class="small">${_dash(lastExec ? _ts(lastExec) : null)}</td>
     <td class="text-end">${_dash(universeSize)}</td>
     <td class="text-end">${_dash(rankingCount)}</td>
