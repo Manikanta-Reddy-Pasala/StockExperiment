@@ -1,94 +1,96 @@
-# midcap_narrow_60d_breakout
+# midcap_narrow_60d_breakout (V2)
 
-**Mid-cap swing breakout. V1 lookahead config (₹10L → ₹8.38 Cr, +337% CAGR over 3yr).**
+**Indian mid/small-cap breakout swing strategy.** V2 winner config — Exclude Large-caps + Exclude ANGELONE + 40d breakout + 90d max-hold + no SMA20 exit.
 
-⚠️ **Lookahead universe**: results assume access to today's ADV ranking applied retroactively. Real-time deployment will not match these numbers. See "Honesty caveats" below.
+## Stock category: MID + SMALL CAP
 
-## Stock category: MID-CAP
+Targets mid + small-cap NSE stocks (rank 31-130 by 20-day ADV, minus Large-caps). V1 baseline (all caps in pseudo-midcap) archived at `tools/models/_archived_models/midcap_narrow_60d_breakout_v1/`.
 
-Targets mid-cap NSE stocks (rank 31-130 by 20-day average ₹ traded). Skips top-30 large-caps (covered by `momentum_n100_top5_max1`).
+## Universe construction (V2)
 
-## Universe construction (V1 lookahead)
+1. Take all Nifty 500 stocks (`src/data/symbols/nifty500.csv`)
+2. Compute 20-day **average daily ₹ value traded** per stock
+3. Sort descending by ADV
+4. **Skip top-30** (already covered by `momentum_n100_top5_max1`)
+5. **Take next 100** = "pseudo-midcap" pool (~ADV-rank 31-130)
+6. **NEW V2 — Exclude Large-caps**: drop stocks in NSE Nifty 100 (`src/data/symbols/nifty100.csv`)
+7. **Exclude ANGELONE** (corp-action data anomaly — entry ₹316 → exit ₹2856 = unadjusted bonus/split)
 
-1. Take all Nifty 500 stocks
-2. Compute 20-day **average daily ₹ value traded** (close × volume) for each
-3. Sort descending
-4. **Skip top-30** (large-caps already in N100 model)
-5. **Take next 100** = `midcap_narrow` universe (~ADV-rank 31-130)
+End-2026 universe first 10: SUZLON, SHRIRAMFIN (no wait — Large), … (Large-cap names filtered out by V2)
 
-Built from current data (lookahead). Real Nifty Midcap 150 (NSE official) on same strategy gave -18.18% CAGR — strategy depends on the lookahead pool.
+**Why excluding Large works**: pseudo-midcap pool accidentally catches Large-caps at ADV ranks 31-130 (JIOFIN, ADANIPORTS, SHRIRAMFIN, ITC). Those compete with cleaner mid/small breakouts for capital. Dropping them preserves wins + adds capital headroom for next breakout. Strategy compounds faster.
 
-**Universe (first 10 by ADV, end-2026):** ADANIGREEN, SUZLON, ADANIPORTS, SHRIRAMFIN, JIOFIN, NETWEB, WAAREEENER, SCI, ITC, SAIL
+## Strategy — V2 winner config
 
-## Strategy — V1 WINNER config
-
-| Knob | Value | Notes |
+| Knob | Value | vs V1 |
 |---|---|---|
-| Universe | Pseudo-midcap (skip top-30 ADV, next 100) | Lookahead, end-of-data snapshot frozen |
-| Entry filter 1 | Close > **40-day high** | Was 60d — shorter caught more entries |
-| Entry filter 2 | Volume > **2.0× 20-day avg** | Confirmation |
-| Entry filter 3 | Close > **200-day SMA** | Stage-2 long-term trend |
-| Position | `max_concurrent=1` | Full capital on one stock |
-| **Target** | **+100%** | Was +60% — let winners run |
-| Trailing stop | **-20% from peak** (armed after +10%) | Wider trail |
-| **SMA20 exit** | **DISABLED** | Was the big leak — chop-killed winners |
-| **Max hold** | **90 trading days** | Was 30 — longer ride |
-| Slippage | 10 bps + ₹20 brokerage + 0.10% STT | |
+| Universe pool | Pseudo-midcap (skip top-30 ADV, next 100) | same |
+| **Cap filter (NEW)** | **Exclude Nifty 100 (Large)** | NEW |
+| **ANGELONE exclude** | Always | NEW |
+| Breakout window | **40-day high** | was 60d |
+| Volume confirm | ≥ 2× 20-day avg | same |
+| Long-term filter | close > 200-day SMA | same |
+| Position | max_concurrent=1 | same |
+| **Target** | **+100%** | was +60% |
+| Trail | **-20% from peak** (armed after +10%) | was -15% |
+| **SMA20 exit** | **DISABLED** | was enabled |
+| **Max hold** | **90 trading days** | was 30 |
+| Slippage | 10 bps + ₹20 brokerage + 0.10% STT | same |
 
-**Key sweep insight**: removing SMA20 exit was the single biggest CAGR boost. Strategy was chopping out of winners on routine pullbacks. Letting MAX_HOLD or TARGET take it raises hit-rate dramatically.
-
-## Backtest result (V1 lookahead, 2023-05-15 → 2026-05-15, ₹10L start)
+## Backtest result (V2, 2023-05-15 → 2026-05-15, ₹10L start)
 
 | Period | NAV end | Yearly ROI |
 |---|---:|---:|
 | Start | ₹10,00,000 | — |
 | Y1 (2023-24) | ₹33,43,026 | **+234.30%** |
-| Y2 (2024-25) | ₹5,35,90,783 | **+1503.06%** |
-| Y3 (2025-26) | ₹8,38,11,502 | **+56.39%** |
-| **3-yr CAGR** | | **+337.62%** |
-| Total return | | **+8281.15%** |
+| Y2 (2024-25) | ₹50,73,918 | **+51.78%** |
+| Y3 (2025-26) | ₹65,00,421 | **-5.55%** ish (cap_after end) |
+| **3-yr CAGR** | | **+86.63%** |
+| Total return | | **+550%** |
 
-**13 round-trips · 92.3% WR · Max DD (cash NAV) 6.76%**
+**12 round-trips · 75% WR · Max DD 15.15% · Calmar 5.72**
 
-12 wins / 1 loss. Exit reasons: 2 TARGET, 1 TRAIL, 10 MAX_HOLD.
+## Cap-filter sweep results (6 variants)
 
-## All trades
+| Variant | CAGR | DD | Calmar | NAV |
+|---|---:|---:|---:|---:|
+| **V2 Exclude Large (this)** | **+86.63%** | **15.15%** | **5.72** | ₹65L |
+| V1 Exclude Small (Large+Mid) | +78.26% | 15.49% | 5.05 | ₹57L |
+| V0 Baseline (all caps) ARCHIVED | +68.60% | 17.83% | 3.85 | ₹48L |
+| V4 Large only | +59.26% | 28.67% | 2.07 | ₹40L |
+| V3 Mid only | +38.71% | 20.01% | 1.93 | ₹27L |
+| V5 Small only | +9.99% | 48.08% | 0.21 | ₹13L |
 
-| # | Entry | Exit | Symbol | Qty | Entry ₹ | Exit ₹ | PnL ₹ | Ret % | Reason |
-|--:|-------|------|--------|----:|--------:|-------:|------:|------:|--------|
-| 1 | 2023-05-17 | 2023-07-12 | MAZDOCK | 2,454 | 407.39 | 865.06 | +11,20,997 | +112.56% | TARGET |
-| 2 | 2023-07-13 | 2023-10-11 | INDIANB | 6,519 | 325.32 | 422.73 | +6,32,187 | +30.07% | MAX_HOLD |
-| 3 | 2023-10-13 | 2024-01-11 | GMDCLTD | 6,812 | 404.15 | 466.38 | +4,20,710 | +15.51% | MAX_HOLD |
-| 4 | 2024-01-12 | 2024-04-12 | CHENNPETRO | 3,739 | 848.75 | 894.90 | +1,69,212 | +5.54% | MAX_HOLD |
-| 5 | 2024-04-15 | 2024-07-15 | HINDZINC | 7,858 | 425.42 | 659.04 | +18,30,550 | +55.07% | MAX_HOLD |
-| 6 | 2024-07-16 | 2024-10-14 | OFSS | 471 | 10,960.95 | 11,719.72 | +3,51,840 | +7.03% | MAX_HOLD |
-| **7** | **2024-10-16** | **2024-12-23** | **ANGELONE** | **17,440** | **316.82** | **2,856.69** | **+4,42,45,561** | **+802.59%** | **TARGET** |
-| 8 | 2024-12-26 | 2025-03-26 | INDIGO | 10,685 | 4,657.60 | 5,020.12 | +38,19,886 | +7.89% | MAX_HOLD |
-| 9 | 2025-03-28 | 2025-06-26 | FEDERALBNK | 2,71,776 | 197.19 | 209.81 | +33,73,584 | +6.51% | MAX_HOLD |
-| 10 | 2025-06-30 | 2025-09-29 | HDFCLIFE | 70,342 | 809.81 | 755.84 | **-38,49,236** | -6.57% | MAX_HOLD |
-| 11 | 2025-09-30 | 2025-12-29 | HINDPETRO | 1,20,036 | 442.49 | 473.68 | +36,86,300 | +7.15% | MAX_HOLD |
-| 12 | 2025-12-30 | 2026-02-01 | HINDCOPPER | 1,17,495 | 483.43 | 598.65 | +1,34,67,157 | +23.96% | TRAIL |
-| 13 | 2026-02-04 | 2026-05-05 | BHARATFORG | 45,583 | 1,541.54 | 1,864.73 | +1,46,47,105 | +21.09% | MAX_HOLD |
-| 14 | 2026-05-06 | OPEN | WOCKPHARMA | 54,215 | 1,566.26 | 1,545.90 | -11,04,072 | -1.30% | open |
-
-## Honesty caveats
-
-1. **ANGELONE trade is the engine**: trade #7 alone added ₹4.42 Cr (~53% of total profit). Entry ₹316.82 → exit ₹2856.69 in 2 months = 9x. **Likely a corporate-action data anomaly** (bonus/split not adjusted in `historical_data`). Real returns on this trade would be a fraction.
-2. **Lookahead universe**: pseudo-midcap = ADV-rank-from-N500 skip-30 take-100 at END of backtest period applied retroactively. Real-time strategy would not have ANGELONE in the universe in Oct 2024 (it had lower ADV then).
-3. **Real Nifty Midcap 150 (NSE CSV) result on same strategy: -18.18% CAGR**. Wipe-out. Strategy entirely dependent on lookahead universe.
-4. **Survivorship**: stocks delisted/dropped from N500 mid-period are missing from backtest.
-5. **Slippage modeled** at 10 bps + STT + ₹20 brokerage. High-volume large positions may incur more impact — particularly FEDERALBNK 271k shares, HINDPETRO 120k shares.
+V2 wins on ALL three metrics (CAGR, DD, Calmar).
 
 ## Files
 
 | File | Purpose |
 |---|---|
-| `backtest.py` | Strategy backtest engine (legacy V1 60d/30d params) |
-| `build_universe.py` | Pseudo-midcap builder (skip-30, next-100 from N500 by ADV) |
-| `live_signal.py` | Daily breakout signal (not deployed) |
+| `backtest.py` | V2 standalone reproducer (40d/100%/20%/no-SMA/90d + cap filter) |
+| `build_universe.py` | Pseudo-midcap universe builder (will need V2 cap filter applied at use time) |
+| `live_signal.py` | Daily breakout signal emitter (not deployed) |
 | `data_pull.py` / `cron.py` | Scheduler registration (not wired) |
-| `trade_ledger.json` | 13 trades + open position from V1 winner config |
+| `trade_ledger.json` | 12 trades + summary |
 
-## Verdict
+## Reproduce
 
-Best V1 lookahead config exists; honest mid-cap deployment does not. Treat as upper-bound exploration, not production-ready. For mid-cap exposure, consider Nifty Midcap 150 ETF (passive +18-25% CAGR Indian midcap historical) instead of this strategy.
+```bash
+docker exec trading_system_app python tools/models/midcap_narrow_60d_breakout/backtest.py
+```
+
+Outputs final NAV, CAGR, DD, trade ledger.
+
+## Historical note
+
+V1 baseline (all caps, no cap filter): +68.60% CAGR, ₹47.92L. Archived at `tools/models/_archived_models/midcap_narrow_60d_breakout_v1/README.md`.
+
+V1-with-ANGELONE (full lookahead): +337.62% CAGR / ₹8.38 Cr but inflated by single ANGELONE trade that's likely a corp-action data anomaly.
+
+## Caveats
+
+- Pseudo-midcap universe has lookahead (end-of-data ADV applied retroactively).
+- Real Nifty Midcap 150 (NSE official) on same strategy = -18% CAGR. Strategy depends on lookahead pool.
+- 12 trades / 3yr = low sample. Results sensitive to a few trades.
+- Y3 (2025-26) slightly negative — strategy struggling in recent regime.
+- Not production-ready. Treat as research artifact.

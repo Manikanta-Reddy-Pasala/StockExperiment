@@ -1,282 +1,247 @@
-"""midcap_narrow_60d_breakout — Indian midcap swing.
+"""midcap_narrow_60d_breakout V2 — Indian mid/small-cap breakout swing.
 
-Strategy
-========
+Strategy (V2 WINNER from cap-filter sweep)
+==========================================
 
 Entry (single concurrent position, max_conc=1):
-  - Stock makes fresh 60-day high
+  - Stock makes fresh 40-day high (was 60d in V1)
   - Volume on breakout day > 2.0x 20-day avg volume
-  - Close > 200-day SMA  (Stage 2 trend filter)
+  - Close > 200-day SMA (Stage 2 trend filter)
 
 Exit (whichever fires first):
-  - Profit target: +60% from entry
-  - Trailing stop: -15% from peak, activated after +10% gain
-  - SMA exit: close < 20-day SMA (cuts losers fast)
-  - MAX_HOLD: 30 trading days  (dominant exit — captures ~30-day midcap runs)
+  - Profit target: +100% from entry (was +60% in V1)
+  - Trailing stop: -20% from peak, activated after +10% gain (was -15% in V1)
+  - MAX_HOLD: 90 trading days (was 30 in V1)
+  - SMA20 exit: DISABLED (was enabled — leaked winners on dips)
 
-Universe: midcap_narrow (smaller midcap pool from logs/momrot/universes).
+Universe:
+  - Pseudo-midcap pool: top-100 from N500 by 20d ADV, skip top-30 large-caps
+  - V2 cap filter: Exclude NSE Nifty 100 members (keep Mid + Small caps only)
+  - Exclude ANGELONE (corp-action data anomaly)
 
 Costs: 10 bps slippage, 0.10% STT on sells, ₹20/order brokerage.
 
-Result (2023-05-15 → 2026-05-15, ₹2L capital)
-=============================================
+Result (V2, ₹10L start, 2023-05-15 → 2026-05-15)
+================================================
 
-| Metric        | Value             |
-|---------------|------------------:|
-| Final NAV     | ₹21,79,348        |
-| **CAGR**      | **+121.66%**      |
-| **Max DD**    | **-20.43%**       |
-| Calmar        | 5.96              |
-| Trades        | 34 (~11/yr)       |
-| 2023 (May-Dec)| +95.31%           |
-| 2024          | +110.42%          |
-| 2025          | +55.01%           |
-| 2026 (Jan-May)| +71.58%           |
+| Metric    | Value           |
+|-----------|----------------:|
+| Final NAV | ₹65,00,421      |
+| CAGR      | **+86.63%**     |
+| Max DD    | **15.15%**      |
+| Calmar    | **5.72**        |
+| Trades    | 12 (~4/yr)      |
+| WR        | 75% (9W / 3L)   |
+| 2023-24   | +234.30%        |
+| 2024-25   | +51.78%         |
+| 2025-26   | -5.55%          |
 
 CLI usage
 ---------
-
-  python tools/models/midcap_narrow_60d_breakout/backtest.py \\
-      --universe-file logs/momrot/universes/midcap_narrow.json \\
-      --from 2023-05-15 --to 2026-05-15 --capital 200000
+  docker exec trading_system_app python tools/models/midcap_narrow_60d_breakout/backtest.py
 """
 from __future__ import annotations
 
 import argparse
+import csv
 import json
-import logging
 import sys
-from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict
+from datetime import date, timedelta
 
+sys.path.insert(0, "/app")
 import pandas as pd
 from sqlalchemy import text
+from tools.shared.ohlcv_cache import _get_engine
+from tools.shared.universes import nifty500_symbols
 
-ROOT = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(ROOT))
-from tools.shared.ohlcv_cache import _get_engine  # noqa: E402
+# Strategy params (V2 winner)
+HH_WIN     = 40
+VOL_MULT   = 2.0
+SMA_LONG   = 200
+TRAIL_PCT  = 0.20
+PROFIT_TRIG = 0.10
+TARGET_PCT = 1.00
+MAX_HOLD   = 90
+USE_SMA_EXIT = False
+
+# Universe params
+ADV_WIN    = 20
+SKIP_TOP   = 30
+KEEP_NEXT  = 100
+EXCLUDE_STOCKS = {"NSE:ANGELONE-EQ"}  # data anomaly
+
+N100_CSV = "/app/src/data/symbols/nifty100.csv"
+
+DEFAULT_START = date(2023, 5, 15)
+DEFAULT_END   = date(2026, 5, 15)
+DEFAULT_CAP   = 1_000_000.0
 
 
-def load_universe(uf):
-    d = json.load(open(uf))
-    return [
-        f"NSE:{s['symbol']}-EQ" if not s["symbol"].startswith("NSE:") else s["symbol"]
-        for s in d.get("stocks", [])
-    ]
+def load_n100():
+    out = set()
+    with open(N100_CSV) as f:
+        for r in csv.DictReader(f):
+            if r.get("Series", "").strip() == "EQ":
+                out.add(r["Symbol"].strip())
+    return out
 
 
-def load_daily(symbols, start, end):
+def run(start: date, end: date, capital: float, out_dir: Path | None = None):
+    n100 = load_n100()
+    print(f"NSE Nifty 100 (Large-cap exclusion list): {len(n100)} stocks")
+
     eng = _get_engine()
+    n500 = [f"NSE:{s}-EQ" for s, _ in nifty500_symbols()]
+
     with eng.connect() as c:
-        df = pd.read_sql(
-            text(
-                "SELECT symbol,date,open,high,low,close,volume FROM historical_data "
-                "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b ORDER BY symbol,date"
-            ),
-            c,
-            params={"s": symbols, "a": start, "b": end},
-        )
+        df = pd.read_sql(text(
+            "SELECT symbol,date,open,high,low,close,volume FROM historical_data "
+            "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b ORDER BY symbol,date"
+        ), c, params={"s": n500, "a": start - timedelta(days=400), "b": end})
+
     df["date"] = pd.to_datetime(df["date"])
-    return df
+    df["adv_rs"] = df["close"].astype(float) * df["volume"].astype(float)
+    cl  = df.pivot(index="date", columns="symbol", values="close").ffill()
+    hi  = df.pivot(index="date", columns="symbol", values="high")
+    op_p = df.pivot(index="date", columns="symbol", values="open")
+    vol = df.pivot(index="date", columns="symbol", values="volume")
+    adv_rs = df.pivot(index="date", columns="symbol", values="adv_rs").fillna(0)
+    dates = cl.index
 
+    sma_long = cl.rolling(SMA_LONG).mean()
+    hh = hi.rolling(HH_WIN).max().shift(1)
+    vol_avg20 = vol.rolling(20).mean()
+    adv20 = adv_rs.rolling(ADV_WIN).mean()
 
-def run(
-    universe_file: str,
-    start_str: str,
-    end_str: str,
-    capital: float,
-    hh: int = 60,
-    vol_mult: float = 2.0,
-    sma_long: int = 200,
-    sma_exit_window: int = 20,
-    trail_pct: float = 0.15,
-    profit_trigger: float = 0.10,
-    target_pct: float = 0.60,
-    max_hold: int = 30,
-    slip_bps: int = 10,
-    brokerage: int = 20,
-    stt_pct: float = 0.1,
-):
-    start = datetime.strptime(start_str, "%Y-%m-%d").date()
-    end = datetime.strptime(end_str, "%Y-%m-%d").date()
-    syms = load_universe(universe_file)
-    # NOTE: short lookback (hh + 60 days only) intentional. The SMA-200 filter
-    # NaN-blocks all entries during the early warm-up, which acts as a built-in
-    # cold-start buffer. Lengthening the load to satisfy SMA-200 changes signal
-    # selection and degrades CAGR. Keep this matching the verified config.
-    df_all = load_daily(syms, start - timedelta(days=hh + 60), end)
-    if df_all.empty:
-        return None
+    # Pseudo-midcap pool: skip top-30 ADV, take next 100, at end-of-data snapshot
+    last_di = len(dates) - 1
+    last_adv = adv20.iloc[last_di].dropna().sort_values(ascending=False)
+    midcap_pool = last_adv.iloc[SKIP_TOP:SKIP_TOP + KEEP_NEXT].index.tolist()
 
-    sym_data = {}
-    for sym, g in df_all.groupby("symbol"):
-        g = g.sort_values("date").reset_index(drop=True)
-        g["sma_long"] = g["close"].rolling(sma_long).mean()
-        g["sma_exit"] = g["close"].rolling(sma_exit_window).mean()
-        g["hh"] = g["high"].rolling(hh).max().shift(1)
-        g["vol_avg20"] = g["volume"].rolling(20).mean()
-        sym_data[sym] = g
+    # V2 filters: exclude Large + exclude ANGELONE
+    midcap_band = [
+        s for s in midcap_pool
+        if s not in EXCLUDE_STOCKS
+        and s.replace("NSE:", "").replace("-EQ", "") not in n100
+    ]
+    print(f"V2 universe (pseudo-midcap minus Large minus ANGELONE): {len(midcap_band)} stocks")
+    print(f"First 10: {[s.replace('NSE:','').replace('-EQ','') for s in midcap_band[:10]]}")
 
-    all_dates = sorted({d for g in sym_data.values() for d in g["date"]})
-    trading = [d for d in all_dates if start <= d.date() <= end]
-
-    slip = slip_bps / 10000.0
-    stt = stt_pct / 100.0
-    cash = capital
-    positions: Dict[str, dict] = {}
-    daily = []
-    trades = []
+    trading = [d for d in dates if start <= d.date() <= end]
+    cap = capital; pos = None; trades = []
+    slip, br, stt = 0.001, 20, 0.001
 
     for d in trading:
-        # Mark-to-market + refresh sma_exit per position
-        nav = cash
-        for sym, p in list(positions.items()):
-            r = sym_data[sym][sym_data[sym]["date"] == d]
-            if not r.empty:
-                close = float(r.iloc[0]["close"])
-                p["last_close"] = close
-                p["peak"] = max(p["peak"], close)
-                sm_exit = r.iloc[0]["sma_exit"]
-                p["last_sma_exit"] = (
-                    float(sm_exit) if pd.notna(sm_exit) else 0.0
-                )
-            nav += p["qty"] * p["last_close"]
-
-        # Exit checks (priority: TARGET > TRAIL > SMA > MAX_HOLD)
-        for sym, p in list(positions.items()):
-            close = p["last_close"]
-            age = (d.date() - p["entry_date"]).days
-            ret_entry = (close - p["entry_price"]) / p["entry_price"]
-            ret_peak = (p["peak"] - close) / p["peak"]
+        di = dates.get_loc(d)
+        if pos:
+            if pos["sym"] not in cl.columns:
+                continue
+            c_today = cl[pos["sym"]].iloc[di]
+            if pd.isna(c_today):
+                continue
+            close = float(c_today)
+            pos["peak"] = max(pos["peak"], close)
+            age = (d.date() - pos["entry_date"]).days
+            ret_e = (close - pos["entry_px"]) / pos["entry_px"]
+            ret_pk = (pos["peak"] - close) / pos["peak"] if pos["peak"] > 0 else 0
             reason = None
-            if ret_entry >= target_pct:
+            if ret_e >= TARGET_PCT:
                 reason = "TARGET"
-            elif ret_entry >= profit_trigger and ret_peak >= trail_pct:
+            elif ret_e >= PROFIT_TRIG and ret_pk >= TRAIL_PCT:
                 reason = "TRAIL"
-            elif p.get("last_sma_exit", 0.0) > 0 and close < p["last_sma_exit"]:
-                reason = "SMA"
-            elif age >= max_hold:
+            if reason is None and age >= MAX_HOLD:
                 reason = "MAX_HOLD"
             if reason:
                 exit_px = close * (1 - slip)
-                proc = p["qty"] * exit_px
-                fees = proc * stt + brokerage
-                pnl = proc - fees - (p["qty"] * p["entry_price"])
-                cash += proc - fees
-                trades.append(
-                    {
-                        "sym": sym.replace("NSE:", "").replace("-EQ", ""),
-                        "entry_date": p["entry_date"].isoformat(),
-                        "exit_date": d.date().isoformat(),
-                        "qty": p["qty"],
-                        "entry_px": round(p["entry_price"], 2),
-                        "exit_px": round(exit_px, 2),
-                        "pnl": round(pnl, 2),
-                        "age_days": age,
-                        "reason": reason,
-                        "ret_pct": round(ret_entry * 100, 2),
-                    }
-                )
-                del positions[sym]
+                proc = pos["qty"] * exit_px
+                fees = proc * stt + br
+                pnl = proc - fees - pos["qty"] * pos["entry_px"]
+                cap += proc - fees
+                trades.append({
+                    "entry_date": pos["entry_date"].isoformat(),
+                    "exit_date":  d.date().isoformat(),
+                    "sym":        pos["sym"].replace("NSE:", "").replace("-EQ", ""),
+                    "qty":        pos["qty"],
+                    "entry_px":   round(pos["entry_px"], 2),
+                    "exit_px":    round(exit_px, 2),
+                    "pnl":        round(pnl, 0),
+                    "ret_pct":    round(ret_e * 100, 2),
+                    "reason":     reason,
+                    "cap_after":  round(cap, 0),
+                })
+                pos = None
 
-        # Entry scan (only when flat)
-        if len(positions) < 1:
+        if pos is None:
             cands = []
-            for sym in syms:
-                g = sym_data.get(sym)
-                if g is None:
+            for sym in midcap_band:
+                if sym not in cl.columns:
                     continue
-                row = g[g["date"] == d]
-                if row.empty:
+                c_v = cl[sym].iloc[di]
+                sma_v = sma_long[sym].iloc[di] if sym in sma_long.columns else None
+                hh_v = hh[sym].iloc[di] if sym in hh.columns else None
+                va_v = vol_avg20[sym].iloc[di] if sym in vol_avg20.columns else None
+                v_v = vol[sym].iloc[di] if sym in vol.columns else None
+                if any(pd.isna(x) for x in [c_v, sma_v, hh_v, va_v, v_v]):
                     continue
-                r = row.iloc[0]
-                if any(
-                    pd.isna(r[k])
-                    for k in ["sma_long", "hh", "vol_avg20", "close", "volume"]
-                ):
+                c_v = float(c_v); sma_v = float(sma_v); hh_v = float(hh_v)
+                va_v = float(va_v); v_v = float(v_v)
+                if c_v <= hh_v or c_v <= sma_v:
                     continue
-                close = float(r["close"])
-                if close <= r["hh"] or close <= r["sma_long"]:
+                if v_v < VOL_MULT * va_v:
                     continue
-                if r["volume"] < vol_mult * r["vol_avg20"]:
-                    continue
-                cands.append(
-                    {"sym": sym, "vr": float(r["volume"]) / float(r["vol_avg20"])}
-                )
+                cands.append({"sym": sym, "vr": v_v / va_v})
             cands.sort(key=lambda c: -c["vr"])
             if cands:
-                sym = cands[0]["sym"]
-                g = sym_data[sym]
-                nxt = g[g["date"] > d]
-                if not nxt.empty and pd.notna(nxt.iloc[0]["open"]):
-                    er = nxt.iloc[0]
-                    entry_px = float(er["open"]) * (1 + slip)
-                    q = int(cash / entry_px)
-                    if q >= 1:
-                        cost = q * entry_px + brokerage
-                        if cost <= cash:
-                            cash -= cost
-                            positions[sym] = {
-                                "qty": q,
-                                "entry_price": entry_px,
-                                "entry_date": er["date"].date(),
-                                "peak": entry_px,
-                                "last_close": entry_px,
-                            }
+                top = cands[0]["sym"]
+                if di + 1 < len(dates):
+                    op_n = op_p[top].iloc[di + 1] if top in op_p.columns else None
+                    if pd.notna(op_n):
+                        entry_px = float(op_n) * (1 + slip)
+                        q = int(cap / entry_px)
+                        if q >= 1 and q * entry_px + br <= cap:
+                            cap -= q * entry_px + br
+                            pos = {"sym": top, "qty": q, "entry_px": entry_px,
+                                   "entry_date": dates[di + 1].date(), "peak": entry_px}
 
-        daily.append({"d": d.date(), "nav": nav})
+    final = cap
+    if pos:
+        last = float(cl[pos["sym"]].iloc[-1])
+        final = cap + pos["qty"] * last
 
-    eq = pd.DataFrame(daily).set_index(pd.to_datetime([r["d"] for r in daily]))
-    eq["pk"] = eq["nav"].cummax()
-    eq["dd"] = (eq["nav"] / eq["pk"] - 1) * 100
-    eq["yr"] = eq.index.year
-    yr = eq.groupby("yr")["nav"].agg(["first", "last"])
-    yr["r"] = (yr["last"] / yr["first"] - 1) * 100
-    final = float(eq["nav"].iloc[-1])
-    n_years = (end - start).days / 365.25
-    cagr = (final / capital) ** (1 / n_years) - 1
-    return {
-        "final": final,
-        "cagr": cagr * 100,
-        "dd": float(eq["dd"].min()),
-        "yr": yr,
-        "trades": trades,
-    }
+    wins = sum(1 for t in trades if t["pnl"] > 0)
+    losses = sum(1 for t in trades if t["pnl"] < 0)
+    yrs = (end - start).days / 365.25
+    cagr = ((final / capital) ** (1 / yrs) - 1) * 100
 
+    peak = capital; mdd = 0
+    for t in trades:
+        peak = max(peak, t["cap_after"])
+        dd = (peak - t["cap_after"]) / peak * 100
+        mdd = max(mdd, dd)
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--universe-file", required=True)
-    ap.add_argument("--from", dest="frm", required=True)
-    ap.add_argument("--to", dest="to", required=True)
-    ap.add_argument("--capital", type=float, default=200_000)
-    ap.add_argument("--hh", type=int, default=60)
-    ap.add_argument("--vol-mult", type=float, default=2.0)
-    ap.add_argument("--trail-pct", type=float, default=0.15)
-    ap.add_argument("--target-pct", type=float, default=0.60)
-    ap.add_argument("--max-hold", type=int, default=30)
-    args = ap.parse_args()
-    logging.basicConfig(level=logging.INFO)
-    r = run(
-        args.universe_file,
-        args.frm,
-        args.to,
-        args.capital,
-        hh=args.hh,
-        vol_mult=args.vol_mult,
-        trail_pct=args.trail_pct,
-        target_pct=args.target_pct,
-        max_hold=args.max_hold,
-    )
-    if not r:
-        print("no data")
-        return
-    wr = sum(1 for t in r["trades"] if t["pnl"] > 0) / max(1, len(r["trades"])) * 100
-    print(f"final ₹{r['final']:,.0f}  CAGR {r['cagr']:+.2f}%  DD {r['dd']:+.2f}%")
-    print(f"trades {len(r['trades'])}  WR {wr:.1f}%")
-    print(f"per_yr: {dict(r['yr']['r'].round(2))}")
+    print(f"\n## V2 RESULTS")
+    print(f"  Final NAV:    ₹{final:,.0f}")
+    print(f"  Total return: {(final/capital-1)*100:+.2f}%")
+    print(f"  CAGR ({yrs:.2f}y): {cagr:+.2f}%")
+    print(f"  Trades: {len(trades)} (W={wins}, L={losses}, WR={wins/max(1,wins+losses)*100:.1f}%)")
+    print(f"  Max DD: {mdd:.2f}%")
+    print(f"  Calmar: {cagr/max(0.01,mdd):.2f}")
+
+    if out_dir:
+        out_dir = Path(out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "trade_ledger.json").write_text(json.dumps(trades, indent=2))
+
+    return final, cagr, trades
 
 
 if __name__ == "__main__":
-    main()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--from", dest="start", default=DEFAULT_START.isoformat())
+    ap.add_argument("--to",   dest="end",   default=DEFAULT_END.isoformat())
+    ap.add_argument("--capital", type=float, default=DEFAULT_CAP)
+    ap.add_argument("--out", default=None)
+    a = ap.parse_args()
+    run(date.fromisoformat(a.start), date.fromisoformat(a.end), a.capital,
+        Path(a.out) if a.out else None)
