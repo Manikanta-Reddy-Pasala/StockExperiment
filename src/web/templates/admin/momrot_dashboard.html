@@ -392,7 +392,7 @@ document.getElementById('btn_run_now').addEventListener('click', async () => {
     if (p.buy.qty < 1) html += '<tr><td colspan="4" class="text-warning small">qty=0 insufficient cash — BUY skips</td></tr>';
   }
   html += '</tbody></table>';
-  const ok = await appModal.confirm('LIVE Rebalance — Real Money', html,
+  const ok = await appModal.confirm('LIVE Rebalance', html,
     {okLabel:'Execute', okClass:'btn-danger', headerCls:'bg-danger text-white'});
   if (!ok) return;
   const r = await fetch('/admin/momrot/run-now', {method:'POST'});
@@ -428,7 +428,7 @@ document.getElementById('btn_buy_now').addEventListener('click', async () => {
   const qty = parseInt(input);
   if (!qty || qty < 1) { await appModal.alert('Invalid', 'Quantity must be positive', 'danger'); return; }
   if (qty > maxQty) { await appModal.alert('Insufficient', `qty ${qty} > max ${maxQty}`, 'danger'); return; }
-  const ok = await appModal.confirm('LIVE BUY — Real Money',
+  const ok = await appModal.confirm('LIVE BUY',
     `Symbol: <strong>${sym}</strong><br>Qty: <strong>${qty}</strong> @ <strong>${fmtINR(price)}</strong><br>Total: <strong>${fmtINR(qty*price)}</strong>`,
     {okLabel:'Place BUY', okClass:'btn-success', headerCls:'bg-success text-white'});
   if (!ok) return;

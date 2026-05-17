@@ -203,7 +203,7 @@ async function rebalanceModel(model) {
     preview = '<div class="text-warning">Could not load preview: ' + e.message + '</div>';
   }
 
-  const ok = await appModal.confirm('LIVE Rebalance — Real Money',
+  const ok = await appModal.confirm('LIVE Rebalance',
     preview + '<hr><div class="small text-muted">Runs live_signal + LIVE fyers_executor. SELL/BUY orders placed on Fyers.</div>',
     {okLabel: 'Execute Rebalance', okClass: 'btn-danger', headerCls: 'bg-danger text-white'});
   if (!ok) return;
@@ -225,7 +225,7 @@ async function rebalanceModel(model) {
 }
 
 async function sellNow(symbol, qty) {
-  const ok = await appModal.confirm('LIVE SELL', `Sell <strong>${symbol}</strong> qty=<strong>${qty}</strong> at market. Real money. Proceed?`,
+  const ok = await appModal.confirm('LIVE SELL', `Sell <strong>${symbol}</strong> qty=<strong>${qty}</strong> at market. Proceed?`,
                                      {okLabel:'Place SELL', okClass:'btn-danger', headerCls:'bg-danger text-white'});
   if (!ok) return;
   const r = await fetch('/admin/momrot/sell-now', {
