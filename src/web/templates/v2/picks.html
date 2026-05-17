@@ -21,13 +21,42 @@
 
 {% block scripts %}
 <script>
-// 4 equity models to show. Order matters — first card is opened by default.
+// 4 equity models to show. `schedule` drives the next-rebalance display.
 const MODELS = [
-  {key: "momentum_n100_top5_max1",     title: "Momentum N100 Top-5 (mc=1)",        desc: "Monthly rotation • real Nifty 100 • 30d return"},
-  {key: "n20_daily_large_only",        title: "N20 Daily ADV ∩ N100",              desc: "Daily rotation • top-20 ADV ∩ N100 • uptrend"},
-  {key: "midcap_narrow_60d_breakout",  title: "Midcap 60d Breakout",               desc: "Event-driven • 60d-high + vol surge + 200d SMA"},
-  {key: "momentum_pseudo_n100_adv",    title: "Pseudo-N100 ADV",                    desc: "Monthly rotation • top-100 ADV from N500 • yearly-PIT rebuild"},
+  {key: "momentum_n100_top5_max1",     title: "Momentum N100 Top-5 (mc=1)",        desc: "Monthly rotation • real Nifty 100 • 30d return",                          schedule: "monthly"},
+  {key: "n20_daily_large_only",        title: "N20 Daily ADV ∩ N100",              desc: "Daily rotation • top-20 ADV ∩ N100 • uptrend",                            schedule: "daily"},
+  {key: "midcap_narrow_60d_breakout",  title: "Midcap 60d Breakout",               desc: "Event-driven • 60d-high + vol surge + 200d SMA",                          schedule: "event"},
+  {key: "momentum_pseudo_n100_adv",    title: "Pseudo-N100 ADV",                    desc: "Monthly rotation • top-100 ADV from N500 • yearly-PIT rebuild",            schedule: "monthly"},
 ];
+
+// Compute next rebalance date+days for a given schedule. Mirrors backend
+// _next_rebalance() logic so UI doesn't need an extra API round trip.
+function nextRebalance(schedule) {
+  const today = new Date();
+  if (schedule === "monthly") {
+    let target;
+    if (today.getDate() <= 7) {
+      target = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    } else {
+      target = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    }
+    while (target.getDay() === 0 || target.getDay() === 6) {
+      target.setDate(target.getDate() + 1);
+    }
+    const days = Math.max(0, Math.ceil((target - today) / 86400000));
+    return {label: target.toISOString().slice(0,10), days, kind: 'monthly'};
+  }
+  if (schedule === "daily") {
+    let target = new Date(today);
+    target.setDate(target.getDate() + 1);
+    while (target.getDay() === 0 || target.getDay() === 6) {
+      target.setDate(target.getDate() + 1);
+    }
+    const days = Math.ceil((target - today) / 86400000);
+    return {label: target.toISOString().slice(0,10), days, kind: 'daily'};
+  }
+  return {label: 'event-driven', days: null, kind: 'event'};
+}
 
 const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractionDigits:2});
 const fmtPct = n => (n>=0?"+":"") + Number(n||0).toFixed(2) + "%";
@@ -109,6 +138,32 @@ function renderCard(m, idx, ranking, status) {
        </div>`
     : '';
 
+  // Held-vs-current-rank-1 banner — explains why UI may show a held symbol
+  // that's NOT in today's top-5. Only relevant when model is holding.
+  let heldBannerHtml = '';
+  if (heldSym && status && status.current_position) {
+    const heldNorm = heldSym.replace('NSE:','').replace('-EQ','');
+    const inTop = (top || []).some(r =>
+      r.symbol.replace('NSE:','').replace('-EQ','') === heldNorm);
+    const cp = status.current_position;
+    const entryDate = cp.entry_date || '—';
+    const sched = nextRebalance(m.schedule);
+    const rebalLine = sched.kind === 'event'
+      ? 'Rebalance: event-driven (on next breakout trigger)'
+      : `Next rebalance: <strong>${sched.label}</strong> ${sched.days != null ? `(in ${sched.days} day${sched.days===1?'':'s'})` : ''} · ${sched.kind}`;
+    const actionLine = inTop
+      ? `Holding <strong>${heldNorm}</strong> — still in today's top-5, no rotation needed.`
+      : rank1
+        ? `Holding <strong>${heldNorm}</strong> from ${entryDate}. Today's rank-1 is <strong>${rank1.symbol}</strong> — rotation will SELL ${heldNorm} + BUY ${rank1.symbol} at next rebalance.`
+        : `Holding <strong>${heldNorm}</strong> from ${entryDate}.`;
+    const bannerCls = inTop ? 'alert-success' : 'alert-warning';
+    heldBannerHtml = `
+      <div class="alert ${bannerCls} py-2 px-3 small mb-0 rounded-0 border-0">
+        <i class="bi bi-bookmark-check me-1"></i>${actionLine}<br>
+        <span class="small-mute">${rebalLine}</span>
+      </div>`;
+  }
+
   return `
     <div class="card mb-3">
       <div class="card-header model-card-header d-flex justify-content-between align-items-center"
@@ -124,6 +179,7 @@ function renderCard(m, idx, ranking, status) {
         </div>
       </div>
       <div id="${collapseId}" class="collapse">
+        ${heldBannerHtml}
         ${noteHtml}
         <div class="table-responsive">
           <table class="table table-sm align-middle mb-0">
