@@ -54,6 +54,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
     cl = df.pivot(index="date", columns="symbol", values="close").ffill()
     adv_rs = df.pivot(index="date", columns="symbol", values="adv_rs").fillna(0)
     adv20 = adv_rs.rolling(ADV_WIN).mean()
+    sma200 = cl.rolling(200).mean()  # uptrend filter
     dates = cl.index
 
     # Yearly-PIT universe rebuild
@@ -100,8 +101,12 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
 
     for d in rebal:
         di = dates.get_loc(d)
-        if di < LOOKBACK: continue
+        if di < max(LOOKBACK, 200): continue
         univ = pick_universe(d)
+        # Uptrend filter: keep only stocks with close > 200d SMA
+        up = sma200.iloc[di] < cl.iloc[di]
+        univ = [s for s in univ if bool(up.get(s, False))]
+        if not univ: continue
         rets = cl.iloc[di].reindex(univ) / cl.iloc[di - LOOKBACK].reindex(univ) - 1
         rk = rets.dropna().sort_values(ascending=False)
         if rk.empty: continue

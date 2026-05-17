@@ -9,7 +9,7 @@
 | # | Model | Universe | Rebalance | Final NAV | CAGR | Max DD | LIVE |
 |--:|---|---|---|---:|---:|---:|:-:|
 | 1 | `momentum_n100_top5_max1` | Real NSE Nifty 100 | Monthly | ₹4,424,405 | **+64.17%** | 37.30% | ✅ |
-| 2 | `momentum_pseudo_n100_adv` | Top-100 ADV from N500 MINUS Small | Monthly | ₹9,221,004 | **+109.70%** | 36.44% | ❌ |
+| 2 | `momentum_pseudo_n100_adv` | Top-100 ADV from N500 MINUS Small + uptrend filter | Monthly | ₹10,820,091 | **+121.18%** | 25.42% | ❌ |
 | 3 | `midcap_narrow_60d_breakout` | Top-100 ADV from N500 MINUS Large | Event-driven | ₹13,456,535 | **+137.85%** | **8.12%** | ❌ |
 | 4 | `finnifty_ic_otm4_w300_lots5` | FINNIFTY options (4 strikes per Mon) | Monthly IC | ₹22,25,673 | **+123.27%** compound | 13.88% | ❌ |
 | 5 | `n20_daily_large_only` | Top-20 ADV + uptrend + NSE Nifty 100 | Daily | ₹11,813,452 | **+127.75%** | **24.74%** | ❌ |
