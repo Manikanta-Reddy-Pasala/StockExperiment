@@ -1,6 +1,6 @@
 # momentum_n100_top5_max1 — SUMMARY
 
-**LIVE production model. Monthly rotation on REAL NSE Nifty 100. Top-1 by 30d return.**
+**LIVE production. Monthly rotation on REAL NSE Nifty 100. Top-1 by 30d return.**
 
 ## Backtest window & trade frequency
 
@@ -8,43 +8,34 @@
 |---|---|
 | Backtest window | **2023-05-15 → 2026-05-12** (≈3.00 years) |
 | First entry | 2023-05-15 |
-| Last exit | 2026-04-01 |
-| Total trades | 30 |
-| Trades per year | ~10.0 |
+| Last exit | 2026-05-04 |
+| Total trades | 31 |
+| Trades per year | ~10.3 |
 | Rebalance period | Monthly |
-| Data source | yfinance (full N500 re-pull 2026-05-17, split-adjusted) |
+| Data source | **Fyers** (4-year re-pull 2026-05-17, cont_flag=1, chunked 360d) |
 
-## Headline result (CLEAN DATA - full N500 yfinance re-pull)
+## Headline result (Fyers production data)
 
 | Metric | Value |
 |---|---:|
-| Final NAV | **₹3,205,882** |
-| Total return | **+220.59%** |
-| **3-yr CAGR** | **+62.33%/yr** |
-| Max DD (NAV-based) | 42.82% |
-| Calmar | 1.46 |
-| Trades | 30 |
-| WR | 70.0% (21W / 9L) |
-
-## Data quality journey
-
-| Stage | CAGR | DD | Notes |
-|---|---:|---:|---|
-| Original Fyers (dirty data) | +80.38% | 29.71% | Inflated by KOTAKBANK +400% fake jump etc. |
-| **Full N500 yfinance (this)** | **+62.33%** | **42.82%** | Clean, split-adjusted, honest |
-
-Data fix: 504 N500 stocks re-pulled from yfinance with auto_adjust=True (handles splits/bonuses). 412,152 rows refreshed 2026-05-17. Only 11 anomalies remain (5 stocks: real demergers ABFRL/VEDL + yfinance Nov 2023 quirks for CGCL/GPIL/MOTILALOFS).
+| Final NAV | **₹4,603,816** |
+| Total return | **+360.38%** |
+| **3-yr CAGR** | **+67.10%/yr** |
+| Max DD (NAV-based) | 42.81% |
+| Calmar | 1.57 |
+| Trades | 31 |
+| WR | 71.0% (22W / 9L) |
 
 ## Yearly money flow
 
 | Year | Open | Close | ROI | Trades |
 |---|---:|---:|---:|---:|
-| 2023-24 | ₹1,000,000 | ₹2,437,605 | **+143.76%** | 10 |
-| 2024-25 | ₹2,437,605 | ₹2,098,470 | **+-13.91%** | 10 |
-| 2025-26 | ₹2,098,470 | ₹3,205,882 | **+52.77%** | 10 |
+| 2023-24 | ₹1,000,000 | ₹2,416,397 | **+141.64%** | 10 |
+| 2024-25 | ₹2,416,397 | ₹2,029,655 | **+-16.00%** | 10 |
+| 2025-26 | ₹2,029,655 | ₹4,603,816 | **+126.83%** | 11 |
 
 ## Returns by NSE cap segment
 
 | Cap | Trades | Wins | Losses | WR | Total PnL ₹ |
 |---|---:|---:|---:|---:|---:|
-| **Large** | 30 | 21 | 9 | 70% | +2,205,881 |
+| **Large** | 31 | 22 | 9 | 71% | +3,603,815 |

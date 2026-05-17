@@ -8,11 +8,11 @@
 
 | # | Model | Stock list filter | Rebalance | Final NAV | CAGR | Max DD | LIVE |
 |--:|---|---|---|---:|---:|---:|:-:|
-| 1 | `momentum_n100_top5_max1` | Real NSE Nifty 100 (104 stocks) | Monthly | ₹4,277,552 | **+62.33%** | 42.82% | ✅ |
-| 2 | `momentum_pseudo_n100_adv` | Top-100 ADV from N500 (yearly PIT) | Monthly | ₹10,356,837 | **+117.98%** | 36.45% | ❌ |
-| 3 | `midcap_narrow_60d_breakout` | Pseudo-midcap MINUS Large (Mid+Small only) | Event-driven | ₹4,371,284 | **+63.51%** | 32.01% | ❌ |
+| 1 | `momentum_n100_top5_max1` | Real NSE Nifty 100 (104) | Monthly | ₹4,665,507 | **+67.10%** | 42.81% | ✅ |
+| 2 | `momentum_pseudo_n100_adv` | Top-100 ADV from N500 (yearly PIT) | Monthly | ₹5,611,351 | **+77.70%** | 36.45% | ❌ |
+| 3 | `midcap_narrow_60d_breakout` | Pseudo-midcap MINUS Large | Event-driven | ₹2,142,597 | **+28.92%** | 28.11% | ❌ |
 | 4 | `finnifty_ic_otm4_w300_lots5` | FINNIFTY options (no equity) | Monthly Iron Condor | ₹1.11 Cr (scaled) | **+123%** | 13.88% | ❌ |
-| 5 | `n20_daily_v2_large_only` | Top-20 ADV + uptrend + NSE Nifty 100 filter | Daily | ₹16,373,734 | **+153.93%** | **27.13%** | ❌ |
+| 5 | `n20_daily_v2_large_only` | Top-20 ADV + uptrend + Nifty 100 | Daily | ₹13,239,463 | **+136.57%** | **27.58%** | ❌ |
 
 ¹ **V2 winner** = Exclude Large + Exclude ANGELONE. Cap-filter sweep tested 6 variants; V2 won on CAGR, DD, Calmar. Full V1 (all caps + ANGELONE) = +337% CAGR / ₹8.38 Cr but inflated by data anomaly. Baseline ex-ANGELONE = +68.60% / 17.83% DD.
 
