@@ -1724,7 +1724,7 @@ def admin_backfill_history():
     """
     data = request.get_json(silent=True) or {}
     days = int(data.get("days", 1500))
-    universe = data.get("universe", "n50,n500")
+    universe = data.get("universe", "all")
 
     ts = datetime.now().strftime("%Y%m%dT%H%M%S")
     task_id = f"backfill_{ts}"

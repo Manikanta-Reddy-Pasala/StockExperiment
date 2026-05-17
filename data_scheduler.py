@@ -86,31 +86,35 @@ def run_data_pipeline():
 
 
 def backfill_full_history():
-    """Ensure all N50+N500 stocks have 4 years (1500d) of daily OHLCV.
+    """Ensure ALL NSE-EQ stocks have 4 years (1500d) of daily OHLCV.
 
-    Uses existing tools/shared/prefetch_ohlcv.py with --skip-frac=0.85,
-    which skips symbols whose cache already has ≥85% of expected rows
-    for the window. Idempotent — re-running on a complete cache is cheap
-    (per-symbol coverage check is a single SELECT COUNT(*)).
+    Uses existing tools/shared/prefetch_ohlcv.py --universe all (every
+    NSE:...-EQ symbol from the stocks master table) with --skip-frac=0.85.
+    Idempotent — re-running on a complete cache is cheap (per-symbol
+    coverage check is a single SELECT COUNT(*)).
+
+    Daily-only by design. No live trading model uses hourly (1h) bars.
+    Backfilling 1h for 2400+ symbols would 25x the Fyers API calls for
+    zero trading benefit.
 
     Runs weekly (Sunday 03:00 IST — before any market activity) and
     once on scheduler startup if env BACKFILL_ON_BOOT=true.
 
-    Daily incremental pulls (per-model data_pull at 20:45) continue to
-    keep the latest 2 days fresh. This job only fills HISTORICAL gaps.
+    Daily incremental pulls (per-model data_pull at 20:45) keep the
+    latest 2 days fresh. This job only fills HISTORICAL gaps.
     """
     logger.info("=" * 80)
-    logger.info("Full History Backfill — 4 years (1500 days) for N50 + N500")
+    logger.info("Full History Backfill — 4 years (1500d) Daily for ALL NSE-EQ")
     logger.info("=" * 80)
     _run_subprocess_with_retry(
         ['python3', 'tools/shared/prefetch_ohlcv.py',
-         '--universe', 'n50,n500',
+         '--universe', 'all',
          '--days', '1500',
          '--intervals', 'D',
          '--sleep', '0.15',
          '--retry-passes', '2'],
         'backfill_4y_history',
-        timeout=14400,  # 4 hours — enough for ~500 syms even with rate-limit
+        timeout=21600,  # 6 hours — ~2400 syms, mostly cached after first run
         max_retries=1,
     )
 

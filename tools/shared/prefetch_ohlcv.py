@@ -48,6 +48,24 @@ def load_universe(name: str) -> List[Tuple[str, str]]:
         return list(NIFTY50_SYMBOLS)
     if name in ("n500", "nifty500"):
         return nifty500_symbols()
+    if name in ("all", "all-stocks", "all_stocks"):
+        # Every NSE-EQ symbol from the `stocks` master table. Strips the
+        # NSE:...-EQ wrapper so the rest of this pipeline sees plain
+        # tickers (matches n50/n500 format).
+        from sqlalchemy import text
+        eng = _get_engine()
+        if eng is None:
+            raise RuntimeError("DB unavailable — cannot enumerate 'all' universe")
+        with eng.connect() as c:
+            rows = c.execute(text(
+                "SELECT symbol, name FROM stocks "
+                "WHERE symbol LIKE 'NSE:%-EQ' ORDER BY symbol"
+            )).fetchall()
+        out = []
+        for sym, name_ in rows:
+            plain = sym.replace("NSE:", "").replace("-EQ", "")
+            out.append((plain, name_ or plain))
+        return out
     raise ValueError(f"Unknown universe: {name}")
 
 
@@ -110,8 +128,11 @@ def main() -> int:
     args = ap.parse_args()
 
     universes = [u.strip() for u in args.universe.split(",") if u.strip()]
+    # NOTE: 'all' is now a real universe loader (every NSE-EQ in stocks table).
+    # If user passes 'all', use only that — combining with n50/n500 is redundant
+    # since 'all' is a superset.
     if "all" in universes:
-        universes = ["n50", "n500"]
+        universes = ["all"]
     intervals = [iv.strip() for iv in args.intervals.split(",") if iv.strip()]
 
     # De-dupe symbols across universes (N50 fully contained in N500 mostly).
