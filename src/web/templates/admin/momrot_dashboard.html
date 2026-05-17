@@ -82,7 +82,7 @@
     </div>
   </div>
 
-  <!-- Next rebalance + actions -->
+  <!-- Next rebalance + N100-specific quick actions -->
   <div class="row g-3 mb-4">
     <div class="col-md-5">
       <div class="card mr-card p-3">
@@ -92,23 +92,51 @@
       </div>
     </div>
     <div class="col-md-7">
-      <div class="card mr-card p-3 d-flex flex-row align-items-center gap-2">
-        <button class="btn btn-danger flex-fill" id="btn_run_now">
-          <i class="bi bi-play-circle"></i> LIVE Rebalance
+      <div class="card mr-card p-3 d-flex flex-row align-items-center gap-2 flex-wrap">
+        <button class="btn btn-danger btn-sm flex-fill" id="btn_run_now">
+          <i class="bi bi-play-circle"></i> LIVE Rebalance (N100)
         </button>
-        <button class="btn btn-success flex-fill" id="btn_buy_now">
-          <i class="bi bi-cart-plus"></i> Buy Rank-1
+        <button class="btn btn-success btn-sm flex-fill" id="btn_buy_now">
+          <i class="bi bi-cart-plus"></i> Buy Rank-1 (N100)
         </button>
-        <button class="btn btn-outline-secondary flex-fill" id="btn_rebuild">
+        <button class="btn btn-outline-secondary btn-sm flex-fill" id="btn_rebuild">
           <i class="bi bi-arrow-clockwise"></i> Rebuild N100
         </button>
-        <button class="btn btn-outline-info flex-fill" id="btn_refresh">
+        <button class="btn btn-outline-info btn-sm flex-fill" id="btn_refresh">
           <i class="bi bi-arrow-repeat"></i> Refresh
         </button>
-        <button class="btn btn-outline-success flex-fill" id="btn_tg_test">
+        <button class="btn btn-outline-success btn-sm flex-fill" id="btn_tg_test">
           <i class="bi bi-send"></i> Test TG
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- Admin Triggers — per-model multi-model panel (T7) -->
+  <div class="card mr-card mb-4">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-toggles"></i> Admin Triggers — per-model</span>
+      <button class="btn btn-sm btn-outline-secondary" id="btn_triggers_refresh">
+        <i class="bi bi-arrow-repeat"></i> Refresh
+      </button>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-momrot mb-0">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Enabled</th>
+            <th class="text-end">NAV</th>
+            <th class="text-end">P&amp;L %</th>
+            <th>Last Signal</th>
+            <th>Position</th>
+            <th class="text-end" style="min-width:240px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="triggers_body">
+          <tr><td colspan="7" class="text-center text-muted py-3">Loading…</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
@@ -474,8 +502,149 @@ document.getElementById('btn_tg_test').addEventListener('click', async () => {
     d.success ? 'success' : 'danger');
 });
 
+// ---------------------------------------------------------------------------
+// Admin Triggers — per-model panel (T7). Loads /admin/models/<m>/triggers/status
+// for each of the 4 equity models and lets ops run-signal / run-execute /
+// toggle-enabled. Does NOT touch /admin/momrot/* legacy routes used above.
+// ---------------------------------------------------------------------------
+
+const TRIGGER_MODELS = [
+  {key: 'momentum_n100_top5_max1',    label: 'N100 Top-5 (mc=1)'},
+  {key: 'n20_daily_large_only',       label: 'N20 Daily ADV ∩ N100'},
+  {key: 'midcap_narrow_60d_breakout', label: 'Midcap 60d Breakout'},
+  {key: 'momentum_pseudo_n100_adv',   label: 'Pseudo-N100 (lookahead)'},
+];
+
+function _ts(s) {
+  if (!s) return '<span class="small-mute">never</span>';
+  try {
+    const d = new Date(s);
+    return `<span title="${s}">${d.toLocaleString()}</span>`;
+  } catch (e) { return s; }
+}
+
+function _renderTriggerRow(m, st) {
+  if (!st || !st.success) {
+    return `<tr><td><strong>${m.label}</strong></td>
+      <td colspan="6" class="text-danger small">load failed: ${st && st.error || 'n/a'}</td></tr>`;
+  }
+  const enabledBadge = st.enabled
+    ? '<span class="badge bg-success">ON</span>'
+    : '<span class="badge bg-secondary">OFF</span>';
+  const pnlCls = cls(st.pnl_pct);
+  const pos = st.current_position
+    ? `<code>${(st.current_position.sym||'').replace('NSE:','').replace('-EQ','')}</code>` +
+      ` <span class="small-mute">x${st.current_position.qty} @ ${fmtINR(st.current_position.entry_px)}</span>`
+    : '<span class="small-mute">flat</span>';
+
+  return `<tr>
+    <td>
+      <strong>${m.label}</strong><br>
+      <span class="small-mute">${m.key}</span>
+    </td>
+    <td>${enabledBadge}</td>
+    <td class="text-end">${fmtINR(st.nav)}</td>
+    <td class="text-end ${pnlCls}">${fmtPct(st.pnl_pct)}</td>
+    <td class="small">${_ts(st.last_signal_at)}</td>
+    <td class="small">${pos}</td>
+    <td class="text-end">
+      <button class="btn btn-sm btn-outline-primary me-1"
+              onclick="triggerRunSignal('${m.key}')">
+        <i class="bi bi-broadcast"></i> Signal
+      </button>
+      <button class="btn btn-sm btn-outline-warning me-1"
+              onclick="triggerRunExecute('${m.key}')">
+        <i class="bi bi-play-fill"></i> Execute
+      </button>
+      <button class="btn btn-sm ${st.enabled ? 'btn-outline-danger' : 'btn-outline-success'}"
+              onclick="triggerToggleEnabled('${m.key}', ${!st.enabled})">
+        ${st.enabled ? '<i class="bi bi-pause"></i> Pause' : '<i class="bi bi-play"></i> Resume'}
+      </button>
+    </td>
+  </tr>`;
+}
+
+async function loadTriggers() {
+  const body = document.getElementById('triggers_body');
+  body.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Loading…</td></tr>`;
+  const fetches = TRIGGER_MODELS.map(async m => {
+    try {
+      const r = await fetch(`/admin/models/${m.key}/triggers/status`);
+      return {m, st: await r.json()};
+    } catch (e) {
+      return {m, st: {success: false, error: e.message}};
+    }
+  });
+  const rows = await Promise.all(fetches);
+  body.innerHTML = rows.map(r => _renderTriggerRow(r.m, r.st)).join('');
+}
+
+async function triggerRunSignal(modelName) {
+  const ok = await appModal.confirm('Run Signal Now',
+    `Run <code>live_signal.py</code> for <strong>${modelName}</strong>?<br>` +
+    'Writes a /tmp/manual_*.json signal file. Does NOT place orders.',
+    {okLabel: 'Run Signal', okClass: 'btn-primary'});
+  if (!ok) return;
+  const r = await fetch(`/admin/${modelName}/run-signal`, {method: 'POST'});
+  const d = await r.json();
+  await appModal.alert(d.success ? 'Signal Run Started' : 'Failed',
+    d.success
+      ? `Task: <code>${d.task_id}</code><br>Signals out: <code>${d.signals_out}</code><br>` +
+        `<small>${d.cmd || ''}</small>`
+      : ('Error: ' + d.error),
+    d.success ? 'success' : 'danger');
+  setTimeout(loadTriggers, 5000);
+}
+
+async function triggerRunExecute(modelName) {
+  const ok = await appModal.confirm('Run Execute (DRY-RUN)',
+    `Run <code>fyers_executor.py --dry-run</code> for <strong>${modelName}</strong>?<br>` +
+    'Uses the newest signal file in the model\'s signals dir. NO real orders placed.',
+    {okLabel: 'Dry-Run Execute', okClass: 'btn-warning'});
+  if (!ok) return;
+  const r = await fetch(`/admin/${modelName}/run-execute`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({dry_run: true}),
+  });
+  const d = await r.json();
+  await appModal.alert(d.success ? 'Execute Started' : 'Failed',
+    d.success
+      ? `Task: <code>${d.task_id}</code><br>Signal file: <code>${d.signals_file}</code><br>dry_run=${d.dry_run}`
+      : ('Error: ' + d.error),
+    d.success ? 'success' : 'danger');
+  setTimeout(loadTriggers, 5000);
+}
+
+async function triggerToggleEnabled(modelName, newVal) {
+  const ok = await appModal.confirm(
+    newVal ? 'Resume Model' : 'Pause Model',
+    `Set <strong>${modelName}</strong> enabled = <strong>${newVal}</strong>?<br>` +
+    (newVal
+      ? 'Model will trade on next scheduled signal.'
+      : 'Model live_signal will short-circuit and emit no orders.'),
+    {okLabel: newVal ? 'Resume' : 'Pause',
+     okClass: newVal ? 'btn-success' : 'btn-danger'});
+  if (!ok) return;
+  const r = await fetch(`/admin/${modelName}/toggle-enabled`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({enabled: newVal}),
+  });
+  const d = await r.json();
+  await appModal.alert(d.success ? 'Updated' : 'Failed',
+    d.success
+      ? `<code>${modelName}</code> enabled = <strong>${d.settings.enabled}</strong>`
+      : ('Error: ' + d.error),
+    d.success ? 'success' : 'danger');
+  loadTriggers();
+}
+
+document.getElementById('btn_triggers_refresh').addEventListener('click', loadTriggers);
+
 // Initial load + auto-refresh
-loadSummary(); loadHistory(); loadRunLogs();
+loadSummary(); loadHistory(); loadRunLogs(); loadTriggers();
 setInterval(loadSummary, 30000);  // every 30s
+setInterval(loadTriggers, 60000); // every 60s
 </script>
 {% endblock %}

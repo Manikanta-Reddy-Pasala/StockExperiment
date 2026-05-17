@@ -1083,3 +1083,438 @@ def model_trade_history(model_name):
     except Exception as e:
         logger.error(f"trade history error: {e}", exc_info=True)
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+# =============================================================================
+# Today's signals across all wired models (T10 dashboard widget)
+# =============================================================================
+
+# Map model_name -> list of (relative_filename_templates) under /app/logs.
+# We probe each candidate path; first existing file wins. Templates support
+# {date} placeholder (ISO yyyy-mm-dd).
+_SIGNAL_PATHS = {
+    "momentum_n100_top5_max1": [
+        "/app/logs/momrot/signals/{date}_momrot_n100.json",
+    ],
+    "momentum_pseudo_n100_adv": [
+        "/app/logs/momrot_pseudo/signals/{date}_pseudo_n100.json",
+        "/app/logs/momentum_pseudo_n100_adv/signals/{date}.json",
+    ],
+    "midcap_narrow_60d_breakout": [
+        "/app/logs/midcap_narrow/signals/{date}.json",
+        "/app/logs/midcap_narrow/signals/{date}_midcap_narrow.json",
+    ],
+    "n20_daily_large_only": [
+        "/app/logs/n20_daily/signals/{date}_n20.json",
+        "/app/logs/n20_daily_large_only/signals/{date}.json",
+    ],
+    "finnifty_ic_otm4_w300_lots5": [
+        "/app/logs/finnifty_ic_otm4_w300_lots5/signals/{date}.json",
+    ],
+}
+
+
+@admin_bp.route('/signals/today', methods=['GET'])
+def signals_today():
+    """Aggregate today's emitted signals across all wired models.
+
+    Reads each model's signals/{today}.json file. Returns array per model
+    with metadata so the dashboard can render an "what fired today" widget.
+
+    ?date=YYYY-MM-DD optionally overrides today (debugging / history view).
+    """
+    try:
+        import json
+        from pathlib import Path
+        from datetime import date as _date
+
+        date_str = request.args.get("date") or _date.today().isoformat()
+
+        results = []
+        for model_name, candidates in _SIGNAL_PATHS.items():
+            found_path = None
+            signals = []
+            err = None
+            for tmpl in candidates:
+                p = Path(tmpl.format(date=date_str))
+                if p.exists():
+                    found_path = str(p)
+                    try:
+                        data = json.loads(p.read_text() or "[]")
+                        if isinstance(data, list):
+                            signals = data
+                        elif isinstance(data, dict) and "signals" in data:
+                            signals = data["signals"]
+                    except Exception as e:
+                        err = f"parse: {e}"
+                    break
+
+            results.append({
+                "model_name": model_name,
+                "date": date_str,
+                "path": found_path,
+                "count": len(signals),
+                "signals": signals,
+                "error": err,
+                "has_file": found_path is not None,
+            })
+
+        total = sum(r["count"] for r in results)
+        return jsonify({
+            "success": True,
+            "date": date_str,
+            "total_signals": total,
+            "models": results,
+        })
+    except Exception as e:
+        logger.error(f"signals/today error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# =============================================================================
+# T7 + T9 — Per-model Admin Triggers + Today's Picks
+# =============================================================================
+
+# Per-equity-model wiring: where each model writes signals/rankings, and how
+# to invoke its live_signal.py. Kept here so future models = single-row diff.
+MODEL_PATHS = {
+    "momentum_n100_top5_max1": {
+        "signals_dir": "/app/logs/momrot/signals",
+        "ranking_dir": "/app/logs/momrot/ranking",
+        "live_signal": "tools/models/momentum_n100_top5_max1/live_signal.py",
+        "extra_args": [
+            "--universe-file", "/app/logs/momrot/universes/n100_current.json",
+            "--top-n", "5",
+        ],
+        "label": "N100 monthly rotation top-5 (mc=1)",
+        "universe_path": "/app/logs/momrot/universes/n100_current.json",
+    },
+    "momentum_pseudo_n100_adv": {
+        "signals_dir": "/app/logs/momrot_pseudo/signals",
+        "ranking_dir": "/app/logs/momrot_pseudo/ranking",
+        "live_signal": "tools/models/momentum_pseudo_n100_adv/live_signal.py",
+        "extra_args": [
+            "--universes-file",
+            "tools/models/momentum_pseudo_n100_adv/yearly_universes.json",
+            "--top-n", "5",
+        ],
+        "label": "Pseudo-N100 monthly rotation top-5 (DISABLED — lookahead)",
+        "universe_path":
+            "tools/models/momentum_pseudo_n100_adv/yearly_universes.json",
+    },
+    "midcap_narrow_60d_breakout": {
+        "signals_dir": "/app/logs/midcap_narrow/signals",
+        "ranking_dir": "/app/logs/midcap_narrow/ranking",
+        "live_signal": "tools/models/midcap_narrow_60d_breakout/live_signal.py",
+        "extra_args": [
+            "--universe-file", "/app/logs/momrot/universes/midcap_narrow.json",
+        ],
+        "label": "Midcap 60d-high breakout (event-driven)",
+        "universe_path": "/app/logs/momrot/universes/midcap_narrow.json",
+    },
+    "n20_daily_large_only": {
+        "signals_dir": "/app/logs/n20_daily/signals",
+        "ranking_dir": "/app/logs/n20_daily/ranking",
+        "live_signal": "tools/models/n20_daily_large_only/live_signal.py",
+        "extra_args": ["--top-n", "1"],
+        "label": "Top-20 ADV ∩ N100 daily rotation (mc=1)",
+        "universe_path": None,  # PIT built each run from N500 OHLCV
+    },
+}
+
+
+def _latest_signal_file(signals_dir: str):
+    """Return (path, mtime_iso) of newest *.json signal file or (None, None)."""
+    try:
+        d = Path(signals_dir)
+        if not d.exists():
+            return None, None
+        files = sorted(
+            d.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True
+        )
+        if not files:
+            return None, None
+        f = files[0]
+        return str(f), datetime.fromtimestamp(f.stat().st_mtime).isoformat()
+    except Exception:
+        return None, None
+
+
+@admin_bp.route('/models/<model_name>/triggers/status', methods=['GET'])
+def model_triggers_status(model_name):
+    """Aggregate per-model status used by the Admin Triggers table row.
+
+    Combines:
+      - file-system newest signal file (mtime)
+      - last execution row from model_trades table
+      - current open position from model_ledger (via get_portfolio_stats)
+      - settings: enabled flag, NAV, invested, win-rate, P&L %
+    """
+    try:
+        from src.services.trading.model_ledger_service import (
+            ensure_models_seeded, get_portfolio_stats,
+        )
+        from src.models.database import get_database_manager
+        from sqlalchemy import text
+
+        ensure_models_seeded()
+        paths = MODEL_PATHS.get(model_name)
+        if not paths:
+            return jsonify({"success": False,
+                            "error": f"Unknown model: {model_name}"}), 400
+
+        # Newest signal file in this model's signals dir
+        last_signal_file, last_signal_at = _latest_signal_file(
+            paths["signals_dir"]
+        )
+
+        # Latest execution (BUY/SELL only) for this model from model_trades
+        db = get_database_manager()
+        last_execution_at = None
+        last_order_id = None
+        with db.get_session() as s:
+            row = s.execute(text("""
+                SELECT trade_at, fyers_order_id
+                FROM model_trades
+                WHERE model_name = :m
+                  AND side IN ('BUY','SELL')
+                ORDER BY trade_at DESC
+                LIMIT 1
+            """), {"m": model_name}).fetchone()
+            if row:
+                last_execution_at = (
+                    row[0].isoformat() if row[0] else None
+                )
+                last_order_id = row[1]
+
+            # Portfolio stats — find this model's slice
+            def _mtm(sym):
+                r = s.execute(text(
+                    "SELECT close FROM historical_data "
+                    "WHERE symbol=:s ORDER BY date DESC LIMIT 1"
+                ), {"s": sym}).fetchone()
+                return float(r.close) if r else None
+            stats = get_portfolio_stats(price_lookup=_mtm)
+
+        per_model = next(
+            (m for m in stats["models"] if m["model_name"] == model_name), {}
+        )
+
+        current_position = None
+        if per_model.get("open_symbol"):
+            current_position = {
+                "sym": per_model["open_symbol"],
+                "qty": per_model["open_qty"],
+                "entry_px": per_model["open_entry_px"],
+                "entry_date": per_model.get("open_entry_date"),
+                "mtm_price": per_model.get("open_mtm_price"),
+                "position_value": per_model.get("position_value"),
+            }
+
+        return jsonify({
+            "success": True,
+            "model_name": model_name,
+            "label": paths.get("label", model_name),
+            "enabled": bool(per_model.get("enabled")),
+            "last_signal_at": last_signal_at,
+            "last_signal_file": last_signal_file,
+            "last_execution_at": last_execution_at,
+            "last_order_id": last_order_id,
+            "current_position": current_position,
+            "nav": per_model.get("nav", 0),
+            "invested": per_model.get("invested_amount", 0),
+            "cash": per_model.get("cash", 0),
+            "pnl_total": per_model.get("pnl_total", 0),
+            "pnl_pct": per_model.get("return_pct", 0),
+            "realized_pnl": per_model.get("realized_pnl", 0),
+            "total_trades": per_model.get("total_trades", 0),
+            "win_rate_pct": per_model.get("win_rate_pct", 0),
+        })
+    except Exception as e:
+        logger.error(f"triggers/status error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@admin_bp.route('/<model_name>/run-signal', methods=['POST'])
+def admin_run_signal(model_name):
+    """Manually trigger live_signal.py for a model. Writes signal file to
+    /tmp/manual_<model>_<ts>.json so it never overwrites scheduler output.
+    Runs in background thread; returns task_id for polling.
+    """
+    paths = MODEL_PATHS.get(model_name)
+    if not paths:
+        return jsonify({"success": False,
+                        "error": f"Unknown model: {model_name}"}), 400
+
+    ts = datetime.now().strftime("%Y%m%dT%H%M%S")
+    signals_out = f"/tmp/manual_{model_name}_{ts}.json"
+    task_id = f"signal_{model_name}_{ts}"
+
+    project_root = '/app' if os.path.exists('/app/run_pipeline.py') else os.getcwd()
+    cmd = [
+        "python3", paths["live_signal"],
+        *paths["extra_args"],
+        "--signals-out", signals_out,
+        "--force",
+    ]
+
+    def runner():
+        run_command_async(task_id, cmd, f"Manual signal for {model_name}")
+        # Stash output path on the task so the UI can pick it up for execute
+        if task_id in running_tasks:
+            running_tasks[task_id]["signals_out"] = signals_out
+
+    threading.Thread(target=runner).start()
+
+    return jsonify({
+        "success": True,
+        "task_id": task_id,
+        "signals_out": signals_out,
+        "message": f"Signal run started for {model_name}",
+        "cmd": " ".join(cmd),
+    })
+
+
+@admin_bp.route('/<model_name>/run-execute', methods=['POST'])
+def admin_run_execute(model_name):
+    """Manually trigger fyers_executor.py against the latest signals file.
+
+    Body (optional): {signals_file: <path>, dry_run: true}
+      - If signals_file omitted, uses newest file in the model's signals_dir.
+      - dry_run defaults to True for safety; pass false to actually place.
+    """
+    paths = MODEL_PATHS.get(model_name)
+    if not paths:
+        return jsonify({"success": False,
+                        "error": f"Unknown model: {model_name}"}), 400
+
+    data = request.get_json(silent=True) or {}
+    signals_file = data.get("signals_file")
+    if not signals_file:
+        signals_file, _ = _latest_signal_file(paths["signals_dir"])
+    if not signals_file:
+        return jsonify({
+            "success": False,
+            "error": f"No signal file found in {paths['signals_dir']}; "
+                     f"run /admin/{model_name}/run-signal first",
+        }), 400
+
+    dry_run = bool(data.get("dry_run", True))
+    ts = datetime.now().strftime("%Y%m%dT%H%M%S")
+    task_id = f"execute_{model_name}_{ts}"
+    user_id = os.environ.get("USER_ID", "1")
+
+    cmd = [
+        "python3", "tools/live/fyers_executor.py",
+        "--signals", signals_file,
+        "--user-id", user_id,
+        "--model-name", model_name,
+    ]
+    if dry_run:
+        cmd.append("--dry-run")
+
+    threading.Thread(
+        target=run_command_async,
+        args=(task_id, cmd,
+              f"Manual {'DRY-RUN' if dry_run else 'LIVE'} execute for {model_name}"),
+    ).start()
+
+    return jsonify({
+        "success": True,
+        "task_id": task_id,
+        "signals_file": signals_file,
+        "dry_run": dry_run,
+        "message": f"Execute started for {model_name} (dry_run={dry_run})",
+        "cmd": " ".join(cmd),
+    })
+
+
+@admin_bp.route('/<model_name>/toggle-enabled', methods=['POST'])
+def admin_toggle_enabled(model_name):
+    """Flip model_settings.enabled. Body optional: {enabled: bool}; if omitted
+    we toggle the current value. Returns the new settings row.
+    """
+    try:
+        from src.services.trading.model_ledger_service import (
+            get_all_settings, set_enabled, ensure_models_seeded,
+        )
+        ensure_models_seeded()
+        data = request.get_json(silent=True) or {}
+        if "enabled" in data:
+            new_val = bool(data["enabled"])
+        else:
+            current = next(
+                (s for s in get_all_settings() if s["model_name"] == model_name),
+                None,
+            )
+            if not current:
+                return jsonify({"success": False,
+                                "error": f"Unknown model: {model_name}"}), 400
+            new_val = not bool(current.get("enabled"))
+        return jsonify({
+            "success": True,
+            "settings": set_enabled(model_name, new_val),
+        })
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"toggle-enabled error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@admin_bp.route('/<model_name>/ranking', methods=['GET'])
+def admin_model_ranking(model_name):
+    """Read the per-model ranking JSON written by live_signal.py.
+
+    Query: ?top=N (default 5; capped to the file's top_n)
+
+    Each live_signal.py also writes today's top-N ranking to
+    `/app/logs/<model>/ranking/<date>.json`. This endpoint returns the
+    newest file in that dir, sliced to `top`.
+    """
+    paths = MODEL_PATHS.get(model_name)
+    if not paths:
+        return jsonify({"success": False,
+                        "error": f"Unknown model: {model_name}"}), 400
+
+    try:
+        top = int(request.args.get("top", 5))
+        d = Path(paths["ranking_dir"])
+        if not d.exists():
+            return jsonify({
+                "success": True,
+                "model": model_name,
+                "label": paths.get("label", model_name),
+                "ranking": [],
+                "note": f"No ranking dir yet ({paths['ranking_dir']}) — "
+                        "scheduler will create it on next live_signal run, "
+                        "or hit /admin/<m>/run-signal.",
+            })
+
+        files = sorted(d.glob("*.json"), key=lambda p: p.stat().st_mtime,
+                       reverse=True)
+        if not files:
+            return jsonify({
+                "success": True, "model": model_name,
+                "label": paths.get("label", model_name),
+                "ranking": [],
+                "note": "No ranking files yet for this model.",
+            })
+
+        import json as _json
+        payload = _json.loads(files[0].read_text())
+        ranking = payload.get("top_n") or []
+        return jsonify({
+            "success": True,
+            "model": model_name,
+            "label": paths.get("label", model_name),
+            "date": payload.get("date"),
+            "universe_size": payload.get("universe_size"),
+            "ranking": ranking[:top],
+            "source": str(files[0]),
+            "generated_at": datetime.fromtimestamp(
+                files[0].stat().st_mtime).isoformat(),
+        })
+    except Exception as e:
+        logger.error(f"model ranking error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500

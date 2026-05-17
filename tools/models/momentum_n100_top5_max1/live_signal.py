@@ -191,6 +191,29 @@ def main():
     with open(args.signals_out, "w") as f:
         json.dump(signals, f, indent=2, default=str)
     log.info(f"Wrote {args.signals_out}")
+
+    # Persist top-N ranking for the Today's Picks UI. Always written (even
+    # on non-rebalance days the user wants to *see* the current ranking).
+    ranking_dir = Path("/app/logs/momrot/ranking")
+    ranking_dir.mkdir(parents=True, exist_ok=True)
+    ranking_path = ranking_dir / f"{today.strftime('%Y-%m-%d')}.json"
+    top_payload = {
+        "model": "momentum_n100_top5_max1",
+        "date": today.strftime("%Y-%m-%d"),
+        "universe_size": len(stocks),
+        "top_n": [
+            {
+                "rank": i + 1,
+                "symbol": sym,
+                "name": name,
+                "ret_30d_pct": round(ret, 2),
+                "price": round(price, 2),
+            }
+            for i, (sym, name, ret, price) in enumerate(ranks[:5])
+        ],
+    }
+    ranking_path.write_text(json.dumps(top_payload, indent=2, default=str))
+    log.info(f"Wrote ranking -> {ranking_path}")
     return 0
 
 

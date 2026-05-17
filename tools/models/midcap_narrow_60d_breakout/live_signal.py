@@ -119,7 +119,12 @@ def check_exit(pos: Dict, df_sym: pd.DataFrame) -> Optional[Dict]:
 
 
 def scan_entry_candidate(df: pd.DataFrame, symbols: List[str]) -> Optional[Dict]:
-    """Find best fresh 60d-high breakout with vol surge today."""
+    """Find best fresh 60d-high breakout with vol surge today.
+
+    Side effect: stashes all qualifying candidates on the function (as
+    `scan_entry_candidate.last_candidates`) so the picks UI can show the
+    full short-list, not just rank-1.
+    """
     today = df["date"].max()
     cands = []
     for sym, g in df.groupby("symbol"):
@@ -146,9 +151,10 @@ def scan_entry_candidate(df: pd.DataFrame, symbols: List[str]) -> Optional[Dict]
             "vol_ratio": float(r["volume"]) / float(r["vol_avg20"]),
             "high_60d_prev": float(r["hh"]),
         })
+    cands.sort(key=lambda c: -c["vol_ratio"])
+    scan_entry_candidate.last_candidates = cands  # type: ignore[attr-defined]
     if not cands:
         return None
-    cands.sort(key=lambda c: -c["vol_ratio"])
     return cands[0]
 
 
@@ -156,6 +162,9 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--universe-file", required=True)
     ap.add_argument("--signals-out", required=True)
+    ap.add_argument("--force", action="store_true",
+                    help="no-op flag (midcap has no rebalance gate); "
+                    "accepted for symmetry with other models")
     args = ap.parse_args()
 
     logging.basicConfig(level=logging.INFO,
@@ -210,6 +219,50 @@ def main() -> int:
     Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.signals_out).write_text(json.dumps(signals, indent=2, default=str))
     log.info(f"Wrote {len(signals)} signals -> {args.signals_out}")
+
+    # Persist top-5 breakout candidates by vol_ratio for the picks UI.
+    # If model is holding a position, list the held symbol first (rank 1),
+    # then any qualifying breakout candidates from today's scan.
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    candidates = getattr(scan_entry_candidate, "last_candidates", []) or []
+    top_rows = []
+    if pos:
+        held_sym = pos["open_symbol"]
+        last_close = float(
+            df[df["symbol"] == held_sym].sort_values("date").iloc[-1]["close"]
+        ) if not df[df["symbol"] == held_sym].empty else float(pos["open_entry_px"])
+        ret_held = (last_close / float(pos["open_entry_px"]) - 1) * 100
+        top_rows.append({
+            "rank": 1,
+            "symbol": held_sym,
+            "name": held_sym + " (HELD)",
+            "ret_30d_pct": round(ret_held, 2),
+            "price": round(last_close, 2),
+        })
+    for i, c in enumerate(candidates[: 5 - len(top_rows)], len(top_rows) + 1):
+        # ret_30d_pct here = breakout headroom above 60d HH (proxy momentum)
+        headroom = (c["close"] / c["high_60d_prev"] - 1) * 100 \
+            if c.get("high_60d_prev") else 0
+        top_rows.append({
+            "rank": i,
+            "symbol": c["symbol"],
+            "name": c["symbol"],
+            "ret_30d_pct": round(headroom, 2),
+            "price": round(c["close"], 2),
+            "vol_ratio": round(c["vol_ratio"], 2),
+        })
+    ranking_payload = {
+        "model": MODEL_NAME,
+        "date": today_str,
+        "universe_size": len(syms),
+        "top_n": top_rows,
+    }
+    ranking_dir = Path("/app/logs/midcap_narrow/ranking")
+    ranking_dir.mkdir(parents=True, exist_ok=True)
+    (ranking_dir / f"{today_str}.json").write_text(
+        json.dumps(ranking_payload, indent=2, default=str)
+    )
+    log.info(f"Wrote ranking -> {ranking_dir / (today_str + '.json')}")
     return 0
 
 

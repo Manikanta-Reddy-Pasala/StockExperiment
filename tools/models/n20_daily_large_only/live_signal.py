@@ -254,6 +254,31 @@ def main() -> int:
     with open(args.signals_out, "w") as f:
         json.dump(signals, f, indent=2, default=str)
     log.info(f"Wrote {args.signals_out}")
+
+    # Per-model ranking JSON for Today's Picks UI. Top-5 always written so
+    # the picks page works even on weekends / when the model is disabled.
+    ranking_dir = Path("/app/logs/n20_daily/ranking")
+    ranking_dir.mkdir(parents=True, exist_ok=True)
+    today_str = today.strftime("%Y-%m-%d")
+    ranking_payload = {
+        "model": MODEL_NAME,
+        "date": today_str,
+        "universe_size": len(ranks),
+        "top_n": [
+            {
+                "rank": i + 1,
+                "symbol": plain,
+                "name": plain,
+                "ret_30d_pct": round(ret, 2),
+                "price": round(price, 2),
+            }
+            for i, (_fyers_sym, plain, ret, price) in enumerate(ranks[:5])
+        ],
+    }
+    (ranking_dir / f"{today_str}.json").write_text(
+        json.dumps(ranking_payload, indent=2, default=str)
+    )
+    log.info(f"Wrote ranking -> {ranking_dir / (today_str + '.json')}")
     return 0
 
 

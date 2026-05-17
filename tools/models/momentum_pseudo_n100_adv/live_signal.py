@@ -197,6 +197,36 @@ def main() -> int:
     log.info(f"{MODEL_NAME} signal run: today={today.date()} "
              f"weekday={today.strftime('%A')} day_of_month={today.day}")
 
+    # Even when disabled / non-rebalance day, we still want the Today's Picks
+    # UI to show the ranking. Compute it up front and write to the per-model
+    # ranking dir, then proceed with the enabled-flag + rebalance gates.
+    yearly = load_yearly_universes(args.universes_file)
+    universe_key, symbols = pick_universe_for(today, yearly)
+    today_ts = int(today.timestamp())
+    ranks = rank_universe(symbols, today_ts)
+    log.info(f"PIT universe: {universe_key} → {len(symbols)} symbols")
+
+    ranking_dir = Path("/app/logs/momrot_pseudo/ranking")
+    ranking_dir.mkdir(parents=True, exist_ok=True)
+    ranking_path = ranking_dir / f"{today.strftime('%Y-%m-%d')}.json"
+    ranking_payload = {
+        "model": MODEL_NAME,
+        "date": today.strftime("%Y-%m-%d"),
+        "universe_size": len(symbols),
+        "top_n": [
+            {
+                "rank": i + 1,
+                "symbol": plain,
+                "name": plain,
+                "ret_30d_pct": round(ret, 2),
+                "price": round(price, 2),
+            }
+            for i, (_fyers, plain, ret, price) in enumerate(ranks[:5])
+        ],
+    }
+    ranking_path.write_text(json.dumps(ranking_payload, indent=2, default=str))
+    log.info(f"Wrote ranking -> {ranking_path}")
+
     # Enabled-flag gate (skippable via --force)
     if not args.force and not is_model_enabled():
         log.warning(f"{MODEL_NAME}: model_settings.enabled is False — "
@@ -213,15 +243,8 @@ def main() -> int:
             Path(args.signals_out).write_text(json.dumps([]))
             return 0
 
-    yearly = load_yearly_universes(args.universes_file)
-    universe_key, symbols = pick_universe_for(today, yearly)
-    log.info(f"PIT universe: {universe_key} → {len(symbols)} symbols")
-
     pos = get_current_position()
     log.info(f"Currently held: {pos.get('open_symbol') if pos else 'none'}")
-
-    today_ts = int(today.timestamp())
-    ranks = rank_universe(symbols, today_ts)
     log.info(f"Ranked {len(ranks)} stocks (after MAX_PRICE={MAX_PRICE} filter). "
              f"Top-{args.top_n}:")
     for i, (sym, name, ret, price) in enumerate(ranks[:args.top_n], 1):
