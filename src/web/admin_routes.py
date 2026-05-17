@@ -1520,6 +1520,22 @@ def model_triggers_status(model_name):
                 )
                 last_order_id = row[1]
 
+            # Latest BUY trade reason — distinguishes model-pick vs manual
+            # (e.g. LINK_FYERS_POSITION when a broker holding was synced to
+            # the ledger, ISOLATION_RESET, manual SEED via UI).
+            entry_reason = None
+            entry_trade_at = None
+            buy_row = s.execute(text("""
+                SELECT trade_at, reason
+                FROM model_trades
+                WHERE model_name = :m AND side = 'BUY'
+                ORDER BY trade_at DESC
+                LIMIT 1
+            """), {"m": model_name}).fetchone()
+            if buy_row:
+                entry_trade_at = buy_row[0].isoformat() if buy_row[0] else None
+                entry_reason = buy_row[1]
+
             # Portfolio stats — find this model's slice
             def _mtm(sym):
                 r = s.execute(text(
@@ -1540,6 +1556,8 @@ def model_triggers_status(model_name):
                 "qty": per_model["open_qty"],
                 "entry_px": per_model["open_entry_px"],
                 "entry_date": per_model.get("open_entry_date"),
+                "entry_reason": entry_reason,
+                "entry_trade_at": entry_trade_at,
                 "mtm_price": per_model.get("open_mtm_price"),
                 "position_value": per_model.get("position_value"),
             }

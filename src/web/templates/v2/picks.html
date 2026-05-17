@@ -139,7 +139,9 @@ function renderCard(m, idx, ranking, status) {
     : '';
 
   // Held-vs-current-rank-1 banner — explains why UI may show a held symbol
-  // that's NOT in today's top-5. Only relevant when model is holding.
+  // that's NOT in today's top-5. Distinguishes:
+  //   - Model-picked entry (regular monthly/daily rotation) → wait or force
+  //   - Manual sync entry (LINK_FYERS_POSITION, SEED) → not a model pick
   let heldBannerHtml = '';
   if (heldSym && status && status.current_position) {
     const heldNorm = heldSym.replace('NSE:','').replace('-EQ','');
@@ -147,20 +149,42 @@ function renderCard(m, idx, ranking, status) {
       r.symbol.replace('NSE:','').replace('-EQ','') === heldNorm);
     const cp = status.current_position;
     const entryDate = cp.entry_date || '—';
+    const reason = (cp.entry_reason || '').toUpperCase();
+    const isManual = ['LINK_FYERS_POSITION','SEED','MANUAL'].includes(reason);
     const sched = nextRebalance(m.schedule);
     const rebalLine = sched.kind === 'event'
       ? 'Rebalance: event-driven (on next breakout trigger)'
-      : `Next rebalance: <strong>${sched.label}</strong> ${sched.days != null ? `(in ${sched.days} day${sched.days===1?'':'s'})` : ''} · ${sched.kind}`;
-    const actionLine = inTop
-      ? `Holding <strong>${heldNorm}</strong> — still in today's top-5, no rotation needed.`
-      : rank1
-        ? `Holding <strong>${heldNorm}</strong> from ${entryDate}. Today's rank-1 is <strong>${rank1.symbol}</strong> — rotation will SELL ${heldNorm} + BUY ${rank1.symbol} at next rebalance.`
-        : `Holding <strong>${heldNorm}</strong> from ${entryDate}.`;
-    const bannerCls = inTop ? 'alert-success' : 'alert-warning';
+      : `Next auto-rebalance: <strong>${sched.label}</strong> ${sched.days != null ? `(in ${sched.days} day${sched.days===1?'':'s'})` : ''} · ${sched.kind}`;
+
+    const originLine = isManual
+      ? `<span class="badge bg-info">MANUAL</span> Held <strong>${heldNorm}</strong> linked from broker on ${entryDate} (reason: <code>${reason}</code>) — NOT a model pick.`
+      : reason
+        ? `<span class="badge bg-primary">MODEL PICK</span> Entered <strong>${heldNorm}</strong> on ${entryDate} via <code>${reason}</code>.`
+        : `Entered <strong>${heldNorm}</strong> on ${entryDate}.`;
+
+    let actionLine;
+    let bannerCls;
+    if (inTop) {
+      actionLine = `Still in today's top-5 — no rotation needed.`;
+      bannerCls = 'alert-success';
+    } else if (rank1) {
+      const waitOrSell = sched.kind === 'monthly'
+        ? `Two options: (a) <strong>Wait</strong> — auto-rebalance ${sched.label} will SELL ${heldNorm} + BUY ${rank1.symbol}. (b) <strong>Force now</strong> via Portfolio page Rebalance button.`
+        : sched.kind === 'daily'
+          ? `Daily rotation — next session will SELL ${heldNorm} + BUY ${rank1.symbol}.`
+          : `Will rotate to ${rank1.symbol} on next event trigger.`;
+      actionLine = `Today's rank-1 is <strong>${rank1.symbol}</strong> (${fmtPct(rank1.ret_30d_pct)}). ${waitOrSell}`;
+      bannerCls = isManual ? 'alert-info' : 'alert-warning';
+    } else {
+      actionLine = `No fresh ranking available — run signal first.`;
+      bannerCls = 'alert-warning';
+    }
+
     heldBannerHtml = `
       <div class="alert ${bannerCls} py-2 px-3 small mb-0 rounded-0 border-0">
-        <i class="bi bi-bookmark-check me-1"></i>${actionLine}<br>
-        <span class="small-mute">${rebalLine}</span>
+        <div>${originLine}</div>
+        <div class="mt-1"><i class="bi bi-arrow-right me-1"></i>${actionLine}</div>
+        <div class="small-mute mt-1">${rebalLine}</div>
       </div>`;
   }
 

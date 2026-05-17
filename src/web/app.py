@@ -51,6 +51,18 @@ def create_app():
     # Force template auto-reload so Jinja re-reads files on each request
     app.config['TEMPLATES_AUTO_RELOAD'] = True
 
+    # Disable browser cache on HTML responses so template/JS changes deploy
+    # immediately without users needing to hard-refresh. Static assets
+    # (.js/.css/.png) keep their default cache headers.
+    @app.after_request
+    def add_no_cache_for_html(response):
+        ct = response.headers.get('Content-Type', '')
+        if ct.startswith('text/html'):
+            response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+        return response
+
     # Request/response logging middleware removed for clean console output
     print("🔇 Console logging optimized - Only essential logs will be shown")
     

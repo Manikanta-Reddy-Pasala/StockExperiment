@@ -27,7 +27,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, make_response, render_template, request
 from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
@@ -306,7 +306,13 @@ def _current_ranking(top: int = 10, live_prices: bool = True) -> List[Dict]:
 @momrot_bp.route("")
 @momrot_bp.route("/")
 def momrot_dashboard():
-    return render_template("admin/momrot_dashboard.html")
+    # Disable browser cache so JS/template changes deploy immediately
+    # without users needing to hard-refresh.
+    resp = make_response(render_template("admin/momrot_dashboard.html"))
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 
 @momrot_bp.route("/state")
