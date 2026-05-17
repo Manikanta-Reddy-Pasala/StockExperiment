@@ -1,48 +1,72 @@
 # Trading Models
 
-3 equity + 1 options. Each subfolder is a self-contained strategy: data ingest, backtest, live signal, scheduler, and docs. Models slot into the main schedulers via uniform `cron.py` register pattern.
+**4 models** (3 equity + 1 options). All deliver ≥ 80% CAGR over 3-year backtest (2023-05-15 → 2026-05-12). Each subfolder is self-contained: data ingest, backtest, live signal, scheduler, and docs.
 
-## Models by stock category
+## Models
 
-| Category | Model | Stock universe | Selection logic | CAGR (3yr) | Max DD | LIVE? |
-|---|---|---|---|---:|---:|:-:|
-| **Large-cap (production, REAL universe)** | `momentum_n100_top5_max1` v2 | Real NSE Nifty 100 (104 stocks, `src/data/symbols/nifty100.csv`) | Top-1 by 30-day return, monthly rotation | +80.38% | -29.71% | ✅ |
-| **Large-cap (lookahead V1, comparison)** | `momentum_n100_top5_max1` v1 | Pseudo-N100 (top-100 N500 by 20-day ADV) | Top-1 by 30-day return, monthly rotation | +136.39% | -16.15% | — |
-| **Mid-cap** | `midcap_narrow_60d_breakout` | Pseudo-midcap (N500, skip top-30 ADV, take next 100) | 40d breakout high + vol>2× + close>200SMA → top-1 by volume ratio | +337.62% (lookahead) | -6.76% | ❌ |
-| **Options** | `finnifty_ic_otm4_w300_lots5` | FINNIFTY weekly/monthly options | Sell OTM 4% CE+PE Iron Condor, buy ±300pt wings, 5 lots | +337.6%/yr | -13.88% | ❌ |
+| # | Folder | Category | Universe | CAGR (3yr) | Max DD | LIVE |
+|--:|---|---|---|---:|---:|:-:|
+| 1 | `momentum_n100_top5_max1` | Large-cap equity | **REAL NSE Nifty 100** (NSE CSV, 104 stocks) | **+80.38%** | 29.71% | ✅ |
+| 2 | `momentum_pseudo_n100_adv` | Large/mid blend equity | Pseudo-N100 (top-100 by 20-day ADV from N500) | **+136.39%** | 16.15% | ❌ |
+| 3 | `midcap_narrow_60d_breakout` | Mid-cap equity | Pseudo-midcap (N500 skip-30 ADV, take next 100) | **+337.62%** ⚠️ | 6.76% | ❌ |
+| 4 | `finnifty_ic_otm4_w300_lots5` | Options | FINNIFTY 4-strike Iron Condor chain | **+337%/yr** | 13.88% | ❌ |
 
-3rd equity (small-cap) **not implemented** — tested variants (mid+small-only universe +20% CAGR, full N500 +2% CAGR) failed; small-cap rotation = death spiral in Indian regime. Use Nifty Smallcap 100 ETF for passive small-cap exposure.
+⚠️ Midcap result heavily influenced by single ANGELONE trade (likely corporate-action data anomaly). See model README for details.
 
-## How stock lists are created
+## How universes are constructed (per model)
 
-### Large-cap: REAL Nifty 100 (LIVE)
+### 1. momentum_n100_top5_max1 — REAL Nifty 100 (LIVE PRODUCTION)
 - Source: `https://nsearchives.nseindia.com/content/indices/ind_nifty100list.csv`
-- Refresh: `python tools/refresh_nifty100.py` (run manually after NSE Mar/Sep rebalance)
+- Refresh: `python tools/refresh_nifty100.py` after each NSE Mar/Sep rebalance
 - Cached: `src/data/symbols/nifty100.csv` (104 stocks)
-- Builder: `tools/models/momentum_n100_top5_max1/build_universe.py --out <path>`
-  - Reads CSV → emits JSON with all 104 stocks
-- Strategy then ranks by 30d momentum and picks top-1
+- Selection: all 104 → rank by 30-day return → pick top-1 monthly
+- **No filter**: NSE already curates the constituents (free-float market cap leaders)
 
-### Large-cap (V1 lookahead): Pseudo-N100 by ADV
-- Source: Nifty 500 (`src/data/symbols/nifty500.csv`)
-- Compute 20-day ADV (close × volume) per stock
-- Sort descending → top 100 = "pseudo-N100"
-- ⚠️ Includes mid/small-caps with retail-heavy volume (HFCL, BSE, GROWW, COHANCE, DIXON etc.) — 47/100 NOT in real NSE Nifty 100
-- Result inflated by lookahead bias (today's ADV applied retroactively to 2023)
+### 2. momentum_pseudo_n100_adv — Pseudo-N100 by ADV
+- Source: `src/data/symbols/nifty500.csv` (NSE 500)
+- Compute 20-day ADV = avg(close × volume) per stock
+- Sort descending → take top 100 = pseudo-N100
+- Rebuilt at each year-start (yearly-PIT lookahead approximation)
+- Differs from real N100 by 47 stocks: BSE, MAZDOCK, NETWEB, COCHINSHIP, GRSE, IRFC, IDEA, ITI, NBCC, PAYTM, COFORGE, DIXON, COHANCE, HFCL, GROWW etc. (retail-volume mid-caps)
 
-### Mid-cap: Pseudo-midcap by ADV
-- Source: Nifty 500
-- Same ADV calc as above
+### 3. midcap_narrow_60d_breakout — Pseudo-midcap by ADV
+- Source: `src/data/symbols/nifty500.csv`
+- Same ADV calc as pseudo-N100
 - **Skip top-30** (large-caps, in N100 model already)
 - **Take next 100** = pseudo-midcap (ADV-rank 31-130)
-- Universe end-2026: ADANIGREEN, SUZLON, ADANIPORTS, SHRIRAMFIN, JIOFIN, NETWEB, WAAREEENER, SCI, ITC, SAIL ...
-- ⚠️ Same lookahead bias. Real NSE Nifty Midcap 150 on same strategy = -18% CAGR.
+- End-2026 first 10: ADANIGREEN, SUZLON, ADANIPORTS, SHRIRAMFIN, JIOFIN, NETWEB, WAAREEENER, SCI, ITC, SAIL
+- Real NSE Nifty Midcap 150 on same strategy = -18% CAGR (without lookahead)
 
-### Options: FINNIFTY weekly/monthly options chain
-- Source: NSE Bhav Copy (FNO archives), pre-fetched via `tools/shared/prefetch_bhav.py`
-- Stored in: `historical_options` DB table (~1.16M bars over 3yr)
-- Selection per cycle: nearest weekly Iron Condor 4% OTM from spot
-- No "stock list" — derived from index spot price each Monday
+### 4. finnifty_ic_otm4_w300_lots5 — FINNIFTY option chain
+- Source: NSE Bhav Copy (FNO archives), via `tools/shared/prefetch_bhav.py`
+- Stored: `historical_options` table (~1.16M bars over 3yr)
+- No "stock list" — 4 strikes derived per Monday from FINNIFTY spot:
+  - SELL CE at +4% OTM (round to 50pt strike)
+  - SELL PE at -4% OTM
+  - BUY CE wing at +300pt further (caps upside risk)
+  - BUY PE wing at -300pt further (caps downside risk)
+
+## Strategy templates
+
+### Equity rotation (n100_top5_max1 + pseudo_n100_adv)
+- Monthly rebalance (1st of month)
+- Rank universe by 30-day return
+- Hold top-1 (max_concurrent = 1)
+- Exit on rotation (when not rank-1)
+- No SL, no target
+
+### Equity swing breakout (midcap_narrow_60d_breakout)
+- Daily scan
+- Entry: 40-day high + vol > 2× 20d avg + close > 200d SMA
+- max_concurrent = 1
+- Exits: +100% TARGET, -20% TRAIL from peak after +10%, 90-day MAX_HOLD
+- **SMA20 exit DISABLED** (V1 winner config)
+
+### Options (finnifty_ic)
+- Weekly Monday entry on monthly expiry
+- 4-strike Iron Condor 5 lots
+- Stop: 3× entry credit OR hold to expiry Thursday
+- Defined-risk by wings
 
 ## Per-model folder layout
 
@@ -56,38 +80,32 @@ tools/models/<name>/
 ├── schema.sql           (options only) DB schema
 ├── run_winner.py        (options only) winning-config ledger generator
 ├── sweep.py             (options only) variant sweep
-├── data_pull.py         daily/weekly data ingest jobs for THIS model
-└── cron.py              schedule registration:
-                            register_data_jobs(schedule)     # data_scheduler
-                            register_trading_jobs(schedule)  # scheduler (tech)
+├── data_pull.py         daily/weekly data ingest jobs
+├── cron.py              schedule registration (data + trading)
+└── trade_ledger.json    backtest output (trades + open + summary)
 ```
 
-Results land in `exports/models/<name>/`.
+Results land in `exports/models/<name>/`:
+
+```
+exports/models/<name>/
+├── SUMMARY.md           one-page summary: yearly ROI, top winners, caveats
+├── TRADE_LEDGER.md      full trade-by-trade ledger
+├── trades.csv           (finnifty) machine-readable trade dump
+├── monthly.csv          (finnifty) monthly equity curve
+└── MONTHLY_INVESTED.md  (finnifty) per-month invested capital + credit
+```
 
 ## Data requirements per model
 
-| Model | Daily Equity OHLCV | Index Spots | NSE Option Bhav | Universe CSV |
-|---|---|---|---|---|
-| `momentum_n100_top5_max1` | ✅ N100 close | — | — | NSE Nifty 100 (quarterly refresh) |
-| `midcap_narrow_60d_breakout` | ✅ N500 OHLCV+volume | — | — | derived from N500 (ADV rank) |
-| `finnifty_ic_otm4_w300_lots5` | — | ✅ FINNIFTY spot | ✅ FINNIFTY OPTIDX | — |
+| Model | N100 OHLCV | N500 OHLCV | Index Spots | Option Bhav | Universe CSV |
+|---|---|---|---|---|---|
+| `momentum_n100_top5_max1` | ✅ | — | — | — | NSE Nifty 100 (quarterly refresh) |
+| `momentum_pseudo_n100_adv` | — | ✅ | — | — | derived (ADV rank from N500) |
+| `midcap_narrow_60d_breakout` | — | ✅ | — | — | derived (N500 skip-30 take-100 ADV) |
+| `finnifty_ic_otm4_w300_lots5` | — | — | ✅ FINNIFTY | ✅ FINNIFTY OPTIDX | — |
 
-## Adding a new model
-
-1. `mkdir tools/models/<new_name>/` + `touch __init__.py`
-2. Write `data_pull.py` + `cron.py` exposing `register_data_jobs` and `register_trading_jobs` (or no-op for either).
-3. Add import + register call into `data_scheduler.py` (data side) and `scheduler.py` (trading side):
-   ```python
-   from tools.models.<new_name>.cron import register_data_jobs as register_<key>_data
-   register_<key>_data(schedule)
-   ```
-4. Write `README.md` documenting:
-   - Stock category (large/mid/small/options)
-   - How universe is constructed (source CSV or derived)
-   - Strategy rules
-   - Backtest result + caveats
-
-## Saga pipeline (data_scheduler 21:00 daily, admin trigger button)
+## Saga pipeline (data_scheduler 21:00 IST daily, admin trigger button)
 
 `src/services/data/pipeline_saga.py` runs 4 steps:
 
@@ -98,7 +116,15 @@ Results land in `exports/models/<name>/`.
 | 3. HISTORICAL_DATA | Pull daily OHLCV into `historical_data` |
 | 6. PIPELINE_VALIDATION | Row-count quality check |
 
-Same saga invoked by:
+Invoked by:
 - `data_scheduler.py` at 21:00 IST daily (cron)
-- Admin Triggers page POST `/admin/trigger/pipeline` (manual button)
+- Admin Triggers page POST `/admin/trigger/pipeline` (manual)
 - Admin Triggers page POST `/admin/trigger/all` (sequential wrapper)
+
+## Adding a new model
+
+1. `mkdir tools/models/<new_name>/` + `touch __init__.py`
+2. Write `data_pull.py` + `cron.py` exposing `register_data_jobs` and `register_trading_jobs`
+3. Add import + register call into `data_scheduler.py` and `scheduler.py`
+4. Write `README.md` covering: stock category, universe construction, strategy rules, backtest result, caveats
+5. Write `SUMMARY.md` + `TRADE_LEDGER.md` in `exports/models/<new_name>/`
