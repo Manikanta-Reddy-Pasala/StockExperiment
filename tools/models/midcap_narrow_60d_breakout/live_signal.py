@@ -121,12 +121,15 @@ def check_exit(pos: Dict, df_sym: pd.DataFrame) -> Optional[Dict]:
 def scan_entry_candidate(df: pd.DataFrame, symbols: List[str]) -> Optional[Dict]:
     """Find best fresh 60d-high breakout with vol surge today.
 
-    Side effect: stashes all qualifying candidates on the function (as
-    `scan_entry_candidate.last_candidates`) so the picks UI can show the
-    full short-list, not just rank-1.
+    Side effects (stashed on the function so the picks UI can show short-lists):
+      - `last_candidates`     — stocks that fully qualify (rare on quiet days)
+      - `last_near_miss`      — top-5 stocks closest to qualifying (always
+                                populated), ranked by proximity-to-breakout
+                                score so the UI never shows an empty card.
     """
     today = df["date"].max()
     cands = []
+    near_miss = []
     for sym, g in df.groupby("symbol"):
         g = g.sort_values("date").reset_index(drop=True)
         if len(g) < SMA_LONG + 5:
@@ -141,18 +144,33 @@ def scan_entry_candidate(df: pd.DataFrame, symbols: List[str]) -> Optional[Dict]
         if any(pd.isna(r[k]) for k in ["sma_long", "hh", "vol_avg20", "close", "volume"]):
             continue
         close = float(r["close"])
-        if close <= float(r["hh"]) or close <= float(r["sma_long"]):
-            continue
-        if float(r["volume"]) < VOL_MULT * float(r["vol_avg20"]):
-            continue
-        cands.append({
+        hh = float(r["hh"])
+        sma_long = float(r["sma_long"])
+        vol_avg = float(r["vol_avg20"])
+        vol_ratio = float(r["volume"]) / vol_avg if vol_avg > 0 else 0.0
+        hh_ratio = close / hh if hh > 0 else 0.0  # >1 = above prior 60d high
+        sma_ratio = close / sma_long if sma_long > 0 else 0.0  # >1 = above SMA200
+        qualifies = (close > hh and close > sma_long and vol_ratio >= VOL_MULT)
+        info = {
             "symbol": sym,
             "close": close,
-            "vol_ratio": float(r["volume"]) / float(r["vol_avg20"]),
-            "high_60d_prev": float(r["hh"]),
-        })
+            "vol_ratio": vol_ratio,
+            "high_60d_prev": hh,
+            "hh_ratio": hh_ratio,
+            "sma_ratio": sma_ratio,
+            "qualifies": qualifies,
+        }
+        if qualifies:
+            cands.append(info)
+        # Near-miss score = how close the stock is to ALL 3 conditions firing.
+        # Higher = closer to a breakout. Below-HH stocks get penalized.
+        score = (hh_ratio - 1) * 50 + (sma_ratio - 1) * 20 + (vol_ratio - 1) * 10
+        info["near_miss_score"] = score
+        near_miss.append(info)
     cands.sort(key=lambda c: -c["vol_ratio"])
+    near_miss.sort(key=lambda c: -c["near_miss_score"])
     scan_entry_candidate.last_candidates = cands  # type: ignore[attr-defined]
+    scan_entry_candidate.last_near_miss = near_miss[:5]  # type: ignore[attr-defined]
     if not cands:
         return None
     return cands[0]
@@ -220,11 +238,13 @@ def main() -> int:
     Path(args.signals_out).write_text(json.dumps(signals, indent=2, default=str))
     log.info(f"Wrote {len(signals)} signals -> {args.signals_out}")
 
-    # Persist top-5 breakout candidates by vol_ratio for the picks UI.
-    # If model is holding a position, list the held symbol first (rank 1),
-    # then any qualifying breakout candidates from today's scan.
+    # Persist top-5 picks for UI. Priority:
+    #   1. Held symbol (if any) as rank 1
+    #   2. Today's qualifying breakouts (rare — needs all 3 filters firing)
+    #   3. Near-miss candidates (always populated) so card is never empty
     today_str = datetime.now().strftime("%Y-%m-%d")
-    candidates = getattr(scan_entry_candidate, "last_candidates", []) or []
+    qualified = getattr(scan_entry_candidate, "last_candidates", []) or []
+    near_miss = getattr(scan_entry_candidate, "last_near_miss", []) or []
     top_rows = []
     if pos:
         held_sym = pos["open_symbol"]
@@ -239,24 +259,36 @@ def main() -> int:
             "ret_30d_pct": round(ret_held, 2),
             "price": round(last_close, 2),
         })
-    for i, c in enumerate(candidates[: 5 - len(top_rows)], len(top_rows) + 1):
+    # Use qualified first; if none, fall back to near-miss with annotation
+    pool = qualified if qualified else near_miss
+    note = None
+    if not qualified:
+        note = ("No qualifying breakouts today — showing near-miss candidates "
+                "(closest to firing all 3 filters: above 60d high, above 200d "
+                "SMA, volume > 2x avg). Breakout model trades infrequently.")
+    for i, c in enumerate(pool[: 5 - len(top_rows)], len(top_rows) + 1):
         # ret_30d_pct here = breakout headroom above 60d HH (proxy momentum)
+        # Negative = stock still below prior 60d high (near-miss territory)
         headroom = (c["close"] / c["high_60d_prev"] - 1) * 100 \
             if c.get("high_60d_prev") else 0
-        top_rows.append({
+        row = {
             "rank": i,
             "symbol": c["symbol"],
-            "name": c["symbol"],
+            "name": c["symbol"] + ("" if c.get("qualifies") else " (near-miss)"),
             "ret_30d_pct": round(headroom, 2),
             "price": round(c["close"], 2),
             "vol_ratio": round(c["vol_ratio"], 2),
-        })
+        }
+        top_rows.append(row)
     ranking_payload = {
         "model": MODEL_NAME,
         "date": today_str,
         "universe_size": len(syms),
+        "qualifying_breakouts": len(qualified),
         "top_n": top_rows,
     }
+    if note:
+        ranking_payload["note"] = note
     ranking_dir = Path("/app/logs/midcap_narrow/ranking")
     ranking_dir.mkdir(parents=True, exist_ok=True)
     (ranking_dir / f"{today_str}.json").write_text(

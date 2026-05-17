@@ -91,15 +91,23 @@ function renderCard(m, idx, ranking, status) {
 
   // Top pick summary shown when collapsed — gives operator the most important
   // signal at a glance without needing to expand. Click header to see top-5.
+  const isNearMiss = rank1 && rank1.name && rank1.name.includes('near-miss');
   const topPickHtml = rank1
     ? `<div class="mt-2 small">
-         <span class="badge badge-rank-1 me-1">★ 1</span>
+         <span class="badge ${isNearMiss ? 'bg-warning text-dark' : 'badge-rank-1'} me-1">${isNearMiss ? 'NEAR' : '★ 1'}</span>
          <strong>${rank1.symbol}</strong>
-         <span class="text-muted">${rank1.name || ''}</span>
+         <span class="text-muted">${(rank1.name || '').replace(' (near-miss)', '')}</span>
          <span class="ms-2 ${cls(rank1.ret_30d_pct)}">${fmtPct(rank1.ret_30d_pct)}</span>
          <span class="ms-2 text-muted">${fmtINR(rank1.price)}</span>
        </div>`
     : '<div class="mt-2 small text-muted">No top pick available</div>';
+
+  // Model-emitted note (e.g. midcap "no breakout today, showing near-miss")
+  const noteHtml = (ranking && ranking.note)
+    ? `<div class="alert alert-info py-2 px-3 small mb-0 rounded-0 border-0">
+         <i class="bi bi-info-circle me-1"></i>${ranking.note}
+       </div>`
+    : '';
 
   return `
     <div class="card mb-3">
@@ -116,6 +124,7 @@ function renderCard(m, idx, ranking, status) {
         </div>
       </div>
       <div id="${collapseId}" class="collapse">
+        ${noteHtml}
         <div class="table-responsive">
           <table class="table table-sm align-middle mb-0">
             <thead>

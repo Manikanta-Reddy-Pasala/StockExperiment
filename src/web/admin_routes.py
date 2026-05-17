@@ -1812,6 +1812,8 @@ def admin_model_ranking(model_name):
             "date": payload.get("date"),
             "universe_size": payload.get("universe_size"),
             "ranking": ranking[:top],
+            "note": payload.get("note"),
+            "qualifying_breakouts": payload.get("qualifying_breakouts"),
             "source": str(files[0]),
             "generated_at": datetime.fromtimestamp(
                 files[0].stat().st_mtime).isoformat(),
