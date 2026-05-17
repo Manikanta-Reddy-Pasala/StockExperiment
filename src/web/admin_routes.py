@@ -1695,6 +1695,99 @@ def admin_toggle_enabled(model_name):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@admin_bp.route('/data/backfill', methods=['POST'])
+def admin_backfill_history():
+    """Trigger 4-year (1500d) historical OHLCV backfill for N50+N500.
+
+    Wraps tools/shared/prefetch_ohlcv.py. Idempotent (skip-frac=0.85).
+    Same job that data_scheduler runs every Sunday at 03:00.
+
+    Body (optional): {days: int = 1500, universe: str = "n50,n500"}
+    """
+    data = request.get_json(silent=True) or {}
+    days = int(data.get("days", 1500))
+    universe = data.get("universe", "n50,n500")
+
+    ts = datetime.now().strftime("%Y%m%dT%H%M%S")
+    task_id = f"backfill_{ts}"
+
+    cmd = [
+        "python3", "tools/shared/prefetch_ohlcv.py",
+        "--universe", universe,
+        "--days", str(days),
+        "--intervals", "D",
+        "--sleep", "0.15",
+        "--retry-passes", "2",
+    ]
+
+    threading.Thread(
+        target=run_command_async,
+        args=(task_id, cmd,
+              f"Backfill {days}d OHLCV for {universe}"),
+        daemon=True,
+    ).start()
+
+    return jsonify({
+        "success": True,
+        "task_id": task_id,
+        "days": days,
+        "universe": universe,
+        "message": (f"Backfill started for {universe} ({days}d). "
+                    f"~30-60 min depending on cache state. "
+                    f"Already-covered stocks are skipped."),
+        "cmd": " ".join(cmd),
+    })
+
+
+@admin_bp.route('/data/coverage', methods=['GET'])
+def admin_data_coverage():
+    """Return per-stock historical_data coverage buckets.
+
+    Used by UI to show data health: how many stocks have 4y, 3y, 1y, etc.
+    """
+    try:
+        from src.models.database import get_database_manager
+        from sqlalchemy import text
+        db = get_database_manager()
+        with db.get_session() as s:
+            rows = s.execute(text("""
+                SELECT bucket, COUNT(*) AS n FROM (
+                    SELECT CASE
+                        WHEN cnt >= 990 THEN '4y_full'
+                        WHEN cnt >= 750 THEN '3y'
+                        WHEN cnt >= 500 THEN '2y'
+                        WHEN cnt >= 250 THEN '1y'
+                        ELSE 'short'
+                    END AS bucket
+                    FROM (
+                        SELECT symbol, COUNT(*) AS cnt
+                        FROM historical_data
+                        WHERE symbol LIKE 'NSE:%%-EQ'
+                        GROUP BY symbol
+                    ) t
+                ) tt GROUP BY bucket
+            """)).fetchall()
+            buckets = {r[0]: r[1] for r in rows}
+            stats = s.execute(text("""
+                SELECT MIN(date), MAX(date),
+                       COUNT(DISTINCT symbol) AS syms,
+                       COUNT(*) AS total_rows
+                FROM historical_data
+                WHERE symbol LIKE 'NSE:%%-EQ'
+            """)).fetchone()
+        return jsonify({
+            "success": True,
+            "buckets": buckets,
+            "earliest_date": str(stats[0]) if stats[0] else None,
+            "latest_date": str(stats[1]) if stats[1] else None,
+            "total_symbols": stats[2] if stats[2] else 0,
+            "total_rows": stats[3] if stats[3] else 0,
+        })
+    except Exception as e:
+        logger.error(f"data coverage error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @admin_bp.route('/<model_name>/rebalance', methods=['POST'])
 def admin_model_rebalance(model_name):
     """Live per-model rebalance: signal then LIVE execute (real Fyers orders).

@@ -85,6 +85,36 @@ def run_data_pipeline():
     _run_subprocess_with_retry(['python3', 'run_pipeline.py'], 'Data Pipeline', timeout=3600, max_retries=2)
 
 
+def backfill_full_history():
+    """Ensure all N50+N500 stocks have 4 years (1500d) of daily OHLCV.
+
+    Uses existing tools/shared/prefetch_ohlcv.py with --skip-frac=0.85,
+    which skips symbols whose cache already has ≥85% of expected rows
+    for the window. Idempotent — re-running on a complete cache is cheap
+    (per-symbol coverage check is a single SELECT COUNT(*)).
+
+    Runs weekly (Sunday 03:00 IST — before any market activity) and
+    once on scheduler startup if env BACKFILL_ON_BOOT=true.
+
+    Daily incremental pulls (per-model data_pull at 20:45) continue to
+    keep the latest 2 days fresh. This job only fills HISTORICAL gaps.
+    """
+    logger.info("=" * 80)
+    logger.info("Full History Backfill — 4 years (1500 days) for N50 + N500")
+    logger.info("=" * 80)
+    _run_subprocess_with_retry(
+        ['python3', 'tools/shared/prefetch_ohlcv.py',
+         '--universe', 'n50,n500',
+         '--days', '1500',
+         '--intervals', 'D',
+         '--sleep', '0.15',
+         '--retry-passes', '2'],
+        'backfill_4y_history',
+        timeout=14400,  # 4 hours — enough for ~500 syms even with rate-limit
+        max_retries=1,
+    )
+
+
 
 def export_daily_csv():
     """
@@ -360,11 +390,22 @@ def run_scheduler():
     # Export CSV & validate quality (10 PM - after pipeline completes)
     schedule.every().day.at("22:00").do(export_daily_csv)
     schedule.every().day.at("22:00").do(validate_data_quality)
-    
-    # Optional: Run immediately on startup for testing
-    # Uncomment to run tasks on scheduler start
-    # logger.info("Running initial data pipeline...")
-    # run_data_pipeline()
+
+    # Weekly full-history backfill — fills gaps for stocks added after the
+    # initial seed (newly-listed midcaps, universe changes, etc.). Daily
+    # incremental pulls only fetch last 2 days, so any stock with <4y of
+    # history would stay short forever without this job.
+    schedule.every().sunday.at("03:00").do(backfill_full_history)
+    logger.info("  - Full History Backfill (4y): Weekly Sunday at 03:00 AM")
+
+    # Run backfill immediately on startup if env flag set. Useful for
+    # first-time deployment + manual recovery after data loss.
+    if os.environ.get("BACKFILL_ON_BOOT", "false").lower() == "true":
+        logger.info("BACKFILL_ON_BOOT=true → running backfill_full_history now")
+        try:
+            backfill_full_history()
+        except Exception as e:
+            logger.error(f"Boot backfill failed: {e}", exc_info=True)
     
     # Keep scheduler running
     logger.info("Data scheduler is now running. Press Ctrl+C to stop.")
