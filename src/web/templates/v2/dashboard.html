@@ -8,98 +8,83 @@
   .pos { color: #15a36b; } .neg { color: #d4453a; } .neutral { color: #4f5868; }
   .row-held { background: #fffbea !important; font-weight: 600; }
   .strategy-pill { background: linear-gradient(135deg,#667eea,#764ba2); color:#fff; padding:4px 12px; border-radius:14px; font-size:0.75rem; font-weight:600; }
+
+  /* T10 multi-model dashboard cards */
+  .model-card { border-radius: 10px; border: 1px solid #e3e6ef; transition: transform .12s ease, box-shadow .12s ease; height: 100%; }
+  .model-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.06); }
+  .model-card .card-body { padding: 1rem; }
+  .model-card.equity { border-top: 4px solid #5b8def; }
+  .model-card.options { border-top: 4px solid #b66dff; }
+  .model-card.disabled { opacity: 0.65; border-top-color: #adb5bd; }
+  .model-card .ttl { font-size: 0.95rem; font-weight: 700; line-height: 1.2; }
+  .model-card .uni { font-size: 0.72rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .model-card .kv { display:flex; justify-content: space-between; font-size: 0.85rem; padding: 3px 0; }
+  .model-card .kv .k { color: #6c757d; }
+  .model-card .kv .v { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .model-card .nav-row { margin-top: 6px; padding-top: 6px; border-top: 1px dashed #e3e6ef; }
+  .model-card .pnl-line { font-size: 1.1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .model-card .pnl-line small { font-size: 0.75rem; font-weight: 500; }
+  .model-card .footer-bar { display:flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 8px; border-top: 1px solid #f0f2f7; font-size: 0.75rem; }
+  .model-card .sig-badge { padding: 2px 8px; border-radius: 10px; font-weight: 600; font-size: 0.7rem; }
+  .model-card .sig-fired { background: #d4edda; color: #155724; }
+  .model-card .sig-quiet { background: #e9ecef; color: #6c757d; }
+  .model-card .sig-error { background: #f8d7da; color: #721c24; }
+  .model-card .warn-pill { font-size: 0.6rem; padding: 1px 6px; border-radius: 8px; background:#fff3cd; color:#856404; border:1px solid #ffeeba; vertical-align: middle; margin-left: 4px; }
+  .model-card .enable-pill { font-size: 0.6rem; padding: 1px 6px; border-radius: 8px; background:#f1f3f5; color:#6c757d; border:1px solid #dee2e6; vertical-align: middle; margin-left: 4px; }
+
+  /* Today's signals widget */
+  .signals-widget .sig-row { display:flex; gap: 10px; align-items: center; padding: 4px 0; border-bottom: 1px dashed #eef0f5; font-size: 0.85rem; }
+  .signals-widget .sig-row:last-child { border-bottom: none; }
+  .signals-widget .sig-row .side { width: 50px; }
+  .signals-widget .sig-row .model { width: 220px; color: #6c757d; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; }
+  .signals-widget .sig-row code { background: #f4f6fb; padding: 1px 6px; border-radius: 4px; }
+  .signals-widget .empty { color: #6c757d; padding: 14px 6px; text-align: center; }
+  .totals-strip { background: linear-gradient(180deg,#fafbff,#f4f6fb); border: 1px solid #e3e6ef; border-radius: 10px; padding: 12px 16px; }
 </style>
 
-<!-- Portfolio overview: per-model + aggregate (multi-model ready) -->
-<div class="card mb-4">
+<!-- Today's signals widget (T10) -->
+<div class="card mb-4 signals-widget">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <strong>Portfolio (all enabled models)</strong>
-    <a href="/settings" class="btn btn-sm btn-outline-secondary">Manage Allocations</a>
-  </div>
-  <div class="card-body">
-    <div class="row g-3 mb-3" id="portfolio_total_row">
-      <div class="col-6 col-lg-3"><div class="text-muted small">Allocated</div><div class="fs-5 fw-bold" id="pf_alloc">--</div></div>
-      <div class="col-6 col-lg-3"><div class="text-muted small">Current NAV</div><div class="fs-5 fw-bold" id="pf_nav">--</div></div>
-      <div class="col-6 col-lg-3"><div class="text-muted small">Total P&amp;L</div><div class="fs-5 fw-bold" id="pf_pnl">--</div></div>
-      <div class="col-6 col-lg-3"><div class="text-muted small">Realized P&amp;L</div><div class="fs-5 fw-bold" id="pf_realized">--</div></div>
+    <span><i class="bi bi-broadcast text-primary me-1"></i><strong>Today's Signals</strong> <span class="text-muted small ms-1">across all wired models</span></span>
+    <div>
+      <span class="badge bg-light text-dark me-1" id="sig_date">--</span>
+      <span class="badge bg-primary" id="sig_total">0</span>
     </div>
-    <div class="table-responsive">
-      <table class="table table-sm align-middle mb-0">
-        <thead><tr>
-          <th>Model</th><th class="text-end">Allocated</th><th class="text-end">Cash</th>
-          <th>Open Position</th><th class="text-end">Position Val</th>
-          <th class="text-end">NAV</th><th class="text-end">P&amp;L</th>
-          <th class="text-end">Realized</th><th class="text-end">Trades</th>
-        </tr></thead>
-        <tbody id="pf_tbody"><tr><td colspan="9" class="text-center text-muted py-3">Loading…</td></tr></tbody>
-      </table>
+  </div>
+  <div class="card-body py-2" id="signals_body">
+    <div class="empty">Loading…</div>
+  </div>
+</div>
+
+<!-- Portfolio totals strip (T10) -->
+<div class="totals-strip mb-3 d-flex flex-wrap gap-4 align-items-center justify-content-between">
+  <div>
+    <span class="strategy-pill">Multi-Model Portfolio</span>
+    <span class="text-muted small ms-2">4 equity + 1 options · per-model cash silos</span>
+  </div>
+  <div class="row text-end g-3 flex-grow-1 justify-content-end">
+    <div class="col-auto"><div class="text-muted small">Invested</div><div class="fs-5 fw-bold" id="tot_invested">--</div></div>
+    <div class="col-auto"><div class="text-muted small">Current NAV</div><div class="fs-5 fw-bold" id="tot_nav">--</div></div>
+    <div class="col-auto"><div class="text-muted small">Total P&amp;L</div><div class="fs-5 fw-bold" id="tot_pnl">--</div></div>
+    <div class="col-auto"><div class="text-muted small">Realized</div><div class="fs-5 fw-bold" id="tot_realized">--</div></div>
+    <div class="col-auto align-self-center">
+      <a href="/settings" class="btn btn-sm btn-outline-secondary"><i class="bi bi-sliders"></i> Manage Allocations</a>
     </div>
   </div>
 </div>
 
+<!-- 5-card grid: 4 equity + 1 options (T10) -->
+<div class="row g-3 mb-4" id="model_grid">
+  <div class="col-12 text-center text-muted py-3">Loading models…</div>
+</div>
+
+<!-- Top-1 strategy callout (carry-over from prior dashboard) -->
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
-    <span class="strategy-pill">Trading Models</span>
-    <span class="ms-2 text-muted small">Monthly N100 momentum — top-5 max=1 — 60d lookback</span>
+    <span class="strategy-pill">Primary: Monthly N100</span>
+    <span class="ms-2 text-muted small">Live momentum_n100_top5_max1 — top-5 max=1 — 60d lookback</span>
   </div>
   <div class="small text-muted">Updated: <span id="updated_at">–</span></div>
-</div>
-
-<!-- Summary cards: NAV, Invested, Market Value, Wallet -->
-<div class="row g-3 mb-4">
-  <div class="col-6 col-lg-3">
-    <div class="card summary-card h-100"><div class="card-body py-3 text-center">
-      <div class="text-muted small mb-1">Total NAV</div>
-      <div id="total_value" class="fs-4 fw-bold">--</div>
-      <div class="small text-muted">cash + holdings</div>
-    </div></div>
-  </div>
-  <div class="col-6 col-lg-3">
-    <div class="card summary-card h-100"><div class="card-body py-3 text-center">
-      <div class="text-muted small mb-1">Invested</div>
-      <div id="invested" class="fs-4 fw-bold">--</div>
-      <div class="small text-muted">cost basis</div>
-    </div></div>
-  </div>
-  <div class="col-6 col-lg-3">
-    <div class="card summary-card h-100"><div class="card-body py-3 text-center">
-      <div class="text-muted small mb-1">Market Value</div>
-      <div id="market_value" class="fs-4 fw-bold">--</div>
-      <div class="small text-muted">live price × qty</div>
-    </div></div>
-  </div>
-  <div class="col-6 col-lg-3">
-    <div class="card summary-card h-100"><div class="card-body py-3 text-center">
-      <div class="text-muted small mb-1">Wallet (Cash)</div>
-      <div id="wallet" class="fs-4 fw-bold">--</div>
-      <div class="small text-muted">Fyers available_cash</div>
-    </div></div>
-  </div>
-</div>
-
-<!-- P&L + Open Position + Next Rebalance row -->
-<div class="row g-3 mb-4">
-  <div class="col-6 col-lg-4">
-    <div class="card summary-card h-100"><div class="card-body py-3 text-center">
-      <div class="text-muted small mb-1">Total P&amp;L</div>
-      <div id="total_pnl" class="fs-4 fw-bold">--</div>
-      <div id="total_pct" class="small">--</div>
-    </div></div>
-  </div>
-  <div class="col-6 col-lg-4">
-    <div class="card summary-card h-100"><div class="card-body py-3 text-center">
-      <div class="text-muted small mb-1">Open Position</div>
-      <div id="held_symbol" class="fs-4 fw-bold">--</div>
-      <div id="held_value" class="small text-muted">--</div>
-    </div></div>
-  </div>
-  <div class="col-6 col-lg-4">
-    <div class="card summary-card h-100"><div class="card-body py-3 text-center">
-      <div class="text-muted small mb-1">Next Rebalance</div>
-      <div id="next_date" class="fs-4 fw-bold">--</div>
-      <div id="next_days" class="small text-muted">--</div>
-    </div></div>
-  </div>
 </div>
 
 <div class="row g-3 mb-4">
@@ -119,7 +104,7 @@
   </div>
   <div class="col-lg-5">
     <div class="card h-100">
-      <div class="card-header">Current Holding</div>
+      <div class="card-header">Current Holding (primary model)</div>
       <div class="card-body" id="holding_card">
         <div class="text-muted text-center py-3">Loading…</div>
       </div>
@@ -135,63 +120,166 @@ const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractio
 const fmtPct = n => (n>=0?"+":"") + Number(n||0).toFixed(2) + "%";
 const cls = n => n>0?"pos":(n<0?"neg":"neutral");
 
-async function loadPortfolio() {
-  try {
-    const r = await fetch('/admin/models/portfolio');
-    const d = await r.json();
-    if (!d.success) return;
-    const t = d.total || {};
-    document.getElementById('pf_alloc').textContent = fmtINR(t.allocated_capital);
-    document.getElementById('pf_nav').textContent = fmtINR(t.nav);
-    const pnlEl = document.getElementById('pf_pnl');
-    pnlEl.textContent = fmtINR(t.pnl_total) + ' (' + fmtPct(t.return_pct) + ')';
-    pnlEl.className = 'fs-5 fw-bold ' + cls(t.pnl_total);
-    document.getElementById('pf_realized').textContent = fmtINR(t.realized_pnl);
-    const tbody = document.getElementById('pf_tbody');
-    tbody.innerHTML = '';
-    (d.models || []).forEach(m => {
-      const tr = document.createElement('tr');
-      const posHtml = m.open_symbol
-        ? `${m.open_symbol} <span class="text-muted small">x${m.open_qty} @ ${fmtINR(m.open_entry_px)}</span>`
-        : '<span class="text-muted">flat</span>';
-      tr.innerHTML = `
-        <td><strong>${m.model_name}</strong>${m.enabled ? '' : ' <span class="badge bg-secondary">disabled</span>'}</td>
-        <td class="text-end">${fmtINR(m.allocated_capital)}</td>
-        <td class="text-end">${fmtINR(m.cash)}</td>
-        <td>${posHtml}</td>
-        <td class="text-end">${fmtINR(m.position_value)}</td>
-        <td class="text-end"><strong>${fmtINR(m.nav)}</strong></td>
-        <td class="text-end ${cls(m.pnl_total)}">${fmtINR(m.pnl_total)} (${fmtPct(m.return_pct)})</td>
-        <td class="text-end ${cls(m.realized_pnl)}">${fmtINR(m.realized_pnl)}</td>
-        <td class="text-end">${m.total_trades} (${m.wins}W/${m.losses}L = ${m.win_rate_pct}%)</td>
-      `;
-      tbody.appendChild(tr);
-    });
-  } catch(e) { console.error('portfolio load failed', e); }
+// Display metadata per model — universe label, kind (drives card colour),
+// optional warning. Kept independent of backend description text so the UI
+// can evolve without redeploying the service.
+const MODEL_META = {
+  'momentum_n100_top5_max1':     { universe: 'Nifty 100 (live)',       kind: 'equity'  },
+  'momentum_pseudo_n100_adv':    { universe: 'Pseudo-N100 ADV',        kind: 'equity', warn: 'LOOKAHEAD' },
+  'midcap_narrow_60d_breakout':  { universe: 'Midcap-narrow 60d HH',   kind: 'equity'  },
+  'n20_daily_large_only':        { universe: 'Top-20 ADV ∩ N100',      kind: 'equity'  },
+  'finnifty_ic_otm4_w300_lots5': { universe: 'FinNifty Options IC',    kind: 'options' },
+};
+// Display order: 4 equity first then options.
+const MODEL_ORDER = [
+  'momentum_n100_top5_max1',
+  'momentum_pseudo_n100_adv',
+  'midcap_narrow_60d_breakout',
+  'n20_daily_large_only',
+  'finnifty_ic_otm4_w300_lots5',
+];
+
+let _signalsByModel = {};
+
+function renderModelCard(m, sig) {
+  const meta = MODEL_META[m.model_name] || { universe: '—', kind: 'unknown' };
+  const cardCls = `model-card ${meta.kind} ${m.enabled ? '' : 'disabled'}`;
+  const pnlCls = cls(m.pnl_total);
+  const warn = meta.warn ? `<span class="warn-pill" title="Strategy has known lookahead bias — research only">${meta.warn}</span>` : '';
+  const enableBadge = m.enabled
+    ? '<span class="enable-pill" style="background:#d4edda;color:#155724;border-color:#c3e6cb">LIVE</span>'
+    : '<span class="enable-pill">disabled</span>';
+  const refOnly = meta.warn ? ' <span class="enable-pill" style="background:#fff3cd;color:#856404;border-color:#ffeeba">REFERENCE ONLY</span>' : '';
+
+  let sigBadge = '<span class="sig-badge sig-quiet">no signal</span>';
+  if (sig) {
+    if (sig.error) sigBadge = `<span class="sig-badge sig-error" title="${sig.error}">error</span>`;
+    else if (sig.count > 0) sigBadge = `<span class="sig-badge sig-fired">${sig.count} signal${sig.count>1?'s':''}</span>`;
+    else if (sig.has_file) sigBadge = '<span class="sig-badge sig-quiet">quiet</span>';
+    else sigBadge = '<span class="sig-badge sig-quiet" title="No signal file written today">no run</span>';
+  }
+
+  const posLine = m.open_symbol
+    ? `<strong>${m.open_symbol}</strong> <span class="text-muted">x${m.open_qty}</span> @ ${fmtINR(m.open_entry_px)}`
+    : '<span class="text-muted">flat</span>';
+
+  return `
+    <div class="col-12 col-md-6 col-xl-4">
+      <div class="${cardCls}">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <div class="ttl">${m.model_name}${warn}</div>
+              <div class="uni">${meta.universe} · ${meta.kind}</div>
+            </div>
+            <div class="text-end">${enableBadge}${refOnly}</div>
+          </div>
+          <div class="kv"><span class="k">Invested</span><span class="v">${fmtINR(m.invested_amount ?? m.allocated_capital)}</span></div>
+          <div class="kv"><span class="k">Cash</span><span class="v">${fmtINR(m.cash)}</span></div>
+          <div class="kv"><span class="k">Open Position</span><span class="v">${posLine}</span></div>
+          <div class="kv nav-row"><span class="k">Current NAV</span><span class="v">${fmtINR(m.current_amount ?? m.nav)}</span></div>
+          <div class="kv">
+            <span class="k">P&amp;L</span>
+            <span class="v">
+              <span class="pnl-line ${pnlCls}">${fmtINR(m.pnl_total)} <small>(${fmtPct(m.return_pct)})</small></span>
+            </span>
+          </div>
+          <div class="footer-bar">
+            <span class="text-muted">${m.total_trades||0} trades · ${m.wins||0}W/${m.losses||0}L</span>
+            ${sigBadge}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
-async function load() {
-  loadPortfolio();
+function renderTotals(t) {
+  if (!t) return;
+  document.getElementById('tot_invested').textContent = fmtINR(t.invested_amount ?? t.allocated_capital);
+  document.getElementById('tot_nav').textContent = fmtINR(t.current_amount ?? t.nav);
+  const pnlEl = document.getElementById('tot_pnl');
+  pnlEl.textContent = fmtINR(t.pnl_total) + ' (' + fmtPct(t.return_pct) + ')';
+  pnlEl.className = 'fs-5 fw-bold ' + cls(t.pnl_total);
+  document.getElementById('tot_realized').textContent = fmtINR(t.realized_pnl);
+}
+
+function renderSignalsWidget(data) {
+  const body = document.getElementById('signals_body');
+  document.getElementById('sig_date').textContent = data.date || '--';
+  document.getElementById('sig_total').textContent = data.total_signals || 0;
+  const rows = [];
+  (data.models || []).forEach(grp => {
+    (grp.signals || []).forEach(s => {
+      const side = (s.side || '').toUpperCase();
+      const sideCls = side === 'BUY' ? 'text-success' : (side === 'SELL' ? 'text-danger' : 'text-muted');
+      const sym = s.symbol || s.ticker || s.instrument || '—';
+      const note = s.note || s.signal || s.reason || '';
+      const price = s.price ? ` @ ${fmtINR(s.price)}` : '';
+      rows.push(`
+        <div class="sig-row">
+          <span class="side fw-bold ${sideCls}">${side || '—'}</span>
+          <code>${sym}</code>
+          <span class="text-muted small">${note}${price}</span>
+          <span class="ms-auto model">${grp.model_name}</span>
+        </div>
+      `);
+    });
+  });
+  if (rows.length === 0) {
+    body.innerHTML = '<div class="empty">No signals fired today across any model.</div>';
+  } else {
+    body.innerHTML = rows.join('');
+  }
+}
+
+async function loadPortfolio() {
+  try {
+    const [pf, sig] = await Promise.all([
+      fetch('/admin/models/portfolio').then(r => r.json()),
+      fetch('/admin/signals/today').then(r => r.json()).catch(() => ({success:false, models:[]})),
+    ]);
+
+    // Build signal lookup map first so cards can render their badge.
+    _signalsByModel = {};
+    if (sig.success) {
+      (sig.models || []).forEach(g => { _signalsByModel[g.model_name] = g; });
+      renderSignalsWidget(sig);
+    } else {
+      document.getElementById('signals_body').innerHTML =
+        '<div class="empty text-danger">Failed to load signals: ' + (sig.error || 'unknown') + '</div>';
+    }
+
+    if (!pf.success) return;
+    renderTotals(pf.total);
+
+    // Index models by name; preserve fixed display order regardless of DB order.
+    const byName = {};
+    (pf.models || []).forEach(m => { byName[m.model_name] = m; });
+    const grid = document.getElementById('model_grid');
+    const cards = MODEL_ORDER
+      .filter(name => byName[name])
+      .map(name => renderModelCard(byName[name], _signalsByModel[name]));
+    // Append any extra models that aren't in MODEL_ORDER (forward-compat).
+    Object.keys(byName).forEach(name => {
+      if (!MODEL_ORDER.includes(name)) cards.push(renderModelCard(byName[name], _signalsByModel[name]));
+    });
+    grid.innerHTML = cards.length ? cards.join('') : '<div class="col-12 text-center text-muted py-3">No models seeded.</div>';
+  } catch(e) {
+    console.error('portfolio load failed', e);
+  }
+}
+
+async function loadPrimary() {
   try {
     const r = await fetch('/admin/momrot/summary');
     const d = await r.json();
     if (!d.success) return;
     const s = d.state, n = d.next_rebalance;
-
     document.getElementById('updated_at').textContent = s.ledger_updated_at || '–';
-    document.getElementById('total_value').textContent = fmtINR(s.total_value);
-    document.getElementById('invested').textContent = fmtINR(s.position_cost || 0);
-    document.getElementById('market_value').textContent = fmtINR(s.market_value || 0);
-    document.getElementById('wallet').textContent = fmtINR(s.cash || 0);
-    document.getElementById('total_pnl').textContent = fmtINR(s.total_pnl);
-    document.getElementById('total_pnl').className = 'fs-4 fw-bold ' + cls(s.total_pnl);
-    document.getElementById('total_pct').textContent = fmtPct(s.total_pct);
-    document.getElementById('total_pct').className = 'small ' + cls(s.total_pct);
 
     if (s.open_positions && s.open_positions.length > 0) {
       const p = s.open_positions[0];
-      document.getElementById('held_symbol').textContent = p.symbol;
-      document.getElementById('held_value').textContent = fmtINR(p.market_value);
       document.getElementById('holding_card').innerHTML = `
         <div class="d-flex justify-content-between mb-2"><span class="text-muted">Symbol</span><strong>${p.symbol}</strong></div>
         <div class="d-flex justify-content-between mb-2"><span class="text-muted">Qty</span><strong>${p.qty.toLocaleString('en-IN')}</strong></div>
@@ -203,13 +291,8 @@ async function load() {
         <div class="d-flex justify-content-between"><span class="text-muted">Return %</span><strong class="${cls(p.unrealized_pct)}">${fmtPct(p.unrealized_pct)}</strong></div>
       `;
     } else {
-      document.getElementById('held_symbol').textContent = "None";
-      document.getElementById('held_value').textContent = "Cash only";
       document.getElementById('holding_card').innerHTML = '<div class="text-muted text-center py-3">No open position</div>';
     }
-
-    document.getElementById('next_date').textContent = n.date;
-    document.getElementById('next_days').textContent = `in ${n.days_until}d (${n.weekday})`;
 
     const held = new Set((s.open_positions||[]).map(p=>p.symbol));
     const tbody = document.getElementById('picks_tbody');
@@ -228,6 +311,11 @@ async function load() {
       `).join('');
     }
   } catch(e) { console.error(e); }
+}
+
+function load() {
+  loadPortfolio();
+  loadPrimary();
 }
 load();
 setInterval(load, 30000);

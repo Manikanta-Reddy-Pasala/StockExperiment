@@ -88,16 +88,36 @@
                 <div class="text-muted small mb-2">
                     Each model spends only its own cash. Deposits add to that model's pool; withdrawals pull from it. Profits + losses stay within the model. Other models are untouched.
                 </div>
+                <style>
+                  /* T8 alignment fix: keep numeric columns compact + nowrap,
+                     prevent action-button vertical stacking, lock column widths.
+                     Buttons are icon-only with tooltips to keep the row narrow
+                     on standard 1100-1400px viewports. */
+                  .alloc-table { table-layout: auto; }
+                  .alloc-table th, .alloc-table td { vertical-align: middle; }
+                  .alloc-table td.num, .alloc-table th.num { white-space: nowrap; font-variant-numeric: tabular-nums; }
+                  .alloc-table .col-model { min-width: 180px; max-width: 220px; }
+                  .alloc-table .col-position { min-width: 150px; }
+                  .alloc-table .col-actions { width: 1%; white-space: nowrap; }
+                  .alloc-table th, .alloc-table td { padding: 0.4rem 0.5rem; }
+                  .alloc-table .pnl-pct { display:block; font-size: 0.72rem; opacity: 0.85; margin-top: 2px; }
+                  .alloc-table .action-bar { display:flex; gap: 3px; flex-wrap: nowrap; justify-content: flex-end; align-items: center; }
+                  .alloc-table .action-bar .btn { padding: 0.2rem 0.45rem; font-size: 0.78rem; line-height: 1; min-width: 30px; }
+                  .alloc-table .action-bar .btn i { font-size: 0.85rem; }
+                  .alloc-table .action-bar .dropdown-menu { font-size: 0.85rem; }
+                  .alloc-table .lookahead-pill { font-size: 0.65rem; padding: 1px 6px; border-radius: 10px; background:#fff3cd; color:#856404; border:1px solid #ffeeba; margin-left:6px; vertical-align: middle; }
+                  .alloc-table .universe-tag { font-size: 0.7rem; color:#6c757d; display:block; }
+                </style>
                 <div class="table-responsive">
-                    <table class="table table-sm align-middle">
+                    <table class="table table-sm alloc-table mb-0">
                         <thead><tr>
-                            <th>Model</th>
-                            <th class="text-end">Total Deposited ₹</th>
-                            <th class="text-end">Cash ₹</th>
-                            <th>Open Position</th>
-                            <th class="text-end">NAV ₹</th>
-                            <th class="text-end">P&amp;L</th>
-                            <th class="text-end">Actions</th>
+                            <th class="col-model">Model</th>
+                            <th class="text-end num" title="Total Deposited (principal in)">Deposited</th>
+                            <th class="text-end num">Cash</th>
+                            <th class="col-position">Open Position</th>
+                            <th class="text-end num">NAV</th>
+                            <th class="text-end num">P&amp;L</th>
+                            <th class="text-center col-actions">Actions</th>
                         </tr></thead>
                         <tbody id="alloc_tbody"><tr><td colspan="7" class="text-center text-muted">Loading…</td></tr></tbody>
                     </table>
@@ -364,6 +384,16 @@ loadSettings();
 const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractionDigits:2});
 const fmtPct = n => (n>=0?"+":"") + Number(n||0).toFixed(2) + "%";
 
+// Universe + warning metadata keyed on model_name. Keeps UI display
+// independent of backend description text.
+const MODEL_META = {
+  'momentum_n100_top5_max1': { universe: 'Nifty 100 (live)', kind: 'equity' },
+  'momentum_pseudo_n100_adv': { universe: 'Pseudo-N100 ADV', kind: 'equity', warn: 'LOOKAHEAD' },
+  'midcap_narrow_60d_breakout': { universe: 'Midcap-narrow (60d HH)', kind: 'equity' },
+  'n20_daily_large_only': { universe: 'Top-20 ADV ∩ N100', kind: 'equity' },
+  'finnifty_ic_otm4_w300_lots5': { universe: 'FinNifty Options', kind: 'options' },
+};
+
 async function loadAllocations() {
   try {
     const r = await fetch('/admin/models/portfolio');
@@ -372,27 +402,50 @@ async function loadAllocations() {
     const tbody = document.getElementById('alloc_tbody');
     tbody.innerHTML = '';
     (d.models||[]).forEach(m => {
+      const meta = MODEL_META[m.model_name] || { universe: '—', kind: 'unknown' };
       const tr = document.createElement('tr');
       const posHtml = m.open_symbol
-        ? `${m.open_symbol} x${m.open_qty} @ ${fmtINR(m.open_entry_px)} <span class="text-muted small">(${m.open_entry_date||''})</span>`
+        ? `<div><strong>${m.open_symbol}</strong> <span class="text-muted small">x${m.open_qty} @ ${fmtINR(m.open_entry_px)}</span></div>
+           <div class="text-muted small">${m.open_entry_date||''}</div>`
         : '<span class="text-muted">flat</span>';
       const pnlCls = m.pnl_total >= 0 ? 'text-success' : 'text-danger';
+      const enabledBadge = m.enabled ? '' : ' <span class="badge bg-secondary">disabled</span>';
+      const warnBadge = meta.warn ? ` <span class="lookahead-pill" title="Strategy has known lookahead bias — research only">${meta.warn}</span>` : '';
+      // Position-state-dependent button: clear/sell-mark if holding, seed if flat.
+      const posBtn = m.open_symbol
+        ? `<button class="btn btn-outline-danger" onclick="resetPos('${m.model_name}')" title="Mark flat (no Fyers order)" aria-label="Clear position"><i class="bi bi-x-circle"></i></button>`
+        : `<button class="btn btn-outline-primary" onclick="openSeed('${m.model_name}')" title="Seed existing position into ledger" aria-label="Seed position"><i class="bi bi-bookmark-plus"></i></button>`;
+      const dropdownId = `act_${m.model_name}`;
       tr.innerHTML = `
-        <td><strong>${m.model_name}</strong>${m.enabled ? '' : ' <span class="badge bg-secondary">disabled</span>'}</td>
-        <td class="text-end">${fmtINR(m.allocated_capital)}</td>
-        <td class="text-end">${fmtINR(m.cash)}</td>
-        <td>${posHtml}</td>
-        <td class="text-end"><strong>${fmtINR(m.nav)}</strong></td>
-        <td class="text-end ${pnlCls}">${fmtINR(m.pnl_total)} (${fmtPct(m.return_pct)})</td>
-        <td class="text-end">
-          <button class="btn btn-success btn-sm" onclick="openCap('${m.model_name}','deposit')">+ Deposit</button>
-          <button class="btn btn-warning btn-sm" onclick="openCap('${m.model_name}','withdraw')">- Withdraw</button>
-          ${m.open_symbol
-            ? `<button class="btn btn-outline-danger btn-sm" onclick="resetPos('${m.model_name}')">Clear Pos</button>`
-            : `<button class="btn btn-outline-primary btn-sm" onclick="openSeed('${m.model_name}')">Seed Pos</button>`}
-          <button class="btn btn-outline-info btn-sm" onclick="bootstrap('${m.model_name}')" title="Auto-import existing position from legacy ledger">Bootstrap</button>
-          <button class="btn btn-link btn-sm text-danger" onclick="resetModel('${m.model_name}')">Reset</button>
-          <button class="btn btn-link btn-sm" onclick="toggleEnabled('${m.model_name}', ${!m.enabled})">${m.enabled?'Disable':'Enable'}</button>
+        <td class="col-model">
+          <strong>${m.model_name}</strong>${enabledBadge}${warnBadge}
+          <span class="universe-tag">${meta.universe} · ${meta.kind}</span>
+        </td>
+        <td class="text-end num">${fmtINR(m.allocated_capital)}</td>
+        <td class="text-end num">${fmtINR(m.cash)}</td>
+        <td class="col-position">${posHtml}</td>
+        <td class="text-end num"><strong>${fmtINR(m.nav)}</strong></td>
+        <td class="text-end num ${pnlCls}">
+          ${fmtINR(m.pnl_total)}
+          <span class="pnl-pct">${fmtPct(m.return_pct)}</span>
+        </td>
+        <td class="text-end col-actions">
+          <div class="action-bar" role="group" aria-label="Capital actions for ${m.model_name}">
+            <button class="btn btn-success" onclick="openCap('${m.model_name}','deposit')" title="Deposit cash" aria-label="Deposit"><i class="bi bi-plus-lg"></i></button>
+            <button class="btn btn-warning" onclick="openCap('${m.model_name}','withdraw')" title="Withdraw cash" aria-label="Withdraw"><i class="bi bi-dash-lg"></i></button>
+            ${posBtn}
+            <div class="dropdown">
+              <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="${dropdownId}" data-bs-toggle="dropdown" aria-expanded="false" title="More actions" aria-label="More actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="${dropdownId}">
+                <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); bootstrap('${m.model_name}')"><i class="bi bi-arrow-down-square me-2"></i>Bootstrap from legacy ledger</a></li>
+                <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); toggleEnabled('${m.model_name}', ${!m.enabled})"><i class="bi bi-toggle-on me-2"></i>${m.enabled ? 'Disable model' : 'Enable model'}</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item text-danger" href="#" onclick="event.preventDefault(); resetModel('${m.model_name}')"><i class="bi bi-trash me-2"></i>Hard reset (zero all)</a></li>
+              </ul>
+            </div>
+          </div>
         </td>
       `;
       tbody.appendChild(tr);
