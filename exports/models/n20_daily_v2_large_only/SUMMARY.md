@@ -2,6 +2,18 @@
 
 Daily-rebalance momentum rotation on NSE Nifty 100 large-caps. Top-20 ADV pool + uptrend + Nifty 100 filter → top-1 by 30d return → daily rotate.
 
+## Backtest window & trade frequency
+
+| Metric | Value |
+|---|---|
+| Backtest window | **2023-05-15 → 2026-05-12** (≈3.00 years) |
+| First entry | 2023-05-15 |
+| Last exit | 2026-04-13 |
+| Total trades | 139 |
+| Trades per year | ~46.3 |
+| Strategy class | Daily rotation (top-1 by 30d return) |
+| Rebalance period | Daily |
+
 ## Stock pick logic (plain English)
 
 1. **Universe (per day)**: top-20 N500 stocks by 20-day ADV

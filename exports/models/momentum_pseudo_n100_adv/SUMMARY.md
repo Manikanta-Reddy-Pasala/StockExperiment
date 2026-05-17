@@ -2,6 +2,18 @@
 
 V1 lookahead variant. Monthly rotation on top-100 ADV-ranked stocks from Nifty 500.
 
+## Backtest window & trade frequency
+
+| Metric | Value |
+|---|---|
+| Backtest window | **2023-05-15 → 2026-05-12** (≈3.00 years) |
+| First entry | 2023-05-15 |
+| Last exit | 2026-05-04 |
+| Total trades | 30 |
+| Trades per year | ~10.0 |
+| Strategy class | Monthly rotation (1st trading day) |
+| Rebalance period | Monthly |
+
 ## Stock pick logic (plain English)
 
 1. **Universe build**: take all 500 stocks in NSE Nifty 500 list

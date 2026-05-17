@@ -62,6 +62,18 @@ NSE classification (current snapshot): **Large** = in Nifty 100 (104 stocks). **
 
 All trades Large-cap by construction.
 
+## Backtest window & trade frequency (all models)
+
+| Model | Trades | Trades/yr | Strategy class | Rebalance |
+|---|---:|---:|---|---|
+| `momentum_n100_top5_max1` | 31 | ~10 | Monthly rotation | Monthly (1st trading day) |
+| `momentum_pseudo_n100_adv` | 30 | ~10 | Monthly rotation | Monthly (1st trading day) |
+| `midcap_narrow_60d_breakout` | 12 | ~4 | Event-driven swing (long hold ~60-90d) | Event-driven |
+| `finnifty_ic_otm4_w300_lots5` | 35 | ~12 | Monthly Iron Condor | Monthly expiry |
+| `n20_daily_v2_large_only` | 139 | ~46 | Daily rotation | Daily |
+
+All 5 models use the **same 3-year backtest window: 2023-05-15 → 2026-05-12**. Trade count differs by strategy class — daily rotation churns most, event-driven swing churns least.
+
 ## Composite ranking — risk-adjusted Calmar (CAGR / Max DD)
 
 | Rank | Model | CAGR | MaxDD | Calmar | Notes |

@@ -2,6 +2,18 @@
 
 **Honest result with corp-action anomaly removed.** ANGELONE excluded from pseudo-midcap universe.
 
+## Backtest window & trade frequency
+
+| Metric | Value |
+|---|---|
+| Backtest window | **2023-05-15 → 2026-05-12** (≈3.00 years) |
+| First entry | 2023-05-17 |
+| Last exit | 2026-04-23 |
+| Total trades | 12 |
+| Trades per year | ~4.0 |
+| Strategy class | Daily breakout scan, long-hold swing (60-90d/trade) |
+| Rebalance period | Event-driven |
+
 ## Stock pick logic (plain English)
 
 1. **Universe build**: take all 500 stocks in NSE Nifty 500

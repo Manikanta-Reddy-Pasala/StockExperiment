@@ -2,6 +2,18 @@
 
 **LIVE production model.** Monthly momentum rotation on REAL NSE Nifty 100.
 
+## Backtest window & trade frequency
+
+| Metric | Value |
+|---|---|
+| Backtest window | **2023-05-15 → 2026-05-12** (≈3.00 years) |
+| First entry | 2023-05-15 |
+| Last exit | 2026-05-04 |
+| Total trades | 31 |
+| Trades per year | ~10.3 |
+| Strategy class | Monthly rotation (1st trading day) |
+| Rebalance period | Monthly |
+
 ## Stock pick logic (plain English)
 
 1. **Universe**: take all 104 stocks in official NSE Nifty 100 list (`src/data/symbols/nifty100.csv`)

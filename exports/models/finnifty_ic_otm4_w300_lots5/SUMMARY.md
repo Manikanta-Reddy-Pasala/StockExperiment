@@ -1,5 +1,18 @@
 # FINNIFTY_monthly_IC_OTM4_w300_lots5 — SUMMARY (with option prices & amounts)
 
+## Backtest window & trade frequency
+
+| Metric | Value |
+|---|---|
+| Backtest window | **2023-05-15 → 2026-05-15** (≈3.00 years) |
+| First cycle | 2023-05-15 (May expiry) |
+| Last cycle | 2026-05-12 (May expiry) |
+| Total cycles | 35 |
+| Cycles per year | ~12 |
+| Months tracked | 33 |
+| Strategy class | Monthly Iron Condor (one cycle per monthly expiry) |
+| Rebalance period | Monthly (next Monday after expiry) |
+
 ## Stock / Option pick logic (plain English)
 
 This model trades **FINNIFTY index options** — there's no equity stock list.
