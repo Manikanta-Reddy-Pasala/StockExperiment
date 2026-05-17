@@ -1086,6 +1086,239 @@ def model_trade_history(model_name):
 
 
 # =============================================================================
+# Per-model Balance Sheet + Transactions (T11)
+# =============================================================================
+#
+# Three endpoints power the per-model "Balance Sheet & Transactions" UI page:
+#
+#   GET /admin/<m>/balance-sheet   — structured invested / cash / P&L / NAV JSON
+#   GET /admin/<m>/trade-history   — every BUY/SELL/DEPOSIT/WITHDRAW + summary
+#   GET /admin/models/<m>/detail   — renders v2/model_detail.html
+#
+# All math is sourced from model_ledger_service (single source of truth).
+# Live MTM uses the latest historical_data close — same lookup as the
+# portfolio + triggers-status endpoints so numbers reconcile.
+
+def _mtm_price_lookup(session):
+    """Return a closure(symbol) -> last close from historical_data."""
+    from sqlalchemy import text
+
+    def _lookup(sym):
+        r = session.execute(text(
+            "SELECT close FROM historical_data "
+            "WHERE symbol = :s ORDER BY date DESC LIMIT 1"
+        ), {"s": sym}).fetchone()
+        return float(r.close) if r else None
+
+    return _lookup
+
+
+@admin_bp.route('/<model_name>/balance-sheet', methods=['GET'])
+def model_balance_sheet(model_name):
+    """Per-model balance sheet (invested, cash, open position, P&L, NAV).
+
+    Shape (kept stable for the UI):
+      {
+        model_name, as_of (ISO),
+        enabled, label,
+        invested_amount, cash,
+        open_position: { symbol, qty, entry_px, entry_date,
+                         current_px, position_value,
+                         unrealized_pnl, unrealized_pct } | null,
+        realized_pnl, unrealized_pnl, total_pnl, nav, return_pct,
+        total_trades, wins, losses, win_rate_pct
+      }
+    """
+    try:
+        from src.services.trading.model_ledger_service import (
+            ensure_models_seeded, get_portfolio_stats,
+        )
+        from src.models.database import get_database_manager
+
+        ensure_models_seeded()
+        db = get_database_manager()
+        with db.get_session() as session:
+            stats = get_portfolio_stats(price_lookup=_mtm_price_lookup(session))
+
+        per_model = next(
+            (m for m in stats["models"] if m["model_name"] == model_name),
+            None,
+        )
+        if per_model is None:
+            return jsonify({
+                "success": False,
+                "error": f"Unknown model: {model_name}",
+            }), 404
+
+        invested = per_model.get("invested_amount", 0.0) or 0.0
+        cash = per_model.get("cash", 0.0) or 0.0
+        pos_value = per_model.get("position_value", 0.0) or 0.0
+        realized = per_model.get("realized_pnl", 0.0) or 0.0
+        nav = per_model.get("nav", 0.0) or 0.0
+        # total_pnl == NAV - invested (consistent with portfolio totals)
+        total_pnl = nav - invested
+        # unrealized = open-position MTM less entry cost
+        open_position = None
+        unrealized_pnl = 0.0
+        unrealized_pct = 0.0
+        if per_model.get("open_symbol") and per_model.get("open_qty"):
+            qty = per_model["open_qty"]
+            entry_px = per_model.get("open_entry_px") or 0.0
+            current_px = (
+                per_model.get("open_mtm_price")
+                or per_model.get("open_entry_px")
+                or 0.0
+            )
+            entry_cost = float(qty) * float(entry_px)
+            unrealized_pnl = float(pos_value) - entry_cost
+            unrealized_pct = (
+                (unrealized_pnl / entry_cost * 100.0) if entry_cost > 0 else 0.0
+            )
+            open_position = {
+                "symbol": per_model["open_symbol"],
+                "qty": qty,
+                "entry_px": entry_px,
+                "entry_date": per_model.get("open_entry_date"),
+                "current_px": current_px,
+                "position_value": pos_value,
+                "unrealized_pnl": round(unrealized_pnl, 2),
+                "unrealized_pct": round(unrealized_pct, 2),
+            }
+
+        return_pct = (total_pnl / invested * 100.0) if invested > 0 else 0.0
+
+        # Lookup pretty label if available in MODEL_PATHS
+        label = MODEL_PATHS.get(model_name, {}).get("label", model_name)
+
+        return jsonify({
+            "success": True,
+            "model_name": model_name,
+            "label": label,
+            "enabled": bool(per_model.get("enabled")),
+            "as_of": stats.get("as_of") or datetime.utcnow().isoformat(),
+            "invested_amount": round(float(invested), 2),
+            "cash": round(float(cash), 2),
+            "open_position": open_position,
+            "realized_pnl": round(float(realized), 2),
+            "unrealized_pnl": round(float(unrealized_pnl), 2),
+            "total_pnl": round(float(total_pnl), 2),
+            "nav": round(float(nav), 2),
+            "return_pct": round(float(return_pct), 2),
+            "total_trades": per_model.get("total_trades", 0) or 0,
+            "wins": per_model.get("wins", 0) or 0,
+            "losses": per_model.get("losses", 0) or 0,
+            "win_rate_pct": per_model.get("win_rate_pct", 0) or 0,
+        })
+    except Exception as e:
+        logger.error(f"balance-sheet error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@admin_bp.route('/<model_name>/trade-history', methods=['GET'])
+def model_trade_history_full(model_name):
+    """Per-model transaction list + summary roll-up.
+
+    Shape:
+      {
+        model_name,
+        trades: [ {id, trade_at, side, symbol, qty, price, value,
+                   pnl, reason, fyers_order_id, model_name}, ... ],
+        summary: {
+          total_buys, total_sells,
+          total_deposits, total_withdrawals,
+          total_buy_value, total_sell_value,
+          total_pnl, wins, losses, win_rate_pct
+        }
+      }
+
+    Note: returns ALL trades by default (no limit) so the UI table shows
+    the complete history. Pass ?limit=N to truncate.
+    """
+    try:
+        from src.services.trading.model_ledger_service import get_trades
+
+        raw_limit = request.args.get("limit")
+        # Default: large enough to show full history. Cap at 5000 for safety.
+        limit = int(raw_limit) if raw_limit else 5000
+        limit = max(1, min(limit, 5000))
+
+        trades = get_trades(model_name, limit=limit)
+        # Trades come newest-first from service; UI wants chronological too,
+        # but newest-first is fine for transaction-list display.
+
+        # Summary roll-up
+        total_buys = 0
+        total_sells = 0
+        total_deposits = 0
+        total_withdrawals = 0
+        total_buy_value = 0.0
+        total_sell_value = 0.0
+        total_pnl = 0.0
+        wins = 0
+        losses = 0
+        for t in trades:
+            side = (t.get("side") or "").upper()
+            val = float(t.get("value") or 0)
+            pnl = t.get("pnl")
+            if side == "BUY":
+                total_buys += 1
+                total_buy_value += val
+            elif side == "SELL":
+                total_sells += 1
+                total_sell_value += val
+                if pnl is not None:
+                    pnl_f = float(pnl)
+                    total_pnl += pnl_f
+                    if pnl_f > 0:
+                        wins += 1
+                    elif pnl_f < 0:
+                        losses += 1
+            elif side == "DEPOSIT":
+                total_deposits += 1
+            elif side == "WITHDRAW":
+                total_withdrawals += 1
+
+        decided = wins + losses
+        win_rate_pct = round(100.0 * wins / decided, 1) if decided else 0.0
+
+        return jsonify({
+            "success": True,
+            "model_name": model_name,
+            "trades": trades,
+            "summary": {
+                "total_buys": total_buys,
+                "total_sells": total_sells,
+                "total_deposits": total_deposits,
+                "total_withdrawals": total_withdrawals,
+                "total_buy_value": round(total_buy_value, 2),
+                "total_sell_value": round(total_sell_value, 2),
+                "total_pnl": round(total_pnl, 2),
+                "wins": wins,
+                "losses": losses,
+                "win_rate_pct": win_rate_pct,
+            },
+        })
+    except Exception as e:
+        logger.error(f"trade-history error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@admin_bp.route('/models/<model_name>/detail', methods=['GET'])
+def model_detail_page(model_name):
+    """Render the per-model "Balance Sheet & Transactions" UI page.
+
+    Page itself is data-light — it fetches both endpoints client-side so the
+    same JSON powers automation + humans.
+    """
+    label = MODEL_PATHS.get(model_name, {}).get("label", model_name)
+    return render_template(
+        "v2/model_detail.html",
+        model_name=model_name,
+        label=label,
+    )
+
+
+# =============================================================================
 # Today's signals across all wired models (T10 dashboard widget)
 # =============================================================================
 

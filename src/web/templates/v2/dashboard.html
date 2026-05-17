@@ -163,6 +163,7 @@ function renderModelCard(m, sig) {
     ? `<strong>${m.open_symbol}</strong> <span class="text-muted">x${m.open_qty}</span> @ ${fmtINR(m.open_entry_px)}`
     : '<span class="text-muted">flat</span>';
 
+  const detailHref = `/admin/models/${encodeURIComponent(m.model_name)}/detail`;
   return `
     <div class="col-12 col-md-6 col-xl-4">
       <div class="${cardCls}">
@@ -187,6 +188,11 @@ function renderModelCard(m, sig) {
           <div class="footer-bar">
             <span class="text-muted">${m.total_trades||0} trades · ${m.wins||0}W/${m.losses||0}L</span>
             ${sigBadge}
+          </div>
+          <div class="mt-2 text-end">
+            <a href="${detailHref}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size:0.72rem;">
+              <i class="bi bi-receipt"></i> Balance Sheet &amp; Transactions
+            </a>
           </div>
         </div>
       </div>
