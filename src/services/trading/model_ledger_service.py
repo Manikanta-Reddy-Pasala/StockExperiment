@@ -25,6 +25,15 @@ from src.models.model_ledger_models import (
 
 log = logging.getLogger(__name__)
 
+
+def _normalize_symbol(sym: str) -> str:
+    """Normalize bare symbol (HFCL) to Fyers form (NSE:HFCL-EQ) for
+    consistent MTM lookup against historical_data table (Fyers symbols)."""
+    if not sym or ":" in sym:
+        return sym
+    return f"NSE:{sym}-EQ"
+
+
 # Models the system knows about. Adding a new model = append here.
 # `enabled` controls auto-seeding default (per-row UI toggle still wins later).
 # `default_capital` ₹30K = small live test slug; user can deposit more via UI.
@@ -252,7 +261,9 @@ def auto_bootstrap_from_json_ledger(json_path: str, model_name: str,
         ledger.cash = (ledger.cash or Decimal(0)) + total_allocated
 
         # Seed position (eats cost from cash, leaves cash_buffer)
-        ledger.open_symbol = symbol
+        # Normalize symbol to Fyers format (NSE:XXX-EQ) so MTM lookup
+        # against historical_data table works — that table stores Fyers form.
+        ledger.open_symbol = _normalize_symbol(symbol)
         ledger.open_qty = qty
         ledger.open_entry_px = Decimal(str(entry_px))
         # entry_date from JSON if present, else today
@@ -379,7 +390,8 @@ def seed_position(model_name: str, symbol: str, qty: int,
                 f"Not enough cash in {model_name} ledger "
                 f"(₹{float(l.cash):,.0f}) to seed position cost ₹{float(cost):,.0f}"
             )
-        l.open_symbol = symbol
+        norm = _normalize_symbol(symbol)
+        l.open_symbol = norm
         l.open_qty = qty
         l.open_entry_px = Decimal(str(entry_px))
         l.open_entry_date = datetime.strptime(entry_date_str, "%Y-%m-%d").date()
@@ -387,7 +399,7 @@ def seed_position(model_name: str, symbol: str, qty: int,
         s.add(ModelTrade(
             model_name=model_name,
             side="BUY",
-            symbol=symbol,
+            symbol=norm,
             qty=qty,
             price=Decimal(str(entry_px)),
             value=cost,
@@ -442,7 +454,8 @@ def record_buy(model_name: str, symbol: str, qty: int, price: float,
                 f"{model_name}: cash {float(l.cash):,.0f} < cost {float(cost):,.0f}"
             )
         l.cash = l.cash - cost
-        l.open_symbol = symbol
+        norm = _normalize_symbol(symbol)
+        l.open_symbol = norm
         l.open_qty = qty
         l.open_entry_px = price_d
         l.open_entry_date = date.today()
@@ -451,7 +464,7 @@ def record_buy(model_name: str, symbol: str, qty: int, price: float,
         s.add(ModelTrade(
             model_name=model_name,
             side="BUY",
-            symbol=symbol,
+            symbol=norm,
             qty=qty,
             price=price_d,
             value=cost,
