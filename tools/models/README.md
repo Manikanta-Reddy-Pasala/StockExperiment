@@ -1,6 +1,6 @@
 # Trading Models
 
-**4 models** (3 equity + 1 options). All deliver ≥ 80% CAGR over 3-year backtest (2023-05-15 → 2026-05-12). Each subfolder is self-contained: data ingest, backtest, live signal, scheduler, and docs.
+**5 models** (4 equity + 1 options). All deliver ≥ 80% CAGR over 3-year backtest (2023-05-15 → 2026-05-12). Each subfolder is self-contained: data ingest, backtest, live signal, scheduler, and docs.
 
 ## Models
 
@@ -9,7 +9,8 @@
 | 1 | `momentum_n100_top5_max1` | Large-cap equity | **REAL NSE Nifty 100** (NSE CSV, 104 stocks) | **+80.38%** | 29.71% | ✅ |
 | 2 | `momentum_pseudo_n100_adv` | Large/mid blend equity | Pseudo-N100 (top-100 by 20-day ADV from N500) | **+136.39%** | 16.15% | ❌ |
 | 3 | `midcap_narrow_60d_breakout` | Mid-cap equity | Pseudo-midcap (N500 skip-30 ADV, take next 100) | **+337.62%** ⚠️ | 6.76% | ❌ |
-| 4 | `finnifty_ic_otm4_w300_lots5` | Options | FINNIFTY 4-strike Iron Condor chain | **+337%/yr** | 13.88% | ❌ |
+| 4 | `finnifty_ic_otm4_w300_lots5` | Options | FINNIFTY 4-strike Iron Condor chain | **+123%** compound | 13.88% | ❌ |
+| 5 | `n20_daily_30d_mc1_uptrend` | Top-20 concentrated equity | Top-20 by ADV + uptrend filter (PIT-strict) | **+157.27%** | 50.61% | ❌ |
 
 ⚠️ Midcap result heavily influenced by single ANGELONE trade (likely corporate-action data anomaly). See model README for details.
 
