@@ -108,20 +108,18 @@ async function loadAggregate() {
     const tbody = document.getElementById('agg_tbody');
     tbody.innerHTML = '';
     (d.models||[]).forEach(m => {
+      if (!m.enabled) return;  // hide disabled models entirely
       const tr = document.createElement('tr');
-      if (!m.enabled) tr.classList.add('row-disabled');
       const posHtml = m.open_symbol
         ? `${m.open_symbol} <span class="text-muted small">x${m.open_qty} @ ${fmtINR(m.open_entry_px)}</span>`
         : '<span class="text-muted">flat</span>';
-      const disabledBadge = m.enabled ? '' : ' <span class="badge bg-secondary">DISABLED</span>';
       const wired = WIRED_MODELS.has(m.model_name);
       const rebalBtn = wired
-        ? `<button class="btn btn-sm btn-danger" ${m.enabled ? '' : 'disabled title="Enable model first"'}
-             onclick="rebalanceModel('${m.model_name}')">
+        ? `<button class="btn btn-sm btn-danger" onclick="rebalanceModel('${m.model_name}')">
              <i class="bi bi-arrow-repeat"></i> Rebalance</button>`
         : '<span class="text-muted small">n/a</span>';
       tr.innerHTML = `
-        <td><strong>${m.model_name}</strong>${disabledBadge}</td>
+        <td><strong>${m.model_name}</strong></td>
         <td class="text-end">${fmtINR(m.allocated_capital)}</td>
         <td class="text-end">${fmtINR(m.cash)}</td>
         <td>${posHtml}</td>
@@ -134,7 +132,7 @@ async function loadAggregate() {
       tbody.appendChild(tr);
     });
     if (!tbody.children.length) {
-      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">No models seeded.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">No enabled models. <a href="/settings">Enable one in Settings</a>.</td></tr>';
     }
   } catch(e) { console.error(e); }
 }

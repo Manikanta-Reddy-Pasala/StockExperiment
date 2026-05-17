@@ -51,14 +51,15 @@ async function fetchJSON(url) {
 
 function renderCard(m, idx, ranking, status) {
   const collapseId = "collapse_" + m.key;
-  const openCls = idx === 0 ? "show" : "";
   const disabled = status && status.success && status.enabled === false;
   const heldSym = status && status.success && status.current_position
     ? status.current_position.sym
     : null;
 
-  let rows = "";
   const top = (ranking && ranking.ranking) || [];
+  const rank1 = top[0];
+
+  let rows = "";
   if (top.length === 0) {
     rows = `<tr><td colspan="5" class="text-center text-muted py-3">
       ${(ranking && ranking.note) || 'No ranking JSON yet — run live_signal.py'}
@@ -66,10 +67,7 @@ function renderCard(m, idx, ranking, status) {
   } else {
     rows = top.map(r => {
       const held = heldSym && (heldSym.replace('NSE:','').replace('-EQ','') === r.symbol.replace('NSE:','').replace('-EQ',''));
-      // On the first (open-by-default) card, also highlight rank-1 row
-      // with table-primary so the top pick stands out at a glance.
-      const isTop = idx === 0 && r.rank === 1;
-      const rowCls = [held ? 'row-held' : '', isTop ? 'table-primary' : ''].filter(Boolean).join(' ');
+      const rowCls = held ? 'row-held' : '';
       return `<tr class="${rowCls}">
         <td>${r.rank === 1 ? '<span class="badge badge-rank-1">★ 1</span>' : '#'+r.rank}</td>
         <td><strong>${r.symbol}</strong></td>
@@ -94,19 +92,33 @@ function renderCard(m, idx, ranking, status) {
     ? `<span class="small-mute">${ranking.date}</span>`
     : '';
 
+  // Top pick summary shown when collapsed — gives operator the most important
+  // signal at a glance without needing to expand. Click header to see top-5.
+  const topPickHtml = rank1
+    ? `<div class="mt-2 small">
+         <span class="badge badge-rank-1 me-1">★ 1</span>
+         <strong>${rank1.symbol}</strong>
+         <span class="text-muted">${rank1.name || ''}</span>
+         <span class="ms-2 ${cls(rank1.ret_30d_pct)}">${fmtPct(rank1.ret_30d_pct)}</span>
+         <span class="ms-2 text-muted">${fmtINR(rank1.price)}</span>
+       </div>`
+    : '<div class="mt-2 small text-muted">No top pick available</div>';
+
   return `
     <div class="card mb-3">
       <div class="card-header model-card-header d-flex justify-content-between align-items-center"
-           data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="${idx === 0}">
+           data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false">
         <div>
           <strong>${m.title}</strong>${badges}
+          <i class="bi bi-chevron-down ms-1 small-mute"></i>
           <div class="small-mute mt-1">${m.desc}</div>
+          ${topPickHtml}
         </div>
         <div class="text-end">
           ${navHtml}<br>${dateHtml}
         </div>
       </div>
-      <div id="${collapseId}" class="collapse ${openCls}">
+      <div id="${collapseId}" class="collapse">
         <div class="table-responsive">
           <table class="table table-sm align-middle mb-0">
             <thead>
