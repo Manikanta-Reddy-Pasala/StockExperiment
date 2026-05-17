@@ -65,10 +65,10 @@ TARGET_PCT = 1.00
 MAX_HOLD   = 90
 USE_SMA_EXIT = False
 
-# Universe params
+# Universe params (V3 winner: top-100 ADV minus Large, was skip-30+take-100)
 ADV_WIN    = 20
-SKIP_TOP   = 30
-KEEP_NEXT  = 100
+SKIP_TOP   = 0     # V3: top-100 ADV from N500 (instead of skip-top-30)
+KEEP_NEXT  = 100   # Take top 100. Large filter applied below via NSE Nifty 100 CSV.
 
 # DATA_FIXES no longer needed for ANGELONE — historical_data was restored
 # from yfinance (split-adjusted) on 2026-05-17. Pattern preserved for future

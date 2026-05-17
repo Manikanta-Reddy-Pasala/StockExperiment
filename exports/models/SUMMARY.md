@@ -10,7 +10,7 @@
 |--:|---|---|---|---:|---:|---:|:-:|
 | 1 | `momentum_n100_top5_max1` | Real NSE Nifty 100 (104) | Monthly | ₹4,483,692 | **+64.90%** | 42.81% | ✅ |
 | 2 | `momentum_pseudo_n100_adv` | Top-100 ADV from N500 (yearly PIT) | Monthly | ₹9,080,597 | **+108.63%** | 36.45% | ❌ |
-| 3 | `midcap_narrow_60d_breakout` | Pseudo-midcap MINUS Large | Event-driven | ₹3,030,363 | **+44.71%** | 23.41% | ❌ |
+| 3 | `midcap_narrow_60d_breakout` (V3) | Top-100 ADV from N500 MINUS Large | Event-driven | ₹7,713,735 | **+97.59%** | 22.82% | ❌ |
 | 4 | `finnifty_ic_otm4_w300_lots5` | FINNIFTY options (no equity) | Monthly Iron Condor | ₹1.11 Cr (scaled) | **+123%** | 13.88% | ❌ |
 | 5 | `n20_daily_v2_large_only` | Top-20 ADV + uptrend + Nifty 100 | Daily | ₹13,655,640 | **+139.02%** | **25.66%** | ❌ |
 
