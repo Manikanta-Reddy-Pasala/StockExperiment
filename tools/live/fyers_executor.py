@@ -335,11 +335,20 @@ def main() -> int:
     else:
         svc = None
 
-    # Canonical ledger paths
-    LEDGER_DIR = Path("/app/logs/momrot/ledger")
-    LEDGER_DIR.mkdir(parents=True, exist_ok=True)
-    LEDGER_FILE = LEDGER_DIR / "momrot_ledger.json"
-    HISTORY_FILE = LEDGER_DIR / "trade_history.jsonl"
+    # Canonical ledger paths — per-model isolation so each model's
+    # open positions don't contaminate sizing for other models.
+    if args.model_name and args.model_name != "momentum_n100_top5_max1":
+        # Per-model ledger dir
+        LEDGER_DIR = Path(f"/app/logs/{args.model_name}/ledger")
+        LEDGER_DIR.mkdir(parents=True, exist_ok=True)
+        LEDGER_FILE = LEDGER_DIR / f"{args.model_name}_ledger.json"
+        HISTORY_FILE = LEDGER_DIR / "trade_history.jsonl"
+    else:
+        # Legacy path for momentum_n100_top5_max1 (preserves HFCL position)
+        LEDGER_DIR = Path("/app/logs/momrot/ledger")
+        LEDGER_DIR.mkdir(parents=True, exist_ok=True)
+        LEDGER_FILE = LEDGER_DIR / "momrot_ledger.json"
+        HISTORY_FILE = LEDGER_DIR / "trade_history.jsonl"
 
     # Load current ledger (open positions)
     if LEDGER_FILE.exists():
