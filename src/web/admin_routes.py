@@ -494,6 +494,18 @@ def trigger_model_data_pull(model_name):
             ("Option bhavcopy (NIFTY/BN/FN)", "tools.models.finnifty_ic_otm4_w300_lots5.data_pull",
              "fetch_option_bhav"),
         ],
+        "n20_daily_large_only": [
+            ("Equity OHLCV (N500 — covers N20 top-ADV)",
+             "tools.models.n20_daily_large_only.data_pull", "pull_daily_ohlcv"),
+            ("N100 universe refresh (source for top-20 ADV ∩ N100)",
+             "tools.models.n20_daily_large_only.data_pull", "refresh_universe"),
+        ],
+        "momentum_pseudo_n100_adv": [
+            ("Equity OHLCV (N500 — covers Pseudo-N100 ADV)",
+             "tools.models.momentum_pseudo_n100_adv.data_pull", "pull_daily_ohlcv"),
+            ("Pseudo-N100 yearly universe refresh",
+             "tools.models.momentum_pseudo_n100_adv.data_pull", "refresh_universe"),
+        ],
     }
     if model_name not in allowed:
         return jsonify({"success": False, "error": f"Unknown model: {model_name}"}), 400
