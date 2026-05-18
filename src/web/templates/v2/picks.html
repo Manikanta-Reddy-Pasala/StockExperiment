@@ -23,38 +23,61 @@
 <script>
 // 4 equity models to show. `schedule` drives the next-rebalance display.
 const MODELS = [
-  {key: "momentum_n100_top5_max1",     title: "Momentum N100 Top-5 (mc=1)",        desc: "Monthly rotation • real Nifty 100 • 30d return",                          schedule: "monthly"},
+  {key: "momentum_n100_top5_max1",     title: "Momentum N100 Top-5 (mc=1)",        desc: "Monthly rotation + mid-month check • real Nifty 100 • 30d return",        schedule: "monthly_midcheck"},
   {key: "n20_daily_large_only",        title: "N20 Daily ADV ∩ N100",              desc: "Daily rotation • top-20 ADV ∩ N100 • uptrend",                            schedule: "daily"},
   {key: "midcap_narrow_60d_breakout",  title: "Midcap 60d Breakout",               desc: "Event-driven • 60d-high + vol surge + 200d SMA",                          schedule: "event"},
   {key: "momentum_pseudo_n100_adv",    title: "Pseudo-N100 ADV",                    desc: "Monthly rotation • top-100 ADV from N500 • yearly-PIT rebuild",            schedule: "monthly"},
 ];
 
+// Format YYYY-MM-DD in local TZ (avoid toISOString → UTC date drift).
+function _ymdLocal(d) {
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
+}
+
+// First weekday on/after a given local date.
+function _firstWeekday(d) {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  while (x.getDay() === 0 || x.getDay() === 6) x.setDate(x.getDate()+1);
+  return x;
+}
+
 // Compute next rebalance date+days for a given schedule. Mirrors backend
 // _next_rebalance() logic so UI doesn't need an extra API round trip.
 function nextRebalance(schedule) {
   const today = new Date();
-  if (schedule === "monthly") {
-    let target;
-    if (today.getDate() <= 7) {
-      target = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    } else {
-      target = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-    }
-    while (target.getDay() === 0 || target.getDay() === 6) {
-      target.setDate(target.getDate() + 1);
-    }
-    const days = Math.max(0, Math.ceil((target - today) / 86400000));
-    return {label: target.toISOString().slice(0,10), days, kind: 'monthly'};
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  if (schedule === "monthly_midcheck") {
+    // Two candidate dates:
+    //   (1) first weekday on/after the 15th of THIS month
+    //   (2) first weekday of NEXT month
+    // Return whichever is SOONER and still in the future.
+    let mid = _firstWeekday(new Date(today.getFullYear(), today.getMonth(), 15));
+    let next = _firstWeekday(new Date(today.getFullYear(), today.getMonth()+1, 1));
+    let target, kind;
+    if (mid > startOfToday) { target = mid; kind = 'mid-month'; }
+    else                    { target = next; kind = 'monthly'; }
+    const days = Math.max(0, Math.ceil((target - startOfToday) / 86400000));
+    return {label: _ymdLocal(target), days, kind};
   }
+
+  if (schedule === "monthly") {
+    let target = today.getDate() <= 7
+      ? _firstWeekday(startOfToday)
+      : _firstWeekday(new Date(today.getFullYear(), today.getMonth()+1, 1));
+    const days = Math.max(0, Math.ceil((target - startOfToday) / 86400000));
+    return {label: _ymdLocal(target), days, kind: 'monthly'};
+  }
+
   if (schedule === "daily") {
     let target = new Date(today);
     target.setDate(target.getDate() + 1);
-    while (target.getDay() === 0 || target.getDay() === 6) {
-      target.setDate(target.getDate() + 1);
-    }
-    const days = Math.ceil((target - today) / 86400000);
-    return {label: target.toISOString().slice(0,10), days, kind: 'daily'};
+    target = _firstWeekday(target);
+    const days = Math.ceil((target - startOfToday) / 86400000);
+    return {label: _ymdLocal(target), days, kind: 'daily'};
   }
+
   return {label: 'event-driven', days: null, kind: 'event'};
 }
 
@@ -179,9 +202,11 @@ function renderCard(m, idx, ranking, status) {
     } else if (rank1) {
       const waitOrSell = sched.kind === 'monthly'
         ? `Two options: (a) <strong>Wait</strong> — auto-rebalance ${sched.label} will SELL ${heldNorm} + BUY ${rank1.symbol}. (b) <strong>Force now</strong> via Portfolio page Rebalance button.`
-        : sched.kind === 'daily'
-          ? `Daily rotation — next session will SELL ${heldNorm} + BUY ${rank1.symbol}.`
-          : `Will rotate to ${rank1.symbol} on next event trigger.`;
+        : sched.kind === 'mid-month'
+          ? `Mid-month check ${sched.label} — rotates only if rank-1 leads held by ≥5pp.`
+          : sched.kind === 'daily'
+            ? `Daily rotation — next session will SELL ${heldNorm} + BUY ${rank1.symbol}.`
+            : `Will rotate to ${rank1.symbol} on next event trigger.`;
       actionLine = `Today's rank-1 is <strong>${rank1.symbol}</strong> (${fmtPct(rank1.ret_30d_pct)}). ${waitOrSell}`;
       bannerCls = isManual ? 'alert-info' : 'alert-warning';
     } else {
