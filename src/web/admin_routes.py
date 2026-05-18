@@ -910,46 +910,55 @@ def get_model_portfolio():
         # Make sure rows exist for all known models
         ensure_models_seeded()
 
-        # MTM price lookup: prefer real-time Fyers quote (today's LTP during
-        # market hours), fall back to historical_data latest close. Without
-        # the Fyers refresh, intraday moves are invisible until next EOD pull.
-        # NOTE: do NOT share a SQLAlchemy session with get_portfolio_stats —
-        # nested scoped-session use detaches its ModelLedger rows mid-loop.
-        price_cache: dict = {}
+        # Pre-resolve MTM prices for every open position BEFORE calling
+        # get_portfolio_stats, so the lookup callback can be a pure dict read.
+        # Scoped sessions are shared per-thread; nesting them around
+        # get_portfolio_stats causes ModelLedger rows to detach mid-loop.
+        from src.models.model_ledger_models import ModelLedger
+        db = get_database_manager()
+        open_symbols: list = []
+        with db.get_session() as s0:
+            for l in s0.query(ModelLedger).all():
+                if l.open_symbol:
+                    open_symbols.append(l.open_symbol)
+        # De-dupe + normalise to bare ticker
+        bare_set = sorted({s.replace("NSE:", "").replace("-EQ", "") for s in open_symbols})
 
-        def lookup(sym):
-            # `sym` arrives as either "HFCL" or "NSE:HFCL-EQ"; normalise.
-            bare = sym.replace("NSE:", "").replace("-EQ", "")
-            if bare in price_cache:
-                return price_cache[bare]
-            fyers_sym = f"NSE:{bare}-EQ"
-            # 1. Real-time Fyers quote.
+        price_map: dict = {}
+        if bare_set:
+            fyers_syms = [f"NSE:{b}-EQ" for b in bare_set]
+            # Real-time Fyers quotes (batch).
             try:
                 from src.services.brokers.fyers_service import FyersService
                 svc = FyersService()
-                q = svc.quotes_multiple(1, [fyers_sym]) or {}
-                qd = ((q.get("data") or {}).get(fyers_sym) or {})
-                v = float(qd.get("ltp") or 0)
-                if v > 0:
-                    price_cache[bare] = v
-                    return v
+                qr = svc.quotes_multiple(1, fyers_syms) or {}
+                qdata = (qr.get("data") or {})
+                for fs, qd in qdata.items():
+                    b = fs.replace("NSE:", "").replace("-EQ", "")
+                    v = float((qd or {}).get("ltp") or 0)
+                    if v > 0:
+                        price_map[b] = v
             except Exception as e:
-                logger.warning(f"Fyers quote failed for {fyers_sym}: {e}")
-            # 2. Historical close fallback — fresh short-lived session.
-            try:
-                db = get_database_manager()
-                with db.get_session() as s2:
-                    r = s2.execute(text(
-                        "SELECT close FROM historical_data "
-                        "WHERE symbol = :s OR symbol = :fs "
-                        "ORDER BY date DESC LIMIT 1"
-                    ), {"s": bare, "fs": fyers_sym}).fetchone()
-                    v = float(r.close) if r else None
-            except Exception as e:
-                logger.warning(f"DB close lookup failed for {bare}: {e}")
-                v = None
-            price_cache[bare] = v
-            return v
+                logger.warning(f"Fyers quotes batch failed: {e}")
+            # DB close fallback for any not covered.
+            missing = [b for b in bare_set if b not in price_map]
+            if missing:
+                with db.get_session() as s1:
+                    for b in missing:
+                        try:
+                            fs = f"NSE:{b}-EQ"
+                            r = s1.execute(text(
+                                "SELECT close FROM historical_data "
+                                "WHERE symbol = :s OR symbol = :fs "
+                                "ORDER BY date DESC LIMIT 1"
+                            ), {"s": b, "fs": fs}).fetchone()
+                            if r:
+                                price_map[b] = float(r.close)
+                        except Exception as e:
+                            logger.warning(f"DB close lookup failed for {b}: {e}")
+
+        def lookup(sym):
+            return price_map.get(sym.replace("NSE:", "").replace("-EQ", ""))
 
         stats = get_portfolio_stats(price_lookup=lookup)
         return jsonify({"success": True, **stats})
