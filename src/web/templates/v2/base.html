@@ -272,34 +272,61 @@
         };
       })();
 
-      /* Global IST timestamp formatters. All backend timestamps are
-         UTC or naive-local; render in Asia/Kolkata everywhere so the
-         dashboard reads market-time consistently regardless of the
-         viewer's browser locale. */
-      window.fmtIST = function(iso, opts) {
+      /* Global IST timestamp formatters. Backend containers run TZ=Asia/Kolkata,
+         so naive-ISO timestamps (no Z, no ±HH:MM offset) emitted by
+         datetime.now().isoformat() are ALREADY IST. Passing them through
+         `new Date(...)` makes JS reinterpret them in the viewer's browser TZ
+         and shift again — that bug rendered '15:15 IST' as '11:35 IST' for
+         a user in GMT+4.
+
+         Strategy:
+           - Naive ISO ("YYYY-MM-DDTHH:MM[:SS][.fff]") → already IST, format
+             the parts directly with no Date() conversion.
+           - ISO with Z or offset → trustworthy absolute time, Intl converts. */
+      const _ISO_NAIVE_RE = /^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?$/;
+      const _ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+      window.fmtIST = function(iso) {
         if (!iso) return '—';
+        const s = String(iso);
+        const m = _ISO_NAIVE_RE.exec(s);
+        if (m) {
+          const [, y, mo, d, h, mi] = m;
+          return `${d}/${mo}/${y}, ${h}:${mi} IST`;
+        }
+        if (_ISO_DATE_RE.test(s)) {
+          const [y, mo, d] = s.split('-');
+          return `${d}/${mo}/${y}`;
+        }
         try {
-          const d = new Date(iso);
-          if (Number.isNaN(d.getTime())) return String(iso);
-          const o = Object.assign({
-            timeZone: 'Asia/Kolkata',
-            year: 'numeric', month: '2-digit', day: '2-digit',
-            hour: '2-digit', minute: '2-digit',
-            hour12: false,
-          }, opts || {});
-          return new Intl.DateTimeFormat('en-IN', o).format(d) + ' IST';
-        } catch (_) { return String(iso); }
-      };
-      window.fmtISTDate = function(iso) {
-        if (!iso) return '—';
-        try {
-          const d = new Date(iso);
-          if (Number.isNaN(d.getTime())) return String(iso);
+          const d2 = new Date(s);
+          if (Number.isNaN(d2.getTime())) return s;
           return new Intl.DateTimeFormat('en-IN', {
             timeZone: 'Asia/Kolkata',
             year: 'numeric', month: '2-digit', day: '2-digit',
-          }).format(d);
-        } catch (_) { return String(iso); }
+            hour: '2-digit', minute: '2-digit', hour12: false,
+          }).format(d2).replace(',', ',') + ' IST';
+        } catch (_) { return s; }
+      };
+      window.fmtISTDate = function(iso) {
+        if (!iso) return '—';
+        const s = String(iso);
+        if (_ISO_DATE_RE.test(s)) {
+          const [y, mo, d] = s.split('-');
+          return `${d}/${mo}/${y}`;
+        }
+        const m = _ISO_NAIVE_RE.exec(s);
+        if (m) {
+          const [, y, mo, d] = m;
+          return `${d}/${mo}/${y}`;
+        }
+        try {
+          const d2 = new Date(s);
+          if (Number.isNaN(d2.getTime())) return s;
+          return new Intl.DateTimeFormat('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            year: 'numeric', month: '2-digit', day: '2-digit',
+          }).format(d2);
+        } catch (_) { return s; }
       };
     </script>
 
