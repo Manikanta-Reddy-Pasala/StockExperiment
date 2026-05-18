@@ -86,8 +86,8 @@ function renderCard(m, idx, ranking, status) {
     const note = (ranking && ranking.note) || 'No ranking JSON yet — generate one for this model.';
     rows = `<tr><td colspan="5" class="text-center text-muted py-3">
       <div class="mb-2">${note}</div>
-      <button class="btn btn-sm btn-primary" onclick="runSignal('${m.key}', event)">
-        <i class="bi bi-broadcast"></i> Run Signal for ${m.title}
+      <button class="btn btn-sm btn-primary" onclick="runSignal('${m.key}', event)" title="Force re-run live_signal with latest data">
+        <i class="bi bi-arrow-clockwise"></i> Re-calculate ${m.title}
       </button>
     </td></tr>`;
   } else {
@@ -270,20 +270,26 @@ async function load() {
 
 async function runSignal(modelKey, ev) {
   if (ev) { ev.preventDefault(); ev.stopPropagation(); }
-  const ok = await appModal.confirm('Run Signal',
-    `Generate fresh ranking for <strong>${modelKey}</strong>?<br><br>` +
-    'Runs the model\'s live_signal.py. Writes JSON to /tmp/manual_*.json. ' +
-    'No orders placed.',
-    {okLabel: 'Run', okClass: 'btn-primary'});
+  const ok = await appModal.confirm('Re-calculate',
+    `Re-run <strong>${modelKey}</strong>'s live_signal now?<br><br>` +
+    'Forces a fresh ranking using latest data. No orders placed. ' +
+    'Picks page refreshes when done (10-60s).',
+    {okLabel: 'Re-calculate', okClass: 'btn-primary'});
   if (!ok) return;
+  // Show a "running" spinner so user gets feedback.
+  let toastClose;
+  try { toastClose = appModal.alert ? null : null; } catch(_) {}
   try {
-    const r = await fetch(`/admin/${modelKey}/run-signal`, {method: 'POST'});
+    // ?recalc=1 forces synchronous re-run + returns fresh ranking
+    const r = await fetch(`/admin/${modelKey}/ranking?top=5&recalc=1`, {cache: 'no-store'});
     const d = await r.json();
     if (d.success) {
-      await appModal.alert('Signal Started',
-        `Model: <strong>${modelKey}</strong><br>Task: <code>${d.task_id}</code><br><br>Ranking will appear in ~30s. Picks page auto-refreshes every 60s.`,
+      await load();
+      await appModal.alert('Done',
+        `Model: <strong>${modelKey}</strong>` +
+        (d.ran_now ? '<br><span class="badge bg-success">Re-calculated</span>' : '<br><span class="badge bg-secondary">Cached</span>') +
+        `<br>Ranking entries: ${(d.ranking||[]).length}`,
         'success');
-      setTimeout(load, 30000);
     } else {
       await appModal.alert('Failed', 'Error: <strong>' + (d.error || 'unknown') + '</strong>', 'danger');
     }

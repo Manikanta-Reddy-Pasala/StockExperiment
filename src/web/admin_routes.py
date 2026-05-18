@@ -1915,11 +1915,19 @@ def admin_model_rebalance(model_name):
 def admin_model_ranking(model_name):
     """Read the per-model ranking JSON written by live_signal.py.
 
-    Query: ?top=N (default 5; capped to the file's top_n)
+    Query:
+      ?top=N       (default 5; capped to the file's top_n)
+      ?recalc=1    force a fresh live_signal.py run before reading
 
-    Each live_signal.py also writes today's top-N ranking to
-    `/app/logs/<model>/ranking/<date>.json`. This endpoint returns the
-    newest file in that dir, sliced to `top`.
+    Lifecycle:
+      1. If today's ranking file exists and recalc != 1, return cached
+         (still overlays live Fyers LTP on each row).
+      2. Otherwise run live_signal.py synchronously, then read the file
+         it wrote. Subsequent same-day requests hit the cache.
+
+    Scheduler still runs live_signal nightly/morning; this on-demand
+    rerun fills the gap when a user opens Today's Picks before the cron
+    has fired.
     """
     paths = MODEL_PATHS.get(model_name)
     if not paths:
@@ -1928,13 +1936,49 @@ def admin_model_ranking(model_name):
 
     try:
         top = int(request.args.get("top", 5))
-        d = Path(paths["ranking_dir"])
+        recalc = request.args.get("recalc", "").lower() in ("1", "true", "yes")
+        ranking_dir = Path(paths["ranking_dir"])
+        today_file = ranking_dir / f"{datetime.now().strftime('%Y-%m-%d')}.json"
+
+        # Auto-run live_signal if today's file is missing/empty or recalc=1.
+        # Skip auto-run for the finnifty options model (no live_signal flow).
+        need_run = recalc or (not today_file.exists()) or (
+            today_file.exists() and today_file.stat().st_size < 32
+        )
+        ran_now = False
+        if need_run and paths.get("live_signal"):
+            ts = datetime.now().strftime("%Y%m%dT%H%M%S")
+            signals_out = f"/tmp/auto_{model_name}_{ts}.json"
+            cmd = [
+                "python3", paths["live_signal"],
+                *paths["extra_args"],
+                "--signals-out", signals_out,
+            ]
+            if recalc:
+                cmd.append("--force")
+            try:
+                r = subprocess.run(cmd, capture_output=True, text=True,
+                                   timeout=180)
+                if r.returncode == 0:
+                    ran_now = True
+                else:
+                    logger.warning(
+                        f"auto live_signal for {model_name} failed "
+                        f"({r.returncode}): {r.stderr[-300:]}"
+                    )
+            except subprocess.TimeoutExpired:
+                logger.warning(f"auto live_signal for {model_name} timed out")
+            except Exception as e:
+                logger.warning(f"auto live_signal for {model_name} crashed: {e}")
+
+        d = ranking_dir
         if not d.exists():
             return jsonify({
                 "success": True,
                 "model": model_name,
                 "label": paths.get("label", model_name),
                 "ranking": [],
+                "ran_now": ran_now,
                 "note": f"No ranking dir yet ({paths['ranking_dir']}) — "
                         "scheduler will create it on next live_signal run, "
                         "or hit /admin/<m>/run-signal.",
@@ -1947,6 +1991,7 @@ def admin_model_ranking(model_name):
                 "success": True, "model": model_name,
                 "label": paths.get("label", model_name),
                 "ranking": [],
+                "ran_now": ran_now,
                 "note": "No ranking files yet for this model.",
             })
 
@@ -1978,6 +2023,7 @@ def admin_model_ranking(model_name):
             "source": str(files[0]),
             "generated_at": datetime.fromtimestamp(
                 files[0].stat().st_mtime).isoformat(),
+            "ran_now": ran_now,
         })
     except Exception as e:
         logger.error(f"model ranking error: {e}", exc_info=True)
