@@ -2341,13 +2341,14 @@ def audit_orders_list():
         symbol = request.args.get("symbol")
         limit = min(int(request.args.get("limit", 200)), 1000)
         days = int(request.args.get("days", 30))
-        q = """
+        days = max(1, min(int(days), 3650))   # 1..10y safety clamp
+        q = f"""
             SELECT id, model_name, placed_at, fyers_order_id, symbol, side,
                    qty, ordered_price, fill_price, fill_qty, status,
                    slippage_inr, error_text
             FROM audit_orders
-            WHERE placed_at >= NOW() - INTERVAL ':days days'
-        """.replace(":days days", f"'{days} days'")
+            WHERE placed_at >= NOW() - INTERVAL '{days} days'
+        """
         params = {}
         if model:
             q += " AND model_name = :m"
