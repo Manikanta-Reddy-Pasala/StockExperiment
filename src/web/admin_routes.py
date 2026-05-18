@@ -1998,11 +1998,21 @@ def admin_model_ranking(model_name):
         ranking_dir = Path(paths["ranking_dir"])
         today_file = ranking_dir / f"{datetime.now().strftime('%Y-%m-%d')}.json"
 
-        # Auto-run live_signal if today's file is missing/empty or recalc=1.
+        # Auto-run live_signal if today's file is missing, empty, or has
+        # no picks (top_n=[]). Earlier 32-byte size check missed the case
+        # where the file existed with universe metadata but empty top_n —
+        # which is exactly what midcap wrote on a no-breakout day, so the
+        # card sat empty until the user clicked Re-calculate.
+        need_run = recalc or (not today_file.exists())
+        if not need_run and today_file.exists():
+            try:
+                import json as _jsoncheck
+                _p = _jsoncheck.loads(today_file.read_text())
+                if not (_p.get("top_n") or []):
+                    need_run = True
+            except Exception:
+                need_run = True
         # Skip auto-run for the finnifty options model (no live_signal flow).
-        need_run = recalc or (not today_file.exists()) or (
-            today_file.exists() and today_file.stat().st_size < 32
-        )
         ran_now = False
         if need_run and paths.get("live_signal"):
             ts = datetime.now().strftime("%Y%m%dT%H%M%S")
