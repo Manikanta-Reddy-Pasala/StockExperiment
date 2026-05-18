@@ -365,7 +365,7 @@ async function loadRunLogs() {
       <div class="mb-3">
         <div class="d-flex justify-content-between mb-1">
           <strong>${l.name}</strong>
-          <span class="small-mute">${new Date(l.mtime).toLocaleString()}</span>
+          <span class="small-mute">${window.fmtIST ? window.fmtIST(l.mtime) : new Date(l.mtime).toLocaleString()}</span>
         </div>
         <pre class="log-tail">${l.tail.join('\n')}</pre>
       </div>
@@ -550,8 +550,7 @@ const MODEL_LABELS = {
 function _ts(s) {
   if (!s) return '<span class="small-mute">never</span>';
   try {
-    const d = new Date(s);
-    return `<span title="${s}">${d.toLocaleString()}</span>`;
+    return `<span title="${s}">${window.fmtIST ? window.fmtIST(s) : new Date(s).toLocaleString()}</span>`;
   } catch (e) { return s; }
 }
 

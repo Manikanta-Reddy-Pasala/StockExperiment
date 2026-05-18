@@ -134,17 +134,8 @@ function fmtNum(v) {
   if (v == null || v === '' || Number.isNaN(Number(v))) return '—';
   return Number(v).toLocaleString('en-IN');
 }
-function fmtDate(iso) {
-  if (!iso) return '—';
-  // Render local-friendly: YYYY-MM-DD HH:MM
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return iso;
-    const pad = n => String(n).padStart(2,'0');
-    return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate())
-         + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
-  } catch (_) { return iso; }
-}
+// Render in IST regardless of viewer locale (markets are Asia/Kolkata).
+const fmtDate = (iso) => window.fmtIST ? window.fmtIST(iso) : (iso || '—');
 function cls(v) {
   const n = Number(v);
   if (!Number.isFinite(n) || n === 0) return 'neutral';
@@ -212,7 +203,7 @@ async function loadBalanceSheet() {
         <table class="table table-sm table-borderless mb-0 metric-table">
           <tbody>
             <tr><td class="k">Entry Price</td><td class="v">${fmtINR(op.entry_px)}</td></tr>
-            <tr><td class="k">Entry Date</td><td class="v">${op.entry_date || '—'}</td></tr>
+            <tr><td class="k">Entry Date</td><td class="v">${op.entry_date ? (window.fmtISTDate ? window.fmtISTDate(op.entry_date) : op.entry_date) : '—'}</td></tr>
             <tr><td class="k">Current Price (MTM)</td><td class="v">${fmtINR(op.current_px)}</td></tr>
             <tr><td class="k">Position Value</td><td class="v">${fmtINR(op.position_value)}</td></tr>
             <tr><td class="k"><strong>Unrealized P&amp;L</strong></td>

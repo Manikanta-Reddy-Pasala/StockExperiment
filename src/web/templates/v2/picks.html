@@ -114,9 +114,10 @@ function renderCard(m, idx, ranking, status) {
     ? `<span class="small-mute">NAV ${fmtINR(status.nav)} · P&amp;L <span class="${cls(status.pnl_pct)}">${fmtPct(status.pnl_pct)}</span></span>`
     : '';
 
-  const dateHtml = ranking && ranking.date
-    ? `<span class="small-mute">${ranking.date}</span>`
-    : '';
+  const _dateLbl = ranking && ranking.generated_at
+    ? (window.fmtIST ? window.fmtIST(ranking.generated_at) : ranking.generated_at)
+    : (ranking && ranking.date ? (window.fmtISTDate ? window.fmtISTDate(ranking.date) : ranking.date) : null);
+  const dateHtml = _dateLbl ? `<span class="small-mute" title="ranking generated">${_dateLbl}</span>` : '';
 
   // Schedule + next rebalance pill (always visible on every card)
   const _sched = nextRebalance(m.schedule);
