@@ -1,141 +1,195 @@
-# StockExperiment — Momentum Rotation
+# StockExperiment — Multi-Model Live Trading + Audit
 
-NSE momentum-based stock rotation system on Nifty-100 (pseudo, ADV-ranked).
-Picks rank-1 stock by 60-day return, holds for the month, rebalances on
-the 1st weekday of every month.
+NSE momentum & breakout trading system running **5 isolated models** in parallel against a single Fyers brokerage account. Each model has its own capital pool, own ledger, own ranking signal, own rebalance cadence. Live orders fire daily via cron 09:30 IST; every decision is captured in a 7-table audit trail.
 
-Production: `77.42.45.12` · App: <https://stock.oneshell.in>
+Production: `77.42.45.12` · App: <https://stock.oneshell.in> · Bot: `@stocks_momrot_bot`
 
 ---
 
-## Strategy — Momentum Rotation
+## Models
 
-```
-1. Universe = pseudo-Nifty-100 (top 100 NSE stocks by 20-day ADV)
-2. Every rebalance day (1st weekday of month):
-   - Rank all 100 stocks by 60-day price return descending
-   - Identify top-5
-3. Hold rank-1 only (max-concurrent = 1, full capital deploy)
-4. Rotation rule:
-   - If held stock STILL in top-5 → hold
-   - If held stock dropped out → SELL at close, BUY new rank-1 at close
-5. No stop loss. No profit target. Pure ranking-driven exits.
-6. Capital ceiling: ₹10,00,000 reference.
-```
+| Model | Universe | Cadence | Product | Hold | Signal |
+|-------|----------|---------|---------|------|--------|
+| `momentum_n100_top5_max1` | Real Nifty 100 | Monthly (1st weekday) | CNC delivery | until rank-1 changes | top-5 by 30d return, hold rank-1 |
+| `momentum_pseudo_n100_adv` | Top-100 ADV from N500 (yearly PIT rebuild) | Monthly | CNC | until rank-1 changes | top-5 by 30d return |
+| `midcap_narrow_60d_breakout` | ~100 NSE midcaps | Event-driven (daily check) | CNC | until stop/trail | 60d-high + vol >2× + 200d SMA, ALL must fire |
+| `n20_daily_large_only` | Top-20 ADV ∩ Nifty 100 | Daily | CNC | until rank-1 changes | rank by short-term return + uptrend filter (PIT) |
+| `finnifty_ic_otm4_w300_lots5` | FinNifty weekly | Weekly expiry | Options multi-leg | weekly | OTM4 iron condor, 300pt wing, 5 lots (executor not yet wired) |
 
-### Backtest Results (May 2023 → May 2026, 3 years)
+**Capital model (per model):**
+- `Allocated` = user-deposited principal, immutable unless user tops up or withdraws (`ModelSettings.invested_amount`).
+- `Available Cash` = idle un-invested cash + cumulative realized P&L (`ModelLedger.cash`).
+- `Position Value (Live)` = held_qty × live Fyers LTP.
+- `Realized P&L` = sum of closed-trade P&L (`ModelLedger.realized_pnl`).
+- `Unrealized P&L` = position_value − entry_cost.
+- `Available (Net Worth) / NAV` = cash + position_value.
+- `Total P&L` = NAV − allocated.
 
-Walk-forward validated monthly max=1 (see `exports/backtests/MODEL3_TRADE_LEDGER.md`):
-
-| Year    | ROI    | MaxDD |
-|---------|-------:|------:|
-| 2023-24 | +80.87% | 10.39% |
-| 2024-25 | +133.78% | 8.04% |
-| 2025-26 | +46.14% | 0.00% |
-| **Avg** | **+86.93%** | **6.14%** |
-
-Compound: ₹10L → ₹61.80L (+518% over 3 yrs).
-
-**Realistic live expectation:** 35-55% CAGR after slippage / STT / STCG.
+Each model gets a single `model_settings` row + single `model_ledger` row + N `model_trades` rows. No cross-talk; one model's BUY never touches another's cash.
 
 ---
 
-## Components
+## Logic — End-to-end Flow
 
-### Live Production
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  Container TZ = Asia/Kolkata (IST). All cron times below are IST.    │
+└──────────────────────────────────────────────────────────────────────┘
 
-| Path | Purpose |
-|------|---------|
-| `tools/live/momentum_rotation_signal.py` | Daily ranker, emits BUY/SELL signals JSON |
-| `tools/live/paper_executor.py` | Executes signals against ledger |
-| `tools/live/daily_summary.py` | Sends short Telegram digest each day |
-| `tools/live/telegram_notify.py` | Bot API helper |
-| `tools/live/fyers_executor.py` | Real-order placement (gated by `LIVE_TRADING=true`) |
-| `/opt/trading_system/momrot_daily.sh` | Host cron wrapper (Mon-Fri 04:01 UTC) |
-| `/opt/trading_system/momrot_rebuild_universe.sh` | Weekly N100 rebuild (Sun 03:00 UTC) |
+06:30-35  Universe refresh (monthly/yearly/quarterly per model)
+            └─ tools/models/<m>/data_pull.py refresh_universe()
 
-### Backtest
+09:25     emit_signal — every enabled model
+            └─ tools/models/<m>/live_signal.py
+                 - Loads OHLCV from Postgres (historical_data)
+                 - Computes rank by model's scoring rule
+                 - If held in top-N → emit HOLD; else SELL old + BUY rank-1
+                 - Writes signals JSON + ranking JSON to /app/logs/<m>/
+                 - Audit hook: audit_model_rankings + audit_model_signals
 
-| Path | Purpose |
-|------|---------|
-| `tools/backtests/momentum_rotation_backtest.py` | Monthly engine — used for `optimize_p18/p19` results |
-| `tools/backtests/momrot_freq_backtest.py` | Daily/weekly/monthly variant |
-| `tools/backtests/tiered_momentum_rotation.py` | 3-tier cap-stratified variant (lost in test) |
-| `tools/backtests/build_universe_by_adv.py` | Builds pseudo-N100 by ADV ranking |
-| `tools/backtests/realistic_capital_sim.py` | Capital simulator with max_concurrent + compounding |
-| `tools/backtests/ohlcv_cache.py` | Postgres-backed OHLCV access layer |
+09:30-32  execute_orders (LIVE_TRADING-gated)
+            └─ tools/live/fyers_executor.py
+                 1. RiskManager.from_model(name)
+                    → capital = model_ledger.cash (live truth)
+                    → max_total_buy_inr = allocated + realized (hard ceiling)
+                 2. PASS 1 — exits first, block on each fill
+                 3. RiskManager rebuilt (SELL proceeds in cash now)
+                 4. PASS 2 — entries with refreshed sizing
+                    → size_position clamps if breach max_total_buy_inr
+                    → _placeorder() → CNC LIMIT @ tol → MARKET fallback
+                 5. record_buy / record_sell → updates model_ledger
+                 6. Audit hooks: audit_orders + audit_rebalance_decisions
+                 7. Telegram notify: ✅ BUY <model> <sym> x<qty> @ <px>
 
-### UI
+15:30     Market close. CNC holdings persist overnight.
 
-| Path | URL |
-|------|-----|
-| `src/web/momrot_routes.py` | `/admin/momrot/*` backend endpoints |
-| `src/web/templates/admin/momrot_dashboard.html` | Live portfolio + ranking + Fyers card |
-| `src/web/templates/v2/dashboard.html` | Summary page |
-| `src/web/templates/v2/portfolio.html` | Holdings (from Fyers) |
-| `src/web/templates/v2/picks.html` | Top-20 momentum ranking |
-| `src/web/templates/v2/history.html` | Closed-trade ledger |
-| `src/web/templates/v2/settings.html` | Capital + rotation rules + Fyers broker |
+20:30-45  Daily OHLCV pull per model (post-close, naturally tomorrow's data)
+            └─ tools/models/<m>/data_pull.py pull_daily_ohlcv()
 
-Portfolio + Dashboard now read from **live Fyers account** (funds + holdings)
-via `FyersService`. Paper ledger at `/app/logs/momrot/ledger/` is retained
-for simulation tracking but no longer drives portfolio display.
+21:00     Legacy 4-step saga (technical indicators + market cap refresh)
+22:00     CSV exports + data-quality validation
+22:05     audit_data_quality snapshot (90d retention for trending)
+Sun 03:00 Full 4-year backfill (every NSE-EQ symbol, ~2400 stocks)
+Mon 06:00 Symbol master refresh from Fyers
+
+Re-run / force: each model's Rebalance button (portfolio page) chains
+                 live_signal + executor synchronously with progress modal.
+```
+
+### Sizing rules (every BUY)
+
+```
+qty = floor(min(cash, max_per_trade_inr) / price)
+qty = min(qty, floor((max_total_buy_inr - used_value) / price))   ← hard guardrail
+qty = 0 if qty < 1
+```
+
+Per-model `Rebalance` clicks are serialized: if a prior rebalance for the same model is still pending/running (in-process lock OR cross-worker DB check), a duplicate click returns HTTP 409.
 
 ---
 
-## Daily Telegram Digest
+## Audit — 7-Table Forensics
 
-Bot: `@stocks_momrot_bot`. Sends short summary every weekday 09:31 IST:
+All audit tables auto-created at app boot via `Base.metadata.create_all()`. Helpers in `src/services/audit_service.py` — never raise (trading must never break on audit failure).
 
-```
-*Momrot 2026-05-14* ⏸️ HOLD
-NAV ₹10,00,000  (+0.00%)
-Day P&L ₹+0
-Hold HFCL (+0.0%)
-Top1 ✓ HFCL (+113.2%)
-Next rebalance: 2026-06-01
-```
+| Table | What it captures | Written by |
+|-------|------------------|------------|
+| `audit_orders` | Every Fyers `placeorder` request + response, fill price, slippage, order ID, raw JSON | `tools/live/fyers_executor.py::_placeorder()` |
+| `audit_rebalance_decisions` | Reasoning per entry attempt: HOLD/ROTATE/OPEN/SKIP_CANNOT_ENTER/SKIP_QTY_ZERO, held vs rank-1, qty before/after clamp | `fyers_executor.main()` entry loop |
+| `audit_model_rankings` | Daily top-N snapshot per model — rank, symbol, score, price, universe_size, qualifying_count | All 4 `live_signal.py` files |
+| `audit_model_signals` | Every signal emitted including HOLD days — type (ENTRY/EXIT/HOLD), side, price, reason | All 4 `live_signal.py` files |
+| `audit_config_changes` | Settings + ledger field deltas — old vs new, reason, who | SQLAlchemy `set` listeners on `ModelSettings` + `ModelLedger` |
+| `audit_data_quality` | Daily snapshot of `/admin/system/models-status` — coverage %, stale days, universe age | Scheduler 22:05 IST |
+| `audit_system_events` | BOOT, CRON_FIRED, TOKEN_REFRESH, DEPLOY markers | `src/web/app.py` + `data_scheduler.py` startup |
 
-Status icons: `⏸️ HOLD` · `🔄 REBALANCED` · `❌ FAILED` · `⚠️ NO_DATA`
+**UI:** single audit dashboard at `/admin/audit` — 7 lazy-loaded tabs, IST timestamps via `window.fmtIST`, slippage colouring, model + days filters.
+
+**API:** read-only JSON endpoints under `/admin/audit/*` (orders, rankings, signals, decisions, config-changes, data-quality, system-events) — accept `?model=` + `?days=` for filtering.
+
+Retention:
+- Rankings, signals, orders, decisions, config-changes — forever.
+- Data quality — 365 days (rotate after).
+- System events — 90 days (high volume).
 
 ---
 
-## Documentation
+## Risk Controls
 
-| File | Content |
-|------|---------|
-| `exports/backtests/WINNERS_FOUND.md` | 3 winning models from 19-phase journey |
-| `exports/backtests/MODEL3_TRADE_LEDGER.md` | Full trade-by-trade ledger for winner |
-| `exports/backtests/HOW_WE_GOT_HERE.md` | Methodology + 19-phase research journey |
-| `exports/backtests/REBALANCE_FREQ_COMPARISON.md` | Daily/weekly/monthly × max-1/2 comparison |
-| `exports/backtests/TIERED_VS_MODEL3.md` | Tier-stratified variant test (failed) |
-| `tools/live/PAPER_DEPLOY_RUNBOOK.md` | Deployment runbook |
+1. **Per-model capital cap** — `max_total_buy_inr = allocated + cumulative_realized_pnl`. Size_position clamps any BUY that would breach. Logs WARNING line on every clamp.
+2. **Concurrency lock** — rebalance endpoint rejects 409 if same-model task already in-flight (in-process threading.Lock + DB-backed cross-worker check).
+3. **Daily loss kill-switch** — `MAX_DAILY_LOSS_PCT = -5.0` blocks new entries.
+4. **No agent trading** — per repo memory rule (`feedback-no-real-trades.md`): the agent never invokes placeorder, only the user via UI buttons or the scheduler.
+5. **LIVE_TRADING gate** — executor falls back to dry-run if `LIVE_TRADING != true`.
+6. **Per-trade cap** — `MAX_PER_TRADE_INR` (default capital / max_concurrent).
+
+---
+
+## UI
+
+| Page | URL | Purpose |
+|------|-----|---------|
+| Dashboard | `/` | Per-model cards: allocated, position, realized, unrealized, NAV, P&L |
+| Today's Picks | `/picks` | Per-model collapsible card with top-5 ranking + Re-calculate button |
+| Portfolio | `/portfolio` | Aggregate table + live Fyers funds widget + open positions + per-model Rebalance |
+| Model Detail | `/admin/models/<m>/detail` | Balance sheet + trade history per model |
+| Admin Triggers | `/admin` | Per-Model Data Status (5 models) + manual pulls |
+| Audit | `/admin/audit` | 7-tab forensics dashboard (orders, decisions, rankings, signals, config, data quality, system) |
+| History | `/history` | Closed-trade ledger across all models |
+| Settings | `/settings` | Per-model enable/disable, capital top-up/withdraw, seed/clear position |
+| Users | `/admin/users` | Manage app users |
+
+All timestamps render in IST via `window.fmtIST` helper in `base.html` (naive ISO from backend treated as IST literal, no double-shift).
+
+---
+
+## Data
+
+- **Postgres** historical_data table — 4 years of daily OHLCV for ~2400 NSE-EQ stocks
+- Weekly Sunday 03:00 IST full backfill via `tools/shared/prefetch_ohlcv.py --universe all`
+- Per-model daily incremental pulls at 20:30-45 IST
+- Symbol master refresh Mon 06:00 IST
+- Live LTP overlaid on every UI display via Fyers `quotes_multiple` API (`_resolve_live_prices` in `admin_routes.py`)
 
 ---
 
 ## Quick Commands
 
 ```bash
-# View live ledger
-ssh root@77.42.45.12 'cat /opt/trading_system/logs/momrot/ledger/momrot_ledger.json'
+# Latest model rankings
+curl -s https://stock.oneshell.in/admin/audit/rankings?days=1 | jq .
 
-# Latest cron run log
-ssh root@77.42.45.12 'ls -t /opt/trading_system/logs/momrot/run_logs/*.log | head -1 | xargs cat'
+# Recent Fyers orders
+curl -s https://stock.oneshell.in/admin/audit/orders?days=7 | jq .
 
-# Force rebalance via UI
-curl -X POST https://stock.oneshell.in/admin/momrot/run-now
+# Data coverage
+curl -s https://stock.oneshell.in/admin/data/coverage | jq .
 
-# Disable daily cron
-ssh root@77.42.45.12 'crontab -l | grep -v momrot | crontab -'
+# Force rebalance one model (UI does this on Rebalance button)
+curl -X POST https://stock.oneshell.in/admin/n20_daily_large_only/rebalance \
+  -H 'Content-Type: application/json' -d '{"dry_run":false}'
+
+# Force fresh signal recompute
+curl -s 'https://stock.oneshell.in/admin/midcap_narrow_60d_breakout/ranking?recalc=1' | jq .
+
+# Disable scheduler for a model (no real orders)
+# Settings UI → toggle Enabled → ledger persists, cron skips
 ```
+
+---
+
+## Tags / Releases
+
+- `v1.0.0` — Initial single-model momentum rotation
+- `v2.0-btc-rules` — BTC-correlated regime filter (rejected)
+- `v2.1-slope50` — EMA-50 slope refinement
+- **`v3.0-multi-model-audit`** — 5 isolated models + 7-table audit trail + capital guardrails (current)
 
 ---
 
 ## Realistic Caveats
 
-- 3-year backtest is a small sample.
-- Indian momentum strategies have documented 30-40% CAGR over decades but with
-  20-30% worst-year DD in 2018-style mom-crashes.
-- Live forward could see 10-15% returns in a regime shift year.
-- All three winners are momentum-correlated and will suffer together in a
-  mom-crash year.
+- Backtests are 3-year samples — 2018-style momentum crashes underrepresented.
+- All 4 equity models are momentum-correlated; they will draw down together in a regime shift.
+- Live forward expectation: 25-40% CAGR after slippage / STT / STCG, not the 80%+ headline backtest figures.
+- Fyers MIS auto-square-off at 3:20 IST → equity models use **CNC** to allow multi-day hold (matches backtest).
+- TOTP-based token refresh: see `feedback-no-yfinance.md` for the recovery flow.
