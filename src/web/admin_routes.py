@@ -2312,3 +2312,269 @@ def admin_model_ranking(model_name):
     except Exception as e:
         logger.error(f"model ranking error: {e}", exc_info=True)
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+# =============================================================================
+# Audit endpoints — read-only forensics over the 7 audit tables
+# =============================================================================
+
+@admin_bp.route('/audit/orders', methods=['GET'])
+def audit_orders_list():
+    """List recent Fyers orders. Query: ?model=&symbol=&limit=&days="""
+    try:
+        from src.models.database import get_database_manager
+        from sqlalchemy import text
+        model = request.args.get("model")
+        symbol = request.args.get("symbol")
+        limit = min(int(request.args.get("limit", 200)), 1000)
+        days = int(request.args.get("days", 30))
+        q = """
+            SELECT id, model_name, placed_at, fyers_order_id, symbol, side,
+                   qty, ordered_price, fill_price, fill_qty, status,
+                   slippage_inr, error_text
+            FROM audit_orders
+            WHERE placed_at >= NOW() - INTERVAL ':days days'
+        """.replace(":days days", f"'{days} days'")
+        params = {}
+        if model:
+            q += " AND model_name = :m"
+            params["m"] = model
+        if symbol:
+            q += " AND symbol ILIKE :s"
+            params["s"] = f"%{symbol}%"
+        q += " ORDER BY placed_at DESC LIMIT :limit"
+        params["limit"] = limit
+        db = get_database_manager()
+        with db.get_session() as s:
+            rows = s.execute(text(q), params).fetchall()
+        out = []
+        for r in rows:
+            out.append({
+                "id": r.id,
+                "model_name": r.model_name,
+                "placed_at": r.placed_at.isoformat() if r.placed_at else None,
+                "fyers_order_id": r.fyers_order_id,
+                "symbol": r.symbol,
+                "side": r.side,
+                "qty": r.qty,
+                "ordered_price": float(r.ordered_price) if r.ordered_price else None,
+                "fill_price": float(r.fill_price) if r.fill_price else None,
+                "fill_qty": r.fill_qty,
+                "status": r.status,
+                "slippage_inr": float(r.slippage_inr) if r.slippage_inr else None,
+                "error_text": r.error_text,
+            })
+        return jsonify({"success": True, "orders": out})
+    except Exception as e:
+        logger.error(f"audit_orders_list error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@admin_bp.route('/audit/rankings', methods=['GET'])
+def audit_rankings_list():
+    """Daily rankings per model. Query: ?model=&date=&days="""
+    try:
+        from src.models.database import get_database_manager
+        from sqlalchemy import text
+        model = request.args.get("model")
+        d = request.args.get("date")
+        days = int(request.args.get("days", 7))
+        q = "SELECT model_name, ranked_at, trading_date, universe_size, qualifying_count, rank, symbol, name, score, price, extra FROM audit_model_rankings WHERE 1=1"
+        params = {}
+        if model:
+            q += " AND model_name = :m"
+            params["m"] = model
+        if d:
+            q += " AND trading_date = :d"
+            params["d"] = d
+        else:
+            q += f" AND trading_date >= CURRENT_DATE - INTERVAL '{days} days'"
+        q += " ORDER BY trading_date DESC, model_name, rank LIMIT 500"
+        db = get_database_manager()
+        with db.get_session() as s:
+            rows = s.execute(text(q), params).fetchall()
+        out = [{
+            "model_name": r.model_name,
+            "ranked_at": r.ranked_at.isoformat() if r.ranked_at else None,
+            "trading_date": r.trading_date.isoformat() if r.trading_date else None,
+            "universe_size": r.universe_size,
+            "qualifying_count": r.qualifying_count,
+            "rank": r.rank, "symbol": r.symbol, "name": r.name,
+            "score": float(r.score) if r.score else None,
+            "price": float(r.price) if r.price else None,
+            "extra": r.extra,
+        } for r in rows]
+        return jsonify({"success": True, "rankings": out})
+    except Exception as e:
+        logger.error(f"audit_rankings_list error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@admin_bp.route('/audit/signals', methods=['GET'])
+def audit_signals_list():
+    """Emitted signals. Query: ?model=&days="""
+    try:
+        from src.models.database import get_database_manager
+        from sqlalchemy import text
+        model = request.args.get("model")
+        days = int(request.args.get("days", 30))
+        q = "SELECT model_name, emitted_at, trading_date, signal_type, symbol, side, price, qty_planned, reason FROM audit_model_signals WHERE emitted_at >= NOW() - INTERVAL '%d days'" % days
+        params = {}
+        if model:
+            q += " AND model_name = :m"
+            params["m"] = model
+        q += " ORDER BY emitted_at DESC LIMIT 500"
+        db = get_database_manager()
+        with db.get_session() as s:
+            rows = s.execute(text(q), params).fetchall()
+        out = [{
+            "model_name": r.model_name,
+            "emitted_at": r.emitted_at.isoformat() if r.emitted_at else None,
+            "trading_date": r.trading_date.isoformat() if r.trading_date else None,
+            "signal_type": r.signal_type, "symbol": r.symbol, "side": r.side,
+            "price": float(r.price) if r.price else None,
+            "qty_planned": r.qty_planned, "reason": r.reason,
+        } for r in rows]
+        return jsonify({"success": True, "signals": out})
+    except Exception as e:
+        logger.error(f"audit_signals_list error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@admin_bp.route('/audit/decisions', methods=['GET'])
+def audit_decisions_list():
+    """Rebalance reasoning. Query: ?model=&days="""
+    try:
+        from src.models.database import get_database_manager
+        from sqlalchemy import text
+        model = request.args.get("model")
+        days = int(request.args.get("days", 30))
+        q = "SELECT * FROM audit_rebalance_decisions WHERE decided_at >= NOW() - INTERVAL '%d days'" % days
+        params = {}
+        if model:
+            q += " AND model_name = :m"
+            params["m"] = model
+        q += " ORDER BY decided_at DESC LIMIT 500"
+        db = get_database_manager()
+        with db.get_session() as s:
+            rows = s.execute(text(q), params).fetchall()
+        out = []
+        for r in rows:
+            out.append({
+                "id": r.id,
+                "model_name": r.model_name,
+                "decided_at": r.decided_at.isoformat() if r.decided_at else None,
+                "trigger": r.trigger,
+                "held_symbol": r.held_symbol, "held_qty": r.held_qty,
+                "held_entry_px": float(r.held_entry_px) if r.held_entry_px else None,
+                "held_mtm_px": float(r.held_mtm_px) if r.held_mtm_px else None,
+                "rank1_symbol": r.rank1_symbol,
+                "rank1_price": float(r.rank1_price) if r.rank1_price else None,
+                "decision": r.decision, "reason": r.reason,
+                "qty_sized": r.qty_sized, "qty_clamped": r.qty_clamped,
+                "clamp_reason": r.clamp_reason,
+            })
+        return jsonify({"success": True, "decisions": out})
+    except Exception as e:
+        logger.error(f"audit_decisions_list error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@admin_bp.route('/audit/config-changes', methods=['GET'])
+def audit_config_changes_list():
+    """Settings/ledger field history. Query: ?model=&days="""
+    try:
+        from src.models.database import get_database_manager
+        from sqlalchemy import text
+        model = request.args.get("model")
+        days = int(request.args.get("days", 30))
+        q = "SELECT * FROM audit_config_changes WHERE changed_at >= NOW() - INTERVAL '%d days'" % days
+        params = {}
+        if model:
+            q += " AND model_name = :m"
+            params["m"] = model
+        q += " ORDER BY changed_at DESC LIMIT 500"
+        db = get_database_manager()
+        with db.get_session() as s:
+            rows = s.execute(text(q), params).fetchall()
+        out = [{
+            "id": r.id,
+            "changed_at": r.changed_at.isoformat() if r.changed_at else None,
+            "changed_by": r.changed_by,
+            "model_name": r.model_name,
+            "field": r.field,
+            "old_value": r.old_value, "new_value": r.new_value,
+            "reason": r.reason,
+        } for r in rows]
+        return jsonify({"success": True, "changes": out})
+    except Exception as e:
+        logger.error(f"audit_config_changes_list error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@admin_bp.route('/audit/data-quality', methods=['GET'])
+def audit_data_quality_list():
+    """Daily data-coverage snapshots. Query: ?model=&days="""
+    try:
+        from src.models.database import get_database_manager
+        from sqlalchemy import text
+        model = request.args.get("model")
+        days = int(request.args.get("days", 90))
+        q = "SELECT * FROM audit_data_quality WHERE snapshot_at >= NOW() - INTERVAL '%d days'" % days
+        params = {}
+        if model:
+            q += " AND model_name = :m"
+            params["m"] = model
+        q += " ORDER BY snapshot_at DESC LIMIT 500"
+        db = get_database_manager()
+        with db.get_session() as s:
+            rows = s.execute(text(q), params).fetchall()
+        out = [{
+            "id": r.id,
+            "snapshot_at": r.snapshot_at.isoformat() if r.snapshot_at else None,
+            "model_name": r.model_name,
+            "universe_size": r.universe_size,
+            "universe_age_days": r.universe_age_days,
+            "coverage_pct": float(r.coverage_pct) if r.coverage_pct else None,
+            "stale_days": r.stale_days,
+            "data_sufficient": r.data_sufficient, "wired": r.wired,
+        } for r in rows]
+        return jsonify({"success": True, "snapshots": out})
+    except Exception as e:
+        logger.error(f"audit_data_quality_list error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@admin_bp.route('/audit/system-events', methods=['GET'])
+def audit_system_events_list():
+    """Boot/cron/token-refresh events. Query: ?event_type=&days="""
+    try:
+        from src.models.database import get_database_manager
+        from sqlalchemy import text
+        evtype = request.args.get("event_type")
+        days = int(request.args.get("days", 7))
+        q = "SELECT id, event_at, event_type, component, metadata FROM audit_system_events WHERE event_at >= NOW() - INTERVAL '%d days'" % days
+        params = {}
+        if evtype:
+            q += " AND event_type = :t"
+            params["t"] = evtype
+        q += " ORDER BY event_at DESC LIMIT 500"
+        db = get_database_manager()
+        with db.get_session() as s:
+            rows = s.execute(text(q), params).fetchall()
+        out = [{
+            "id": r.id,
+            "event_at": r.event_at.isoformat() if r.event_at else None,
+            "event_type": r.event_type, "component": r.component,
+            "metadata": r.metadata,
+        } for r in rows]
+        return jsonify({"success": True, "events": out})
+    except Exception as e:
+        logger.error(f"audit_system_events_list error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@admin_bp.route('/audit', methods=['GET'])
+def audit_dashboard():
+    """Unified read-only audit dashboard."""
+    return render_template('admin/audit_dashboard.html')

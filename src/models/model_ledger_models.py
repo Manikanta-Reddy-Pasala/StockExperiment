@@ -73,3 +73,47 @@ class ModelTrade(Base):
     # Naive timestamp in container's local time (TZ=Asia/Kolkata → IST).
     # UI fmtIST helper treats naive ISO as already-IST and doesn't re-shift.
     trade_at = Column(DateTime, default=datetime.now, index=True)
+
+
+# ---------------------------------------------------------------------------
+# SQLAlchemy event listeners — mirror every settings/ledger column change
+# into audit_config_changes. Best-effort: failures never raise into trading.
+# ---------------------------------------------------------------------------
+try:
+    from sqlalchemy import event as _sa_event
+
+    _SETTINGS_FIELDS = ("enabled", "invested_amount", "current_amount", "description")
+    _LEDGER_FIELDS = (
+        "cash", "open_symbol", "open_qty", "open_entry_px",
+        "open_entry_date", "realized_pnl",
+    )
+
+    def _emit_audit(model_name, field, old_v, new_v, reason):
+        try:
+            from src.services.audit_service import write_config_change
+            write_config_change(model_name, field, old_v, new_v, reason)
+        except Exception:
+            pass
+
+    def _settings_attr_changed(target, value, oldvalue, initiator):
+        if oldvalue == value or oldvalue is None:
+            return
+        if initiator.key not in _SETTINGS_FIELDS:
+            return
+        _emit_audit(target.model_name, initiator.key, oldvalue, value, "SETTINGS_UPDATE")
+
+    def _ledger_attr_changed(target, value, oldvalue, initiator):
+        if oldvalue == value or oldvalue is None:
+            return
+        if initiator.key not in _LEDGER_FIELDS:
+            return
+        _emit_audit(target.model_name, initiator.key, oldvalue, value, "LEDGER_UPDATE")
+
+    for _f in _SETTINGS_FIELDS:
+        _sa_event.listen(getattr(ModelSettings, _f), "set",
+                         _settings_attr_changed, retval=False)
+    for _f in _LEDGER_FIELDS:
+        _sa_event.listen(getattr(ModelLedger, _f), "set",
+                         _ledger_attr_changed, retval=False)
+except Exception:
+    pass

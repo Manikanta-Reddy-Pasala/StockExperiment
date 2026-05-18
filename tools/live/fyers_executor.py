@@ -66,9 +66,16 @@ def _sanitize_tag(tag: str) -> str:
     return cleaned[:20] or "auto"
 
 
+# Module-level context: set in main() so every nested _placeorder() can
+# tag its audit row with the right model name without changing every
+# place_limit_with_fallback signature.
+_CURRENT_MODEL: Optional[str] = None
+
+
 def _placeorder(svc, user_id: int, symbol: str, qty: int, side: str,
                 pricetype: str = "MARKET", price: float = 0.0,
-                product: str = "CNC", tag: str = "") -> Dict:
+                product: str = "CNC", tag: str = "",
+                _audit_model: Optional[str] = None) -> Dict:
     """Thin wrapper around FyersService.placeorder using the standardized API.
 
     Returns the response dict (with `status`, `data.orderid` on success).
@@ -78,11 +85,19 @@ def _placeorder(svc, user_id: int, symbol: str, qty: int, side: str,
     models (n100, pseudo-n100, midcap, n20) backtest as delivery — exits
     only when the signal rotates, not at end-of-day. INTRADAY (MIS) is
     available if a future strategy needs forced same-day square-off.
+
+    _audit_model — if set, every placeorder call writes an audit_orders
+    row capturing request/response. Optional so older callers still work.
     """
     fyers_sym = to_fyers_symbol(symbol)
     safe_tag = _sanitize_tag(tag)
+    req = {
+        "symbol": fyers_sym, "qty": int(qty), "side": side.upper(),
+        "product": product, "pricetype": pricetype.upper(),
+        "price": float(price), "tag": safe_tag,
+    }
     try:
-        return svc.placeorder(
+        res = svc.placeorder(
             user_id=user_id,
             symbol=fyers_sym,
             quantity=str(int(qty)),
@@ -96,7 +111,25 @@ def _placeorder(svc, user_id: int, symbol: str, qty: int, side: str,
             tag=safe_tag,
         )
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        res = {"status": "error", "message": str(e)}
+    # Audit hook
+    try:
+        from src.services.audit_service import write_order
+        status_ok = str((res or {}).get("status") or (res or {}).get("s") or "").lower() in ("ok", "success")
+        oid = (res or {}).get("id") or ((res or {}).get("data") or {}).get("orderid") or ""
+        write_order(
+            model_name=_audit_model or _CURRENT_MODEL,
+            symbol=fyers_sym, side=side.upper(), qty=int(qty),
+            ordered_price=float(price), fill_price=None, fill_qty=None,
+            product=product, pricetype=pricetype.upper(),
+            status=("placed" if status_ok else "rejected"),
+            fyers_order_id=oid,
+            error_text=None if status_ok else (res or {}).get("message"),
+            raw_request=req, raw_response=res,
+        )
+    except Exception:
+        pass
+    return res
 
 
 def _extract_order_id(res: Dict) -> str:
@@ -389,6 +422,10 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
 
+    # Make model name visible to nested helpers (audit_orders rows).
+    global _CURRENT_MODEL
+    _CURRENT_MODEL = args.model_name
+
     live = os.environ.get("LIVE_TRADING", "false").lower() == "true"
     if not live:
         log.warning("LIVE_TRADING != 'true' — forcing dry-run mode")
@@ -560,12 +597,52 @@ def main() -> int:
         if not ok:
             log.info(f"SKIP {sym}: {reason}")
             skipped += 1
+            try:
+                from src.services.audit_service import write_rebalance_decision
+                write_rebalance_decision(
+                    model_name=args.model_name or "(env)",
+                    trigger="CRON" if not args.dry_run else "DRY",
+                    decision="SKIP_CANNOT_ENTER", reason=reason,
+                    rank1_symbol=sym, rank1_price=price,
+                )
+            except Exception:
+                pass
             continue
         qty = rm.size_position(price, open_positions)
         if qty < 1:
             log.info(f"SKIP {sym}: qty<1 (capital=₹{rm.cfg.capital_inr:,})")
             skipped += 1
+            try:
+                from src.services.audit_service import write_rebalance_decision
+                write_rebalance_decision(
+                    model_name=args.model_name or "(env)",
+                    trigger="CRON" if not args.dry_run else "DRY",
+                    decision="SKIP_QTY_ZERO",
+                    reason=f"qty<1 at price ₹{price:.2f}, capital=₹{rm.cfg.capital_inr:,}",
+                    rank1_symbol=sym, rank1_price=price,
+                    qty_sized=0, qty_clamped=0, clamp_reason="CASH",
+                )
+            except Exception:
+                pass
             continue
+
+        # Decision audit — BUY allowed
+        try:
+            from src.services.audit_service import write_rebalance_decision
+            held_obj = next((p for p in open_positions), None)
+            write_rebalance_decision(
+                model_name=args.model_name or "(env)",
+                trigger="CRON" if not args.dry_run else "DRY",
+                decision="OPEN" if not held_obj else "ROTATE",
+                reason=f"emit ENTRY {sig.get('signal')}",
+                held_symbol=held_obj.symbol if held_obj else None,
+                held_qty=held_obj.qty if held_obj else None,
+                held_entry_px=held_obj.entry_price if held_obj else None,
+                rank1_symbol=sym, rank1_price=price,
+                qty_sized=qty, qty_clamped=qty, clamp_reason="NONE",
+            )
+        except Exception:
+            pass
 
         order_id = "DRY"
         status = "dry-run"

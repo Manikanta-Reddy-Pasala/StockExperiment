@@ -346,11 +346,37 @@ def validate_data_quality():
         logger.error(f"❌ Data quality validation failed: {e}", exc_info=True)
 
 
+def snapshot_data_quality_audit():
+    """Daily 22:05 IST — hit /admin/system/models-status and persist into
+    audit_data_quality so coverage trends are SQL-queryable."""
+    logger.info("Snapshotting data quality audit")
+    try:
+        import urllib.request
+        import json as _j
+        with urllib.request.urlopen("http://trading_system:5001/admin/system/models-status", timeout=30) as r:
+            payload = _j.loads(r.read().decode())
+        if not payload.get("success"):
+            logger.warning(f"models-status failed: {payload.get('error')}")
+            return
+        from src.services.audit_service import write_data_quality
+        write_data_quality(payload.get("models") or [])
+        logger.info(f"Wrote data-quality audit for {len(payload.get('models') or [])} models")
+    except Exception as e:
+        logger.error(f"snapshot_data_quality_audit error: {e}", exc_info=True)
+
+
 def run_scheduler():
     """Main scheduler loop."""
     logger.info("=" * 80)
     logger.info("Data Pipeline Scheduler Started")
     logger.info("=" * 80)
+    # Audit: record scheduler boot
+    try:
+        from src.services.audit_service import write_system_event
+        write_system_event("BOOT", "data_scheduler",
+                           metadata={"pid": os.getpid()})
+    except Exception as _e:
+        logger.debug(f"audit BOOT failed: {_e}")
     logger.info("Scheduled Tasks:")
     logger.info("  - Symbol Master Update:    Weekly (Monday) at 06:00 AM")
     logger.info("  - Per-model data jobs registered below")
@@ -394,6 +420,7 @@ def run_scheduler():
     # Export CSV & validate quality (10 PM - after pipeline completes)
     schedule.every().day.at("22:00").do(export_daily_csv)
     schedule.every().day.at("22:00").do(validate_data_quality)
+    schedule.every().day.at("22:05").do(snapshot_data_quality_audit)
 
     # Weekly full-history backfill — fills gaps for stocks added after the
     # initial seed (newly-listed midcaps, universe changes, etc.). Daily

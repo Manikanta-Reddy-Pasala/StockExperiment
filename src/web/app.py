@@ -101,6 +101,14 @@ def create_app():
     except Exception as e:
         app.logger.warning(f"⚠️ Could not create database tables: {e}")
 
+    # Audit: record app boot
+    try:
+        from src.services.audit_service import write_system_event
+        write_system_event("BOOT", "trading_system",
+                           metadata={"pid": os.getpid()})
+    except Exception as _e:
+        app.logger.debug(f"audit BOOT failed: {_e}")
+
     # Seed per-model ledger rows (idempotent)
     try:
         from ..services.trading.model_ledger_service import ensure_models_seeded

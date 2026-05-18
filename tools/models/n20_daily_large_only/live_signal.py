@@ -279,6 +279,24 @@ def main() -> int:
         json.dumps(ranking_payload, indent=2, default=str)
     )
     log.info(f"Wrote ranking -> {ranking_dir / (today_str + '.json')}")
+
+    # Audit: persist rankings + signals to DB
+    try:
+        from src.services.audit_service import write_rankings, write_signal
+        write_rankings(MODEL_NAME, today.date(),
+                       ranking_payload.get("universe_size") or 0,
+                       0, ranking_payload.get("top_n") or [])
+        if signals:
+            for _sig in signals:
+                write_signal(MODEL_NAME, today.date(),
+                             _sig.get("signal", ""), _sig.get("symbol", ""),
+                             _sig.get("side", ""), price=_sig.get("price"),
+                             reason=(_sig.get("note") or "")[:120])
+        else:
+            write_signal(MODEL_NAME, today.date(), "HOLD", "", "NONE",
+                         reason="no signal emitted")
+    except Exception as _e:
+        log.debug(f"audit hook failed: {_e}")
     return 0
 
 

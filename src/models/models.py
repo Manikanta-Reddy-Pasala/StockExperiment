@@ -16,6 +16,13 @@ from .stock_models import (
 # Per-model ledger tables (capital, position, PnL, trades — multi-model ready)
 from .model_ledger_models import ModelSettings, ModelLedger, ModelTrade  # noqa: F401
 
+# Audit tables — Base.metadata.create_all() picks them up on app boot.
+from .audit_models import (  # noqa: F401
+    AuditOrder, AuditRebalanceDecision,
+    AuditModelRanking, AuditModelSignal,
+    AuditConfigChange, AuditDataQuality, AuditSystemEvent,
+)
+
 
 
 class User(UserMixin, Base):
