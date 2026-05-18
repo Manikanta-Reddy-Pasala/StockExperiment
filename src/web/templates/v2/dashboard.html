@@ -199,7 +199,9 @@ function renderTotals(t) {
   const pnlEl = document.getElementById('tot_pnl');
   pnlEl.textContent = fmtINR(t.pnl_total) + ' (' + fmtPct(t.return_pct) + ')';
   pnlEl.className = 'fs-5 fw-bold ' + cls(t.pnl_total);
-  document.getElementById('tot_realized').textContent = fmtINR(t.realized_pnl);
+  const realEl = document.getElementById('tot_realized');
+  realEl.textContent = fmtINR(t.realized_pnl);
+  realEl.className = 'fs-5 fw-bold ' + cls(t.realized_pnl);
 }
 
 function renderSignalsWidget(data) {
