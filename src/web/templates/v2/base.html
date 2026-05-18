@@ -211,6 +211,40 @@
               `<input id="app-modal-input" type="text" class="form-control" value="${String(defaultVal).replace(/"/g,'&quot;')}">`;
             return show({title, html: body, kind:'prompt', okLabel:'OK'});
           },
+          /* Open a non-dismissible progress modal. Returns a controller:
+             - update(html)        — replace body content
+             - finish(html, type)  — replace body, show OK button (type=info|success|danger), returns promise that resolves when user closes
+          */
+          progress: (title, html='', headerCls='') => {
+            init();
+            document.getElementById('app-modal-title').textContent = title || 'Working';
+            document.getElementById('app-modal-body').innerHTML = html;
+            document.getElementById('app-modal-header').className = 'modal-header ' + headerCls;
+            const okBtn = document.getElementById('app-modal-ok');
+            const cancelBtn = document.getElementById('app-modal-cancel');
+            okBtn.style.display = 'none';
+            cancelBtn.style.display = 'none';
+            modal.show();
+            return {
+              update: (h) => { document.getElementById('app-modal-body').innerHTML = h; },
+              setTitle: (t) => { document.getElementById('app-modal-title').textContent = t; },
+              setHeader: (cls) => { document.getElementById('app-modal-header').className = 'modal-header ' + cls; },
+              finish: (h, type='info') => {
+                document.getElementById('app-modal-body').innerHTML = h;
+                const cls = type === 'danger' ? 'bg-danger text-white' : (type === 'success' ? 'bg-success text-white' : '');
+                document.getElementById('app-modal-header').className = 'modal-header ' + cls;
+                okBtn.className = 'btn ' + (type === 'danger' ? 'btn-danger' : (type === 'success' ? 'btn-success' : 'btn-primary'));
+                okBtn.textContent = 'OK';
+                okBtn.style.display = '';
+                cancelBtn.style.display = 'none';
+                return new Promise(resolve => {
+                  okBtn.onclick = () => { modal.hide(); resolve(true); };
+                  document.getElementById('app-modal').addEventListener('hidden.bs.modal', () => resolve(true), {once:true});
+                });
+              },
+              close: () => modal.hide(),
+            };
+          },
         };
       })();
     </script>

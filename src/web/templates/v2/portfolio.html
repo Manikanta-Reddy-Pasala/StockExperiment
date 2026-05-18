@@ -228,20 +228,118 @@ async function rebalanceModel(model) {
     {okLabel: 'Execute Rebalance', okClass: 'btn-danger', headerCls: 'bg-danger text-white'});
   if (!ok) return;
 
-  const r = await fetch(`/admin/${model}/rebalance`, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({dry_run: false}),
-  });
-  const d = await r.json();
-  if (d.success) {
-    await appModal.alert('Rebalance Started',
-      `Model: <strong>${model}</strong><br>Signal task: <code>${d.signal_task_id}</code><br>Execute task: <code>${d.execute_task_id}</code><br><br>Live orders will fire in ~10s. Watch positions table refresh.`,
-      'success');
-  } else {
-    await appModal.alert('Rebalance Failed', 'Error: <strong>' + (d.error || 'unknown') + '</strong>', 'danger');
+  // Open progress modal — stays up until both signal + execute tasks finish.
+  const prog = appModal.progress('LIVE Rebalance — Working',
+    `<div class="d-flex align-items-center mb-2">
+       <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+       <span>Submitting rebalance for <code>${model}</code>…</span>
+     </div>`,
+    'bg-danger text-white');
+
+  let d;
+  try {
+    const r = await fetch(`/admin/${model}/rebalance`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({dry_run: false}),
+    });
+    d = await r.json();
+  } catch (e) {
+    await prog.finish('<div class="text-danger">Network error: <strong>' + e.message + '</strong></div>', 'danger');
+    return;
   }
-  setTimeout(() => loadState(), 8000);
+  if (!d.success) {
+    await prog.finish('<div class="text-danger">Error: <strong>' + (d.error || 'unknown') + '</strong></div>', 'danger');
+    return;
+  }
+
+  const sigId = d.signal_task_id;
+  const exeId = d.execute_task_id;
+
+  // Status labels per task state
+  const stateBadge = (t) => {
+    if (!t) return '<span class="badge bg-secondary">pending</span>';
+    if (t.status === 'running' || t.status === 'started') return '<span class="badge bg-warning text-dark">running</span>';
+    if (t.status === 'completed') return '<span class="badge bg-success">completed</span>';
+    if (t.status === 'failed' || t.status === 'error' || t.status === 'timeout') return `<span class="badge bg-danger">${t.status}</span>`;
+    return `<span class="badge bg-secondary">${t.status || 'pending'}</span>`;
+  };
+
+  const fetchTask = async (id) => {
+    try {
+      const r = await fetch(`/admin/task/${id}/status`);
+      const j = await r.json();
+      return j.success ? j.task : null;
+    } catch (_) { return null; }
+  };
+
+  // Extract a useful one-line summary from executor stdout (order id / qty / symbol).
+  const extractOrderInfo = (output) => {
+    if (!output) return '';
+    const lines = String(output).split('\n');
+    const tail = lines.slice(-50);
+    const orderLine = tail.find(l => /order_id|placed|BUY|SELL/.test(l));
+    return orderLine ? orderLine.trim() : tail.slice(-3).join('<br>');
+  };
+
+  // Poll loop — exit when both signal+execute are terminal, OR after 180s.
+  const deadline = Date.now() + 180000;
+  let sigT = null, exeT = null;
+  const isTerminal = (t) => t && ['completed','failed','error','timeout'].includes(t.status);
+
+  while (Date.now() < deadline) {
+    [sigT, exeT] = await Promise.all([fetchTask(sigId), fetchTask(exeId)]);
+    const sigSum = sigT && sigT.output ? `<div class="small text-muted mt-1">${extractOrderInfo(sigT.output)}</div>` : '';
+    const exeSum = exeT && exeT.output ? `<div class="small text-muted mt-1">${extractOrderInfo(exeT.output)}</div>` : '';
+    const errSig = sigT && sigT.error && sigT.status !== 'completed' ? `<div class="small text-danger mt-1">${String(sigT.error).slice(0,300)}</div>` : '';
+    const errExe = exeT && exeT.error && exeT.status !== 'completed' ? `<div class="small text-danger mt-1">${String(exeT.error).slice(0,300)}</div>` : '';
+
+    prog.update(`
+      <div class="mb-3">
+        <div class="d-flex align-items-center justify-content-between">
+          <div><strong>1. Signal</strong> <code class="small">${sigId}</code></div>
+          ${stateBadge(sigT)}
+        </div>
+        ${sigSum}${errSig}
+      </div>
+      <div class="mb-3">
+        <div class="d-flex align-items-center justify-content-between">
+          <div><strong>2. Execute (Fyers)</strong> <code class="small">${exeId}</code></div>
+          ${stateBadge(exeT)}
+        </div>
+        ${exeSum}${errExe}
+      </div>
+      <div class="small text-muted">Polling… auto-refresh every 2s. Closes when execute terminates.</div>
+    `);
+
+    if (isTerminal(sigT) && isTerminal(exeT)) break;
+    // Signal failed → execute won't run; still wait briefly in case it's about to start.
+    if (isTerminal(sigT) && sigT.status !== 'completed' && (Date.now() - deadline + 180000) > 10000) break;
+
+    await new Promise(r => setTimeout(r, 2000));
+  }
+
+  // Decide final outcome.
+  const sigOk = sigT && sigT.status === 'completed';
+  const exeOk = exeT && exeT.status === 'completed';
+  let type, html;
+  if (sigOk && exeOk) {
+    type = 'success';
+    html = `<div class="mb-2"><strong>Signal:</strong> ${stateBadge(sigT)} &nbsp; <strong>Execute:</strong> ${stateBadge(exeT)}</div>
+            <div class="small mt-2"><strong>Executor output (tail):</strong></div>
+            <pre class="small mt-1" style="max-height:240px;overflow:auto;background:#f8f9fa;padding:8px;">${(exeT.output || '').split('\n').slice(-25).join('\n')}</pre>`;
+  } else if (sigOk && !exeOk) {
+    type = 'danger';
+    html = `<div class="mb-2"><strong>Signal:</strong> ${stateBadge(sigT)} &nbsp; <strong>Execute:</strong> ${stateBadge(exeT)}</div>
+            <div class="text-danger small mt-2">${(exeT && (exeT.error || exeT.output) || 'Executor did not complete.').slice(-500)}</div>`;
+  } else {
+    type = 'danger';
+    html = `<div class="mb-2"><strong>Signal:</strong> ${stateBadge(sigT)} &nbsp; <strong>Execute:</strong> ${stateBadge(exeT)}</div>
+            <div class="text-danger small mt-2">${(sigT && (sigT.error || sigT.output) || 'Signal did not complete.').slice(-500)}</div>`;
+  }
+  prog.setTitle(type === 'success' ? 'Rebalance Complete' : 'Rebalance Failed');
+  await prog.finish(html, type);
+  loadState();
 }
 
 async function sellNow(symbol, qty) {
