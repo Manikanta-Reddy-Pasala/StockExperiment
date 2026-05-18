@@ -70,4 +70,6 @@ class ModelTrade(Base):
     pnl = Column(Numeric(14, 2))               # only on SELL
     reason = Column(String(32))                # ENTRY | TARGET | TRAIL | SMA | MAX_HOLD
     fyers_order_id = Column(String(64))
-    trade_at = Column(DateTime, default=datetime.utcnow, index=True)
+    # Naive timestamp in container's local time (TZ=Asia/Kolkata → IST).
+    # UI fmtIST helper treats naive ISO as already-IST and doesn't re-shift.
+    trade_at = Column(DateTime, default=datetime.now, index=True)

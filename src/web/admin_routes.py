@@ -1260,7 +1260,7 @@ def model_balance_sheet(model_name):
             "model_name": model_name,
             "label": label,
             "enabled": bool(per_model.get("enabled")),
-            "as_of": stats.get("as_of") or datetime.utcnow().isoformat(),
+            "as_of": stats.get("as_of") or datetime.now().isoformat(),  # IST
             "invested_amount": round(float(invested), 2),
             "cash": round(float(cash), 2),
             "open_position": open_position,

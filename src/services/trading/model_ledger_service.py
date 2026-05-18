@@ -627,7 +627,7 @@ def get_portfolio_stats(price_lookup=None) -> Dict:
                 "realized_pnl": float(total_realized),
                 "total_trades": total_trades,
             },
-            "as_of": datetime.utcnow().isoformat(),
+            "as_of": datetime.now().isoformat(),  # IST (container TZ=Asia/Kolkata)
         }
 
 
