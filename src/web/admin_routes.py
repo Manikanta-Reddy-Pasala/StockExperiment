@@ -913,38 +913,45 @@ def get_model_portfolio():
         # MTM price lookup: prefer real-time Fyers quote (today's LTP during
         # market hours), fall back to historical_data latest close. Without
         # the Fyers refresh, intraday moves are invisible until next EOD pull.
-        live_cache: dict = {}
+        # NOTE: do NOT share a SQLAlchemy session with get_portfolio_stats —
+        # nested scoped-session use detaches its ModelLedger rows mid-loop.
+        price_cache: dict = {}
 
-        def _fyers_quote(fyers_sym: str):
-            if fyers_sym in live_cache:
-                return live_cache[fyers_sym]
+        def lookup(sym):
+            # `sym` arrives as either "HFCL" or "NSE:HFCL-EQ"; normalise.
+            bare = sym.replace("NSE:", "").replace("-EQ", "")
+            if bare in price_cache:
+                return price_cache[bare]
+            fyers_sym = f"NSE:{bare}-EQ"
+            # 1. Real-time Fyers quote.
             try:
                 from src.services.brokers.fyers_service import FyersService
                 svc = FyersService()
                 q = svc.quotes_multiple(1, [fyers_sym]) or {}
                 qd = ((q.get("data") or {}).get(fyers_sym) or {})
                 v = float(qd.get("ltp") or 0)
-                live_cache[fyers_sym] = v if v > 0 else None
-            except Exception:
-                live_cache[fyers_sym] = None
-            return live_cache[fyers_sym]
-
-        db = get_database_manager()
-        with db.get_session() as session:
-            def lookup(sym):
-                # `sym` arrives as either "HFCL" or "NSE:HFCL-EQ"; normalise.
-                bare = sym.replace("NSE:", "").replace("-EQ", "")
-                fyers_sym = f"NSE:{bare}-EQ"
-                v = _fyers_quote(fyers_sym)
-                if v:
+                if v > 0:
+                    price_cache[bare] = v
                     return v
-                r = session.execute(text(
-                    "SELECT close FROM historical_data "
-                    "WHERE symbol = :s OR symbol = :fs "
-                    "ORDER BY date DESC LIMIT 1"
-                ), {"s": bare, "fs": fyers_sym}).fetchone()
-                return float(r.close) if r else None
-            stats = get_portfolio_stats(price_lookup=lookup)
+            except Exception as e:
+                logger.warning(f"Fyers quote failed for {fyers_sym}: {e}")
+            # 2. Historical close fallback — fresh short-lived session.
+            try:
+                db = get_database_manager()
+                with db.get_session() as s2:
+                    r = s2.execute(text(
+                        "SELECT close FROM historical_data "
+                        "WHERE symbol = :s OR symbol = :fs "
+                        "ORDER BY date DESC LIMIT 1"
+                    ), {"s": bare, "fs": fyers_sym}).fetchone()
+                    v = float(r.close) if r else None
+            except Exception as e:
+                logger.warning(f"DB close lookup failed for {bare}: {e}")
+                v = None
+            price_cache[bare] = v
+            return v
+
+        stats = get_portfolio_stats(price_lookup=lookup)
         return jsonify({"success": True, **stats})
     except Exception as e:
         logger.error(f"models portfolio error: {e}", exc_info=True)
