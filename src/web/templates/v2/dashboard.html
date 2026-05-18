@@ -65,10 +65,10 @@
     <span class="text-muted small ms-2">4 equity + 1 options · per-model cash silos</span>
   </div>
   <div class="row text-end g-3 flex-grow-1 justify-content-end">
-    <div class="col-auto"><div class="text-muted small">Invested</div><div class="fs-5 fw-bold" id="tot_invested">--</div></div>
-    <div class="col-auto"><div class="text-muted small">Current NAV</div><div class="fs-5 fw-bold" id="tot_nav">--</div></div>
-    <div class="col-auto"><div class="text-muted small">Total P&amp;L</div><div class="fs-5 fw-bold" id="tot_pnl">--</div></div>
-    <div class="col-auto"><div class="text-muted small">Realized</div><div class="fs-5 fw-bold" id="tot_realized">--</div></div>
+    <div class="col-auto"><div class="text-muted small" title="Original capital deposited across all models">Allocated</div><div class="fs-5 fw-bold" id="tot_invested">--</div></div>
+    <div class="col-auto"><div class="text-muted small" title="Cash + live position value">Current NAV</div><div class="fs-5 fw-bold" id="tot_nav">--</div></div>
+    <div class="col-auto"><div class="text-muted small" title="Realized + unrealized P&L vs allocated">Total P&amp;L</div><div class="fs-5 fw-bold" id="tot_pnl">--</div></div>
+    <div class="col-auto"><div class="text-muted small" title="Locked-in profit/loss from closed trades">Realized</div><div class="fs-5 fw-bold" id="tot_realized">--</div></div>
     <div class="col-auto align-self-center">
       <a href="/settings" class="btn btn-sm btn-outline-secondary"><i class="bi bi-sliders"></i> Manage Allocations</a>
     </div>
@@ -152,12 +152,13 @@ function renderModelCard(m, sig) {
             </div>
             <div class="text-end">${enableBadge}${refOnly}</div>
           </div>
-          <div class="kv"><span class="k">Invested</span><span class="v">${fmtINR(m.invested_amount ?? m.allocated_capital)}</span></div>
-          <div class="kv"><span class="k">Cash</span><span class="v">${fmtINR(m.cash)}</span></div>
+          <div class="kv"><span class="k">Allocated</span><span class="v" title="Original capital deposited">${fmtINR(m.invested_amount ?? m.allocated_capital)}</span></div>
+          <div class="kv"><span class="k">Available Cash</span><span class="v" title="Cash + cumulative realized P&L — usable for next trade">${fmtINR(m.cash)}</span></div>
           <div class="kv"><span class="k">Open Position</span><span class="v">${posLine}</span></div>
-          <div class="kv nav-row"><span class="k">Current NAV</span><span class="v">${fmtINR(m.current_amount ?? m.nav)}</span></div>
+          <div class="kv"><span class="k">Realized P&amp;L</span><span class="v ${cls(m.realized_pnl)}" title="Cumulative locked-in profit/loss from closed trades">${fmtINR(m.realized_pnl)}</span></div>
+          <div class="kv nav-row"><span class="k">Current NAV</span><span class="v" title="Cash + live position value">${fmtINR(m.nav)}</span></div>
           <div class="kv">
-            <span class="k">P&amp;L</span>
+            <span class="k">Total P&amp;L</span>
             <span class="v">
               <span class="pnl-line ${pnlCls}">${fmtINR(m.pnl_total)} <small>(${fmtPct(m.return_pct)})</small></span>
             </span>

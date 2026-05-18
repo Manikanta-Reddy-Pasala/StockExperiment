@@ -22,13 +22,18 @@
     <div class="table-responsive">
       <table class="table table-sm align-middle mb-0">
         <thead><tr>
-          <th>Model</th><th class="text-end">Allocated</th><th class="text-end">Cash</th>
-          <th>Open Position</th><th class="text-end">Position Val</th>
-          <th class="text-end">NAV</th><th class="text-end">P&amp;L</th>
+          <th>Model</th>
+          <th class="text-end" title="Original capital deposited">Allocated</th>
+          <th class="text-end" title="Cash + realized P&L — available for next trade">Available Cash</th>
+          <th>Open Position</th>
+          <th class="text-end">Position Val</th>
+          <th class="text-end" title="Locked-in profit/loss from closed trades">Realized</th>
+          <th class="text-end" title="Cash + position MTM">NAV</th>
+          <th class="text-end" title="NAV vs Allocated">Total P&amp;L</th>
           <th class="text-end">Trades</th>
           <th class="text-center" style="min-width:140px;">Actions</th>
         </tr></thead>
-        <tbody id="agg_tbody"><tr><td colspan="9" class="text-center text-muted py-3">Loading…</td></tr></tbody>
+        <tbody id="agg_tbody"><tr><td colspan="10" class="text-center text-muted py-3">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -142,6 +147,7 @@ async function loadAggregate() {
         <td class="text-end">${fmtINR(m.cash)}</td>
         <td>${posHtml}</td>
         <td class="text-end">${fmtINR(m.position_value)}</td>
+        <td class="text-end ${cls(m.realized_pnl)}">${fmtINR(m.realized_pnl)}</td>
         <td class="text-end"><strong>${fmtINR(m.nav)}</strong></td>
         <td class="text-end ${cls(m.pnl_total)}">${fmtINR(m.pnl_total)} (${fmtPct(m.return_pct)})</td>
         <td class="text-end">${m.total_trades} (${m.wins}W/${m.losses}L)</td>
@@ -150,7 +156,7 @@ async function loadAggregate() {
       tbody.appendChild(tr);
     });
     if (!tbody.children.length) {
-      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">No enabled models. <a href="/settings">Enable one in Settings</a>.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-3">No enabled models. <a href="/settings">Enable one in Settings</a>.</td></tr>';
     }
   } catch(e) { console.error(e); }
 }
