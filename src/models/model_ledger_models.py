@@ -76,11 +76,19 @@ class ModelTrade(Base):
 
 
 # ---------------------------------------------------------------------------
-# SQLAlchemy event listeners — mirror every settings/ledger column change
-# into audit_config_changes. Best-effort: failures never raise into trading.
+# SQLAlchemy event listeners — buffer 'set' events into the parent session,
+# flush into audit_config_changes only AFTER the session commits.
+#
+# Earlier version called write_config_change() directly inside the 'set'
+# event; that opened a *new* session while the parent session was mid-flush,
+# which detached the ModelSettings row and broke toggle-enabled with
+# 'Instance not bound to a Session'. We now stash deltas on session.info
+# and write them in an after_commit hook, where the parent session is safely
+# closed.
 # ---------------------------------------------------------------------------
 try:
     from sqlalchemy import event as _sa_event
+    from sqlalchemy.orm import Session as _SASession
 
     _SETTINGS_FIELDS = ("enabled", "invested_amount", "current_amount", "description")
     _LEDGER_FIELDS = (
@@ -88,10 +96,15 @@ try:
         "open_entry_date", "realized_pnl",
     )
 
-    def _emit_audit(model_name, field, old_v, new_v, reason):
+    def _buffer_change(target, field, old_v, new_v, reason):
         try:
-            from src.services.audit_service import write_config_change
-            write_config_change(model_name, field, old_v, new_v, reason)
+            sess = _SASession.object_session(target)
+            if sess is None:
+                return
+            sess.info.setdefault("_audit_buffer", []).append({
+                "model_name": getattr(target, "model_name", None),
+                "field": field, "old": old_v, "new": new_v, "reason": reason,
+            })
         except Exception:
             pass
 
@@ -100,14 +113,30 @@ try:
             return
         if initiator.key not in _SETTINGS_FIELDS:
             return
-        _emit_audit(target.model_name, initiator.key, oldvalue, value, "SETTINGS_UPDATE")
+        _buffer_change(target, initiator.key, oldvalue, value, "SETTINGS_UPDATE")
 
     def _ledger_attr_changed(target, value, oldvalue, initiator):
         if oldvalue == value or oldvalue is None:
             return
         if initiator.key not in _LEDGER_FIELDS:
             return
-        _emit_audit(target.model_name, initiator.key, oldvalue, value, "LEDGER_UPDATE")
+        _buffer_change(target, initiator.key, oldvalue, value, "LEDGER_UPDATE")
+
+    @_sa_event.listens_for(_SASession, "after_commit")
+    def _flush_audit_buffer(session):
+        buf = session.info.pop("_audit_buffer", None)
+        if not buf:
+            return
+        # Open a fresh session for the audit writes — never reuse the
+        # parent (it just committed, attribute reads on its objects are
+        # detached). audit_service.write_config_change opens its own.
+        for ch in buf:
+            try:
+                from src.services.audit_service import write_config_change
+                write_config_change(ch["model_name"], ch["field"],
+                                    ch["old"], ch["new"], ch["reason"])
+            except Exception:
+                pass
 
     for _f in _SETTINGS_FIELDS:
         _sa_event.listen(getattr(ModelSettings, _f), "set",
