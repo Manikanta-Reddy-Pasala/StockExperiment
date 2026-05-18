@@ -53,6 +53,24 @@
   <i class="bi bi-exclamation-triangle me-1"></i>
   <strong>LIVE trading active.</strong> Sell + Rebalance buttons place REAL Fyers orders. Confirm dialog required.
 </div>
+
+<!-- Dedicated rebalance modal — never shared with appModal to avoid
+     stale-listener races when switching from confirm to progress state. -->
+<div class="modal fade" id="rebalance-modal" tabindex="-1" aria-hidden="true"
+     data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content shadow-lg border-0">
+      <div class="modal-header" id="rebalance-modal-header">
+        <h5 class="modal-title" id="rebalance-modal-title">LIVE Rebalance</h5>
+      </div>
+      <div class="modal-body" id="rebalance-modal-body"></div>
+      <div class="modal-footer" id="rebalance-modal-footer">
+        <button type="button" class="btn btn-outline-secondary" id="rebalance-modal-cancel">Cancel</button>
+        <button type="button" class="btn btn-danger" id="rebalance-modal-ok">Execute Rebalance</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -223,18 +241,57 @@ async function rebalanceModel(model) {
     preview = '<div class="text-warning">Could not load preview: ' + e.message + '</div>';
   }
 
-  const ok = await appModal.confirm('LIVE Rebalance',
-    preview + '<hr><div class="small text-muted">Runs live_signal + LIVE fyers_executor. SELL/BUY orders placed on Fyers.</div>',
-    {okLabel: 'Execute Rebalance', okClass: 'btn-danger', headerCls: 'bg-danger text-white'});
+  // Use a dedicated bootstrap modal that lives only on the portfolio page,
+  // so we never inherit stale handlers from the global appModal.
+  const modalEl = document.getElementById('rebalance-modal');
+  const titleEl = document.getElementById('rebalance-modal-title');
+  const bodyEl = document.getElementById('rebalance-modal-body');
+  const headerEl = document.getElementById('rebalance-modal-header');
+  const okBtn = document.getElementById('rebalance-modal-ok');
+  const cancelBtn = document.getElementById('rebalance-modal-cancel');
+  const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+  // Phase 1: confirm
+  titleEl.textContent = 'LIVE Rebalance';
+  headerEl.className = 'modal-header bg-danger text-white';
+  bodyEl.innerHTML = preview + '<hr><div class="small text-muted">Runs live_signal + LIVE fyers_executor. SELL/BUY orders placed on Fyers.</div>';
+  okBtn.textContent = 'Execute Rebalance';
+  okBtn.className = 'btn btn-danger';
+  okBtn.style.display = '';
+  cancelBtn.style.display = '';
+  bsModal.show();
+
+  const ok = await new Promise(resolve => {
+    okBtn.onclick = () => resolve(true);
+    cancelBtn.onclick = () => { bsModal.hide(); resolve(false); };
+  });
   if (!ok) return;
 
-  // Open progress modal — stays up until both signal + execute tasks finish.
-  const prog = await appModal.progress('LIVE Rebalance — Working',
-    `<div class="d-flex align-items-center mb-2">
+  // Phase 2: progress (same modal, no hide/show needed)
+  titleEl.textContent = 'LIVE Rebalance — Working';
+  bodyEl.innerHTML = `<div class="d-flex align-items-center mb-2">
        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
        <span>Submitting rebalance for <code>${model}</code>…</span>
-     </div>`,
-    'bg-danger text-white');
+     </div>`;
+  okBtn.style.display = 'none';
+  cancelBtn.style.display = 'none';
+
+  // Convenience helpers scoped to this rebalance flow
+  const prog = {
+    update: (h) => { bodyEl.innerHTML = h; },
+    setTitle: (t) => { titleEl.textContent = t; },
+    finish: (h, type='info') => {
+      bodyEl.innerHTML = h;
+      headerEl.className = 'modal-header ' + (type === 'danger' ? 'bg-danger text-white' : (type === 'success' ? 'bg-success text-white' : ''));
+      okBtn.textContent = 'OK';
+      okBtn.className = 'btn ' + (type === 'danger' ? 'btn-danger' : (type === 'success' ? 'btn-success' : 'btn-primary'));
+      okBtn.style.display = '';
+      cancelBtn.style.display = 'none';
+      return new Promise(resolve => {
+        okBtn.onclick = () => { bsModal.hide(); resolve(true); };
+      });
+    },
+  };
 
   let d;
   try {

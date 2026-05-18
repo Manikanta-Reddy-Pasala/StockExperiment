@@ -58,6 +58,14 @@ def to_fyers_symbol(plain: str) -> str:
 
 # --------- low-level Fyers wrappers ---------
 
+def _sanitize_tag(tag: str) -> str:
+    """Fyers rejects orderTag with non-alphanumerics (error_code -50).
+    Strip anything outside [A-Za-z0-9], cap to 20 chars to be safe."""
+    import re
+    cleaned = re.sub(r"[^A-Za-z0-9]", "", tag or "")
+    return cleaned[:20] or "auto"
+
+
 def _placeorder(svc, user_id: int, symbol: str, qty: int, side: str,
                 pricetype: str = "MARKET", price: float = 0.0,
                 product: str = "INTRADAY", tag: str = "") -> Dict:
@@ -67,6 +75,7 @@ def _placeorder(svc, user_id: int, symbol: str, qty: int, side: str,
     Never raises — exceptions are converted to {"status":"error", ...}.
     """
     fyers_sym = to_fyers_symbol(symbol)
+    safe_tag = _sanitize_tag(tag)
     try:
         return svc.placeorder(
             user_id=user_id,
@@ -79,7 +88,7 @@ def _placeorder(svc, user_id: int, symbol: str, qty: int, side: str,
             trigger_price="0",
             disclosed_quantity="0",
             validity="DAY",
-            tag=tag,
+            tag=safe_tag,
         )
     except Exception as e:
         return {"status": "error", "message": str(e)}
