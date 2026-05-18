@@ -143,6 +143,45 @@ def _portfolio_state() -> Dict:
 
     holdings = (holdings_resp or {}).get("data") or []
     positions = (positions_raw or {}).get("data") or []
+
+    # Build symbol set + batch-fetch fresh quotes. Fyers holdings.last_price is
+    # often stale (yesterday's close or pre-market snapshot). We override with
+    # real-time quotes; DB latest close is the final fallback.
+    fresh_ltp: Dict[str, float] = {}
+    fyers_syms_for_quote = []
+    for p in holdings:
+        s = (p.get("symbol") or "").strip()
+        if s:
+            fyers_syms_for_quote.append(s if s.startswith("NSE:") else f"NSE:{s.replace('-EQ','')}-EQ")
+    for p in positions:
+        s = (p.get("symbol") or "").strip()
+        if not s or p.get("productType") != "CNC":
+            continue
+        fyers_syms_for_quote.append(s if s.startswith("NSE:") else f"NSE:{s.replace('-EQ','')}-EQ")
+    fyers_syms_for_quote = list({s for s in fyers_syms_for_quote if s})
+    if fyers_syms_for_quote:
+        try:
+            from src.services.brokers.fyers_service import FyersService
+            qsvc = FyersService()
+            qr = qsvc.quotes_multiple(1, fyers_syms_for_quote) or {}
+            qdata = (qr.get("data") or {})
+            for fs, qd in qdata.items():
+                bare = fs.replace("NSE:", "").replace("-EQ", "")
+                v = float((qd or {}).get("ltp") or 0)
+                if v > 0:
+                    fresh_ltp[bare] = v
+        except Exception as e:
+            logger.warning(f"quotes_multiple fail in _portfolio_state: {e}")
+
+    def _resolve_ltp(bare_sym: str, fyers_ltp: float) -> float:
+        v = fresh_ltp.get(bare_sym)
+        if v and v > 0:
+            return v
+        v = _live_price(bare_sym)  # DB latest close
+        if v and v > 0:
+            return v
+        return fyers_ltp  # last-resort: stale Fyers field
+
     open_positions = []
     seen_syms = set()
     position_cost = 0.0
@@ -156,8 +195,9 @@ def _portfolio_state() -> Dict:
         if qty <= 0:
             continue
         avg = float(p.get("average_price") or 0)
-        ltp = float(p.get("last_price") or 0)
-        pnl = float(p.get("pnl") or (ltp - avg) * qty)
+        stale_ltp = float(p.get("last_price") or 0)
+        ltp = _resolve_ltp(sym, stale_ltp)
+        pnl = (ltp - avg) * qty
         cost = avg * qty
         mv = ltp * qty
         position_cost += cost
@@ -188,8 +228,9 @@ def _portfolio_state() -> Dict:
         if sym in seen_syms:
             continue  # already counted as holding
         avg = float(p.get("buyAvg") or p.get("netAvg") or 0)
-        ltp = float(p.get("ltp") or 0)
-        pnl = float(p.get("unrealized_profit") or p.get("pl") or 0)
+        stale_ltp = float(p.get("ltp") or 0)
+        ltp = _resolve_ltp(sym, stale_ltp)
+        pnl = (ltp - avg) * net_qty
         cost = avg * net_qty
         mv = ltp * net_qty
         position_cost += cost
