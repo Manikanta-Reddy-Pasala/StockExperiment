@@ -208,6 +208,11 @@ function renderCard(m, idx, ranking, status) {
         </div>
         <div class="text-end">
           ${navHtml}<br>${dateHtml}
+          <button class="btn btn-sm btn-outline-primary mt-1"
+                  onclick="runSignal('${m.key}', event)"
+                  title="Force re-run live_signal with latest data">
+            <i class="bi bi-arrow-clockwise"></i> Re-calculate
+          </button>
         </div>
       </div>
       <div id="${collapseId}" class="collapse">

@@ -181,22 +181,42 @@ async function rebalanceModel(model) {
     const heldNorm = _norm(m.open_symbol);
     const inTop = rank1 && rank.some(r => _norm(r.symbol) === heldNorm);
 
+    // Estimate qty: floor((cash + currentHoldingMV) / rank1.price)
+    // Selling existing holding releases cash; rebalance can use ~all of NAV.
+    const buyingPower = (Number(m.cash) || 0) +
+                        ((Number(m.open_qty) || 0) * (Number(m.open_entry_px) || 0));
+    const estQty = rank1 && rank1.price > 0
+      ? Math.max(0, Math.floor(buyingPower / Number(rank1.price)))
+      : 0;
+    const estCost = estQty * (Number(rank1 && rank1.price) || 0);
+
     let actionRow;
     if (!rank1) {
       actionRow = '<div class="text-warning">No ranking available — run signal first.</div>';
     } else if (!m.open_symbol) {
-      actionRow = `<div><span class="badge bg-success">BUY</span> <strong>${rank1.symbol}</strong> with cash ${fmtINR(m.cash)}</div>`;
+      actionRow = `<div>
+        <span class="badge bg-success">BUY</span> <strong>${rank1.symbol}</strong>
+        x<strong>${estQty}</strong> @ ${fmtINR(rank1.price)}
+        = ${fmtINR(estCost)}
+      </div>`;
     } else if (inTop) {
       actionRow = `<div class="text-muted">Already holding <strong>${m.open_symbol}</strong> (in top-5). No action.</div>`;
     } else {
-      actionRow = `<div><span class="badge bg-danger">SELL</span> <strong>${m.open_symbol}</strong> → <span class="badge bg-success">BUY</span> <strong>${rank1.symbol}</strong></div>`;
+      actionRow = `<div>
+        <span class="badge bg-danger">SELL</span> <strong>${m.open_symbol}</strong> x${m.open_qty}
+        <span class="mx-1">→</span>
+        <span class="badge bg-success">BUY</span> <strong>${rank1.symbol}</strong>
+        x<strong>${estQty}</strong> @ ${fmtINR(rank1.price)}
+        = ${fmtINR(estCost)}
+      </div>`;
     }
     preview = `
       <div class="small mb-2">
         <div><strong>Model:</strong> ${model}</div>
-        <div><strong>Cash:</strong> ${fmtINR(m.cash)} · <strong>NAV:</strong> ${fmtINR(m.nav)}</div>
-        <div><strong>Current:</strong> ${m.open_symbol ? m.open_symbol + ' x' + m.open_qty : 'flat'}</div>
-        <div><strong>Rank-1:</strong> ${rank1 ? rank1.symbol + ' @ ' + fmtINR(rank1.price) : '—'}</div>
+        <div><strong>Cash (in ledger):</strong> ${fmtINR(m.cash)} · <strong>NAV:</strong> ${fmtINR(m.nav)}</div>
+        <div><strong>Buying power (cash + held cost):</strong> ${fmtINR(buyingPower)}</div>
+        <div><strong>Current:</strong> ${m.open_symbol ? m.open_symbol + ' x' + m.open_qty + ' @ ' + fmtINR(m.open_entry_px) : 'flat'}</div>
+        <div><strong>Rank-1:</strong> ${rank1 ? rank1.symbol + ' @ ' + fmtINR(rank1.price) + (rank1.live ? ' <span class="badge bg-success">LIVE</span>' : '') : '—'}</div>
       </div>
       ${actionRow}`;
   } catch(e) {
