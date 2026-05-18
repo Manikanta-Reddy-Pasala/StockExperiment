@@ -716,7 +716,7 @@ def models_status():
             models.append({
                 "name": "midcap_narrow_60d_breakout",
                 "type": "equity",
-                "wired": False,
+                "wired": True,
                 "data_sufficient": bool(mc_ok),
                 "items": [
                     {"label": "midcap_narrow universe size",
@@ -830,6 +830,138 @@ def models_status():
                 "wired": False,
                 "data_sufficient": bool(fn_ok),
                 "items": spot_items + opt_items,
+            })
+
+            # ============================================================
+            # Model 4: n20_daily_large_only (equity intraday/daily)
+            # Same N100 universe as model 1 but ranks top-20 by ADV.
+            # Sufficiency = N100 coverage + 70d window per symbol.
+            # ============================================================
+            n20_min_days = 70
+            n20_ok_syms = [s for s in fyers_symbols
+                           if per_sym_days.get(s, 0) >= n20_min_days]
+            n20_cov_pct = (len(n20_ok_syms) / len(fyers_symbols) * 100) if fyers_symbols else 0
+            n20_ok = (
+                len(universe_symbols) >= 50
+                and n20_cov_pct >= 90
+                and stale_days <= 3
+            )
+            models.append({
+                "name": "n20_daily_large_only",
+                "type": "equity",
+                "wired": True,
+                "data_sufficient": bool(n20_ok),
+                "items": [
+                    {"label": "N100 universe size (source for top-20 ADV)",
+                     "value": len(universe_symbols),
+                     "required": ">= 50 syms",
+                     "ok": len(universe_symbols) >= 50,
+                     "extra": f"file age {universe_age_days}d" if universe_age_days is not None else "missing"},
+                    {"label": f"Symbols w/ >= {n20_min_days} trading days "
+                              f"(last {window_calendar_days}d)",
+                     "value": f"{len(n20_ok_syms)} / {len(fyers_symbols)}",
+                     "required": ">= 90% coverage",
+                     "ok": n20_cov_pct >= 90,
+                     "extra": f"{n20_cov_pct:.1f}% coverage"},
+                    {"label": "Latest equity close",
+                     "value": overall_latest.isoformat() if overall_latest else "—",
+                     "required": "<= 3d old (holiday OK)",
+                     "ok": stale_days <= 3,
+                     "extra": f"{stale_days}d old"},
+                ],
+            })
+
+            # ============================================================
+            # Model 5: momentum_pseudo_n100_adv (equity monthly rotation)
+            # Uses yearly_universes.json — top-100 ADV from N500, rebuilt
+            # yearly via PIT. Validates current year's slice.
+            # ============================================================
+            pseudo_uni_file = Path(
+                "/app/tools/models/momentum_pseudo_n100_adv/yearly_universes.json"
+            )
+            pseudo_syms_plain = []
+            pseudo_uni_age_days = None
+            current_year = str(today.year)
+            if pseudo_uni_file.exists():
+                try:
+                    u = json.loads(pseudo_uni_file.read_text())
+                    # yearly map: {"2026": [{"symbol": ...}, ...], ...}
+                    yr_block = u.get(current_year) or u.get(str(today.year - 1)) or []
+                    if isinstance(yr_block, list):
+                        pseudo_syms_plain = [
+                            s["symbol"] if isinstance(s, dict) else s for s in yr_block
+                        ]
+                    mtime = date.fromtimestamp(pseudo_uni_file.stat().st_mtime)
+                    pseudo_uni_age_days = (today - mtime).days
+                except Exception:
+                    pass
+
+            pseudo_fyers = [
+                (s if s.startswith("NSE:") else f"NSE:{s}-EQ")
+                for s in pseudo_syms_plain
+            ]
+            pseudo_per_sym = {}
+            pseudo_latest = {}
+            if pseudo_fyers:
+                rows = session.execute(text("""
+                    SELECT symbol, COUNT(DISTINCT date) days, MAX(date) latest
+                    FROM historical_data
+                    WHERE symbol = ANY(:syms) AND date >= :since
+                    GROUP BY symbol
+                """), {"syms": pseudo_fyers, "since": since}).fetchall()
+                pseudo_per_sym = {r.symbol: int(r.days) for r in rows}
+                pseudo_latest = {r.symbol: r.latest for r in rows}
+
+            pseudo_ok_syms = [s for s in pseudo_fyers if pseudo_per_sym.get(s, 0) >= 90]
+            pseudo_under = [s for s in pseudo_fyers if pseudo_per_sym.get(s, 0) < 90]
+            pseudo_missing = [s for s in pseudo_fyers if s not in pseudo_per_sym]
+            pseudo_latest_dates = [d for d in pseudo_latest.values() if d]
+            pseudo_overall_latest = max(pseudo_latest_dates) if pseudo_latest_dates else None
+            pseudo_stale = (today - pseudo_overall_latest).days if pseudo_overall_latest else 999
+            pseudo_cov = (len(pseudo_ok_syms) / len(pseudo_fyers) * 100) if pseudo_fyers else 0
+            pseudo_data_ok = (
+                len(pseudo_syms_plain) >= 80
+                and pseudo_cov >= 85
+                and pseudo_stale <= 3
+            )
+            pseudo_worst = sorted(pseudo_per_sym.items(), key=lambda kv: kv[1])[:5]
+            pseudo_worst_str = ", ".join(
+                f"{s.replace('NSE:', '').replace('-EQ', '')}={d}"
+                for s, d in pseudo_worst
+            ) if pseudo_worst else ""
+
+            models.append({
+                "name": "momentum_pseudo_n100_adv",
+                "type": "equity",
+                "wired": True,
+                "data_sufficient": bool(pseudo_data_ok),
+                "items": [
+                    {"label": f"Pseudo-N100 universe size ({current_year})",
+                     "value": len(pseudo_syms_plain),
+                     "required": ">= 80 syms",
+                     "ok": len(pseudo_syms_plain) >= 80,
+                     "extra": f"file age {pseudo_uni_age_days}d" if pseudo_uni_age_days is not None else "missing"},
+                    {"label": f"Symbols w/ >= 90 trading days "
+                              f"(last {window_calendar_days}d)",
+                     "value": f"{len(pseudo_ok_syms)} / {len(pseudo_fyers)}",
+                     "required": ">= 85% coverage",
+                     "ok": pseudo_cov >= 85,
+                     "extra": f"{pseudo_cov:.1f}% coverage"},
+                    {"label": "Symbols below threshold",
+                     "value": len(pseudo_under),
+                     "required": "0 (allow few)",
+                     "ok": len(pseudo_under) <= 15,
+                     "extra": pseudo_worst_str},
+                    {"label": "Symbols completely missing",
+                     "value": len(pseudo_missing),
+                     "required": "0",
+                     "ok": len(pseudo_missing) == 0},
+                    {"label": "Latest equity close",
+                     "value": pseudo_overall_latest.isoformat() if pseudo_overall_latest else "—",
+                     "required": "<= 3d old (holiday OK)",
+                     "ok": pseudo_stale <= 3,
+                     "extra": f"{pseudo_stale}d old"},
+                ],
             })
 
         return jsonify({"success": True, "models": models, "as_of": today.isoformat()})
