@@ -518,7 +518,7 @@ async function loadAllocations() {
         ? `<div><strong>${m.open_symbol}</strong> <span class="text-muted small">x${m.open_qty} @ ${fmtINR(m.open_entry_px)}</span></div>
            <div class="text-muted small">${m.open_entry_date||''}</div>`
         : '<span class="text-muted">flat</span>';
-      const pnlCls = m.pnl_total >= 0 ? 'text-success' : 'text-danger';
+      const pnlCls = m.pnl_total > 0 ? 'pos' : (m.pnl_total < 0 ? 'neg' : 'neutral');
       const enabledBadge = m.enabled ? '' : ' <span class="disabled-badge">DISABLED</span>';
       if (!m.enabled) tr.classList.add('row-disabled');
       const warnBadge = meta.warn ? ` <span class="lookahead-pill" title="Strategy note">${meta.warn}</span>` : '';

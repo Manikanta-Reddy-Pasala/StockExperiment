@@ -10,6 +10,20 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
     <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
+    <style>
+      /* Global P&L colour classes — applied to any numeric span/td/div
+         showing return %, P&L, or unrealized values. !important so they
+         beat Bootstrap table cell colour, .v cell rules, .fs-* utilities,
+         etc. Used as: pos (gain) / neg (loss) / neutral (zero / N/A). */
+      .pos, .pos * { color: #15a36b !important; }
+      .neg, .neg * { color: #d4453a !important; }
+      .neutral { color: #4f5868 !important; }
+      /* Treat Bootstrap text-success / text-danger the same so a few legacy
+         templates (settings.html) that still emit those classes match the
+         rest of the UI exactly. */
+      .text-success { color: #15a36b !important; }
+      .text-danger  { color: #d4453a !important; }
+    </style>
     {% block head %}{% endblock %}
 </head>
 <body>
