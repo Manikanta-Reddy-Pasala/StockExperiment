@@ -201,7 +201,7 @@
                         <input class="form-control form-control-sm" id="cap_amount" type="number" step="100" placeholder="e.g. 29000">
                     </div>
                     <div class="col-md-8">
-                        <button class="btn btn-primary btn-sm" onclick="submitCap()">Confirm</button>
+                        <button class="btn btn-primary btn-sm" id="cap_submit" onclick="submitCap()">Confirm</button>
                         <button class="btn btn-link btn-sm" onclick="document.getElementById('cap_panel').classList.add('d-none')">Cancel</button>
                     </div>
                 </div>
@@ -579,18 +579,66 @@ async function submitCap() {
   const model = panel.dataset.model;
   const action = panel.dataset.action;
   const amount = parseFloat(document.getElementById('cap_amount').value);
-  if (!amount || amount <= 0) { Trading.toast('Enter amount > 0', 'warning'); return; }
-  const r = await fetch(`/admin/models/${model}/${action}`, {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({amount})
-  });
-  const d = await r.json();
-  if (d.success) {
-    Trading.toast(`${model}: ${action} ₹${amount.toLocaleString('en-IN')} OK`, 'success');
+  if (!amount || amount <= 0) {
+    await appModal.alert('Invalid amount', 'Enter an amount greater than 0.', 'warning');
+    return;
+  }
+  const submitBtn = document.getElementById('cap_submit');
+  const origLabel = submitBtn ? submitBtn.innerHTML : null;
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Processing…';
+  }
+  try {
+    const r = await fetch(`/admin/models/${model}/${action}`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({amount})
+    });
+    const d = await r.json();
+    if (!d.success) {
+      await appModal.alert(`${action} Failed`, d.error || `${action} failed`, 'danger');
+      return;
+    }
+    // 1. Close the panel
     panel.classList.add('d-none');
+    // 2. Re-render the table with fresh server data
     await loadAllocations();
-  } else {
-    await appModal.alert(`${action} Failed`, d.error || `${action} failed`, 'danger');
+    // 3. Flash the affected row green
+    flashRow(model);
+    // 4. Confirm to the user with the NEW values from the server response
+    const cash = d.ledger ? d.ledger.cash : null;
+    const invested = d.settings ? d.settings.invested_amount : null;
+    const msg =
+      `<div class="mb-2"><strong>${model}</strong></div>` +
+      `<div class="mb-2"><span class="badge bg-${action==='deposit'?'success':'warning text-dark'}">` +
+      `${action === 'deposit' ? '+ Deposit' : '- Withdraw'}</span> ` +
+      `₹${amount.toLocaleString('en-IN')}</div>` +
+      (invested != null ? `<div class="small">Allocated: <strong>₹${Number(invested).toLocaleString('en-IN')}</strong></div>` : '') +
+      (cash != null ? `<div class="small">Available cash: <strong>₹${Number(cash).toLocaleString('en-IN')}</strong></div>` : '');
+    await appModal.alert(`${action[0].toUpperCase()+action.slice(1)} successful`, msg, 'success');
+  } catch (e) {
+    await appModal.alert('Network Error', e.message, 'danger');
+  } finally {
+    if (submitBtn && origLabel) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = origLabel;
+    }
+  }
+}
+
+// Flash a row green so user visually catches the change
+function flashRow(modelName) {
+  const tbody = document.getElementById('alloc_tbody');
+  if (!tbody) return;
+  for (const tr of tbody.querySelectorAll('tr')) {
+    const td = tr.querySelector('.col-model strong');
+    if (td && td.textContent.trim() === modelName) {
+      tr.style.transition = 'background-color 1.5s ease';
+      tr.style.backgroundColor = '#d4edda';
+      setTimeout(() => { tr.style.backgroundColor = ''; }, 1800);
+      tr.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+      return;
+    }
   }
 }
 
@@ -604,8 +652,11 @@ async function resetModel(model) {
   const r = await fetch(`/admin/models/${model}/reset`, {method: 'POST'});
   const d = await r.json();
   if (d.success) {
-    Trading.toast(`${model} reset`, 'success');
     await loadAllocations();
+    flashRow(model);
+    await appModal.alert('Reset complete',
+      `<strong>${model}</strong> hard-reset.<br>Allocated, cash, realized P&L, and position all zeroed.`,
+      'success');
   } else {
     await appModal.alert('Reset Failed', d.error || 'reset failed', 'danger');
   }
@@ -624,8 +675,11 @@ async function bootstrap(model) {
   const d = await r.json();
   if (d.success) {
     const p = d.bootstrapped_position || {};
-    Trading.toast(`${model}: imported ${p.symbol} x${p.qty} cost ₹${(p.cost||0).toLocaleString('en-IN')}`, 'success');
     await loadAllocations();
+    flashRow(model);
+    await appModal.alert('Bootstrap successful',
+      `<strong>${model}</strong> imported.<br>Position: <strong>${p.symbol||'flat'}</strong> x${p.qty||0} cost ₹${(p.cost||0).toLocaleString('en-IN')}`,
+      'success');
   } else {
     await appModal.alert('Bootstrap Failed', d.error || 'bootstrap failed', 'danger');
   }
@@ -648,9 +702,14 @@ async function toggleEnabled(model, enabled) {
     });
     const d = await r.json();
     if (d.success) {
-      Trading.toast(`${model} ${enabled ? 'enabled' : 'disabled'}`,
-                    enabled ? 'success' : 'warning');
       await loadAllocations();
+      flashRow(model);
+      await appModal.alert(
+        enabled ? 'Model enabled' : 'Model disabled',
+        `<strong>${model}</strong> is now <strong>${enabled ? 'ENABLED' : 'DISABLED'}</strong>.<br>` +
+        (enabled ? 'Scheduled signal + execute jobs will fire at next cron.'
+                 : 'Cron jobs paused. Open positions untouched.'),
+        enabled ? 'success' : 'warning');
     } else {
       await appModal.alert('Toggle Failed', d.error || 'toggle failed', 'danger');
     }
@@ -668,8 +727,11 @@ async function resetPos(model) {
   const r = await fetch(`/admin/models/${model}/reset-position`, {method: 'POST'});
   const d = await r.json();
   if (d.success) {
-    Trading.toast(`${model} reset to flat`, 'success');
     await loadAllocations();
+    flashRow(model);
+    await appModal.alert('Position marked flat',
+      `<strong>${model}</strong> position cleared in ledger.<br>No Fyers order placed.`,
+      'success');
   } else {
     await appModal.alert('Reset Failed', d.error || 'reset failed', 'danger');
   }
@@ -694,7 +756,8 @@ async function submitSeed() {
     entry_date: document.getElementById('seed_entry_date').value,
   };
   if (!body.symbol || !body.qty || !body.entry_px || !body.entry_date) {
-    Trading.toast('Fill all fields', 'warning'); return;
+    await appModal.alert('Missing fields', 'Symbol, qty, entry price, and entry date are all required.', 'warning');
+    return;
   }
   const r = await fetch(`/admin/models/${model}/seed-position`, {
     method: 'POST', headers: {'Content-Type':'application/json'},
@@ -702,9 +765,12 @@ async function submitSeed() {
   });
   const d = await r.json();
   if (d.success) {
-    Trading.toast(`${model}: position seeded`, 'success');
     document.getElementById('seed_panel').classList.add('d-none');
     await loadAllocations();
+    flashRow(model);
+    await appModal.alert('Position seeded',
+      `<strong>${model}</strong> ledger now holds <strong>${body.symbol}</strong> x${body.qty} @ ₹${body.entry_px}.<br>Entry date: ${body.entry_date}.`,
+      'success');
   } else {
     await appModal.alert('Seed Failed', d.error || 'seed failed', 'danger');
   }
