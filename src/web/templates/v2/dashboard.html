@@ -152,17 +152,31 @@ function renderModelCard(m, sig) {
             </div>
             <div class="text-end">${enableBadge}${refOnly}</div>
           </div>
-          <div class="kv"><span class="k">Allocated</span><span class="v" title="Original capital deposited">${fmtINR(m.invested_amount ?? m.allocated_capital)}</span></div>
-          <div class="kv"><span class="k">Available Cash</span><span class="v" title="Cash + cumulative realized P&L — usable for next trade">${fmtINR(m.cash)}</span></div>
-          <div class="kv"><span class="k">Open Position</span><span class="v">${posLine}</span></div>
-          <div class="kv"><span class="k">Realized P&amp;L</span><span class="v ${cls(m.realized_pnl)}" title="Cumulative locked-in profit/loss from closed trades">${fmtINR(m.realized_pnl)}</span></div>
-          <div class="kv nav-row"><span class="k">Current NAV</span><span class="v" title="Cash + live position value">${fmtINR(m.nav)}</span></div>
-          <div class="kv">
-            <span class="k">Total P&amp;L</span>
-            <span class="v">
-              <span class="pnl-line ${pnlCls}">${fmtINR(m.pnl_total)} <small>(${fmtPct(m.return_pct)})</small></span>
-            </span>
-          </div>
+          ${(() => {
+            const invested = Number(m.invested_amount ?? m.allocated_capital ?? 0);
+            const idleCash = Number(m.cash || 0);
+            const posCost = (Number(m.open_qty || 0) * Number(m.open_entry_px || 0)) || 0;
+            const posValue = Number(m.position_value || 0);
+            const unreal = posValue ? posValue - posCost : 0;
+            const realized = Number(m.realized_pnl || 0);
+            const nav = Number(m.nav || (idleCash + posValue));
+            return `
+              <div class="kv"><span class="k">Allocated</span><span class="v" title="Original capital deposited">${fmtINR(invested)}</span></div>
+              <div class="kv"><span class="k">Open Position</span><span class="v">${posLine}</span></div>
+              <div class="kv"><span class="k">Invested in Position</span><span class="v" title="Entry cost = qty × entry price">${fmtINR(posCost)}</span></div>
+              <div class="kv"><span class="k">Position Value (Live)</span><span class="v" title="MTM = qty × live LTP">${fmtINR(posValue)}</span></div>
+              <div class="kv"><span class="k">Idle Cash</span><span class="v" title="Cash not tied up in open position">${fmtINR(idleCash)}</span></div>
+              <div class="kv"><span class="k">Realized P&amp;L</span><span class="v ${cls(realized)}" title="Cumulative from closed trades">${fmtINR(realized)}</span></div>
+              <div class="kv"><span class="k">Unrealized P&amp;L</span><span class="v ${cls(unreal)}" title="Live MTM − entry cost">${fmtINR(unreal)}</span></div>
+              <div class="kv nav-row"><span class="k">Available (Net Worth)</span><span class="v" title="Allocated + realized + unrealized = total spend power if liquidated">${fmtINR(nav)}</span></div>
+              <div class="kv">
+                <span class="k">Total P&amp;L</span>
+                <span class="v">
+                  <span class="pnl-line ${pnlCls}">${fmtINR(m.pnl_total)} <small>(${fmtPct(m.return_pct)})</small></span>
+                </span>
+              </div>
+            `;
+          })()}
           <div class="footer-bar">
             <span class="text-muted">${m.total_trades||0} trades · ${m.wins||0}W/${m.losses||0}L</span>
             ${sigBadge}
