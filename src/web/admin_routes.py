@@ -910,14 +910,39 @@ def get_model_portfolio():
         # Make sure rows exist for all known models
         ensure_models_seeded()
 
-        # MTM price lookup using historical_data latest close
+        # MTM price lookup: prefer real-time Fyers quote (today's LTP during
+        # market hours), fall back to historical_data latest close. Without
+        # the Fyers refresh, intraday moves are invisible until next EOD pull.
+        live_cache: dict = {}
+
+        def _fyers_quote(fyers_sym: str):
+            if fyers_sym in live_cache:
+                return live_cache[fyers_sym]
+            try:
+                from src.services.brokers.fyers_service import FyersService
+                svc = FyersService()
+                q = svc.quotes_multiple(1, [fyers_sym]) or {}
+                qd = ((q.get("data") or {}).get(fyers_sym) or {})
+                v = float(qd.get("ltp") or 0)
+                live_cache[fyers_sym] = v if v > 0 else None
+            except Exception:
+                live_cache[fyers_sym] = None
+            return live_cache[fyers_sym]
+
         db = get_database_manager()
         with db.get_session() as session:
             def lookup(sym):
+                # `sym` arrives as either "HFCL" or "NSE:HFCL-EQ"; normalise.
+                bare = sym.replace("NSE:", "").replace("-EQ", "")
+                fyers_sym = f"NSE:{bare}-EQ"
+                v = _fyers_quote(fyers_sym)
+                if v:
+                    return v
                 r = session.execute(text(
                     "SELECT close FROM historical_data "
-                    "WHERE symbol = :s ORDER BY date DESC LIMIT 1"
-                ), {"s": sym}).fetchone()
+                    "WHERE symbol = :s OR symbol = :fs "
+                    "ORDER BY date DESC LIMIT 1"
+                ), {"s": bare, "fs": fyers_sym}).fetchone()
                 return float(r.close) if r else None
             stats = get_portfolio_stats(price_lookup=lookup)
         return jsonify({"success": True, **stats})
