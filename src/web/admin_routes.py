@@ -137,15 +137,27 @@ def get_active_tasks_from_db():
 
 
 def run_command_async(task_id, command, description):
-    """Run a command asynchronously and track its status."""
+    """Run a command asynchronously and track its status.
+
+    Persists task state to DB on every status change so the /admin/task/<id>/status
+    poll works across multiple Gunicorn workers (in-memory running_tasks is
+    per-process and is invisible to other workers).
+    """
     try:
-        running_tasks[task_id] = {
+        task_data = {
+            'type': 'command',
             'status': 'running',
             'description': description,
             'start_time': datetime.now().isoformat(),
             'output': '',
-            'error': ''
+            'error': '',
+            'steps': [],
         }
+        running_tasks[task_id] = task_data
+        try:
+            save_task_to_db(task_id, task_data)
+        except Exception as _e:
+            logger.warning(f"save_task_to_db (start) failed for {task_id}: {_e}")
 
         # Get the project root directory (where run_pipeline.py lives)
         project_root = '/app' if os.path.exists('/app/run_pipeline.py') else os.getcwd()
@@ -157,21 +169,33 @@ def run_command_async(task_id, command, description):
             timeout=3600,  # 1 hour timeout
             cwd=project_root
         )
-        
+
         running_tasks[task_id]['status'] = 'completed' if result.returncode == 0 else 'failed'
         running_tasks[task_id]['output'] = result.stdout
         running_tasks[task_id]['error'] = result.stderr
         running_tasks[task_id]['return_code'] = result.returncode
         running_tasks[task_id]['end_time'] = datetime.now().isoformat()
-        
+        try:
+            save_task_to_db(task_id, running_tasks[task_id])
+        except Exception as _e:
+            logger.warning(f"save_task_to_db (end) failed for {task_id}: {_e}")
+
     except subprocess.TimeoutExpired:
         running_tasks[task_id]['status'] = 'timeout'
         running_tasks[task_id]['error'] = 'Task timeout after 1 hour'
         running_tasks[task_id]['end_time'] = datetime.now().isoformat()
+        try:
+            save_task_to_db(task_id, running_tasks[task_id])
+        except Exception:
+            pass
     except Exception as e:
         running_tasks[task_id]['status'] = 'error'
         running_tasks[task_id]['error'] = str(e)
         running_tasks[task_id]['end_time'] = datetime.now().isoformat()
+        try:
+            save_task_to_db(task_id, running_tasks[task_id])
+        except Exception:
+            pass
 
 
 @admin_bp.route('/')
@@ -1889,14 +1913,48 @@ def admin_model_rebalance(model_name):
     if dry_run:
         exec_cmd.append("--dry-run")
 
+    # Pre-register both tasks so the UI's polling never hits 'task not found'.
+    # The runner thread will flip status as it progresses.
+    for tid, desc in [
+        (signal_task, f"Rebalance signal for {model_name}"),
+        (exec_task, f"Rebalance {'DRY-RUN' if dry_run else 'LIVE'} execute for {model_name}"),
+    ]:
+        pre = {
+            'type': 'command',
+            'status': 'pending',
+            'description': desc,
+            'start_time': datetime.now().isoformat(),
+            'output': '',
+            'error': '',
+            'steps': [],
+        }
+        running_tasks[tid] = pre
+        try:
+            save_task_to_db(tid, pre)
+        except Exception as e:
+            logger.warning(f"save_task_to_db pre-register {tid} failed: {e}")
+
     def runner():
         run_command_async(signal_task, signal_cmd,
                           f"Rebalance signal for {model_name}")
-        # Only execute if signal file actually exists
-        if os.path.exists(signals_out):
+        # Only execute if signal file actually exists AND signal completed OK
+        sig_state = running_tasks.get(signal_task, {})
+        if os.path.exists(signals_out) and sig_state.get('status') == 'completed':
             run_command_async(exec_task, exec_cmd,
                               f"Rebalance {'DRY-RUN' if dry_run else 'LIVE'} "
                               f"execute for {model_name}")
+        else:
+            # Mark execute as skipped so the UI doesn't poll forever.
+            running_tasks[exec_task].update({
+                'status': 'failed',
+                'error': 'Skipped: signal step did not complete successfully '
+                         f"(status={sig_state.get('status')!r})",
+                'end_time': datetime.now().isoformat(),
+            })
+            try:
+                save_task_to_db(exec_task, running_tasks[exec_task])
+            except Exception:
+                pass
 
     threading.Thread(target=runner, daemon=True).start()
 

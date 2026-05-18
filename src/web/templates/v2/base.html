@@ -215,15 +215,34 @@
              - update(html)        — replace body content
              - finish(html, type)  — replace body, show OK button (type=info|success|danger), returns promise that resolves when user closes
           */
-          progress: (title, html='', headerCls='') => {
+          progress: async (title, html='', headerCls='') => {
             init();
+            const modalEl = document.getElementById('app-modal');
+            // If the modal is currently showing (e.g. previous confirm just
+            // returned and bootstrap is still in 'hiding' transition), wait
+            // for the hidden event before re-showing — otherwise the new
+            // show() races with the in-flight hide and the modal flashes
+            // closed.
+            if (modalEl.classList.contains('show')) {
+              await new Promise(r => modalEl.addEventListener('hidden.bs.modal', r, {once:true}));
+            }
+            // Clear any stale resolver from a prior confirm() so the
+            // `hidden.bs.modal` listener doesn't accidentally re-resolve.
+            currentResolve = null;
             document.getElementById('app-modal-title').textContent = title || 'Working';
             document.getElementById('app-modal-body').innerHTML = html;
             document.getElementById('app-modal-header').className = 'modal-header ' + headerCls;
             const okBtn = document.getElementById('app-modal-ok');
             const cancelBtn = document.getElementById('app-modal-cancel');
+            // Detach any old click handlers so they don't fire stale promises.
+            okBtn.onclick = null;
+            cancelBtn.onclick = null;
             okBtn.style.display = 'none';
             cancelBtn.style.display = 'none';
+            // Disable backdrop + esc dismissal while running so the user
+            // can't accidentally kill the modal mid-trade.
+            modalEl.setAttribute('data-bs-backdrop', 'static');
+            modalEl.setAttribute('data-bs-keyboard', 'false');
             modal.show();
             return {
               update: (h) => { document.getElementById('app-modal-body').innerHTML = h; },
@@ -237,9 +256,14 @@
                 okBtn.textContent = 'OK';
                 okBtn.style.display = '';
                 cancelBtn.style.display = 'none';
+                // Re-enable normal dismissal for the result modal.
+                modalEl.setAttribute('data-bs-backdrop', 'true');
+                modalEl.setAttribute('data-bs-keyboard', 'true');
                 return new Promise(resolve => {
-                  okBtn.onclick = () => { modal.hide(); resolve(true); };
-                  document.getElementById('app-modal').addEventListener('hidden.bs.modal', () => resolve(true), {once:true});
+                  let done = false;
+                  const finishOnce = () => { if (!done) { done = true; resolve(true); } };
+                  okBtn.onclick = () => { modal.hide(); finishOnce(); };
+                  modalEl.addEventListener('hidden.bs.modal', finishOnce, {once:true});
                 });
               },
               close: () => modal.hide(),

@@ -229,7 +229,7 @@ async function rebalanceModel(model) {
   if (!ok) return;
 
   // Open progress modal — stays up until both signal + execute tasks finish.
-  const prog = appModal.progress('LIVE Rebalance — Working',
+  const prog = await appModal.progress('LIVE Rebalance — Working',
     `<div class="d-flex align-items-center mb-2">
        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
        <span>Submitting rebalance for <code>${model}</code>…</span>
