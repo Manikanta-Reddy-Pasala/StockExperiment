@@ -909,58 +909,7 @@ def get_model_portfolio():
 
         # Make sure rows exist for all known models
         ensure_models_seeded()
-
-        # Pre-resolve MTM prices for every open position BEFORE calling
-        # get_portfolio_stats, so the lookup callback can be a pure dict read.
-        # Scoped sessions are shared per-thread; nesting them around
-        # get_portfolio_stats causes ModelLedger rows to detach mid-loop.
-        from src.models.model_ledger_models import ModelLedger
-        db = get_database_manager()
-        open_symbols: list = []
-        with db.get_session() as s0:
-            for l in s0.query(ModelLedger).all():
-                if l.open_symbol:
-                    open_symbols.append(l.open_symbol)
-        # De-dupe + normalise to bare ticker
-        bare_set = sorted({s.replace("NSE:", "").replace("-EQ", "") for s in open_symbols})
-
-        price_map: dict = {}
-        if bare_set:
-            fyers_syms = [f"NSE:{b}-EQ" for b in bare_set]
-            # Real-time Fyers quotes (batch).
-            try:
-                from src.services.brokers.fyers_service import FyersService
-                svc = FyersService()
-                qr = svc.quotes_multiple(1, fyers_syms) or {}
-                qdata = (qr.get("data") or {})
-                for fs, qd in qdata.items():
-                    b = fs.replace("NSE:", "").replace("-EQ", "")
-                    v = float((qd or {}).get("ltp") or 0)
-                    if v > 0:
-                        price_map[b] = v
-            except Exception as e:
-                logger.warning(f"Fyers quotes batch failed: {e}")
-            # DB close fallback for any not covered.
-            missing = [b for b in bare_set if b not in price_map]
-            if missing:
-                with db.get_session() as s1:
-                    for b in missing:
-                        try:
-                            fs = f"NSE:{b}-EQ"
-                            r = s1.execute(text(
-                                "SELECT close FROM historical_data "
-                                "WHERE symbol = :s OR symbol = :fs "
-                                "ORDER BY date DESC LIMIT 1"
-                            ), {"s": b, "fs": fs}).fetchone()
-                            if r:
-                                price_map[b] = float(r.close)
-                        except Exception as e:
-                            logger.warning(f"DB close lookup failed for {b}: {e}")
-
-        def lookup(sym):
-            return price_map.get(sym.replace("NSE:", "").replace("-EQ", ""))
-
-        stats = get_portfolio_stats(price_lookup=lookup)
+        stats = get_portfolio_stats(price_lookup=_live_mtm_lookup_for_model(None))
         return jsonify({"success": True, **stats})
     except Exception as e:
         logger.error(f"models portfolio error: {e}", exc_info=True)
@@ -1140,16 +1089,69 @@ def model_trade_history(model_name):
 # Live MTM uses the latest historical_data close — same lookup as the
 # portfolio + triggers-status endpoints so numbers reconcile.
 
-def _mtm_price_lookup(session):
-    """Return a closure(symbol) -> last close from historical_data."""
+def _resolve_live_prices(symbols):
+    """Batch-resolve LTP for the given symbols (any mix of 'HFCL' or
+    'NSE:HFCL-EQ'). Tries real-time Fyers quotes first, falls back to
+    historical_data latest close. Returns {bare_symbol: float} — caller
+    should normalise lookups by stripping NSE:/-EQ.
+
+    Pre-resolving up front (rather than per-row inside get_portfolio_stats)
+    avoids scoped-session conflicts that detach ModelLedger rows.
+    """
     from sqlalchemy import text
+    from src.models.database import get_database_manager
+
+    bare_set = sorted({(s or "").replace("NSE:", "").replace("-EQ", "")
+                       for s in symbols if s})
+    out: dict = {}
+    if not bare_set:
+        return out
+    fyers_syms = [f"NSE:{b}-EQ" for b in bare_set]
+    try:
+        from src.services.brokers.fyers_service import FyersService
+        svc = FyersService()
+        qr = svc.quotes_multiple(1, fyers_syms) or {}
+        for fs, qd in (qr.get("data") or {}).items():
+            b = fs.replace("NSE:", "").replace("-EQ", "")
+            v = float((qd or {}).get("ltp") or 0)
+            if v > 0:
+                out[b] = v
+    except Exception as e:
+        logger.warning(f"Fyers quotes batch failed: {e}")
+    missing = [b for b in bare_set if b not in out]
+    if missing:
+        try:
+            db = get_database_manager()
+            with db.get_session() as s:
+                for b in missing:
+                    fs = f"NSE:{b}-EQ"
+                    r = s.execute(text(
+                        "SELECT close FROM historical_data "
+                        "WHERE symbol = :s OR symbol = :fs "
+                        "ORDER BY date DESC LIMIT 1"
+                    ), {"s": b, "fs": fs}).fetchone()
+                    if r:
+                        out[b] = float(r.close)
+        except Exception as e:
+            logger.warning(f"DB close fallback failed: {e}")
+    return out
+
+
+def _live_mtm_lookup_for_model(model_name):
+    """Pre-resolve the given model's open-position MTM and return a closure
+    suitable for get_portfolio_stats(price_lookup=...)."""
+    from src.models.model_ledger_models import ModelLedger
+    from src.models.database import get_database_manager
+    db = get_database_manager()
+    with db.get_session() as s:
+        rows = s.query(ModelLedger).all()
+        # Pre-extract open_symbols inside session — values are primitives,
+        # safe to use after exit.
+        open_syms = [l.open_symbol for l in rows if l.open_symbol]
+    prices = _resolve_live_prices(open_syms)
 
     def _lookup(sym):
-        r = session.execute(text(
-            "SELECT close FROM historical_data "
-            "WHERE symbol = :s ORDER BY date DESC LIMIT 1"
-        ), {"s": sym}).fetchone()
-        return float(r.close) if r else None
+        return prices.get((sym or "").replace("NSE:", "").replace("-EQ", ""))
 
     return _lookup
 
@@ -1177,9 +1179,7 @@ def model_balance_sheet(model_name):
         from src.models.database import get_database_manager
 
         ensure_models_seeded()
-        db = get_database_manager()
-        with db.get_session() as session:
-            stats = get_portfolio_stats(price_lookup=_mtm_price_lookup(session))
+        stats = get_portfolio_stats(price_lookup=_live_mtm_lookup_for_model(model_name))
 
         per_model = next(
             (m for m in stats["models"] if m["model_name"] == model_name),
@@ -1577,14 +1577,10 @@ def model_triggers_status(model_name):
                 entry_trade_at = buy_row[0].isoformat() if buy_row[0] else None
                 entry_reason = buy_row[1]
 
-            # Portfolio stats — find this model's slice
-            def _mtm(sym):
-                r = s.execute(text(
-                    "SELECT close FROM historical_data "
-                    "WHERE symbol=:s ORDER BY date DESC LIMIT 1"
-                ), {"s": sym}).fetchone()
-                return float(r.close) if r else None
-            stats = get_portfolio_stats(price_lookup=_mtm)
+        # Portfolio stats — pre-resolve live MTM outside any open session so
+        # get_portfolio_stats's internal session doesn't conflict with the
+        # one we used for the trade queries above.
+        stats = get_portfolio_stats(price_lookup=_live_mtm_lookup_for_model(model_name))
 
         per_model = next(
             (m for m in stats["models"] if m["model_name"] == model_name), {}
