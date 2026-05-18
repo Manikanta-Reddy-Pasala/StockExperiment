@@ -159,6 +159,16 @@ def scan_entry_candidate(df: pd.DataFrame, symbols: List[str]) -> Optional[Dict]
         vol_ratio = float(r["volume"]) / vol_avg if vol_avg > 0 else 0.0
         hh_ratio = close / hh if hh > 0 else 0.0  # >1 = above prior 60d high
         sma_ratio = close / sma_long if sma_long > 0 else 0.0  # >1 = above SMA
+        # True 30d return — distinct from headroom-vs-HH. Other models use the
+        # same field name; align so UI labels stay correct.
+        ret_30d_pct = 0.0
+        if len(g) >= 31:
+            try:
+                close_30d_ago = float(g.iloc[-31]["close"])
+                if close_30d_ago > 0:
+                    ret_30d_pct = (close / close_30d_ago - 1.0) * 100
+            except Exception:
+                pass
         # Strict qualification: needs full SMA_LONG AND all 3 filters
         has_full_sma = len(g) >= SMA_LONG and pd.notna(r["sma_long"])
         qualifies = (has_full_sma and close > hh
@@ -170,6 +180,7 @@ def scan_entry_candidate(df: pd.DataFrame, symbols: List[str]) -> Optional[Dict]
             "high_60d_prev": hh,
             "hh_ratio": hh_ratio,
             "sma_ratio": sma_ratio,
+            "ret_30d_pct": ret_30d_pct,
             "qualifies": qualifies,
             "sma_window_used": sma_window,
         }
@@ -282,15 +293,17 @@ def main() -> int:
                 "(closest to firing all 3 filters: above 60d high, above 200d "
                 "SMA, volume > 2x avg). Breakout model trades infrequently.")
     for i, c in enumerate(pool[: 5 - len(top_rows)], len(top_rows) + 1):
-        # ret_30d_pct here = breakout headroom above 60d HH (proxy momentum)
-        # Negative = stock still below prior 60d high (near-miss territory)
+        # ret_30d_pct = TRUE 30-day return (now distinct from headroom).
+        # headroom_pct = how far above/below the prior 60d high (used for
+        # near-miss ranking). Negative = still below prior 60d high.
         headroom = (c["close"] / c["high_60d_prev"] - 1) * 100 \
             if c.get("high_60d_prev") else 0
         row = {
             "rank": i,
             "symbol": c["symbol"],
             "name": c["symbol"] + ("" if c.get("qualifies") else " (near-miss)"),
-            "ret_30d_pct": round(headroom, 2),
+            "ret_30d_pct": round(c.get("ret_30d_pct", 0.0), 2),
+            "headroom_pct": round(headroom, 2),
             "price": round(c["close"], 2),
             "vol_ratio": round(c["vol_ratio"], 2),
         }

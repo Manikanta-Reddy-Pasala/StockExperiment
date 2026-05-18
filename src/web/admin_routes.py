@@ -2245,7 +2245,22 @@ def admin_model_ranking(model_name):
         ran_now = False
         if need_run and paths.get("live_signal"):
             ts = datetime.now().strftime("%Y%m%dT%H%M%S")
-            signals_out = f"/tmp/auto_{model_name}_{ts}.json"
+            # Write to the canonical signals dir so the NEXT scheduled
+            # executor run (09:30 IST or manual rebalance) actually sees
+            # the fresh signal. Previously this wrote to /tmp and the
+            # cron executor missed it — model picked rank-1 but never
+            # placed an order.
+            sig_dir = Path(paths.get("signals_dir") or f"/tmp")
+            sig_dir.mkdir(parents=True, exist_ok=True)
+            today_iso = datetime.now().strftime("%Y-%m-%d")
+            # Match each model's cron file-naming convention by checking
+            # what cron.py writes; fall back to a model-suffixed default.
+            existing = sorted(sig_dir.glob(f"{today_iso}*.json"),
+                              key=lambda p: p.stat().st_mtime, reverse=True)
+            if existing:
+                signals_out = str(existing[0])
+            else:
+                signals_out = str(sig_dir / f"{today_iso}_{model_name}.json")
             cmd = [
                 "python3", paths["live_signal"],
                 *paths["extra_args"],
