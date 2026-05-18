@@ -70,7 +70,8 @@ def load_panel(symbols: List[str], days_back: int) -> Tuple[pd.DataFrame, pd.Ser
         if df.empty:
             continue
         df = df.copy()
-        df["date"] = pd.to_datetime(df["date"]).dt.normalize()
+        date_col = "candle_time" if "candle_time" in df.columns else "date"
+        df["date"] = pd.to_datetime(df[date_col]).dt.normalize()
         df = df.sort_values("date").drop_duplicates("date", keep="last")
         closes[sym] = df.set_index("date")["close"].astype(float)
 
@@ -85,7 +86,8 @@ def load_panel(symbols: List[str], days_back: int) -> Tuple[pd.DataFrame, pd.Ser
     if idx_df.empty:
         raise RuntimeError(f"no {INDEX_SYM} data")
     idx_df = idx_df.copy()
-    idx_df["date"] = pd.to_datetime(idx_df["date"]).dt.normalize()
+    idx_date_col = "candle_time" if "candle_time" in idx_df.columns else "date"
+    idx_df["date"] = pd.to_datetime(idx_df[idx_date_col]).dt.normalize()
     idx_df = idx_df.sort_values("date").drop_duplicates("date", keep="last")
     idx = idx_df.set_index("date")["close"].astype(float)
     idx = idx.reindex(panel.index).ffill(limit=3)
