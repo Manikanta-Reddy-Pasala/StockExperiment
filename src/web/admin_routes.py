@@ -1953,13 +1953,26 @@ def admin_model_ranking(model_name):
         import json as _json
         payload = _json.loads(files[0].read_text())
         ranking = payload.get("top_n") or []
+        ranking = ranking[:top]
+
+        # Enrich each row with live Fyers LTP so the picks page shows today's
+        # price instead of whatever EOD close live_signal.py wrote yesterday.
+        if ranking:
+            live = _resolve_live_prices([r.get("symbol") for r in ranking])
+            for r in ranking:
+                bare = (r.get("symbol") or "").replace("NSE:", "").replace("-EQ", "")
+                v = live.get(bare)
+                if v and v > 0:
+                    r["price"] = round(float(v), 2)
+                    r["live"] = True
+
         return jsonify({
             "success": True,
             "model": model_name,
             "label": paths.get("label", model_name),
             "date": payload.get("date"),
             "universe_size": payload.get("universe_size"),
-            "ranking": ranking[:top],
+            "ranking": ranking,
             "note": payload.get("note"),
             "qualifying_breakouts": payload.get("qualifying_breakouts"),
             "source": str(files[0]),
