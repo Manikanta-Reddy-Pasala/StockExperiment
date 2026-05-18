@@ -74,31 +74,35 @@ class RiskManager:
 
     @classmethod
     def from_model(cls, model_name: str):
-        """Build RiskManager using per-model `current_amount` as capital.
+        """Build RiskManager using per-model AVAILABLE CASH as capital.
 
-        Reads `model_settings.current_amount` from the DB (live NAV cache,
-        updated on each fill by record_buy/record_sell). Other risk knobs
-        still come from env so a single model's capital change doesn't force
-        a redeploy.
+        Reads `model_ledger.cash` (idle, un-invested) — the truthful amount
+        currently spendable on a new BUY. Previously used model_settings.
+        current_amount, which is a stale NAV cache; if a position is
+        already open, NAV includes position MTM that is *not* available.
+
+        Concrete bug avoided: today's manual rebalance clicks on n20 all
+        saw current_amount=30000 and each placed a fresh 67-share BUY.
+        Sizing off live cash makes the 2nd/3rd clicks return qty=0 because
+        cash dropped to ₹471 after the first BUY.
 
         Fallback rules:
-          - Unknown model OR DB access fails → fall back to from_env() and
-            log a WARNING. Preserves backward-compat with momentum_n100_top5_max1
-            (already live with HFCL).
-          - Settings present but current_amount <= 0 → still uses 0 as the
-            capital floor; size_position will return 0 (kill-switch via cash).
+          - Unknown model OR DB error → fall back to from_env(), log WARNING.
+          - cash <= 0 → capital floor = 0; size_position returns 0.
         """
         try:
-            from src.services.trading.model_ledger_service import get_all_settings
-            settings_rows = {row["model_name"]: row for row in get_all_settings()}
-            row = settings_rows.get(model_name)
-            if not row:
-                log.warning(
-                    "RiskManager.from_model('%s'): model not in DB, falling back to from_env()",
-                    model_name,
-                )
-                return cls.from_env()
-            capital = int(float(row.get("current_amount") or 0))
+            from src.models.database import get_database_manager
+            from src.models.model_ledger_models import ModelLedger
+            db = get_database_manager()
+            with db.get_session() as s:
+                ledger = s.query(ModelLedger).filter_by(model_name=model_name).first()
+                if not ledger:
+                    log.warning(
+                        "RiskManager.from_model('%s'): no model_ledger row, "
+                        "falling back to from_env()", model_name,
+                    )
+                    return cls.from_env()
+                capital = int(float(ledger.cash or 0))
         except Exception as e:
             log.warning(
                 "RiskManager.from_model('%s') failed (%s), falling back to from_env()",

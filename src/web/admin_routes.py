@@ -1867,6 +1867,23 @@ def admin_data_coverage():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+# Per-model serialization lock — prevents concurrent rebalance clicks
+# from each placing a fresh BUY before the prior one's record_buy reaches
+# the ledger. Keyed by model_name. Threading.Lock is process-local; for
+# multi-worker Gunicorn we ALSO reject 409 if a prior task is still in
+# 'running' status in the DB (cross-worker safety).
+_rebalance_locks: Dict[str, threading.Lock] = {}
+_rebalance_locks_guard = threading.Lock()
+
+def _get_rebalance_lock(model_name: str) -> threading.Lock:
+    with _rebalance_locks_guard:
+        lk = _rebalance_locks.get(model_name)
+        if lk is None:
+            lk = threading.Lock()
+            _rebalance_locks[model_name] = lk
+        return lk
+
+
 @admin_bp.route('/<model_name>/rebalance', methods=['POST'])
 def admin_model_rebalance(model_name):
     """Live per-model rebalance: signal then LIVE execute (real Fyers orders).
@@ -1875,12 +1892,46 @@ def admin_model_rebalance(model_name):
     If current position is in fresh top-N: no action. Otherwise: SELL old, BUY rank-1.
     Capital sized from this model's ledger cash only.
 
+    Concurrency: rejects with HTTP 409 if a previous rebalance for the
+    same model is still running (in this worker via threading.Lock OR in
+    any worker via the model_tasks DB table). Prevents the "3 clicks =
+    3 separate BUYs" bug we hit on n20 today.
+
     Body (optional): {dry_run: bool} — defaults False (LIVE).
     """
     paths = MODEL_PATHS.get(model_name)
     if not paths:
         return jsonify({"success": False,
                         "error": f"Unknown model: {model_name}"}), 400
+
+    # Cross-worker check: any prior task still running for this model?
+    try:
+        from src.models.database import get_database_manager
+        from sqlalchemy import text as _text
+        _db = get_database_manager()
+        with _db.get_session() as _s:
+            row = _s.execute(_text("""
+                SELECT task_id FROM admin_task_tracking
+                WHERE task_id LIKE :prefix AND status IN ('pending','running')
+                ORDER BY start_time DESC LIMIT 1
+            """), {"prefix": f"rebal_%_{model_name}_%"}).fetchone()
+        if row:
+            return jsonify({
+                "success": False,
+                "error": (f"Rebalance already in progress for {model_name} "
+                          f"(task {row[0]}). Wait for it to finish."),
+            }), 409
+    except Exception as e:
+        logger.warning(f"rebalance concurrency check failed for {model_name}: {e}")
+
+    # In-process lock (fast path for same-worker repeat clicks)
+    lk = _get_rebalance_lock(model_name)
+    if not lk.acquire(blocking=False):
+        return jsonify({
+            "success": False,
+            "error": f"Rebalance already in progress for {model_name} (in-process).",
+        }), 409
+    # Release after the runner thread completes — handled in inner closure.
 
     data = request.get_json(silent=True) or {}
     dry_run = bool(data.get("dry_run", False))
@@ -1935,24 +1986,30 @@ def admin_model_rebalance(model_name):
             logger.warning(f"save_task_to_db pre-register {tid} failed: {e}")
 
     def runner():
-        run_command_async(signal_task, signal_cmd,
-                          f"Rebalance signal for {model_name}")
-        # Only execute if signal file actually exists AND signal completed OK
-        sig_state = running_tasks.get(signal_task, {})
-        if os.path.exists(signals_out) and sig_state.get('status') == 'completed':
-            run_command_async(exec_task, exec_cmd,
-                              f"Rebalance {'DRY-RUN' if dry_run else 'LIVE'} "
-                              f"execute for {model_name}")
-        else:
-            # Mark execute as skipped so the UI doesn't poll forever.
-            running_tasks[exec_task].update({
-                'status': 'failed',
-                'error': 'Skipped: signal step did not complete successfully '
-                         f"(status={sig_state.get('status')!r})",
-                'end_time': datetime.now().isoformat(),
-            })
+        try:
+            run_command_async(signal_task, signal_cmd,
+                              f"Rebalance signal for {model_name}")
+            # Only execute if signal file actually exists AND signal completed OK
+            sig_state = running_tasks.get(signal_task, {})
+            if os.path.exists(signals_out) and sig_state.get('status') == 'completed':
+                run_command_async(exec_task, exec_cmd,
+                                  f"Rebalance {'DRY-RUN' if dry_run else 'LIVE'} "
+                                  f"execute for {model_name}")
+            else:
+                # Mark execute as skipped so the UI doesn't poll forever.
+                running_tasks[exec_task].update({
+                    'status': 'failed',
+                    'error': 'Skipped: signal step did not complete successfully '
+                             f"(status={sig_state.get('status')!r})",
+                    'end_time': datetime.now().isoformat(),
+                })
+                try:
+                    save_task_to_db(exec_task, running_tasks[exec_task])
+                except Exception:
+                    pass
+        finally:
             try:
-                save_task_to_db(exec_task, running_tasks[exec_task])
+                lk.release()
             except Exception:
                 pass
 

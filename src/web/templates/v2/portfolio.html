@@ -9,6 +9,30 @@
   .row-disabled td { opacity: 0.55; }
 </style>
 
+<!-- Fyers broker funds (real-time available cash in trading account) -->
+<div class="card mb-3" id="fyers-funds-card">
+  <div class="card-body py-2">
+    <div class="row g-2 align-items-center">
+      <div class="col-auto"><i class="bi bi-bank2 text-primary"></i></div>
+      <div class="col-md-auto">
+        <span class="text-muted small">Fyers Account · Available Cash</span>
+        <div class="fs-5 fw-bold" id="fyers_available_cash">--</div>
+      </div>
+      <div class="col-md-auto">
+        <span class="text-muted small">Utilised Margin</span>
+        <div class="fs-6" id="fyers_used_margin">--</div>
+      </div>
+      <div class="col-md-auto">
+        <span class="text-muted small">Total Margin</span>
+        <div class="fs-6" id="fyers_total_margin">--</div>
+      </div>
+      <div class="col-md-auto ms-auto">
+        <span class="small-mute" id="fyers_funds_ts">--</span>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Aggregate across all models -->
 <div class="card mb-4">
   <div class="card-header"><strong>All Models Portfolio</strong></div>
@@ -164,8 +188,22 @@ async function loadAggregate() {
   } catch(e) { console.error(e); }
 }
 
+async function loadFyersFunds() {
+  try {
+    const r = await fetch('/admin/momrot/state', {cache: 'no-store'});
+    const d = await r.json();
+    if (!d.success) return;
+    const s = d.data;
+    document.getElementById('fyers_available_cash').textContent = fmtINR(s.cash);
+    document.getElementById('fyers_used_margin').textContent = fmtINR(s.utilized_margin);
+    document.getElementById('fyers_total_margin').textContent = fmtINR(s.total_margin);
+    document.getElementById('fyers_funds_ts').textContent =
+      window.fmtIST ? window.fmtIST(s.ledger_updated_at) : (s.ledger_updated_at || '');
+  } catch(e) { console.error(e); }
+}
+
 async function loadState() {
-  await loadAggregate();
+  await Promise.all([loadAggregate(), loadFyersFunds()]);
   try {
     const r = await fetch('/admin/momrot/state', {cache: 'no-store'});
     const d = await r.json();
