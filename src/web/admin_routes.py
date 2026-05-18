@@ -551,6 +551,7 @@ def models_status():
     """
     try:
         from src.models.database import get_database_manager
+        from src.models.model_ledger_models import ModelSettings
         from sqlalchemy import text
         import json
         from pathlib import Path
@@ -558,6 +559,19 @@ def models_status():
 
         today = date.today()
         db_manager = get_database_manager()
+
+        # Runtime-derived 'wired' flag — data-driven, no hardcoding.
+        # A model counts as WIRED only if BOTH:
+        #   1. It has an entry in MODEL_PATHS (live_signal + executor route)
+        #   2. model_settings.enabled = True (DB toggle; user controls via UI)
+        # Disabled models or models with no MODEL_PATHS entry are UNWIRED.
+        with db_manager.get_session() as _ws:
+            enabled_map = {
+                row.model_name: bool(row.enabled)
+                for row in _ws.query(ModelSettings).all()
+            }
+        def _wired(name: str) -> bool:
+            return (name in MODEL_PATHS) and bool(enabled_map.get(name, False))
 
         models = []
         with db_manager.get_session() as session:
@@ -626,7 +640,7 @@ def models_status():
             models.append({
                 "name": "momentum_n100_top5_max1",
                 "type": "equity",
-                "wired": True,
+                "wired": _wired("momentum_n100_top5_max1"),
                 "data_sufficient": bool(eq_ok),
                 "items": [
                     {"label": "N100 universe size",
@@ -716,7 +730,7 @@ def models_status():
             models.append({
                 "name": "midcap_narrow_60d_breakout",
                 "type": "equity",
-                "wired": True,
+                "wired": _wired("midcap_narrow_60d_breakout"),
                 "data_sufficient": bool(mc_ok),
                 "items": [
                     {"label": "midcap_narrow universe size",
@@ -827,7 +841,7 @@ def models_status():
             models.append({
                 "name": "finnifty_ic_otm4_w300_lots5",
                 "type": "options",
-                "wired": False,
+                "wired": _wired("finnifty_ic_otm4_w300_lots5"),
                 "data_sufficient": bool(fn_ok),
                 "items": spot_items + opt_items,
             })
@@ -849,7 +863,7 @@ def models_status():
             models.append({
                 "name": "n20_daily_large_only",
                 "type": "equity",
-                "wired": True,
+                "wired": _wired("n20_daily_large_only"),
                 "data_sufficient": bool(n20_ok),
                 "items": [
                     {"label": "N100 universe size (source for top-20 ADV)",
@@ -933,7 +947,7 @@ def models_status():
             models.append({
                 "name": "momentum_pseudo_n100_adv",
                 "type": "equity",
-                "wired": True,
+                "wired": _wired("momentum_pseudo_n100_adv"),
                 "data_sufficient": bool(pseudo_data_ok),
                 "items": [
                     {"label": f"Pseudo-N100 universe size ({current_year})",
