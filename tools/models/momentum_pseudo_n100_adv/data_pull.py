@@ -58,20 +58,46 @@ def pull_daily_ohlcv():
 
 
 def refresh_universe():
-    """Rebuild yearly PIT universe via build_universe.py (top-100 by ADV).
+    """Rebuild PIT universe via build_universe.py (top-100 by ADV) and
+    MERGE the result into yearly_universes.json under today's date key.
 
-    Called on month-1 of each year (May). Output: yearly_universes.json
-    appended/updated with new year-start key.
+    Called on month-1 of each year (May) by cron, or on-demand from the
+    /admin 'Pull Data Now' button. Output side-effect:
+      - One-off snapshot at /app/exports/backtests/pseudo_n100_{date}.json
+      - Same symbols merged into yearly_universes.json under "YYYY-MM-DD"
+        key so live_signal.pick_universe_for() finds it immediately.
     """
+    import json
     log.info("=" * 80)
     log.info("momentum_pseudo_n100_adv yearly PIT universe refresh")
     log.info("=" * 80)
     end_date = datetime.now().strftime("%Y-%m-%d")
     out_file = f"/app/exports/backtests/pseudo_n100_{end_date}.json"
     Path(out_file).parent.mkdir(parents=True, exist_ok=True)
-    _run(
+    ok = _run(
         ["python3",
          "tools/models/momentum_pseudo_n100_adv/build_universe.py",
          "--top", "100", "--end-date", end_date, "--out", out_file],
         "build_pseudo_n100_universe", timeout=600,
     )
+    if not ok:
+        log.error("build_universe failed — yearly_universes.json NOT updated")
+        return
+    try:
+        snapshot = json.loads(Path(out_file).read_text())
+        if isinstance(snapshot, dict):
+            entries = snapshot.get("stocks") or snapshot.get("symbols") or []
+        else:
+            entries = snapshot
+        symbols = [e["symbol"] if isinstance(e, dict) else e for e in entries]
+        if len(symbols) < 50:
+            log.warning(f"build_universe returned only {len(symbols)} — skipping merge")
+            return
+        yearly = {}
+        if Path(UNIVERSES_FILE).exists():
+            yearly = json.loads(Path(UNIVERSES_FILE).read_text())
+        yearly[end_date] = [{"symbol": s} for s in symbols]
+        Path(UNIVERSES_FILE).write_text(json.dumps(yearly, indent=2))
+        log.info(f"  merged {len(symbols)} symbols into yearly_universes.json as '{end_date}'")
+    except Exception as e:
+        log.error(f"  yearly_universes.json merge failed: {e}", exc_info=True)

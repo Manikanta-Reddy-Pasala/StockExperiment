@@ -907,16 +907,29 @@ def models_status():
             )
             pseudo_syms_plain = []
             pseudo_uni_age_days = None
-            current_year = str(today.year)
+            pseudo_picked_key = None
             if pseudo_uni_file.exists():
                 try:
                     u = json.loads(pseudo_uni_file.read_text())
-                    # yearly map: {"2026": [{"symbol": ...}, ...], ...}
-                    yr_block = u.get(current_year) or u.get(str(today.year - 1)) or []
-                    if isinstance(yr_block, list):
-                        pseudo_syms_plain = [
-                            s["symbol"] if isinstance(s, dict) else s for s in yr_block
-                        ]
+                    # File keys are ISO date strings ("2025-05-13") of each
+                    # rebalance — pick the most recent <= today, same logic
+                    # as live_signal.pick_universe_for().
+                    candidates = []
+                    for k in u.keys():
+                        try:
+                            d = date.fromisoformat(k)
+                            if d <= today:
+                                candidates.append((d, k))
+                        except Exception:
+                            continue
+                    if candidates:
+                        candidates.sort()
+                        pseudo_picked_key = candidates[-1][1]
+                        yr_block = u.get(pseudo_picked_key) or []
+                        if isinstance(yr_block, list):
+                            pseudo_syms_plain = [
+                                s["symbol"] if isinstance(s, dict) else s for s in yr_block
+                            ]
                     mtime = date.fromtimestamp(pseudo_uni_file.stat().st_mtime)
                     pseudo_uni_age_days = (today - mtime).days
                 except Exception:
@@ -962,7 +975,7 @@ def models_status():
                 "wired": _wired("momentum_pseudo_n100_adv"),
                 "data_sufficient": bool(pseudo_data_ok),
                 "items": [
-                    {"label": f"Pseudo-N100 universe size ({current_year})",
+                    {"label": f"Pseudo-N100 universe size (snapshot {pseudo_picked_key or 'missing'})",
                      "value": len(pseudo_syms_plain),
                      "required": ">= 80 syms",
                      "ok": len(pseudo_syms_plain) >= 80,
