@@ -68,11 +68,16 @@ def _sanitize_tag(tag: str) -> str:
 
 def _placeorder(svc, user_id: int, symbol: str, qty: int, side: str,
                 pricetype: str = "MARKET", price: float = 0.0,
-                product: str = "INTRADAY", tag: str = "") -> Dict:
+                product: str = "CNC", tag: str = "") -> Dict:
     """Thin wrapper around FyersService.placeorder using the standardized API.
 
     Returns the response dict (with `status`, `data.orderid` on success).
     Never raises — exceptions are converted to {"status":"error", ...}.
+
+    Default product = CNC (delivery, multi-day hold) since all four equity
+    models (n100, pseudo-n100, midcap, n20) backtest as delivery — exits
+    only when the signal rotates, not at end-of-day. INTRADAY (MIS) is
+    available if a future strategy needs forced same-day square-off.
     """
     fyers_sym = to_fyers_symbol(symbol)
     safe_tag = _sanitize_tag(tag)
