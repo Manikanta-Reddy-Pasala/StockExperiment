@@ -11,6 +11,8 @@ x-common-env: &common-env
   FYERS_CLIENT_ID_LOGIN: ${FYERS_CLIENT_ID_LOGIN:-}
   SECRET_KEY: ${SECRET_KEY:-}
   LIVE_TRADING: ${LIVE_TRADING:-false}
+  TG_BOT_TOKEN: ${TG_BOT_TOKEN:-}
+  TG_CHAT_ID: ${TG_CHAT_ID:-}
 
 x-screening-env: &screening-env
   # Data Provider Mode

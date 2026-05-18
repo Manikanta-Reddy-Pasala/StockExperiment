@@ -138,6 +138,42 @@ def _get_order_status(svc, user_id: int, order_id: str) -> Optional[Dict]:
     return None
 
 
+def _resolve_recent_order_id(svc, user_id: int, symbol: str, qty: int,
+                             side: str) -> str:
+    """Find the most recent order in the order book matching (symbol, qty, side).
+
+    Used when placeorder returns success but data.orderid is empty
+    (some Fyers SDK versions/sandbox responses behave this way).
+    """
+    try:
+        ob = svc.orderbook(user_id=user_id) or {}
+        rows = ob.get("data") or []
+        if isinstance(rows, dict):
+            rows = rows.get("orderBook") or rows.get("orders") or []
+        side_code = 1 if side.upper() == "BUY" else -1
+        # Newest first if possible
+        rows = sorted(
+            rows or [],
+            key=lambda r: r.get("orderDateTime") or r.get("createdAt") or "",
+            reverse=True,
+        )
+        for r in rows:
+            if not isinstance(r, dict):
+                continue
+            sym = (r.get("symbol") or "").upper()
+            if symbol.upper() not in sym and sym not in symbol.upper():
+                continue
+            if str(r.get("qty") or r.get("quantity") or "") != str(qty):
+                continue
+            r_side = r.get("side")
+            if r_side is not None and r_side != side_code:
+                continue
+            return str(r.get("id") or r.get("orderId") or "")
+    except Exception as e:
+        log.debug(f"_resolve_recent_order_id failed: {e}")
+    return ""
+
+
 def _wait_for_fill(svc, user_id: int, order_id: str,
                    timeout_s: int = 60, poll_s: float = 2.0) -> Tuple[bool, str]:
     """Poll Fyers order book until status is terminal.
@@ -225,6 +261,17 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
         return {"filled": False, "status": "place_failed", "order_id": "",
                 "fill_price": None, "reason": str(res)}
     order_id = _extract_order_id(res)
+    # Fyers may return success + empty orderid synchronously; that still means
+    # the order was accepted. Try to recover the real id from the order book
+    # before we give up and short-circuit to MARKET.
+    if not order_id:
+        order_id = _resolve_recent_order_id(svc, user_id, symbol, qty, side)
+    if not order_id:
+        log.warning(f"  LIMIT {symbol} placed but no orderId returned — "
+                    f"recording as placed (will rely on Fyers fills).")
+        return {"filled": True, "status": "limit_no_id",
+                "order_id": "", "fill_price": first_px,
+                "reason": "no_orderid"}
     filled, term = _wait_for_fill(svc, user_id, order_id,
                                    timeout_s=first_window_s, poll_s=2.0)
     if filled:
@@ -277,6 +324,15 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
 
 # --------- Ledger hooks ---------
 
+def _tg_safe(text: str):
+    """Best-effort Telegram notify — never raises."""
+    try:
+        from tools.live.telegram_notify import send
+        send(text)
+    except Exception as e:
+        log.debug(f"tg notify skipped: {e}")
+
+
 def _record_model_buy(model_name, symbol, qty, price, order_id):
     if not model_name:
         return
@@ -284,8 +340,14 @@ def _record_model_buy(model_name, symbol, qty, price, order_id):
         from src.services.trading.model_ledger_service import record_buy
         record_buy(model_name, symbol, qty, price, fyers_order_id=order_id)
         log.info(f"  ledger: recorded BUY for {model_name}")
+        _tg_safe(
+            f"✅ *BUY {model_name}*\n"
+            f"`{symbol}` x{qty} @ ₹{float(price):.2f} = ₹{float(qty)*float(price):,.0f}\n"
+            f"order_id=`{order_id or '—'}`"
+        )
     except Exception as e:
         log.warning(f"  ledger record_buy failed for {model_name}: {e}")
+        _tg_safe(f"⚠️ BUY {model_name} {symbol} x{qty} placed but ledger write FAILED: {e}")
 
 
 def _record_model_sell(model_name, exit_price, reason, order_id):
@@ -295,8 +357,14 @@ def _record_model_sell(model_name, exit_price, reason, order_id):
         from src.services.trading.model_ledger_service import record_sell
         record_sell(model_name, exit_price, reason, fyers_order_id=order_id)
         log.info(f"  ledger: recorded SELL for {model_name}")
+        _tg_safe(
+            f"💰 *SELL {model_name}*\n"
+            f"@ ₹{float(exit_price):.2f}  reason=`{reason}`\n"
+            f"order_id=`{order_id or '—'}`"
+        )
     except Exception as e:
         log.warning(f"  ledger record_sell failed for {model_name}: {e}")
+        _tg_safe(f"⚠️ SELL {model_name} order placed but ledger write FAILED: {e}")
 
 
 # --------- main ---------
