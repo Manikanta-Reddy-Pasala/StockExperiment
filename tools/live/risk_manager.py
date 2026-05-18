@@ -39,6 +39,10 @@ class RiskConfig:
     limit_tol_pct: float = 0.5          # initial LIMIT slack vs last price
     limit_retry_pct: float = 1.0        # widened slack on first re-quote
     limit_fallback_s: int = 20          # total seconds before MARKET fallback
+    # Hard ceiling: total BUY exposure must never exceed allocated capital +
+    # cumulative realized P&L. Set per-model in from_model(); kept at -1 for
+    # env-based callers (treated as 'no cap' for backward-compat).
+    max_total_buy_inr: int = -1
 
 
 @dataclass
@@ -92,10 +96,11 @@ class RiskManager:
         """
         try:
             from src.models.database import get_database_manager
-            from src.models.model_ledger_models import ModelLedger
+            from src.models.model_ledger_models import ModelLedger, ModelSettings
             db = get_database_manager()
             with db.get_session() as s:
                 ledger = s.query(ModelLedger).filter_by(model_name=model_name).first()
+                settings = s.query(ModelSettings).filter_by(model_name=model_name).first()
                 if not ledger:
                     log.warning(
                         "RiskManager.from_model('%s'): no model_ledger row, "
@@ -103,6 +108,12 @@ class RiskManager:
                     )
                     return cls.from_env()
                 capital = int(float(ledger.cash or 0))
+                # Hard ceiling: allocated + cumulative realized P&L. Any BUY
+                # whose value pushes us above this is blocked even if cash
+                # somehow over-states (concurrency bug, manual DB tweak, etc.).
+                allocated = float(settings.invested_amount or 0) if settings else 0.0
+                realized = float(ledger.realized_pnl or 0)
+                max_total_buy = int(allocated + realized)
         except Exception as e:
             log.warning(
                 "RiskManager.from_model('%s') failed (%s), falling back to from_env()",
@@ -127,10 +138,13 @@ class RiskManager:
             limit_tol_pct=float(os.environ.get("LIMIT_TOL_PCT", 0.5)),
             limit_retry_pct=float(os.environ.get("LIMIT_RETRY_PCT", 1.0)),
             limit_fallback_s=int(os.environ.get("LIMIT_FALLBACK_S", 20)),
+            max_total_buy_inr=max_total_buy,
         )
         log.info(
-            "RiskManager.from_model('%s'): capital=₹%s max_concurrent=%d max_per_trade=₹%s",
-            model_name, f"{capital:,}", max_concurrent, f"{max_per_trade:,}",
+            "RiskManager.from_model('%s'): capital=₹%s max_concurrent=%d "
+            "max_per_trade=₹%s max_total_buy=₹%s (allocated+realized)",
+            model_name, f"{capital:,}", max_concurrent,
+            f"{max_per_trade:,}", f"{max_total_buy:,}",
         )
         return cls(cfg)
 
@@ -151,7 +165,7 @@ class RiskManager:
         if len(open_positions) >= self.cfg.max_concurrent:
             return False, f"max_concurrent {self.cfg.max_concurrent} reached"
         # Daily loss kill-switch
-        day_loss_pct = (day_pnl / self.cfg.capital_inr) * 100
+        day_loss_pct = (day_pnl / max(1, self.cfg.capital_inr)) * 100
         if day_loss_pct <= self.cfg.max_daily_loss_pct:
             return False, f"daily loss kill-switch ({day_loss_pct:.1f}%)"
         # Already in position on this symbol?
@@ -161,7 +175,15 @@ class RiskManager:
         return True, "ok"
 
     def size_position(self, price: float, open_positions: List[Position]) -> int:
-        """Equal-share remaining cash across remaining slots, floor to lot."""
+        """Equal-share remaining cash across remaining slots, floor to lot.
+
+        Final guardrail: total BUY exposure (existing open + this new) is
+        capped at allocated_capital + cumulative_realized_pnl. If the
+        sized qty would breach that ceiling, it's truncated to fit. This
+        is a hard backstop against bugs that slip past the cash check —
+        e.g. concurrent rebalance clicks that each see the same stale cash
+        value before record_buy persists.
+        """
         used = sum(p.qty * p.entry_price for p in open_positions)
         cash = self.cfg.capital_inr - used
         slots_left = self.cfg.max_concurrent - len(open_positions)
@@ -169,6 +191,22 @@ class RiskManager:
             return 0
         slot_alloc = min(cash / slots_left, self.cfg.max_per_trade_inr)
         qty = int(slot_alloc // price)
+
+        # Hard ceiling: allocated + realized. Never let total open BUYs
+        # exceed this regardless of what cash reports.
+        if self.cfg.max_total_buy_inr is not None and self.cfg.max_total_buy_inr > 0:
+            headroom = self.cfg.max_total_buy_inr - used
+            max_qty_by_ceiling = int(max(0, headroom) // price)
+            if qty > max_qty_by_ceiling:
+                log.warning(
+                    "size_position: clamping qty %d → %d for price ₹%.2f "
+                    "(used=₹%s, ceiling=₹%s, headroom=₹%s)",
+                    qty, max_qty_by_ceiling, price,
+                    f"{used:,.0f}",
+                    f"{self.cfg.max_total_buy_inr:,}",
+                    f"{headroom:,.0f}",
+                )
+                qty = max_qty_by_ceiling
         return max(qty, 0)
 
 
