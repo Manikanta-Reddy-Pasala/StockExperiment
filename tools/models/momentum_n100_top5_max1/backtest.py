@@ -5,6 +5,8 @@ Strategy:
   Signal:   Rank by 30-day return, pick top-1
   Position: max_concurrent=1
   Rebalance: 1st trading day of each month
+  OPTIONAL: --mid-month-check adds a day-15 weekday rank check; rotates
+            only if rank-1 leads current held's 30d return by >= 5pp.
 
 Pure NSE-official Nifty 100 list. No ADV narrowing, no price filter (distinct
 from momentum_pseudo_n100_adv which retains MAX_PRICE filter).
@@ -35,7 +37,8 @@ def load_n100():
     return out
 
 
-def run(start: date, end: date, capital: float, out_dir: Path | None = None):
+def run(start: date, end: date, capital: float, out_dir: Path | None = None,
+        mid_month_check: bool = False, mid_month_lead_pct: float = 5.0):
     n100_syms = load_n100()
     print(f"NSE Nifty 100 universe: {len(n100_syms)} stocks")
 
@@ -54,6 +57,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
     print(f"Loaded {len(dates)} days × {len(present)} symbols")
 
     rebal_set = set()
+    mid_month_set = set()
     y, m = start.year, start.month
     while True:
         target = pd.Timestamp(y, m, 1)
@@ -62,11 +66,22 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
             break
         if fut[0].date() >= start:
             rebal_set.add(fut[0])
+        # Mid-month: first trading day on/after the 15th
+        if mid_month_check:
+            target_mid = pd.Timestamp(y, m, 15)
+            fut_mid = dates[dates >= target_mid]
+            if len(fut_mid) > 0 and fut_mid[0].date() <= end:
+                mid_month_set.add(fut_mid[0])
         m += 1
         if m > 12: m = 1; y += 1
     sd = pd.Timestamp(start)
     if sd in dates: rebal_set.add(sd)
-    rebal = sorted(rebal_set)
+    # Combined rotation calendar with per-day flag
+    calendar = sorted({(d, "full") for d in rebal_set} |
+                      {(d, "mid") for d in mid_month_set if d not in rebal_set},
+                      key=lambda x: x[0])
+    rebal = [d for d, _ in calendar]
+    rebal_kind = {d: k for d, k in calendar}
 
     cap = capital
     hold = None; qty = 0; entry_px = 0.0; entry_date = None
@@ -88,6 +103,15 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
             continue
         top = rk.index[0]
 
+        # Mid-month lead gate: skip rotation unless top1 leads held by >= threshold
+        if rebal_kind.get(d) == "mid" and hold is not None and top != hold:
+            top_ret_pct = float(rk.iloc[0]) * 100
+            held_ret_pct = float(rk[hold]) * 100 if hold in rk.index else None
+            if held_ret_pct is None:
+                pass  # held dropped from ranking; allow rotation
+            elif (top_ret_pct - held_ret_pct) < mid_month_lead_pct:
+                continue  # not enough edge; skip
+
         if top != hold:
             if hold and qty > 0:
                 sx = cl[hold].iloc[di]
@@ -107,6 +131,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
                         "pnl":        round(pnl, 0),
                         "ret_pct":    round(pct, 2),
                         "cap_after":  round(cap, 0),
+                        "exit_reason": "MIDCHECK" if rebal_kind.get(d) == "mid" else "ROTATE",
                     })
                     hold = None; qty = 0
 
@@ -183,6 +208,12 @@ if __name__ == "__main__":
     ap.add_argument("--to",   dest="end",   default=DEFAULT_END.isoformat())
     ap.add_argument("--capital", type=float, default=DEFAULT_CAP)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--mid-month-check", action="store_true",
+                    help="Enable day-15 weekday rank check with lead gate")
+    ap.add_argument("--mid-month-lead-pct", type=float, default=5.0,
+                    help="Minimum lead (pp) for mid-month rotation. Default 5.0")
     a = ap.parse_args()
     run(date.fromisoformat(a.start), date.fromisoformat(a.end), a.capital,
-        Path(a.out) if a.out else None)
+        Path(a.out) if a.out else None,
+        mid_month_check=a.mid_month_check,
+        mid_month_lead_pct=a.mid_month_lead_pct)

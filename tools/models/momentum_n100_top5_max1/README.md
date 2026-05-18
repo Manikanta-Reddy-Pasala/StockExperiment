@@ -23,12 +23,30 @@ Real Nifty 100 contains: HDFCBANK, RELIANCE, ICICIBANK, TCS, INFY, BHARTIARTL, S
 | Universe | Real NIFTY 100 from `src/data/symbols/nifty100.csv` (NSE archives) |
 | Signal | Rank by **30-day return** |
 | Position | Hold top-1 (`top_n=5` ranking, `max_concurrent=1`) |
-| Rebalance | 1st of every month |
-| Exit | Rotation only — sell when stock drops out of rank-1. No SL, no target |
+| Rebalance | **1st weekday of month** (unconditional rotate to rank-1) |
+| **Mid-month check** | **Day-15 weekday — rotate only if rank-1 leads held by ≥ 5pp** |
+| Exit | Rotation only — sell when stock drops out of rank-1 OR mid-month lead breached. No SL, no target |
 
 **Universe refresh**: `python tools/refresh_nifty100.py` pulls NSE CSV. NSE rebalances March/September.
 
+### Mid-month check rationale
+
+Pure monthly rotation misses stocks that break out *during* the month and become the obvious winner by month-end (calendar-lag risk). The mid-month check addresses this without exploding turnover:
+
+- Runs on the first weekday on/after day 15
+- Re-ranks the universe
+- Rotates **only** if today's rank-1 has a 30d return ≥ 5pp higher than currently-held stock's 30d return
+- Most months: no action (held stock usually still leads or lead is below 5pp)
+- ~30-40% of months trigger an actual rotation
+- Backtest on 2023-05 → 2026-05: +19.7pp CAGR over plain monthly with honest costs (slip + STT + brokerage + 20% STCG)
+
+5pp threshold is a round number chosen *before* testing the variant; not sweep-selected. See `backtest.py --mid-month-check` to reproduce.
+
 ## Backtest result (REAL Nifty 100, 2023-05-15 → 2026-05-12)
+
+Two configurations supported — same engine, mid-month flag toggles behaviour:
+
+### A. Plain monthly (no mid-month check) — `--from 2023-05-15 --to 2026-05-12`
 
 | Period | NAV end | Yearly ROI |
 |---|---:|---:|
@@ -39,9 +57,29 @@ Real Nifty 100 contains: HDFCBANK, RELIANCE, ICICIBANK, TCS, INFY, BHARTIARTL, S
 | **3-yr CAGR** | | **+65.10%** |
 | Total return | | **+348.37%** |
 
-**31 round-trips · 71.0% WR · Max DD (rebal cap_after) 37.30%**
+**31 round-trips · 71.0% WR · Max DD 37.30% · Calmar 1.75**
 
 Y2 chop: 3 consecutive losers (BAJAJ-AUTO -19%, HINDZINC -10%, MAZDOCK round-2 -4%). Strategy mean-reverts.
+
+### B. With mid-month check — `--mid-month-check`
+
+Honest-cost backtest (slip 0.10% × 2 + STT 0.10% + ₹20 brokerage + 20% STCG yearly):
+
+| Variant | NAV | CAGR | MaxDD | Calmar | Trades |
+|---|---:|---:|---:|---:|---:|
+| Plain monthly (with costs) | ₹44L | **+61.75%** | -47.00% | 1.31 | 27 |
+| **+ mid-month check (5pp)** | **₹62L** | **+81.44%** | -46.52% | **1.75** | 38 |
+
+Mid-month rotation fired 13 times in 38 months. **Improvement: +19.7pp CAGR, Calmar 1.31 → 1.75, DD ~unchanged.**
+
+Year-by-year:
+
+| Variant | 2023-24 | 2024-25 | 2025-26 |
+|---|---:|---:|---:|
+| Plain monthly | +121% | -8% | +87% |
+| **+ mid-month check** | **+242%** | -6% | +70% |
+
+Mid-month captures big bull-trend continuations (2023-24 doubled the year). Cost slightly in choppy 2025-26 (-17pp vs plain).
 
 ## Top losers (unfiltered)
 
@@ -95,9 +133,26 @@ python tools/refresh_nifty100.py
 # Refresh OHLCV
 python tools/shared/prefetch_ohlcv.py --universe n50,n500 --days 1500 --intervals 1h,D
 
-# Run backtest (in container)
+# Plain monthly (legacy reference)
 docker exec trading_system_app python tools/models/momentum_n100_top5_max1/backtest.py
+
+# With mid-month check + 5pp lead (LIVE config)
+docker exec trading_system_app python tools/models/momentum_n100_top5_max1/backtest.py \
+    --mid-month-check --mid-month-lead-pct 5.0
 ```
+
+## Live cron schedule
+
+Three jobs registered (all IST, naïve = container TZ=Asia/Kolkata):
+
+| Time | Job | Purpose |
+|---|---|---|
+| 09:25 | `emit_signal` (--rebalance-only) | Monthly rebalance signal on 1st weekday of month |
+| 09:27 | `emit_mid_month_signal` (--mid-month-check) | Day-15 weekday rank check, 5pp lead gate |
+| 09:30 | `execute_orders` | Place Fyers orders from monthly signal file |
+| 09:35 | `execute_mid_month_orders` | Place Fyers orders from mid-month signal file (if non-empty) |
+| 20:30 | `pull_daily_ohlcv` | Daily N500 OHLCV refresh |
+| 06:30 | `_monthly_universe` | NSE Nifty 100 CSV refresh on day-1 |
 
 Full trade ledger: `exports/models/momentum_n100_top5_max1/TRADE_LEDGER.md`
 
