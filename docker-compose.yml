@@ -12,6 +12,7 @@ x-common-env: &common-env
   SECRET_KEY: ${SECRET_KEY:-}
   LIVE_TRADING: ${LIVE_TRADING:-false}
   MAX_CONCURRENT: ${MAX_CONCURRENT:-1}
+  MIN_PRICE: ${MIN_PRICE:-1.0}
   TG_BOT_TOKEN: ${TG_BOT_TOKEN:-}
   TG_CHAT_ID: ${TG_CHAT_ID:-}
 
