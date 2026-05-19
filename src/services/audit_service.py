@@ -53,6 +53,19 @@ def write_order(model_name: Optional[str], symbol: str, side: str, qty: int,
                 slip = float(fill_qty) * (float(fill_price) - float(ordered_price))
             except Exception:
                 slip = None
+        # Broker charges — compute on fill_qty + fill_price when available
+        # (truth), else on ordered_qty + ordered_price (estimate).
+        charges_breakdown = None
+        charges_total = None
+        try:
+            from tools.live.broker_charges import compute_charges
+            calc_qty = int(fill_qty) if fill_qty else int(qty)
+            calc_px = float(fill_price) if fill_price else float(ordered_price)
+            if calc_qty > 0 and calc_px > 0:
+                charges_breakdown = compute_charges(side, calc_qty, calc_px, product or "CNC")
+                charges_total = charges_breakdown.get("total")
+        except Exception as _e:
+            log.debug(f"broker_charges compute failed: {_e}")
         db = get_database_manager()
         with db.get_session() as s:
             row = AuditOrder(
@@ -72,6 +85,8 @@ def write_order(model_name: Optional[str], symbol: str, side: str, qty: int,
                 error_text=error_text,
                 raw_request=raw_request,
                 raw_response=raw_response,
+                charges_inr=_safe_dec(charges_total),
+                charges_breakdown=charges_breakdown,
             )
             s.add(row)
             s.flush()

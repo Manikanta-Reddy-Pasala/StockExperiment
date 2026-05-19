@@ -2603,6 +2603,83 @@ def audit_system_events_list():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@admin_bp.route('/audit/charges-summary', methods=['GET'])
+def audit_charges_summary():
+    """Per-model broker-charge totals (BUY vs SELL) across all audit_orders.
+
+    Returns rows: {model_name, buy_charges, sell_charges, buy_count, sell_count,
+                   total_charges, lifetime_pnl, charges_pct_of_turnover}
+    """
+    try:
+        from src.models.database import get_database_manager
+        from sqlalchemy import text
+        days = int(request.args.get("days", 365))
+        days = max(1, min(days, 3650))
+        db = get_database_manager()
+        with db.get_session() as s:
+            rows = s.execute(text(f"""
+                SELECT
+                    COALESCE(model_name, '(unattributed)') AS model_name,
+                    side,
+                    COUNT(*) AS n_trades,
+                    COALESCE(SUM(charges_inr), 0) AS total_charges,
+                    COALESCE(SUM(COALESCE(fill_qty, qty) * COALESCE(fill_price, ordered_price)), 0) AS total_turnover
+                FROM audit_orders
+                WHERE placed_at >= NOW() - INTERVAL '{days} days'
+                  AND status IN ('placed','filled','partial')
+                GROUP BY model_name, side
+                ORDER BY model_name, side
+            """)).fetchall()
+
+        per_model: Dict[str, Dict] = {}
+        for r in rows:
+            m = r.model_name or "(unattributed)"
+            blk = per_model.setdefault(m, {
+                "model_name": m,
+                "buy_charges": 0.0, "sell_charges": 0.0,
+                "buy_count": 0, "sell_count": 0,
+                "buy_turnover": 0.0, "sell_turnover": 0.0,
+                "total_charges": 0.0, "total_turnover": 0.0,
+            })
+            if r.side == "BUY":
+                blk["buy_charges"] = float(r.total_charges or 0)
+                blk["buy_count"] = int(r.n_trades or 0)
+                blk["buy_turnover"] = float(r.total_turnover or 0)
+            elif r.side == "SELL":
+                blk["sell_charges"] = float(r.total_charges or 0)
+                blk["sell_count"] = int(r.n_trades or 0)
+                blk["sell_turnover"] = float(r.total_turnover or 0)
+
+        out = []
+        for m, blk in per_model.items():
+            blk["total_charges"] = blk["buy_charges"] + blk["sell_charges"]
+            blk["total_turnover"] = blk["buy_turnover"] + blk["sell_turnover"]
+            blk["charges_pct_of_turnover"] = (
+                round(blk["total_charges"] / blk["total_turnover"] * 100, 4)
+                if blk["total_turnover"] > 0 else 0.0
+            )
+            out.append(blk)
+        out.sort(key=lambda x: -x["total_charges"])
+        # Grand total row
+        gt = {"model_name": "__TOTAL__",
+              "buy_charges": sum(x["buy_charges"] for x in out),
+              "sell_charges": sum(x["sell_charges"] for x in out),
+              "buy_count": sum(x["buy_count"] for x in out),
+              "sell_count": sum(x["sell_count"] for x in out),
+              "buy_turnover": sum(x["buy_turnover"] for x in out),
+              "sell_turnover": sum(x["sell_turnover"] for x in out)}
+        gt["total_charges"] = gt["buy_charges"] + gt["sell_charges"]
+        gt["total_turnover"] = gt["buy_turnover"] + gt["sell_turnover"]
+        gt["charges_pct_of_turnover"] = (
+            round(gt["total_charges"] / gt["total_turnover"] * 100, 4)
+            if gt["total_turnover"] > 0 else 0.0
+        )
+        return jsonify({"success": True, "by_model": out, "total": gt, "days": days})
+    except Exception as e:
+        logger.error(f"audit_charges_summary error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @admin_bp.route('/audit', methods=['GET'])
 def audit_dashboard():
     """Unified read-only audit dashboard."""

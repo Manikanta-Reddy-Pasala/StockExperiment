@@ -46,6 +46,10 @@ class AuditOrder(Base):
     error_text = Column(Text)
     raw_request = Column(JSONB)
     raw_response = Column(JSONB)
+    # Broker charges (computed via tools/live/broker_charges.py — SEBI rates).
+    # Total rupees + full breakdown JSON (brokerage/stt/exchange/sebi/stamp/gst/dp).
+    charges_inr = Column(Numeric(14, 4))
+    charges_breakdown = Column(JSONB)
 
 
 class AuditRebalanceDecision(Base):

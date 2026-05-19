@@ -29,6 +29,7 @@
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-config">Config Changes</button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-data">Data Quality</button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-system">System Events</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-charges">Broker Charges</button></li>
 </ul>
 
 <div class="tab-content border border-top-0 p-3 bg-white">
@@ -49,8 +50,8 @@
       <table class="table table-sm audit-table"><thead><tr>
         <th>Placed (IST)</th><th>Model</th><th>Symbol</th><th>Side</th>
         <th class="text-end">Qty</th><th class="text-end">Ordered ₹</th><th class="text-end">Fill ₹</th>
-        <th>Status</th><th class="text-end">Slippage</th><th>Order ID</th>
-      </tr></thead><tbody id="orders-body"><tr><td colspan="10" class="text-center muted">Loading…</td></tr></tbody></table>
+        <th>Status</th><th class="text-end">Slippage</th><th class="text-end" title="Brokerage + STT + GST + exchange + SEBI + stamp + DP">Charges ₹</th><th>Order ID</th>
+      </tr></thead><tbody id="orders-body"><tr><td colspan="11" class="text-center muted">Loading…</td></tr></tbody></table>
     </div>
   </div>
 
@@ -132,6 +133,26 @@
     </div>
   </div>
 
+  <div class="tab-pane fade" id="tab-charges">
+    <div class="filter-bar d-flex gap-2 align-items-center">
+      <label class="small mb-0">Days:</label>
+      <select id="charges-days" class="form-select form-select-sm" style="width:auto;">
+        <option>30</option><option>90</option><option selected>365</option><option>3650</option>
+      </select>
+      <span class="text-muted small">Brokerage + STT + GST + exchange + SEBI + stamp + DP (SEBI rates, CNC delivery)</span>
+      <button class="btn btn-sm btn-outline-primary ms-auto" onclick="loadCharges()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm audit-table"><thead><tr>
+        <th>Model</th>
+        <th class="text-end">BUYs</th><th class="text-end">BUY Charges ₹</th><th class="text-end">BUY Turnover ₹</th>
+        <th class="text-end">SELLs</th><th class="text-end">SELL Charges ₹</th><th class="text-end">SELL Turnover ₹</th>
+        <th class="text-end"><strong>Total Charges ₹</strong></th>
+        <th class="text-end" title="Total charges as % of total turnover">% Turnover</th>
+      </tr></thead><tbody id="charges-body"><tr><td colspan="9" class="text-center muted">Loading…</td></tr></tbody></table>
+    </div>
+  </div>
+
 </div>
 {% endblock %}
 
@@ -172,7 +193,7 @@ async function loadOrders() {
   const u = `/admin/audit/orders?days=${days}` + (model ? `&model=${encodeURIComponent(model)}` : '');
   const d = await _get(u);
   const body = document.getElementById('orders-body');
-  if (!d.success) { body.innerHTML = `<tr><td colspan="10" class="text-danger">${d.error||'err'}</td></tr>`; return; }
+  if (!d.success) { body.innerHTML = `<tr><td colspan="11" class="text-danger">${d.error||'err'}</td></tr>`; return; }
   body.innerHTML = (d.orders || []).map(o => `
     <tr>
       <td>${fmtT(o.placed_at)}</td>
@@ -184,8 +205,43 @@ async function loadOrders() {
       <td class="text-end">${fmtINR(o.fill_price)}</td>
       <td><span class="pill ${o.status==='placed'||o.status==='filled'?'pill-ok':'pill-fail'}">${o.status}</span></td>
       <td class="text-end ${cls(-(o.slippage_inr||0))}">${o.slippage_inr==null?'—':fmtINR(o.slippage_inr)}</td>
+      <td class="text-end neg">${o.charges_inr==null?'—':fmtINR(o.charges_inr)}</td>
       <td><code class="small">${o.fyers_order_id||'—'}</code></td>
-    </tr>`).join('') || '<tr><td colspan="10" class="text-center muted">No orders.</td></tr>';
+    </tr>`).join('') || '<tr><td colspan="11" class="text-center muted">No orders.</td></tr>';
+}
+
+async function loadCharges() {
+  const days = document.getElementById('charges-days').value;
+  const d = await _get(`/admin/audit/charges-summary?days=${days}`);
+  const body = document.getElementById('charges-body');
+  if (!d.success) { body.innerHTML = `<tr><td colspan="9" class="text-danger">${d.error||'err'}</td></tr>`; return; }
+  const rows = d.by_model || [];
+  let html = rows.map(r => `
+    <tr>
+      <td><code class="small">${r.model_name}</code></td>
+      <td class="text-end">${r.buy_count}</td>
+      <td class="text-end neg">${fmtINR(r.buy_charges)}</td>
+      <td class="text-end">${fmtINR(r.buy_turnover)}</td>
+      <td class="text-end">${r.sell_count}</td>
+      <td class="text-end neg">${fmtINR(r.sell_charges)}</td>
+      <td class="text-end">${fmtINR(r.sell_turnover)}</td>
+      <td class="text-end neg"><strong>${fmtINR(r.total_charges)}</strong></td>
+      <td class="text-end">${r.charges_pct_of_turnover.toFixed(3)}%</td>
+    </tr>`).join('');
+  const t = d.total || {};
+  html += `
+    <tr style="background:#f0f3ff; font-weight:600;">
+      <td><strong>TOTAL</strong></td>
+      <td class="text-end">${t.buy_count||0}</td>
+      <td class="text-end neg">${fmtINR(t.buy_charges)}</td>
+      <td class="text-end">${fmtINR(t.buy_turnover)}</td>
+      <td class="text-end">${t.sell_count||0}</td>
+      <td class="text-end neg">${fmtINR(t.sell_charges)}</td>
+      <td class="text-end">${fmtINR(t.sell_turnover)}</td>
+      <td class="text-end neg"><strong>${fmtINR(t.total_charges)}</strong></td>
+      <td class="text-end">${(t.charges_pct_of_turnover||0).toFixed(3)}%</td>
+    </tr>`;
+  body.innerHTML = html || '<tr><td colspan="9" class="text-center muted">No charges yet — first trade pending.</td></tr>';
 }
 
 async function loadDecisions() {
@@ -304,6 +360,7 @@ document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(b => {
     else if (t==='#tab-config') loadConfig();
     else if (t==='#tab-data') loadDataQ();
     else if (t==='#tab-system') loadSysEvents();
+    else if (t==='#tab-charges') loadCharges();
   });
 });
 loadOrders();
