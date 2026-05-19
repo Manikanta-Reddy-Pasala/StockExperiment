@@ -66,6 +66,9 @@
             <tr><td class="k"><strong>Return %</strong></td><td class="v headline" id="bs_return_pct">—</td></tr>
             <tr><td class="k">Trades (W / L)</td><td class="v" id="bs_trades">—</td></tr>
             <tr><td class="k">Win Rate</td><td class="v" id="bs_win_rate">—</td></tr>
+            <tr><td class="k" title="Lifetime BUY-side broker charges (brokerage + exchange + SEBI + stamp + GST)">Buy Txn Charges</td><td class="v neg" id="bs_buy_charges">—</td></tr>
+            <tr><td class="k" title="Lifetime SELL-side broker charges (brokerage + STT + exchange + SEBI + GST + DP)">Sell Txn Charges</td><td class="v neg" id="bs_sell_charges">—</td></tr>
+            <tr><td class="k"><strong>Total Txn Charges</strong></td><td class="v headline neg" id="bs_total_charges">—</td></tr>
           </tbody>
         </table>
       </div>
@@ -189,6 +192,9 @@ async function loadBalanceSheet() {
     document.getElementById('bs_trades').textContent =
       `${data.total_trades || 0} (${data.wins || 0}W / ${data.losses || 0}L)`;
     document.getElementById('bs_win_rate').textContent = fmtPct(data.win_rate_pct);
+    document.getElementById('bs_buy_charges').textContent = fmtINR(data.buy_txn_charges);
+    document.getElementById('bs_sell_charges').textContent = fmtINR(data.sell_txn_charges);
+    document.getElementById('bs_total_charges').textContent = fmtINR(data.total_txn_charges);
 
     // Open position card
     const posBody = document.getElementById('pos_body');

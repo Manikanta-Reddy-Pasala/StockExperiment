@@ -1092,7 +1092,8 @@ def system_status():
 
 @admin_bp.route('/models/portfolio', methods=['GET'])
 def get_model_portfolio():
-    """Per-model + aggregate stats: allocated, NAV, cash, position, PnL.
+    """Per-model + aggregate stats: allocated, NAV, cash, position, PnL,
+    plus lifetime broker txn charges (BUY / SELL / TOTAL).
 
     Used by dashboard cards. Includes MTM if last close available.
     """
@@ -1103,9 +1104,41 @@ def get_model_portfolio():
         from src.models.database import get_database_manager
         from sqlalchemy import text
 
-        # Make sure rows exist for all known models
         ensure_models_seeded()
         stats = get_portfolio_stats(price_lookup=_live_mtm_lookup_for_model(None))
+
+        # Layer on per-model broker txn charges (lifetime sum of audit_orders.charges_inr)
+        try:
+            db = get_database_manager()
+            with db.get_session() as s:
+                rows = s.execute(text("""
+                    SELECT COALESCE(model_name,'(unattributed)') AS m, side,
+                           COALESCE(SUM(charges_inr),0) AS c
+                    FROM audit_orders
+                    WHERE status IN ('placed','filled','partial')
+                    GROUP BY model_name, side
+                """)).fetchall()
+            ch_map = {}
+            for r in rows:
+                blk = ch_map.setdefault(r.m, {"buy": 0.0, "sell": 0.0})
+                if r.side == "BUY":
+                    blk["buy"] = float(r.c or 0)
+                elif r.side == "SELL":
+                    blk["sell"] = float(r.c or 0)
+            for m in stats.get("models", []):
+                blk = ch_map.get(m["model_name"], {"buy": 0.0, "sell": 0.0})
+                m["buy_txn_charges"] = round(blk["buy"], 2)
+                m["sell_txn_charges"] = round(blk["sell"], 2)
+                m["total_txn_charges"] = round(blk["buy"] + blk["sell"], 2)
+            total_buy = sum(m["buy_txn_charges"] for m in stats.get("models", []))
+            total_sell = sum(m["sell_txn_charges"] for m in stats.get("models", []))
+            if "total" in stats:
+                stats["total"]["buy_txn_charges"] = round(total_buy, 2)
+                stats["total"]["sell_txn_charges"] = round(total_sell, 2)
+                stats["total"]["total_txn_charges"] = round(total_buy + total_sell, 2)
+        except Exception as _e:
+            logger.debug(f"charges enrich failed: {_e}")
+
         return jsonify({"success": True, **stats})
     except Exception as e:
         logger.error(f"models portfolio error: {e}", exc_info=True)
@@ -1427,6 +1460,26 @@ def model_balance_sheet(model_name):
         # Lookup pretty label if available in MODEL_PATHS
         label = MODEL_PATHS.get(model_name, {}).get("label", model_name)
 
+        # Lifetime broker txn charges (audit_orders sum)
+        buy_charges = sell_charges = 0.0
+        try:
+            from src.models.database import get_database_manager as _gdb
+            _db = _gdb()
+            with _db.get_session() as _s:
+                _r = _s.execute(text("""
+                    SELECT side, COALESCE(SUM(charges_inr),0) AS c
+                    FROM audit_orders
+                    WHERE model_name = :m AND status IN ('placed','filled','partial')
+                    GROUP BY side
+                """), {"m": model_name}).fetchall()
+            for row in _r:
+                if row.side == "BUY":
+                    buy_charges = float(row.c or 0)
+                elif row.side == "SELL":
+                    sell_charges = float(row.c or 0)
+        except Exception as _e:
+            logger.debug(f"balance-sheet charges enrich failed: {_e}")
+
         return jsonify({
             "success": True,
             "model_name": model_name,
@@ -1445,6 +1498,9 @@ def model_balance_sheet(model_name):
             "wins": per_model.get("wins", 0) or 0,
             "losses": per_model.get("losses", 0) or 0,
             "win_rate_pct": per_model.get("win_rate_pct", 0) or 0,
+            "buy_txn_charges": round(buy_charges, 2),
+            "sell_txn_charges": round(sell_charges, 2),
+            "total_txn_charges": round(buy_charges + sell_charges, 2),
         })
     except Exception as e:
         logger.error(f"balance-sheet error: {e}", exc_info=True)

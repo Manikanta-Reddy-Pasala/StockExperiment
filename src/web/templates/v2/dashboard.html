@@ -69,6 +69,7 @@
     <div class="col-auto"><div class="text-muted small" title="Cash + live position value">Current NAV</div><div class="fs-5 fw-bold" id="tot_nav">--</div></div>
     <div class="col-auto"><div class="text-muted small" title="Realized + unrealized P&L vs allocated">Total P&amp;L</div><div class="fs-5 fw-bold" id="tot_pnl">--</div></div>
     <div class="col-auto"><div class="text-muted small" title="Locked-in profit/loss from closed trades">Realized</div><div class="fs-5 fw-bold" id="tot_realized">--</div></div>
+    <div class="col-auto"><div class="text-muted small" title="Lifetime broker charges across all models (brokerage + STT + GST + exchange + SEBI + stamp + DP)">Total Txn Charges</div><div class="fs-5 fw-bold neg" id="tot_charges">--</div></div>
     <div class="col-auto align-self-center">
       <a href="/settings" class="btn btn-sm btn-outline-secondary"><i class="bi bi-sliders"></i> Manage Allocations</a>
     </div>
@@ -175,6 +176,9 @@ function renderModelCard(m, sig) {
                   <span class="pnl-line ${pnlCls}">${fmtINR(m.pnl_total)} <small>(${fmtPct(m.return_pct)})</small></span>
                 </span>
               </div>
+              <div class="kv"><span class="k">Buy Txn Charges</span><span class="v neg" title="Lifetime broker charges paid on BUY orders (brokerage + exchange + SEBI + stamp + GST)">${fmtINR(m.buy_txn_charges)}</span></div>
+              <div class="kv"><span class="k">Sell Txn Charges</span><span class="v neg" title="Lifetime broker charges paid on SELL orders (brokerage + STT + exchange + SEBI + GST + DP)">${fmtINR(m.sell_txn_charges)}</span></div>
+              <div class="kv"><span class="k">Total Txn Charges</span><span class="v neg" title="BUY + SELL charges paid lifetime">${fmtINR(m.total_txn_charges)}</span></div>
             `;
           })()}
           <div class="footer-bar">
@@ -202,6 +206,8 @@ function renderTotals(t) {
   const realEl = document.getElementById('tot_realized');
   realEl.textContent = fmtINR(t.realized_pnl);
   realEl.className = 'fs-5 fw-bold ' + cls(t.realized_pnl);
+  const chEl = document.getElementById('tot_charges');
+  if (chEl) chEl.textContent = fmtINR(t.total_txn_charges);
 }
 
 function renderSignalsWidget(data) {
