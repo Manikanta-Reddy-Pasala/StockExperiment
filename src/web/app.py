@@ -1103,9 +1103,8 @@ def create_app():
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
     # Register broker-specific blueprints
-    from .routes.brokers import fyers_bp, zerodha_bp
+    from .routes.brokers import fyers_bp
     app.register_blueprint(fyers_bp)
-    app.register_blueprint(zerodha_bp)
 
     # Register admin routes for manual triggers
     try:
@@ -1147,12 +1146,6 @@ def create_app():
     def brokers_fyers():
         """FYERS broker page."""
         return render_template('brokers/fyers.html')
-
-    @app.route('/brokers/zerodha')
-    @login_required
-    def brokers_zerodha():
-        """Zerodha broker page."""
-        return render_template('brokers/zerodha.html')
 
 
 

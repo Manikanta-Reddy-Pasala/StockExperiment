@@ -27,7 +27,6 @@
                                         <label for="broker-selector" class="form-label">Choose Broker</label>
                                         <select class="form-select" id="broker-selector">
                                             <option value="fyers">FYERS</option>
-                                            <option value="zerodha">Zerodha</option>
                                         </select>
                                     </div>
                                     <div class="col-md-6">
@@ -77,34 +76,6 @@
                         </div>
                     </div>
 
-                    <!-- Zerodha Broker Card -->
-                    <div class="col-lg-4 mb-4">
-                        <div class="card h-100 broker-card">
-                            <div class="card-header bg-light">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <h6 class="card-title mb-0">
-                                        <i class="bi bi-building text-primary me-2"></i>Zerodha
-                                    </h6>
-                                    <span class="badge bg-warning">Coming Soon</span>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <p class="card-text">India's largest stock broker with Kite Connect API integration.</p>
-                                <ul class="list-unstyled">
-                                    <li><i class="bi bi-clock text-warning me-2"></i>Kite Connect API</li>
-                                    <li><i class="bi bi-clock text-warning me-2"></i>NSE & BSE Support</li>
-                                    <li><i class="bi bi-clock text-warning me-2"></i>F&O Trading</li>
-                                    <li><i class="bi bi-clock text-warning me-2"></i>Real-time Data</li>
-                                </ul>
-                                <div class="d-grid gap-2">
-                                    <button class="btn btn-outline-secondary" disabled>
-                                        <i class="bi bi-hourglass-split me-1"></i> Coming Soon
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                 </div>
             </div>
         </div>
@@ -138,54 +109,40 @@
     
     // Select broker and navigate to its page
     function selectBroker(broker) {
-        if (broker === 'zerodha') {
-            showNotification('Zerodha integration is coming soon! Please use FYERS for now.', 'info');
-            return;
-        }
-        
         // Navigate to the specific broker page
         window.location.href = `/brokers/${broker}`;
     }
-    
+
     // Get current broker from settings and redirect
     async function getCurrentBrokerAndRedirect() {
         try {
             const response = await fetch('/api/settings', {
                 credentials: 'same-origin'
             });
-            
+
             if (response.ok) {
                 const data = await response.json();
                 if (data.success && data.settings && data.settings.broker_provider) {
                     const currentBroker = data.settings.broker_provider;
                     document.getElementById('broker-selector').value = currentBroker;
-                    
-                    // Auto-redirect to the current broker page
-                    if (currentBroker !== 'zerodha') {
-                        window.location.href = `/brokers/${currentBroker}`;
-                    }
+                    window.location.href = `/brokers/${currentBroker}`;
                 }
             }
         } catch (error) {
             console.error('Error getting current broker:', error);
         }
     }
-    
+
     // Go to selected broker
     function goToSelectedBroker() {
         const selectedBroker = document.getElementById('broker-selector').value;
         selectBroker(selectedBroker);
     }
-    
+
     // Test connection for selected broker
     async function testSelectedBroker() {
         const selectedBroker = document.getElementById('broker-selector').value;
-        
-        if (selectedBroker === 'zerodha') {
-            showNotification('Zerodha integration is coming soon! Please use FYERS for now.', 'info');
-            return;
-        }
-        
+
         try {
             const response = await fetch(`/api/brokers/${selectedBroker}/test`, {
                 method: 'POST'

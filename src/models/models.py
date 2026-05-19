@@ -500,7 +500,7 @@ class BrokerConfiguration(Base):
     
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=True)  # NULL for global configs
-    broker_name = Column(String(50), nullable=False)  # 'fyers', 'zerodha', etc.
+    broker_name = Column(String(50), nullable=False)  # 'fyers'
     client_id = Column(String(100))
     access_token = Column(Text)
     refresh_token = Column(Text)

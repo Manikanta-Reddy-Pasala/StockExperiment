@@ -50,21 +50,8 @@ class BrokerFeatureFactory:
         except ImportError:
             pass  # FYERS providers not available
 
-        # Import and register Zerodha providers
-        try:
-            from ..implementations.zerodha_dashboard_provider import ZerodhaDashboardProvider
-            from ..implementations.zerodha_orders_provider import ZerodhaOrdersProvider
-            from ..implementations.zerodha_portfolio_provider import ZerodhaPortfolioProvider
-            from ..implementations.zerodha_reports_provider import ZerodhaReportsProvider
 
-            self.register_dashboard_provider('zerodha', ZerodhaDashboardProvider)
-            self.register_orders_provider('zerodha', ZerodhaOrdersProvider)
-            self.register_portfolio_provider('zerodha', ZerodhaPortfolioProvider)
-            self.register_reports_provider('zerodha', ZerodhaReportsProvider)
-        except ImportError:
-            pass  # Zerodha providers not available
-        
-    
+
     # Registration methods
     def register_dashboard_provider(self, broker: str, provider_class: Type[IDashboardProvider]):
         """Register a dashboard provider for a broker."""

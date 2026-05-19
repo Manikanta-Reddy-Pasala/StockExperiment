@@ -228,7 +228,7 @@ class UnifiedBrokerService:
     
     # Market data methods
     def get_quotes(self, user_id: int, symbols: List[str]) -> Dict[str, Any]:
-        """Get market quotes from user's selected broker (Fyers/Zerodha). No fallback."""
+        """Get market quotes from Fyers. No fallback."""
         try:
             from src.models.database import get_database_manager
             from src.models.models import User, BrokerConfiguration
@@ -248,9 +248,6 @@ class UnifiedBrokerService:
             if current_broker == 'fyers':
                 from ..brokers.fyers_service import FyersService
                 return FyersService().quotes_multiple(user_id, symbols)
-            elif current_broker == 'zerodha':
-                from ..brokers.zerodha_service import ZerodhaService
-                return ZerodhaService().get_quotes(user_id, ','.join(symbols))
             return self._no_provider_error('quotes')
 
         except Exception as e:
@@ -262,7 +259,7 @@ class UnifiedBrokerService:
             }
 
     def get_historical_data(self, user_id: int, symbol: str, resolution: str = "1D", period: str = "1d") -> Dict[str, Any]:
-        """Get historical data from user's selected broker (Fyers/Zerodha). No fallback."""
+        """Get historical data from Fyers. No fallback."""
         try:
             import re
             from datetime import datetime, timedelta
@@ -302,9 +299,6 @@ class UnifiedBrokerService:
                 from ..brokers.fyers_service import FyersService
                 exchange = symbol.split(':')[0] if ':' in symbol else 'NSE'
                 return FyersService().history(user_id, symbol, exchange, resolution, start_date_str, end_date_str)
-            elif current_broker == 'zerodha':
-                from ..brokers.zerodha_service import ZerodhaService
-                return ZerodhaService().history(user_id, symbol, resolution, start_date_str, end_date_str)
             return self._no_provider_error('historical_data')
 
         except Exception as e:

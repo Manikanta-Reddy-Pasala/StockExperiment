@@ -1,11 +1,9 @@
 """
 Broker Implementations Package
 
-This package contains the concrete implementations of the broker interfaces
-for different brokers like FYERS and Zerodha.
+Concrete implementations of the broker interfaces. Only Fyers is supported.
 """
 
-# FYERS implementations (conditional import)
 try:
     from .fyers_dashboard_provider import FyersDashboardProvider
     from .fyers_orders_provider import FyersOrdersProvider
@@ -15,13 +13,8 @@ try:
 except ImportError:
     FYERS_AVAILABLE = False
 
-# Zerodha implementations (removed - not implemented)
-ZERODHA_AVAILABLE = False
-
-# Build __all__ list conditionally
 __all__ = []
 
-# Add FYERS if available
 if FYERS_AVAILABLE:
     __all__.extend([
         'FyersDashboardProvider',
@@ -29,5 +22,3 @@ if FYERS_AVAILABLE:
         'FyersPortfolioProvider',
         'FyersReportsProvider'
     ])
-
-# Zerodha implementations removed - not available
