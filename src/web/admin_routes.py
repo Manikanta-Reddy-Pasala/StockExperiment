@@ -1406,6 +1406,7 @@ def model_balance_sheet(model_name):
             ensure_models_seeded, get_portfolio_stats,
         )
         from src.models.database import get_database_manager
+        from sqlalchemy import text
 
         ensure_models_seeded()
         stats = get_portfolio_stats(price_lookup=_live_mtm_lookup_for_model(model_name))
