@@ -54,18 +54,19 @@ class SymbolDatabaseService:
                 return {'added': 0, 'updated': 0, 'deactivated': 0, 'errors': 1}
 
             with self.db_manager.get_session() as session:
-                # Get existing symbols from database
+                # Get ALL existing symbols (active + inactive) — fytoken is the PK,
+                # so we MUST consider inactive rows too or INSERT will UniqueViolation
+                # when a previously-deactivated symbol relists.
                 existing_symbols = {}
                 db_symbols = session.query(SymbolMaster).filter(
-                    SymbolMaster.exchange == exchange.upper(),
-                    SymbolMaster.is_active == True
+                    SymbolMaster.exchange == exchange.upper()
                 ).all()
 
                 for db_symbol in db_symbols:
                     existing_symbols[db_symbol.fytoken] = db_symbol
 
                 # Track statistics
-                stats = {'added': 0, 'updated': 0, 'deactivated': 0, 'errors': 0}
+                stats = {'added': 0, 'updated': 0, 'deactivated': 0, 'reactivated': 0, 'errors': 0}
                 active_tokens = set()
 
                 # Process each symbol from Fyers
@@ -79,10 +80,14 @@ class SymbolDatabaseService:
                         active_tokens.add(fytoken)
 
                         if fytoken in existing_symbols:
-                            # Update existing symbol
                             db_symbol = existing_symbols[fytoken]
+                            was_inactive = not db_symbol.is_active
                             updated = self._update_symbol_record(db_symbol, symbol_data)
-                            if updated:
+                            if was_inactive:
+                                db_symbol.is_active = True
+                                db_symbol.updated_at = datetime.utcnow()
+                                stats['reactivated'] += 1
+                            elif updated:
                                 stats['updated'] += 1
                         else:
                             # Add new symbol
@@ -96,9 +101,9 @@ class SymbolDatabaseService:
                         stats['errors'] += 1
                         continue
 
-                # Deactivate symbols not in current Fyers data
+                # Deactivate symbols not in current Fyers data (skip already-inactive)
                 for fytoken, db_symbol in existing_symbols.items():
-                    if fytoken not in active_tokens:
+                    if fytoken not in active_tokens and db_symbol.is_active:
                         db_symbol.is_active = False
                         db_symbol.updated_at = datetime.utcnow()
                         stats['deactivated'] += 1
