@@ -1066,51 +1066,6 @@ def create_app():
             app.logger.error(f"Error saving settings for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
-    # Mock Trading API Routes
-    @app.route('/api/mock-trading/toggle', methods=['POST'])
-    @login_required
-    def api_toggle_mock_trading():
-        """Toggle mock trading mode for a user."""
-        try:
-            data = request.get_json()
-            enabled = data.get('enabled', True)
-
-            with db_manager.get_session() as session:
-                user = session.query(User).filter(User.id == current_user.id).first()
-                if not user:
-                    return jsonify({'success': False, 'error': 'User not found'}), 404
-
-                user.is_mock_trading_mode = enabled
-                session.commit()
-
-                app.logger.info(f"Mock trading mode {'enabled' if enabled else 'disabled'} for user {current_user.id}")
-                return jsonify({
-                    'success': True,
-                    'message': f"Mock trading mode {'enabled' if enabled else 'disabled'}",
-                    'is_mock_trading_mode': enabled
-                })
-        except Exception as e:
-            app.logger.error(f"Error toggling mock trading for user {current_user.id}: {str(e)}")
-            return jsonify({'success': False, 'error': 'Internal server error'}), 500
-
-    @app.route('/api/mock-trading/status', methods=['GET'])
-    @login_required
-    def api_get_mock_trading_status():
-        """Get mock trading status for a user."""
-        try:
-            with db_manager.get_session() as session:
-                user = session.query(User).filter(User.id == current_user.id).first()
-                if not user:
-                    return jsonify({'success': False, 'error': 'User not found'}), 404
-
-                return jsonify({
-                    'success': True,
-                    'is_mock_trading_mode': user.is_mock_trading_mode
-                })
-        except Exception as e:
-            app.logger.error(f"Error getting mock trading status for user {current_user.id}: {str(e)}")
-            return jsonify({'success': False, 'error': 'Internal server error'}), 500
-
     # Broker Selection API
     @app.route('/api/brokers/current', methods=['GET'])
     @login_required

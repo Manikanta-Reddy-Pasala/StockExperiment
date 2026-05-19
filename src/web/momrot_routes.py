@@ -445,11 +445,23 @@ def api_run_logs():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-def _fyers_place_market(symbol: str, qty: int, side: str, user_id: int = 1) -> Dict:
-    """Place LIVE Fyers market order via standardized placeorder."""
+def _fyers_place_market(symbol: str, qty: int, side: str, user_id: int = 1,
+                        model_name: str = "momentum_n100_top5_max1") -> Dict:
+    """Place LIVE Fyers market order via standardized placeorder.
+
+    Also writes an audit_orders row (with computed broker charges) so every
+    UI-triggered trade is captured in the charges-summary aggregates.
+    """
     from src.services.brokers.fyers_service import FyersService
     fyers_sym = symbol if symbol.startswith("NSE:") else f"NSE:{symbol}-EQ"
     svc = FyersService()
+    req = {
+        "symbol": fyers_sym, "qty": int(qty), "side": side.upper(),
+        "product": "CNC", "pricetype": "MARKET",
+        "price": 0.0, "tag": "momrot",
+    }
+    res: Dict = {}
+    err_msg: Optional[str] = None
     try:
         res = svc.placeorder(
             user_id=user_id,
@@ -464,10 +476,31 @@ def _fyers_place_market(symbol: str, qty: int, side: str, user_id: int = 1) -> D
             tag="momrot",
         )
         ok = (res or {}).get("status") in ("success", "ok") or (res or {}).get("s") == "ok"
-        return {"ok": ok, "result": res}
     except Exception as e:
         logger.exception(f"placeorder fail {symbol}")
-        return {"ok": False, "error": str(e)}
+        err_msg = str(e)
+        ok = False
+    # Audit hook — always write, success OR failure
+    try:
+        from src.services.audit_service import write_order
+        oid = (res or {}).get("id") or ((res or {}).get("data") or {}).get("orderid") or ""
+        # Use LTP as ordered_price for MARKET orders so charges compute on a real number
+        px = _fyers_live_ltp(symbol, user_id) or 0.0
+        write_order(
+            model_name=model_name,
+            symbol=fyers_sym, side=side.upper(), qty=int(qty),
+            ordered_price=float(px), fill_price=None, fill_qty=None,
+            product="CNC", pricetype="MARKET",
+            status=("placed" if ok else "rejected"),
+            fyers_order_id=oid,
+            error_text=(err_msg or (None if ok else (res or {}).get("message"))),
+            raw_request=req, raw_response=res if res else {"error": err_msg},
+        )
+    except Exception as _e:
+        logger.debug(f"audit write_order failed: {_e}")
+    if err_msg:
+        return {"ok": False, "error": err_msg}
+    return {"ok": ok, "result": res}
 
 
 def _fyers_available_cash(user_id: int = 1) -> float:

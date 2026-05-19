@@ -1,15 +1,11 @@
 """
 Unified Multi-Broker Service
 
-This service provides a unified interface for all broker features
-using the Strategy pattern and broker-specific implementations.
-
-Supports yfinance as a fallback data provider for paper trading
-when broker API is unavailable.
+Unified interface for all broker features via Strategy pattern.
+Broker-only: Fyers is the sole data source. No yfinance fallback.
 """
 
 import logging
-import os
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from ..interfaces import (
@@ -19,12 +15,6 @@ from ..interfaces import (
 )
 
 logger = logging.getLogger(__name__)
-
-# Data provider mode: 'broker', 'yfinance', or 'auto' (try broker, fallback to yfinance)
-# For quotes: auto fallback is enabled
-# For historical: yfinance fallback is disabled by default (use existing DB data)
-DATA_PROVIDER_MODE = os.getenv('DATA_PROVIDER_MODE', 'auto')
-YFINANCE_HISTORICAL_ENABLED = os.getenv('YFINANCE_HISTORICAL_ENABLED', 'false').lower() == 'true'
 
 
 class UnifiedBrokerService:
@@ -238,16 +228,8 @@ class UnifiedBrokerService:
     
     # Market data methods
     def get_quotes(self, user_id: int, symbols: List[str]) -> Dict[str, Any]:
-        """
-        Get market quotes using user's selected broker.
-        Falls back to yfinance if broker fails and DATA_PROVIDER_MODE is 'auto' or 'yfinance'.
-        """
+        """Get market quotes from user's selected broker (Fyers/Zerodha). No fallback."""
         try:
-            # Check if we should skip broker and go straight to yfinance
-            if DATA_PROVIDER_MODE == 'yfinance':
-                return self._get_quotes_yfinance(symbols)
-
-            # Get the user's current broker from broker configurations
             from src.models.database import get_database_manager
             from src.models.models import User, BrokerConfiguration
 
@@ -255,132 +237,35 @@ class UnifiedBrokerService:
             with db_manager.get_session() as session:
                 user = session.query(User).filter(User.id == user_id).first()
                 if not user:
-                    # No user found, try yfinance if in auto mode
-                    if DATA_PROVIDER_MODE == 'auto':
-                        logger.info("No user found, falling back to yfinance")
-                        return self._get_quotes_yfinance(symbols)
                     return self._no_provider_error('quotes')
 
-                # Get the active broker configuration for the user
                 broker_config = session.query(BrokerConfiguration).filter(
                     BrokerConfiguration.user_id == user_id,
                     BrokerConfiguration.is_active == True
                 ).first()
-
                 current_broker = broker_config.broker_name if broker_config else 'fyers'
 
-            # Try primary broker first
-            result = None
-            primary_broker_failed = False
-
-            # Get quotes based on broker
             if current_broker == 'fyers':
-                try:
-                    from ..brokers.fyers_service import FyersService
-                    broker = FyersService()
-                    result = broker.quotes_multiple(user_id, symbols)
-                    # Check if result indicates authentication/credential failure
-                    if (not result.get('success') and
-                        ('invalid input' in result.get('error', '').lower() or
-                         'authentication' in result.get('error', '').lower() or
-                         'token' in result.get('error', '').lower())):
-                        primary_broker_failed = True
-                        logger.warning(f"Fyers quotes failed with auth/credential error")
-                except Exception as e:
-                    primary_broker_failed = True
-                    logger.warning(f"Fyers service failed with exception: {e}")
-
+                from ..brokers.fyers_service import FyersService
+                return FyersService().quotes_multiple(user_id, symbols)
             elif current_broker == 'zerodha':
                 from ..brokers.zerodha_service import ZerodhaService
-                broker = ZerodhaService()
-                symbols_str = ','.join(symbols)
-                result = broker.get_quotes(user_id, symbols_str)
-            else:
-                if DATA_PROVIDER_MODE == 'auto':
-                    logger.info(f"Unknown broker {current_broker}, falling back to yfinance")
-                    return self._get_quotes_yfinance(symbols)
-                return self._no_provider_error('quotes')
-
-            # Check for both 'success' and 'status' fields to handle different broker response formats
-            broker_failed = primary_broker_failed or (
-                result and
-                not result.get('success', False) and
-                not result.get('status') == 'success'
-            )
-
-            # If primary broker failed, try yfinance fallback
-            if broker_failed:
-                if DATA_PROVIDER_MODE == 'auto':
-                    logger.info(f"Primary broker {current_broker} failed, falling back to yfinance")
-                    return self._get_quotes_yfinance(symbols)
-                else:
-                    logger.warning(f"Primary broker failed and fallback disabled")
-                    return {
-                        'success': False,
-                        'error': 'Primary broker failed and fallback disabled',
-                        'data': {},
-                        'primary_broker': current_broker
-                    }
-
-            return result if result else self._no_provider_error('quotes')
+                return ZerodhaService().get_quotes(user_id, ','.join(symbols))
+            return self._no_provider_error('quotes')
 
         except Exception as e:
             logger.error(f"Error getting quotes for user {user_id}: {e}")
-            # Try yfinance as last resort in auto mode
-            if DATA_PROVIDER_MODE == 'auto':
-                logger.info("Exception occurred, falling back to yfinance")
-                return self._get_quotes_yfinance(symbols)
             return {
                 'success': False,
                 'error': f'Failed to get quotes: {str(e)}',
                 'data': {}
             }
 
-    def _get_quotes_yfinance(self, symbols: List[str]) -> Dict[str, Any]:
-        """Get quotes using yfinance as fallback provider."""
-        try:
-            from ..data.yfinance_data_service import get_yfinance_service
-            yf_service = get_yfinance_service()
-
-            quotes = yf_service.get_quotes_bulk(symbols)
-
-            if quotes:
-                return {
-                    'success': True,
-                    'data': quotes,
-                    'provider': 'yfinance',
-                    'message': f'Fetched {len(quotes)} quotes via yfinance'
-                }
-            else:
-                return {
-                    'success': False,
-                    'error': 'No quotes received from yfinance',
-                    'data': {},
-                    'provider': 'yfinance'
-                }
-        except ImportError:
-            logger.error("yfinance not installed. Run: pip install yfinance")
-            return {
-                'success': False,
-                'error': 'yfinance not installed',
-                'data': {}
-            }
-        except Exception as e:
-            logger.error(f"yfinance fallback failed: {e}")
-            return {
-                'success': False,
-                'error': f'yfinance fallback failed: {str(e)}',
-                'data': {}
-            }
-    
     def get_historical_data(self, user_id: int, symbol: str, resolution: str = "1D", period: str = "1d") -> Dict[str, Any]:
-        """
-        Get historical data using user's selected broker.
-        Falls back to yfinance if broker fails and DATA_PROVIDER_MODE is 'auto' or 'yfinance'.
-        """
+        """Get historical data from user's selected broker (Fyers/Zerodha). No fallback."""
         try:
-            # Parse days from period for yfinance fallback
             import re
+            from datetime import datetime, timedelta
             if period == "1d":
                 days = 1
             elif period == "1w":
@@ -393,12 +278,6 @@ class UnifiedBrokerService:
                 match = re.match(r'(\d+)d', period)
                 days = int(match.group(1)) if match else 1
 
-            # Check if we should skip broker and go straight to yfinance
-            # Note: yfinance historical is disabled by default to avoid rate limits
-            if DATA_PROVIDER_MODE == 'yfinance' and YFINANCE_HISTORICAL_ENABLED:
-                return self._get_historical_data_yfinance(symbol, days)
-
-            # Get the user's current broker from broker configurations
             from src.models.database import get_database_manager
             from src.models.models import User, BrokerConfiguration
 
@@ -406,141 +285,36 @@ class UnifiedBrokerService:
             with db_manager.get_session() as session:
                 user = session.query(User).filter(User.id == user_id).first()
                 if not user:
-                    if DATA_PROVIDER_MODE == 'auto' and YFINANCE_HISTORICAL_ENABLED:
-                        logger.info("No user found, falling back to yfinance for historical data")
-                        return self._get_historical_data_yfinance(symbol, days)
                     return self._no_provider_error('historical_data')
 
-                # Get the active broker configuration for the user
                 broker_config = session.query(BrokerConfiguration).filter(
                     BrokerConfiguration.user_id == user_id,
                     BrokerConfiguration.is_active == True
                 ).first()
-
                 current_broker = broker_config.broker_name if broker_config else 'fyers'
 
-            # Calculate start and end dates based on period
-            from datetime import datetime, timedelta
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days)
-
             start_date_str = start_date.strftime('%Y-%m-%d')
             end_date_str = end_date.strftime('%Y-%m-%d')
 
-            result = None
-            broker_failed = False
-
-            # Get historical data based on broker
             if current_broker == 'fyers':
-                try:
-                    from ..brokers.fyers_service import FyersService
-                    broker = FyersService()
-                    # Extract exchange from symbol (e.g., "NSE:NLCINDIA-EQ" -> "NSE")
-                    exchange = symbol.split(':')[0] if ':' in symbol else 'NSE'
-                    result = broker.history(user_id, symbol, exchange, resolution, start_date_str, end_date_str)
-
-                    # Check if result indicates failure
-                    if not result.get('success') and not result.get('status') == 'success':
-                        broker_failed = True
-                        logger.warning(f"Fyers historical data failed: {result.get('error', 'Unknown error')}")
-                except Exception as e:
-                    broker_failed = True
-                    logger.warning(f"Fyers history service failed: {e}")
-
+                from ..brokers.fyers_service import FyersService
+                exchange = symbol.split(':')[0] if ':' in symbol else 'NSE'
+                return FyersService().history(user_id, symbol, exchange, resolution, start_date_str, end_date_str)
             elif current_broker == 'zerodha':
-                try:
-                    from ..brokers.zerodha_service import ZerodhaService
-                    broker = ZerodhaService()
-                    result = broker.history(user_id, symbol, resolution, start_date_str, end_date_str)
-
-                    if not result.get('success') and not result.get('status') == 'success':
-                        broker_failed = True
-                except Exception as e:
-                    broker_failed = True
-                    logger.warning(f"Zerodha history service failed: {e}")
-            else:
-                broker_failed = True
-
-            # If broker failed, try yfinance fallback only if enabled
-            # Historical data fallback via yfinance is disabled by default to avoid rate limits
-            if broker_failed:
-                if DATA_PROVIDER_MODE == 'auto' and YFINANCE_HISTORICAL_ENABLED:
-                    logger.info(f"Broker historical data failed for {symbol}, falling back to yfinance")
-                    return self._get_historical_data_yfinance(symbol, days)
-                else:
-                    # Don't use yfinance for bulk historical data - use existing DB data
-                    logger.warning(f"Broker failed for {symbol}, yfinance historical fallback disabled")
-                    return {
-                        'success': False,
-                        'error': 'Broker failed. Use existing historical data from database.',
-                        'data': {}
-                    }
-
-            return result if result else self._no_provider_error('historical_data')
+                from ..brokers.zerodha_service import ZerodhaService
+                return ZerodhaService().history(user_id, symbol, resolution, start_date_str, end_date_str)
+            return self._no_provider_error('historical_data')
 
         except Exception as e:
             logger.error(f"Error getting historical data for user {user_id}, symbol {symbol}: {e}")
-            # Try yfinance as last resort only if explicitly enabled (avoid rate limits)
-            if DATA_PROVIDER_MODE == 'auto' and YFINANCE_HISTORICAL_ENABLED:
-                logger.info(f"Exception occurred for {symbol}, falling back to yfinance")
-                return self._get_historical_data_yfinance(symbol, days if 'days' in locals() else 365)
             return {
                 'success': False,
                 'error': f'Failed to get historical data: {str(e)}',
                 'data': {}
             }
 
-    def _get_historical_data_yfinance(self, symbol: str, days: int = 365) -> Dict[str, Any]:
-        """Get historical data using yfinance as fallback provider."""
-        try:
-            from ..data.yfinance_data_service import get_yfinance_service
-            yf_service = get_yfinance_service()
-
-            df = yf_service.get_historical_data(symbol, days)
-
-            if df is not None and not df.empty:
-                # Convert DataFrame to list of dicts for consistency with broker format
-                candles = []
-                for _, row in df.iterrows():
-                    candles.append({
-                        'date': row['date'].isoformat() if hasattr(row['date'], 'isoformat') else str(row['date']),
-                        'open': float(row['open']),
-                        'high': float(row['high']),
-                        'low': float(row['low']),
-                        'close': float(row['close']),
-                        'volume': int(row['volume'])
-                    })
-
-                return {
-                    'success': True,
-                    'data': {'candles': candles},
-                    'provider': 'yfinance',
-                    'symbol': symbol,
-                    'records': len(candles),
-                    'message': f'Fetched {len(candles)} candles via yfinance'
-                }
-            else:
-                return {
-                    'success': False,
-                    'error': f'No historical data received from yfinance for {symbol}',
-                    'data': {},
-                    'provider': 'yfinance'
-                }
-        except ImportError:
-            logger.error("yfinance not installed. Run: pip install yfinance")
-            return {
-                'success': False,
-                'error': 'yfinance not installed',
-                'data': {}
-            }
-        except Exception as e:
-            logger.error(f"yfinance historical data fallback failed for {symbol}: {e}")
-            return {
-                'success': False,
-                'error': f'yfinance fallback failed: {str(e)}',
-                'data': {}
-            }
-    
     # Utility methods
     def get_available_brokers(self) -> Dict[str, Dict[str, bool]]:
         """Get list of available brokers and their supported features."""

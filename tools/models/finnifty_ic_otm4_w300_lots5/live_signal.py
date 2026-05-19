@@ -7,9 +7,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
-# Reuse all helpers from sister model; only the strategy params differ.
-from tools.models.finnifty_ic_otm3_w500_lots4 import live_signal as base
-from tools.models.finnifty_ic_otm3_w500_lots4.live_signal import main as _main
+# Iron Condor base logic lives alongside as a private module (was previously
+# imported from sibling otm3 model, but otm3 was archived 2026-05-16. Inlined
+# here so otm4 stands alone.)
+from tools.models.finnifty_ic_otm4_w300_lots5 import _base_logic as base
+from tools.models.finnifty_ic_otm4_w300_lots5._base_logic import main as _main
 
 # Override params for this variant
 base.MODEL_NAME = "finnifty_ic_otm4_w300_lots5"
