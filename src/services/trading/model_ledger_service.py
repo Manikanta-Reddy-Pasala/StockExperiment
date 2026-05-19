@@ -429,13 +429,36 @@ def reset_position(model_name: str) -> Dict:
 
 # ---- Live buy/sell hooks (called by executor) ----
 
+def _compute_real_charges(side: str, qty: int, price: float,
+                          product: str = "CNC") -> Decimal:
+    """Return full SEBI-rate charges total (brokerage+STT+exchange+SEBI+stamp+GST+DP).
+
+    Falls back to a flat-rate approximation if the calculator isn't importable
+    (defensive — module is in tools/, not src/).
+    """
+    try:
+        from tools.live.broker_charges import compute_charges
+        br = compute_charges(side, qty, price, product)
+        return Decimal(str(br.get("total", 0)))
+    except Exception:
+        approx = Decimal("20")
+        if side.upper() == "SELL":
+            approx += Decimal(str(qty)) * Decimal(str(price)) * Decimal("0.001")
+        return approx
+
+
 def record_buy(model_name: str, symbol: str, qty: int, price: float,
-               brokerage: float = 20, fyers_order_id: str = None) -> Dict:
+               brokerage: float = None, fyers_order_id: str = None,
+               product: str = "CNC") -> Dict:
     """Record a BUY fill.
 
-    Cash flow: cash -= (qty*price + brokerage)
-    NAV flow:  current_amount -= brokerage
+    Cash flow: cash -= (qty*price + charges)
+    NAV flow:  current_amount -= charges
                (qty*price stays as position value, so net NAV moves only by fees)
+
+    charges = full SEBI-rate broker_charges.compute_charges (brokerage + exchange
+    + SEBI + stamp + GST), not the legacy ₹20 flat. brokerage kwarg is ignored —
+    kept for back-compat with older call sites.
     """
     db = get_database_manager()
     with db.get_session() as s:
@@ -447,8 +470,8 @@ def record_buy(model_name: str, symbol: str, qty: int, price: float,
             raise ValueError(f"{model_name}: already holding {l.open_symbol}")
         qty_d = Decimal(str(qty))
         price_d = Decimal(str(price))
-        brk_d = Decimal(str(brokerage))
-        cost = qty_d * price_d + brk_d
+        charges = _compute_real_charges("BUY", qty, price, product)
+        cost = qty_d * price_d + charges
         if l.cash < cost:
             raise ValueError(
                 f"{model_name}: cash {float(l.cash):,.0f} < cost {float(cost):,.0f}"
@@ -459,8 +482,7 @@ def record_buy(model_name: str, symbol: str, qty: int, price: float,
         l.open_qty = qty
         l.open_entry_px = price_d
         l.open_entry_date = date.today()
-        # NAV moves only by brokerage at entry (position value = cost minus fees)
-        settings.current_amount = (settings.current_amount or Decimal(0)) - brk_d
+        settings.current_amount = (settings.current_amount or Decimal(0)) - charges
         s.add(ModelTrade(
             model_name=model_name,
             side="BUY",
@@ -475,13 +497,16 @@ def record_buy(model_name: str, symbol: str, qty: int, price: float,
 
 
 def record_sell(model_name: str, exit_price: float, reason: str,
-                brokerage: float = 20, stt_pct: float = 0.001,
-                fyers_order_id: str = None) -> Dict:
+                brokerage: float = None, stt_pct: float = None,
+                fyers_order_id: str = None, product: str = "CNC") -> Dict:
     """Record a SELL fill.
 
-    Cash flow: cash += (qty*exit_price - fees)
+    Cash flow: cash += (qty*exit_price - charges)
     NAV flow:  current_amount = cash (position flat, no open MTM)
                — recomputed from cash because we just realized the trade.
+
+    charges = full SEBI-rate broker_charges.compute_charges (incl. STT, DP, GST).
+    brokerage + stt_pct kwargs are ignored — kept for back-compat.
     """
     db = get_database_manager()
     with db.get_session() as s:
@@ -492,8 +517,12 @@ def record_sell(model_name: str, exit_price: float, reason: str,
         qty = l.open_qty
         entry_px = l.open_entry_px
         proc = Decimal(str(qty)) * Decimal(str(exit_price))
-        fees = proc * Decimal(str(stt_pct)) + Decimal(str(brokerage))
+        fees = _compute_real_charges("SELL", qty, float(exit_price), product)
         net = proc - fees
+        # P&L = exit proceeds (net of sell-side charges) minus entry cost. Entry
+        # cost in the ledger already reflects buy-side charges (cash was
+        # decremented by qty*entry_px + buy_charges at record_buy time), so the
+        # cumulative realized_pnl across a round-trip captures BOTH legs.
         pnl = net - (Decimal(str(qty)) * entry_px)
         l.cash = l.cash + net
         l.realized_pnl = (l.realized_pnl or Decimal(0)) + pnl
