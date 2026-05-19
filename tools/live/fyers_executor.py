@@ -168,7 +168,7 @@ def _get_order_status(svc, user_id: int, order_id: str) -> Optional[Dict]:
         for row in rows or []:
             if not isinstance(row, dict):
                 continue
-            rid = str(row.get("id") or row.get("orderId") or "")
+            rid = str(row.get("orderid") or row.get("id") or row.get("orderId") or "")
             if rid and rid == str(order_id):
                 return row
     except Exception as e:
@@ -192,21 +192,27 @@ def _resolve_recent_order_id(svc, user_id: int, symbol: str, qty: int,
         # Newest first if possible
         rows = sorted(
             rows or [],
-            key=lambda r: r.get("orderDateTime") or r.get("createdAt") or "",
+            key=lambda r: r.get("orderDateTime") or r.get("timestamp") or r.get("createdAt") or "",
             reverse=True,
         )
+        side_upper = side.upper()
         for r in rows:
             if not isinstance(r, dict):
                 continue
             sym = (r.get("symbol") or "").upper()
             if symbol.upper() not in sym and sym not in symbol.upper():
                 continue
-            if str(r.get("qty") or r.get("quantity") or "") != str(qty):
+            if str(r.get("quantity") or r.get("qty") or "") != str(qty):
                 continue
+            # Fyers wrapped rows give 'action' (BUY/SELL string); raw rows
+            # give 'side' (1/-1 int). Accept either.
+            r_action = (r.get("action") or "").upper()
             r_side = r.get("side")
-            if r_side is not None and r_side != side_code:
+            if r_action and r_action != side_upper:
                 continue
-            return str(r.get("id") or r.get("orderId") or "")
+            if (not r_action) and r_side is not None and r_side != side_code:
+                continue
+            return str(r.get("orderid") or r.get("id") or r.get("orderId") or "")
     except Exception as e:
         log.debug(f"_resolve_recent_order_id failed: {e}")
     return ""
