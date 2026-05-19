@@ -241,6 +241,41 @@ def cleanup_old_csv_files(export_dir: Path, keep_days: int = 30):
         logger.error(f"  ❌ CSV cleanup failed: {e}")
 
 
+def refresh_universe_csvs():
+    """
+    Refresh all 4 Nifty universe CSVs (nifty100, nifty500, midcap150, smallcap250)
+    from NSE archives. NSE reconstitutes indices in March + September each year;
+    midcap150/smallcap250 also see periodic reshuffles. Run weekly to catch
+    additions/removals (e.g., FY25 IPOs entering Nifty 500).
+
+    Files written:
+      - src/data/symbols/nifty100.csv
+      - src/data/symbols/nifty500.csv
+      - src/data/symbols/nifty_midcap150.csv
+      - src/data/symbols/nifty_smallcap250.csv
+    """
+    logger.info("=" * 80)
+    logger.info("Refreshing Nifty universe CSVs from NSE")
+    logger.info("=" * 80)
+    scripts = [
+        "tools/refresh_nifty100.py",
+        "tools/refresh_nifty500.py",
+        "tools/refresh_nifty_midcap150.py",
+        "tools/refresh_nifty_smallcap250.py",
+    ]
+    import subprocess
+    for s in scripts:
+        try:
+            r = subprocess.run(["python3", s], capture_output=True,
+                               text=True, timeout=60, cwd="/app")
+            if r.returncode == 0:
+                logger.info(f"  ✅ {s}: {r.stdout.strip().splitlines()[-1] if r.stdout.strip() else 'ok'}")
+            else:
+                logger.error(f"  ❌ {s} failed (rc={r.returncode}): {r.stderr.strip()[-200:]}")
+        except Exception as e:
+            logger.error(f"  ❌ {s} exception: {e}")
+
+
 def update_symbol_master():
     """
     Update symbol master CSV from NSE (Weekly on Monday at 6:00 AM).
@@ -379,14 +414,55 @@ def run_scheduler():
         logger.debug(f"audit BOOT failed: {_e}")
     logger.info("Scheduled Tasks:")
     logger.info("  - Symbol Master Update:    Weekly (Monday) at 06:00 AM")
+    logger.info("  - Universe CSV Refresh:    Weekly (Saturday) at 06:00 AM (nifty100/500/midcap/smallcap)")
+    logger.info("  - Boot catch-up:           Auto-refresh any cache >7d old on startup")
     logger.info("  - Per-model data jobs registered below")
     logger.info("  - Data Pipeline (4 steps): Daily at 09:00 PM (after market close)")
     logger.info("  - CSV Export:              Daily at 10:00 PM")
     logger.info("  - Data Quality Check:      Daily at 10:00 PM (parallel with CSV)")
     logger.info("=" * 80)
 
-    # Weekly symbol master update (Monday 6 AM)
+    # Weekly symbol master update (Monday 6 AM) — refreshes NSE_CM_symbols.json cache
     schedule.every().monday.at("06:00").do(update_symbol_master)
+
+    # Weekly universe CSV refresh (Saturday 06:00) — nifty100/500/midcap150/smallcap250
+    # Saturday is post-Friday-close + before Monday open, captures NSE rebalance announcements
+    schedule.every().saturday.at("06:00").do(refresh_universe_csvs)
+
+    # Catch-up on startup: if any universe CSV or symbol cache is >7 days old,
+    # refresh immediately (so container restarts heal stale files automatically).
+    try:
+        import datetime as _dt
+        cache_dir = "/app/src/data/symbols"
+        stale_threshold = _dt.timedelta(days=7)
+        now = _dt.datetime.now()
+        files_to_check = [
+            ("nifty100.csv", refresh_universe_csvs),
+            ("nifty500.csv", refresh_universe_csvs),
+            ("nifty_midcap150.csv", refresh_universe_csvs),
+            ("nifty_smallcap250.csv", refresh_universe_csvs),
+            ("NSE_CM_symbols.json", update_symbol_master),
+        ]
+        triggered = set()
+        for fname, fn in files_to_check:
+            fpath = os.path.join(cache_dir, fname)
+            if not os.path.exists(fpath):
+                age_msg = "missing"
+            else:
+                age = now - _dt.datetime.fromtimestamp(os.path.getmtime(fpath))
+                if age <= stale_threshold:
+                    continue
+                age_msg = f"{age.days}d old"
+            if fn.__name__ in triggered:
+                continue
+            triggered.add(fn.__name__)
+            logger.info(f"Boot catch-up: {fname} {age_msg} → running {fn.__name__}() now")
+            try:
+                fn()
+            except Exception as e:
+                logger.error(f"Boot catch-up {fn.__name__} failed: {e}", exc_info=True)
+    except Exception as _e:
+        logger.warning(f"Boot catch-up scan failed: {_e}")
 
     # Per-model data jobs. Add new models by creating
     # tools/models/<name>/cron.py with register_data_jobs(schedule).
