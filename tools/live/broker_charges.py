@@ -28,13 +28,15 @@ from typing import Dict
 
 # Rate constants — kept as Decimal for precision
 BROKERAGE_FLAT = Decimal("20.00")        # per order
-STT_SELL_PCT = Decimal("0.0010")         # 0.10%
-EXCHANGE_TXN_PCT = Decimal("0.0000345")  # 0.00345%
-SEBI_PCT = Decimal("0.000001")           # 0.0001%
-STAMP_BUY_PCT = Decimal("0.00015")       # 0.015%
+STT_SELL_CNC_PCT = Decimal("0.0010")     # 0.10% delivery sell-side
+STT_SELL_MIS_PCT = Decimal("0.00025")    # 0.025% intraday sell-side
+EXCHANGE_TXN_PCT = Decimal("0.0000345")  # 0.00345% both sides
+SEBI_PCT = Decimal("0.000001")           # 0.0001% both sides
+STAMP_BUY_CNC_PCT = Decimal("0.00015")   # 0.015% delivery buy-side
+STAMP_BUY_MIS_PCT = Decimal("0.00003")   # 0.003% intraday buy-side
 STAMP_BUY_CAP = Decimal("1500.00")
 GST_PCT = Decimal("0.18")                # 18%
-DP_CHARGES_INCL_GST = Decimal("15.93")   # CDSL Rs.13.5 + 18% GST
+DP_CHARGES_INCL_GST = Decimal("15.93")   # CDSL Rs.13.5 + 18% GST (CNC sell only)
 
 
 def compute_charges(side: str, qty: int, price: float,
@@ -52,29 +54,36 @@ def compute_charges(side: str, qty: int, price: float,
     if not qty or not price or qty < 0 or price <= 0:
         return _zero_breakdown()
 
-    if product.upper() != "CNC":
-        # Future: INTRADAY rates differ; for now flag and return zero.
+    prod_u = product.upper()
+    is_intraday = prod_u in ("INTRADAY", "MIS")
+    is_cnc = prod_u in ("CNC", "DELIVERY", "MARGIN")
+    if not (is_intraday or is_cnc):
         return _zero_breakdown(note=f"unsupported product: {product}")
 
     side_u = (side or "").upper()
     turnover = Decimal(str(qty)) * Decimal(str(price))
 
-    # Brokerage flat (or capped) — Fyers caps at Rs.20 per order delivery
+    # Brokerage flat (or capped) — Fyers: min(Rs.20, 0.03% × turnover)
     brokerage = min(BROKERAGE_FLAT, turnover * Decimal("0.0003"))
     brokerage = max(brokerage, Decimal("0"))
 
-    # STT: SELL only for delivery
-    stt = (turnover * STT_SELL_PCT) if side_u == "SELL" else Decimal("0")
+    # STT: SELL only. CNC=0.10%, INTRADAY=0.025%
+    if side_u == "SELL":
+        stt_rate = STT_SELL_MIS_PCT if is_intraday else STT_SELL_CNC_PCT
+        stt = turnover * stt_rate
+    else:
+        stt = Decimal("0")
 
-    # Exchange transaction charges (both sides)
+    # Exchange transaction charges (both sides, same rate for CNC/MIS)
     exchange = turnover * EXCHANGE_TXN_PCT
 
     # SEBI charges (both sides)
     sebi = turnover * SEBI_PCT
 
-    # Stamp duty: BUY only, capped
+    # Stamp duty: BUY only. CNC=0.015%, INTRADAY=0.003%
     if side_u == "BUY":
-        stamp = min(turnover * STAMP_BUY_PCT, STAMP_BUY_CAP)
+        stamp_rate = STAMP_BUY_MIS_PCT if is_intraday else STAMP_BUY_CNC_PCT
+        stamp = min(turnover * stamp_rate, STAMP_BUY_CAP)
     else:
         stamp = Decimal("0")
 
@@ -82,8 +91,8 @@ def compute_charges(side: str, qty: int, price: float,
     gst_base = brokerage + exchange + sebi
     gst = gst_base * GST_PCT
 
-    # DP charges: SELL only, flat per scrip per day (already GST-inclusive)
-    dp = DP_CHARGES_INCL_GST if side_u == "SELL" else Decimal("0")
+    # DP charges: CNC sell only (no demat involvement for intraday)
+    dp = DP_CHARGES_INCL_GST if (side_u == "SELL" and is_cnc) else Decimal("0")
 
     total = brokerage + stt + exchange + sebi + stamp + gst + dp
 
