@@ -54,9 +54,13 @@ def emit_signal():
 
 
 def execute_orders():
-    """LIVE_TRADING_OPTIONS-gated. Option multi-leg executor not yet wired."""
-    if os.environ.get("LIVE_TRADING_OPTIONS", "false").lower() != "true":
-        log.info(f"{MODEL_NAME} execute: LIVE_TRADING_OPTIONS != 'true', skipping.")
+    """LIVE_TRADING-gated. Option multi-leg executor not yet wired.
+
+    Uses the same LIVE_TRADING flag as equity models — options enable/disable
+    is controlled per-model via ModelSettings.enabled, not a second env var.
+    """
+    if os.environ.get("LIVE_TRADING", "false").lower() != "true":
+        log.info(f"{MODEL_NAME} execute: LIVE_TRADING != 'true', skipping.")
         return
     today = datetime.now().strftime("%Y-%m-%d")
     signals_file = SIGNALS_DIR / f"{today}.json"
