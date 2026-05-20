@@ -31,7 +31,9 @@ SPOT_MAP = {
 LOT_HISTORY = {
     "NIFTY":     {date(2024, 9, 24): 75, date(1, 1, 1): 50},
     "BANKNIFTY": {date(2024, 9, 24): 30, date(1, 1, 1): 15},
-    "FINNIFTY":  {date(2024, 9, 24): 65, date(1, 1, 1): 40},
+    # FinNifty: 40 → 65 (Sep 2024) → 60 (2026 SEBI revision)
+    "FINNIFTY":  {date(2026, 1, 1): 60, date(2024, 9, 24): 65,
+                  date(1, 1, 1): 40},
 }
 STRIKE_STEP = {"NIFTY": 50, "BANKNIFTY": 100, "FINNIFTY": 50}
 

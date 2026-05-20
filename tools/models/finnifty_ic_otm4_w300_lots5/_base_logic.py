@@ -36,7 +36,7 @@ WING_WIDTH = 500
 STOP_MULT = 3.0
 LOTS = 4
 STRIKE_STEP = 50
-LOT_SIZE = 65  # post Sep 2024
+LOT_SIZE = 60  # post 2026 SEBI lot-size revision (was 65 post Sep 2024)
 
 
 def get_spot_close(d: date) -> Optional[float]:
