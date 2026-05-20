@@ -134,9 +134,16 @@ def export_daily_csv():
         import pandas as pd
         import os
         
-        # Create exports directory
         export_dir = Path('exports')
         export_dir.mkdir(exist_ok=True)
+        try:
+            os.chmod(export_dir, 0o777)
+        except (PermissionError, OSError):
+            pass
+        if not os.access(export_dir, os.W_OK):
+            export_dir = Path('/app/logs/exports')
+            export_dir.mkdir(parents=True, exist_ok=True)
+            logger.warning(f"exports/ not writable, falling back to {export_dir}")
         
         today = datetime.now().strftime('%Y-%m-%d')
         

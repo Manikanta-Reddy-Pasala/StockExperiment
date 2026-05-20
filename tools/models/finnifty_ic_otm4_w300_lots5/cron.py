@@ -67,8 +67,25 @@ def execute_orders():
     if not signals_file.exists():
         log.info(f"{MODEL_NAME} execute: no signal at {signals_file}, skipping.")
         return
-    log.warning(f"{MODEL_NAME}: option Fyers executor not yet implemented. "
-                f"Signals at {signals_file} ready for manual review.")
+    log.info(f"PLACING {MODEL_NAME} FYERS ORDERS (4-leg IC via options executor)")
+    cmd = [
+        "python3", "tools/live/fyers_executor_options.py",
+        "--signals", str(signals_file),
+        "--model-name", MODEL_NAME,
+        "--product", "MARGIN",
+    ]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if r.returncode == 0:
+            log.info(f"✅ {MODEL_NAME} Fyers execute complete")
+            if r.stdout:
+                log.info(r.stdout[-600:])
+        else:
+            log.error(f"❌ {MODEL_NAME} Fyers execute failed ({r.returncode})")
+            if r.stderr:
+                log.error(r.stderr[-600:])
+    except Exception as e:
+        log.error(f"❌ {MODEL_NAME} Fyers execute error: {e}")
 
 
 def register_trading_jobs(schedule):

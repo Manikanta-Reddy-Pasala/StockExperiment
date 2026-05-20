@@ -702,6 +702,24 @@ def main() -> int:
     log.info(f"Done: placed={placed} closed={closed} skipped={skipped} "
              f"(live={live}, dry_run={args.dry_run}, "
              f"model={args.model_name or '(env)'})")
+
+    # HOLD audit — when cron runs but no entry/exit was taken, still log
+    # the decision so audit_rebalance_decisions has one row per (model, day).
+    if placed == 0 and closed == 0 and skipped == 0:
+        try:
+            from src.services.audit_service import write_rebalance_decision
+            held_obj = open_positions[0] if open_positions else None
+            write_rebalance_decision(
+                model_name=args.model_name or "(env)",
+                trigger="CRON" if not args.dry_run else "DRY",
+                decision="HOLD",
+                reason="no entry/exit signals emitted today",
+                held_symbol=held_obj.symbol if held_obj else None,
+                held_qty=held_obj.qty if held_obj else None,
+                held_entry_px=held_obj.entry_price if held_obj else None,
+            )
+        except Exception as e:
+            log.debug(f"HOLD audit write failed: {e}")
     return 0
 
 
