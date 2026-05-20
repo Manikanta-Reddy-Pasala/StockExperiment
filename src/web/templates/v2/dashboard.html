@@ -177,18 +177,23 @@ function renderModelCard(m, sig) {
             const drift = reconSum - reconTarget;
             const reconCls = Math.abs(drift) < 1 ? 'pos' : 'neg';
             return `
-              <div class="kv"><span class="k">Allocated</span><span class="v" title="Original capital deposited">${fmtINR(invested)}</span></div>
+              <div class="kv"><span class="k"><strong>Allocated</strong></span><span class="v" title="Original capital deposited">${fmtINR(invested)}</span></div>
               <div class="kv"><span class="k">Open Position</span><span class="v">${posLine}</span></div>
-              <div class="kv"><span class="k">Cost Basis (open pos)</span><span class="v" title="qty × entry price — what you paid, ex-charges">${fmtINR(posCost)}</span></div>
-              <div class="kv"><span class="k">Buy Charges (open pos)</span><span class="v neg" title="Broker charges paid on this BUY (brokerage + exchange + SEBI + stamp + GST)">${fmtINR(openChg)}</span></div>
-              <div class="kv"><span class="k">Position Value (Live)</span><span class="v" title="MTM = qty × live LTP">${fmtINR(posValue)}</span></div>
-              <div class="kv"><span class="k">Idle Cash</span><span class="v" title="Cash not tied up in open position">${fmtINR(idleCash)}</span></div>
-              <div class="kv"><span class="k">Realized P&amp;L</span><span class="v ${cls(realized)}" title="Cumulative from closed trades">${fmtINR(realized)}</span></div>
-              <div class="kv"><span class="k">Unrealized P&amp;L</span><span class="v ${cls(unreal)}" title="Live MTM − entry cost">${fmtINR(unreal)}</span></div>
-              <div class="kv" title="Identity: cash + cost basis + buy chg + sell chg - realized_gross = Allocated. Every rupee of allocated capital accounted for. Non-zero drift signals accounting drift (e.g. partial fills, off-books trades).">
-                <span class="k">Reconcile (all flows)</span>
-                <span class="v ${reconCls}">${fmtINR(reconSum)} <small>(target ${fmtINR(invested)}, drift ${drift >= 0 ? '+' : ''}${fmtINR(drift)})</small></span>
+              <div class="kv reconcile-hdr"><span class="k" colspan="2" style="font-size:0.7rem;color:#6c757d;text-transform:uppercase;letter-spacing:0.5px;">Capital flow (sums to Allocated)</span></div>
+              <div class="kv"><span class="k">+ Idle Cash</span><span class="v" title="Cash not tied up in open position">${fmtINR(idleCash)}</span></div>
+              <div class="kv"><span class="k">+ Cost Basis (open pos)</span><span class="v" title="qty × entry price — what you paid, ex-charges">${fmtINR(posCost)}</span></div>
+              <div class="kv"><span class="k">+ Buy Chg (lifetime)</span><span class="v neg" title="Lifetime broker charges paid on BUY orders (brokerage + exchange + SEBI + stamp + GST)">${fmtINR(lifetimeBuyChg)}</span></div>
+              <div class="kv"><span class="k">+ Sell Chg (lifetime)</span><span class="v neg" title="Lifetime broker charges paid on SELL orders (brokerage + STT + exchange + SEBI + GST + DP)">${fmtINR(lifetimeSellChg)}</span></div>
+              <div class="kv"><span class="k">− Realized P&amp;L (gross)</span><span class="v ${cls(realGross)}" title="Pure price-diff P&L on closed trades (= Realized net + Sell chg). Subtracted because the price-diff already moved between cash and entries — sum-only would double-count.">${fmtINR(realGross)}</span></div>
+              <div class="kv" title="Identity: cash + cost basis + buy chg + sell chg − realized_gross = Allocated. Every rupee accounted for.">
+                <span class="k"><strong>= Reconcile</strong></span>
+                <span class="v ${reconCls}"><strong>${fmtINR(reconSum)}</strong> <small>(drift ${drift >= 0 ? '+' : ''}${fmtINR(drift)})</small></span>
               </div>
+              <div class="kv reconcile-hdr"><span class="k" colspan="2" style="font-size:0.7rem;color:#6c757d;text-transform:uppercase;letter-spacing:0.5px;">Live position view</span></div>
+              <div class="kv"><span class="k">Position Value (Live MTM)</span><span class="v" title="MTM = qty × live LTP">${fmtINR(posValue)}</span></div>
+              <div class="kv"><span class="k">Unrealized P&amp;L</span><span class="v ${cls(unreal)}" title="Live MTM − entry cost">${fmtINR(unreal)}</span></div>
+              <div class="kv"><span class="k">Realized P&amp;L (net)</span><span class="v ${cls(realized)}" title="Cumulative from closed trades, net of sell charges">${fmtINR(realized)}</span></div>
+              <div class="kv"><span class="k">Buy Chg (open pos only)</span><span class="v neg" title="Buy charges paid on current open position only (subset of lifetime). Informational — not added separately to Reconcile.">${fmtINR(openChg)}</span></div>
               <div class="kv nav-row"><span class="k">Available (Net Worth)</span><span class="v" title="Cash + live position value = total spend power if liquidated">${fmtINR(nav)}</span></div>
               <div class="kv">
                 <span class="k">Total P&amp;L</span>
@@ -196,8 +201,6 @@ function renderModelCard(m, sig) {
                   <span class="pnl-line ${pnlCls}">${fmtINR(m.pnl_total)} <small>(${fmtPct(m.return_pct)})</small></span>
                 </span>
               </div>
-              <div class="kv"><span class="k">Buy Txn Charges (lifetime)</span><span class="v neg" title="Lifetime broker charges paid on BUY orders (brokerage + exchange + SEBI + stamp + GST)">${fmtINR(m.buy_txn_charges)}</span></div>
-              <div class="kv"><span class="k">Sell Txn Charges (lifetime)</span><span class="v neg" title="Lifetime broker charges paid on SELL orders (brokerage + STT + exchange + SEBI + GST + DP)">${fmtINR(m.sell_txn_charges)}</span></div>
               <div class="kv"><span class="k">Total Txn Charges (lifetime)</span><span class="v neg" title="BUY + SELL charges paid lifetime">${fmtINR(m.total_txn_charges)}</span></div>
             `;
           })()}
