@@ -164,15 +164,17 @@ function renderModelCard(m, sig) {
             const nav = Number(m.nav || (idleCash + posValue));
             // Reconciliation: cost basis + open-pos charges + idle cash should
             // equal allocated + realized (locked-in profit stays in cash).
-            // Accounting identity (every rupee of allocated capital tracked):
-            //   alloc = cash + cost_basis + buy_chg_life + sell_chg_life
-            //           - realized_gross
-            // realized_gross = pure price-diff P&L of closed trades. Server
-            // returns this directly (= realized_db + sell_chg_lifetime).
+            // Accounting identity (intuitive form — sell chg already nets into realized):
+            //   alloc = cash + cost_basis + buy_chg_lifetime - realized_pnl_net
+            // Loss (realized < 0): subtracting a negative = adding |loss|, matches
+            //   "loss is money gone, add it back to recover Allocated".
+            // Profit (realized > 0): subtracting a positive reduces sum — gain is
+            //   already in cash, would double-count if added.
+            // Sell charges are absorbed INSIDE realized_pnl_net (record_sell already
+            // subtracted them from sale proceeds), so they're not a separate term.
             const lifetimeBuyChg = Number(m.buy_txn_charges || 0);
             const lifetimeSellChg = Number(m.sell_txn_charges || 0);
-            const realGross = realized + lifetimeSellChg;  // DB net is realized_db; gross adds sell chg back
-            const reconSum = idleCash + posCost + lifetimeBuyChg + lifetimeSellChg - realGross;
+            const reconSum = idleCash + posCost + lifetimeBuyChg - realized;
             const reconTarget = invested;
             const drift = reconSum - reconTarget;
             const reconCls = Math.abs(drift) < 1 ? 'pos' : 'neg';
@@ -182,13 +184,13 @@ function renderModelCard(m, sig) {
               <div class="kv reconcile-hdr"><span class="k" colspan="2" style="font-size:0.7rem;color:#6c757d;text-transform:uppercase;letter-spacing:0.5px;">Capital flow (sums to Allocated)</span></div>
               <div class="kv"><span class="k">+ Idle Cash</span><span class="v" title="Cash not tied up in open position">${fmtINR(idleCash)}</span></div>
               <div class="kv"><span class="k">+ Cost Basis (open pos)</span><span class="v" title="qty × entry price — what you paid, ex-charges">${fmtINR(posCost)}</span></div>
-              <div class="kv"><span class="k">+ Buy Chg (lifetime)</span><span class="v neg" title="Lifetime broker charges paid on BUY orders (brokerage + exchange + SEBI + stamp + GST)">${fmtINR(lifetimeBuyChg)}</span></div>
-              <div class="kv"><span class="k">+ Sell Chg (lifetime)</span><span class="v neg" title="Lifetime broker charges paid on SELL orders (brokerage + STT + exchange + SEBI + GST + DP)">${fmtINR(lifetimeSellChg)}</span></div>
-              <div class="kv"><span class="k">− Realized P&amp;L (gross)</span><span class="v ${cls(realGross)}" title="Pure price-diff P&L on closed trades (= Realized net + Sell chg). Subtracted because the price-diff already moved between cash and entries — sum-only would double-count.">${fmtINR(realGross)}</span></div>
-              <div class="kv" title="Identity: cash + cost basis + buy chg + sell chg − realized_gross = Allocated. Every rupee accounted for.">
+              <div class="kv"><span class="k">+ Buy Chg (lifetime)</span><span class="v neg" title="Lifetime broker charges paid on BUY orders (brokerage + exchange + SEBI + stamp + GST). Real money gone forever.">${fmtINR(lifetimeBuyChg)}</span></div>
+              <div class="kv"><span class="k">${realized >= 0 ? '−' : '+'} Realized ${realized >= 0 ? 'gain' : 'loss'} (net)</span><span class="v ${cls(realized)}" title="Realized P&L net of sell charges. LOSS adds back to Allocated (money gone from cash). GAIN subtracts (already added to cash, would double-count). Sell charges ₹${lifetimeSellChg.toFixed(2)} are already inside this number — record_sell deducts them at trade time.">${fmtINR(Math.abs(realized))}</span></div>
+              <div class="kv" title="Identity: cash + cost basis + buy chg ± realized = Allocated. Every rupee accounted for. Sell charges already netted inside realized.">
                 <span class="k"><strong>= Reconcile</strong></span>
                 <span class="v ${reconCls}"><strong>${fmtINR(reconSum)}</strong> <small>(drift ${drift >= 0 ? '+' : ''}${fmtINR(drift)})</small></span>
               </div>
+              <div class="kv" style="font-size:0.7rem;color:#6c757d;"><span class="k" colspan="2">Note: Sell Chg ₹${lifetimeSellChg.toFixed(2)} already deducted inside Realized (net). Not a separate line.</span></div>
               <div class="kv reconcile-hdr"><span class="k" colspan="2" style="font-size:0.7rem;color:#6c757d;text-transform:uppercase;letter-spacing:0.5px;">Live position view</span></div>
               <div class="kv"><span class="k">Position Value (Live MTM)</span><span class="v" title="MTM = qty × live LTP">${fmtINR(posValue)}</span></div>
               <div class="kv"><span class="k">Unrealized P&amp;L</span><span class="v ${cls(unreal)}" title="Live MTM − entry cost">${fmtINR(unreal)}</span></div>

@@ -59,12 +59,12 @@
           <tbody>
             <tr class="bs-section"><td colspan="2" class="bs-section-hdr">Capital flow — should sum to Allocated</td></tr>
             <tr><td class="k">Allocated (deposits)</td><td class="v headline" id="bs_invested">—</td></tr>
-            <tr><td class="k" title="Cash sitting idle in the model — not deployed in any position">+ Idle Cash</td><td class="v" id="bs_cash">—</td></tr>
-            <tr><td class="k" title="qty × entry price for the currently held position (ex-charges)">+ Cost Basis (open pos)</td><td class="v" id="bs_entry_cost">—</td></tr>
-            <tr><td class="k" title="Sum of BUY-side broker charges paid lifetime (brokerage + exchange + SEBI + stamp + GST)">+ Buy Charges paid (lifetime)</td><td class="v neg" id="bs_buy_charges">—</td></tr>
-            <tr><td class="k" title="Sum of SELL-side broker charges paid lifetime (brokerage + STT + exchange + SEBI + GST + DP)">+ Sell Charges paid (lifetime)</td><td class="v neg" id="bs_sell_charges">—</td></tr>
-            <tr><td class="k" title="Pure price-diff P&amp;L of closed trades — what you'd see ignoring charges. Subtracted because gains were spent on something (additional buys / left in cash); losses returned to alloc identity.">− Realized P&amp;L (gross, pre-charges)</td><td class="v" id="bs_realized_gross">—</td></tr>
+            <tr><td class="k" title="Cash sitting idle — not deployed in any position">+ Idle Cash</td><td class="v" id="bs_cash">—</td></tr>
+            <tr><td class="k" title="qty × entry price for currently held position (ex-charges)">+ Cost Basis (open pos)</td><td class="v" id="bs_entry_cost">—</td></tr>
+            <tr><td class="k" title="Sum of BUY-side broker charges paid lifetime (brokerage + exchange + SEBI + stamp + GST). Real money gone.">+ Buy Charges paid (lifetime)</td><td class="v neg" id="bs_buy_charges">—</td></tr>
+            <tr><td class="k" id="bs_realized_label" title="Realized P&L net of sell charges. LOSS adds back to Allocated (money gone). GAIN subtracts (already in cash). Sell charges already netted inside this number.">± Realized P&amp;L (net)</td><td class="v" id="bs_realized_signed">—</td></tr>
             <tr><td class="k"><strong>= Reconcile total</strong></td><td class="v headline" id="bs_reconcile">—</td></tr>
+            <tr><td colspan="2" style="font-size:0.72rem;color:#6c757d;padding:4px 12px;">Note: Sell Charges (lifetime) <span id="bs_sell_chg_note">—</span> already netted inside Realized (net). Listed in P&amp;L summary below for reference.</td></tr>
             <tr class="bs-section"><td colspan="2" class="bs-section-hdr">Live position view</td></tr>
             <tr><td class="k" title="Live MTM = qty × current LTP">Position Value (Live MTM)</td><td class="v" id="bs_position_value">—</td></tr>
             <tr><td class="k" title="Hypothetical P&amp;L if you sold open position right now at LTP (ex-sell-charges)">Unrealized P&amp;L</td><td class="v" id="bs_unrealized">—</td></tr>
@@ -190,19 +190,24 @@ async function loadBalanceSheet() {
     document.getElementById('bs_buy_charges').textContent = fmtINR(lifetimeBuyChg);
     document.getElementById('bs_sell_charges').textContent = fmtINR(lifetimeSellChg);
 
-    // Show realized_gross with sign — negative for losses; this term is
-    // SUBTRACTED in the reconcile (gains flowed to cash and would otherwise
-    // double-count; losses returned to allocated identity).
-    const rgEl = document.getElementById('bs_realized_gross');
-    rgEl.textContent = fmtINR(realGross);
-    rgEl.className = 'v ' + cls(realGross);
+    // Show signed realized line — sign determines whether it ADDS to identity
+    // (loss recovers Allocated since money is gone from cash) or SUBTRACTS
+    // (gain already in cash; would double-count if added).
+    const rsEl = document.getElementById('bs_realized_signed');
+    const rsLabel = document.getElementById('bs_realized_label');
+    rsLabel.innerHTML = realNum >= 0
+      ? '− Realized gain (net)'
+      : '+ Realized loss (net)';
+    rsEl.textContent = fmtINR(Math.abs(realNum));
+    rsEl.className = 'v ' + cls(realNum);
 
-    // Accounting identity (every rupee of allocated capital accounted for):
-    //   alloc = cash + cost_basis + buy_chg_lifetime + sell_chg_lifetime - realized_gross
-    // realized_gross = pure price-diff P&L of closed trades (= realized_db + sell_chg).
-    // For N20: 14983.63 + 14981.08 + 27.25 + 28.44 - 20.40 = 30000.00 ✓
+    document.getElementById('bs_sell_chg_note').textContent = fmtINR(lifetimeSellChg);
+
+    // Identity (intuitive): alloc = cash + cost_basis + buy_chg_life - realized_net
+    // Sell chg already netted inside realized_net. For N20:
+    //   14983.63 + 14981.08 + 27.25 - (-8.04) = 30000.00 ✓
     const reconEl = document.getElementById('bs_reconcile');
-    const reconSum = cashNum + entryCost + lifetimeBuyChg + lifetimeSellChg - realGross;
+    const reconSum = cashNum + entryCost + lifetimeBuyChg - realNum;
     const drift = reconSum - invNum;
     reconEl.innerHTML = `${fmtINR(reconSum)} <small class="${Math.abs(drift) < 1 ? 'text-success' : 'text-danger'}">` +
       `(target ${fmtINR(invNum)}, drift ${drift >= 0 ? '+' : ''}${fmtINR(drift)})</small>`;
