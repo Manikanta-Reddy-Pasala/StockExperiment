@@ -241,6 +241,48 @@ def _resolve_recent_order_id(svc, user_id: int, symbol: str, qty: int,
     return ""
 
 
+def _fyers_holds_symbol(svc, user_id: int, symbol: str) -> Tuple[bool, int, float]:
+    """Pre-trade check: does Fyers already have a non-zero position in this
+    symbol (holdings T+1+ OR same-day CNC positions)?
+
+    Returns (held: bool, qty: int, avg_price: float). Guards against multi-fill
+    races where ledger thinks 'flat' but Fyers actually has shares from a
+    prior order that didn't get recorded. May 18 ADANIPOWER incident bug.
+    Best-effort: returns (False, 0, 0.0) on API failure so callers can decide.
+    """
+    bare = (symbol or "").upper().replace("NSE:", "").replace("-EQ", "")
+    if not bare:
+        return False, 0, 0.0
+    try:
+        h = svc.holdings(user_id) or {}
+        for row in (h.get("data") or []):
+            if not isinstance(row, dict):
+                continue
+            sym = (row.get("symbol") or "").upper().replace("NSE:", "").replace("-EQ", "")
+            if sym == bare:
+                qty = int(float(row.get("quantity") or 0))
+                avg = float(row.get("average_price") or 0)
+                if qty > 0:
+                    return True, qty, avg
+    except Exception as e:
+        log.debug(f"holdings fetch in pre-trade check failed: {e}")
+    try:
+        raw = svc._get_api_instance(user_id)._make_request("GET", "positions") or {}
+        for row in (raw.get("data") or []):
+            if not isinstance(row, dict):
+                continue
+            sym = (row.get("symbol") or "").upper().replace("NSE:", "").replace("-EQ", "")
+            if sym != bare:
+                continue
+            qty = int(float(row.get("netQty") or 0))
+            avg = float(row.get("buyAvg") or row.get("netAvg") or 0)
+            if qty > 0:
+                return True, qty, avg
+    except Exception as e:
+        log.debug(f"positions fetch in pre-trade check failed: {e}")
+    return False, 0, 0.0
+
+
 def _wait_for_fill(svc, user_id: int, order_id: str,
                    timeout_s: int = 60, poll_s: float = 2.0
                    ) -> Tuple[bool, str, Optional[float]]:
@@ -645,6 +687,34 @@ def main() -> int:
         sym = sig["symbol"]
         price = float(sig.get("price") or 0)
         side = sig["side"]
+
+        # Pre-trade Fyers position check (BUY only). Guards against ledger ↔
+        # Fyers desync from prior multi-fill races. If Fyers already holds
+        # this symbol, abort the new BUY — model logic expects single-position
+        # per cycle; another order would compound exposure (May 18 incident).
+        if side == "BUY" and not args.dry_run:
+            held, fyers_qty, fyers_avg = _fyers_holds_symbol(svc, args.user_id, sym)
+            if held:
+                log.error(
+                    f"SKIP BUY {sym}: Fyers already holds {fyers_qty}@{fyers_avg:.2f} "
+                    f"(ledger thinks flat or different). Possible prior fill not "
+                    f"recorded — investigate before re-entering."
+                )
+                skipped += 1
+                try:
+                    from src.services.audit_service import write_rebalance_decision
+                    write_rebalance_decision(
+                        model_name=args.model_name or "(env)",
+                        trigger="CRON",
+                        decision="SKIP_FYERS_ALREADY_HOLDS",
+                        reason=f"Fyers position {fyers_qty}@{fyers_avg:.2f} on {sym} "
+                               f"— ledger/Fyers drift, manual recon needed",
+                        rank1_symbol=sym, rank1_price=price,
+                    )
+                except Exception:
+                    pass
+                continue
+
         ok, reason = rm.can_enter(sym, price, side, open_positions)
         if not ok:
             log.info(f"SKIP {sym}: {reason}")

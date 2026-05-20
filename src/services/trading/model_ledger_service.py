@@ -456,6 +456,13 @@ def record_buy(model_name: str, symbol: str, qty: int, price: float,
     NAV flow:  current_amount -= charges
                (qty*price stays as position value, so net NAV moves only by fees)
 
+    Same-symbol behavior: ACCUMULATES into the open position (qty += new_qty,
+    entry_px = weighted average). Different-symbol while holding still raises.
+    Accumulation matters when an upstream race / UI bug / retry path produces
+    multiple Fyers fills on the same symbol — the previous "raise on already
+    holding" guard dropped 2nd+ fills, leaving Fyers and ledger out of sync
+    (the May 18 ADANIPOWER incident lost track of ~134 shares this way).
+
     charges = full SEBI-rate broker_charges.compute_charges (brokerage + exchange
     + SEBI + stamp + GST), not the legacy ₹20 flat. brokerage kwarg is ignored —
     kept for back-compat with older call sites.
@@ -466,8 +473,13 @@ def record_buy(model_name: str, symbol: str, qty: int, price: float,
         l = s.query(ModelLedger).filter_by(model_name=model_name).first()
         if not l or not settings:
             raise ValueError(f"Unknown model: {model_name}")
-        if l.open_symbol:
-            raise ValueError(f"{model_name}: already holding {l.open_symbol}")
+        norm = _normalize_symbol(symbol)
+        # Different-symbol guard remains — model logic owns single-symbol per
+        # position; rotating to a different symbol must SELL first.
+        if l.open_symbol and l.open_symbol != norm:
+            raise ValueError(
+                f"{model_name}: already holding {l.open_symbol}, cannot buy {norm}"
+            )
         qty_d = Decimal(str(qty))
         price_d = Decimal(str(price))
         charges = _compute_real_charges("BUY", qty, price, product)
@@ -477,11 +489,26 @@ def record_buy(model_name: str, symbol: str, qty: int, price: float,
                 f"{model_name}: cash {float(l.cash):,.0f} < cost {float(cost):,.0f}"
             )
         l.cash = l.cash - cost
-        norm = _normalize_symbol(symbol)
-        l.open_symbol = norm
-        l.open_qty = qty
-        l.open_entry_px = price_d
-        l.open_entry_date = date.today()
+        if l.open_symbol == norm and l.open_qty:
+            # Accumulate same-symbol fill: weighted-average entry price.
+            prev_qty = Decimal(str(l.open_qty))
+            prev_px = l.open_entry_px or Decimal(0)
+            total_qty = prev_qty + qty_d
+            new_avg = ((prev_qty * prev_px) + (qty_d * price_d)) / total_qty
+            l.open_qty = int(total_qty)
+            l.open_entry_px = new_avg
+            # open_entry_date stays as original (earliest fill) for hold-period
+            # accounting; weighted avg doesn't change first-entry date.
+            log.info(
+                f"{model_name}: ACCUMULATED {norm} +{qty}@{price} "
+                f"(was {int(prev_qty)}@{float(prev_px):.4f}, "
+                f"now {int(total_qty)}@{float(new_avg):.4f})"
+            )
+        else:
+            l.open_symbol = norm
+            l.open_qty = qty
+            l.open_entry_px = price_d
+            l.open_entry_date = date.today()
         settings.current_amount = (settings.current_amount or Decimal(0)) - charges
         s.add(ModelTrade(
             model_name=model_name,
