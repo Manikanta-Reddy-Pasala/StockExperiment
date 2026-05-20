@@ -67,8 +67,9 @@
   <div class="row text-end g-3 flex-grow-1 justify-content-end">
     <div class="col-auto"><div class="text-muted small" title="Original capital deposited across all models">Allocated</div><div class="fs-5 fw-bold" id="tot_invested">--</div></div>
     <div class="col-auto"><div class="text-muted small" title="Cash + live position value">Current NAV</div><div class="fs-5 fw-bold" id="tot_nav">--</div></div>
-    <div class="col-auto"><div class="text-muted small" title="Realized + unrealized P&L vs allocated">Total P&amp;L</div><div class="fs-5 fw-bold" id="tot_pnl">--</div></div>
-    <div class="col-auto"><div class="text-muted small" title="Locked-in profit/loss from closed trades">Realized</div><div class="fs-5 fw-bold" id="tot_realized">--</div></div>
+    <div class="col-auto"><div class="text-muted small" title="Current open positions only — Live MTM − Cost Basis. Hypothetical if you sold every open position right now.">Current P&amp;L (open pos)</div><div class="fs-5 fw-bold" id="tot_current_pnl">--</div></div>
+    <div class="col-auto"><div class="text-muted small" title="Realized + unrealized P&L vs allocated (net of all charges)">Total P&amp;L</div><div class="fs-5 fw-bold" id="tot_pnl">--</div></div>
+    <div class="col-auto"><div class="text-muted small" title="Locked-in profit/loss from closed trades (net of sell charges)">Realized</div><div class="fs-5 fw-bold" id="tot_realized">--</div></div>
     <div class="col-auto"><div class="text-muted small" title="Lifetime broker charges across all models (brokerage + STT + GST + exchange + SEBI + stamp + DP)">Total Txn Charges</div><div class="fs-5 fw-bold neg" id="tot_charges">--</div></div>
     <div class="col-auto align-self-center">
       <a href="/settings" class="btn btn-sm btn-outline-secondary"><i class="bi bi-sliders"></i> Manage Allocations</a>
@@ -197,12 +198,24 @@ function renderModelCard(m, sig) {
               <div class="kv" style="font-size:0.7rem;color:#6c757d;line-height:1.4;padding:6px 0;"><span class="k" colspan="2">Note: realized P&amp;L (net) ₹${realized.toFixed(2)} = closed-trade gross ₹${realGross.toFixed(2)} − sell chg ₹${lifetimeSellChg.toFixed(2)}. Both sell chg AND gross are shown above so every rupee is visible.</span></div>
               <div class="kv reconcile-hdr"><span class="k" colspan="2" style="font-size:0.7rem;color:#6c757d;text-transform:uppercase;letter-spacing:0.5px;">Live position view</span></div>
               <div class="kv"><span class="k">Position Value (Live MTM)</span><span class="v" title="MTM = qty × live LTP">${fmtINR(posValue)}</span></div>
-              <div class="kv"><span class="k">Unrealized P&amp;L</span><span class="v ${cls(unreal)}" title="Live MTM − entry cost">${fmtINR(unreal)}</span></div>
-              <div class="kv"><span class="k">Realized P&amp;L (net)</span><span class="v ${cls(realized)}" title="Cumulative from closed trades, net of sell charges">${fmtINR(realized)}</span></div>
+              ${(() => {
+                const curPnlGross = unreal;
+                const curPnlNetOfBuy = unreal - openChg;
+                const curPctGross = posCost > 0 ? (unreal / posCost * 100) : 0;
+                return `
+                  <div class="kv"><span class="k" title="Current position P&L = Live MTM − Cost basis. Hypothetical: if you sold now at LTP, ignoring sell charges.">Current Position P&amp;L (gross)</span>
+                    <span class="v"><span class="pnl-line ${cls(curPnlGross)}">${fmtINR(curPnlGross)} <small>(${fmtPct(curPctGross)})</small></span></span>
+                  </div>
+                  <div class="kv"><span class="k" title="Current position P&L minus the buy-side broker charges already paid on this position. More accurate 'what's my open trade worth net of fees so far'.">Current P&amp;L (net of buy chg)</span>
+                    <span class="v ${cls(curPnlNetOfBuy)}">${fmtINR(curPnlNetOfBuy)}</span>
+                  </div>
+                `;
+              })()}
+              <div class="kv"><span class="k">Realized P&amp;L (net, closed trades)</span><span class="v ${cls(realized)}" title="Cumulative from closed trades, net of sell charges">${fmtINR(realized)}</span></div>
               <div class="kv"><span class="k">Buy Chg (open pos only)</span><span class="v neg" title="Buy charges paid on current open position only (subset of lifetime). Informational — not added separately to Reconcile.">${fmtINR(openChg)}</span></div>
               <div class="kv nav-row"><span class="k">Available (Net Worth)</span><span class="v" title="Cash + live position value = total spend power if liquidated">${fmtINR(nav)}</span></div>
               <div class="kv">
-                <span class="k">Total P&amp;L</span>
+                <span class="k">Total P&amp;L (realized + unrealized − charges)</span>
                 <span class="v">
                   <span class="pnl-line ${pnlCls}">${fmtINR(m.pnl_total)} <small>(${fmtPct(m.return_pct)})</small></span>
                 </span>
@@ -225,10 +238,36 @@ function renderModelCard(m, sig) {
   `;
 }
 
-function renderTotals(t) {
+function renderTotals(t, models) {
   if (!t) return;
   document.getElementById('tot_invested').textContent = fmtINR(t.invested_amount ?? t.allocated_capital);
   document.getElementById('tot_nav').textContent = fmtINR(t.current_amount ?? t.nav);
+
+  // Aggregate current open-position P&L across models (sum of per-model
+  // unrealized = MTM − cost_basis). Backend `total` doesn't have this so
+  // compute client-side from models array.
+  let totUnreal = 0;
+  let totCostOpen = 0;
+  (models || []).forEach(m => {
+    const posCost = (Number(m.open_qty || 0) * Number(m.open_entry_px || 0)) || 0;
+    const posValue = Number(m.position_value || 0);
+    if (posCost > 0) {
+      totUnreal += (posValue - posCost);
+      totCostOpen += posCost;
+    }
+  });
+  const curPct = totCostOpen > 0 ? (totUnreal / totCostOpen * 100) : 0;
+  const curEl = document.getElementById('tot_current_pnl');
+  if (curEl) {
+    if (totCostOpen > 0) {
+      curEl.textContent = fmtINR(totUnreal) + ' (' + fmtPct(curPct) + ')';
+      curEl.className = 'fs-5 fw-bold ' + cls(totUnreal);
+    } else {
+      curEl.textContent = '—';
+      curEl.className = 'fs-5 fw-bold text-muted';
+    }
+  }
+
   const pnlEl = document.getElementById('tot_pnl');
   pnlEl.textContent = fmtINR(t.pnl_total) + ' (' + fmtPct(t.return_pct) + ')';
   pnlEl.className = 'fs-5 fw-bold ' + cls(t.pnl_total);
@@ -288,7 +327,8 @@ async function loadPortfolio() {
     if (!pf.success) return;
     // Totals strip uses backend pf.total which sums ALL models (incl. disabled) —
     // capital remains allocated even when paused. Do not recompute here.
-    renderTotals(pf.total);
+    // Pass models array so renderTotals can compute aggregate open-pos P&L.
+    renderTotals(pf.total, pf.models);
 
     // Index models by name; preserve fixed display order regardless of DB order.
     // Skip-rendering disabled models: user wants them gone from Dashboard, not

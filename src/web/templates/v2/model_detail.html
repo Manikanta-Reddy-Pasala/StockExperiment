@@ -73,11 +73,12 @@
             </td></tr>
             <tr class="bs-section"><td colspan="2" class="bs-section-hdr">Live position view</td></tr>
             <tr><td class="k" title="Live MTM = qty × current LTP">Position Value (Live MTM)</td><td class="v" id="bs_position_value">—</td></tr>
-            <tr><td class="k" title="Hypothetical P&amp;L if you sold open position right now at LTP (ex-sell-charges)">Unrealized P&amp;L</td><td class="v" id="bs_unrealized">—</td></tr>
+            <tr><td class="k" title="Current position P&L = Live MTM − Cost basis. What the open trade would book if you sold right now (ex-sell-charges).">Current Position P&amp;L (gross)</td><td class="v headline" id="bs_unrealized">—</td></tr>
+            <tr><td class="k" title="Current position P&L minus buy-side charges already paid. More accurate 'what's my open trade worth right now net of entry fees'.">Current P&amp;L (net of buy chg)</td><td class="v" id="bs_cur_net">—</td></tr>
             <tr><td class="k" title="Buy-side charges already paid on the open position (subset of Buy Charges lifetime)">Buy Charges (open pos only)</td><td class="v neg" id="bs_entry_charges">—</td></tr>
             <tr class="bs-section"><td colspan="2" class="bs-section-hdr">P&amp;L summary</td></tr>
-            <tr><td class="k" title="Realized — net of sell charges (what's actually in your cash)">Realized P&amp;L (net)</td><td class="v" id="bs_realized">—</td></tr>
-            <tr><td class="k"><strong>Total P&amp;L (realized + unrealized)</strong></td><td class="v headline" id="bs_total_pnl">—</td></tr>
+            <tr><td class="k" title="Realized — net of sell charges (what's actually in your cash)">Realized P&amp;L (net, closed trades)</td><td class="v" id="bs_realized">—</td></tr>
+            <tr><td class="k"><strong>Total P&amp;L (realized + unrealized − charges)</strong></td><td class="v headline" id="bs_total_pnl">—</td></tr>
             <tr><td class="k"><strong>NAV (cash + position MTM)</strong></td><td class="v headline" id="bs_nav">—</td></tr>
             <tr><td class="k"><strong>Return %</strong></td><td class="v headline" id="bs_return_pct">—</td></tr>
             <tr><td class="k">Trades (W / L)</td><td class="v" id="bs_trades">—</td></tr>
