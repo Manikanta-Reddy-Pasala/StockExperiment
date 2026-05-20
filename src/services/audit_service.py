@@ -96,6 +96,57 @@ def write_order(model_name: Optional[str], symbol: str, side: str, qty: int,
         return None
 
 
+def update_order_fill(fyers_order_id: str, fill_price: float,
+                      fill_qty: Optional[int] = None,
+                      status: str = "filled") -> bool:
+    """Backfill audit_orders.fill_price / fill_qty / status once Fyers confirms
+    the fill. Recomputes slippage_inr and charges from the real fill numbers so
+    downstream P&L attribution uses truth, not the LIMIT order price estimate.
+
+    Returns True if a row was updated, False otherwise. Never raises.
+    """
+    if not fyers_order_id:
+        return False
+    try:
+        from src.models.database import get_database_manager
+        from src.models.audit_models import AuditOrder
+        db = get_database_manager()
+        with db.get_session() as s:
+            row = (s.query(AuditOrder)
+                     .filter(AuditOrder.fyers_order_id == str(fyers_order_id))
+                     .order_by(AuditOrder.id.desc())
+                     .first())
+            if not row:
+                return False
+            row.fill_price = _safe_dec(fill_price)
+            if fill_qty is not None:
+                row.fill_qty = _safe_int(fill_qty)
+            row.status = status
+            # Recompute slippage from real fill price
+            try:
+                q = float(row.fill_qty or row.qty or 0)
+                op = float(row.ordered_price or 0)
+                if q > 0 and op > 0:
+                    row.slippage_inr = _safe_dec(q * (float(fill_price) - op))
+            except Exception:
+                pass
+            # Recompute charges from real fill_price (was computed off ordered_price)
+            try:
+                from tools.live.broker_charges import compute_charges
+                q = int(row.fill_qty or row.qty or 0)
+                if q > 0:
+                    br = compute_charges(row.side or "BUY", q, float(fill_price),
+                                          row.product or "CNC")
+                    row.charges_breakdown = br
+                    row.charges_inr = _safe_dec(br.get("total"))
+            except Exception as _e:
+                log.debug(f"recompute charges failed: {_e}")
+            return True
+    except Exception as e:
+        log.warning(f"audit update_order_fill failed: {e}")
+        return False
+
+
 def write_rebalance_decision(
     model_name: str, trigger: str, decision: str, reason: str,
     held_symbol: Optional[str] = None,

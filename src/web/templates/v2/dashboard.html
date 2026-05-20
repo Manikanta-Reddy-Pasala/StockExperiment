@@ -158,27 +158,39 @@ function renderModelCard(m, sig) {
             const idleCash = Number(m.cash || 0);
             const posCost = (Number(m.open_qty || 0) * Number(m.open_entry_px || 0)) || 0;
             const posValue = Number(m.position_value || 0);
+            const openChg = Number(m.entry_charges_open || 0);
             const unreal = posValue ? posValue - posCost : 0;
             const realized = Number(m.realized_pnl || 0);
             const nav = Number(m.nav || (idleCash + posValue));
+            // Reconciliation: cost basis + open-pos charges + idle cash should
+            // equal allocated + realized (locked-in profit stays in cash).
+            const reconSum = posCost + openChg + idleCash;
+            const reconTarget = invested + realized;
+            const drift = reconSum - reconTarget;
+            const reconCls = Math.abs(drift) < 1 ? 'pos' : 'neg';
             return `
               <div class="kv"><span class="k">Allocated</span><span class="v" title="Original capital deposited">${fmtINR(invested)}</span></div>
               <div class="kv"><span class="k">Open Position</span><span class="v">${posLine}</span></div>
-              <div class="kv"><span class="k">Invested in Position</span><span class="v" title="Entry cost = qty × entry price">${fmtINR(posCost)}</span></div>
+              <div class="kv"><span class="k">Cost Basis (open pos)</span><span class="v" title="qty × entry price — what you paid, ex-charges">${fmtINR(posCost)}</span></div>
+              <div class="kv"><span class="k">Buy Charges (open pos)</span><span class="v neg" title="Broker charges paid on this BUY (brokerage + exchange + SEBI + stamp + GST)">${fmtINR(openChg)}</span></div>
               <div class="kv"><span class="k">Position Value (Live)</span><span class="v" title="MTM = qty × live LTP">${fmtINR(posValue)}</span></div>
               <div class="kv"><span class="k">Idle Cash</span><span class="v" title="Cash not tied up in open position">${fmtINR(idleCash)}</span></div>
               <div class="kv"><span class="k">Realized P&amp;L</span><span class="v ${cls(realized)}" title="Cumulative from closed trades">${fmtINR(realized)}</span></div>
               <div class="kv"><span class="k">Unrealized P&amp;L</span><span class="v ${cls(unreal)}" title="Live MTM − entry cost">${fmtINR(unreal)}</span></div>
-              <div class="kv nav-row"><span class="k">Available (Net Worth)</span><span class="v" title="Allocated + realized + unrealized = total spend power if liquidated">${fmtINR(nav)}</span></div>
+              <div class="kv" title="Cost basis + open-pos charges + idle cash. Should equal Allocated + Realized P&amp;L. Non-zero drift signals an accounting bug.">
+                <span class="k">Reconcile (cost+chg+cash)</span>
+                <span class="v ${reconCls}">${fmtINR(reconSum)} <small>(drift ${drift >= 0 ? '+' : ''}${fmtINR(drift)})</small></span>
+              </div>
+              <div class="kv nav-row"><span class="k">Available (Net Worth)</span><span class="v" title="Cash + live position value = total spend power if liquidated">${fmtINR(nav)}</span></div>
               <div class="kv">
                 <span class="k">Total P&amp;L</span>
                 <span class="v">
                   <span class="pnl-line ${pnlCls}">${fmtINR(m.pnl_total)} <small>(${fmtPct(m.return_pct)})</small></span>
                 </span>
               </div>
-              <div class="kv"><span class="k">Buy Txn Charges</span><span class="v neg" title="Lifetime broker charges paid on BUY orders (brokerage + exchange + SEBI + stamp + GST)">${fmtINR(m.buy_txn_charges)}</span></div>
-              <div class="kv"><span class="k">Sell Txn Charges</span><span class="v neg" title="Lifetime broker charges paid on SELL orders (brokerage + STT + exchange + SEBI + GST + DP)">${fmtINR(m.sell_txn_charges)}</span></div>
-              <div class="kv"><span class="k">Total Txn Charges</span><span class="v neg" title="BUY + SELL charges paid lifetime">${fmtINR(m.total_txn_charges)}</span></div>
+              <div class="kv"><span class="k">Buy Txn Charges (lifetime)</span><span class="v neg" title="Lifetime broker charges paid on BUY orders (brokerage + exchange + SEBI + stamp + GST)">${fmtINR(m.buy_txn_charges)}</span></div>
+              <div class="kv"><span class="k">Sell Txn Charges (lifetime)</span><span class="v neg" title="Lifetime broker charges paid on SELL orders (brokerage + STT + exchange + SEBI + GST + DP)">${fmtINR(m.sell_txn_charges)}</span></div>
+              <div class="kv"><span class="k">Total Txn Charges (lifetime)</span><span class="v neg" title="BUY + SELL charges paid lifetime">${fmtINR(m.total_txn_charges)}</span></div>
             `;
           })()}
           <div class="footer-bar">

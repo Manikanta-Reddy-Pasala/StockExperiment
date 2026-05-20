@@ -1139,6 +1139,34 @@ def get_model_portfolio():
         except Exception as _e:
             logger.debug(f"charges enrich failed: {_e}")
 
+        # Per-model BUY charges for the CURRENT open position only (latest
+        # filled BUY matching open_symbol). Lets the dashboard reconcile
+        # Allocated = Cost Basis + Open-Pos Charges + Idle Cash + Realized.
+        try:
+            db = get_database_manager()
+            with db.get_session() as s:
+                for m in stats.get("models", []):
+                    m["entry_charges_open"] = 0.0
+                    open_sym = m.get("open_symbol")
+                    if not open_sym:
+                        continue
+                    bare = open_sym.upper().replace("NSE:", "").replace("-EQ", "")
+                    r = s.execute(text("""
+                        SELECT COALESCE(charges_inr, 0) AS c
+                        FROM audit_orders
+                        WHERE model_name = :m
+                          AND side = 'BUY'
+                          AND status IN ('placed','filled','partial')
+                          AND (UPPER(symbol) = :bare OR UPPER(symbol) = :fyers)
+                        ORDER BY created_at DESC
+                        LIMIT 1
+                    """), {"m": m["model_name"], "bare": bare,
+                           "fyers": f"NSE:{bare}-EQ"}).fetchone()
+                    if r and r.c:
+                        m["entry_charges_open"] = round(float(r.c), 2)
+        except Exception as _e:
+            logger.debug(f"open-pos charges enrich failed: {_e}")
+
         return jsonify({"success": True, **stats})
     except Exception as e:
         logger.error(f"models portfolio error: {e}", exc_info=True)
@@ -1430,6 +1458,8 @@ def model_balance_sheet(model_name):
         total_pnl = nav - invested
         # unrealized = open-position MTM less entry cost
         open_position = None
+        entry_cost_open = 0.0
+        entry_charges_open = 0.0
         unrealized_pnl = 0.0
         unrealized_pct = 0.0
         if per_model.get("open_symbol") and per_model.get("open_qty"):
@@ -1440,17 +1470,51 @@ def model_balance_sheet(model_name):
                 or per_model.get("open_entry_px")
                 or 0.0
             )
-            entry_cost = float(qty) * float(entry_px)
-            unrealized_pnl = float(pos_value) - entry_cost
+            entry_cost_open = float(qty) * float(entry_px)
+            unrealized_pnl = float(pos_value) - entry_cost_open
             unrealized_pct = (
-                (unrealized_pnl / entry_cost * 100.0) if entry_cost > 0 else 0.0
+                (unrealized_pnl / entry_cost_open * 100.0)
+                if entry_cost_open > 0 else 0.0
             )
+            # BUY-side charges for the currently held position. Pulled from
+            # audit_orders by matching the latest filled BUY for this model +
+            # bare symbol (ledger stores NSE:XXX-EQ form; audit_orders also
+            # stores Fyers form but be tolerant of either).
+            try:
+                from src.models.database import get_database_manager as _gdb
+                _db = _gdb()
+                bare = (per_model["open_symbol"] or "").upper()
+                bare = bare.replace("NSE:", "").replace("-EQ", "")
+                with _db.get_session() as _s:
+                    row = _s.execute(text("""
+                        SELECT COALESCE(charges_inr, 0) AS c
+                        FROM audit_orders
+                        WHERE model_name = :m
+                          AND side = 'BUY'
+                          AND status IN ('placed','filled','partial')
+                          AND (
+                              UPPER(symbol) = :sym_bare
+                           OR UPPER(symbol) = :sym_fyers
+                          )
+                        ORDER BY created_at DESC
+                        LIMIT 1
+                    """), {
+                        "m": model_name,
+                        "sym_bare": bare,
+                        "sym_fyers": f"NSE:{bare}-EQ",
+                    }).fetchone()
+                if row and row.c:
+                    entry_charges_open = float(row.c)
+            except Exception as _e:
+                logger.debug(f"open-pos charges lookup failed: {_e}")
             open_position = {
                 "symbol": per_model["open_symbol"],
                 "qty": qty,
                 "entry_px": entry_px,
                 "entry_date": per_model.get("open_entry_date"),
                 "current_px": current_px,
+                "entry_cost": round(entry_cost_open, 2),
+                "entry_charges": round(entry_charges_open, 2),
                 "position_value": pos_value,
                 "unrealized_pnl": round(unrealized_pnl, 2),
                 "unrealized_pct": round(unrealized_pct, 2),
@@ -1490,6 +1554,10 @@ def model_balance_sheet(model_name):
             "invested_amount": round(float(invested), 2),
             "cash": round(float(cash), 2),
             "open_position": open_position,
+            # Top-level mirror so UIs can render cost-basis + buy-charges rows
+            # without drilling into open_position. Zero when flat.
+            "entry_cost_open": round(float(entry_cost_open), 2),
+            "entry_charges_open": round(float(entry_charges_open), 2),
             "realized_pnl": round(float(realized), 2),
             "unrealized_pnl": round(float(unrealized_pnl), 2),
             "total_pnl": round(float(total_pnl), 2),

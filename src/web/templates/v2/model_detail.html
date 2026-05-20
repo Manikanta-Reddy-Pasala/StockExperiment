@@ -57,8 +57,11 @@
         <table class="table table-borderless metric-table mb-0">
           <tbody>
             <tr><td class="k">Invested (cumulative deposits)</td><td class="v" id="bs_invested">—</td></tr>
+            <tr><td class="k" title="qty × entry price — what you actually paid for the open position (ex-charges)">Cost Basis (open pos)</td><td class="v" id="bs_entry_cost">—</td></tr>
+            <tr><td class="k" title="Buy-side broker charges paid on the open position only">Buy Charges (open pos)</td><td class="v neg" id="bs_entry_charges">—</td></tr>
             <tr><td class="k">Cash (idle)</td><td class="v" id="bs_cash">—</td></tr>
-            <tr><td class="k">Open Position Value</td><td class="v" id="bs_position_value">—</td></tr>
+            <tr><td class="k" title="Sanity check: cost basis + buy charges + idle cash should equal allocated (minus realized P&amp;L moves)">Reconcile (cost + buy chg + cash)</td><td class="v" id="bs_reconcile">—</td></tr>
+            <tr><td class="k" title="Live MTM = qty × current LTP">Position Value (Live MTM)</td><td class="v" id="bs_position_value">—</td></tr>
             <tr><td class="k">Realized P&amp;L</td><td class="v" id="bs_realized">—</td></tr>
             <tr><td class="k">Unrealized P&amp;L</td><td class="v" id="bs_unrealized">—</td></tr>
             <tr><td class="k"><strong>Total P&amp;L</strong></td><td class="v headline" id="bs_total_pnl">—</td></tr>
@@ -66,9 +69,9 @@
             <tr><td class="k"><strong>Return %</strong></td><td class="v headline" id="bs_return_pct">—</td></tr>
             <tr><td class="k">Trades (W / L)</td><td class="v" id="bs_trades">—</td></tr>
             <tr><td class="k">Win Rate</td><td class="v" id="bs_win_rate">—</td></tr>
-            <tr><td class="k" title="Lifetime BUY-side broker charges (brokerage + exchange + SEBI + stamp + GST)">Buy Txn Charges</td><td class="v neg" id="bs_buy_charges">—</td></tr>
-            <tr><td class="k" title="Lifetime SELL-side broker charges (brokerage + STT + exchange + SEBI + GST + DP)">Sell Txn Charges</td><td class="v neg" id="bs_sell_charges">—</td></tr>
-            <tr><td class="k"><strong>Total Txn Charges</strong></td><td class="v headline neg" id="bs_total_charges">—</td></tr>
+            <tr><td class="k" title="Lifetime BUY-side broker charges (brokerage + exchange + SEBI + stamp + GST)">Buy Txn Charges (lifetime)</td><td class="v neg" id="bs_buy_charges">—</td></tr>
+            <tr><td class="k" title="Lifetime SELL-side broker charges (brokerage + STT + exchange + SEBI + GST + DP)">Sell Txn Charges (lifetime)</td><td class="v neg" id="bs_sell_charges">—</td></tr>
+            <tr><td class="k"><strong>Total Txn Charges (lifetime)</strong></td><td class="v headline neg" id="bs_total_charges">—</td></tr>
           </tbody>
         </table>
       </div>
@@ -166,6 +169,27 @@ async function loadBalanceSheet() {
     // Balance sheet table
     document.getElementById('bs_invested').textContent = fmtINR(data.invested_amount);
     document.getElementById('bs_cash').textContent = fmtINR(data.cash);
+
+    const entryCost = Number(data.entry_cost_open || 0);
+    const entryChg = Number(data.entry_charges_open || 0);
+    const cashNum = Number(data.cash || 0);
+    const invNum = Number(data.invested_amount || 0);
+    const realNum = Number(data.realized_pnl || 0);
+
+    document.getElementById('bs_entry_cost').textContent =
+      entryCost > 0 ? fmtINR(entryCost) : '<span class="text-muted">— (flat)</span>';
+    document.getElementById('bs_entry_charges').textContent =
+      entryChg > 0 ? fmtINR(entryChg) : '<span class="text-muted">—</span>';
+
+    const reconEl = document.getElementById('bs_reconcile');
+    const reconSum = entryCost + entryChg + cashNum;
+    // Reconciliation target = allocated + realized P&L (cumulative locked-in
+    // profit stays in cash). Drift > ₹1 highlights an accounting bug.
+    const reconTarget = invNum + realNum;
+    const drift = reconSum - reconTarget;
+    reconEl.innerHTML = `${fmtINR(reconSum)} <small class="${Math.abs(drift) < 1 ? 'text-success' : 'text-danger'}">` +
+      `(target ${fmtINR(reconTarget)}, drift ${drift >= 0 ? '+' : ''}${fmtINR(drift)})</small>`;
+
     const posValueEl = document.getElementById('bs_position_value');
     if (data.open_position) {
       posValueEl.textContent = fmtINR(data.open_position.position_value);
@@ -210,8 +234,11 @@ async function loadBalanceSheet() {
           <tbody>
             <tr><td class="k">Entry Price</td><td class="v">${fmtINR(op.entry_px)}</td></tr>
             <tr><td class="k">Entry Date</td><td class="v">${op.entry_date ? (window.fmtISTDate ? window.fmtISTDate(op.entry_date) : op.entry_date) : '—'}</td></tr>
+            <tr><td class="k" title="qty × entry price (ex-charges)">Cost Basis</td><td class="v">${fmtINR(op.entry_cost)}</td></tr>
+            <tr><td class="k" title="Brokerage + STT + GST + exchange + SEBI + stamp paid on this BUY">Buy Charges</td><td class="v neg">${fmtINR(op.entry_charges)}</td></tr>
+            <tr><td class="k" title="Cost basis + buy charges = total INR deployed to open this position">Total Deployed</td><td class="v">${fmtINR(Number(op.entry_cost || 0) + Number(op.entry_charges || 0))}</td></tr>
             <tr><td class="k">Current Price (MTM)</td><td class="v">${fmtINR(op.current_px)}</td></tr>
-            <tr><td class="k">Position Value</td><td class="v">${fmtINR(op.position_value)}</td></tr>
+            <tr><td class="k">Position Value (MTM)</td><td class="v">${fmtINR(op.position_value)}</td></tr>
             <tr><td class="k"><strong>Unrealized P&amp;L</strong></td>
                 <td class="v headline ${pnlCls}">${fmtINR(op.unrealized_pnl)} <small>(${fmtPct(op.unrealized_pct)})</small></td></tr>
           </tbody>

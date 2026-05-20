@@ -176,6 +176,29 @@ def _get_order_status(svc, user_id: int, order_id: str) -> Optional[Dict]:
     return None
 
 
+def _extract_traded_price(row: Dict) -> Optional[float]:
+    """Pull average traded price from a Fyers orderbook row.
+
+    Fyers field name varies by SDK version: `tradedPrice` (raw),
+    `traded_price`, `avgPrice`, `avg_price`, `executedPrice`. Returns None
+    if no field is present or value <= 0.
+    """
+    if not isinstance(row, dict):
+        return None
+    for key in ("tradedPrice", "traded_price", "avgPrice", "avg_price",
+                "executedPrice", "executed_price", "fillPrice", "fill_price"):
+        val = row.get(key)
+        if val is None or val == "":
+            continue
+        try:
+            f = float(val)
+        except (TypeError, ValueError):
+            continue
+        if f > 0:
+            return f
+    return None
+
+
 def _resolve_recent_order_id(svc, user_id: int, symbol: str, qty: int,
                              side: str) -> str:
     """Find the most recent order in the order book matching (symbol, qty, side).
@@ -219,15 +242,18 @@ def _resolve_recent_order_id(svc, user_id: int, symbol: str, qty: int,
 
 
 def _wait_for_fill(svc, user_id: int, order_id: str,
-                   timeout_s: int = 60, poll_s: float = 2.0) -> Tuple[bool, str]:
+                   timeout_s: int = 60, poll_s: float = 2.0
+                   ) -> Tuple[bool, str, Optional[float]]:
     """Poll Fyers order book until status is terminal.
 
-    Returns (filled: bool, terminal_status: str).
+    Returns (filled: bool, terminal_status: str, traded_price: float | None).
     `terminal_status` is one of: 'filled', 'cancelled', 'rejected', 'expired',
     'timeout', 'not_found'.
+    `traded_price` is the average fill price reported by Fyers on a filled
+    order; None when the order didn't fill or the field is absent.
     """
     if not order_id:
-        return False, "not_found"
+        return False, "not_found", None
     deadline = time.time() + timeout_s
     last_status = "unknown"
     while time.time() < deadline:
@@ -236,17 +262,17 @@ def _wait_for_fill(svc, user_id: int, order_id: str,
             st = row.get("status")
             # Map status int → string
             if st == 2:
-                return True, "filled"
+                return True, "filled", _extract_traded_price(row)
             if st == 1:
-                return False, "cancelled"
+                return False, "cancelled", None
             if st == 5:
-                return False, "rejected"
+                return False, "rejected", None
             if st == 7:
-                return False, "expired"
+                return False, "expired", None
             last_status = f"code={st}"
         time.sleep(poll_s)
     log.warning(f"_wait_for_fill timeout after {timeout_s}s on order {order_id} (last={last_status})")
-    return False, "timeout"
+    return False, "timeout", None
 
 
 def _cancel_order(svc, user_id: int, order_id: str) -> bool:
@@ -316,11 +342,12 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
         return {"filled": True, "status": "limit_no_id",
                 "order_id": "", "fill_price": first_px,
                 "reason": "no_orderid"}
-    filled, term = _wait_for_fill(svc, user_id, order_id,
-                                   timeout_s=first_window_s, poll_s=2.0)
+    filled, term, traded_px = _wait_for_fill(svc, user_id, order_id,
+                                              timeout_s=first_window_s, poll_s=2.0)
     if filled:
         return {"filled": True, "status": "limit_filled", "order_id": order_id,
-                "fill_price": first_px, "reason": "tol"}
+                "fill_price": traded_px if traded_px is not None else first_px,
+                "reason": "tol"}
     if term in ("rejected", "cancelled", "expired"):
         # Order is already gone — try a fresh widened LIMIT
         log.warning(f"  LIMIT {symbol} terminal={term}, retry with widened tol")
@@ -339,11 +366,12 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
 
     log.info(f"  LIMIT {side} {symbol} re-quote px={retry_px} "
              f"(retry_tol={rm_cfg.limit_retry_pct}%)")
-    filled, term = _wait_for_fill(svc, user_id, order_id,
-                                   timeout_s=second_window_s, poll_s=2.0)
+    filled, term, traded_px = _wait_for_fill(svc, user_id, order_id,
+                                              timeout_s=second_window_s, poll_s=2.0)
     if filled:
         return {"filled": True, "status": "limit_retry_filled", "order_id": order_id,
-                "fill_price": retry_px, "reason": "retry_tol"}
+                "fill_price": traded_px if traded_px is not None else retry_px,
+                "reason": "retry_tol"}
 
     # MARKET fallback
     _cancel_order(svc, user_id, order_id)
@@ -354,14 +382,16 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
         return {"filled": False, "status": "market_failed", "order_id": "",
                 "fill_price": None, "reason": str(res3)}
     market_id = _extract_order_id(res3)
-    filled, term = _wait_for_fill(svc, user_id, market_id,
-                                   timeout_s=30, poll_s=2.0)
+    filled, term, traded_px = _wait_for_fill(svc, user_id, market_id,
+                                              timeout_s=30, poll_s=2.0)
     return {
         "filled": filled,
         "status": "market_filled" if filled else f"market_{term}",
         "order_id": market_id,
-        # Fyers fills near LTP for MARKET; best-effort placeholder = last_price
-        "fill_price": last_price if filled else None,
+        # Use Fyers-reported tradedPrice when available (real avg fill);
+        # last_price is a placeholder if Fyers omits it on this SDK version.
+        "fill_price": (traded_px if traded_px is not None
+                       else (last_price if filled else None)),
         "reason": "market_fallback",
     }
 
@@ -377,7 +407,20 @@ def _tg_safe(text: str):
         log.debug(f"tg notify skipped: {e}")
 
 
+def _backfill_audit_fill(order_id: str, fill_price: float, fill_qty: int):
+    """Update audit_orders with real Fyers tradedPrice + recompute charges."""
+    if not order_id or fill_price is None:
+        return
+    try:
+        from src.services.audit_service import update_order_fill
+        update_order_fill(order_id, fill_price=float(fill_price),
+                          fill_qty=int(fill_qty), status="filled")
+    except Exception as e:
+        log.debug(f"audit update_order_fill failed: {e}")
+
+
 def _record_model_buy(model_name, symbol, qty, price, order_id):
+    _backfill_audit_fill(order_id, price, qty)
     if not model_name:
         return
     try:
@@ -394,7 +437,9 @@ def _record_model_buy(model_name, symbol, qty, price, order_id):
         _tg_safe(f"⚠️ BUY {model_name} {symbol} x{qty} placed but ledger write FAILED: {e}")
 
 
-def _record_model_sell(model_name, exit_price, reason, order_id):
+def _record_model_sell(model_name, exit_price, reason, order_id, qty=None):
+    if qty is not None:
+        _backfill_audit_fill(order_id, exit_price, qty)
     if not model_name:
         return
     try:
@@ -580,7 +625,8 @@ def main() -> int:
         })
         if not args.dry_run:
             _record_model_sell(model_for_signal, fill_price,
-                               sig.get("reason", sig_type), order_id)
+                               sig.get("reason", sig_type), order_id,
+                               qty=held.qty)
         open_positions = [p for p in open_positions if p.symbol != sym]
         _save_ledger()
         log.info(f"{'DRY-RUN' if args.dry_run else 'CLOSED'} PASS-1 {sym} qty={held.qty} "
