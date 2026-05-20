@@ -69,6 +69,11 @@ def main() -> int:
     ap.add_argument("--entry-px", type=float, default=None,
                     help="Override Fyers avg_price with this value (use when "
                          "position already squared on Fyers but ledger stuck).")
+    ap.add_argument("--cash-delta", type=float, default=None,
+                    help="Cash-only patch: add this signed amount (₹) to "
+                         "ledger.cash without touching entry_px. Use to "
+                         "remove phantom cash from legacy bootstraps or "
+                         "off-books trade fragments. Skips Fyers lookup.")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
@@ -79,6 +84,41 @@ def main() -> int:
 
     db = get_database_manager()
 
+    # ---- Cash-only patch branch ------------------------------------------
+    if args.cash_delta is not None:
+        with db.get_session() as s:
+            l = s.query(ModelLedger).filter_by(model_name=args.model).first()
+            if not l:
+                log.error(f"No ledger for model={args.model}")
+                return 2
+            old_cash = float(l.cash or 0)
+        new_cash = old_cash + float(args.cash_delta)
+        log.info(f"=== Cash patch for {args.model} ===")
+        log.info(f"  cash       : {old_cash:,.2f} -> {new_cash:,.2f}  "
+                 f"(delta {float(args.cash_delta):+,.2f})")
+        if not args.apply:
+            log.warning("DRY-RUN — re-run with --apply to persist.")
+            return 0
+        with db.get_session() as s:
+            l = s.query(ModelLedger).filter_by(model_name=args.model).first()
+            if not l:
+                log.error("Race: ledger gone — abort")
+                return 4
+            l.cash = Decimal(str(new_cash))
+            s.flush()
+        try:
+            write_config_change(
+                model_name=args.model, field="cash",
+                old_value=old_cash, new_value=new_cash,
+                reason=f"Phantom cash patch ({float(args.cash_delta):+.2f})",
+                changed_by="reconcile_entry_px",
+            )
+        except Exception:
+            pass
+        log.info(f"{args.model}: COMMITTED cash={new_cash:,.2f}")
+        return 0
+
+    # ---- Entry-px reconcile branch (default) -----------------------------
     # Step 1: read snapshot into local vars (no ORM instance held past this).
     with db.get_session() as s:
         l = s.query(ModelLedger).filter_by(model_name=args.model).first()
