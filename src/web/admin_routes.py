@@ -1545,6 +1545,14 @@ def model_balance_sheet(model_name):
         except Exception as _e:
             logger.debug(f"balance-sheet charges enrich failed: {_e}")
 
+        # realized_pnl in DB is net of sell-side charges (record_sell subtracts
+        # sell_chg from sale proceeds before computing pnl). Gross = pure price-
+        # diff P&L of closed trades = realized_db + sell_chg_lifetime.
+        # Surfacing both lets the UI build an identity that sums exactly to
+        # allocated without double-counting sell charges:
+        #   alloc = cash + cost_basis + buy_chg + sell_chg - realized_gross
+        realized_gross = float(realized) + sell_charges
+
         return jsonify({
             "success": True,
             "model_name": model_name,
@@ -1559,6 +1567,7 @@ def model_balance_sheet(model_name):
             "entry_cost_open": round(float(entry_cost_open), 2),
             "entry_charges_open": round(float(entry_charges_open), 2),
             "realized_pnl": round(float(realized), 2),
+            "realized_pnl_gross": round(realized_gross, 2),
             "unrealized_pnl": round(float(unrealized_pnl), 2),
             "total_pnl": round(float(total_pnl), 2),
             "nav": round(float(nav), 2),
