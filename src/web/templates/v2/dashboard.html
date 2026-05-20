@@ -164,7 +164,13 @@ function renderModelCard(m, sig) {
             const nav = Number(m.nav || (idleCash + posValue));
             // Reconciliation: cost basis + open-pos charges + idle cash should
             // equal allocated + realized (locked-in profit stays in cash).
-            const reconSum = posCost + openChg + idleCash;
+            // Accounting identity (all charges as cash outflow at trade time):
+            //   cash + cost_basis + lifetime_buy_chg = allocated + realized_pnl
+            // Note: realized_pnl in DB is net of SELL-side charges only; the
+            // BUY-side charges are absorbed into cash flow at buy time and
+            // surface here as a separate sunk-cost line.
+            const lifetimeBuyChg = Number(m.buy_txn_charges || 0);
+            const reconSum = posCost + idleCash + lifetimeBuyChg;
             const reconTarget = invested + realized;
             const drift = reconSum - reconTarget;
             const reconCls = Math.abs(drift) < 1 ? 'pos' : 'neg';
@@ -177,8 +183,8 @@ function renderModelCard(m, sig) {
               <div class="kv"><span class="k">Idle Cash</span><span class="v" title="Cash not tied up in open position">${fmtINR(idleCash)}</span></div>
               <div class="kv"><span class="k">Realized P&amp;L</span><span class="v ${cls(realized)}" title="Cumulative from closed trades">${fmtINR(realized)}</span></div>
               <div class="kv"><span class="k">Unrealized P&amp;L</span><span class="v ${cls(unreal)}" title="Live MTM − entry cost">${fmtINR(unreal)}</span></div>
-              <div class="kv" title="Cost basis + open-pos charges + idle cash. Should equal Allocated + Realized P&amp;L. Non-zero drift signals an accounting bug.">
-                <span class="k">Reconcile (cost+chg+cash)</span>
+              <div class="kv" title="Cost basis + idle cash + lifetime BUY charges should equal Allocated + Realized P&amp;L. Non-zero drift signals an accounting drift (e.g. partial fills, manual recon).">
+                <span class="k">Reconcile (cost+cash+buy chg)</span>
                 <span class="v ${reconCls}">${fmtINR(reconSum)} <small>(drift ${drift >= 0 ? '+' : ''}${fmtINR(drift)})</small></span>
               </div>
               <div class="kv nav-row"><span class="k">Available (Net Worth)</span><span class="v" title="Cash + live position value = total spend power if liquidated">${fmtINR(nav)}</span></div>

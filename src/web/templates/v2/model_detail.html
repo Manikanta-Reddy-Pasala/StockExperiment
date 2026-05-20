@@ -60,7 +60,7 @@
             <tr><td class="k" title="qty × entry price — what you actually paid for the open position (ex-charges)">Cost Basis (open pos)</td><td class="v" id="bs_entry_cost">—</td></tr>
             <tr><td class="k" title="Buy-side broker charges paid on the open position only">Buy Charges (open pos)</td><td class="v neg" id="bs_entry_charges">—</td></tr>
             <tr><td class="k">Cash (idle)</td><td class="v" id="bs_cash">—</td></tr>
-            <tr><td class="k" title="Sanity check: cost basis + buy charges + idle cash should equal allocated (minus realized P&amp;L moves)">Reconcile (cost + buy chg + cash)</td><td class="v" id="bs_reconcile">—</td></tr>
+            <tr><td class="k" title="Accounting identity: Cost Basis + Idle Cash + Lifetime BUY Charges should equal Allocated + Realized P&amp;L. Non-zero drift = partial fills / manual recon / off-books trades.">Reconcile (cost + cash + buy chg)</td><td class="v" id="bs_reconcile">—</td></tr>
             <tr><td class="k" title="Live MTM = qty × current LTP">Position Value (Live MTM)</td><td class="v" id="bs_position_value">—</td></tr>
             <tr><td class="k">Realized P&amp;L</td><td class="v" id="bs_realized">—</td></tr>
             <tr><td class="k">Unrealized P&amp;L</td><td class="v" id="bs_unrealized">—</td></tr>
@@ -175,6 +175,7 @@ async function loadBalanceSheet() {
     const cashNum = Number(data.cash || 0);
     const invNum = Number(data.invested_amount || 0);
     const realNum = Number(data.realized_pnl || 0);
+    const lifetimeBuyChg = Number(data.buy_txn_charges || 0);
 
     document.getElementById('bs_entry_cost').textContent =
       entryCost > 0 ? fmtINR(entryCost) : '<span class="text-muted">— (flat)</span>';
@@ -182,9 +183,10 @@ async function loadBalanceSheet() {
       entryChg > 0 ? fmtINR(entryChg) : '<span class="text-muted">—</span>';
 
     const reconEl = document.getElementById('bs_reconcile');
-    const reconSum = entryCost + entryChg + cashNum;
-    // Reconciliation target = allocated + realized P&L (cumulative locked-in
-    // profit stays in cash). Drift > ₹1 highlights an accounting bug.
+    // Accounting identity: cash + cost_basis + lifetime_buy_chg = allocated + realized.
+    // BUY-side charges are paid in cash at trade time; realized_pnl only nets
+    // out SELL-side charges, so buy charges show as a separate sunk-cost line.
+    const reconSum = entryCost + cashNum + lifetimeBuyChg;
     const reconTarget = invNum + realNum;
     const drift = reconSum - reconTarget;
     reconEl.innerHTML = `${fmtINR(reconSum)} <small class="${Math.abs(drift) < 1 ? 'text-success' : 'text-danger'}">` +
