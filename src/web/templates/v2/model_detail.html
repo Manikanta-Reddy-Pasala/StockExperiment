@@ -177,9 +177,9 @@ async function loadBalanceSheet() {
     const realNum = Number(data.realized_pnl || 0);
     const lifetimeBuyChg = Number(data.buy_txn_charges || 0);
 
-    document.getElementById('bs_entry_cost').textContent =
+    document.getElementById('bs_entry_cost').innerHTML =
       entryCost > 0 ? fmtINR(entryCost) : '<span class="text-muted">— (flat)</span>';
-    document.getElementById('bs_entry_charges').textContent =
+    document.getElementById('bs_entry_charges').innerHTML =
       entryChg > 0 ? fmtINR(entryChg) : '<span class="text-muted">—</span>';
 
     const reconEl = document.getElementById('bs_reconcile');

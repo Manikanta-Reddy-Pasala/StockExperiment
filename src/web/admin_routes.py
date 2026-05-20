@@ -1158,7 +1158,7 @@ def get_model_portfolio():
                           AND side = 'BUY'
                           AND status IN ('placed','filled','partial')
                           AND (UPPER(symbol) = :bare OR UPPER(symbol) = :fyers)
-                        ORDER BY created_at DESC
+                        ORDER BY placed_at DESC NULLS LAST, id DESC
                         LIMIT 1
                     """), {"m": m["model_name"], "bare": bare,
                            "fyers": f"NSE:{bare}-EQ"}).fetchone()
@@ -1496,7 +1496,7 @@ def model_balance_sheet(model_name):
                               UPPER(symbol) = :sym_bare
                            OR UPPER(symbol) = :sym_fyers
                           )
-                        ORDER BY created_at DESC
+                        ORDER BY placed_at DESC NULLS LAST, id DESC
                         LIMIT 1
                     """), {
                         "m": model_name,
