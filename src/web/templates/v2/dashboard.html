@@ -86,10 +86,8 @@
     <div class="row text-end g-3 flex-grow-1 justify-content-end align-items-center">
       <div class="col-auto"><div class="text-muted small" title="Original capital invested across all models">Invested</div><div class="fs-5 fw-bold" id="tot_invested">--</div></div>
       <div class="col-auto"><div class="text-muted small" title="Cash + live position value. Identity: NAV = Invested + Total P&L.">Current NAV</div><div class="fs-5 fw-bold" id="tot_nav">--</div></div>
-      <div class="col-auto"><div class="text-muted small" title="Locked-in profit/loss from closed trades">Realized</div><div class="fs-5 fw-bold" id="tot_realized">--</div></div>
       <div class="col-auto"><div class="text-muted small" title="+ Current open positions: Live MTM − Cost Basis">+ Current P&amp;L (open pos)</div><div class="fs-5 fw-bold" id="tot_current_pnl">--</div></div>
       <div class="col-auto"><div class="text-muted small" title="= NAV − Invested. Charges already deducted from cash.">= Total P&amp;L</div><div class="fs-5 fw-bold" id="tot_pnl">--</div></div>
-      <div class="col-auto"><div class="text-muted small" title="Approximate lifetime broker charges across all models (formula-based). Info only — already deducted from cash, not subtracted again from Total P&L.">Approx Txn Charges</div><div class="fs-5 fw-bold neg" id="tot_charges">--</div></div>
       <div class="col-auto align-self-center">
         <a href="/settings" class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation()"><i class="bi bi-sliders"></i> Manage Allocations</a>
       </div>
@@ -108,9 +106,10 @@
       </div>
       <div class="col-12 col-md-6">
         <div class="text-muted small text-uppercase mb-2" style="letter-spacing:0.5px;">Total P&amp;L breakdown (approx)</div>
-        <div class="kv"><span class="k">Realized (closed trades)</span><span class="v" id="td_realized">—</span></div>
+        <div class="kv"><span class="k" title="Locked-in P&L from closed trades across all models">Realized (closed trades)</span><span class="v" id="td_realized">—</span></div>
         <div class="kv"><span class="k">+ Unrealized (MTM − cost)</span><span class="v" id="td_unreal">—</span></div>
         <div class="kv"><span class="k"><strong>≈ Total P&amp;L</strong></span><span class="v" id="td_pnl2">—</span></div>
+        <div class="kv mt-2 pt-2" style="border-top:1px dashed #dee2e6;"><span class="k" title="Approximate lifetime broker charges across all models (formula-based). Info only — already deducted from cash at trade time.">Approx Txn Charges (info)</span><span class="v neg" id="td_charges">—</span></div>
         <div class="text-muted" style="font-size:0.75rem; margin-top:6px;">
           Approximate breakdown. Exact match with NAV − Invested may differ by small charge rounding — charges are formula-estimated, not broker-exact.
         </div>
@@ -308,16 +307,12 @@ function renderTotals(t, models) {
   const pnlEl = document.getElementById('tot_pnl');
   pnlEl.textContent = fmtINR(t.pnl_total) + ' (' + fmtPct(t.return_pct) + ')';
   pnlEl.className = 'fs-5 fw-bold ' + cls(t.pnl_total);
-  const realEl = document.getElementById('tot_realized');
-  realEl.textContent = fmtINR(t.realized_pnl);
-  realEl.className = 'fs-5 fw-bold ' + cls(t.realized_pnl);
-  const chEl = document.getElementById('tot_charges');
-  if (chEl) chEl.textContent = fmtINR(t.total_txn_charges);
 
   const navVal = Number(t.current_amount ?? t.nav ?? 0);
   const allocVal = Number(t.invested_amount ?? t.allocated_capital ?? 0);
   const pnlVal = Number(t.pnl_total ?? 0);
   const realVal = Number(t.realized_pnl ?? 0);
+  const chgVal = Number(t.total_txn_charges ?? 0);
   const unrealVal = pnlVal - realVal;
   const setText = (id, val, signed) => {
     const el = document.getElementById(id);
@@ -331,6 +326,7 @@ function renderTotals(t, models) {
   setText('td_pnl2', pnlVal, true);
   setText('td_realized', realVal, true);
   setText('td_unreal', unrealVal, true);
+  setText('td_charges', chgVal, false);
 }
 
 function renderSignalsWidget(data) {
