@@ -8,8 +8,8 @@ Currently models CNC (delivery) only. INTRADAY rates differ (lower STT 0.025%,
 no DP charges, no stamp duty) — if/when an INTRADAY model is wired, branch on
 product.
 
-Reference rates (Indian equity delivery, mid-2026):
-  - Brokerage (Fyers): Rs.20 flat per executed order (whichever lower)
+Reference rates (Indian equity, mid-2026):
+  - Brokerage (Fyers): ZERO on CNC delivery; min(Rs.20, 0.03%) on INTRADAY/MIS
   - STT (Securities Transaction Tax): 0.10% on sell-side turnover only
   - NSE/BSE Exchange Transaction Charges: ~0.00345% turnover (NSE)
   - SEBI Charges: 0.0001% turnover (Rs.10 per crore)
@@ -63,9 +63,14 @@ def compute_charges(side: str, qty: int, price: float,
     side_u = (side or "").upper()
     turnover = Decimal(str(qty)) * Decimal(str(price))
 
-    # Brokerage flat (or capped) — Fyers: min(Rs.20, 0.03% × turnover)
-    brokerage = min(BROKERAGE_FLAT, turnover * Decimal("0.0003"))
-    brokerage = max(brokerage, Decimal("0"))
+    # Brokerage — Fyers schedule (mid-2026):
+    #   CNC (delivery): ZERO brokerage (Fyers free delivery since 2024)
+    #   INTRADAY/MIS:  min(Rs.20, 0.03% × turnover)
+    if is_cnc:
+        brokerage = Decimal("0")
+    else:
+        brokerage = min(BROKERAGE_FLAT, turnover * Decimal("0.0003"))
+        brokerage = max(brokerage, Decimal("0"))
 
     # STT: SELL only. CNC=0.10%, INTRADAY=0.025%
     if side_u == "SELL":
