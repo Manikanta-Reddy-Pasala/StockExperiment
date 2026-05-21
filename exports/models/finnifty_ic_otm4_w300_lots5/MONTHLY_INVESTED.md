@@ -5,16 +5,14 @@
 | Column | Definition |
 |---|---|
 | **Trades** | Number of Iron Condor cycles opened that month |
-| **Margin Locked** | Defined-risk capital deployed = wing_width × lot_size × num_lots (per cycle, summed if multiple in month). This is the MOST you can lose per IC, NOT what you spend cash-wise. |
-| **Premium Collected** | Net credit received when opening IC = (CE_short + PE_short) − (CE_wing + PE_wing) × lot × lots. This is the cash that flows INTO your account on entry. |
-| **Worst-case Loss** | Hard cap on month's loss = Margin Locked − Premium Collected. Strategy can never lose more than this per IC. |
-| **Realized P&L** | Actual profit/loss when IC closed (at stop or expiry). Premium Collected − Exit Debit Paid. Sign reflects outcome: +ve = kept most of credit, −ve = had to buy back at higher price. |
-| **ROI on Equity** | Month P&L / equity at start of month. Tracks portfolio growth. |
-| **End-of-Month Equity** | Cumulative NAV after this month's trades close. |
+| **Margin Locked** | Defined-risk capital = wing_width × lot_size × num_lots, summed across cycles |
+| **Premium Collected** | Net credit on entry = (CE_short + PE_short) − (CE_wing + PE_wing) × lot × lots |
+| **Worst-case Loss** | Margin Locked − Premium Collected (hard cap) |
+| **Realized P&L** | Actual P&L when IC closed (stop or expiry) |
+| **ROI on Equity** | Month P&L / equity at start of month |
+| **End-of-Month Equity** | Cumulative NAV after this month's trades |
 
-Capital is **defined-risk margin**. With 5 lots × 65 (post Sep 2024) × ₹300 wing = ₹97,500 margin per cycle on ₹2L start. Margin scales with lot size + wing width but never exceeds the equity (refuses to enter otherwise).
-
-**Note on negative Worst-case Loss values**: A handful of months show Worst-case Loss < 0 (e.g. 2023-05 −₹1.45L, 2025-11 −₹2.31L). This happens when the backtest's recorded Premium Collected exceeded the theoretical wing_width × lot × lots. Real-world IC structure caps loss at wing_width − net_credit (always ≥ 0). The negative values are an artifact of close-price entry modeling (mid-of-day prices may overstate filled credit). Treat Worst-case Loss = max(0, value) for live planning.
+Lot history (FinNifty): 40 → 65 (Sep 2024) → 60 (2026 SEBI). Margin scales accordingly per trade.
 
 ## Monthly ledger
 
@@ -36,7 +34,7 @@ Capital is **defined-risk margin**. With 5 lots × 65 (post Sep 2024) × ₹300 
 | 2024-06 | 1 | 0% | ₹60,000 | ₹24,648 | ₹35,352 | ₹-35,951 | -5.59% | ₹607,582 |
 | 2024-07 | 1 | 100% | ₹60,000 | ₹69,570 | ₹-9,570 | ₹+69,569 | +11.45% | ₹677,151 |
 | 2024-08 | 1 | 100% | ₹60,000 | ₹40,464 | ₹19,536 | ₹+40,463 | +5.98% | ₹717,615 |
-| 2024-09 | 2 | 100% | ₹157,500 | ₹180,782 | ₹-23,283 | ₹+143,687 | +20.02% | ₹861,301 |
+| 2024-09 | 2 | 100% | ₹157,500 | ₹180,782 | ₹-23,282 | ₹+143,687 | +20.02% | ₹861,301 |
 | 2024-11 | 1 | 100% | ₹97,500 | ₹91,676 | ₹5,824 | ₹+91,676 | +10.64% | ₹952,978 |
 | 2024-12 | 1 | 100% | ₹97,500 | ₹25,327 | ₹72,173 | ₹+25,329 | +2.66% | ₹978,306 |
 | 2025-01 | 1 | 100% | ₹97,500 | ₹30,088 | ₹67,412 | ₹+30,087 | +3.08% | ₹1,008,394 |
@@ -50,16 +48,16 @@ Capital is **defined-risk margin**. With 5 lots × 65 (post Sep 2024) × ₹300 
 | 2025-10 | 1 | 0% | ₹97,500 | ₹33,049 | ₹64,451 | ₹-73,894 | -5.39% | ₹1,296,134 |
 | 2025-11 | 1 | 100% | ₹97,500 | ₹328,656 | ₹-231,156 | ₹+328,656 | +25.36% | ₹1,624,790 |
 | 2025-12 | 1 | 100% | ₹97,500 | ₹3,084 | ₹94,416 | ₹+3,083 | +0.19% | ₹1,627,873 |
-| 2026-02 | 1 | 0% | ₹97,500 | ₹36,306 | ₹61,194 | ₹-83,244 | -5.11% | ₹1,544,629 |
-| 2026-04 | 1 | 100% | ₹97,500 | ₹731,146 | ₹-633,646 | ₹+632,671 | +40.96% | ₹2,177,300 |
-| 2026-05 | 1 | 100% | ₹97,500 | ₹48,373 | ₹49,127 | ₹+48,373 | +2.22% | ₹2,225,673 |
+| 2026-02 | 1 | 0% | ₹90,000 | ₹33,513 | ₹56,487 | ₹-76,841 | -4.72% | ₹1,551,033 |
+| 2026-04 | 1 | 100% | ₹90,000 | ₹674,904 | ₹-584,904 | ₹+584,004 | +37.65% | ₹2,135,036 |
+| 2026-05 | 1 | 100% | ₹90,000 | ₹44,652 | ₹45,348 | ₹+44,652 | +2.09% | ₹2,179,688 |
 
 ## Headline summary
 
 - **Total cycles:** 35
 - **Win rate:** 77.1% (27W / 8L)
-- **Cumulative margin deployed:** ₹2,775,000 (sum across all cycles)
-- **Cumulative premium collected:** ₹2,815,865
-- **Total realized P&L:** ₹+2,025,673
-- **Start NAV:** ₹2,00,000 → **End NAV:** ₹2,225,673
-- **Return on starting equity:** +1012.84% (over 3yr)
+- **Cumulative margin deployed:** ₹2,752,500
+- **Cumulative premium collected:** ₹2,753,109
+- **Total realized P&L:** ₹+1,979,688
+- **Start NAV:** ₹200,000 → **End NAV:** ₹2,179,688
+- **Return on starting equity:** +989.84%
