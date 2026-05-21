@@ -1,6 +1,8 @@
 # StockExperiment — Multi-Model Live Trading + Audit
 
-NSE momentum & breakout trading system running **5 isolated models** in parallel against a single Fyers brokerage account. Each model has its own capital pool, own ledger, own ranking signal, own rebalance cadence. Live orders fire daily via cron 09:30 IST; every decision is captured in a 7-table audit trail.
+NSE momentum & breakout trading system running **4 active equity models** + 1 disabled options scaffold in parallel against a single Fyers brokerage account. Each model has its own capital pool, own ledger, own ranking signal, own rebalance cadence. Live orders fire daily via cron 09:30 IST; every decision is captured in a 7-table audit trail.
+
+**Charges are approximate** (formula-based — Fyers SEBI rates), deducted from per-model cash at fill time. Not chased to broker-exact.
 
 Production: `77.42.45.12` · App: <https://stock.oneshell.in> · Bot: `@stocks_momrot_bot`
 
@@ -11,19 +13,19 @@ Production: `77.42.45.12` · App: <https://stock.oneshell.in> · Bot: `@stocks_m
 | Model | Universe | Cadence | Product | Hold | Signal |
 |-------|----------|---------|---------|------|--------|
 | `momentum_n100_top5_max1` | Real Nifty 100 | Monthly (1st weekday) | CNC delivery | until rank-1 changes | top-5 by 30d return, hold rank-1 |
-| `momentum_pseudo_n100_adv` | Top-100 ADV from N500 (yearly PIT rebuild) | Monthly | CNC | until rank-1 changes | top-5 by 30d return |
-| `midcap_narrow_60d_breakout` | ~100 NSE midcaps | Event-driven (daily check) | CNC | until stop/trail | 60d-high + vol >2× + 200d SMA, ALL must fire |
-| `n20_daily_large_only` | Top-20 ADV ∩ Nifty 100 | Daily | CNC | until rank-1 changes | rank by short-term return + uptrend filter (PIT) |
-| `finnifty_ic_otm4_w300_lots5` | FinNifty weekly | Weekly expiry | Options multi-leg | weekly | OTM4 iron condor, 300pt wing, 5 lots (executor not yet wired) |
+| `momentum_pseudo_n100_adv` | Top-100 ADV from N500 minus Smallcap-250, yearly PIT rebuild, close > 200d SMA | Monthly | CNC | until rank-1 changes | top-5 by 30d return + uptrend gate |
+| `midcap_narrow_60d_breakout` | ~100 NSE midcaps (top-100 ADV minus Nifty 100) | Event-driven (daily check) | CNC | up to 120d / target +100% / trail -20% from peak | 40d-high + vol >2× + 200d SMA, ALL must fire |
+| `n20_daily_large_only` | Top-20 ADV ∩ Nifty 100 | Daily | CNC | until rank-1 changes | rank by 30d return + 200d SMA uptrend filter (PIT) |
+| `finnifty_ic_otm4_w300_lots5` | FinNifty weekly | Weekly expiry | Options multi-leg | weekly | OTM4 iron condor, 300pt wing, 5 lots (executor not yet wired — currently DISABLED) |
 
 **Capital model (per model):**
-- `Allocated` = user-deposited principal, immutable unless user tops up or withdraws (`ModelSettings.invested_amount`).
-- `Available Cash` = idle un-invested cash + cumulative realized P&L (`ModelLedger.cash`).
+- `Allocated / Invested` = user-deposited principal (`ModelSettings.invested_amount`). Default ₹30,000 per active model.
+- `Available Cash` = idle un-invested cash + cumulative realized P&L (`ModelLedger.cash`). Approx broker charges already deducted at fill time.
 - `Position Value (Live)` = held_qty × live Fyers LTP.
-- `Realized P&L` = sum of closed-trade P&L (`ModelLedger.realized_pnl`).
-- `Unrealized P&L` = position_value − entry_cost.
+- `Realized P&L` = sum of closed-trade P&L (`ModelLedger.realized_pnl`). Approximate (formula-based charges).
+- `Unrealized P&L` = position_value − cost_basis.
 - `Available (Net Worth) / NAV` = cash + position_value.
-- `Total P&L` = NAV − allocated.
+- `Total P&L` = NAV − Invested.
 
 Each model gets a single `model_settings` row + single `model_ledger` row + N `model_trades` rows. No cross-talk; one model's BUY never touches another's cash.
 
@@ -79,9 +81,12 @@ Re-run / force: each model's Rebalance button (portfolio page) chains
 ### Sizing rules (every BUY)
 
 ```
-qty = floor(min(cash, max_per_trade_inr) / price)
-qty = min(qty, floor((max_total_buy_inr - used_value) / price))   ← hard guardrail
-qty = 0 if qty < 1
+slot_alloc = min(cash / slots_left, max_per_trade_inr)
+qty        = floor(slot_alloc / price)
+# Pre-deduct approx broker charges; if qty*price + charges > cash,
+# shrink qty by 1% per iter until cost fits (bounded loop, max 200 iters).
+# Hard guardrail: qty *= cap by (max_total_buy_inr - used_value) / price
+# qty = 0 if no fit — Telegram alert fires with shortfall details.
 ```
 
 Per-model `Rebalance` clicks are serialized: if a prior rebalance for the same model is still pending/running (in-process lock OR cross-worker DB check), a duplicate click returns HTTP 409.
@@ -182,7 +187,8 @@ curl -s 'https://stock.oneshell.in/admin/midcap_narrow_60d_breakout/ranking?reca
 - `v1.0.0` — Initial single-model momentum rotation
 - `v2.0-btc-rules` — BTC-correlated regime filter (rejected)
 - `v2.1-slope50` — EMA-50 slope refinement
-- **`v3.0-multi-model-audit`** — 5 isolated models + 7-table audit trail + capital guardrails (current)
+- `v3.0-multi-model-audit` — 5 isolated models + 7-table audit trail + capital guardrails
+- **`v3.1-approx-charges`** — Approximate broker charges (formula), live-backtest parity sync (midcap V2 + pseudo_n100 smallcap exclude + 200d uptrend), insufficient-cash Telegram alerts, per-model ledger reconciler (current)
 
 ---
 
