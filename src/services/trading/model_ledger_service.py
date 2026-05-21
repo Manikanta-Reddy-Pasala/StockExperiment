@@ -494,6 +494,17 @@ def record_buy(model_name: str, symbol: str, qty: int, price: float,
                 f"{qty}x{symbol}@{price} (cost=₹{float(cost):,.2f}, "
                 f"cash=₹{float(l.cash):,.2f}) — ledger absorbs"
             )
+            try:
+                from tools.live.telegram_notify import send as _tg
+                _tg(
+                    f"⚠️ *Post-fill cash shortfall absorbed*\n"
+                    f"Model: `{model_name}`\n"
+                    f"Symbol: `{symbol}` x{qty} @ ₹{float(price):,.2f}\n"
+                    f"Cost: ₹{float(cost):,.2f}  Cash: ₹{float(l.cash):,.2f}\n"
+                    f"Short: ₹{shortfall:,.2f} — ledger cash will go negative"
+                )
+            except Exception:
+                pass
         l.cash = l.cash - cost
         if l.open_symbol == norm and l.open_qty:
             # Accumulate same-symbol fill: weighted-average entry price.

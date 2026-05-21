@@ -738,7 +738,20 @@ def main() -> int:
             continue
         qty = rm.size_position(price, open_positions)
         if qty < 1:
-            log.info(f"SKIP {sym}: qty<1 (capital=₹{rm.cfg.capital_inr:,})")
+            # Compute the gap so the notification can quote actual shortfall.
+            used_inr = sum(p.qty * p.entry_price for p in open_positions)
+            cash_avail = rm.cfg.capital_inr - used_inr
+            try:
+                from tools.live.broker_charges import compute_charges
+                approx_chg = float(
+                    compute_charges("BUY", 1, float(price), "CNC").get("total", 0))
+            except Exception:
+                approx_chg = 20.0
+            needed_for_one = float(price) + approx_chg
+            log.info(
+                f"SKIP {sym}: qty<1 (cash=₹{cash_avail:,.2f}, "
+                f"needed≥₹{needed_for_one:,.2f} for 1 share + approx chg)"
+            )
             skipped += 1
             try:
                 from src.services.audit_service import write_rebalance_decision
@@ -746,12 +759,21 @@ def main() -> int:
                     model_name=args.model_name or "(env)",
                     trigger="CRON" if not args.dry_run else "DRY",
                     decision="SKIP_QTY_ZERO",
-                    reason=f"qty<1 at price ₹{price:.2f}, capital=₹{rm.cfg.capital_inr:,}",
+                    reason=(f"qty<1 at price ₹{price:.2f}, cash=₹{cash_avail:,.2f}, "
+                            f"needed≥₹{needed_for_one:,.2f}"),
                     rank1_symbol=sym, rank1_price=price,
                     qty_sized=0, qty_clamped=0, clamp_reason="CASH",
                 )
             except Exception:
                 pass
+            _tg_safe(
+                f"⚠️ *Insufficient cash — order skipped*\n"
+                f"Model: `{args.model_name or '(env)'}`\n"
+                f"Symbol: `{sym}` @ ₹{float(price):,.2f}\n"
+                f"Available cash: ₹{cash_avail:,.2f}\n"
+                f"Needed (≥1 share + approx chg): ₹{needed_for_one:,.2f}\n"
+                f"Short by: ₹{max(0.0, needed_for_one - cash_avail):,.2f}"
+            )
             continue
 
         # Decision audit — BUY allowed
