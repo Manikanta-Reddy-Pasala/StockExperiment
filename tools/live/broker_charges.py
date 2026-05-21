@@ -8,10 +8,11 @@ Currently models CNC (delivery) only. INTRADAY rates differ (lower STT 0.025%,
 no DP charges, no stamp duty) — if/when an INTRADAY model is wired, branch on
 product.
 
-Reference rates (Indian equity, mid-2026):
-  - Brokerage (Fyers): min(Rs.20, 0.03%) per executed order (both CNC + MIS).
-    NOTE: Fyers's actual CNC brokerage on the user's account is higher than
-    this formula. Treat as estimate; reconcile cash via Fyers ledger.
+Reference rates (Indian equity, mid-2026, calibrated against user's
+actual Fyers ledger 14/18/19 May 2026):
+  - Brokerage (Fyers):
+      CNC delivery:   Rs.20 flat per executed order  (observed: HFCL ~Rs.40 = 2 fills × Rs.20, ADANI Rs.20)
+      INTRADAY/MIS:   min(Rs.20, 0.03% × turnover) per executed order
   - STT (Securities Transaction Tax): 0.10% on sell-side turnover only
   - NSE/BSE Exchange Transaction Charges: ~0.00345% turnover (NSE)
   - SEBI Charges: 0.0001% turnover (Rs.10 per crore)
@@ -65,15 +66,17 @@ def compute_charges(side: str, qty: int, price: float,
     side_u = (side or "").upper()
     turnover = Decimal(str(qty)) * Decimal(str(price))
 
-    # Brokerage — Fyers schedule (mid-2026):
-    #   CNC + INTRADAY/MIS both use min(Rs.20, 0.03% × turnover).
-    # Note: Fyers's ACTUAL CNC brokerage observed on user's account is
-    # higher than this formula (e.g. ₹40.90 on ₹29,528 turnover, ₹20 on
-    # ₹14,981). Don't know the exact CNC schedule — this estimate is a
-    # lower bound. Use Fyers ledger as truth for actual cash impact;
-    # this field is informational only.
-    brokerage = min(BROKERAGE_FLAT, turnover * Decimal("0.0003"))
-    brokerage = max(brokerage, Decimal("0"))
+    # Brokerage — Fyers schedule (calibrated mid-2026):
+    #   CNC delivery: Rs.20 flat per executed order
+    #     (observed: HFCL Rs.40.90 = 2 fills × Rs.20 + paise rounding;
+    #      ADANI single fill Rs.20.00 exact)
+    #   INTRADAY/MIS: min(Rs.20, 0.03% × turnover) per executed order
+    #     (observed: ADANI Rs.4.47-4.49 per 14.9K turnover fill ≈ 0.03%)
+    if is_cnc:
+        brokerage = BROKERAGE_FLAT  # Rs.20 flat
+    else:
+        brokerage = min(BROKERAGE_FLAT, turnover * Decimal("0.0003"))
+        brokerage = max(brokerage, Decimal("0"))
 
     # STT: SELL only. CNC=0.10%, INTRADAY=0.025%
     if side_u == "SELL":
