@@ -40,7 +40,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from src.models.database import get_database_manager  # noqa: E402
-from src.models.trading_models import ModelLedger, ModelTrade  # noqa: E402
+from src.models.model_ledger_models import ModelLedger, ModelTrade  # noqa: E402
 from tools.live.broker_charges import compute_charges  # noqa: E402
 
 
