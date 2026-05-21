@@ -220,64 +220,38 @@ function renderModelCard(m, sig) {
             const unreal = posValue ? posValue - posCost : 0;
             const realized = Number(m.realized_pnl || 0);
             const nav = Number(m.nav || (idleCash + posValue));
-            // Reconciliation: cost basis + open-pos charges + idle cash should
-            // equal allocated + realized (locked-in profit stays in cash).
-            // Accounting identity (full form — every charge visible):
-            //   alloc = cash + cost_basis + buy_chg + sell_chg - realized_gross
-            // realized_gross = pure price-diff P&L of closed trades
-            //                = realized_net + sell_chg_lifetime
-            // (because record_sell subtracts sell_chg from sale proceeds before
-            // computing pnl, so DB net is already gross-minus-sell_chg).
-            // For N20: 14983.63 + 14981.08 + 27.25 + 28.44 - 20.40 = 30000 ✓
-            //   (realized_gross = -8.04 + 28.44 = +20.40 — price diff WAS a gain
-            //    before charges ate it; net came out -8.04 loss because sell_chg
-            //    28.44 was larger than the 20.40 gross gain.)
-            const lifetimeBuyChg = Number(m.buy_txn_charges || 0);
-            const lifetimeSellChg = Number(m.sell_txn_charges || 0);
-            const realGross = realized + lifetimeSellChg;
-            const reconSum = idleCash + posCost + lifetimeBuyChg + lifetimeSellChg - realGross;
-            const reconTarget = invested;
-            const drift = reconSum - reconTarget;
-            const reconCls = Math.abs(drift) < 1 ? 'pos' : 'neg';
+            const curPctGross = posCost > 0 ? (unreal / posCost * 100) : 0;
             return `
-              <div class="kv"><span class="k"><strong>Allocated</strong></span><span class="v" title="Original capital deposited">${fmtINR(invested)}</span></div>
-              <div class="kv"><span class="k">Open Position</span><span class="v">${posLine}</span></div>
-              <div class="kv reconcile-hdr"><span class="k" colspan="2" style="font-size:0.7rem;color:#6c757d;text-transform:uppercase;letter-spacing:0.5px;">Capital flow (sums to Allocated)</span></div>
-              <div class="kv"><span class="k">+ Idle Cash</span><span class="v" title="Cash not tied up in open position">${fmtINR(idleCash)}</span></div>
-              <div class="kv"><span class="k">+ Cost Basis (open pos)</span><span class="v" title="qty × entry price — what you paid, ex-charges">${fmtINR(posCost)}</span></div>
-              <div class="kv"><span class="k">+ Buy Chg paid (lifetime)</span><span class="v neg" title="Lifetime BUY-side broker charges (brokerage + exchange + SEBI + stamp + GST). Real money gone.">${fmtINR(lifetimeBuyChg)}</span></div>
-              <div class="kv"><span class="k">+ Sell Chg paid (lifetime)</span><span class="v neg" title="Lifetime SELL-side broker charges (brokerage + STT + exchange + SEBI + GST + DP). Real money gone.">${fmtINR(lifetimeSellChg)}</span></div>
-              <div class="kv"><span class="k">${realGross >= 0 ? '−' : '+'} Closed-trade ${realGross >= 0 ? 'gross gain' : 'gross loss'}</span><span class="v ${cls(realGross)}" title="Pure price-diff P&L on closed trades, BEFORE sell charges. For this model: Realized net (₹${realized.toFixed(2)}) + Sell chg already counted above (₹${lifetimeSellChg.toFixed(2)}) = ₹${realGross.toFixed(2)} gross. GAIN subtracts (price-diff already in cash). LOSS adds back (money gone from cash).">${fmtINR(Math.abs(realGross))}</span></div>
-              <div class="kv" title="Identity: cash + cost basis + buy chg + sell chg − realized_gross = Allocated. Every rupee accounted for, every charge visible.">
-                <span class="k"><strong>= Reconcile</strong></span>
-                <span class="v ${reconCls}"><strong>${fmtINR(reconSum)}</strong> <small>(drift ${drift >= 0 ? '+' : ''}${fmtINR(drift)})</small></span>
-              </div>
-              <div class="kv" style="font-size:0.7rem;color:#6c757d;line-height:1.4;padding:6px 0;"><span class="k" colspan="2">Note: realized P&amp;L (net) ₹${realized.toFixed(2)} = closed-trade gross ₹${realGross.toFixed(2)} − sell chg ₹${lifetimeSellChg.toFixed(2)}. Both sell chg AND gross are shown above so every rupee is visible.</span></div>
-              <div class="kv reconcile-hdr"><span class="k" colspan="2" style="font-size:0.7rem;color:#6c757d;text-transform:uppercase;letter-spacing:0.5px;">Live position view</span></div>
-              <div class="kv"><span class="k">Position Value (Live MTM)</span><span class="v" title="MTM = qty × live LTP">${fmtINR(posValue)}</span></div>
-              ${(() => {
-                const curPnlGross = unreal;
-                const curPnlNetOfBuy = unreal - openChg;
-                const curPctGross = posCost > 0 ? (unreal / posCost * 100) : 0;
-                return `
-                  <div class="kv"><span class="k" title="Current position P&L = Live MTM − Cost basis. Hypothetical: if you sold now at LTP, ignoring sell charges.">Current Position P&amp;L (gross)</span>
-                    <span class="v"><span class="pnl-line ${cls(curPnlGross)}">${fmtINR(curPnlGross)} <small>(${fmtPct(curPctGross)})</small></span></span>
+              <div class="row g-2 px-1 pt-2">
+                <div class="col-12">
+                  <div class="text-muted text-uppercase" style="font-size:0.7rem; letter-spacing:0.5px; margin-bottom:4px;">Position</div>
+                  <div class="kv"><span class="k">Open</span><span class="v">${posLine}</span></div>
+                  <div class="kv"><span class="k">Idle Cash</span><span class="v" title="Cash not tied up in open position">${fmtINR(idleCash)}</span></div>
+                  <div class="kv"><span class="k">Cost Basis</span><span class="v" title="qty × entry price (ex-charges)">${fmtINR(posCost)}</span></div>
+                  <div class="kv"><span class="k">Position Value (Live MTM)</span><span class="v" title="qty × live LTP">${fmtINR(posValue)}</span></div>
+                  <div class="kv"><span class="k">Current Position P&amp;L (gross)</span><span class="v ${cls(unreal)}">${fmtINR(unreal)} <small>(${fmtPct(curPctGross)})</small></span></div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <div class="text-muted text-uppercase" style="font-size:0.7rem; letter-spacing:0.5px; margin:8px 0 4px;">Math identity</div>
+                  <div class="kv"><span class="k">NAV</span><span class="v">${fmtINR(nav)}</span></div>
+                  <div class="kv"><span class="k">− Allocated</span><span class="v">${fmtINR(invested)}</span></div>
+                  <div class="kv"><span class="k"><strong>= Total P&amp;L</strong></span><span class="v ${pnlCls}"><strong>${fmtINR(m.pnl_total)}</strong> <small>(${fmtPct(m.return_pct)})</small></span></div>
+                  <div class="text-muted" style="font-size:0.72rem; margin-top:4px; line-height:1.4;">
+                    <code>NAV = Allocated + Total P&amp;L</code> — every charge already deducted from cash.
                   </div>
-                  <div class="kv"><span class="k" title="Current position P&L minus the buy-side broker charges already paid on this position. More accurate 'what's my open trade worth net of fees so far'.">Current P&amp;L (net of buy chg)</span>
-                    <span class="v ${cls(curPnlNetOfBuy)}">${fmtINR(curPnlNetOfBuy)}</span>
+                </div>
+                <div class="col-12 col-md-6">
+                  <div class="text-muted text-uppercase" style="font-size:0.7rem; letter-spacing:0.5px; margin:8px 0 4px;">Total P&amp;L breakdown</div>
+                  <div class="kv"><span class="k">Realized (net of sell chg)</span><span class="v ${cls(realized)}" title="Cumulative from closed trades, net of sell charges">${fmtINR(realized)}</span></div>
+                  <div class="kv"><span class="k">+ Unrealized (gross MTM − cost)</span><span class="v ${cls(unreal)}">${fmtINR(unreal)}</span></div>
+                  <div class="kv"><span class="k">− Buy chg on open positions</span><span class="v neg" title="Buy-side broker charges paid on current open position only">${fmtINR(openChg)}</span></div>
+                  <div class="kv"><span class="k"><strong>= Total P&amp;L</strong></span><span class="v ${pnlCls}"><strong>${fmtINR(m.pnl_total)}</strong></span></div>
+                  <div class="text-muted" style="font-size:0.72rem; margin-top:4px; line-height:1.4;">
+                    Total Txn Charges (info only, already in cash): <span class="neg">${fmtINR(m.total_txn_charges)}</span>
+                    = Buy ₹${Number(m.buy_txn_charges||0).toFixed(2)} + Sell ₹${Number(m.sell_txn_charges||0).toFixed(2)}
                   </div>
-                `;
-              })()}
-              <div class="kv"><span class="k">Realized P&amp;L (net, closed trades)</span><span class="v ${cls(realized)}" title="Cumulative from closed trades, net of sell charges">${fmtINR(realized)}</span></div>
-              <div class="kv"><span class="k">Buy Chg (open pos only)</span><span class="v neg" title="Buy charges paid on current open position only (subset of lifetime). Informational — not added separately to Reconcile.">${fmtINR(openChg)}</span></div>
-              <div class="kv nav-row"><span class="k">Available (Net Worth)</span><span class="v" title="Cash + live position value = total spend power if liquidated">${fmtINR(nav)}</span></div>
-              <div class="kv">
-                <span class="k" title="NAV − Allocated. = Realized (net of sell chg) + Unrealized (gross MTM − cost) − Buy chg on open pos. Charges already in cash — Total Txn Charges shown below for info only, not subtracted again.">Total P&amp;L (NAV − Allocated)</span>
-                <span class="v">
-                  <span class="pnl-line ${pnlCls}">${fmtINR(m.pnl_total)} <small>(${fmtPct(m.return_pct)})</small></span>
-                </span>
+                </div>
               </div>
-              <div class="kv"><span class="k">Total Txn Charges (lifetime)</span><span class="v neg" title="BUY + SELL charges paid lifetime">${fmtINR(m.total_txn_charges)}</span></div>
             `;
           })()}
           </div>
