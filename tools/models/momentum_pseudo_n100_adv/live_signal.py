@@ -107,8 +107,12 @@ def _close_above_sma200(symbol: str, today_ts: int) -> bool:
 
     Requires ≥200 daily closes in cache. Returns False on insufficient data
     (fail-CLOSED — matches backtest which skips names without 200d history).
+
+    Lookback: 200 trading days × ~7/5 calendar:trading ratio + holidays
+    buffer = 420 calendar days. Tighter window misses SMA200 for some names
+    (Indian markets ~250 trading days/yr).
     """
-    lookback = (SMA_LONG + 60) * 86400  # buffer for non-trading days
+    lookback = int(SMA_LONG * 1.6 + 100) * 86400  # calendar-day buffer
     df = read_cached(symbol, "D", today_ts - lookback, today_ts)
     if df.empty or len(df) < SMA_LONG:
         return False
