@@ -485,8 +485,14 @@ def record_buy(model_name: str, symbol: str, qty: int, price: float,
         charges = _compute_real_charges("BUY", qty, price, product)
         cost = qty_d * price_d + charges
         if l.cash < cost:
-            raise ValueError(
-                f"{model_name}: cash {float(l.cash):,.0f} < cost {float(cost):,.0f}"
+            # Fyers fill already executed — cannot raise, ledger MUST follow
+            # broker truth or drift forever. Log shortfall + allow cash dip
+            # (rare edge: slippage > sizer's charges buffer).
+            shortfall = float(cost - l.cash)
+            log.warning(
+                f"{model_name}: cash shortfall ₹{shortfall:,.2f} on BUY "
+                f"{qty}x{symbol}@{price} (cost=₹{float(cost):,.2f}, "
+                f"cash=₹{float(l.cash):,.2f}) — ledger absorbs"
             )
         l.cash = l.cash - cost
         if l.open_symbol == norm and l.open_qty:

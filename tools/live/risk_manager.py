@@ -177,12 +177,13 @@ class RiskManager:
     def size_position(self, price: float, open_positions: List[Position]) -> int:
         """Equal-share remaining cash across remaining slots, floor to lot.
 
-        Final guardrail: total BUY exposure (existing open + this new) is
-        capped at allocated_capital + cumulative_realized_pnl. If the
-        sized qty would breach that ceiling, it's truncated to fit. This
-        is a hard backstop against bugs that slip past the cash check —
-        e.g. concurrent rebalance clicks that each see the same stale cash
-        value before record_buy persists.
+        Subtracts approximate broker charges (formula-based) so the sized qty
+        leaves enough cash for fees. If qty*price + charges still exceeds
+        available cash (e.g. fill-price slippage estimate), shrinks qty by 1%
+        in a loop until cost fits or qty drops to 0.
+
+        Final guardrail: total BUY exposure capped at
+        allocated_capital + cumulative_realized_pnl.
         """
         used = sum(p.qty * p.entry_price for p in open_positions)
         cash = self.cfg.capital_inr - used
@@ -192,8 +193,28 @@ class RiskManager:
         slot_alloc = min(cash / slots_left, self.cfg.max_per_trade_inr)
         qty = int(slot_alloc // price)
 
-        # Hard ceiling: allocated + realized. Never let total open BUYs
-        # exceed this regardless of what cash reports.
+        def _approx_buy_charges(q: int, px: float) -> float:
+            if q < 1:
+                return 0.0
+            try:
+                from tools.live.broker_charges import compute_charges
+                br = compute_charges("BUY", q, px, "CNC")
+                return float(br.get("total", 0.0))
+            except Exception:
+                return 20.0  # safe fallback (Fyers flat brokerage approx)
+
+        # Pre-deduct charges, then 1%-shrink loop until fits
+        for _ in range(200):  # max ~87% shrink from start, bounded loop
+            if qty < 1:
+                qty = 0
+                break
+            cost = qty * price + _approx_buy_charges(qty, price)
+            if cost <= cash:
+                break
+            shrunk = int(qty * 0.99)
+            qty = shrunk if shrunk < qty else qty - 1
+
+        # Hard ceiling: allocated + realized.
         if self.cfg.max_total_buy_inr is not None and self.cfg.max_total_buy_inr > 0:
             headroom = self.cfg.max_total_buy_inr - used
             max_qty_by_ceiling = int(max(0, headroom) // price)
