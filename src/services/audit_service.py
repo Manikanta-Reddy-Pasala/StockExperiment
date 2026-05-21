@@ -101,25 +101,16 @@ def update_order_fill(fyers_order_id: str, fill_price: float,
                       status: str = "filled",
                       cash_after: Optional[float] = None) -> bool:
     """Backfill audit_orders.fill_price / fill_qty / status once Fyers confirms
-    the fill. Recomputes slippage_inr and charges.
+    the fill. Recomputes slippage_inr and approximate charges via formula.
 
-    Charge derivation order:
-      1) If cash_after is provided AND raw_request has cash_before:
-         actual_charge = |cash_delta| − notional   (Fyers-truth)
-      2) Else fall back to compute_charges() formula (synthetic estimate)
-
-    The cash-delta path is preferred because it captures Fyers's ACTUAL
-    debited fees (brokerage + STT + exchange + SEBI + stamp + GST + DP +
-    any non-trading like Call & Trade if fired) — no formula drift.
-
-    Caveat: cash_delta only matches notional + charges for CNC delivery
-    where Fyers debits full amount immediately. MIS intraday positions
-    settle via margin, so cash_delta won't equal notional + charges
-    until end-of-day square-off. For MIS, falls back to formula and
-    relies on Fyers ledger CSV reconciliation for true cost.
+    Charges are formula-estimated (compute_charges) — approximate, not
+    broker-exact. Cash-delta derivation removed per product decision: we
+    intentionally do not chase Fyers-exact matching. The Fyers ledger CSV
+    reconciliation tool exists for users who need exact post-hoc audit.
 
     Returns True if a row was updated, False otherwise. Never raises.
     """
+    _ = cash_after  # kept for call-site compatibility; no longer used
     if not fyers_order_id:
         return False
     try:
@@ -146,62 +137,19 @@ def update_order_fill(fyers_order_id: str, fill_price: float,
             except Exception:
                 pass
 
-            # Charge derivation — prefer cash-delta truth over formula
+            # Approximate charges via formula (compute_charges)
             q = int(row.fill_qty or row.qty or 0)
-            notional = q * float(fill_price) if q > 0 else 0.0
-            actual_charge = None
-            cash_delta_used = None
-            cash_before = None
             try:
-                if cash_after is not None and isinstance(row.raw_request, dict):
-                    cash_before = row.raw_request.get("cash_before")
-                    if cash_before is not None and notional > 0:
-                        cb = float(cash_before)
-                        ca = float(cash_after)
-                        delta = cb - ca  # positive = cash left wallet (BUY)
-                        side_u = (row.side or "").upper()
-                        is_cnc = (row.product or "CNC").upper() in (
-                            "CNC", "DELIVERY", "MARGIN")
-                        if side_u == "BUY":
-                            candidate = delta - notional   # what fyers actually billed
-                        else:
-                            candidate = notional - delta   # sell credit shortfall
-                        # Sanity: actual charge should be 0..3% of notional.
-                        # MIS intraday rarely meets that on cash-delta basis
-                        # (margin netting), so only trust for CNC.
-                        if is_cnc and 0.0 <= candidate <= 0.03 * notional:
-                            actual_charge = candidate
-                            cash_delta_used = delta
+                from tools.live.broker_charges import compute_charges
+                if q > 0:
+                    br = compute_charges(row.side or "BUY", q,
+                                          float(fill_price),
+                                          row.product or "CNC")
+                    br["source"] = "formula_approx"
+                    row.charges_breakdown = br
+                    row.charges_inr = _safe_dec(br.get("total"))
             except Exception as _e:
-                log.debug(f"cash-delta charge derive failed: {_e}")
-
-            if actual_charge is not None:
-                # Persist the Fyers-truth charge + a breakdown marker
-                row.charges_inr = _safe_dec(actual_charge)
-                bd = dict(row.charges_breakdown or {}) if isinstance(
-                    row.charges_breakdown, dict) else {}
-                bd.update({
-                    "total": float(round(actual_charge, 4)),
-                    "source": "fyers_cash_delta",
-                    "cash_before": float(cash_before),
-                    "cash_after": float(cash_after),
-                    "cash_delta": float(round(cash_delta_used, 4)),
-                    "notional": float(round(notional, 4)),
-                })
-                row.charges_breakdown = bd
-            else:
-                # Fallback: formula estimate
-                try:
-                    from tools.live.broker_charges import compute_charges
-                    if q > 0:
-                        br = compute_charges(row.side or "BUY", q,
-                                              float(fill_price),
-                                              row.product or "CNC")
-                        br["source"] = "formula_estimate"
-                        row.charges_breakdown = br
-                        row.charges_inr = _safe_dec(br.get("total"))
-                except Exception as _e:
-                    log.debug(f"recompute charges failed: {_e}")
+                log.debug(f"recompute charges failed: {_e}")
             return True
     except Exception as e:
         log.warning(f"audit update_order_fill failed: {e}")

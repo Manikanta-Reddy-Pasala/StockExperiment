@@ -86,11 +86,10 @@
     <div class="row text-end g-3 flex-grow-1 justify-content-end align-items-center">
       <div class="col-auto"><div class="text-muted small" title="Original capital invested across all models">Invested</div><div class="fs-5 fw-bold" id="tot_invested">--</div></div>
       <div class="col-auto"><div class="text-muted small" title="Cash + live position value. Identity: NAV = Invested + Total P&L.">Current NAV</div><div class="fs-5 fw-bold" id="tot_nav">--</div></div>
-      <div class="col-auto"><div class="text-muted small" title="Locked-in profit/loss from closed trades (net of sell charges)">Realized</div><div class="fs-5 fw-bold" id="tot_realized">--</div></div>
-      <div class="col-auto"><div class="text-muted small" title="+ Current open positions: Live MTM − Cost Basis (gross, ignoring sell charges).">+ Current P&amp;L (open pos)</div><div class="fs-5 fw-bold" id="tot_current_pnl">--</div></div>
-      <div class="col-auto"><div class="text-muted small" title="− Buy-side broker charges paid on currently open positions only. Closed-trade charges already inside Realized (post-Fyers-sync).">− Buy Chg (open pos)</div><div class="fs-5 fw-bold neg" id="tot_buychg_open">--</div></div>
-      <div class="col-auto"><div class="text-muted small" title="= NAV − Invested. = Realized + Current P&L (open) − Buy Chg (open). Realized is all-in (synced to Fyers ledger); closed-trade buy charges already inside it.">= Total P&amp;L</div><div class="fs-5 fw-bold" id="tot_pnl">--</div></div>
-      <div class="col-auto"><div class="text-muted small" title="Lifetime broker charges across all models (brokerage + STT + GST + exchange + SEBI + stamp + DP). Info only — already deducted from cash, not subtracted again from Total P&L.">Total Txn Charges</div><div class="fs-5 fw-bold neg" id="tot_charges">--</div></div>
+      <div class="col-auto"><div class="text-muted small" title="Locked-in profit/loss from closed trades">Realized</div><div class="fs-5 fw-bold" id="tot_realized">--</div></div>
+      <div class="col-auto"><div class="text-muted small" title="+ Current open positions: Live MTM − Cost Basis">+ Current P&amp;L (open pos)</div><div class="fs-5 fw-bold" id="tot_current_pnl">--</div></div>
+      <div class="col-auto"><div class="text-muted small" title="= NAV − Invested. Charges already deducted from cash.">= Total P&amp;L</div><div class="fs-5 fw-bold" id="tot_pnl">--</div></div>
+      <div class="col-auto"><div class="text-muted small" title="Approximate lifetime broker charges across all models (formula-based). Info only — already deducted from cash, not subtracted again from Total P&L.">Approx Txn Charges</div><div class="fs-5 fw-bold neg" id="tot_charges">--</div></div>
       <div class="col-auto align-self-center">
         <a href="/settings" class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation()"><i class="bi bi-sliders"></i> Manage Allocations</a>
       </div>
@@ -104,17 +103,16 @@
         <div class="kv"><span class="k">− Invested</span><span class="v" id="td_alloc">—</span></div>
         <div class="kv"><span class="k"><strong>= Total P&amp;L</strong></span><span class="v" id="td_pnl">—</span></div>
         <div class="text-muted" style="font-size:0.75rem; margin-top:6px;">
-          <code>NAV = Invested + Total P&amp;L</code> — every charge already deducted from cash. Total Txn Charges line is info only; do not subtract again.
+          <code>NAV = Invested + Total P&amp;L</code> — approximate transaction charges already deducted from cash at trade time. Approx Txn Charges line is info only.
         </div>
       </div>
       <div class="col-12 col-md-6">
-        <div class="text-muted small text-uppercase mb-2" style="letter-spacing:0.5px;">Total P&amp;L breakdown</div>
-        <div class="kv"><span class="k">Realized (all-in, closed trades)</span><span class="v" id="td_realized">—</span></div>
-        <div class="kv"><span class="k">+ Unrealized (gross MTM − cost)</span><span class="v" id="td_unreal">—</span></div>
-        <div class="kv"><span class="k">− Buy chg (open pos only)</span><span class="v neg" id="td_buychg_open">—</span></div>
-        <div class="kv"><span class="k"><strong>= Total P&amp;L</strong></span><span class="v" id="td_pnl2">—</span></div>
+        <div class="text-muted small text-uppercase mb-2" style="letter-spacing:0.5px;">Total P&amp;L breakdown (approx)</div>
+        <div class="kv"><span class="k">Realized (closed trades)</span><span class="v" id="td_realized">—</span></div>
+        <div class="kv"><span class="k">+ Unrealized (MTM − cost)</span><span class="v" id="td_unreal">—</span></div>
+        <div class="kv"><span class="k"><strong>≈ Total P&amp;L</strong></span><span class="v" id="td_pnl2">—</span></div>
         <div class="text-muted" style="font-size:0.75rem; margin-top:6px;">
-          Realized is all-in (synced to Fyers ledger) so closed-trade buy + sell charges already inside it. Only buy charges on currently open positions sit outside Realized and Unrealized — subtract here to make identity hold.
+          Approximate breakdown. Exact match with NAV − Invested may differ by small charge rounding — charges are formula-estimated, not broker-exact.
         </div>
       </div>
     </div>
@@ -248,15 +246,14 @@ function renderModelCard(m, sig) {
                   </div>
                 </div>
                 <div class="col-12 col-md-6">
-                  <div class="text-muted text-uppercase" style="font-size:0.7rem; letter-spacing:0.5px; margin:8px 0 4px;">Total P&amp;L breakdown</div>
-                  <div class="kv"><span class="k" title="Lifetime closed-trade P&L, all-in (price diff − all charges on closed trades). Net of sell chg AND closed-trade buy chg. Synced to Fyers ledger truth.">Realized (all-in)</span><span class="v ${cls(realized)}">${fmtINR(realized)}</span></div>
-                  <div class="kv"><span class="k" title="Open position: Live MTM − Cost basis. Gross — sell charges will apply on exit.">+ Unrealized (gross MTM − cost)</span><span class="v ${cls(unreal)}">${fmtINR(unreal)}</span></div>
-                  <div class="kv"><span class="k" title="Buy-side broker charges paid on the currently open position only. Not in Realized (open trade) and not in Unrealized (cost basis is ex-charges) — so subtract here to land on NAV − Allocated.">− Buy chg (open pos)</span><span class="v neg">${fmtINR(openChg)}</span></div>
-                  <div class="kv"><span class="k"><strong>= Total P&amp;L</strong></span><span class="v ${pnlCls}"><strong>${fmtINR(m.pnl_total)}</strong></span></div>
+                  <div class="text-muted text-uppercase" style="font-size:0.7rem; letter-spacing:0.5px; margin:8px 0 4px;">Total P&amp;L breakdown (approx)</div>
+                  <div class="kv"><span class="k" title="Lifetime closed-trade P&L">Realized</span><span class="v ${cls(realized)}">${fmtINR(realized)}</span></div>
+                  <div class="kv"><span class="k" title="Open position: Live MTM − Cost basis">+ Unrealized (MTM − cost)</span><span class="v ${cls(unreal)}">${fmtINR(unreal)}</span></div>
+                  <div class="kv"><span class="k"><strong>≈ Total P&amp;L</strong></span><span class="v ${pnlCls}"><strong>${fmtINR(m.pnl_total)}</strong></span></div>
                   <div class="text-muted" style="font-size:0.72rem; margin-top:4px; line-height:1.4;">
-                    Total Txn Charges (lifetime, info only) ₹${Number(m.total_txn_charges||0).toFixed(2)}
+                    Approx Txn Charges (info only): ₹${Number(m.total_txn_charges||0).toFixed(2)}
                     = Buy ₹${Number(m.buy_txn_charges||0).toFixed(2)} + Sell ₹${Number(m.sell_txn_charges||0).toFixed(2)}.
-                    Closed-trade charges already inside Realized.
+                    Formula-estimated, deducted from cash at trade time.
                   </div>
                 </div>
               </div>
@@ -317,22 +314,11 @@ function renderTotals(t, models) {
   const chEl = document.getElementById('tot_charges');
   if (chEl) chEl.textContent = fmtINR(t.total_txn_charges);
 
-  // Detail breakdown (revealed via toggle on totals strip).
-  // Use BUY chg on OPEN positions only — closed-trade buy charges are
-  // already inside Realized (post Fyers-ledger sync, realized is all-in
-  // net of every closed-trade fee). This is the correct delta to make
-  // Realized + Unrealized − Buy chg = Total P&L identity hold.
-  let totBuyChgOpen = 0;
-  (models || []).forEach(m => { totBuyChgOpen += Number(m.entry_charges_open || 0); });
-  const buyOpenEl = document.getElementById('tot_buychg_open');
-  if (buyOpenEl) buyOpenEl.textContent = fmtINR(totBuyChgOpen);
   const navVal = Number(t.current_amount ?? t.nav ?? 0);
   const allocVal = Number(t.invested_amount ?? t.allocated_capital ?? 0);
   const pnlVal = Number(t.pnl_total ?? 0);
   const realVal = Number(t.realized_pnl ?? 0);
-  // Total unrealized = Total P&L − Realized + Buy chg on open
-  // (identity post Fyers-sync: pnl = realized_all_in + unrealized − buy_chg_open)
-  const unrealVal = pnlVal - realVal + totBuyChgOpen;
+  const unrealVal = pnlVal - realVal;
   const setText = (id, val, signed) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -345,7 +331,6 @@ function renderTotals(t, models) {
   setText('td_pnl2', pnlVal, true);
   setText('td_realized', realVal, true);
   setText('td_unreal', unrealVal, true);
-  setText('td_buychg_open', totBuyChgOpen, false);
 }
 
 function renderSignalsWidget(data) {

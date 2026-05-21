@@ -42,28 +42,25 @@
       <div class="col-6 col-lg-2"><div class="text-muted small">Total NAV</div><div class="fs-5 fw-bold" id="agg_nav">--</div></div>
       <div class="col-6 col-lg-2"><div class="text-muted small">Total P&amp;L</div><div class="fs-5 fw-bold" id="agg_pnl">--</div></div>
       <div class="col-6 col-lg-2"><div class="text-muted small">Realized P&amp;L</div><div class="fs-5 fw-bold" id="agg_realized">--</div></div>
-      <div class="col-6 col-lg-2"><div class="text-muted small" title="Lifetime broker charges">Total Txn Charges</div><div class="fs-5 fw-bold neg" id="agg_charges">--</div></div>
+      <div class="col-6 col-lg-2"><div class="text-muted small" title="Approximate lifetime broker charges (formula-based). Info only — already deducted from cash.">Approx Txn Charges</div><div class="fs-5 fw-bold neg" id="agg_charges">--</div></div>
     </div>
     <div class="table-responsive">
       <table class="table table-sm align-middle mb-0">
         <thead><tr>
           <th>Model</th>
           <th class="text-end" title="Original capital deposited">Allocated</th>
-          <th class="text-end" title="qty × entry price (ex-charges)">Cost Basis</th>
-          <th class="text-end" title="Broker charges paid on the current open BUY (open pos only)">Buy Chg (open)</th>
+          <th class="text-end" title="qty × entry price">Cost Basis</th>
           <th class="text-end" title="Cash not tied up in any open position">Idle Cash</th>
           <th>Open Position</th>
           <th class="text-end" title="Live MTM = qty × LTP">Position Value</th>
           <th class="text-end" title="Locked-in profit/loss from closed trades">Realized</th>
-          <th class="text-end" title="Cash + live position value = total spend power if liquidated">Available (Net Worth)</th>
+          <th class="text-end" title="Cash + live position value">Available (Net Worth)</th>
           <th class="text-end" title="NAV vs Allocated">Total P&amp;L</th>
-          <th class="text-end" title="Lifetime BUY-side broker charges">Buy Txn Chg (life)</th>
-          <th class="text-end" title="Lifetime SELL-side broker charges">Sell Txn Chg (life)</th>
-          <th class="text-end" title="BUY + SELL charges lifetime">Total Txn Chg (life)</th>
+          <th class="text-end" title="Approximate lifetime broker charges (Buy + Sell), formula-based">Approx Txn Chg</th>
           <th class="text-end">Trades</th>
           <th class="text-center" style="min-width:140px;">Actions</th>
         </tr></thead>
-        <tbody id="agg_tbody"><tr><td colspan="15" class="text-center text-muted py-3">Loading…</td></tr></tbody>
+        <tbody id="agg_tbody"><tr><td colspan="11" class="text-center text-muted py-3">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -176,28 +173,24 @@ async function loadAggregate() {
              <i class="bi bi-arrow-repeat"></i> Rebalance</button>`
         : '<span class="text-muted small">n/a</span>';
       const posCost = (Number(m.open_qty||0) * Number(m.open_entry_px||0)) || 0;
-      const openChg = Number(m.entry_charges_open || 0);
       tr.innerHTML = `
         <td><strong>${m.model_name}</strong></td>
         <td class="text-end">${fmtINR(m.allocated_capital)}</td>
         <td class="text-end">${fmtINR(posCost)}</td>
-        <td class="text-end neg">${fmtINR(openChg)}</td>
         <td class="text-end">${fmtINR(m.cash)}</td>
         <td>${posHtml}</td>
         <td class="text-end">${fmtINR(m.position_value)}</td>
         <td class="text-end ${cls(m.realized_pnl)}">${fmtINR(m.realized_pnl)}</td>
         <td class="text-end"><strong>${fmtINR(m.nav)}</strong></td>
         <td class="text-end ${cls(m.pnl_total)}">${fmtINR(m.pnl_total)} (${fmtPct(m.return_pct)})</td>
-        <td class="text-end neg">${fmtINR(m.buy_txn_charges)}</td>
-        <td class="text-end neg">${fmtINR(m.sell_txn_charges)}</td>
-        <td class="text-end neg"><strong>${fmtINR(m.total_txn_charges)}</strong></td>
+        <td class="text-end neg" title="Buy ${fmtINR(m.buy_txn_charges)} + Sell ${fmtINR(m.sell_txn_charges)}"><strong>${fmtINR(m.total_txn_charges)}</strong></td>
         <td class="text-end">${m.total_trades} (${m.wins}W/${m.losses}L)</td>
         <td class="text-center">${rebalBtn}</td>
       `;
       tbody.appendChild(tr);
     });
     if (!tbody.children.length) {
-      tbody.innerHTML = '<tr><td colspan="15" class="text-center text-muted py-3">No enabled models. <a href="/settings">Enable one in Settings</a>.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted py-3">No enabled models. <a href="/settings">Enable one in Settings</a>.</td></tr>';
     }
   } catch(e) { console.error(e); }
 }

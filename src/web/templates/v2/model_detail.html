@@ -60,30 +60,28 @@
             <tr class="bs-section"><td colspan="2" class="bs-section-hdr">Capital flow — should sum to Allocated</td></tr>
             <tr><td class="k">Allocated (deposits)</td><td class="v headline" id="bs_invested">—</td></tr>
             <tr><td class="k" title="Cash sitting idle — not deployed in any position">+ Idle Cash</td><td class="v" id="bs_cash">—</td></tr>
-            <tr><td class="k" title="qty × entry price for currently held position (ex-charges)">+ Cost Basis (open pos)</td><td class="v" id="bs_entry_cost">—</td></tr>
-            <tr><td class="k" title="Sum of BUY-side broker charges paid lifetime (brokerage + exchange + SEBI + stamp + GST). Real money gone forever.">+ Buy Charges paid (lifetime)</td><td class="v neg" id="bs_buy_charges">—</td></tr>
-            <tr><td class="k" title="Sum of SELL-side broker charges paid lifetime (brokerage + STT + exchange + SEBI + GST + DP). Real money gone forever.">+ Sell Charges paid (lifetime)</td><td class="v neg" id="bs_sell_charges">—</td></tr>
-            <tr><td class="k" id="bs_realized_label" title="Closed-trade GROSS P&L = pure price-diff (qty × (sell_px − buy_px)) BEFORE sell charges. Equals Realized net + Sell charges added back. GAIN subtracts (already in cash via sell proceeds). LOSS adds back (money gone from cash).">± Closed-trade gross P&amp;L</td><td class="v" id="bs_realized_signed">—</td></tr>
-            <tr><td class="k"><strong>= Reconcile total</strong></td><td class="v headline" id="bs_reconcile">—</td></tr>
+            <tr><td class="k" title="qty × entry price for currently held position">+ Cost Basis (open pos)</td><td class="v" id="bs_entry_cost">—</td></tr>
+            <tr><td class="k" title="Approximate BUY-side broker charges lifetime (formula-estimated)">+ Approx Buy Charges (lifetime)</td><td class="v neg" id="bs_buy_charges">—</td></tr>
+            <tr><td class="k" title="Approximate SELL-side broker charges lifetime (formula-estimated)">+ Approx Sell Charges (lifetime)</td><td class="v neg" id="bs_sell_charges">—</td></tr>
+            <tr><td class="k" id="bs_realized_label" title="Closed-trade gross P&L = qty × (sell_px − buy_px) before charges">± Closed-trade gross P&amp;L</td><td class="v" id="bs_realized_signed">—</td></tr>
+            <tr><td class="k"><strong>≈ Reconcile total</strong></td><td class="v headline" id="bs_reconcile">—</td></tr>
             <tr><td colspan="2" style="font-size:0.72rem;color:#6c757d;padding:4px 12px;line-height:1.4;">
-              Note: Realized P&amp;L net (<span id="bs_realized_note">—</span>) =
+              Approximate reconciliation. Charges are formula-estimated, not broker-exact — small drift expected.
+              Realized net (<span id="bs_realized_note">—</span>) ≈
               Closed-trade gross (<span id="bs_realgross_note">—</span>)
-              − Sell charges (<span id="bs_sell_chg_note">—</span>).
-              All three appear above so every rupee is visible.
+              − Approx sell charges (<span id="bs_sell_chg_note">—</span>).
             </td></tr>
             <tr class="bs-section"><td colspan="2" class="bs-section-hdr">Live position view</td></tr>
             <tr><td class="k" title="Live MTM = qty × current LTP">Position Value (Live MTM)</td><td class="v" id="bs_position_value">—</td></tr>
-            <tr><td class="k" title="Current position P&L = Live MTM − Cost basis. What the open trade would book if you sold right now (ex-sell-charges).">Current Position P&amp;L (gross)</td><td class="v headline" id="bs_unrealized">—</td></tr>
-            <tr><td class="k" title="Current position P&L minus buy-side charges already paid. More accurate 'what's my open trade worth right now net of entry fees'.">Current P&amp;L (net of buy chg)</td><td class="v" id="bs_cur_net">—</td></tr>
-            <tr><td class="k" title="Buy-side charges already paid on the open position (subset of Buy Charges lifetime)">Buy Charges (open pos only)</td><td class="v neg" id="bs_entry_charges">—</td></tr>
+            <tr><td class="k" title="Current position P&L = Live MTM − Cost basis">Current Position P&amp;L</td><td class="v headline" id="bs_unrealized">—</td></tr>
             <tr class="bs-section"><td colspan="2" class="bs-section-hdr">P&amp;L summary</td></tr>
-            <tr><td class="k" title="Realized — net of sell charges (what's actually in your cash)">Realized P&amp;L (net, closed trades)</td><td class="v" id="bs_realized">—</td></tr>
-            <tr><td class="k" title="NAV − Allocated. = Realized (net of sell chg) + Unrealized (gross MTM − cost) − Buy chg on open pos. Charges already baked into cash; Total Txn Charges below is info-only, not subtracted again."><strong>Total P&amp;L (NAV − Allocated)</strong></td><td class="v headline" id="bs_total_pnl">—</td></tr>
+            <tr><td class="k" title="Realized P&L from closed trades">Realized P&amp;L (closed trades)</td><td class="v" id="bs_realized">—</td></tr>
+            <tr><td class="k" title="NAV − Allocated. Charges already deducted from cash at trade time."><strong>Total P&amp;L (NAV − Allocated)</strong></td><td class="v headline" id="bs_total_pnl">—</td></tr>
             <tr><td class="k"><strong>NAV (cash + position MTM)</strong></td><td class="v headline" id="bs_nav">—</td></tr>
             <tr><td class="k"><strong>Return %</strong></td><td class="v headline" id="bs_return_pct">—</td></tr>
             <tr><td class="k">Trades (W / L)</td><td class="v" id="bs_trades">—</td></tr>
             <tr><td class="k">Win Rate</td><td class="v" id="bs_win_rate">—</td></tr>
-            <tr><td class="k"><strong>Total Txn Charges (lifetime)</strong></td><td class="v headline neg" id="bs_total_charges">—</td></tr>
+            <tr><td class="k"><strong>Approx Txn Charges (lifetime)</strong></td><td class="v headline neg" id="bs_total_charges">—</td></tr>
           </tbody>
         </table>
       </div>
@@ -182,7 +180,6 @@ async function loadBalanceSheet() {
     const invNum = Number(data.invested_amount || 0);
     const cashNum = Number(data.cash || 0);
     const entryCost = Number(data.entry_cost_open || 0);
-    const entryChg = Number(data.entry_charges_open || 0);
     const lifetimeBuyChg = Number(data.buy_txn_charges || 0);
     const lifetimeSellChg = Number(data.sell_txn_charges || 0);
     const realNum = Number(data.realized_pnl || 0);
@@ -192,8 +189,6 @@ async function loadBalanceSheet() {
     document.getElementById('bs_cash').textContent = fmtINR(cashNum);
     document.getElementById('bs_entry_cost').innerHTML =
       entryCost > 0 ? fmtINR(entryCost) : '<span class="text-muted">— (flat)</span>';
-    document.getElementById('bs_entry_charges').innerHTML =
-      entryChg > 0 ? fmtINR(entryChg) : '<span class="text-muted">—</span>';
     document.getElementById('bs_buy_charges').textContent = fmtINR(lifetimeBuyChg);
     document.getElementById('bs_sell_charges').textContent = fmtINR(lifetimeSellChg);
 
