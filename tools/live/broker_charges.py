@@ -9,7 +9,9 @@ no DP charges, no stamp duty) — if/when an INTRADAY model is wired, branch on
 product.
 
 Reference rates (Indian equity, mid-2026):
-  - Brokerage (Fyers): ZERO on CNC delivery; min(Rs.20, 0.03%) on INTRADAY/MIS
+  - Brokerage (Fyers): min(Rs.20, 0.03%) per executed order (both CNC + MIS).
+    NOTE: Fyers's actual CNC brokerage on the user's account is higher than
+    this formula. Treat as estimate; reconcile cash via Fyers ledger.
   - STT (Securities Transaction Tax): 0.10% on sell-side turnover only
   - NSE/BSE Exchange Transaction Charges: ~0.00345% turnover (NSE)
   - SEBI Charges: 0.0001% turnover (Rs.10 per crore)
@@ -64,13 +66,14 @@ def compute_charges(side: str, qty: int, price: float,
     turnover = Decimal(str(qty)) * Decimal(str(price))
 
     # Brokerage — Fyers schedule (mid-2026):
-    #   CNC (delivery): ZERO brokerage (Fyers free delivery since 2024)
-    #   INTRADAY/MIS:  min(Rs.20, 0.03% × turnover)
-    if is_cnc:
-        brokerage = Decimal("0")
-    else:
-        brokerage = min(BROKERAGE_FLAT, turnover * Decimal("0.0003"))
-        brokerage = max(brokerage, Decimal("0"))
+    #   CNC + INTRADAY/MIS both use min(Rs.20, 0.03% × turnover).
+    # Note: Fyers's ACTUAL CNC brokerage observed on user's account is
+    # higher than this formula (e.g. ₹40.90 on ₹29,528 turnover, ₹20 on
+    # ₹14,981). Don't know the exact CNC schedule — this estimate is a
+    # lower bound. Use Fyers ledger as truth for actual cash impact;
+    # this field is informational only.
+    brokerage = min(BROKERAGE_FLAT, turnover * Decimal("0.0003"))
+    brokerage = max(brokerage, Decimal("0"))
 
     # STT: SELL only. CNC=0.10%, INTRADAY=0.025%
     if side_u == "SELL":
