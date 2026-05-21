@@ -37,6 +37,26 @@ log = logging.getLogger("momrot_pseudo_signal")
 
 MODEL_NAME = "momentum_pseudo_n100_adv"
 MAX_PRICE = 3000.0  # skip very-large priced names that hurt CAGR in backtest
+SMA_LONG = 200  # uptrend filter — must hold close > 200d SMA (backtest parity)
+SMALLCAP_CSV = "/app/src/data/symbols/nifty_smallcap250.csv"
+
+
+def _load_smallcap_set() -> set:
+    """Backtest excludes Nifty Smallcap 250 names (+2pp CAGR, DD unchanged).
+    Live must mirror. Returns empty set on file missing — fail-soft."""
+    import csv as _csv
+    out: set = set()
+    try:
+        with open(SMALLCAP_CSV) as f:
+            for r in _csv.DictReader(f):
+                if r.get("Series", "").strip() == "EQ":
+                    out.add(r["Symbol"].strip())
+    except FileNotFoundError:
+        log.warning(f"smallcap CSV missing: {SMALLCAP_CSV} — no smallcap filter applied")
+    return out
+
+
+_SMALLCAP_SET = _load_smallcap_set()
 
 
 # ---- Helpers ----
@@ -82,21 +102,43 @@ def get_close_at(symbol: str, target_ts: int) -> float:
     return float(df.iloc[-1]["close"])
 
 
+def _close_above_sma200(symbol: str, today_ts: int) -> bool:
+    """200d SMA uptrend gate (backtest parity).
+
+    Requires ≥200 daily closes in cache. Returns False on insufficient data
+    (fail-CLOSED — matches backtest which skips names without 200d history).
+    """
+    lookback = (SMA_LONG + 60) * 86400  # buffer for non-trading days
+    df = read_cached(symbol, "D", today_ts - lookback, today_ts)
+    if df.empty or len(df) < SMA_LONG:
+        return False
+    closes = df["close"].astype(float)
+    sma = closes.iloc[-SMA_LONG:].mean()
+    return float(closes.iloc[-1]) > float(sma)
+
+
 def rank_universe(symbols: List[str], today_ts: int,
                   lookback_days: int = 30) -> List[tuple]:
     """Return [(symbol, name, 30d_return_pct, current_price)] sorted desc.
 
-    Filters out names with current_price > MAX_PRICE (high-priced burden).
+    Filters applied (backtest parity):
+      - Drop Nifty Smallcap 250 names
+      - Drop current_price > MAX_PRICE
+      - Drop names where close ≤ 200d SMA (uptrend gate)
     """
     lookback_ts = today_ts - lookback_days * 86400
     rows = []
     for plain_sym in symbols:
+        if plain_sym in _SMALLCAP_SET:
+            continue
         fyers_sym = f"NSE:{plain_sym}-EQ"
         c_now = get_close_at(fyers_sym, today_ts)
         c_past = get_close_at(fyers_sym, lookback_ts)
         if c_now <= 0 or c_past <= 0:
             continue
         if c_now > MAX_PRICE:
+            continue
+        if not _close_above_sma200(fyers_sym, today_ts):
             continue
         ret = (c_now / c_past - 1) * 100
         rows.append((fyers_sym, plain_sym, ret, c_now))

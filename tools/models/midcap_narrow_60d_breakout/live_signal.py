@@ -34,15 +34,16 @@ log = logging.getLogger("midcap_breakout_signal")
 
 MODEL_NAME = "midcap_narrow_60d_breakout"
 
-# Strategy params (must match backtest.py)
-HH_WINDOW = 60
+# Strategy params (V2 winner — must match backtest.py)
+HH_WINDOW = 40
 VOL_MULT = 2.0
 SMA_LONG = 200
 SMA_EXIT = 20
-TRAIL_PCT = 0.15
+USE_SMA_EXIT = False  # V2: disabled — leaked winners on dips
+TRAIL_PCT = 0.20
 PROFIT_TRIGGER = 0.10
-TARGET_PCT = 0.60
-MAX_HOLD_DAYS = 30
+TARGET_PCT = 1.00
+MAX_HOLD_DAYS = 120
 
 
 def load_universe(uf: str) -> List[str]:
@@ -114,7 +115,7 @@ def check_exit(pos: Dict, df_sym: pd.DataFrame) -> Optional[Dict]:
         return {"reason": "TARGET", "price": close, "ret_pct": ret_entry * 100}
     if ret_entry >= PROFIT_TRIGGER and ret_peak >= TRAIL_PCT:
         return {"reason": "TRAIL", "price": close, "ret_pct": ret_entry * 100}
-    if sma20 > 0 and close < sma20:
+    if USE_SMA_EXIT and sma20 > 0 and close < sma20:
         return {"reason": "SMA", "price": close, "ret_pct": ret_entry * 100}
     if age >= MAX_HOLD_DAYS:
         return {"reason": "MAX_HOLD", "price": close, "ret_pct": ret_entry * 100}
