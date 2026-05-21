@@ -43,13 +43,11 @@
   .signals-widget .empty { color: #6c757d; padding: 14px 6px; text-align: center; }
   .totals-strip { background: linear-gradient(180deg,#fafbff,#f4f6fb); border: 1px solid #e3e6ef; border-radius: 10px; padding: 12px 16px; }
 
-  /* Collapse toggle button (plus/minus) — used on model cards + top strip */
-  .collapse-toggle { background: transparent; border: 1px solid #d8dde8; border-radius: 6px; padding: 1px 7px; font-size: 0.85rem; color: #4f5868; cursor: pointer; line-height: 1.2; }
-  .collapse-toggle:hover { background: #eef2ff; border-color: #b8c5e8; color: #3a4cc8; }
-  .collapse-toggle .bi-plus-square,
-  .collapse-toggle .bi-dash-square { font-size: 0.9rem; vertical-align: -2px; }
-  .collapse-toggle[aria-expanded="true"] .bi-plus-square { display: none; }
-  .collapse-toggle[aria-expanded="false"] .bi-dash-square { display: none; }
+  /* Click-to-expand header (picks-style) — no buttons */
+  .expand-header { cursor: pointer; }
+  .expand-header:hover { background: #f4f6fb; border-radius: 6px; }
+  .expand-header .bi-chevron-down { transition: transform 0.15s ease; font-size: 0.85rem; color: #6c757d; }
+  .expand-header[aria-expanded="true"] .bi-chevron-down { transform: rotate(180deg); }
   .model-headline { display: flex; gap: 16px; flex-wrap: wrap; align-items: baseline; padding: 6px 0 8px; border-bottom: 1px dashed #e3e6ef; margin-bottom: 6px; font-size: 0.85rem; }
   .model-headline .lbl { color: #6c757d; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.4px; margin-right: 4px; }
   .model-headline .val { font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -76,10 +74,14 @@
 
 <!-- Portfolio totals strip (T10) -->
 <div class="totals-strip mb-3">
-  <div class="d-flex flex-wrap gap-4 align-items-center justify-content-between">
+  <div class="expand-header d-flex flex-wrap gap-4 align-items-center justify-content-between"
+       data-bs-toggle="collapse" data-bs-target="#totals_detail"
+       aria-expanded="false" aria-controls="totals_detail"
+       title="Click to expand breakdown + math identity">
     <div>
       <span class="strategy-pill">Multi-Model Portfolio</span>
       <span class="text-muted small ms-2">4 equity + 1 options · per-model cash silos</span>
+      <i class="bi bi-chevron-down ms-2"></i>
     </div>
     <div class="row text-end g-3 flex-grow-1 justify-content-end align-items-center">
       <div class="col-auto"><div class="text-muted small" title="Original capital deposited across all models">Allocated</div><div class="fs-5 fw-bold" id="tot_invested">--</div></div>
@@ -89,15 +91,7 @@
       <div class="col-auto"><div class="text-muted small" title="Locked-in profit/loss from closed trades (net of sell charges)">Realized</div><div class="fs-5 fw-bold" id="tot_realized">--</div></div>
       <div class="col-auto"><div class="text-muted small" title="Lifetime broker charges across all models (brokerage + STT + GST + exchange + SEBI + stamp + DP). Info only — already deducted from cash, not subtracted again from Total P&L.">Total Txn Charges</div><div class="fs-5 fw-bold neg" id="tot_charges">--</div></div>
       <div class="col-auto align-self-center">
-        <a href="/settings" class="btn btn-sm btn-outline-secondary"><i class="bi bi-sliders"></i> Manage Allocations</a>
-      </div>
-      <div class="col-auto align-self-center">
-        <button class="collapse-toggle collapsed" type="button"
-                data-bs-toggle="collapse" data-bs-target="#totals_detail"
-                aria-expanded="false" aria-controls="totals_detail"
-                title="Expand / collapse breakdown + math identity">
-          <i class="bi bi-plus-square"></i><i class="bi bi-dash-square"></i>
-        </button>
+        <a href="/settings" class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation()"><i class="bi bi-sliders"></i> Manage Allocations</a>
       </div>
     </div>
   </div>
@@ -200,25 +194,21 @@ function renderModelCard(m, sig) {
     <div class="col-12 col-md-6 col-xl-4">
       <div class="${cardCls}">
         <div class="card-body">
-          <div class="d-flex justify-content-between align-items-start">
-            <div>
-              <div class="ttl">${m.model_name}${warn}</div>
-              <div class="uni">${meta.universe} · ${meta.kind}</div>
+          <div class="expand-header" data-bs-toggle="collapse" data-bs-target="#${collapseId}"
+               aria-expanded="false" aria-controls="${collapseId}"
+               title="Click to expand balance sheet">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <div class="ttl">${m.model_name}${warn} <i class="bi bi-chevron-down ms-1"></i></div>
+                <div class="uni">${meta.universe} · ${meta.kind}</div>
+              </div>
+              <div class="text-end">${enableBadge}${refOnly}</div>
             </div>
-            <div class="text-end d-flex align-items-center gap-2">
-              ${enableBadge}${refOnly}
-              <button class="collapse-toggle collapsed" type="button"
-                      data-bs-toggle="collapse" data-bs-target="#${collapseId}"
-                      aria-expanded="false" aria-controls="${collapseId}"
-                      title="Expand / collapse balance sheet">
-                <i class="bi bi-plus-square"></i><i class="bi bi-dash-square"></i>
-              </button>
+            <div class="model-headline">
+              <span><span class="lbl">Allocated</span><span class="val">${fmtINR(headlineInvested)}</span></span>
+              <span><span class="lbl">NAV</span><span class="val">${fmtINR(headlineNav)}</span></span>
+              <span><span class="lbl">Total P&amp;L</span><span class="val ${headlinePnlCls}">${fmtINR(m.pnl_total)} <small>(${fmtPct(m.return_pct)})</small></span></span>
             </div>
-          </div>
-          <div class="model-headline">
-            <span><span class="lbl">Allocated</span><span class="val">${fmtINR(headlineInvested)}</span></span>
-            <span><span class="lbl">NAV</span><span class="val">${fmtINR(headlineNav)}</span></span>
-            <span><span class="lbl">Total P&amp;L</span><span class="val ${headlinePnlCls}">${fmtINR(m.pnl_total)} <small>(${fmtPct(m.return_pct)})</small></span></span>
           </div>
           <div class="collapse" id="${collapseId}">
           ${(() => {
