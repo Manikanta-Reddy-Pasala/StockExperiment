@@ -85,10 +85,11 @@
     </div>
     <div class="row text-end g-3 flex-grow-1 justify-content-end align-items-center">
       <div class="col-auto"><div class="text-muted small" title="Original capital deposited across all models">Allocated</div><div class="fs-5 fw-bold" id="tot_invested">--</div></div>
-      <div class="col-auto"><div class="text-muted small" title="Cash + live position value">Current NAV</div><div class="fs-5 fw-bold" id="tot_nav">--</div></div>
-      <div class="col-auto"><div class="text-muted small" title="Current open positions only — Live MTM − Cost Basis. Hypothetical if you sold every open position right now.">Current P&amp;L (open pos)</div><div class="fs-5 fw-bold" id="tot_current_pnl">--</div></div>
-      <div class="col-auto"><div class="text-muted small" title="NAV − Allocated. Equals Realized (net of sell chg) + Unrealized (gross MTM − cost basis) − Buy chg on open positions. Charges already baked in via cash deductions — do NOT subtract Total Txn Charges separately.">Total P&amp;L</div><div class="fs-5 fw-bold" id="tot_pnl">--</div></div>
+      <div class="col-auto"><div class="text-muted small" title="Cash + live position value. Identity: NAV = Allocated + Total P&L.">Current NAV</div><div class="fs-5 fw-bold" id="tot_nav">--</div></div>
       <div class="col-auto"><div class="text-muted small" title="Locked-in profit/loss from closed trades (net of sell charges)">Realized</div><div class="fs-5 fw-bold" id="tot_realized">--</div></div>
+      <div class="col-auto"><div class="text-muted small" title="+ Current open positions: Live MTM − Cost Basis (gross, ignoring sell charges).">+ Current P&amp;L (open pos)</div><div class="fs-5 fw-bold" id="tot_current_pnl">--</div></div>
+      <div class="col-auto"><div class="text-muted small" title="− Buy-side broker charges paid on currently held positions. Subtracted because they sit outside unrealized until exit.">− Buy Chg (open pos)</div><div class="fs-5 fw-bold neg" id="tot_buychg_open">--</div></div>
+      <div class="col-auto"><div class="text-muted small" title="= NAV − Allocated. = Realized + Current P&L (open) − Buy Chg (open). Charges already baked into cash via per-trade deductions.">= Total P&amp;L</div><div class="fs-5 fw-bold" id="tot_pnl">--</div></div>
       <div class="col-auto"><div class="text-muted small" title="Lifetime broker charges across all models (brokerage + STT + GST + exchange + SEBI + stamp + DP). Info only — already deducted from cash, not subtracted again from Total P&L.">Total Txn Charges</div><div class="fs-5 fw-bold neg" id="tot_charges">--</div></div>
       <div class="col-auto align-self-center">
         <a href="/settings" class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation()"><i class="bi bi-sliders"></i> Manage Allocations</a>
@@ -312,6 +313,8 @@ function renderTotals(t, models) {
   // Detail breakdown (revealed via plus/minus toggle on totals strip)
   let totBuyChgOpen = 0;
   (models || []).forEach(m => { totBuyChgOpen += Number(m.entry_charges_open || 0); });
+  const buyOpenEl = document.getElementById('tot_buychg_open');
+  if (buyOpenEl) buyOpenEl.textContent = fmtINR(totBuyChgOpen);
   const navVal = Number(t.current_amount ?? t.nav ?? 0);
   const allocVal = Number(t.invested_amount ?? t.allocated_capital ?? 0);
   const pnlVal = Number(t.pnl_total ?? 0);
