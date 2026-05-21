@@ -409,6 +409,12 @@ async function loadPortfolio() {
       byName[m.model_name] = m;
     });
     const grid = document.getElementById('model_grid');
+    // Preserve expanded card state across 30s auto-refresh (otherwise
+    // setInterval → innerHTML rebuild wipes the .show class set by user click).
+    const wasExpanded = new Set();
+    grid.querySelectorAll('.collapse.show').forEach(el => {
+      if (el.id) wasExpanded.add(el.id);
+    });
     const cards = MODEL_ORDER
       .filter(name => byName[name])
       .map(name => renderModelCard(byName[name], _signalsByModel[name]));
@@ -417,6 +423,17 @@ async function loadPortfolio() {
       if (!MODEL_ORDER.includes(name)) cards.push(renderModelCard(byName[name], _signalsByModel[name]));
     });
     grid.innerHTML = cards.length ? cards.join('') : '<div class="col-12 text-center text-muted py-3">No enabled models. Visit <a href="/admin/v2/settings">Settings</a> to enable one.</div>';
+    // Re-apply expanded state to cards still present after refresh.
+    wasExpanded.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.add('show');
+      const hdr = grid.querySelector(`[data-bs-target="#${id}"]`);
+      if (hdr) {
+        hdr.setAttribute('aria-expanded', 'true');
+        hdr.classList.remove('collapsed');
+      }
+    });
   } catch(e) {
     console.error('portfolio load failed', e);
   }
