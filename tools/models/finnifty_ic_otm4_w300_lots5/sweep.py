@@ -171,11 +171,16 @@ def run_ic(underlying: str, start: str, end: str,
                       - pair["wce_close"] - pair["wpe_close"])
 
         exit_d = exit_debit = exit_reason = None
+        ce_x = pe_x = wce_x = wpe_x = None
         for pr in pair.itertuples():
             if pr.pv >= net_credit * stop_mult:
                 exit_debit = pr.pv * (1 + slip)
                 exit_d = pr.date
                 exit_reason = "SL"
+                ce_x = float(pr.ce_close)
+                pe_x = float(pr.pe_close)
+                wce_x = float(pr.wce_close)
+                wpe_x = float(pr.wpe_close)
                 break
         if exit_debit is None:
             spot_lookup = dict(zip(spot["date"], spot["close"]))
@@ -185,6 +190,8 @@ def run_ic(underlying: str, start: str, end: str,
             exit_debit = max(0.0, (ic_ce + ic_pe) - (wc + wp)) * (1 + slip)
             exit_d = exp
             exit_reason = "EXPIRY"
+            # At expiry, options settle at intrinsic value (per-leg)
+            ce_x, pe_x, wce_x, wpe_x = ic_ce, ic_pe, wc, wp
 
         # Entry succeeded → claim expiry so other Mondays in cycle skip
         seen_exp.add(exp)
@@ -196,6 +203,16 @@ def run_ic(underlying: str, start: str, end: str,
             "spot": round(spot_close, 1),
             "ce_k": ce_k, "pe_k": pe_k,
             "wce_k": wce_k, "wpe_k": wpe_k,
+            # Per-leg ENTRY prices (post-slippage applied at fill)
+            "ce_entry_px": round(ce_e, 2),
+            "pe_entry_px": round(pe_e, 2),
+            "wce_entry_px": round(wce_e, 2),
+            "wpe_entry_px": round(wpe_e, 2),
+            # Per-leg EXIT prices (intrinsic at expiry / market close at SL)
+            "ce_exit_px": round(ce_x, 2) if ce_x is not None else None,
+            "pe_exit_px": round(pe_x, 2) if pe_x is not None else None,
+            "wce_exit_px": round(wce_x, 2) if wce_x is not None else None,
+            "wpe_exit_px": round(wpe_x, 2) if wpe_x is not None else None,
             "net_credit": round(net_credit, 2),
             "exit_debit": round(exit_debit, 2),
             "pnl_unit": round(pnl_unit, 2),
