@@ -137,19 +137,10 @@ def create_app():
     except Exception as e:
         app.logger.warning(f"Could not register FYERS refresh callback: {e}")
 
-    # Start in-process auto-refresh daemon for Fyers user_id=1.
-    # Belt to the data_scheduler cron's suspenders: cron at 03:30 IST is the
-    # primary pre-market refresh; this in-process thread checks every 30 min
-    # and refreshes if expiry < 30 min away. Survives only until next app
-    # restart, so the cron is still authoritative.
-    if os.environ.get("SKIP_AUTO_TOKEN_REFRESH", "false").lower() != "true":
-        try:
-            from ..services.brokers.fyers_service import FyersService
-            _fy_svc = FyersService()
-            _fy_svc.start_auto_refresh(user_id=1, check_interval_minutes=30)
-            app.logger.info("✅ Fyers auto-refresh daemon started (user_id=1, every 30m)")
-        except Exception as e:
-            app.logger.warning(f"Could not start Fyers auto-refresh daemon: {e}")
+    # Token refresh is owned SOLELY by data_scheduler cron at 03:30 IST.
+    # In-process daemon removed to keep a single source of truth — see
+    # commit ec231858 reverted. Manual CLI + /api endpoint remain as
+    # escape hatches but are not auto-triggered.
 
     # Technical indicators system - no ML models needed
     app.logger.info("📊 Using technical indicator system (RS Rating + Wave Indicators)")

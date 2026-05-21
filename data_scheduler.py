@@ -36,8 +36,19 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def _run_subprocess_with_retry(cmd: list, label: str, timeout: int = 3600, max_retries: int = 2):
-    """Run a subprocess with retry logic."""
+def _tg_alert(text: str):
+    """Best-effort Telegram alert. Never raises."""
+    try:
+        from tools.live.telegram_notify import send
+        send(text, parse_mode="Markdown")
+    except Exception as e:
+        logger.debug(f"tg alert skipped: {e}")
+
+
+def _run_subprocess_with_retry(cmd: list, label: str, timeout: int = 3600,
+                                max_retries: int = 2, alert_on_fail: bool = True):
+    """Run a subprocess with retry logic. TG alert on final failure."""
+    last_err = ""
     for attempt in range(1, max_retries + 1):
         try:
             logger.info(f"Running {label} (attempt {attempt}/{max_retries})...")
@@ -51,7 +62,6 @@ def _run_subprocess_with_retry(cmd: list, label: str, timeout: int = 3600, max_r
             if result.returncode == 0:
                 logger.info(f"  {label} completed successfully")
                 if result.stdout:
-                    # Log last 20 lines to avoid flooding
                     lines = result.stdout.strip().split('\n')
                     if len(lines) > 20:
                         logger.info(f"  Output (last 20 lines):\n{''.join(lines[-20:])}")
@@ -59,9 +69,10 @@ def _run_subprocess_with_retry(cmd: list, label: str, timeout: int = 3600, max_r
                         logger.info(f"  Output:\n{result.stdout}")
                 return True
             else:
+                last_err = (result.stderr or "")[-500:]
                 logger.error(f"  {label} failed (return code {result.returncode})")
-                if result.stderr:
-                    logger.error(f"  Error:\n{result.stderr[-500:]}")
+                if last_err:
+                    logger.error(f"  Error:\n{last_err}")
                 if attempt < max_retries:
                     import time as _time
                     wait = 30 * attempt
@@ -69,11 +80,20 @@ def _run_subprocess_with_retry(cmd: list, label: str, timeout: int = 3600, max_r
                     _time.sleep(wait)
 
         except subprocess.TimeoutExpired:
-            logger.error(f"  {label} timeout after {timeout}s")
+            last_err = f"timeout after {timeout}s"
+            logger.error(f"  {label} {last_err}")
         except Exception as e:
+            last_err = str(e)
             logger.error(f"  {label} error: {e}", exc_info=True)
 
     logger.error(f"  {label} failed after {max_retries} attempts")
+    if alert_on_fail:
+        _tg_alert(
+            f"🛑 *Data pipeline failure*\n"
+            f"Job: `{label}`\n"
+            f"After {max_retries} attempts\n"
+            f"Last error: ```{last_err[:300]}```"
+        )
     return False
 
 
@@ -91,12 +111,21 @@ def refresh_fyers_token_job():
     logger.info("=" * 80)
     logger.info("Fyers token refresh (TOTP, daily 03:30 IST)")
     logger.info("=" * 80)
-    _run_subprocess_with_retry(
+    ok = _run_subprocess_with_retry(
         ['python3', '/app/tools/refresh_fyers_token.py', '--force'],
         'fyers_token_refresh',
         timeout=120,
         max_retries=3,
+        alert_on_fail=False,  # custom alert below — more actionable
     )
+    if not ok:
+        _tg_alert(
+            "🛑 *Fyers token refresh FAILED (3 attempts)*\n"
+            "All downstream data pulls + orders will fail until token "
+            "is restored.\n"
+            "Manual fix: `docker exec trading_system_app python "
+            "/app/tools/refresh_fyers_token.py --force`"
+        )
 
 
 def daily_universe_csv_check():
@@ -113,17 +142,24 @@ def daily_universe_csv_check():
     files = ["nifty100.csv", "nifty500.csv",
              "nifty_midcap150.csv", "nifty_smallcap250.csv"]
     needs_refresh = False
+    stale_list = []
     for fname in files:
         fp = os.path.join(cache_dir, fname)
         if not os.path.exists(fp):
             logger.warning(f"daily_universe_csv_check: {fname} MISSING")
+            stale_list.append(f"{fname}=MISSING")
             needs_refresh = True
             continue
         age = now - _dt.datetime.fromtimestamp(os.path.getmtime(fp))
         if age > stale:
             logger.warning(f"daily_universe_csv_check: {fname} is {age.days}d old (>7d)")
+            stale_list.append(f"{fname}={age.days}d")
             needs_refresh = True
     if needs_refresh:
+        _tg_alert(
+            f"⚠️ *Universe CSVs stale, refreshing*\n"
+            + "\n".join(f"- {s}" for s in stale_list)
+        )
         refresh_universe_csvs()
     else:
         logger.info("daily_universe_csv_check: all universe CSVs fresh (<7d)")
@@ -169,9 +205,16 @@ def pre_market_data_quality_gate():
             logger.info(f"data_quality_gate: PASS {msg}")
         else:
             logger.error(f"data_quality_gate: FAIL {msg}")
+            _tg_alert(
+                f"🛑 *Data quality gate FAIL*\n"
+                f"{msg}\n"
+                f"Trading will be BLOCKED until coverage recovers.\n"
+                f"Investigate: data_scheduler logs + Fyers token validity."
+            )
         _write_gate_marker(ok, msg)
     except Exception as e:
         logger.error(f"data_quality_gate failed: {e}", exc_info=True)
+        _tg_alert(f"🛑 *Data quality gate ERROR*\n```{str(e)[:300]}```")
 
 
 def _write_gate_marker(ok: bool, msg: str):
