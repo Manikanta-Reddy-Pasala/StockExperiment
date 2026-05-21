@@ -77,6 +77,118 @@ def _run_subprocess_with_retry(cmd: list, label: str, timeout: int = 3600, max_r
     return False
 
 
+def refresh_fyers_token_job():
+    """Daily TOTP-based Fyers token refresh (03:30 IST, pre-market).
+
+    Without this, the access_token expires (24h-ish on TOTP path) and every
+    downstream svc.history() / placeorder call silently fails. Failures
+    propagate to: prefetch_ohlcv 'ok' inserts 0 rows, signal scripts emit
+    nothing, executor skips entries.
+
+    Idempotent. Re-fetches even when token still valid (force) so we never
+    rely on TTL detection — too many silent failure modes if TTL math wrong.
+    """
+    logger.info("=" * 80)
+    logger.info("Fyers token refresh (TOTP, daily 03:30 IST)")
+    logger.info("=" * 80)
+    _run_subprocess_with_retry(
+        ['python3', '/app/tools/refresh_fyers_token.py', '--force'],
+        'fyers_token_refresh',
+        timeout=120,
+        max_retries=3,
+    )
+
+
+def daily_universe_csv_check():
+    """Daily 06:00 IST check: any universe CSV >7d stale → refresh now.
+
+    Saturday-only refresh schedule means a Saturday miss = 7d gap. This
+    daily check catches that. Idempotent — refresh_universe_csvs() exits
+    fast when nothing to do.
+    """
+    import datetime as _dt
+    cache_dir = "/app/src/data/symbols"
+    stale = _dt.timedelta(days=7)
+    now = _dt.datetime.now()
+    files = ["nifty100.csv", "nifty500.csv",
+             "nifty_midcap150.csv", "nifty_smallcap250.csv"]
+    needs_refresh = False
+    for fname in files:
+        fp = os.path.join(cache_dir, fname)
+        if not os.path.exists(fp):
+            logger.warning(f"daily_universe_csv_check: {fname} MISSING")
+            needs_refresh = True
+            continue
+        age = now - _dt.datetime.fromtimestamp(os.path.getmtime(fp))
+        if age > stale:
+            logger.warning(f"daily_universe_csv_check: {fname} is {age.days}d old (>7d)")
+            needs_refresh = True
+    if needs_refresh:
+        refresh_universe_csvs()
+    else:
+        logger.info("daily_universe_csv_check: all universe CSVs fresh (<7d)")
+
+
+def pre_market_data_quality_gate():
+    """Pre-market 09:00 IST data quality gate.
+
+    Block rebalancing if today's data ingest is incomplete. Looks at
+    historical_data coverage for yesterday (most recent close). If less
+    than MIN_SYMBOLS have a row for that date, write a marker file that
+    fyers_executor reads on startup to abort with an alert.
+
+    MIN_SYMBOLS=400 chosen because active models (n50+n500 union) is ~504;
+    a 20% gap is too risky to trade on.
+    """
+    MIN_SYMBOLS = 400
+    try:
+        from sqlalchemy import text
+        from tools.shared.ohlcv_cache import _get_engine
+        import datetime as _dt
+        eng = _get_engine()
+        if eng is None:
+            logger.error("data_quality_gate: no DB engine")
+            return
+        # Most-recent trading day = max(date) in historical_data
+        with eng.connect() as c:
+            r = c.execute(text(
+                "SELECT MAX(date) AS d FROM historical_data"
+            )).first()
+            latest = r.d if r else None
+            if latest is None:
+                logger.error("data_quality_gate: historical_data is EMPTY")
+                _write_gate_marker(False, "historical_data is empty")
+                return
+            r = c.execute(text(
+                "SELECT COUNT(DISTINCT symbol) AS n FROM historical_data WHERE date = :d"
+            ), {"d": latest}).first()
+            n_syms = int(r.n) if r else 0
+        ok = n_syms >= MIN_SYMBOLS
+        msg = f"latest={latest} syms={n_syms} (need>={MIN_SYMBOLS})"
+        if ok:
+            logger.info(f"data_quality_gate: PASS {msg}")
+        else:
+            logger.error(f"data_quality_gate: FAIL {msg}")
+        _write_gate_marker(ok, msg)
+    except Exception as e:
+        logger.error(f"data_quality_gate failed: {e}", exc_info=True)
+
+
+def _write_gate_marker(ok: bool, msg: str):
+    """Write marker file consumed by fyers_executor pre-flight check."""
+    try:
+        import json as _json
+        import datetime as _dt
+        os.makedirs("/app/logs", exist_ok=True)
+        with open("/app/logs/data_quality_gate.json", "w") as f:
+            _json.dump({
+                "ok": ok, "msg": msg,
+                "ts": _dt.datetime.now().isoformat(),
+            }, f)
+    except Exception as e:
+        logger.warning(f"gate marker write failed: {e}")
+
+
 def run_data_pipeline():
     """Run complete data pipeline (Daily at 9:00 PM after market close)."""
     logger.info("=" * 80)
@@ -429,12 +541,25 @@ def run_scheduler():
     logger.info("  - Data Quality Check:      Daily at 10:00 PM (parallel with CSV)")
     logger.info("=" * 80)
 
+    # Daily Fyers TOTP token refresh (03:30 IST, pre-market). Without this,
+    # token expires silently → all downstream pulls/orders fail with no rows.
+    schedule.every().day.at("03:30").do(refresh_fyers_token_job)
+
     # Weekly symbol master update (Monday 6 AM) — refreshes NSE_CM_symbols.json cache
     schedule.every().monday.at("06:00").do(update_symbol_master)
 
     # Weekly universe CSV refresh (Saturday 06:00) — nifty100/500/midcap150/smallcap250
     # Saturday is post-Friday-close + before Monday open, captures NSE rebalance announcements
     schedule.every().saturday.at("06:00").do(refresh_universe_csvs)
+
+    # Daily universe CSV staleness check (06:00 IST). Refreshes any >7d-stale
+    # CSV that the Saturday job missed (e.g. job crashed, network down).
+    schedule.every().day.at("06:00").do(daily_universe_csv_check)
+
+    # Pre-market data quality gate (09:00 IST, 30 min before market open).
+    # Writes /app/logs/data_quality_gate.json — fyers_executor reads it
+    # before placing entries. Aborts trading if today's coverage < 400 syms.
+    schedule.every().day.at("09:00").do(pre_market_data_quality_gate)
 
     # Catch-up on startup: if any universe CSV or symbol cache is >7 days old,
     # refresh immediately (so container restarts heal stale files automatically).

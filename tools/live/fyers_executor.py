@@ -530,6 +530,26 @@ def main() -> int:
         log.warning("LIVE_TRADING != 'true' — forcing dry-run mode")
         args.dry_run = True
 
+    # Pre-flight data quality gate. Written by data_scheduler at 09:00 IST.
+    # If today's historical_data coverage is below threshold, abort entries.
+    if not args.dry_run and os.environ.get("SKIP_DQ_GATE", "false").lower() != "true":
+        gate_path = "/app/logs/data_quality_gate.json"
+        if os.path.exists(gate_path):
+            try:
+                with open(gate_path) as _gf:
+                    _gate = json.load(_gf)
+                if not _gate.get("ok"):
+                    log.error(f"Data quality gate FAILED: {_gate.get('msg')} — "
+                              f"aborting trade execution. Set SKIP_DQ_GATE=true to override.")
+                    try:
+                        from tools.live.telegram_notify import send as _tg
+                        _tg(f"🛑 *Trade execution aborted*\nData quality gate: {_gate.get('msg')}")
+                    except Exception:
+                        pass
+                    return 3
+            except Exception as _e:
+                log.warning(f"data_quality_gate read failed: {_e} — proceeding")
+
     # ---- Build RiskManager (per-model if provided, else env) ----
     rm = RiskManager.for_model_or_env(args.model_name)
     log.info(f"Risk: model={args.model_name or '(env)'} "

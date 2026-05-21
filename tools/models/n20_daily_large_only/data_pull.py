@@ -44,7 +44,7 @@ def pull_daily_ohlcv():
     log.info("=" * 80)
     _run(
         ["python3", "tools/shared/prefetch_ohlcv.py",
-         "--universe", "n50,n500", "--days", "2",
+         "--universe", "n50,n500", "--days", "5",
          "--intervals", "D", "--sleep", "0.2"],
         "prefetch_ohlcv_daily", timeout=1800,
     )

@@ -129,6 +129,34 @@ def _fyers_service():
         return None
 
 
+def _history_with_retry(svc, fyers_sym: str, user_id: int, interval: str,
+                         start_str: str, end_str: str,
+                         max_retries: int = 3) -> dict | None:
+    """Call svc.history() with exponential backoff retry.
+
+    Without this, a single network blip or transient Fyers 429/503 drops the
+    whole chunk silently → data gap. Backoff: 2s, 4s, 8s.
+    """
+    import time as _time
+    last_err = None
+    for attempt in range(max_retries):
+        try:
+            res = svc.history(
+                user_id=user_id, symbol=fyers_sym, exchange="NSE",
+                interval=interval, start_date=start_str, end_date=end_str,
+            )
+            if res and res.get("status") == "success":
+                return res
+            last_err = (res or {}).get("message", "no response")
+        except Exception as e:
+            last_err = str(e)
+        if attempt < max_retries - 1:
+            _time.sleep(2 ** (attempt + 1))
+    print(f"  fyers chunk fail {fyers_sym} {start_str}..{end_str} "
+          f"after {max_retries} retries: {last_err}")
+    return None
+
+
 def _fetch_fyers_interval(symbol: str, days: int, user_id: int,
                           interval: str, chunk_days: int = 95) -> pd.DataFrame:
     """Generic Fyers history fetcher — chunks window into chunk_days slices."""
@@ -142,21 +170,12 @@ def _fetch_fyers_interval(symbol: str, days: int, user_id: int,
     all_candles: List = []
     while cursor < end_dt:
         chunk_end = min(cursor + timedelta(days=chunk_days), end_dt)
-        try:
-            res = svc.history(
-                user_id=user_id, symbol=fyers_sym, exchange="NSE",
-                interval=interval,
-                start_date=cursor.strftime("%Y-%m-%d"),
-                end_date=chunk_end.strftime("%Y-%m-%d"),
-            )
-            if res and res.get("status") == "success":
-                all_candles += res.get("data", {}).get("candles", []) or []
-            else:
-                msg = (res or {}).get("message", "no response")
-                print(f"  fyers chunk fail {fyers_sym} "
-                      f"{cursor.date()}..{chunk_end.date()}: {msg}")
-        except Exception as e:
-            print(f"  fyers chunk error {fyers_sym}: {e}")
+        res = _history_with_retry(
+            svc, fyers_sym, user_id, interval,
+            cursor.strftime("%Y-%m-%d"), chunk_end.strftime("%Y-%m-%d"),
+        )
+        if res:
+            all_candles += res.get("data", {}).get("candles", []) or []
         cursor = chunk_end
     if not all_candles:
         return pd.DataFrame()
@@ -223,21 +242,12 @@ def _fetch_daily_fyers_raw(symbol: str, days: int, user_id: int = 1,
     all_candles: List = []
     while cursor < end_dt:
         chunk_end = min(cursor + timedelta(days=chunk_days), end_dt)
-        try:
-            res = svc.history(
-                user_id=user_id, symbol=fyers_sym, exchange="NSE",
-                interval="D",
-                start_date=cursor.strftime("%Y-%m-%d"),
-                end_date=chunk_end.strftime("%Y-%m-%d"),
-            )
-            if res and res.get("status") == "success":
-                all_candles += res.get("data", {}).get("candles", []) or []
-            else:
-                msg = (res or {}).get("message", "no response")
-                print(f"  fyers daily fail {fyers_sym} "
-                      f"{cursor.date()}..{chunk_end.date()}: {msg}")
-        except Exception as e:
-            print(f"  fyers daily error {fyers_sym}: {e}")
+        res = _history_with_retry(
+            svc, fyers_sym, user_id, "D",
+            cursor.strftime("%Y-%m-%d"), chunk_end.strftime("%Y-%m-%d"),
+        )
+        if res:
+            all_candles += res.get("data", {}).get("candles", []) or []
         cursor = chunk_end
     if not all_candles:
         return pd.DataFrame()
