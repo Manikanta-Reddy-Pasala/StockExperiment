@@ -159,13 +159,21 @@ def main() -> int:
     n_skipped = 0
     n_fetched = 0
     total_rows = 0
+    # Incremental-pull guard: skip-logic only meaningful for backfill windows.
+    # Small windows (e.g. --days 2 = 1 expected bar) cause skip-frac to round
+    # to 0 → every symbol skipped → today's candle never fetched.
+    skip_enabled = args.days >= 30
+    if not skip_enabled:
+        print(f"Incremental mode (--days={args.days} < 30): skip-frac disabled, "
+              f"always fetching latest bars.")
+
     for sym, name in symbols:
         n_done += 1
         per_interval_summary = []
         for iv in intervals:
             exp = expected_bars(iv, args.days)
             have = current_coverage(sym, iv, args.days)
-            if have >= int(exp * args.skip_frac):
+            if skip_enabled and have >= int(exp * args.skip_frac):
                 per_interval_summary.append(f"{iv}=skip({have}/{exp})")
                 n_skipped += 1
                 continue
