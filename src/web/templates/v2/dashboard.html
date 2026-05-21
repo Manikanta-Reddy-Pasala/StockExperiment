@@ -84,12 +84,12 @@
       <i class="bi bi-chevron-down ms-2"></i>
     </div>
     <div class="row text-end g-3 flex-grow-1 justify-content-end align-items-center">
-      <div class="col-auto"><div class="text-muted small" title="Original capital deposited across all models">Allocated</div><div class="fs-5 fw-bold" id="tot_invested">--</div></div>
-      <div class="col-auto"><div class="text-muted small" title="Cash + live position value. Identity: NAV = Allocated + Total P&L.">Current NAV</div><div class="fs-5 fw-bold" id="tot_nav">--</div></div>
+      <div class="col-auto"><div class="text-muted small" title="Original capital invested across all models">Invested</div><div class="fs-5 fw-bold" id="tot_invested">--</div></div>
+      <div class="col-auto"><div class="text-muted small" title="Cash + live position value. Identity: NAV = Invested + Total P&L.">Current NAV</div><div class="fs-5 fw-bold" id="tot_nav">--</div></div>
       <div class="col-auto"><div class="text-muted small" title="Locked-in profit/loss from closed trades (net of sell charges)">Realized</div><div class="fs-5 fw-bold" id="tot_realized">--</div></div>
       <div class="col-auto"><div class="text-muted small" title="+ Current open positions: Live MTM − Cost Basis (gross, ignoring sell charges).">+ Current P&amp;L (open pos)</div><div class="fs-5 fw-bold" id="tot_current_pnl">--</div></div>
       <div class="col-auto"><div class="text-muted small" title="− Buy-side broker charges paid on currently held positions. Subtracted because they sit outside unrealized until exit.">− Buy Chg (open pos)</div><div class="fs-5 fw-bold neg" id="tot_buychg_open">--</div></div>
-      <div class="col-auto"><div class="text-muted small" title="= NAV − Allocated. = Realized + Current P&L (open) − Buy Chg (open). Charges already baked into cash via per-trade deductions.">= Total P&amp;L</div><div class="fs-5 fw-bold" id="tot_pnl">--</div></div>
+      <div class="col-auto"><div class="text-muted small" title="= NAV − Invested. = Realized + Current P&L (open) − Buy Chg (open). Charges already baked into cash via per-trade deductions.">= Total P&amp;L</div><div class="fs-5 fw-bold" id="tot_pnl">--</div></div>
       <div class="col-auto"><div class="text-muted small" title="Lifetime broker charges across all models (brokerage + STT + GST + exchange + SEBI + stamp + DP). Info only — already deducted from cash, not subtracted again from Total P&L.">Total Txn Charges</div><div class="fs-5 fw-bold neg" id="tot_charges">--</div></div>
       <div class="col-auto align-self-center">
         <a href="/settings" class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation()"><i class="bi bi-sliders"></i> Manage Allocations</a>
@@ -101,10 +101,10 @@
       <div class="col-12 col-md-6">
         <div class="text-muted small text-uppercase mb-2" style="letter-spacing:0.5px;">Math identity</div>
         <div class="kv"><span class="k">NAV</span><span class="v" id="td_nav">—</span></div>
-        <div class="kv"><span class="k">− Allocated</span><span class="v" id="td_alloc">—</span></div>
+        <div class="kv"><span class="k">− Invested</span><span class="v" id="td_alloc">—</span></div>
         <div class="kv"><span class="k"><strong>= Total P&amp;L</strong></span><span class="v" id="td_pnl">—</span></div>
         <div class="text-muted" style="font-size:0.75rem; margin-top:6px;">
-          <code>NAV = Allocated + Total P&amp;L</code> — every charge already deducted from cash. Total Txn Charges line is info only; do not subtract again.
+          <code>NAV = Invested + Total P&amp;L</code> — every charge already deducted from cash. Total Txn Charges line is info only; do not subtract again.
         </div>
       </div>
       <div class="col-12 col-md-6">
@@ -191,6 +191,11 @@ function renderModelCard(m, sig) {
   const headlinePnlCls = cls(m.pnl_total);
   const headlineInvested = Number(m.invested_amount ?? m.allocated_capital ?? 0);
   const headlineNav = Number(m.nav || 0);
+  const headlinePosCost = (Number(m.open_qty || 0) * Number(m.open_entry_px || 0)) || 0;
+  const headlinePosValue = Number(m.position_value || 0);
+  const headlineCurPnl = headlinePosValue ? (headlinePosValue - headlinePosCost) : 0;
+  const headlineCurPct = headlinePosCost > 0 ? (headlineCurPnl / headlinePosCost * 100) : 0;
+  const headlineCurCls = cls(headlineCurPnl);
   return `
     <div class="col-12 col-md-6 col-xl-4">
       <div class="${cardCls}">
@@ -208,6 +213,7 @@ function renderModelCard(m, sig) {
             <div class="model-headline">
               <span><span class="lbl">Allocated</span><span class="val">${fmtINR(headlineInvested)}</span></span>
               <span><span class="lbl">NAV</span><span class="val">${fmtINR(headlineNav)}</span></span>
+              <span title="Live MTM − Cost basis on open position (gross of sell charges)"><span class="lbl">Current P&amp;L</span><span class="val ${headlineCurCls}">${fmtINR(headlineCurPnl)}${headlinePosCost > 0 ? ` <small>(${fmtPct(headlineCurPct)})</small>` : ''}</span></span>
               <span><span class="lbl">Total P&amp;L</span><span class="val ${headlinePnlCls}">${fmtINR(m.pnl_total)} <small>(${fmtPct(m.return_pct)})</small></span></span>
             </div>
           </div>
