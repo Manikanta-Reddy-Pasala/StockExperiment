@@ -672,8 +672,17 @@ def main() -> int:
             status = res.get("status", "unknown")
             order_id = res.get("order_id", "")
             if not res.get("filled"):
-                log.error(f"EXIT NOT FILLED {sym}: status={status} reason={res.get('reason')}"
+                reason_txt = res.get("reason") or status
+                log.error(f"EXIT NOT FILLED {sym}: status={status} reason={reason_txt}"
                           f" — ABORTING ENTRIES to avoid phantom-cash buys")
+                _tg_safe(
+                    f"🛑 *EXIT NOT FILLED — entries ABORTED*\n"
+                    f"Model: `{args.model_name or '(env)'}`\n"
+                    f"Symbol: `{sym}` qty={held.qty} @ ₹{price:,.2f}\n"
+                    f"Status: `{status}`\n"
+                    f"Reason: {reason_txt}\n"
+                    f"Held position retained; no new entries this cycle."
+                )
                 # Best-effort save of what we did so far, then bail.
                 return 3
             fill_price = res.get("fill_price") or price
@@ -725,6 +734,14 @@ def main() -> int:
                     f"SKIP BUY {sym}: Fyers already holds {fyers_qty}@{fyers_avg:.2f} "
                     f"(ledger thinks flat or different). Possible prior fill not "
                     f"recorded — investigate before re-entering."
+                )
+                _tg_safe(
+                    f"🛑 *Ledger/Fyers DRIFT*\n"
+                    f"Model: `{args.model_name or '(env)'}`\n"
+                    f"Symbol: `{sym}`\n"
+                    f"Fyers holds: {fyers_qty} @ ₹{fyers_avg:.2f}\n"
+                    f"Ledger thinks flat or different — BUY skipped.\n"
+                    f"Manual reconciliation needed."
                 )
                 skipped += 1
                 try:
@@ -830,8 +847,16 @@ def main() -> int:
             status = res.get("status", "unknown")
             order_id = res.get("order_id", "")
             if not res.get("filled"):
-                log.error(f"ENTRY NOT FILLED {sym}: status={status} reason={res.get('reason')}"
+                reason_txt = res.get("reason") or status
+                log.error(f"ENTRY NOT FILLED {sym}: status={status} reason={reason_txt}"
                           f" — skipping this symbol, continuing")
+                _tg_safe(
+                    f"❌ *ENTRY NOT FILLED*\n"
+                    f"Model: `{args.model_name or '(env)'}`\n"
+                    f"Symbol: `{sym}` qty={qty} @ ₹{price:,.2f}\n"
+                    f"Status: `{status}`\n"
+                    f"Reason: {reason_txt}"
+                )
                 skipped += 1
                 continue
             fill_price = res.get("fill_price") or price

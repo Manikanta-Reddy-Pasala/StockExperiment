@@ -21,6 +21,15 @@ logger = logging.getLogger(__name__)
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
+
+def _tg_safe(text: str):
+    """Best-effort Telegram alert. Never raises."""
+    try:
+        from tools.live.telegram_notify import send
+        send(text, parse_mode="Markdown")
+    except Exception:
+        logger.debug("tg notify skipped", exc_info=True)
+
 # Track running tasks (in-memory cache + database persistence)
 running_tasks = {}
 
@@ -1192,10 +1201,13 @@ def deposit_to_model(model_name):
     try:
         from src.services.trading.model_ledger_service import deposit
         data = request.get_json() or {}
-        return jsonify({
-            "success": True,
-            **deposit(model_name, float(data.get("amount", 0))),
-        })
+        amt = float(data.get("amount", 0))
+        result = deposit(model_name, amt)
+        _tg_safe(
+            f"💰 *Deposit* `{model_name}` ₹{amt:,.2f}\n"
+            f"New cash: ₹{result.get('cash', 0):,.2f}"
+        )
+        return jsonify({"success": True, **result})
     except ValueError as e:
         return jsonify({"success": False, "error": str(e)}), 400
     except Exception as e:
@@ -1209,10 +1221,13 @@ def withdraw_from_model(model_name):
     try:
         from src.services.trading.model_ledger_service import withdraw
         data = request.get_json() or {}
-        return jsonify({
-            "success": True,
-            **withdraw(model_name, float(data.get("amount", 0))),
-        })
+        amt = float(data.get("amount", 0))
+        result = withdraw(model_name, amt)
+        _tg_safe(
+            f"💸 *Withdraw* `{model_name}` ₹{amt:,.2f}\n"
+            f"Remaining cash: ₹{result.get('cash', 0):,.2f}"
+        )
+        return jsonify({"success": True, **result})
     except ValueError as e:
         return jsonify({"success": False, "error": str(e)}), 400
     except Exception as e:
@@ -1261,7 +1276,12 @@ def reset_model_route(model_name):
     """Hard reset model ledger to zero. Audit trail preserved."""
     try:
         from src.services.trading.model_ledger_service import reset_model
-        return jsonify({"success": True, **reset_model(model_name)})
+        result = reset_model(model_name)
+        _tg_safe(
+            f"⚠️ *Model RESET* `{model_name}`\n"
+            f"Ledger zeroed. Audit trail preserved."
+        )
+        return jsonify({"success": True, **result})
     except Exception as e:
         logger.error(f"reset model error: {e}", exc_info=True)
         return jsonify({"success": False, "error": str(e)}), 500
@@ -1272,10 +1292,13 @@ def toggle_model_enabled(model_name):
     try:
         from src.services.trading.model_ledger_service import set_enabled
         data = request.get_json() or {}
-        return jsonify({
-            "success": True,
-            "settings": set_enabled(model_name, bool(data.get("enabled"))),
-        })
+        new_state = bool(data.get("enabled"))
+        settings = set_enabled(model_name, new_state)
+        _tg_safe(
+            f"{'✅' if new_state else '⏸️'} *Model "
+            f"{'ENABLED' if new_state else 'DISABLED'}* `{model_name}`"
+        )
+        return jsonify({"success": True, "settings": settings})
     except ValueError as e:
         return jsonify({"success": False, "error": str(e)}), 400
     except Exception as e:
@@ -2291,6 +2314,12 @@ def admin_model_rebalance(model_name):
         except Exception as e:
             logger.warning(f"save_task_to_db pre-register {tid} failed: {e}")
 
+    _tg_safe(
+        f"🔄 *Rebalance triggered* `{model_name}` "
+        f"({'DRY' if dry_run else 'LIVE'})\n"
+        f"Signal → executor chain started."
+    )
+
     def runner():
         try:
             run_command_async(signal_task, signal_cmd,
@@ -2313,6 +2342,11 @@ def admin_model_rebalance(model_name):
                     save_task_to_db(exec_task, running_tasks[exec_task])
                 except Exception:
                     pass
+                _tg_safe(
+                    f"❌ *Rebalance signal FAILED* `{model_name}`\n"
+                    f"Status: `{sig_state.get('status')!r}`\n"
+                    f"Executor skipped — no orders placed."
+                )
         finally:
             try:
                 lk.release()
