@@ -91,10 +91,24 @@ def _placeorder(svc, user_id: int, symbol: str, qty: int, side: str,
     """
     fyers_sym = to_fyers_symbol(symbol)
     safe_tag = _sanitize_tag(tag)
+    # Snapshot Fyers Available Balance BEFORE placing the order.
+    # Used later (on fill backfill) to derive ACTUAL broker charges =
+    # |cash_delta| − notional, instead of the synthetic formula.
+    cash_before = None
+    try:
+        f = svc.funds(user_id=user_id) if hasattr(svc, "funds") else None
+        if isinstance(f, dict):
+            d = f.get("data") or {}
+            cb = d.get("available_cash") if isinstance(d, dict) else None
+            if cb is not None:
+                cash_before = float(cb)
+    except Exception as _e:
+        log.debug(f"cash_before snapshot failed: {_e}")
     req = {
         "symbol": fyers_sym, "qty": int(qty), "side": side.upper(),
         "product": product, "pricetype": pricetype.upper(),
         "price": float(price), "tag": safe_tag,
+        "cash_before": cash_before,
     }
     try:
         res = svc.placeorder(
@@ -449,20 +463,41 @@ def _tg_safe(text: str):
         log.debug(f"tg notify skipped: {e}")
 
 
-def _backfill_audit_fill(order_id: str, fill_price: float, fill_qty: int):
-    """Update audit_orders with real Fyers tradedPrice + recompute charges."""
+def _backfill_audit_fill(order_id: str, fill_price: float, fill_qty: int,
+                         svc=None, user_id: int = 1):
+    """Update audit_orders with real Fyers tradedPrice + charges.
+
+    Charges preferred from Fyers cash-delta truth (cash_before vs cash_after).
+    Pass `svc` so we can snapshot Available Balance right now. If svc is
+    None, falls back to synthetic formula inside update_order_fill.
+    """
     if not order_id or fill_price is None:
         return
+    cash_after = None
+    if svc is not None:
+        try:
+            # Small settle delay so Fyers reflects this trade's cash impact
+            import time as _t
+            _t.sleep(2)
+            f = svc.funds(user_id=user_id) if hasattr(svc, "funds") else None
+            if isinstance(f, dict):
+                d = f.get("data") or {}
+                ca = d.get("available_cash") if isinstance(d, dict) else None
+                if ca is not None:
+                    cash_after = float(ca)
+        except Exception as e:
+            log.debug(f"cash_after snapshot failed: {e}")
     try:
         from src.services.audit_service import update_order_fill
         update_order_fill(order_id, fill_price=float(fill_price),
-                          fill_qty=int(fill_qty), status="filled")
+                          fill_qty=int(fill_qty), status="filled",
+                          cash_after=cash_after)
     except Exception as e:
         log.debug(f"audit update_order_fill failed: {e}")
 
 
-def _record_model_buy(model_name, symbol, qty, price, order_id):
-    _backfill_audit_fill(order_id, price, qty)
+def _record_model_buy(model_name, symbol, qty, price, order_id, svc=None, user_id: int = 1):
+    _backfill_audit_fill(order_id, price, qty, svc=svc, user_id=user_id)
     if not model_name:
         return
     try:
@@ -479,9 +514,10 @@ def _record_model_buy(model_name, symbol, qty, price, order_id):
         _tg_safe(f"⚠️ BUY {model_name} {symbol} x{qty} placed but ledger write FAILED: {e}")
 
 
-def _record_model_sell(model_name, exit_price, reason, order_id, qty=None):
+def _record_model_sell(model_name, exit_price, reason, order_id, qty=None,
+                       svc=None, user_id: int = 1):
     if qty is not None:
-        _backfill_audit_fill(order_id, exit_price, qty)
+        _backfill_audit_fill(order_id, exit_price, qty, svc=svc, user_id=user_id)
     if not model_name:
         return
     try:
@@ -668,7 +704,7 @@ def main() -> int:
         if not args.dry_run:
             _record_model_sell(model_for_signal, fill_price,
                                sig.get("reason", sig_type), order_id,
-                               qty=held.qty)
+                               qty=held.qty, svc=svc, user_id=args.user_id)
         open_positions = [p for p in open_positions if p.symbol != sym]
         _save_ledger()
         log.info(f"{'DRY-RUN' if args.dry_run else 'CLOSED'} PASS-1 {sym} qty={held.qty} "
@@ -799,7 +835,8 @@ def main() -> int:
             "model": model_for_signal,
         })
         if not args.dry_run and side == "BUY":
-            _record_model_buy(model_for_signal, sym, qty, fill_price, order_id)
+            _record_model_buy(model_for_signal, sym, qty, fill_price, order_id,
+                              svc=svc, user_id=args.user_id)
         log.info(f"{'DRY-RUN' if args.dry_run else 'PLACED'} PASS-2 {side} {sym} "
                  f"qty={qty} @ {fill_price} status={status}")
         placed += 1
