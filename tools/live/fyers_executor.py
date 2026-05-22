@@ -610,60 +610,38 @@ def main() -> int:
     else:
         svc = None
 
-    # Canonical ledger paths — per-model isolation so each model's
-    # open positions don't contaminate sizing for other models.
-    if args.model_name and args.model_name != "momentum_n100_top5_max1":
-        # Per-model ledger dir
-        LEDGER_DIR = Path(f"/app/logs/{args.model_name}/ledger")
-        LEDGER_DIR.mkdir(parents=True, exist_ok=True)
-        LEDGER_FILE = LEDGER_DIR / f"{args.model_name}_ledger.json"
-        HISTORY_FILE = LEDGER_DIR / "trade_history.jsonl"
-    else:
-        # Legacy path for momentum_n100_top5_max1 (preserves HFCL position)
-        LEDGER_DIR = Path("/app/logs/momrot/ledger")
-        LEDGER_DIR.mkdir(parents=True, exist_ok=True)
-        LEDGER_FILE = LEDGER_DIR / "momrot_ledger.json"
-        HISTORY_FILE = LEDGER_DIR / "trade_history.jsonl"
-
-    # Load current ledger (open positions)
-    if LEDGER_FILE.exists():
-        try:
-            with open(LEDGER_FILE) as f:
-                ledger = json.load(f)
-        except Exception:
-            ledger = {"open": []}
-    else:
-        ledger = {"open": []}
+    # Load open positions from DB model_ledger (single source of truth).
+    # Per-model row keyed by model_name. record_buy / record_sell maintain
+    # open_symbol / open_qty / open_entry_px. File ledger removed 2026-05-22.
     open_positions: List[Position] = []
-    for p in ledger.get("open", []):
-        open_positions.append(Position(
-            symbol=p["symbol"], qty=int(p["qty"]),
-            entry_price=float(p["entry_price"]),
-            side=p.get("side", "BUY"),
-            sl=float(p.get("sl", 0) or 0),
-            target=float(p.get("target", 0) or 0),
-        ))
+    if args.model_name:
+        try:
+            from src.models.database import get_database_manager
+            from src.models.model_ledger_models import ModelLedger
+            db = get_database_manager()
+            with db.get_session() as _s:
+                _l = _s.query(ModelLedger).filter_by(
+                    model_name=args.model_name).first()
+                if _l and _l.open_symbol and _l.open_qty:
+                    open_positions.append(Position(
+                        symbol=_l.open_symbol,
+                        qty=int(_l.open_qty),
+                        entry_price=float(_l.open_entry_px or 0),
+                        side="BUY",
+                    ))
+        except Exception as _le:
+            log.warning(f"DB open_positions load failed: {_le}; "
+                        "treating as flat")
 
     def _save_ledger():
-        if args.dry_run:
-            return
-        with open(LEDGER_FILE, "w") as f:
-            json.dump({
-                "updated_at": datetime.now().isoformat(),
-                "open": [
-                    {"symbol": p.symbol, "qty": p.qty,
-                     "entry_price": p.entry_price, "side": p.side,
-                     "sl": p.sl, "target": p.target,
-                     "entry_ts": getattr(p, "entry_ts", None)}
-                    for p in open_positions
-                ],
-            }, f, indent=2, default=str)
+        # No-op: record_buy / record_sell persist DB state. In-memory
+        # open_positions kept only for intra-execution sizing.
+        return
 
     def _append_history(rec: dict):
-        if args.dry_run:
-            return
-        with open(HISTORY_FILE, "a") as f:
-            f.write(json.dumps(rec, default=str) + "\n")
+        # No-op: model_trades table is canonical history. Inserted by
+        # record_buy / record_sell in model_ledger_service.
+        return
 
     # Partition signals into exits and entries (preserve order within each)
     exit_signals = [s for s in signals
