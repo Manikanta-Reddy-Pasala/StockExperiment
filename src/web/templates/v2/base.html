@@ -8,7 +8,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}?v=20260522d">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}?v=20260522e">
     <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
     <!-- PWA: installable on Android / iOS -->
     <link rel="manifest" href="/manifest.json">
@@ -150,6 +150,12 @@
         </div>
     </div>
 
+    <!-- Pull-to-refresh indicator (mobile only) -->
+    <div id="ptr-indicator" class="d-md-none" aria-hidden="true">
+        <span id="ptr-spinner">↓</span>
+        <span id="ptr-text">Pull to refresh</span>
+    </div>
+
     <!-- Mobile bottom tab bar (visible on small screens only) -->
     <nav class="mobile-bottom-nav d-md-none" id="mobile-bottom-nav" aria-label="Primary">
         <a href="/dashboard" data-route="/dashboard" class="bn-item">
@@ -175,6 +181,66 @@
           const r = a.getAttribute('data-route');
           if (r && (path === r || path.startsWith(r + '/'))) a.classList.add('active');
         });
+      })();
+
+      // Pull-to-refresh: vertical drag at top of page reloads the page.
+      // PWA standalone mode disables browser-native pull-to-refresh, so
+      // implement it ourselves with a clear visual indicator.
+      (function pullToRefresh() {
+        if (!('ontouchstart' in window)) return;  // skip on desktop
+        const indicator = document.getElementById('ptr-indicator');
+        const spinner = document.getElementById('ptr-spinner');
+        const text = document.getElementById('ptr-text');
+        if (!indicator) return;
+        const THRESHOLD = 70;  // px to trigger
+        const MAX_PULL = 120;
+        let startY = 0, currentY = 0, pulling = false, triggered = false;
+
+        function reset() {
+          indicator.style.transform = 'translateY(-100%)';
+          indicator.style.opacity = '0';
+          spinner.style.transform = 'rotate(0deg)';
+          text.textContent = 'Pull to refresh';
+          pulling = false;
+          triggered = false;
+        }
+        reset();
+
+        document.addEventListener('touchstart', (e) => {
+          if (window.scrollY > 5) return;
+          startY = e.touches[0].clientY;
+          pulling = true;
+        }, { passive: true });
+
+        document.addEventListener('touchmove', (e) => {
+          if (!pulling) return;
+          currentY = e.touches[0].clientY;
+          const delta = currentY - startY;
+          if (delta <= 0) return;
+          const pull = Math.min(delta, MAX_PULL);
+          indicator.style.transform = `translateY(${pull - 50}px)`;
+          indicator.style.opacity = String(Math.min(1, pull / THRESHOLD));
+          spinner.style.transform = `rotate(${pull * 3}deg)`;
+          if (pull >= THRESHOLD && !triggered) {
+            triggered = true;
+            text.textContent = 'Release to refresh';
+          } else if (pull < THRESHOLD && triggered) {
+            triggered = false;
+            text.textContent = 'Pull to refresh';
+          }
+        }, { passive: true });
+
+        document.addEventListener('touchend', () => {
+          if (!pulling) return;
+          if (triggered) {
+            text.textContent = 'Refreshing…';
+            spinner.textContent = '⟳';
+            indicator.style.transform = 'translateY(20px)';
+            setTimeout(() => { window.location.reload(); }, 250);
+          } else {
+            reset();
+          }
+        }, { passive: true });
       })();
     </script>
 
