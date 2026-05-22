@@ -298,20 +298,36 @@ def _wait_for_fill(svc, user_id: int, order_id: str,
         return False, "not_found", None
     deadline = time.time() + timeout_s
     last_status = "unknown"
+    # Service layer may return raw Fyers int OR mapped string. Treat both.
+    # Per Fyers docs: 1=Cancelled, 2=Traded/Filled, 4=Transit, 5=Rejected,
+    # 6=Pending. Mapped strings (api.py): COMPLETE/CANCELLED/REJECTED/PENDING.
+    # Defensive: also catch filledQty == qty (Fyers v3 sometimes lags status).
+    FILLED_STR = {"COMPLETE", "FILLED", "TRADED"}
+    CANCELLED_STR = {"CANCELLED", "CANCELED"}
+    REJECTED_STR = {"REJECTED"}
+    EXPIRED_STR = {"EXPIRED"}
     while time.time() < deadline:
         row = _get_order_status(svc, user_id, order_id)
         if row:
             st = row.get("status")
-            # Map status int → string
-            if st == 2:
+            st_norm = (st.upper() if isinstance(st, str) else st)
+            # filledQty == qty fallback (status lag protection)
+            try:
+                fq = int(row.get("filled_quantity") or row.get("filledQty") or 0)
+                qq = int(row.get("quantity") or row.get("qty") or 0)
+                if qq > 0 and fq >= qq:
+                    return True, "filled", _extract_traded_price(row)
+            except (TypeError, ValueError):
+                pass
+            if st_norm == 2 or st_norm in FILLED_STR:
                 return True, "filled", _extract_traded_price(row)
-            if st == 1:
+            if st_norm == 1 or st_norm in CANCELLED_STR:
                 return False, "cancelled", None
-            if st == 5:
+            if st_norm == 5 or st_norm in REJECTED_STR:
                 return False, "rejected", None
-            if st == 7:
+            if st_norm == 7 or st_norm in EXPIRED_STR:
                 return False, "expired", None
-            last_status = f"code={st}"
+            last_status = f"status={st}"
         time.sleep(poll_s)
     log.warning(f"_wait_for_fill timeout after {timeout_s}s on order {order_id} (last={last_status})")
     return False, "timeout", None

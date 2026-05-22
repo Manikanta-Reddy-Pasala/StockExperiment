@@ -91,16 +91,16 @@ class FyersAPI:
             
             elif method == 'PUT':
                 if endpoint == 'orders':
-                    response = self.fyers_client.modifyorder(**data)
+                    response = self.fyers_client.modify_order(data=data)
                 else:
                     return {'status': 'error', 'message': f'PUT endpoint {endpoint} not implemented'}
-                
+
                 # Standardize response format
                 return self._standardize_response(response)
-            
+
             elif method == 'DELETE':
                 if endpoint == 'orders':
-                    response = self.fyers_client.cancelorder(**data)
+                    response = self.fyers_client.cancel_order(data=data)
                 else:
                     return {'status': 'error', 'message': f'DELETE endpoint {endpoint} not implemented'}
                 
@@ -968,14 +968,21 @@ class FyersAPI:
         return type_mapping.get(order_type, 'MARKET')
     
     def _get_order_status_name(self, status: int) -> str:
-        """Convert Fyers order status number to standard format."""
+        """Convert Fyers order status number to standard format.
+
+        Per Fyers API v3 docs:
+          1 = Cancelled
+          2 = Traded / Filled
+          4 = Transit
+          5 = Rejected
+          6 = Pending
+        """
         status_mapping = {
-            1: 'PENDING',
-            2: 'OPEN',
-            3: 'CANCELLED',
-            4: 'COMPLETE',
+            1: 'CANCELLED',
+            2: 'COMPLETE',
+            4: 'TRANSIT',
             5: 'REJECTED',
-            6: 'EXPIRED'
+            6: 'PENDING',
         }
         return status_mapping.get(status, 'PENDING')
     
