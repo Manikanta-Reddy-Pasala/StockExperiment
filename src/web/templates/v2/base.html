@@ -10,6 +10,21 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
     <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
+    <!-- PWA: installable on Android / iOS -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#15a36b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Trading">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js', { scope: '/' })
+            .catch((e) => console.warn('SW register failed', e));
+        });
+      }
+    </script>
     <style>
       /* Global P&L colour classes — applied to any numeric span/td/div
          showing return %, P&L, or unrealized values. !important so they

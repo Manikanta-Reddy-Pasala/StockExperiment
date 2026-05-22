@@ -323,6 +323,23 @@ def create_app():
         """Dashboard page."""
         return render_template('v2/dashboard.html')
 
+    # PWA: serve manifest + service worker from root so SW can claim '/' scope.
+    @app.route('/manifest.json')
+    def pwa_manifest():
+        from flask import send_from_directory
+        return send_from_directory('static', 'manifest.json',
+                                   mimetype='application/manifest+json')
+
+    @app.route('/sw.js')
+    def pwa_service_worker():
+        from flask import send_from_directory, make_response
+        resp = make_response(send_from_directory('static', 'sw.js',
+                                                 mimetype='application/javascript'))
+        # SW updates must bypass cache so version bumps are picked up.
+        resp.headers['Service-Worker-Allowed'] = '/'
+        resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        return resp
+
     @app.route('/picks')
     @login_required
     def picks():

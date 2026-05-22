@@ -1,0 +1,31 @@
+{
+  "name": "Trading Models — StockExperiment",
+  "short_name": "Trading",
+  "description": "Per-model rebalance, signals, Fyers positions",
+  "id": "/picks",
+  "start_url": "/picks",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#15a36b",
+  "icons": [
+    {
+      "src": "/static/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    { "name": "Today's Picks",  "url": "/picks",     "icons": [{ "src": "/static/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Portfolio",      "url": "/portfolio", "icons": [{ "src": "/static/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Dashboard",      "url": "/dashboard", "icons": [{ "src": "/static/icon-192.png", "sizes": "192x192" }] }
+  ]
+}
