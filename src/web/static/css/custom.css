@@ -837,13 +837,122 @@ body {
 .table-success.bg-opacity-25 { background: rgba(34,197,94,0.08) !important; }
 .table-danger.bg-opacity-25 { background: rgba(248,113,113,0.08) !important; }
 
-/* Mobile improvements */
-@media (max-width: 576px) {
-    .summary-card .card-body { padding: 0.5rem; }
-    .summary-card .fs-4 { font-size: 1.1rem !important; }
-    .summary-card .fs-5 { font-size: 1rem !important; }
-    .card-header { padding: 0.75rem 1rem; font-size: 0.9rem; }
-    .table th, .table td { padding: 0.5rem 0.4rem; font-size: 0.8rem; }
-    .pick-card .card-body { padding: 0.75rem; }
+/* ============================================================
+   Mobile-friendly overrides — tablet & phone breakpoints.
+   Targets: phones (<=576px), small tablets (<=767px).
+   Also handles iOS safe-area for PWA standalone mode.
+   ============================================================ */
+
+/* iOS PWA standalone notch / status-bar safe area */
+@supports (padding: env(safe-area-inset-top)) {
+    body {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
+}
+
+/* Sticky mobile navbar so it doesn't scroll away on long pages */
+@media (max-width: 767.98px) {
+    .navbar.d-md-none {
+        position: sticky;
+        top: 0;
+        z-index: 1030;
+    }
+}
+
+@media (max-width: 767.98px) {
+    /* Page title shrinks on mobile so it stops eating vertical space */
+    .main-content h1.h2 { font-size: 1.25rem !important; }
+    .main-content h1     { font-size: 1.4rem !important; }
+    main h2, main h3     { font-size: 1.1rem; }
+
+    /* Main content padding tighter on phones */
+    .main-content, main.col-md-9 {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+
+    /* Cards: less padding so more fits on a phone screen */
+    .card { margin-bottom: 0.75rem; }
+    .card-body { padding: 0.85rem 0.85rem; }
+    .card-header { padding: 0.6rem 0.85rem; font-size: 0.9rem; }
+
+    /* Header rows that hold (title + buttons) — let them wrap on narrow */
+    .card-header.d-flex,
+    .card-header .d-flex {
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+
+    /* Tables: smaller font, snug padding, horizontal scroll preserved */
+    .table th, .table td {
+        padding: 0.45rem 0.4rem !important;
+        font-size: 0.78rem !important;
+        white-space: nowrap;
+    }
+    /* Sticky thead on scroll within .table-responsive */
+    .table-responsive thead th {
+        position: sticky; top: 0; background: var(--light-table-header-bg, #f8fafc);
+        z-index: 2;
+    }
+
+    /* Touch targets ≥44px (Apple HIG / Material guideline) */
+    .btn, .form-control, .form-select {
+        min-height: 40px;
+    }
+    .btn-sm { min-height: 36px; }
+    .btn-lg { min-height: 48px; }
+
+    /* Form fields full-width on phones */
+    .form-control, .form-select { width: 100%; }
+    .form-check { padding-left: 1.75rem; }
+    .form-check-input { width: 1.2rem; height: 1.2rem; margin-left: -1.75rem; }
+
+    /* Badges shrink slightly so pill stacks don't overflow */
+    .badge { font-size: 0.7rem; padding: 0.3em 0.55em; }
+
+    /* Alerts tighter */
+    .alert { padding: 0.6rem 0.85rem; font-size: 0.85rem; }
+    .alert .alert-link { text-decoration: underline; }
+
+    /* Modal full-width on phone */
+    .modal-dialog { margin: 0.5rem; }
+
+    /* Dropdown menus get touch-friendly items */
+    .dropdown-item { padding: 0.6rem 1rem; min-height: 40px; }
+
+    /* Summary-cards (NAV, P/L tiles) compact */
+    .summary-card .card-body { padding: 0.6rem; }
+    .summary-card .fs-4 { font-size: 1.05rem !important; }
+    .summary-card .fs-5 { font-size: 0.95rem !important; }
+
+    /* Pick-card collapse body padding */
+    .pick-card .card-body { padding: 0.6rem; }
+
+    /* Picks page: rank-1 ★ + title + sched pill stack vertically on narrow */
+    .model-card-header > div:first-child { min-width: 0; flex: 1 1 100%; }
+    .model-card-header > div:last-child  { flex: 1 1 100%; text-align: left !important; }
+    .model-card-header .small-mute { display: block; margin-top: 0.2rem; }
+
+    /* Make code blocks shrink rather than overflow */
+    code, pre { font-size: 0.8em; word-break: break-word; }
+
+    /* Hide truly noisy desktop-only columns (mark with this class per template) */
+    .d-mobile-hide { display: none !important; }
+}
+
+/* Tablet portrait — smaller tweaks */
+@media (min-width: 576px) and (max-width: 991.98px) {
+    .main-content h1.h2 { font-size: 1.45rem !important; }
+    .card-body { padding: 1rem; }
+    .table th, .table td { font-size: 0.85rem; padding: 0.55rem 0.5rem; }
+}
+
+/* When running as installed PWA (no browser chrome), pull content closer
+   to top since no nav bar takes space */
+@media (display-mode: standalone) {
+    .main-content { padding-top: 0.5rem !important; }
 }
 
