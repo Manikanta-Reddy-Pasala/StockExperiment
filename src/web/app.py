@@ -329,6 +329,12 @@ def create_app():
         """Today's Picks page."""
         return render_template('v2/picks.html')
 
+    @app.route('/picks/<model_key>/signals')
+    @login_required
+    def model_signals(model_key):
+        """Per-model signal history (scheduled emissions only)."""
+        return render_template('v2/model_signals.html', model_key=model_key)
+
     @app.route('/portfolio')
     @login_required
     def portfolio():
