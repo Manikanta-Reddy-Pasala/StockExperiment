@@ -3,7 +3,7 @@
 Data side:
   register_data_jobs(schedule) — daily N500 OHLCV + monthly universe refresh.
 Trading side:
-  register_trading_jobs(schedule) — daily live_signal + LIVE_TRADING-gated execute.
+  register_trading_jobs(schedule) — daily live_signal + Fyers execute (always live).
 """
 from __future__ import annotations
 
@@ -54,10 +54,7 @@ def emit_signal():
 
 
 def execute_orders():
-    """LIVE_TRADING-gated: place Fyers orders from today's signal file."""
-    if os.environ.get("LIVE_TRADING", "false").lower() != "true":
-        log.info(f"{MODEL_NAME} execute: LIVE_TRADING != 'true', skipping.")
-        return
+    """Place Fyers orders from today's signal file."""
     today = datetime.now().strftime("%Y-%m-%d")
     signals_file = SIGNALS_DIR / f"{today}_midcap_narrow.json"
     if not signals_file.exists():
@@ -103,10 +100,10 @@ def register_data_jobs(schedule):
 
 
 def register_trading_jobs(schedule):
-    """Daily signal + LIVE_TRADING-gated execute (event-driven, daily check)."""
+    """Daily signal + Fyers execute (event-driven, daily check)."""
     # Signal scan — runs daily after market open to detect breakouts + exits
     schedule.every().day.at("09:25").do(emit_signal)
-    # Execute orders — LIVE_TRADING gated
+    # Execute orders
     schedule.every().day.at("09:32").do(execute_orders)
     # Also check exit conditions at market close (catches end-of-day SMA breaks)
     schedule.every().day.at("15:25").do(emit_signal)

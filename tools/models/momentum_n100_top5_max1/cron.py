@@ -61,10 +61,7 @@ def emit_signal(force: bool = False):
 
 
 def execute_orders():
-    """Place Fyers orders from today's signal file. Gated by LIVE_TRADING=true."""
-    if os.environ.get("LIVE_TRADING", "false").lower() != "true":
-        log.info("Model 3 execute: LIVE_TRADING != 'true', skipping.")
-        return
+    """Place Fyers orders from today's signal file."""
     today = datetime.now().strftime("%Y-%m-%d")
     signals_file = Path(f"/app/logs/momrot/signals/{today}_momrot_n100.json")
     if not signals_file.exists():
@@ -141,10 +138,7 @@ def emit_mid_month_signal():
 
 def execute_mid_month_orders():
     """Execute mid-month signal file (separate from monthly to avoid
-    double-execution race). Gated by LIVE_TRADING."""
-    if os.environ.get("LIVE_TRADING", "false").lower() != "true":
-        log.info("Model 3 mid-month execute: LIVE_TRADING != 'true', skipping.")
-        return
+    double-execution race)."""
     today = datetime.now().strftime("%Y-%m-%d")
     signals_file = Path(f"/app/logs/momrot/signals/{today}_momrot_n100_midmonth.json")
     if not signals_file.exists():
@@ -181,7 +175,7 @@ def execute_mid_month_orders():
 def register_trading_jobs(schedule):
     """Signal + execute. Called by technical_scheduler."""
     schedule.every().day.at("09:25").do(emit_signal)        # rebalance-gated
-    schedule.every().day.at("09:30").do(execute_orders)     # LIVE_TRADING gated
+    schedule.every().day.at("09:30").do(execute_orders)
     # Mid-month rank check (day-15 weekday). live_signal self-skips on
     # non-day-15 so safe to fire daily. 5pp lead threshold.
     schedule.every().day.at("09:27").do(emit_mid_month_signal)

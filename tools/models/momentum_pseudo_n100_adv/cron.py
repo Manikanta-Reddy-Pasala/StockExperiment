@@ -66,10 +66,7 @@ def emit_signal(force: bool = False):
 
 
 def execute_orders():
-    """Place Fyers orders from today's signal file. LIVE_TRADING-gated."""
-    if os.environ.get("LIVE_TRADING", "false").lower() != "true":
-        log.info(f"{MODEL_NAME} execute: LIVE_TRADING != 'true', skipping.")
-        return
+    """Place Fyers orders from today's signal file."""
     today = datetime.now().strftime("%Y-%m-%d")
     signals_file = SIGNALS_DIR / f"{today}_pseudo_n100.json"
     if not signals_file.exists():
