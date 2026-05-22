@@ -101,9 +101,39 @@ def round_strike(p: float, step: int) -> int:
     return int(round(p / step) * step)
 
 
+def slip_for_distance(dist_pct: float, base_slip: float) -> float:
+    """Distance-aware slippage multiplier.
+
+    Real options markets: liquidity drops sharply as you move OTM.
+    Near-ATM strikes have tight 0.5-1% spreads; deep wings can be 10-20%.
+    A constant `slip` parameter understates real-world execution cost on
+    the wings — and Iron Condors live and die by wing-fill quality.
+
+    Tiered multipliers vs `base_slip` (typically 1%):
+      - <2% OTM (ATM): 1x   (still tight)
+      - 2-3% OTM:      2x
+      - 3-4% OTM:      4x
+      - 4-6% OTM:      8x
+      - >6% OTM:      15x   (deep wings: ₹1-5 premium, ₹2-3 spreads)
+    """
+    d = abs(dist_pct)
+    if d < 2.0:
+        mult = 1.0
+    elif d < 3.0:
+        mult = 2.0
+    elif d < 4.0:
+        mult = 4.0
+    elif d < 6.0:
+        mult = 8.0
+    else:
+        mult = 15.0
+    return base_slip * mult
+
+
 def run_ic(underlying: str, start: str, end: str,
            otm_pct: float, wing_width: int, stop_mult: float,
-           slip: float, capital: float, lots: int) -> pd.DataFrame:
+           slip: float, capital: float, lots: int,
+           realistic_slip: bool = False) -> pd.DataFrame:
     spot = load_spot(underlying, start, end)
     spot["dow"] = pd.to_datetime(spot["date"]).dt.dayofweek
     cands = spot[spot["dow"] == 0]  # Mondays
@@ -145,11 +175,21 @@ def run_ic(underlying: str, start: str, end: str,
                 continue
             entry_day = fut.iloc[0]["date"]
 
+        # Per-leg slippage: shorts sit at otm_pct from spot, wings sit
+        # at (otm_pct + wing_width/spot*100) — wings are deeper OTM and
+        # face larger real-world spreads. When realistic_slip is off, all
+        # 4 legs share the flat `slip` (legacy behavior).
+        if realistic_slip:
+            wing_pct = (wing_width / spot_close) * 100
+            short_slip = slip_for_distance(otm_pct, slip)
+            wing_slip = slip_for_distance(otm_pct + wing_pct, slip)
+        else:
+            short_slip = wing_slip = slip
         try:
-            ce_e = float(ce_b[ce_b["date"] == entry_day].iloc[0]["close"]) * (1 - slip)
-            pe_e = float(pe_b[pe_b["date"] == entry_day].iloc[0]["close"]) * (1 - slip)
-            wce_e = float(wce_b[wce_b["date"] == entry_day].iloc[0]["close"]) * (1 + slip)
-            wpe_e = float(wpe_b[wpe_b["date"] == entry_day].iloc[0]["close"]) * (1 + slip)
+            ce_e = float(ce_b[ce_b["date"] == entry_day].iloc[0]["close"]) * (1 - short_slip)
+            pe_e = float(pe_b[pe_b["date"] == entry_day].iloc[0]["close"]) * (1 - short_slip)
+            wce_e = float(wce_b[wce_b["date"] == entry_day].iloc[0]["close"]) * (1 + wing_slip)
+            wpe_e = float(wpe_b[wpe_b["date"] == entry_day].iloc[0]["close"]) * (1 + wing_slip)
         except (IndexError, KeyError):
             continue
         if min(ce_e, pe_e) <= 0.5:
@@ -172,9 +212,12 @@ def run_ic(underlying: str, start: str, end: str,
 
         exit_d = exit_debit = exit_reason = None
         ce_x = pe_x = wce_x = wpe_x = None
+        # Net exit cost: BUY back shorts (pay short_slip), SELL wings
+        # (cross wing_slip the other way). Blended exit slip ≈ average.
+        exit_slip = (short_slip + wing_slip) / 2 if realistic_slip else slip
         for pr in pair.itertuples():
             if pr.pv >= net_credit * stop_mult:
-                exit_debit = pr.pv * (1 + slip)
+                exit_debit = pr.pv * (1 + exit_slip)
                 exit_d = pr.date
                 exit_reason = "SL"
                 ce_x = float(pr.ce_close)
@@ -187,7 +230,7 @@ def run_ic(underlying: str, start: str, end: str,
             exp_spot = float(spot_lookup.get(exp, spot_close))
             ic_ce = max(0.0, exp_spot - ce_k); ic_pe = max(0.0, pe_k - exp_spot)
             wc = max(0.0, exp_spot - wce_k); wp = max(0.0, wpe_k - exp_spot)
-            exit_debit = max(0.0, (ic_ce + ic_pe) - (wc + wp)) * (1 + slip)
+            exit_debit = max(0.0, (ic_ce + ic_pe) - (wc + wp)) * (1 + exit_slip)
             exit_d = exp
             exit_reason = "EXPIRY"
             # At expiry, options settle at intrinsic value (per-leg)
@@ -287,6 +330,23 @@ VARIANTS = [
     {"name": "NF_IC_OTM3_w500_lots5",  "u": "NIFTY", "otm": 3.0, "ww": 500, "stop": 3.0, "lots": 5},
     {"name": "NF_IC_OTM2_w300_lots5",  "u": "NIFTY", "otm": 2.0, "ww": 300, "stop": 3.0, "lots": 5},
     {"name": "NF_IC_OTM2_w500_lots5",  "u": "NIFTY", "otm": 2.0, "ww": 500, "stop": 3.0, "lots": 5},
+    # === TIGHT GEOMETRY (May 2026) — liquid strikes, real-world slip ===
+    # FinNifty — closer-to-ATM shorts + narrow wings stay inside liquid band.
+    {"name": "FN_IC_OTM1_5_w150_lots5", "u": "FINNIFTY", "otm": 1.5, "ww": 150, "stop": 3.0, "lots": 5},
+    {"name": "FN_IC_OTM1_5_w200_lots5", "u": "FINNIFTY", "otm": 1.5, "ww": 200, "stop": 3.0, "lots": 5},
+    {"name": "FN_IC_OTM2_w150_lots5",   "u": "FINNIFTY", "otm": 2.0, "ww": 150, "stop": 3.0, "lots": 5},
+    {"name": "FN_IC_OTM2_w200_lots5",   "u": "FINNIFTY", "otm": 2.0, "ww": 200, "stop": 3.0, "lots": 5},
+    {"name": "FN_IC_OTM2_5_w200_lots5", "u": "FINNIFTY", "otm": 2.5, "ww": 200, "stop": 3.0, "lots": 5},
+    {"name": "FN_IC_OTM2_5_w300_lots5", "u": "FINNIFTY", "otm": 2.5, "ww": 300, "stop": 3.0, "lots": 5},
+    # NIFTY tight variants — lots auto-sized so max-loss ~75% of ₹2L cap
+    # max_loss = wing*75*lots; cap=200K; target<=150K
+    {"name": "NF_IC_OTM1_5_w150_lots13", "u": "NIFTY", "otm": 1.5, "ww": 150, "stop": 3.0, "lots": 13},
+    {"name": "NF_IC_OTM1_5_w200_lots10", "u": "NIFTY", "otm": 1.5, "ww": 200, "stop": 3.0, "lots": 10},
+    {"name": "NF_IC_OTM2_w200_lots10",   "u": "NIFTY", "otm": 2.0, "ww": 200, "stop": 3.0, "lots": 10},
+    {"name": "NF_IC_OTM2_w300_lots6",    "u": "NIFTY", "otm": 2.0, "ww": 300, "stop": 3.0, "lots": 6},
+    {"name": "NF_IC_OTM2_5_w300_lots6",  "u": "NIFTY", "otm": 2.5, "ww": 300, "stop": 3.0, "lots": 6},
+    {"name": "NF_IC_OTM3_w300_lots6",    "u": "NIFTY", "otm": 3.0, "ww": 300, "stop": 3.0, "lots": 6},
+    {"name": "NF_IC_OTM3_w500_lots4",    "u": "NIFTY", "otm": 3.0, "ww": 500, "stop": 3.0, "lots": 4},
 ]
 
 
@@ -295,16 +355,25 @@ def main():
     ap.add_argument("--from", dest="frm", default="2023-05-15")
     ap.add_argument("--to", dest="to", default="2026-05-15")
     ap.add_argument("--capital", type=float, default=200_000)
-    ap.add_argument("--slip", type=float, default=0.01)
+    ap.add_argument("--slip", type=float, default=0.01,
+                    help="Base slippage. With --realistic-slip, this gets "
+                         "multiplied 1x-15x by per-strike distance.")
+    ap.add_argument("--realistic-slip", action="store_true",
+                    help="Tiered per-leg slippage (deeper OTM = more slip). "
+                         "Closer to real F&O execution.")
+    ap.add_argument("--filter", default="",
+                    help="Substring filter on variant name (e.g. 'OTM2' or 'NF_').")
     ap.add_argument("--out", default="/app/logs/iron_condor_sweep.md")
     args = ap.parse_args()
 
     rows = []
-    for v in VARIANTS:
+    variants = [v for v in VARIANTS if not args.filter or args.filter in v["name"]]
+    for v in variants:
         print(f">>> {v['name']}", flush=True)
         try:
             df = run_ic(v["u"], args.frm, args.to, v["otm"], v["ww"],
-                        v["stop"], args.slip, args.capital, v["lots"])
+                        v["stop"], args.slip, args.capital, v["lots"],
+                        realistic_slip=args.realistic_slip)
             s = summarize(df, args.capital, v["name"])
             if s:
                 rows.append(s)

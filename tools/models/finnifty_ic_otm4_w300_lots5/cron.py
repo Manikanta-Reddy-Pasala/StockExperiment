@@ -1,4 +1,8 @@
-"""Cron registration for finnifty_ic_otm4_w300_lots5 — monthly Iron Condor."""
+"""Cron registration for finnifty_ic_otm2_w150_lots5 — monthly Iron Condor.
+
+Promoted 2026-05-22 to safe-tight params (OTM 2% / wing 150 / 5 lots).
+Folder name kept stable for cron stability; runtime identifier below.
+"""
 from __future__ import annotations
 
 import logging
@@ -16,7 +20,9 @@ from tools.models.finnifty_ic_otm4_w300_lots5.data_pull import (  # noqa: E402
 
 log = logging.getLogger(__name__)
 
-MODEL_NAME = "finnifty_ic_otm4_w300_lots5"
+MODEL_NAME = "finnifty_ic_otm2_w150_lots5"
+# Folder kept as legacy name for cron-path stability; runtime model id above.
+MODEL_FOLDER = Path(__file__).parent.name
 SIGNALS_DIR = Path(f"/app/logs/{MODEL_NAME}/signals")
 
 
@@ -35,7 +41,7 @@ def emit_signal():
     signals_out = SIGNALS_DIR / f"{today}.json"
     cmd = [
         "python3",
-        f"tools/models/{MODEL_NAME}/live_signal.py",
+        f"tools/models/{MODEL_FOLDER}/live_signal.py",
         "--signals-out", str(signals_out),
     ]
     try:

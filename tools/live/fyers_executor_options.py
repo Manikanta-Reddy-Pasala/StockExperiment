@@ -29,15 +29,21 @@ logging.basicConfig(level=logging.INFO,
 log = logging.getLogger(__name__)
 
 
-def _place_leg(svc, user_id: int, sig: Dict, product: str, dry: bool) -> Dict:
+def _place_leg(svc, user_id: int, sig: Dict, product: str, dry: bool,
+               use_limit_walk: bool = False) -> Dict:
     symbol = sig["symbol"]
     side = sig["side"].upper()
     qty = int(sig["qty"])
     tag = f"{sig.get('model', 'options')}:{sig.get('leg', '')}"[:20]
     if dry:
-        log.info(f"DRY-RUN {side} {symbol} qty={qty} product={product} tag={tag}")
+        ptype = "LIMIT-WALK" if use_limit_walk else "MARKET"
+        log.info(f"DRY-RUN {side} {symbol} qty={qty} product={product} "
+                 f"pricetype={ptype} tag={tag}")
         return {"status": "dry-run", "order_id": "DRY",
                 "symbol": symbol, "side": side, "qty": qty}
+    if use_limit_walk:
+        from tools.live.option_depth_check import limit_walk
+        return limit_walk(svc, user_id, symbol, side, qty, product, tag)
     try:
         res = svc.placeorder(
             user_id=user_id, symbol=symbol, quantity=str(qty),
@@ -55,7 +61,8 @@ def _place_leg(svc, user_id: int, sig: Dict, product: str, dry: bool) -> Dict:
         if str(res.get("s", "")).lower() not in ("ok", "success"):
             status = str(res.get("message", res.get("s", "unknown")))
     return {"status": status, "order_id": order_id, "raw": res,
-            "symbol": symbol, "side": side, "qty": qty}
+            "symbol": symbol, "side": side, "qty": qty,
+            "pricetype": "MARKET"}
 
 
 def _audit_leg(model_name: str, fill: Dict, price: float, product: str,
@@ -76,7 +83,7 @@ def _audit_leg(model_name: str, fill: Dict, price: float, product: str,
             fill_qty=fill["qty"] if not dry else None,
             fyers_order_id=fill.get("order_id", ""),
             product=product,
-            pricetype="MARKET",
+            pricetype=fill.get("pricetype", "MARKET"),
             status="dry-run" if dry else fill.get("status", "unknown"),
             raw_response=fill.get("raw") if isinstance(fill.get("raw"), dict) else None,
         )
@@ -96,6 +103,18 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true",
                     help="Print orders, don't place. Forced on if "
                          "LIVE_TRADING env != 'true'.")
+    ap.add_argument("--no-depth-gate", action="store_true",
+                    help="Skip L1 depth check before placing.")
+    ap.add_argument("--max-spread-pct", type=float, default=0.15,
+                    help="Reject basket if any leg spread > this fraction "
+                         "of mid-price (default 0.15 = 15%%).")
+    ap.add_argument("--min-volume", type=int, default=500,
+                    help="Min day volume per leg (default 500).")
+    ap.add_argument("--min-oi", type=int, default=5000,
+                    help="Min OI per leg (default 5000).")
+    ap.add_argument("--no-limit-walk", action="store_true",
+                    help="Use MARKET for all legs. Default: shorts MARKET, "
+                         "longs LIMIT-walk (better slippage on thin wings).")
     args = ap.parse_args()
 
     live = os.environ.get("LIVE_TRADING", "false").lower() == "true"
@@ -128,10 +147,44 @@ def main() -> int:
     log.info(f"Executing {len(signals_sorted)} legs for {args.model_name} "
              f"(product={args.product}, live={live}, dry_run={args.dry_run})")
 
+    # Pre-trade liquidity gate (only when we have a live svc — otherwise
+    # nothing to query). Abort the basket if any leg fails — partial fills
+    # in defined-risk strategies leave open undefined risk.
+    if svc is not None and not args.no_depth_gate:
+        from tools.live.option_depth_check import gate_basket
+        ok, report = gate_basket(
+            svc, args.user_id, signals_sorted,
+            max_spread_pct=args.max_spread_pct,
+            min_volume=args.min_volume,
+            min_oi=args.min_oi,
+        )
+        for r in report:
+            log.info(f"  depth {r['symbol']:30} side={r.get('side','?'):4} "
+                     f"bid={r.get('bid',0)} ask={r.get('ask',0)} "
+                     f"spread={r.get('spread_pct',0)}% vol={r.get('volume',0)} "
+                     f"oi={r.get('oi',0)} -> {r['reason']}")
+        if not ok:
+            log.error("DEPTH GATE FAILED — aborting basket")
+            try:
+                from src.services.audit_service import write_rebalance_decision
+                write_rebalance_decision(
+                    model_name=args.model_name, trigger="CRON",
+                    decision="OPTIONS_SKIP_THIN",
+                    reason="; ".join(f"{r['symbol']}:{r['reason']}"
+                                     for r in report if not r["ok"])[:500],
+                )
+            except Exception:
+                pass
+            return 3
+
     placed = 0
     errors = 0
     for sig in signals_sorted:
-        fill = _place_leg(svc, args.user_id, sig, args.product, args.dry_run)
+        # SELL legs (shorts) — liquid strikes near ATM, MARKET is fine.
+        # BUY legs (long wings) — thin strikes, use LIMIT-walk to control slip.
+        use_walk = (not args.no_limit_walk) and sig["side"].upper() == "BUY"
+        fill = _place_leg(svc, args.user_id, sig, args.product, args.dry_run,
+                          use_limit_walk=use_walk)
         _audit_leg(args.model_name, fill, float(sig.get("price", 0) or 0),
                    args.product, args.dry_run)
         if fill["status"] in ("ok", "success", "dry-run"):
