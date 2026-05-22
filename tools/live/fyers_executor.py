@@ -344,6 +344,21 @@ def _modify_order_limit(svc, user_id: int, order_id: str, new_price: float) -> b
         return False
 
 
+def _fetch_live_ltp(svc, user_id: int, symbol: str) -> Optional[float]:
+    """Pull current LTP from Fyers. Returns None on failure so caller falls
+    back to the stale signal-file price."""
+    try:
+        res = svc.quotes(user_id=user_id, symbol=symbol)
+        data = res.get("data") if isinstance(res, dict) else None
+        if not data:
+            return None
+        ltp = float(data.get("ltp") or 0)
+        return ltp if ltp > 0 else None
+    except Exception as e:
+        log.warning(f"live LTP fetch {symbol} failed: {e}")
+        return None
+
+
 # --------- LIMIT-with-tolerance + MARKET-fallback ---------
 
 def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
@@ -655,7 +670,11 @@ def main() -> int:
     for sig in exit_signals:
         sig_type = sig.get("signal")
         sym = sig["symbol"]
-        price = float(sig.get("price") or 0)
+        signal_price = float(sig.get("price") or 0)
+        live_px = None if args.dry_run else _fetch_live_ltp(svc, args.user_id, sym)
+        price = live_px if live_px else signal_price
+        if live_px:
+            log.info(f"  live LTP {sym}={live_px} (signal={signal_price})")
         held = next((p for p in open_positions if p.symbol == sym), None)
         if held is None:
             log.info(f"SKIP exit {sym}: not held")
@@ -726,7 +745,12 @@ def main() -> int:
     # ---- PASS 2: ENTRIES with refreshed sizing ----
     for sig in entry_signals:
         sym = sig["symbol"]
-        price = float(sig.get("price") or 0)
+        signal_price = float(sig.get("price") or 0)
+        live_px = None if args.dry_run else _fetch_live_ltp(svc, args.user_id, sym)
+        price = live_px if live_px else signal_price
+        if live_px:
+            log.info(f"  live LTP {sym}={live_px} (signal={signal_price}, "
+                     f"delta={((live_px/signal_price-1)*100 if signal_price else 0):+.2f}%)")
         side = sig["side"]
 
         # Pre-trade Fyers position check (BUY only). Guards against ledger ↔
