@@ -14,6 +14,45 @@
   .small-mute { font-size: 0.78rem; color: #8b95a5; }
 </style>
 
+<!-- Signal History — global across all 4 equity models, last 30 days -->
+<div class="card mb-3">
+  <div class="card-header model-card-header d-flex justify-content-between align-items-center"
+       data-bs-toggle="collapse" data-bs-target="#sig_history_body" aria-expanded="false">
+    <div>
+      <strong><i class="bi bi-clock-history me-1"></i>Signal History (30d)</strong>
+      <span class="badge bg-secondary ms-2" id="sig_history_count">…</span>
+      <i class="bi bi-chevron-down ms-1 small-mute"></i>
+      <div class="small-mute mt-1">All emitted ENTRY/EXIT signals across models. Source: <code>audit_model_signals</code>.</div>
+    </div>
+    <div class="text-end">
+      <select id="sig_history_filter" class="form-select form-select-sm d-inline-block w-auto"
+              onclick="event.stopPropagation()" onchange="loadSignalHistory()">
+        <option value="">All models</option>
+        <option value="momentum_n100_top5_max1">momentum_n100_top5_max1</option>
+        <option value="momentum_pseudo_n100_adv">momentum_pseudo_n100_adv</option>
+        <option value="midcap_narrow_60d_breakout">midcap_narrow_60d_breakout</option>
+        <option value="n20_daily_large_only">n20_daily_large_only</option>
+        <option value="finnifty_ic_otm4_w300_lots5">finnifty_ic_otm4_w300_lots5</option>
+      </select>
+    </div>
+  </div>
+  <div id="sig_history_body" class="collapse">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle mb-0">
+        <thead>
+          <tr>
+            <th>When (IST)</th><th>Model</th><th>Type</th><th>Symbol</th>
+            <th>Side</th><th class="text-end">Price</th><th>Reason</th>
+          </tr>
+        </thead>
+        <tbody id="sig_history_tbody">
+          <tr><td colspan="7" class="text-center text-muted py-3">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <div id="picks_container">
   <div class="text-muted py-3 text-center">Loading…</div>
 </div>
@@ -260,8 +299,58 @@ function renderCard(m, idx, ranking, status) {
   `;
 }
 
+async function loadSignalHistory() {
+  const filter = document.getElementById('sig_history_filter');
+  const tbody = document.getElementById('sig_history_tbody');
+  const count = document.getElementById('sig_history_count');
+  const model = filter ? filter.value : '';
+  tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Loading…</td></tr>';
+  count.textContent = '…';
+  const url = '/admin/audit/signals?days=30' + (model ? '&model=' + encodeURIComponent(model) : '');
+  try {
+    const r = await fetch(url, {cache: 'no-store'});
+    const d = await r.json();
+    if (!d.success) {
+      tbody.innerHTML = '<tr><td colspan="7" class="text-danger small">Failed: ' + (d.error || 'unknown') + '</td></tr>';
+      count.textContent = 'err';
+      return;
+    }
+    const sigs = d.signals || [];
+    count.textContent = sigs.length;
+    if (sigs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No signals in last 30d</td></tr>';
+      return;
+    }
+    const tsFmt = window.fmtIST || (s => s);
+    tbody.innerHTML = sigs.map(s => {
+      const sideCls = s.side === 'BUY' ? 'pos' : (s.side === 'SELL' ? 'neg' : 'neutral');
+      const typeBadge = s.signal_type === 'HOLD'
+        ? '<span class="badge bg-secondary">HOLD</span>'
+        : s.signal_type && s.signal_type.startsWith('ENTRY')
+          ? '<span class="badge bg-primary">' + s.signal_type + '</span>'
+          : s.signal_type && (s.signal_type.includes('STOP') || s.signal_type.includes('TARGET') || s.signal_type.includes('EXIT'))
+            ? '<span class="badge bg-warning text-dark">' + s.signal_type + '</span>'
+            : '<span class="badge bg-light text-dark">' + (s.signal_type || '—') + '</span>';
+      const px = s.price ? '₹' + Number(s.price).toLocaleString('en-IN', {maximumFractionDigits: 2}) : '—';
+      return '<tr>' +
+        '<td class="small">' + tsFmt(s.emitted_at) + '</td>' +
+        '<td class="small"><code>' + s.model_name + '</code></td>' +
+        '<td>' + typeBadge + '</td>' +
+        '<td>' + (s.symbol || '—') + '</td>' +
+        '<td class="' + sideCls + '">' + (s.side || '—') + '</td>' +
+        '<td class="text-end">' + px + '</td>' +
+        '<td class="small text-muted">' + (s.reason || '—') + '</td>' +
+        '</tr>';
+    }).join('');
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-danger small">' + String(e) + '</td></tr>';
+    count.textContent = 'err';
+  }
+}
+
 async function load() {
   const container = document.getElementById('picks_container');
+  loadSignalHistory();
 
   // Use portfolio.enabled as authoritative source for which models render.
   // triggers/status remains useful for ranking page context (NAV, P&L, pos).
