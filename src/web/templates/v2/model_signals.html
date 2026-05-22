@@ -27,6 +27,10 @@
       <option value="90">Last 90 days</option>
       <option value="365">Last 365 days</option>
     </select>
+    <div class="form-check form-check-inline ms-2">
+      <input class="form-check-input" type="checkbox" id="show_holds" onchange="loadSignals()">
+      <label class="form-check-label small" for="show_holds">Show HOLD (noise)</label>
+    </div>
     <span class="badge bg-secondary ms-2" id="sig_count">…</span>
   </div>
 </div>
@@ -34,6 +38,7 @@
 <div class="alert alert-info py-2 small mb-2">
   <i class="bi bi-info-circle me-1"></i>
   Scheduled cron emissions only. Manual <em>Re-calculate</em> previews are NOT stored.
+  Default view = actionable signals only (ENTRY / EXIT / STOP / TARGET). HOLD rows hidden.
 </div>
 
 <div class="card">
@@ -63,6 +68,7 @@ const MODEL_KEY = {{ model_key|tojson }};
 
 async function loadSignals() {
   const days = document.getElementById('days').value;
+  const showHolds = document.getElementById('show_holds').checked;
   const tbody = document.getElementById('signals_tbody');
   const count = document.getElementById('sig_count');
   tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Loading…</td></tr>';
@@ -78,10 +84,14 @@ async function loadSignals() {
       count.textContent = 'err';
       return;
     }
-    const sigs = d.signals || [];
-    count.textContent = sigs.length;
+    let sigs = d.signals || [];
+    const totalRaw = sigs.length;
+    if (!showHolds) {
+      sigs = sigs.filter(s => s.signal_type && s.signal_type !== 'HOLD');
+    }
+    count.textContent = showHolds ? sigs.length : (sigs.length + ' / ' + totalRaw);
     if (sigs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No scheduled signals in last ' + days + ' days.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No actionable signals in last ' + days + ' days' + (showHolds ? '.' : ' (HOLDs hidden).') + '</td></tr>';
       return;
     }
     const tsFmt = window.fmtIST || (s => s);
