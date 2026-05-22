@@ -380,6 +380,34 @@ def run_scheduler():
     register_n20_daily_jobs(schedule)
     register_fn_ic_otm4_jobs(schedule)
 
+    # Position reconciler — mirrors Fyers truth into model_ledger every 5 min
+    # during market hours (09:30–15:30 IST). Catches drift when record_buy /
+    # record_sell silently miss (status-mapping bugs, executor crashes,
+    # external trades). Auto-fixes safe drift, alerts on unsafe.
+    def _reconcile_market_hours():
+        from datetime import datetime as _dt
+        now = _dt.now()
+        # Weekday + 09:30-15:30 IST window (container TZ assumed IST/UTC+5:30)
+        if now.weekday() >= 5:
+            return
+        hm = now.hour * 60 + now.minute
+        if hm < (9 * 60 + 30) or hm > (15 * 60 + 30):
+            return
+        try:
+            import subprocess
+            r = subprocess.run(
+                ["python3", "tools/live/position_reconciler.py", "--tg-on-fix"],
+                capture_output=True, text=True, timeout=60,
+            )
+            if r.returncode != 0:
+                logger.error(f"reconciler exit={r.returncode}: {r.stderr[-400:]}")
+            elif r.stdout:
+                logger.info(r.stdout[-400:])
+        except Exception as e:
+            logger.error(f"reconciler call failed: {e}")
+
+    schedule.every(5).minutes.do(_reconcile_market_hours)
+
     # Schedule weekly cleanup on Sunday at 3:00 AM
     schedule.every().sunday.at("03:00").do(cleanup_old_snapshots)
 
