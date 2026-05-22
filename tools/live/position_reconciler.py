@@ -46,28 +46,53 @@ def _normalize(sym: str) -> str:
     return s
 
 
+def _merge_pos(out: Dict[str, Dict], rows, source: str) -> None:
+    """Merge Fyers position/holding rows into {symbol: {qty, avg_price,
+    last_price, source}}. Same symbol in both: sum qty + weighted-avg price."""
+    for p in rows or []:
+        sym = _normalize(p.get("symbol") or "")
+        if not sym:
+            continue
+        qty = int(float(p.get("quantity") or 0))
+        if qty == 0:
+            continue
+        px = float(p.get("average_price") or 0)
+        lp = float(p.get("last_price") or 0)
+        if sym in out:
+            prev_qty = out[sym]["qty"]
+            prev_px = out[sym]["avg_price"]
+            total_qty = prev_qty + qty
+            new_px = ((prev_qty * prev_px) + (qty * px)) / total_qty if total_qty else 0
+            out[sym]["qty"] = total_qty
+            out[sym]["avg_price"] = new_px
+            out[sym]["source"] = f"{out[sym]['source']}+{source}"
+            if lp and not out[sym]["last_price"]:
+                out[sym]["last_price"] = lp
+        else:
+            out[sym] = {"qty": qty, "avg_price": px, "last_price": lp,
+                        "source": source}
+
+
 def _fyers_positions_by_symbol(svc, user_id: int = 1) -> Dict[str, Dict]:
-    try:
-        res = svc.positions(user_id=user_id)
-        if not isinstance(res, dict) or res.get("status") != "success":
-            return {}
-        out: Dict[str, Dict] = {}
-        for p in res.get("data", []) or []:
-            sym = _normalize(p.get("symbol") or "")
-            if not sym:
+    """Union of intraday positions + settled holdings. Both are real exposure
+    and the model_ledger should match the sum.
+
+    Background: CNC orders show in positions() on the day of purchase, then
+    move to holdings() after T+1 settlement. Reconciler must check both or
+    it will think the position vanished (false LEDGER_AHEAD alert).
+    """
+    out: Dict[str, Dict] = {}
+    for fn_name, source in [("positions", "pos"), ("holdings", "hold")]:
+        try:
+            fn = getattr(svc, fn_name)
+            res = fn(user_id=user_id)
+            if not isinstance(res, dict) or res.get("status") != "success":
+                log.warning(f"{fn_name}() returned non-success: {res}")
                 continue
-            qty = int(float(p.get("quantity") or 0))
-            if qty == 0:
-                continue
-            out[sym] = {
-                "qty": qty,
-                "avg_price": float(p.get("average_price") or 0),
-                "last_price": float(p.get("last_price") or 0),
-            }
-        return out
-    except Exception as e:
-        log.error(f"fyers positions fetch failed: {e}")
-        return {}
+            _merge_pos(out, res.get("data", []), source)
+        except Exception as e:
+            log.error(f"fyers {fn_name} fetch failed: {e}")
+    return out
 
 
 def reconcile_once(user_id: int = 1, dry_run: bool = False) -> List[Dict]:
