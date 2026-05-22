@@ -284,15 +284,17 @@ def main():
         write_rankings("momentum_n100_top5_max1", today.date(),
                        top_payload.get("universe_size") or 0,
                        0, top_payload.get("top_n") or [])
-        if signals:
-            for _sig in signals:
-                write_signal("momentum_n100_top5_max1", today.date(),
-                             _sig.get("signal", ""), _sig.get("symbol", ""),
-                             _sig.get("side", ""), price=_sig.get("price"),
-                             reason=(_sig.get("note") or "")[:120])
-        else:
-            write_signal("momentum_n100_top5_max1", today.date(), "HOLD", "", "NONE",
-                         reason="no signal emitted")
+        # Audit signals ONLY for scheduled (cron) runs, not manual --force.
+        if not args.force:
+            if signals:
+                for _sig in signals:
+                    write_signal("momentum_n100_top5_max1", today.date(),
+                                 _sig.get("signal", ""), _sig.get("symbol", ""),
+                                 _sig.get("side", ""), price=_sig.get("price"),
+                                 reason=(_sig.get("note") or "")[:120])
+            else:
+                write_signal("momentum_n100_top5_max1", today.date(), "HOLD", "", "NONE",
+                             reason="no signal emitted")
     except Exception as _e:
         log.debug(f"audit hook failed: {_e}")
     return 0
