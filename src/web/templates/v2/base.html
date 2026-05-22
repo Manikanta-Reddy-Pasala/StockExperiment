@@ -158,20 +158,20 @@
 
     <!-- Mobile bottom tab bar (visible on small screens only) -->
     <nav class="mobile-bottom-nav d-md-none" id="mobile-bottom-nav" aria-label="Primary">
-        <a href="/dashboard" data-route="/dashboard" class="bn-item">
-            <i class="bi bi-speedometer2"></i><span>Dash</span>
+        <a href="/dashboard" data-route="/dashboard" class="bn-item" aria-label="Dashboard">
+            <i class="bi bi-grid-fill"></i>
         </a>
-        <a href="/picks" data-route="/picks" class="bn-item">
-            <i class="bi bi-lightbulb"></i><span>Picks</span>
+        <a href="/picks" data-route="/picks" class="bn-item" aria-label="Picks">
+            <i class="bi bi-graph-up-arrow"></i>
         </a>
-        <a href="/portfolio" data-route="/portfolio" class="bn-item">
-            <i class="bi bi-journal-text"></i><span>Folio</span>
+        <a href="/portfolio" data-route="/portfolio" class="bn-item" aria-label="Portfolio">
+            <i class="bi bi-briefcase-fill"></i>
         </a>
-        <a href="/history" data-route="/history" class="bn-item">
-            <i class="bi bi-clock-history"></i><span>Hist</span>
+        <a href="/history" data-route="/history" class="bn-item" aria-label="History">
+            <i class="bi bi-clock-history"></i>
         </a>
-        <a href="/settings" data-route="/settings" class="bn-item">
-            <i class="bi bi-gear"></i><span>Set</span>
+        <a href="/settings" data-route="/settings" class="bn-item" aria-label="Settings">
+            <i class="bi bi-gear-fill"></i>
         </a>
     </nav>
     <script>
@@ -194,7 +194,8 @@
         if (!indicator) return;
         const THRESHOLD = 70;  // px to trigger
         const MAX_PULL = 120;
-        let startY = 0, currentY = 0, pulling = false, triggered = false;
+        let startY = 0, pulling = false, triggered = false;
+        let lastPull = 0, rafPending = false;
 
         function reset() {
           indicator.style.transform = 'translateY(-100%)';
@@ -203,6 +204,7 @@
           text.textContent = 'Pull to refresh';
           pulling = false;
           triggered = false;
+          lastPull = 0;
         }
         reset();
 
@@ -214,20 +216,23 @@
 
         document.addEventListener('touchmove', (e) => {
           if (!pulling) return;
-          currentY = e.touches[0].clientY;
-          const delta = currentY - startY;
+          const delta = e.touches[0].clientY - startY;
           if (delta <= 0) return;
-          const pull = Math.min(delta, MAX_PULL);
-          indicator.style.transform = `translateY(${pull - 50}px)`;
-          indicator.style.opacity = String(Math.min(1, pull / THRESHOLD));
-          spinner.style.transform = `rotate(${pull * 3}deg)`;
-          if (pull >= THRESHOLD && !triggered) {
-            triggered = true;
-            text.textContent = 'Release to refresh';
-          } else if (pull < THRESHOLD && triggered) {
-            triggered = false;
-            text.textContent = 'Pull to refresh';
-          }
+          lastPull = Math.min(delta, MAX_PULL);
+          if (rafPending) return;
+          rafPending = true;
+          requestAnimationFrame(() => {
+            rafPending = false;
+            const pull = lastPull;
+            indicator.style.transform = `translateY(${pull - 50}px)`;
+            indicator.style.opacity = String(Math.min(1, pull / THRESHOLD));
+            spinner.style.transform = `rotate(${pull * 3}deg)`;
+            const t = pull >= THRESHOLD;
+            if (t !== triggered) {
+              triggered = t;
+              text.textContent = t ? 'Release to refresh' : 'Pull to refresh';
+            }
+          });
         }, { passive: true });
 
         document.addEventListener('touchend', () => {
@@ -236,7 +241,7 @@
             text.textContent = 'Refreshing…';
             spinner.textContent = '⟳';
             indicator.style.transform = 'translateY(20px)';
-            setTimeout(() => { window.location.reload(); }, 250);
+            window.location.reload();
           } else {
             reset();
           }
