@@ -390,32 +390,69 @@ async function load() {
 
 async function runSignal(modelKey, ev) {
   if (ev) { ev.preventDefault(); ev.stopPropagation(); }
-  const ok = await appModal.confirm('Re-calculate',
+  const ok = await appModal.confirm('Re-calculate (Preview)',
     `Re-run <strong>${modelKey}</strong>'s live_signal now?<br><br>` +
-    'Forces a fresh ranking using latest data. No orders placed. ' +
-    'Picks page refreshes when done (10-60s).',
+    '<strong>Preview only.</strong> Fresh ranking is shown for comparison.<br>' +
+    '<strong>NOT stored</strong> in Signal History. Schedule still drives real orders.<br>' +
+    'Updates page in 10-60s.',
     {okLabel: 'Re-calculate', okClass: 'btn-primary'});
   if (!ok) return;
-  // Show a "running" spinner so user gets feedback.
-  let toastClose;
-  try { toastClose = appModal.alert ? null : null; } catch(_) {}
   try {
-    // ?recalc=1 forces synchronous re-run + returns fresh ranking
+    // ?recalc=1 forces synchronous re-run with --force; live_signal skips
+    // audit write_signal on force, so this call does NOT pollute history.
     const r = await fetch(`/admin/${modelKey}/ranking?top=5&recalc=1`, {cache: 'no-store'});
     const d = await r.json();
     if (d.success) {
+      // Build a "held vs fresh pick" diff before reloading cards.
+      let diffHtml = '';
+      try {
+        const pf = await fetchJSON('/admin/models/portfolio');
+        const m = (pf.models || []).find(x => x.model_name === modelKey);
+        const heldSym = m && m.open_symbol ? m.open_symbol : null;
+        const heldQty = m && m.open_qty ? m.open_qty : 0;
+        const heldPx  = m && m.open_entry_px ? m.open_entry_px : 0;
+        const top = (d.ranking || [])[0];
+        if (top) {
+          const newSym = top.symbol || '—';
+          const newPx  = top.price || 0;
+          const newRet = top.ret_30d_pct;
+          if (heldSym && _normSym(heldSym) === _normSym(newSym)) {
+            diffHtml = '<div class="alert alert-success py-2 small mb-0">' +
+              '<strong>No change.</strong> Held <code>' + heldSym + '</code> still rank-1. ' +
+              'Schedule will NOT rotate at next rebalance.</div>';
+          } else if (heldSym) {
+            diffHtml = '<div class="alert alert-warning py-2 small mb-0">' +
+              '<strong>Diff detected:</strong><br>' +
+              'Held: <code>' + heldSym + '</code> x' + heldQty + ' @ ₹' + Number(heldPx).toFixed(2) + '<br>' +
+              'Fresh rank-1: <code>' + newSym + '</code> @ ₹' + Number(newPx).toFixed(2) +
+              (newRet != null ? ' (' + (newRet>=0?'+':'') + Number(newRet).toFixed(2) + '%)' : '') + '<br>' +
+              '<em>Schedule decides if/when to rotate. This preview is not stored.</em></div>';
+          } else {
+            diffHtml = '<div class="alert alert-info py-2 small mb-0">' +
+              'Currently flat. Fresh rank-1: <code>' + newSym + '</code> @ ₹' + Number(newPx).toFixed(2) +
+              (newRet != null ? ' (' + (newRet>=0?'+':'') + Number(newRet).toFixed(2) + '%)' : '') + '<br>' +
+              '<em>Schedule decides entry. This preview is not stored.</em></div>';
+          }
+        }
+      } catch(_) {}
       await load();
-      await appModal.alert('Done',
-        `Model: <strong>${modelKey}</strong>` +
-        (d.ran_now ? '<br><span class="badge bg-success">Re-calculated</span>' : '<br><span class="badge bg-secondary">Cached</span>') +
-        `<br>Ranking entries: ${(d.ranking||[]).length}`,
-        'success');
+      await appModal.alert('Re-calculated (Preview)',
+        '<div class="mb-2"><strong>Model:</strong> <code>' + modelKey + '</code> ' +
+        (d.ran_now ? '<span class="badge bg-success ms-1">fresh</span>' : '<span class="badge bg-secondary ms-1">cached</span>') +
+        ' <span class="badge bg-light text-dark ms-1">not stored</span></div>' +
+        diffHtml,
+        'info');
     } else {
       await appModal.alert('Failed', 'Error: <strong>' + (d.error || 'unknown') + '</strong>', 'danger');
     }
   } catch (e) {
     await appModal.alert('Network Error', e.message, 'danger');
   }
+}
+
+function _normSym(s) {
+  if (!s) return '';
+  return s.toUpperCase().replace(/^NSE:/, '').replace(/-EQ$/, '');
 }
 
 load();
