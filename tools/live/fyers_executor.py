@@ -328,10 +328,16 @@ def _cancel_order(svc, user_id: int, order_id: str) -> bool:
         return False
 
 
+def _snap_tick(px: float, tick: float = 0.05) -> float:
+    """Snap price to NSE equity tick size (default 0.05)."""
+    return round(round(px / tick) * tick, 2)
+
+
 def _modify_order_limit(svc, user_id: int, order_id: str, new_price: float) -> bool:
     """Try modify; if not supported, caller should cancel+replace."""
     try:
-        res = svc.modifyorder(user_id=user_id, orderid=order_id, price=str(new_price))
+        snapped = _snap_tick(new_price)
+        res = svc.modifyorder(user_id=user_id, orderid=order_id, price=str(snapped))
         return _is_ok(res)
     except Exception as e:
         log.debug(f"modifyorder failed ({e}); caller will cancel+replace")
@@ -359,11 +365,11 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
     second_window_s = max(5, total_s - first_window_s)
 
     if side.upper() == "BUY":
-        first_px = round(last_price * (1.0 + tol), 2)
-        retry_px = round(last_price * (1.0 + retry), 2)
+        first_px = _snap_tick(last_price * (1.0 + tol))
+        retry_px = _snap_tick(last_price * (1.0 + retry))
     else:
-        first_px = round(last_price * (1.0 - tol), 2)
-        retry_px = round(last_price * (1.0 - retry), 2)
+        first_px = _snap_tick(last_price * (1.0 - tol))
+        retry_px = _snap_tick(last_price * (1.0 - retry))
 
     log.info(f"  LIMIT {side} {symbol} qty={qty} px={first_px} "
              f"(last={last_price}, tol={rm_cfg.limit_tol_pct}%)")
