@@ -40,6 +40,11 @@ def emit_signal():
             log.info(f"✅ {MODEL_NAME} signal -> {signals_out}")
             if r.stdout:
                 log.info(r.stdout[-500:])
+            try:
+                from tools.live.telegram_notify import notify_signals
+                notify_signals(MODEL_NAME, str(signals_out))
+            except Exception as _te:
+                log.debug(f"TG notify failed: {_te}")
         else:
             log.error(f"❌ {MODEL_NAME} signal failed ({r.returncode})")
             if r.stderr:

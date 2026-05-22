@@ -52,6 +52,11 @@ def emit_signal(force: bool = False):
             log.info(f"✅ Model 3 signal -> {signals_out}")
             if r.stdout:
                 log.info(r.stdout[-500:])
+            try:
+                from tools.live.telegram_notify import notify_signals
+                notify_signals("momentum_n100_top5_max1", str(signals_out))
+            except Exception as _te:
+                log.debug(f"TG notify failed: {_te}")
         else:
             log.error(f"❌ Model 3 signal failed ({r.returncode})")
             if r.stderr:
@@ -128,6 +133,11 @@ def emit_mid_month_signal():
             log.info("✅ Model 3 mid-month check complete")
             if r.stdout:
                 log.info(r.stdout[-500:])
+            try:
+                from tools.live.telegram_notify import notify_signals
+                notify_signals("momentum_n100_top5_max1", str(signals_out))
+            except Exception as _te:
+                log.debug(f"TG notify failed: {_te}")
         else:
             log.error(f"❌ Model 3 mid-month check failed ({r.returncode})")
             if r.stderr:
