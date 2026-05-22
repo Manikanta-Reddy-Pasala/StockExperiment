@@ -150,6 +150,34 @@
         </div>
     </div>
 
+    <!-- Mobile bottom tab bar (visible on small screens only) -->
+    <nav class="mobile-bottom-nav d-md-none" id="mobile-bottom-nav" aria-label="Primary">
+        <a href="/dashboard" data-route="/dashboard" class="bn-item">
+            <i class="bi bi-speedometer2"></i><span>Dash</span>
+        </a>
+        <a href="/picks" data-route="/picks" class="bn-item">
+            <i class="bi bi-lightbulb"></i><span>Picks</span>
+        </a>
+        <a href="/portfolio" data-route="/portfolio" class="bn-item">
+            <i class="bi bi-journal-text"></i><span>Folio</span>
+        </a>
+        <a href="/history" data-route="/history" class="bn-item">
+            <i class="bi bi-clock-history"></i><span>Hist</span>
+        </a>
+        <a href="/settings" data-route="/settings" class="bn-item">
+            <i class="bi bi-gear"></i><span>Set</span>
+        </a>
+    </nav>
+    <script>
+      (function highlightActiveBottomNav() {
+        const path = window.location.pathname;
+        document.querySelectorAll('#mobile-bottom-nav .bn-item').forEach(a => {
+          const r = a.getAttribute('data-route');
+          if (r && (path === r || path.startsWith(r + '/'))) a.classList.add('active');
+        });
+      })();
+    </script>
+
     <!-- Toast container -->
     <div id="toast-container" class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:1080;"></div>
 

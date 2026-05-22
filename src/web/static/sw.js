@@ -1,6 +1,6 @@
 // Service worker — minimal cache for shell + offline fallback.
 // Bump CACHE_VERSION on any UI change so old clients refetch.
-const CACHE_VERSION = 'v2-2026-05-22-mobile';
+const CACHE_VERSION = 'v3-2026-05-22-bottomnav';
 const CACHE_NAME = 'trading-pwa-' + CACHE_VERSION;
 const PRECACHE_URLS = [
   '/static/logo.png',
