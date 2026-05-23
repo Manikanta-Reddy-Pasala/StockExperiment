@@ -25,27 +25,33 @@ sys.path.insert(0, str(REPO_ROOT))
 from tools.models.finnifty_ic_otm4_w300_lots5.sweep import run_ic
 
 EXPORTS = REPO_ROOT / "exports" / "models" / "finnifty_ic_otm4_w300_lots5"
-WINGS = [150, 200, 300]
+# OTM × wing grid at week-2 entry, 4-leg-volume gate active.
+COMBOS = [
+    (2.0, 150), (2.0, 200), (2.0, 300),
+    (3.0, 150), (3.0, 200), (3.0, 300),
+    (4.0, 150), (4.0, 200), (4.0, 300),
+]
 
 
 def main() -> int:
     EXPORTS.mkdir(parents=True, exist_ok=True)
     summary: List[Dict] = []
     capital = 200_000
-    for wing in WINGS:
+    for otm, wing in COMBOS:
         daily_volumes: List[Dict] = []
         df = run_ic(
             underlying="FINNIFTY", start="2023-05-15", end="2026-05-15",
-            otm_pct=4.0, wing_width=wing, stop_mult=3.0, slip=0.01,
+            otm_pct=otm, wing_width=wing, stop_mult=3.0, slip=0.01,
             capital=capital, lots=5, realistic_slip=True,
             entry_week=2, daily_volumes=daily_volumes,
         )
+        tag = f"otm{int(otm*10)}_w{wing}"
         if df.empty:
-            print(f"wing{wing}: no trades")
+            print(f"{tag}: no trades")
             continue
-        df.to_csv(EXPORTS / f"wing{wing}_trades.csv", index=False)
+        df.to_csv(EXPORTS / f"{tag}_trades.csv", index=False)
         dv = pd.DataFrame(daily_volumes)
-        dv.to_csv(EXPORTS / f"wing{wing}_daily_volumes.csv", index=False)
+        dv.to_csv(EXPORTS / f"{tag}_daily_volumes.csv", index=False)
         total = float(df["pnl_total"].sum())
         n = len(df)
         wins = int((df["pnl_total"] > 0).sum())
@@ -66,7 +72,7 @@ def main() -> int:
                     and dv["num_trades"].notna().any()
                     else None)
         summary.append({
-            "wing": wing, "trades": n, "wins": wins,
+            "otm": otm, "wing": wing, "trades": n, "wins": wins,
             "wr_pct": round(wins / n * 100, 1) if n else 0,
             "total_pnl": round(total, 2),
             "total_return_pct": round(total / capital * 100, 2),
@@ -78,10 +84,11 @@ def main() -> int:
             "median_num_trades_per_leg_day":
                 int(med_ntrd) if med_ntrd else None,
         })
-        print(f"wing{wing}: {n} trades, WR {wins/n*100:.1f}%, "
+        risky_str = (f"risky={risky_pct:.1f}%" if risky_pct is not None
+                     else "risky=n/a")
+        print(f"{tag}: {n} trades, WR {wins/n*100:.1f}%, "
               f"₹{total:+,.0f} ({total/capital*100:+.2f}%), "
-              f"zero-vol={zero_pct:.1f}%, "
-              f"risky={risky_pct:.1f}%" if risky_pct is not None else "")
+              f"zero-vol={zero_pct:.1f}%, {risky_str}")
     (EXPORTS / "wing_variants_summary.json").write_text(
         json.dumps(summary, indent=2))
     print(f"\nSaved → {EXPORTS}")
