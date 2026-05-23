@@ -456,7 +456,7 @@ def main() -> int:
         n=("pnl_total", "size"),
         wins=("pnl_total", lambda s: (s > 0).sum()),
         total_pnl=("pnl_total", "sum"),
-        avg_credit=("entry_credit", "mean"),
+        avg_credit=("net_credit", "mean"),
     ).reset_index().sort_values("total_pnl", ascending=False)
     by_sym["wr"] = (by_sym["wins"] / by_sym["n"] * 100).round(1)
     print()
