@@ -49,7 +49,7 @@ Each model gets a single `model_settings` row + single `model_ledger` row + N `m
                  - Writes signals JSON + ranking JSON to /app/logs/<m>/
                  - Audit hook: audit_model_rankings + audit_model_signals
 
-09:30-32  execute_orders (LIVE_TRADING-gated)
+09:30-32  execute_orders (always live)
             └─ tools/live/fyers_executor.py
                  1. RiskManager.from_model(name)
                     → capital = model_ledger.cash (live truth)
@@ -124,7 +124,7 @@ Retention:
 2. **Concurrency lock** — rebalance endpoint rejects 409 if same-model task already in-flight (in-process threading.Lock + DB-backed cross-worker check).
 3. **Daily loss kill-switch** — `MAX_DAILY_LOSS_PCT = -5.0` blocks new entries.
 4. **No agent trading** — per repo memory rule (`feedback-no-real-trades.md`): the agent never invokes placeorder, only the user via UI buttons or the scheduler.
-5. **LIVE_TRADING gate** — executor falls back to dry-run if `LIVE_TRADING != true`.
+5. **Always-live** — no env kill switch. Every signal during market hours places real Fyers orders. CLI `--dry-run` flag for manual paper runs only.
 6. **Per-trade cap** — `MAX_PER_TRADE_INR` (default capital / max_concurrent).
 
 ---

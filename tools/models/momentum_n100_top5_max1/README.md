@@ -158,7 +158,7 @@ Full trade ledger: `exports/models/momentum_n100_top5_max1/TRADE_LEDGER.md`
 
 ## Live deployment
 
-Cron via `tools/live/run_daily.sh signals` calls `live_signal.py` with `lookback_days=30` against real-N100 universe. No price filter. Real Fyers orders via `tools/live/fyers_executor.py` (gated by `LIVE_TRADING=true`). No paper trading.
+In-container scheduler (scheduler.py + this model's cron.py) calls `live_signal.py` with `lookback_days=30` against real-N100 universe. No price filter. Real Fyers orders via `tools/live/fyers_executor.py` (always live). No paper trading.
 
 ## Honest caveats
 

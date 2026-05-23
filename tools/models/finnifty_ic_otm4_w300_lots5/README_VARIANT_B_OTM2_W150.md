@@ -130,12 +130,12 @@ This is the headline advantage — you can take 4-5 maximum-loss hits in a row a
 #   MODEL_NAME = "finnifty_ic_otm2_w150_lots5"
 
 # 2. Dry-run
-LIVE_TRADING=false python3 tools/live/fyers_executor_options.py \
+python3 tools/live/fyers_executor_options.py \
   --signals /app/logs/finnifty/2026-05-26.json \
   --model-name finnifty_ic_otm2_w150_lots5 --dry-run
 
-# 3. Live
-LIVE_TRADING=true python3 tools/live/fyers_executor_options.py \
+# 3. Live (always live — no env flag)
+python3 tools/live/fyers_executor_options.py \
   --signals /app/logs/finnifty/2026-05-26.json \
   --model-name finnifty_ic_otm2_w150_lots5 \
   --product MARGIN \
