@@ -120,7 +120,7 @@
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">{% block page_title %}Dashboard{% endblock %}</h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
+                    <div class="btn-toolbar mb-2 mb-md-0 d-none d-md-flex">
                         <div class="dropdown">
                             <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-person-circle"></i> {{ current_user.username }}
@@ -159,19 +159,19 @@
     <!-- Mobile bottom tab bar (visible on small screens only) -->
     <nav class="mobile-bottom-nav d-md-none" id="mobile-bottom-nav" aria-label="Primary">
         <a href="/dashboard" data-route="/dashboard" class="bn-item" aria-label="Dashboard">
-            <i class="bi bi-grid-fill"></i>
+            <i class="bi bi-house-door-fill"></i>
         </a>
         <a href="/picks" data-route="/picks" class="bn-item" aria-label="Picks">
-            <i class="bi bi-graph-up-arrow"></i>
+            <i class="bi bi-stars"></i>
         </a>
         <a href="/portfolio" data-route="/portfolio" class="bn-item" aria-label="Portfolio">
-            <i class="bi bi-briefcase-fill"></i>
+            <i class="bi bi-pie-chart-fill"></i>
         </a>
         <a href="/history" data-route="/history" class="bn-item" aria-label="History">
-            <i class="bi bi-clock-history"></i>
+            <i class="bi bi-bar-chart-line-fill"></i>
         </a>
         <a href="/settings" data-route="/settings" class="bn-item" aria-label="Settings">
-            <i class="bi bi-gear-fill"></i>
+            <i class="bi bi-sliders"></i>
         </a>
     </nav>
     <script>
