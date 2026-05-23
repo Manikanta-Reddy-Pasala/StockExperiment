@@ -3,7 +3,7 @@
 Reads a 4-leg signal JSON (BUY/SELL × 4 option symbols) and places each leg
 as a MARKET order with product=MARGIN (carry-forward F&O / NRML).
 
-Gated by LIVE_TRADING env flag — defaults to dry-run.
+Always live. Use --dry-run for manual dry runs only.
 Writes every fill to audit_orders so charges, slippage, and fill price are
 tracked the same way as equity orders.
 
@@ -144,8 +144,7 @@ def main() -> int:
                     help="Fyers product: MARGIN (NRML carry-forward, default) "
                          "or INTRADAY (MIS, square-off same day)")
     ap.add_argument("--dry-run", action="store_true",
-                    help="Print orders, don't place. Forced on if "
-                         "LIVE_TRADING env != 'true'.")
+                    help="Print orders, don't place. Manual override only.")
     ap.add_argument("--no-depth-gate", action="store_true",
                     help="Skip L1 depth check before placing.")
     ap.add_argument("--max-spread-pct", type=float, default=0.15,
@@ -159,11 +158,6 @@ def main() -> int:
                     help="Use MARKET for all legs. Default: shorts MARKET, "
                          "longs LIMIT-walk (better slippage on thin wings).")
     args = ap.parse_args()
-
-    live = os.environ.get("LIVE_TRADING", "false").lower() == "true"
-    if not live:
-        log.warning("LIVE_TRADING != 'true' — forcing dry-run mode")
-        args.dry_run = True
 
     sig_path = Path(args.signals)
     if not sig_path.exists():

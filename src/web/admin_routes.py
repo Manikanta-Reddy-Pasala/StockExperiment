@@ -2265,13 +2265,6 @@ def admin_model_rebalance(model_name):
     data = request.get_json(silent=True) or {}
     dry_run = bool(data.get("dry_run", False))
 
-    if not dry_run and os.environ.get("LIVE_TRADING", "false").lower() != "true":
-        return jsonify({
-            "success": False,
-            "error": "LIVE_TRADING not enabled. Set LIVE_TRADING=true env "
-                     "or pass {dry_run: true}.",
-        }), 403
-
     ts = datetime.now().strftime("%Y%m%dT%H%M%S")
     signals_out = f"/tmp/rebalance_{model_name}_{ts}.json"
     signal_task = f"rebal_sig_{model_name}_{ts}"

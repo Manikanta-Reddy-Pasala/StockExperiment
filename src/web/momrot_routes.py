@@ -593,14 +593,8 @@ def _notify_tg(text: str) -> None:
 def api_run_now():
     """Force LIVE rebalance: rank N100, sell drop-outs from Fyers, buy new rank-1.
 
-    Real orders placed via Fyers if LIVE_TRADING=true.
+    Always live — places real Fyers orders.
     """
-    if os.environ.get("LIVE_TRADING", "false").lower() != "true":
-        return jsonify({
-            "success": False,
-            "error": "LIVE_TRADING not enabled. Set LIVE_TRADING=true env to place real orders.",
-        }), 403
-
     try:
         user_id = int(request.args.get("user_id", 1))
         actions = []
@@ -691,8 +685,6 @@ def api_run_now():
 @momrot_bp.route("/buy-now", methods=["POST"])
 def api_buy_now():
     """Manual buy: place market order for rank-1 (or specified symbol) using available cash."""
-    if os.environ.get("LIVE_TRADING", "false").lower() != "true":
-        return jsonify({"success": False, "error": "LIVE_TRADING not enabled"}), 403
 
     try:
         user_id = int(request.args.get("user_id", 1))
@@ -794,9 +786,6 @@ def api_rebalance_preview():
 @momrot_bp.route("/sell-now", methods=["POST"])
 def api_sell_now():
     """Manual sell: place SELL market order for symbol + qty."""
-    if os.environ.get("LIVE_TRADING", "false").lower() != "true":
-        return jsonify({"success": False, "error": "LIVE_TRADING not enabled"}), 403
-
     try:
         user_id = int(request.args.get("user_id", 1))
         body = request.get_json(silent=True) or {}

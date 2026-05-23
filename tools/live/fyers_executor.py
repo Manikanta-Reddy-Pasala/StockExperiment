@@ -16,14 +16,14 @@ Order-placement (Phase 2 Task 6):
   RiskManager.cfg (LIMIT_TOL_PCT / LIMIT_RETRY_PCT / LIMIT_FALLBACK_S env).
 
 Hard safeguards:
-  - Requires LIVE_TRADING=true env var (defaults off)
   - Requires user-id config + valid Fyers access_token in DB
   - Per-trade cap enforced via RiskManager
   - Daily-loss kill-switch via RiskManager
   - Backward-compat: if --model-name missing, falls back to env-based capital
+  - --dry-run flag for manual paper runs
 
 Usage:
-  LIVE_TRADING=true python tools/live/fyers_executor.py \
+  python tools/live/fyers_executor.py \
     --signals signals/2026-05-17_n20.json --user-id 1 \
     --model-name n20_daily_large_only
 """
@@ -552,7 +552,7 @@ def main() -> int:
                          "model_settings.current_amount (Phase 2 Task 4) and "
                          "every BUY/SELL is recorded in model_ledger DB.")
     ap.add_argument("--dry-run", action="store_true",
-                    help="Print orders, don't place. Always on if LIVE_TRADING != true.")
+                    help="Print orders, don't place. Manual override only.")
     args = ap.parse_args()
 
     logging.basicConfig(level=logging.INFO,
@@ -561,11 +561,6 @@ def main() -> int:
     # Make model name visible to nested helpers (audit_orders rows).
     global _CURRENT_MODEL
     _CURRENT_MODEL = args.model_name
-
-    live = os.environ.get("LIVE_TRADING", "false").lower() == "true"
-    if not live:
-        log.warning("LIVE_TRADING != 'true' — forcing dry-run mode")
-        args.dry_run = True
 
     # Pre-flight data quality gate. Written by data_scheduler at 09:00 IST.
     # If today's historical_data coverage is below threshold, abort entries.

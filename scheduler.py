@@ -337,7 +337,7 @@ def run_scheduler():
     logger.info("📊 TECHNICAL SCHEDULER — per-model trading jobs")
     logger.info("=" * 80)
     logger.info("Registered models (trading-side):")
-    logger.info("  - momentum_n100_top5_max1:    signal 09:25 + execute 09:30 (LIVE_TRADING gated)")
+    logger.info("  - momentum_n100_top5_max1:    signal 09:25 + execute 09:30 (always live)")
     logger.info("  - momentum_pseudo_n100_adv:   signal 09:25 + execute 09:30 (monthly rebal)")
     logger.info("  - midcap_narrow_60d_breakout: signal 09:25 + execute 09:32 + EOD signal 15:25")
     logger.info("  - n20_daily_large_only:       signal 09:25 + execute 09:30 (daily rotation)")
