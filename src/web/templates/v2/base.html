@@ -6,9 +6,7 @@
     <title>{% block title %}Trading Models{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}?v=20260523a">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}?v=20260523b">
     <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
     <!-- PWA: installable on Android / iOS -->
     <link rel="manifest" href="/manifest.json">
@@ -156,30 +154,24 @@
         <span id="ptr-text">Pull to refresh</span>
     </div>
 
-    <!-- Mobile bottom tab bar (visible on small screens only) -->
+    <!-- Mobile bottom tab bar (visible on small screens only) — inline Lucide SVGs -->
     <nav class="mobile-bottom-nav d-md-none" id="mobile-bottom-nav" aria-label="Primary">
         <a href="/dashboard" data-route="/dashboard" class="bn-item" aria-label="Dashboard">
-            <i data-lucide="layout-dashboard"></i>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
         </a>
         <a href="/picks" data-route="/picks" class="bn-item" aria-label="Picks">
-            <i data-lucide="trending-up"></i>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
         </a>
         <a href="/portfolio" data-route="/portfolio" class="bn-item" aria-label="Portfolio">
-            <i data-lucide="wallet"></i>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
         </a>
         <a href="/history" data-route="/history" class="bn-item" aria-label="History">
-            <i data-lucide="line-chart"></i>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="m19 9-5 5-4-4-3 3"/></svg>
         </a>
         <a href="/settings" data-route="/settings" class="bn-item" aria-label="Settings">
-            <i data-lucide="settings"></i>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
         </a>
     </nav>
-    <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js" defer></script>
-    <script>
-      window.addEventListener('DOMContentLoaded', () => {
-        if (window.lucide) lucide.createIcons();
-      });
-    </script>
     <script>
       (function highlightActiveBottomNav() {
         const path = window.location.pathname;
