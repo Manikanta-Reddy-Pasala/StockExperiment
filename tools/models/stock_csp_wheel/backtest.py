@@ -170,30 +170,42 @@ def _liq_score(opt_df: pd.DataFrame, spot: float, entry_day: date,
     return float(np.log10(avg_vol))
 
 
-def _pick_target_strike(opt_df: pd.DataFrame, spot: float, expiry: date,
-                        entry_day: date, otm_pct: float) -> Optional[Tuple[int, float]]:
-    """Pick PE strike ≈ spot * (1 - otm_pct/100). Return (strike, entry_close).
-    Only uses option close on entry_day (no look-forward)."""
-    target = spot * (1 - otm_pct / 100)
+def _pick_strike_pair(opt_df: pd.DataFrame, spot: float, expiry: date,
+                      entry_day: date, otm_pct: float,
+                      wing_otm_pct: float
+                      ) -> Optional[Tuple[int, float, Optional[int], float]]:
+    """Pick short PE strike ~OTM% + optional long PE strike further OTM
+    (put spread). Returns (short_strike, short_close, long_strike, long_close).
+    long_strike=None when wing_otm_pct<=0 (naked short).
+    """
+    short_target = spot * (1 - otm_pct / 100)
     pe_today = opt_df[(opt_df["date"] == entry_day)
                       & (opt_df["expiry"] == expiry)
                       & (opt_df["opt_type"] == "PE")]
     if pe_today.empty:
         return None
-    # closest strike below target (we want short put below spot)
-    candidates = pe_today[pe_today["strike"] <= target]
-    if candidates.empty:
-        candidates = pe_today
-    chosen = candidates.iloc[(candidates["strike"] - target).abs().argsort()[:1]].iloc[0]
-    if chosen["close"] <= 0.5 or chosen["volume"] < 50:
+    cands = pe_today[pe_today["strike"] <= short_target]
+    if cands.empty:
+        cands = pe_today
+    short = cands.iloc[(cands["strike"] - short_target).abs().argsort()[:1]].iloc[0]
+    if short["close"] <= 0.5 or short["volume"] < 50:
         return None
-    return int(chosen["strike"]), float(chosen["close"])
+    short_k, short_px = int(short["strike"]), float(short["close"])
+    if wing_otm_pct <= 0:
+        return short_k, short_px, None, 0.0
+    wing_target = spot * (1 - (otm_pct + wing_otm_pct) / 100)
+    wing_cands = pe_today[pe_today["strike"] < short_k]
+    if wing_cands.empty:
+        return None
+    wing = wing_cands.iloc[(wing_cands["strike"] - wing_target).abs().argsort()[:1]].iloc[0]
+    return short_k, short_px, int(wing["strike"]), float(wing["close"])
 
 
 def _simulate_one(symbol: str, lot: int, eq: pd.DataFrame, opt_df: pd.DataFrame,
                   monthlies: List[date], entry_offset_days: int,
                   otm_pct: float, profit_pct: float,
-                  min_leg_vol: int) -> List[Dict]:
+                  min_leg_vol: int, wing_otm_pct: float = 0.0,
+                  stop_mult: float = 0.0) -> List[Dict]:
     """Walk monthly cycles for ONE stock. Returns list of trade dicts."""
     trades: List[Dict] = []
     eq_dates = set(eq["date"])
@@ -221,52 +233,83 @@ def _simulate_one(symbol: str, lot: int, eq: pd.DataFrame, opt_df: pd.DataFrame,
             continue  # bearish trend or too thin
         score = 0.4 * tz + 0.4 * rv + 0.2 * liq
 
-        pick = _pick_target_strike(opt_df, spot, exp, entry_day, otm_pct)
+        pick = _pick_strike_pair(opt_df, spot, exp, entry_day,
+                                  otm_pct, wing_otm_pct)
         if pick is None:
             continue
-        strike, entry_credit = pick
+        short_k, short_px, wing_k, wing_px = pick
+        net_credit = short_px - wing_px  # positive for credit spread
 
-        # Walk day-by-day to exit
-        post = opt_df[(opt_df["expiry"] == exp)
-                      & (opt_df["opt_type"] == "PE")
-                      & (opt_df["strike"] == strike)
-                      & (opt_df["date"] >= entry_day)
-                      & (opt_df["date"] <= exp)].sort_values("date")
-        if post.empty:
+        # Per-leg trajectory to expiry. Wing leg optional.
+        post_short = opt_df[(opt_df["expiry"] == exp)
+                            & (opt_df["opt_type"] == "PE")
+                            & (opt_df["strike"] == short_k)
+                            & (opt_df["date"] >= entry_day)
+                            & (opt_df["date"] <= exp)].sort_values("date")
+        if post_short.empty:
             continue
+        post_wing = pd.DataFrame()
+        if wing_k is not None:
+            post_wing = opt_df[(opt_df["expiry"] == exp)
+                               & (opt_df["opt_type"] == "PE")
+                               & (opt_df["strike"] == wing_k)
+                               & (opt_df["date"] >= entry_day)
+                               & (opt_df["date"] <= exp)].sort_values("date")
+            if post_wing.empty:
+                continue
+            wing_by_date = dict(zip(post_wing["date"], post_wing["close"]))
+        else:
+            wing_by_date = {}
 
-        target_buyback = entry_credit * (1 - profit_pct / 100)
+        target_buyback = net_credit * (1 - profit_pct / 100)
+        stop_debit = net_credit * stop_mult if stop_mult > 0 else None
         exit_day = exp
-        exit_price = max(0.0, strike - float(eq[eq["date"].between(exp, exp)]["close"].iloc[0]) if not eq[eq["date"] == exp].empty else 0.0)
+        exit_debit = 0.0
         exit_reason = "EXPIRY"
-        for r in post.itertuples():
+        for r in post_short.itertuples():
             if r.date == entry_day:
                 continue
-            # Skip if too thin to exit
             if min_leg_vol > 0 and r.volume < min_leg_vol:
                 continue
-            if r.close <= target_buyback:
+            wing_close = wing_by_date.get(r.date, 0.0) if wing_k else 0.0
+            current_debit = float(r.close) - float(wing_close)
+            if current_debit <= target_buyback:
                 exit_day = r.date
-                exit_price = float(r.close)
+                exit_debit = current_debit
                 exit_reason = f"PROFIT_{int(profit_pct)}PCT"
                 break
+            if stop_debit is not None and current_debit >= stop_debit:
+                exit_day = r.date
+                exit_debit = current_debit
+                exit_reason = f"STOP_{stop_mult:.0f}X"
+                break
         else:
-            # Held to expiry — settle at intrinsic
+            # Held to expiry — settle at intrinsic for both legs
             spot_at_exp_rows = eq[eq["date"] == exp]
             spot_at_exp = float(spot_at_exp_rows.iloc[0]["close"]) if not spot_at_exp_rows.empty else spot
-            exit_price = max(0.0, strike - spot_at_exp)
+            short_intrinsic = max(0.0, short_k - spot_at_exp)
+            wing_intrinsic = max(0.0, wing_k - spot_at_exp) if wing_k else 0.0
+            exit_debit = short_intrinsic - wing_intrinsic
             exit_reason = "EXPIRY"
 
-        pnl_unit = entry_credit - exit_price
+        pnl_unit = net_credit - exit_debit
         pnl_total = pnl_unit * lot
-        margin = strike * lot * SPAN_RATE
+        # Margin: naked short = strike * lot * SPAN_RATE.
+        #         Put spread = (short_k - wing_k) * lot (defined max loss)
+        #                      plus small exposure ~3% of short notional
+        if wing_k is not None:
+            spread_width = short_k - wing_k
+            margin = spread_width * lot + short_k * lot * 0.03
+        else:
+            margin = short_k * lot * SPAN_RATE
         trades.append({
             "symbol": symbol,
             "entry_date": entry_day, "exit_date": exit_day, "expiry": exp,
-            "spot": round(spot, 2), "strike": strike,
-            "otm_pct_actual": round((spot - strike) / spot * 100, 2),
-            "entry_credit": round(entry_credit, 2),
-            "exit_price": round(exit_price, 2),
+            "spot": round(spot, 2), "short_k": short_k,
+            "wing_k": wing_k if wing_k else 0,
+            "otm_pct_actual": round((spot - short_k) / spot * 100, 2),
+            "net_credit": round(net_credit, 2),
+            "exit_debit": round(exit_debit, 2),
             "pnl_unit": round(pnl_unit, 2),
             "lot": lot,
             "pnl_total": round(pnl_total, 2),
@@ -305,7 +348,20 @@ def main() -> int:
                     help="Days after prev expiry to enter new cycle (default 3)")
     ap.add_argument("--min-leg-volume", type=int, default=50,
                     help="Min option day-volume to consider tradeable")
+    ap.add_argument("--wing-otm-pct", type=float, default=0.0,
+                    help="Buy further-OTM put as protection (0=naked short, "
+                         "default; e.g. 3.0 = buy put 3%% deeper OTM)")
+    ap.add_argument("--stop-mult", type=float, default=0.0,
+                    help="Exit when spread debit hits this × net_credit "
+                         "(0=disabled; e.g. 2.5 = exit at 2.5× loss)")
+    ap.add_argument("--max-per-symbol-pct", type=float, default=20.0,
+                    help="Max %% of capital deployed in any single symbol "
+                         "per cycle (default 20%%)")
+    ap.add_argument("--exclude", default="",
+                    help="Comma-separated symbols to skip "
+                         "(e.g. SBIN,HDFCBANK,MARUTI,AXISBANK,ADANIPORTS)")
     args = ap.parse_args()
+    excluded = {x.strip().upper() for x in args.exclude.split(",") if x.strip()}
 
     print(f"=== CSP wheel — {len(UNIVERSE)} F&O stocks ===")
     print(f"  window  = {args.start} → {args.end}")
@@ -316,6 +372,9 @@ def main() -> int:
     all_trades: List[Dict] = []
     t0 = time.time()
     for i, (sym, lot) in enumerate(UNIVERSE.items()):
+        if sym in excluded:
+            print(f"  [excluded] {sym}")
+            continue
         eq = _equity_daily(sym)
         opt = _option_daily(sym)
         if eq.empty or opt.empty:
@@ -330,7 +389,9 @@ def main() -> int:
             continue
         trades = _simulate_one(sym, lot, eq, opt, monthlies,
                                args.entry_offset, args.otm_pct,
-                               args.profit_pct, args.min_leg_volume)
+                               args.profit_pct, args.min_leg_volume,
+                               wing_otm_pct=args.wing_otm_pct,
+                               stop_mult=args.stop_mult)
         all_trades.extend(trades)
         print(f"  [{i+1}/{len(UNIVERSE)}] {sym}: {len(trades)} trades "
               f"({time.time()-t0:.0f}s)")
@@ -351,10 +412,13 @@ def main() -> int:
     # Capital headroom check: cap total simultaneous margin to args.capital.
     # If sum(margin) for cycle > capital, drop lowest-score trades until fits.
     selected = selected.sort_values(["cycle", "score"], ascending=[True, False])
+    per_symbol_cap = args.capital * args.max_per_symbol_pct / 100.0
     keep_idx = []
     for cyc, grp in selected.groupby("cycle"):
         cum = 0.0
         for idx, row in grp.iterrows():
+            if row["margin_inr"] > per_symbol_cap:
+                continue   # single trade exceeds per-symbol cap
             if cum + row["margin_inr"] <= args.capital:
                 keep_idx.append(idx)
                 cum += row["margin_inr"]
