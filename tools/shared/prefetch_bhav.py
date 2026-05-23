@@ -72,12 +72,20 @@ def parse_old(txt: str, underlying_set: set, instrument_set: set) -> List[dict]:
             ot = r[4].strip()
             if ot not in ("CE", "PE"):
                 continue
+            # r[11] = VAL_INLAKH (total turnover in rupees-lakhs)
+            try:
+                turnover_lakh = float(r[11]) if r[11].strip() else None
+            except (ValueError, IndexError):
+                turnover_lakh = None
             out.append({
                 "underlying": r[1].strip(), "expiry": exp, "strike": strike,
                 "opt_type": ot, "trade_date": td,
                 "open": float(r[5]), "high": float(r[6]),
                 "low": float(r[7]), "close": float(r[8]),
                 "volume": int(float(r[10])), "oi": int(float(r[12])),
+                # Old bhavcopy does NOT provide num_trades — leave NULL.
+                "num_trades": None,
+                "turnover_lakh": turnover_lakh,
             })
         except (ValueError, IndexError):
             continue
@@ -98,6 +106,8 @@ def parse_new(txt: str, underlying_set: set, instrument_set: set) -> List[dict]:
     iK = idx("StrkPric"); iOT = idx("OptnTp"); iO = idx("OpnPric")
     iH = idx("HghPric"); iL = idx("LwPric"); iC = idx("ClsPric")
     iV = idx("TtlTradgVol"); iOI = idx("OpnIntrst"); iTD = idx("TradDt")
+    iNT = idx("TtlNbOfTxsExctd")   # number of distinct trades
+    iTO = idx("TtlTrnvrInRsrL")    # turnover in lakhs of rupees
 
     # Map old OPTIDX -> new IDO, OPTSTK -> STO
     new_instr_set = set()
@@ -122,6 +132,14 @@ def parse_new(txt: str, underlying_set: set, instrument_set: set) -> List[dict]:
             exp = datetime.strptime(r[iXpry], "%Y-%m-%d").date()
             td = datetime.strptime(r[iTD], "%Y-%m-%d").date()
             strike = int(float(r[iK]))
+            num_trades = None
+            if iNT >= 0 and r[iNT]:
+                try: num_trades = int(float(r[iNT]))
+                except ValueError: pass
+            turnover_lakh = None
+            if iTO >= 0 and r[iTO]:
+                try: turnover_lakh = float(r[iTO])
+                except ValueError: pass
             out.append({
                 "underlying": r[iSym], "expiry": exp, "strike": strike,
                 "opt_type": ot, "trade_date": td,
@@ -131,6 +149,8 @@ def parse_new(txt: str, underlying_set: set, instrument_set: set) -> List[dict]:
                 "close": float(r[iC]) if r[iC] else 0.0,
                 "volume": int(float(r[iV])) if r[iV] else 0,
                 "oi":     int(float(r[iOI])) if r[iOI] else 0,
+                "num_trades": num_trades,
+                "turnover_lakh": turnover_lakh,
             })
         except (ValueError, IndexError):
             continue
@@ -180,6 +200,7 @@ def bulk_insert(eng, rows: List[dict]) -> int:
             sym, r["underlying"], r["expiry"], r["strike"], r["opt_type"],
             "D", ts, ct, r["open"], r["high"], r["low"], r["close"],
             r["volume"], r["oi"],
+            r.get("num_trades"), r.get("turnover_lakh"),
         ))
         uni_payload.append((
             sym, r["underlying"], r["expiry"],
@@ -191,9 +212,12 @@ def bulk_insert(eng, rows: List[dict]) -> int:
         cur.executemany(
             "INSERT INTO historical_options "
             "(symbol, underlying, expiry, strike, opt_type, interval, "
-            " timestamp, candle_time, open, high, low, close, volume, oi) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
-            "ON CONFLICT (symbol, interval, timestamp) DO NOTHING",
+            " timestamp, candle_time, open, high, low, close, volume, oi, "
+            " num_trades, turnover_lakh) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+            "ON CONFLICT (symbol, interval, timestamp) DO UPDATE SET "
+            "  num_trades = EXCLUDED.num_trades, "
+            "  turnover_lakh = EXCLUDED.turnover_lakh",
             opt_payload,
         )
         inserted = cur.rowcount or len(opt_payload)

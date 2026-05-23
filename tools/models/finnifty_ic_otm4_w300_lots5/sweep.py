@@ -61,13 +61,17 @@ def load_spot(u: str, a: str, b: str) -> pd.DataFrame:
 
 
 def opt_daily(symbol: str) -> pd.DataFrame:
-    """Daily OHLCV+OI for an option contract. Includes volume + oi so the
-    backtest can filter out illiquid leg-days that wouldn't have actually
-    been fillable in live trading."""
+    """Daily OHLCV+OI for an option contract. Returns:
+        date, close, volume (contracts), oi, num_trades, turnover_lakh
+    so callers can compute realistic-fill share = our_value / day_turnover.
+    """
     eng = _get_engine()
     q = text(
         "SELECT candle_time::date AS date, close, "
-        "       COALESCE(volume, 0) AS volume, COALESCE(oi, 0) AS oi "
+        "       COALESCE(volume, 0) AS volume, "
+        "       COALESCE(oi, 0) AS oi, "
+        "       num_trades, "
+        "       turnover_lakh "
         "FROM historical_options "
         "WHERE symbol=:s AND interval='D' ORDER BY candle_time"
     )
@@ -258,11 +262,14 @@ def run_ic(underlying: str, start: str, end: str,
         # volume + oi for every day but do NOT filter on it — caller
         # gets daily_volumes back to inspect whether liquidity existed.
         def _legcols(df: pd.DataFrame, prefix: str) -> pd.DataFrame:
-            return (df[(df["date"] >= entry_day) & (df["date"] <= exp)]
-                      [["date", "close", "volume", "oi"]]
-                      .rename(columns={"close": f"{prefix}_close",
-                                       "volume": f"{prefix}_vol",
-                                       "oi": f"{prefix}_oi"}))
+            cols = ["date", "close", "volume", "oi", "num_trades", "turnover_lakh"]
+            avail = [c for c in cols if c in df.columns]
+            return (df[(df["date"] >= entry_day) & (df["date"] <= exp)][avail]
+                    .rename(columns={"close": f"{prefix}_close",
+                                     "volume": f"{prefix}_vol",
+                                     "oi": f"{prefix}_oi",
+                                     "num_trades": f"{prefix}_ntrd",
+                                     "turnover_lakh": f"{prefix}_turn"}))
         pair = _legcols(ce_b, "ce")
         for df_o, prefix in [(pe_b, "pe"), (wce_b, "wce"), (wpe_b, "wpe")]:
             pair = pair.merge(_legcols(df_o, prefix), on="date", how="left")
@@ -311,6 +318,8 @@ def run_ic(underlying: str, start: str, end: str,
                                         ("pe", "pe_short", pe_k),
                                         ("wce", "wce_long", wce_k),
                                         ("wpe", "wpe_long", wpe_k)]:
+                    ntrd_raw = getattr(pr, f"{prefix}_ntrd", None)
+                    turn_raw = getattr(pr, f"{prefix}_turn", None)
                     daily_volumes.append({
                         "trade_idx": trade_idx,
                         "underlying": underlying,
@@ -322,6 +331,12 @@ def run_ic(underlying: str, start: str, end: str,
                         "close": float(getattr(pr, f"{prefix}_close", 0)),
                         "volume": int(getattr(pr, f"{prefix}_vol", 0)),
                         "oi": int(getattr(pr, f"{prefix}_oi", 0)),
+                        "num_trades": (int(ntrd_raw)
+                                       if ntrd_raw not in (None, 0) and
+                                       not pd.isna(ntrd_raw) else None),
+                        "turnover_lakh": (float(turn_raw)
+                                          if turn_raw not in (None, 0) and
+                                          not pd.isna(turn_raw) else None),
                     })
 
         pnl_unit = net_credit - exit_debit
