@@ -26,10 +26,12 @@ from __future__ import annotations
 import argparse
 import itertools
 import json
+import os
 import sys
 import time
+from multiprocessing import Pool
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 
@@ -39,6 +41,36 @@ sys.path.insert(0, str(REPO_ROOT))
 from tools.models.finnifty_ic_otm4_w300_lots5.sweep import (
     compute_ic_margin, run_ic,
 )
+
+# Worker-globals: each forked process resets these on first use. Avoids
+# inheriting parent's SQLAlchemy engine which can have stale pooled conns.
+_WORKER_PID = None
+
+
+def _worker_init():
+    """Force fresh DB engine per worker process. SQLAlchemy global engine
+    is cached in ohlcv_cache module; reset it after fork."""
+    global _WORKER_PID
+    _WORKER_PID = os.getpid()
+    try:
+        import tools.shared.ohlcv_cache as oc
+        oc._engine = None  # next _get_engine() call rebuilds for this PID
+    except Exception:
+        pass
+
+
+def _run_combo(task: Tuple) -> Optional[Dict]:
+    """Single backtest task — runs in worker process."""
+    otm, wing, stop, dow, u, start, end, min_vol = task
+    try:
+        df = run_ic(u, start, end, otm, wing, stop, 0.01,
+                    capital=200_000, lots=1, realistic_slip=True,
+                    min_leg_volume=min_vol, entry_dow=dow)
+    except Exception as e:
+        return {"otm": otm, "wing": wing, "stop": stop, "dow": dow,
+                "u": u, "error": str(e), "df": None}
+    return {"otm": otm, "wing": wing, "stop": stop, "dow": dow, "u": u,
+            "df": df.to_dict("records") if not df.empty else []}
 
 EXPORTS = REPO_ROOT / "exports" / "models"
 
@@ -100,30 +132,41 @@ def main() -> int:
     ap.add_argument("--end", default="2026-05-15")
     ap.add_argument("--min-leg-volume", type=int, default=100)
     ap.add_argument("--top", type=int, default=20)
+    ap.add_argument("--workers", type=int, default=6,
+                    help="Parallel worker processes (default 6; "
+                         "I/O-bound on DB reads so > nproc is fine)")
     args = ap.parse_args()
     capitals = [int(x) for x in args.capitals.split(",")]
 
     combos = list(itertools.product(OTMS, WINGS, STOPS, DOWS, UNDERLYINGS))
-    print(f"=== Exhaustive IC sweep ===")
-    print(f"  {len(combos)} backtests per capital × {len(capitals)} capitals = "
-          f"{len(combos)*len(capitals)} runs")
-    print(f"  min_leg_volume={args.min_leg_volume}")
+    tasks = [(otm, wing, stop, dow, u,
+              args.start, args.end, args.min_leg_volume)
+             for (otm, wing, stop, dow, u) in combos]
 
-    # Each (otm, wing, stop, dow, underlying) only runs the backtest ONCE.
-    # Then we rescale to each capital via _peak_safe_lots / _rescale_stats.
+    print(f"=== Exhaustive IC sweep (parallel × {args.workers}) ===")
+    print(f"  {len(combos)} unique backtests × {len(capitals)} capitals = "
+          f"{len(combos)*len(capitals)} result rows")
+    print(f"  min_leg_volume={args.min_leg_volume}, workers={args.workers}")
+
     raw_by_combo: Dict[tuple, pd.DataFrame] = {}
     t0 = time.time()
-    for i, (otm, wing, stop, dow, u) in enumerate(combos):
-        if i % 50 == 0:
-            print(f"  [{i}/{len(combos)}] elapsed {time.time()-t0:.0f}s")
-        try:
-            df = run_ic(u, args.start, args.end, otm, wing, stop, 0.01,
-                        capital=200_000, lots=1, realistic_slip=True,
-                        min_leg_volume=args.min_leg_volume, entry_dow=dow)
-        except Exception as e:
-            print(f"  ! ({u},{otm},{wing},{stop},{DOW_NAMES[dow]}): {e}")
-            df = pd.DataFrame()
-        raw_by_combo[(otm, wing, stop, dow, u)] = df
+    completed = 0
+    with Pool(processes=args.workers, initializer=_worker_init) as pool:
+        for res in pool.imap_unordered(_run_combo, tasks, chunksize=4):
+            completed += 1
+            key = (res["otm"], res["wing"], res["stop"], res["dow"], res["u"])
+            if res.get("error"):
+                print(f"  ! {key}: {res['error']}")
+                raw_by_combo[key] = pd.DataFrame()
+            else:
+                rows = res["df"] or []
+                raw_by_combo[key] = pd.DataFrame(rows) if rows else pd.DataFrame()
+            if completed % 50 == 0:
+                rate = completed / max(1, time.time() - t0)
+                eta = (len(tasks) - completed) / rate if rate > 0 else 0
+                print(f"  [{completed}/{len(tasks)}] elapsed "
+                      f"{time.time()-t0:.0f}s  rate {rate:.1f}/s  "
+                      f"ETA {eta:.0f}s")
 
     print(f"  done in {time.time()-t0:.0f}s. building rescale table…")
 
