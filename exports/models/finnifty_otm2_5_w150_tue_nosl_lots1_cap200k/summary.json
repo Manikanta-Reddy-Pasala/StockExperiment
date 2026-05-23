@@ -1,0 +1,22 @@
+{
+  "trades": 22,
+  "wins": 20,
+  "wr_pct": 90.91,
+  "total_pnl": 48780.3,
+  "final_equity": 248780.3,
+  "total_return_pct": 24.39,
+  "cagr_pct": 8.47,
+  "max_dd_pct": -3.0,
+  "avg_margin_inr": 80467.88,
+  "peak_margin_inr": 117585.0,
+  "capital_inr": 200000,
+  "lots": 1,
+  "n_years": 2.68,
+  "underlying": "FINNIFTY",
+  "variant_slug": "finnifty_otm2_5_w150_tue_nosl",
+  "otm_pct": 2.5,
+  "wing_width": 150,
+  "stop_mult": 99.0,
+  "entry_dow": "TUE",
+  "min_leg_volume": 100
+}

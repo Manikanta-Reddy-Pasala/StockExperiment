@@ -1,0 +1,22 @@
+{
+  "trades": 36,
+  "wins": 22,
+  "wr_pct": 61.11,
+  "total_pnl": 42457.5,
+  "final_equity": 242457.5,
+  "total_return_pct": 21.23,
+  "cagr_pct": 6.57,
+  "max_dd_pct": -7.19,
+  "avg_margin_inr": 68004.33,
+  "peak_margin_inr": 115065.6,
+  "capital_inr": 200000,
+  "lots": 1,
+  "n_years": 3.03,
+  "underlying": "BANKNIFTY",
+  "variant_slug": "banknifty_otm1_5_w500_wed_nosl",
+  "otm_pct": 1.5,
+  "wing_width": 500,
+  "stop_mult": 99.0,
+  "entry_dow": "WED",
+  "min_leg_volume": 100
+}
