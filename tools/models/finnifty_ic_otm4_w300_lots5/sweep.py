@@ -254,6 +254,17 @@ def run_ic(underlying: str, start: str, end: str,
             continue
         if min(ce_e, pe_e) <= 0.5:
             continue
+        # All 4 legs must have non-zero volume on entry day — basket is
+        # atomic, partial fills leave undefined risk. If any leg = 0 vol,
+        # try the next weekday in this same week (loop continues, seen_exp
+        # not yet added). Cycle skipped only if NO weekday in the week
+        # had all 4 legs active.
+        entry_vols = [int(ce_row.get("volume", 0)),
+                      int(pe_row.get("volume", 0)),
+                      int(wce_row.get("volume", 0)),
+                      int(wpe_row.get("volume", 0))]
+        if min(entry_vols) <= 0:
+            continue
         net_credit = (ce_e + pe_e) - (wce_e + wpe_e)
         if net_credit <= 0:
             continue
