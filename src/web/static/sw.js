@@ -1,14 +1,19 @@
 // Service worker — fast shell + SWR for HTML pages + cache-first for static.
 // Bump CACHE_VERSION on any UI change so old clients refetch.
-const CACHE_VERSION = 'v10-2026-05-23-inline-svg-no-chartjs';
+const CACHE_VERSION = 'v11-2026-05-23-new-icons';
 const STATIC_CACHE = 'trading-pwa-static-' + CACHE_VERSION;
 const PAGE_CACHE   = 'trading-pwa-pages-'  + CACHE_VERSION;
+// Bump ?v= on every icon-affecting change. URL-keyed, so any old cached
+// /static/icon.svg entry just sits there and never gets requested again
+// because pages reference /static/icon.svg?v=N now.
+const ICON_VERSION = '2';
 
 const PRECACHE_URLS = [
-  '/static/logo.png',
-  '/static/icon-192.png',
-  '/static/icon-512.png',
-  '/static/apple-touch-icon.png',
+  '/static/icon.svg?v=' + ICON_VERSION,
+  '/static/icon-mono.svg?v=' + ICON_VERSION,
+  '/static/icon-192.png?v=' + ICON_VERSION,
+  '/static/icon-512.png?v=' + ICON_VERSION,
+  '/static/apple-touch-icon.png?v=' + ICON_VERSION,
   '/static/css/custom.css',
 ];
 
@@ -30,6 +35,14 @@ self.addEventListener('install', (event) => {
     ));
     await self.skipWaiting();
   })());
+});
+
+// Listen for SKIP_WAITING message from the page so a freshly-installed
+// worker activates immediately (instead of waiting for all tabs to close).
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('activate', (event) => {

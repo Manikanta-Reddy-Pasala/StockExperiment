@@ -326,9 +326,15 @@ def create_app():
     # PWA: serve manifest + service worker from root so SW can claim '/' scope.
     @app.route('/manifest.json')
     def pwa_manifest():
-        from flask import send_from_directory
-        return send_from_directory('static', 'manifest.json',
-                                   mimetype='application/manifest+json')
+        from flask import send_from_directory, make_response
+        resp = make_response(send_from_directory('static', 'manifest.json',
+                                                  mimetype='application/manifest+json'))
+        # Manifest must bypass HTTP cache so icon updates show up
+        # without forcing user to clear browser data.
+        resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+        return resp
 
     @app.route('/sw.js')
     def pwa_service_worker():
