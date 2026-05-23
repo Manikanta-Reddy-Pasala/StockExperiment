@@ -1143,7 +1143,7 @@ def create_app():
         app.logger.warning(f"Admin routes not available: {e}")
         app.logger.warning("Admin dashboard functionality will be disabled")
 
-    # Register momentum rotation paper-trading dashboard
+    # Register momentum rotation live-trading dashboard
     try:
         from .momrot_routes import momrot_bp
         app.register_blueprint(momrot_bp)

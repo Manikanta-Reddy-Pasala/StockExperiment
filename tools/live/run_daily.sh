@@ -2,7 +2,7 @@
 # Daily live-trading cron wrapper for Momentum N100 model.
 #
 # Only deployed model: tools/models/momentum_n100_top5_max1/.
-# No paper trading — orders go straight to Fyers (gated by LIVE_TRADING=true).
+# Always live — orders go straight to Fyers.
 #
 # Cron suggestions (Indian market hours 09:15-15:30 IST):
 #   1st of month 09:00 IST  -- rebalance: emit ENTRY/STOP_HIT signals
@@ -13,7 +13,7 @@
 #   ./run_daily.sh prefetch       # update OHLCV cache (N100)
 #   ./run_daily.sh signals        # emit momentum rotation signals (rebalance-gated)
 #   ./run_daily.sh signals-force  # force-emit (ignore rebalance gate)
-#   ./run_daily.sh live           # real Fyers orders (LIVE_TRADING=true required)
+#   ./run_daily.sh live           # real Fyers orders
 #   ./run_daily.sh summary        # post-close NAV/P&L summary
 #
 set -euo pipefail
@@ -50,11 +50,7 @@ case "$cmd" in
     ;;
 
   live)
-    if [ "${LIVE_TRADING:-false}" != "true" ]; then
-      echo "REFUSING: LIVE_TRADING env var not 'true'. Set explicitly to enable real orders."
-      exit 1
-    fi
-    echo "[$DATE] LIVE Fyers execution (LIVE_TRADING=true) — placing real orders"
+    echo "[$DATE] LIVE Fyers execution — placing real orders"
     [ -f "$SIGNAL_FILE" ] && $PYTHON tools/live/fyers_executor.py \
       --signals "$SIGNAL_FILE" --user-id "${USER_ID:-1}"
     ;;
@@ -67,7 +63,7 @@ case "$cmd" in
   *)
     echo "Usage: $0 {prefetch|signals|signals-force|live|summary}"
     echo "Env: UNIVERSE_FILE (default /app/logs/momrot/universes/n100_current.json),"
-    echo "     LIVE_TRADING (false), USER_ID (1), PYTHON (python)"
+    echo "     USER_ID (1), PYTHON (python)"
     exit 1
     ;;
 esac

@@ -541,7 +541,7 @@ class AutoTradingSettings(Base):
     auto_target_price_enabled = Column(Boolean, default=True)  # Auto set target price
     execution_time = Column(String(10), default='09:20')  # Time to execute (HH:MM format, market opens 9:15 AM)
     trading_mode = Column(String(20), default='swing')  # 'swing', 'day', 'both'
-    virtual_capital = Column(Float, default=100000.0)    # Configurable paper trading capital
+    virtual_capital = Column(Float, default=100000.0)    # Legacy AutoTradingSettings field; live ledger uses model_settings.invested_amount
     # Per-user EMA 200/400 strategy overrides. JSONB blob; merged onto
     # StrategyConfig defaults at runtime by EMACrossoverRunner.
     ema_strategy_config = Column(JSONB)
