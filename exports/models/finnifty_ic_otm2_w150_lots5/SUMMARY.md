@@ -51,6 +51,24 @@ Notable: returns are **stable** across years (177-245%). Older OTM4/W300 variant
 
 **86 % expiry rate** — strategy collects time decay almost every cycle. The 5 stops were sharp directional moves that breached the 2% OTM short strike.
 
+<!-- MARGIN-BLOCK-START -->
+## Margin (SPAN+exposure approx)
+
+Approximation calibrated to live Sensibull basket 2026-05-23 ±2 %. See `compute_ic_margin` in `sweep.py` for the formula (SPAN 2.9 % of short notional + 0.5 % exposure − long-wing credit).
+
+| Metric | Value |
+|---|---:|
+| Avg margin / trade | ₹319,162 |
+| Peak margin / trade | ₹572,081 |
+| Configured capital | ₹200,000 |
+| Capital / avg-margin ratio | 0.63× |
+
+> ⚠️ **Margin required exceeds configured capital.** Avg margin ₹319,162 > capital ₹200,000. The backtest assumed 5 lots could always be opened on ₹200k capital — but the live broker will block trades when funds are insufficient. Two ways to fix the gap:
+> 1. **Increase capital** to ≥ ₹629,289 (≈ 1.1× peak margin) so every trade has headroom.
+> 2. **Reduce lots** to keep avg margin ≤ ~80 % of capital.
+
+<!-- MARGIN-BLOCK-END -->
+
 ## Files in this folder
 
 | File | Description |

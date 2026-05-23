@@ -130,6 +130,34 @@ def slip_for_distance(dist_pct: float, base_slip: float) -> float:
     return base_slip * mult
 
 
+# SPAN+exposure margin approximation for an Iron Condor on Indian index
+# options. Calibrated against live Sensibull basket on 2026-05-23 for
+# FinNifty OTM2/W150/lots5 (margin shown ₹3,71,286). Formula:
+#
+#   short_notional = (ce_short_k + pe_short_k) * lot * lots
+#   span_margin    = short_notional * SPAN_RATE         # SPAN on shorts
+#   wing_credit    = (wce_entry + wpe_entry) * lot * lots  # paid premium offsets risk
+#   exposure       = short_notional * EXPOSURE_RATE
+#   margin         = max(0, span_margin - wing_credit) + exposure
+#
+# Tuned to within ~2% of the live Sensibull figure. Exchange SPAN moves
+# with realised vol — treat as ballpark, not exact. Brokers add ~5-10%
+# extra buffer in practice.
+SPAN_RATE = 0.029         # ~2.9% of short-leg notional (NSE F&O typical)
+EXPOSURE_RATE = 0.005     # ~0.5% exposure margin
+
+
+def compute_ic_margin(ce_short_k: float, pe_short_k: float,
+                      wce_entry_px: float, wpe_entry_px: float,
+                      lot_size: int, lots: int) -> float:
+    """Approx SPAN+exposure margin for a 4-leg Iron Condor (INR)."""
+    short_notional = (ce_short_k + pe_short_k) * lot_size * lots
+    span_margin = short_notional * SPAN_RATE
+    wing_credit = (wce_entry_px + wpe_entry_px) * lot_size * lots
+    exposure = short_notional * EXPOSURE_RATE
+    return round(max(0.0, span_margin - wing_credit) + exposure, 2)
+
+
 def run_ic(underlying: str, start: str, end: str,
            otm_pct: float, wing_width: int, stop_mult: float,
            slip: float, capital: float, lots: int,
@@ -241,6 +269,8 @@ def run_ic(underlying: str, start: str, end: str,
 
         pnl_unit = net_credit - exit_debit
         lot_size = lot_size_for(underlying, entry_day)
+        margin_required = compute_ic_margin(ce_k, pe_k, wce_e, wpe_e,
+                                            lot_size, lots)
         trades.append({
             "entry_date": entry_day, "exit_date": exit_d, "expiry": exp,
             "spot": round(spot_close, 1),
@@ -263,6 +293,11 @@ def run_ic(underlying: str, start: str, end: str,
             "pnl_total": round(pnl_unit * lots * lot_size, 2),
             "max_loss_per_unit": wing_width - net_credit,
             "max_loss_total": (wing_width - net_credit) * lots * lot_size,
+            # SPAN+exposure margin approximation (INR). See compute_ic_margin
+            # docstring — calibrated to live Sensibull figure ±2%.
+            "margin_required_inr": margin_required,
+            "margin_pct_of_capital": round(margin_required / capital * 100, 1)
+                if capital > 0 else None,
             "exit_reason": exit_reason,
         })
     if not trades:

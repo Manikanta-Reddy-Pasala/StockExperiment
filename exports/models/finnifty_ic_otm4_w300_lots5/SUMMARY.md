@@ -115,3 +115,21 @@
 | 33 | 2026-02-02 | 2026-02-13 | 26799.0 | 27850 | 25750 | 28150 | 25450 | ₹111.71 | ₹367.84 | **₹-76,841** | SL | ₹1,551,033 |
 | 34 | 2026-04-15 | 2026-04-28 | 27564.1 | 28650 | 26450 | 28950 | 26150 | ₹2249.68 | ₹303.00 | **+₹584,004** | EXPIRY | ₹2,135,036 |
 | 35 | 2026-05-04 | 2026-05-26 | 25814.4 | 26850 | 24800 | 27150 | 24500 | ₹148.84 | ₹0.00 | **+₹44,652** | EXPIRY | ₹2,179,688 |
+
+<!-- MARGIN-BLOCK-START -->
+## Margin (SPAN+exposure approx)
+
+Approximation calibrated to live Sensibull basket 2026-05-23 ±2 %. See `compute_ic_margin` in `sweep.py` for the formula (SPAN 2.9 % of short notional + 0.5 % exposure − long-wing credit).
+
+| Metric | Value |
+|---|---:|
+| Avg margin / trade | ₹362,536 |
+| Peak margin / trade | ₹602,378 |
+| Configured capital | ₹200,000 |
+| Capital / avg-margin ratio | 0.55× |
+
+> ⚠️ **Margin required exceeds configured capital.** Avg margin ₹362,536 > capital ₹200,000. The backtest assumed 5 lots could always be opened on ₹200k capital — but the live broker will block trades when funds are insufficient. Two ways to fix the gap:
+> 1. **Increase capital** to ≥ ₹662,615 (≈ 1.1× peak margin) so every trade has headroom.
+> 2. **Reduce lots** to keep avg margin ≤ ~80 % of capital.
+
+<!-- MARGIN-BLOCK-END -->
