@@ -123,6 +123,24 @@ def _round_tick(p: float, tick: float = TICK) -> float:
     return round(round(p / tick) * tick, 2)
 
 
+def _volume_tier(vol: float) -> str:
+    """Bucket day-volume into a liquidity tier. Drives limit-walk pacing.
+
+    Tiers calibrated against typical FinNifty option-chain day-volume:
+      - thick: >5000 contracts traded — tight spread, MARKET-safe
+      - normal: 1000-5000 — start at mid, walk in ticks
+      - thin: 500-1000 — start one tick conservative, walk slow
+      - none: <500 — depth-gate already rejects in basket mode
+    """
+    if vol >= 5000:
+        return "thick"
+    if vol >= 1000:
+        return "normal"
+    if vol >= 500:
+        return "thin"
+    return "none"
+
+
 def limit_walk(
     svc, user_id: int, symbol: str, side: str, qty: int,
     product: str, tag: str,
@@ -136,6 +154,12 @@ def limit_walk(
     After `aggressive_after` steps, jump straight to ask (BUY) / bid (SELL).
     If still unfilled after max_steps, cancel pending and fall back to MARKET.
 
+    The starting bid AND pacing both scale with observed leg volume — thin
+    legs get a more conservative start (one tick away from mid in our favor)
+    and slower walk, since aggressive market orders on illiquid wings can
+    cost 30-80 % of premium in slippage. Caller-supplied overrides win:
+    explicit max_steps / step_sleep / aggressive_after still apply.
+
     Returns dict matching _place_leg's contract.
     """
     side = side.upper()
@@ -145,10 +169,37 @@ def limit_walk(
         return _place_market(svc, user_id, symbol, side, qty, product, tag)
 
     bid, ask = q["bid"], q["ask"]
+    vol = q.get("volume", 0)
+    tier = _volume_tier(vol)
     mid = _round_tick((bid + ask) / 2.0)
-    log.info(f"limit-walk {side} {symbol} bid={bid} ask={ask} mid={mid} qty={qty}")
 
-    target = mid
+    # Volume-aware tuning: thinner book → start further from market in our
+    # favour and walk slower. Defaults preserved for "normal" tier and when
+    # caller passed non-default values.
+    start_offset_ticks = 0
+    if tier == "thin":
+        start_offset_ticks = 1     # one tick more conservative
+        if step_sleep == 3.0:
+            step_sleep = 5.0
+        if aggressive_after == 3:
+            aggressive_after = 4
+    elif tier == "thick":
+        start_offset_ticks = 0
+        if step_sleep == 3.0:
+            step_sleep = 2.0       # liquid book, walk faster
+        if aggressive_after == 3:
+            aggressive_after = 2
+
+    if start_offset_ticks > 0:
+        adj = -TICK * start_offset_ticks if side == "BUY" else TICK * start_offset_ticks
+        target = _round_tick(mid + adj)
+    else:
+        target = mid
+    log.info(f"limit-walk {side} {symbol} bid={bid} ask={ask} mid={mid} "
+             f"vol={int(vol)} tier={tier} start={target} qty={qty} "
+             f"max_steps={max_steps} step_sleep={step_sleep}s "
+             f"aggressive_after={aggressive_after}")
+
     order_id = ""
     last_resp: Dict = {}
     for step in range(max_steps):
