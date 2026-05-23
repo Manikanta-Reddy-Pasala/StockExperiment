@@ -106,7 +106,25 @@ services:
     restart: unless-stopped
     networks:
       - trading_network
-    command: python run.py --multi-user
+    # Production WSGI server (gunicorn) instead of the Werkzeug dev server.
+    # Single worker (so create_app's startup thread + model seeding run
+    # exactly once — no multi-process duplication) with 8 threads to
+    # handle concurrent requests. The dev server was dropping connections
+    # under concurrent load → intermittent "site can't be reached".
+    # 120s timeout covers slow Fyers/DB calls. graceful-timeout lets
+    # in-flight requests finish on deploy so no mid-request connection drop.
+    command: >
+      gunicorn
+      --workers 1
+      --threads 8
+      --worker-class gthread
+      --timeout 120
+      --graceful-timeout 30
+      --keep-alive 5
+      --bind 0.0.0.0:5001
+      --access-logfile -
+      --error-logfile -
+      "src.web.app:create_app()"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
       interval: 30s

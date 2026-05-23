@@ -43,10 +43,57 @@ def create_app():
     """Create Flask application."""
     app = Flask(__name__)
     
-    # Use SECRET_KEY from environment, fall back to random (dev only)
-    app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_hex(16)
-    if not os.environ.get('SECRET_KEY'):
-        print("WARNING: SECRET_KEY not set - sessions will not persist across restarts")
+    # SECRET_KEY resolution — MUST be stable across restarts/deploys or
+    # every signed session + remember-me cookie is invalidated and users
+    # are force-logged-out on each deploy. Resolution order:
+    #   1. SECRET_KEY env var (preferred — set in .env on the host)
+    #   2. Persisted file on a mounted volume (survives image rebuilds
+    #      because /app/logs is bind-mounted to the host, not baked in)
+    #   3. Generate once + persist to that file (self-healing)
+    def _resolve_secret_key() -> str:
+        env_key = os.environ.get('SECRET_KEY')
+        if env_key:
+            return env_key
+        # /app/logs is bind-mounted (see docker-compose) so a key written
+        # here outlives `docker compose build && up -d`.
+        key_path = os.path.join(os.path.dirname(__file__), '..', '..',
+                                'logs', '.flask_secret_key')
+        key_path = os.path.abspath(key_path)
+        try:
+            if os.path.exists(key_path):
+                with open(key_path) as f:
+                    k = f.read().strip()
+                if k:
+                    return k
+            k = secrets.token_hex(32)
+            os.makedirs(os.path.dirname(key_path), exist_ok=True)
+            with open(key_path, 'w') as f:
+                f.write(k)
+            os.chmod(key_path, 0o600)
+            print(f"SECRET_KEY generated + persisted to {key_path}")
+            return k
+        except Exception as e:
+            print(f"WARNING: could not persist SECRET_KEY ({e}) — "
+                  f"sessions will reset on restart")
+            return secrets.token_hex(32)
+
+    app.secret_key = _resolve_secret_key()
+
+    # Session + remember-me cookies long-lived so a deploy doesn't log
+    # users out. 30-day rolling window.
+    from datetime import timedelta
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+    app.config['SESSION_REFRESH_EACH_REQUEST'] = True
+    app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=30)
+    app.config['REMEMBER_COOKIE_HTTPONLY'] = True
+    app.config['REMEMBER_COOKIE_SAMESITE'] = 'Lax'
+    # Secure cookies only when served over HTTPS (prod). Allow override
+    # for local http dev via SECURE_COOKIES=false.
+    _secure = os.environ.get('SECURE_COOKIES', 'true').lower() == 'true'
+    app.config['REMEMBER_COOKIE_SECURE'] = _secure
+    app.config['SESSION_COOKIE_SECURE'] = _secure
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
     # Force template auto-reload so Jinja re-reads files on each request
     app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -260,6 +307,10 @@ def create_app():
 
             try:
                 user = user_service.login_user(username, password)
+                # Mark session permanent so it honors the 30-day lifetime
+                # (otherwise it's a session cookie that dies on browser close).
+                from flask import session as _flask_session
+                _flask_session.permanent = True
                 login_user(user, remember=remember)
                 next_page = request.args.get('next')
                 return redirect(next_page) if next_page else redirect(url_for('dashboard'))

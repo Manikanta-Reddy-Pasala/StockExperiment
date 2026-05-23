@@ -185,6 +185,8 @@ def webauthn_authenticate_complete():
             user = session.query(User).filter(User.id == result['user']['id']).first()
             if user:
                 session.expunge(user)
+                from flask import session as flask_session
+                flask_session.permanent = True
                 login_user(user, remember=True)
 
         return jsonify({
