@@ -982,11 +982,19 @@ body {
     min-height: 56px;
 }
 .mobile-bottom-nav .bn-item i { font-size: 1.55rem; line-height: 1; }
+.mobile-bottom-nav .bn-item svg {
+    width: 26px;
+    height: 26px;
+    stroke-width: 2;
+    transition: transform 0.12s ease, stroke-width 0.12s ease;
+}
 .mobile-bottom-nav .bn-item.active {
     color: #15a36b;
 }
-.mobile-bottom-nav .bn-item.active i {
+.mobile-bottom-nav .bn-item.active i,
+.mobile-bottom-nav .bn-item.active svg {
     transform: scale(1.12);
+    stroke-width: 2.5;
 }
 .mobile-bottom-nav .bn-item:active,
 .mobile-bottom-nav .bn-item:focus-visible {

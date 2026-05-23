@@ -52,6 +52,9 @@ pytest-mock==3.11.1
 redis==5.0.1
 celery==5.3.4
 
+# Production WSGI server
+gunicorn==22.0.0
+
 # Development tools
 black==23.7.0
 flake8==6.0.0
