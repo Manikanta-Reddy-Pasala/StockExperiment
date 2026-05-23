@@ -1,32 +1,33 @@
 # Live Execution Infrastructure
 
-Generic broker + execution scripts. Used by Model 3 (momentum_n100_top5_max1)
-for live Fyers order placement. **No paper trading.**
+Generic broker + execution scripts. Always-live Fyers order placement.
+**No paper trading. No env-gated kill switch.**
 
 ## Files
 
 | File | Purpose |
 |---|---|
-| `fyers_executor.py` | Real Fyers order placement (gated by `LIVE_TRADING=true`) |
+| `fyers_executor.py` | Real Fyers equity order placement (BUY/SELL with limit-walk fallback) |
+| `fyers_executor_options.py` | Multi-leg options executor (Iron Condor etc.) |
 | `risk_manager.py` | Pre-trade risk check (capital lock, kill-switch) |
-| `daily_summary.py` | Read live ledger from `/app/logs/momrot/ledger/`, emit NAV/P&L |
+| `daily_summary.py` | Read live ledger from DB, emit NAV/P&L |
 | `telegram_notify.py` | Optional Telegram notifications for signals/fills |
-| `run_daily.sh` | Cron wrapper — see `--help` |
+| `position_reconciler.py` | Match Fyers positions vs ledger every 5 min, auto-mirror drift |
+| `broker_charges.py` | SEBI-rate charge computation (brokerage + STT + GST + stamp) |
 
-## Daily flow (cron)
+## Daily flow
 
-```
-09:00 IST  ./run_daily.sh prefetch        # cache OHLCV (N100)
-09:30 IST  ./run_daily.sh signals         # emit signals (rebalance-gated)
-09:35 IST  LIVE_TRADING=true ./run_daily.sh live    # place Fyers orders
-15:35 IST  ./run_daily.sh summary         # post-close NAV + P&L
-```
+All scheduling lives in `scheduler.py` (runs inside `technical_scheduler`
+container, APScheduler-backed). Each model registers its own jobs via
+`tools/models/<model>/cron.py`. There is no host-side cron wrapper any more.
 
 ## Live trading safety
 
-- `LIVE_TRADING=true` must be set explicitly. Default refuses.
+- Every signal that lands during market hours places real Fyers orders.
 - `USER_ID` env selects which Fyers session (broker_configurations row).
-- Capital + kill-switch enforced in `risk_manager.py`.
+- Per-trade ₹30k cap + daily-loss kill enforced by `risk_manager.py`.
+- Data-quality gate (`data_quality_gate.json`) blocks entries if coverage low.
+- `--dry-run` CLI flag still available on executors for manual paper runs.
 
 ## Bootstrap (one-time)
 
@@ -36,12 +37,12 @@ for live Fyers order placement. **No paper trading.**
        --top 100 --out /app/logs/momrot/universes/n100_current.json
    ```
 2. Ensure Fyers token is fresh (`tools/refresh_fyers_token.py`).
-3. Test signals dry-run: `./run_daily.sh signals-force` then inspect JSON.
-4. Enable live: `LIVE_TRADING=true ./run_daily.sh live`.
+3. Confirm `model_settings.enabled=true` + `invested_amount` funded.
 
 ## Refresh universe
 
-Run weekly (Sunday) or after universe drift:
+Self-heals every Saturday 06:00 IST via `data_scheduler` (refresh_universe_csvs).
+Manual override:
 ```bash
 python tools/models/momentum_n100_top5_max1/build_universe.py \
     --top 100 --out /app/logs/momrot/universes/n100_current.json

@@ -167,32 +167,28 @@ def run_ic(underlying: str, start: str, end: str,
            otm_pct: float, wing_width: int, stop_mult: float,
            slip: float, capital: float, lots: int,
            realistic_slip: bool = False,
-           min_leg_volume: int = 0,
-           min_leg_oi: int = 0,
-           entry_dow: int = -1) -> pd.DataFrame:
-    """
-    `entry_dow` filters entry weekday: -1 = any (default), 0..4 = Mon..Fri only.
-    """
+           entry_week: int = 1,
+           daily_volumes: Optional[list] = None) -> pd.DataFrame:
     """Backtest a monthly Iron Condor on `underlying`.
 
-    The volume/OI filters reject historical leg-days that wouldn't have
-    been fillable in live trading. Without this guard the backtest happily
-    "trades" against options with zero contracts changing hands that day —
-    purely a mark-to-market fantasy. With min_leg_volume=100 a real bid
-    actually existed at the recorded close (live order would have hit).
+    `entry_week` picks WHEN inside the new monthly cycle the IC enters:
+       1 = first trading day of week 1 (typically first Mon of cycle)
+       2 = first trading day of week 2
+       3 = first trading day of week 3
+    Only ONE entry per monthly expiry (seen_exp guards duplicates).
 
-    `min_leg_volume` checks ENTRY-day volume on all 4 legs (rejects entry)
-    and EXIT-day volume on the exiting leg (forces hold-to-expiry instead
-    of an impossible SL fill).
+    `daily_volumes` (optional list) gets appended one row per leg per
+    holding day so callers can see whether each leg actually had volume
+    on every day of the trade. Schema:
+       {trade_idx, date, leg (ce_short|pe_short|wce_long|wpe_long),
+        strike, close, volume, oi}
     """
     spot = load_spot(underlying, start, end)
     spot["dow"] = pd.to_datetime(spot["date"]).dt.dayofweek
-    # Walk weekdays. entry_dow narrows the set: -1 = any (default — fall
-    # through Mon→Tue→… if Mon thin), 0..4 = restrict to that weekday only.
-    if entry_dow >= 0:
-        cands = spot[spot["dow"] == entry_dow]
-    else:
-        cands = spot[spot["dow"] < 5]
+    cands = spot[spot["dow"] < 5].copy()  # all weekdays
+    # Tag each row with which week-of-month it sits in (1, 2, 3, …).
+    cands["week_of_month"] = ((pd.to_datetime(cands["date"]).dt.day - 1) // 7) + 1
+    cands = cands[cands["week_of_month"] == entry_week]
     step = STRIKE_STEP[underlying]
 
     trades = []
@@ -254,33 +250,19 @@ def run_ic(underlying: str, start: str, end: str,
             continue
         if min(ce_e, pe_e) <= 0.5:
             continue
-        # Per-leg liquidity gate at entry day. Reject the whole basket if any
-        # leg had near-zero volume on the day — live broker couldn't have
-        # filled at the recorded close.
-        if min_leg_volume > 0:
-            entry_vols = [int(ce_row.get("volume", 0)),
-                          int(pe_row.get("volume", 0)),
-                          int(wce_row.get("volume", 0)),
-                          int(wpe_row.get("volume", 0))]
-            if min(entry_vols) < min_leg_volume:
-                continue
-        if min_leg_oi > 0:
-            entry_ois = [int(ce_row.get("oi", 0)), int(pe_row.get("oi", 0)),
-                         int(wce_row.get("oi", 0)), int(wpe_row.get("oi", 0))]
-            if min(entry_ois) < min_leg_oi:
-                continue
         net_credit = (ce_e + pe_e) - (wce_e + wpe_e)
         if net_credit <= 0:
             continue
 
-        # Build pair trajectory — includes per-leg volume so we can refuse
-        # to take an SL on a day with no actual liquidity (forces hold-to-
-        # expiry, same as if live broker had no fill).
+        # Build per-leg trajectory across the holding window. We RECORD
+        # volume + oi for every day but do NOT filter on it — caller
+        # gets daily_volumes back to inspect whether liquidity existed.
         def _legcols(df: pd.DataFrame, prefix: str) -> pd.DataFrame:
             return (df[(df["date"] >= entry_day) & (df["date"] <= exp)]
-                      [["date", "close", "volume"]]
+                      [["date", "close", "volume", "oi"]]
                       .rename(columns={"close": f"{prefix}_close",
-                                       "volume": f"{prefix}_vol"}))
+                                       "volume": f"{prefix}_vol",
+                                       "oi": f"{prefix}_oi"}))
         pair = _legcols(ce_b, "ce")
         for df_o, prefix in [(pe_b, "pe"), (wce_b, "wce"), (wpe_b, "wpe")]:
             pair = pair.merge(_legcols(df_o, prefix), on="date", how="left")
@@ -295,16 +277,6 @@ def run_ic(underlying: str, start: str, end: str,
         exit_slip = (short_slip + wing_slip) / 2 if realistic_slip else slip
         for pr in pair.itertuples():
             if pr.pv >= net_credit * stop_mult:
-                # Refuse SL when ANY leg has zero volume on this day —
-                # live order to BUY back the short or SELL the wing won't
-                # fill, so the strategy holds to expiry instead.
-                if min_leg_volume > 0:
-                    leg_vols = [int(getattr(pr, "ce_vol", 0)),
-                                int(getattr(pr, "pe_vol", 0)),
-                                int(getattr(pr, "wce_vol", 0)),
-                                int(getattr(pr, "wpe_vol", 0))]
-                    if min(leg_vols) < min_leg_volume:
-                        continue
                 exit_debit = pr.pv * (1 + exit_slip)
                 exit_d = pr.date
                 exit_reason = "SL"
@@ -324,8 +296,33 @@ def run_ic(underlying: str, start: str, end: str,
             # At expiry, options settle at intrinsic value (per-leg)
             ce_x, pe_x, wce_x, wpe_x = ic_ce, ic_pe, wc, wp
 
-        # Entry succeeded → claim expiry so other Mondays in cycle skip
+        # Entry succeeded → claim expiry so other weekdays skip this cycle
         seen_exp.add(exp)
+
+        # Capture per-leg daily volume + oi over the holding window.
+        # NO filtering on volume — caller inspects this to see whether
+        # actual market activity existed on each day of the trade.
+        if daily_volumes is not None:
+            trade_idx = len(trades)
+            held = pair[(pair["date"] >= entry_day)
+                        & (pair["date"] <= exit_d)]
+            for pr in held.itertuples():
+                for prefix, leg, k in [("ce", "ce_short", ce_k),
+                                        ("pe", "pe_short", pe_k),
+                                        ("wce", "wce_long", wce_k),
+                                        ("wpe", "wpe_long", wpe_k)]:
+                    daily_volumes.append({
+                        "trade_idx": trade_idx,
+                        "underlying": underlying,
+                        "entry_date": entry_day,
+                        "expiry": exp,
+                        "date": pr.date,
+                        "leg": leg,
+                        "strike": k,
+                        "close": float(getattr(pr, f"{prefix}_close", 0)),
+                        "volume": int(getattr(pr, f"{prefix}_vol", 0)),
+                        "oi": int(getattr(pr, f"{prefix}_oi", 0)),
+                    })
 
         pnl_unit = net_credit - exit_debit
         lot_size = lot_size_for(underlying, entry_day)
