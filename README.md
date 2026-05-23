@@ -182,13 +182,39 @@ curl -s 'https://stock.oneshell.in/admin/midcap_narrow_60d_breakout/ranking?reca
 
 ---
 
+## Runtime + Mobile PWA
+
+- **WSGI:** `gunicorn -w 4 -b 0.0.0.0:5001 wsgi:app` (replaces single-thread Werkzeug). True concurrency across tabs.
+- **Session:** `SECRET_KEY` persisted in `.env` (64 hex chars). Container restart / rebuild **does NOT** re-login users.
+- **Service Worker (`/static/sw.js` v10):**
+  - Static (`/static/*`) — cache-first
+  - HTML tab routes (`/dashboard`, `/picks`, `/portfolio`, `/history`, `/settings`) — stale-while-revalidate, precached on install. Tab nav feels instant.
+  - APIs (`/api/*`, `/admin/*`, `/login`) — network-only, never cached.
+- **Mobile UI:** bottom tab bar with inline Lucide SVGs (no JS lib). Top-right username/Settings/Logout dropdown hidden on mobile (`d-none d-md-flex`). Pull-to-refresh gesture in PWA standalone mode.
+- **No CDN JS bloat:** Chart.js + chartjs-plugin-datalabels removed from v2 base (were 225KB of unused payload).
+- **DB resources:** `database` container 1G mem, `data_scheduler` 1G, app 1G, dragonfly 512M.
+
+## Deployment
+
+`/app/src` is baked into image at build time (NOT volume-mounted). Code/template changes need rebuild:
+
+```bash
+ssh root@77.42.45.12 'cd /opt/trading_system && \
+  git pull --ff-only && \
+  docker compose build trading_system && \
+  docker compose up -d trading_system'
+```
+
+Env-only changes: `docker compose up -d --force-recreate trading_system`.
+
 ## Tags / Releases
 
 - `v1.0.0` — Initial single-model momentum rotation
 - `v2.0-btc-rules` — BTC-correlated regime filter (rejected)
 - `v2.1-slope50` — EMA-50 slope refinement
 - `v3.0-multi-model-audit` — 5 isolated models + 7-table audit trail + capital guardrails
-- **`v3.1-approx-charges`** — Approximate broker charges (formula), live-backtest parity sync (midcap V2 + pseudo_n100 smallcap exclude + 200d uptrend), insufficient-cash Telegram alerts, per-model ledger reconciler (current)
+- `v3.1-approx-charges` — Approximate broker charges, live-backtest parity sync, insufficient-cash alerts, per-model ledger reconciler
+- **`v3.2-always-live`** — LIVE_TRADING gate removed (always live), gunicorn 4-worker, persistent SECRET_KEY, SW v10 SWR PWA, inline Lucide nav, dropped chart.js bloat, purged dead `historical_data_15m/1h` tables (4.4G), deleted dead `run_daily.sh` (current)
 
 ---
 
