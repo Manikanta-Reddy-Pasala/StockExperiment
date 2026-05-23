@@ -1,56 +1,56 @@
 [
   {
     "entry_week": 1,
-    "trades": 35,
-    "wins": 20,
-    "wr_pct": 57.1,
-    "total_pnl": 1602643.69,
-    "total_return_pct": 801.32,
+    "trades": 10,
+    "wins": 2,
+    "wr_pct": 20.0,
+    "total_pnl": -211727.15,
+    "total_return_pct": -105.86,
     "avg_volume_per_leg": {
-      "ce_short": 141359.0,
-      "pe_short": 61138.0,
-      "wce_long": 155397.0,
-      "wpe_long": 138499.0
+      "ce_short": 9141.0,
+      "pe_short": 26075.0,
+      "wce_long": 9240.0,
+      "wpe_long": 96239.0
     },
-    "pct_held_days_zero_volume": 33.35,
-    "pct_held_days_our_share_over_10pct_of_traded": 22.89,
-    "median_avg_trade_size_inr": 7355.0,
-    "median_num_trades_per_leg_day": 497
+    "pct_held_days_zero_volume": 4.44,
+    "pct_held_days_our_share_over_10pct_of_traded": 22.53,
+    "median_avg_trade_size_inr": 12363.0,
+    "median_num_trades_per_leg_day": 522
   },
   {
     "entry_week": 2,
-    "trades": 35,
-    "wins": 27,
-    "wr_pct": 77.1,
-    "total_pnl": 2067115.14,
-    "total_return_pct": 1033.56,
+    "trades": 15,
+    "wins": 10,
+    "wr_pct": 66.7,
+    "total_pnl": 41229.66,
+    "total_return_pct": 20.61,
     "avg_volume_per_leg": {
-      "ce_short": 162197.0,
-      "pe_short": 162445.0,
-      "wce_long": 377133.0,
-      "wpe_long": 157602.0
+      "ce_short": 27015.0,
+      "pe_short": 13181.0,
+      "wce_long": 17549.0,
+      "wpe_long": 14411.0
     },
-    "pct_held_days_zero_volume": 22.37,
-    "pct_held_days_our_share_over_10pct_of_traded": 20.16,
-    "median_avg_trade_size_inr": 5448.0,
-    "median_num_trades_per_leg_day": 843
+    "pct_held_days_zero_volume": 2.11,
+    "pct_held_days_our_share_over_10pct_of_traded": 21.49,
+    "median_avg_trade_size_inr": 6426.0,
+    "median_num_trades_per_leg_day": 873
   },
   {
     "entry_week": 3,
-    "trades": 36,
-    "wins": 27,
-    "wr_pct": 75.0,
-    "total_pnl": 1726659.19,
-    "total_return_pct": 863.33,
+    "trades": 27,
+    "wins": 18,
+    "wr_pct": 66.7,
+    "total_pnl": -54634.19,
+    "total_return_pct": -27.32,
     "avg_volume_per_leg": {
-      "ce_short": 442347.0,
-      "pe_short": 168411.0,
-      "wce_long": 627238.0,
-      "wpe_long": 207198.0
+      "ce_short": 662343.0,
+      "pe_short": 496481.0,
+      "wce_long": 382294.0,
+      "wpe_long": 135919.0
     },
-    "pct_held_days_zero_volume": 10.84,
-    "pct_held_days_our_share_over_10pct_of_traded": 14.16,
-    "median_avg_trade_size_inr": 3432.0,
-    "median_num_trades_per_leg_day": 1351
+    "pct_held_days_zero_volume": 0.14,
+    "pct_held_days_our_share_over_10pct_of_traded": 10.33,
+    "median_avg_trade_size_inr": 3638.0,
+    "median_num_trades_per_leg_day": 1657
   }
 ]
