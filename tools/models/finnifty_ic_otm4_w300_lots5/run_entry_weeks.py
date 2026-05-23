@@ -61,10 +61,10 @@ def main() -> int:
         avg_vol = (dv.groupby("leg")["volume"].mean().round(0).to_dict()
                    if not dv.empty else {})
         zero_pct = ((dv["volume"] == 0).mean() * 100) if not dv.empty else 0
-        # Fill-safety: how often is our order >10% of day's turnover?
-        risky_fill_pct = ((dv["our_share_of_turnover"] > 0.10).mean() * 100
+        # Fill-safety: how often is our order >10% of day's traded value?
+        risky_fill_pct = ((dv["our_share_of_traded"] > 0.10).mean() * 100
                           if not dv.empty
-                          and "our_share_of_turnover" in dv else None)
+                          and "our_share_of_traded" in dv else None)
         # Median avg trade size (₹) across all leg-days
         median_avg_trade_inr = (float(dv["avg_trade_inr"].median())
                                 if not dv.empty
@@ -84,7 +84,7 @@ def main() -> int:
             "total_return_pct": round(total / PARAMS["capital"] * 100, 2),
             "avg_volume_per_leg": avg_vol,
             "pct_held_days_zero_volume": round(zero_pct, 2),
-            "pct_held_days_our_share_over_10pct": (
+            "pct_held_days_our_share_over_10pct_of_traded": (
                 round(risky_fill_pct, 2) if risky_fill_pct is not None else None),
             "median_avg_trade_size_inr": (
                 round(median_avg_trade_inr, 0) if median_avg_trade_inr else None),
