@@ -313,6 +313,15 @@ def run_ic(underlying: str, start: str, end: str,
             trade_idx = len(trades)
             held = pair[(pair["date"] >= entry_day)
                         & (pair["date"] <= exit_d)]
+            # Our intended order size per leg = lot_size * lots * entry_close.
+            # Used to compute our_share_of_turnover so the caller can flag
+            # "this leg-day's turnover is too thin for our intended order".
+            our_order_inr_per_leg = {
+                "ce_short": lot_size_for(underlying, entry_day) * lots * ce_e,
+                "pe_short": lot_size_for(underlying, entry_day) * lots * pe_e,
+                "wce_long": lot_size_for(underlying, entry_day) * lots * wce_e,
+                "wpe_long": lot_size_for(underlying, entry_day) * lots * wpe_e,
+            }
             for pr in held.itertuples():
                 for prefix, leg, k in [("ce", "ce_short", ce_k),
                                         ("pe", "pe_short", pe_k),
@@ -320,6 +329,15 @@ def run_ic(underlying: str, start: str, end: str,
                                         ("wpe", "wpe_long", wpe_k)]:
                     ntrd_raw = getattr(pr, f"{prefix}_ntrd", None)
                     turn_raw = getattr(pr, f"{prefix}_turn", None)
+                    ntrd = (int(ntrd_raw) if ntrd_raw not in (None, 0)
+                            and not pd.isna(ntrd_raw) else None)
+                    turn = (float(turn_raw) if turn_raw not in (None, 0)
+                            and not pd.isna(turn_raw) else None)
+                    turn_inr = turn * 100_000 if turn else None
+                    avg_trade_inr = (turn_inr / ntrd
+                                     if turn_inr and ntrd else None)
+                    our_share = (our_order_inr_per_leg[leg] / turn_inr
+                                 if turn_inr and turn_inr > 0 else None)
                     daily_volumes.append({
                         "trade_idx": trade_idx,
                         "underlying": underlying,
@@ -331,12 +349,16 @@ def run_ic(underlying: str, start: str, end: str,
                         "close": float(getattr(pr, f"{prefix}_close", 0)),
                         "volume": int(getattr(pr, f"{prefix}_vol", 0)),
                         "oi": int(getattr(pr, f"{prefix}_oi", 0)),
-                        "num_trades": (int(ntrd_raw)
-                                       if ntrd_raw not in (None, 0) and
-                                       not pd.isna(ntrd_raw) else None),
-                        "turnover_lakh": (float(turn_raw)
-                                          if turn_raw not in (None, 0) and
-                                          not pd.isna(turn_raw) else None),
+                        "num_trades": ntrd,
+                        "turnover_lakh": turn,
+                        # Derived: avg ₹ per actual trade that day; lets
+                        # caller see typical fill size.
+                        "avg_trade_inr": round(avg_trade_inr, 0)
+                                         if avg_trade_inr else None,
+                        # Derived: our intended ₹ order vs day's total.
+                        # >0.10 = our trade is >10% of day → won't fill clean.
+                        "our_share_of_turnover": round(our_share, 4)
+                                                  if our_share else None,
                     })
 
         pnl_unit = net_credit - exit_debit

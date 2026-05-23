@@ -60,8 +60,23 @@ def main() -> int:
         n = len(df)
         avg_vol = (dv.groupby("leg")["volume"].mean().round(0).to_dict()
                    if not dv.empty else {})
-        # How often did a leg have zero volume on a held day?
         zero_pct = ((dv["volume"] == 0).mean() * 100) if not dv.empty else 0
+        # Fill-safety: how often is our order >10% of day's turnover?
+        risky_fill_pct = ((dv["our_share_of_turnover"] > 0.10).mean() * 100
+                          if not dv.empty
+                          and "our_share_of_turnover" in dv else None)
+        # Median avg trade size (₹) across all leg-days
+        median_avg_trade_inr = (float(dv["avg_trade_inr"].median())
+                                if not dv.empty
+                                and "avg_trade_inr" in dv
+                                and dv["avg_trade_inr"].notna().any()
+                                else None)
+        # Median num_trades per leg-day
+        median_num_trades = (float(dv["num_trades"].median())
+                             if not dv.empty
+                             and "num_trades" in dv
+                             and dv["num_trades"].notna().any()
+                             else None)
         summary.append({
             "entry_week": week, "trades": n, "wins": wins,
             "wr_pct": round(wins / n * 100, 1),
@@ -69,6 +84,12 @@ def main() -> int:
             "total_return_pct": round(total / PARAMS["capital"] * 100, 2),
             "avg_volume_per_leg": avg_vol,
             "pct_held_days_zero_volume": round(zero_pct, 2),
+            "pct_held_days_our_share_over_10pct": (
+                round(risky_fill_pct, 2) if risky_fill_pct is not None else None),
+            "median_avg_trade_size_inr": (
+                round(median_avg_trade_inr, 0) if median_avg_trade_inr else None),
+            "median_num_trades_per_leg_day": (
+                int(median_num_trades) if median_num_trades else None),
         })
         print(f"week{week}: {n} trades, WR {wins/n*100:.1f}%, "
               f"₹{total:+,.0f} ({total/PARAMS['capital']*100:+.1f}%), "
