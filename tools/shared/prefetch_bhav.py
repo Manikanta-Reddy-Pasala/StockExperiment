@@ -107,7 +107,7 @@ def parse_new(txt: str, underlying_set: set, instrument_set: set) -> List[dict]:
     iH = idx("HghPric"); iL = idx("LwPric"); iC = idx("ClsPric")
     iV = idx("TtlTradgVol"); iOI = idx("OpnIntrst"); iTD = idx("TradDt")
     iNT = idx("TtlNbOfTxsExctd")   # number of distinct trades
-    iTO = idx("TtlTrnvrInRsrL")    # turnover in lakhs of rupees
+    iTO = idx("TtlTrfVal")         # total traded value in lakhs of rupees
 
     # Map old OPTIDX -> new IDO, OPTSTK -> STO
     new_instr_set = set()
