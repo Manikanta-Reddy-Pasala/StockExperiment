@@ -183,7 +183,11 @@ def run_ic(underlying: str, start: str, end: str,
     """
     spot = load_spot(underlying, start, end)
     spot["dow"] = pd.to_datetime(spot["date"]).dt.dayofweek
-    cands = spot[spot["dow"] == 0]  # Mondays
+    # Walk EVERY trading day, not just Mondays. If Monday's wings have no
+    # volume, we naturally fall through to Tue/Wed/Thu/Fri until a day in
+    # this cycle has fillable legs. seen_exp guards against multiple entries
+    # per expiry. Preserves "earliest viable entry per cycle" semantics.
+    cands = spot[spot["dow"] < 5]  # all weekdays
     step = STRIKE_STEP[underlying]
 
     trades = []
@@ -195,9 +199,9 @@ def run_ic(underlying: str, start: str, end: str,
             continue
         # NOTE: seen_exp.add(exp) deferred until AFTER successful entry below.
         # Earlier bug: marking expiry as seen before validating strike/bar
-        # availability meant a single failed first-Monday (e.g. wing strike
-        # not yet listed) would skip the entire monthly cycle. Now retries on
-        # subsequent Mondays until entry succeeds.
+        # availability meant a single failed first day (e.g. wing strike not
+        # yet listed OR no volume yet) would skip the entire monthly cycle.
+        # Now retries on subsequent weekdays until entry succeeds.
         spot_close = float(r.close)
         ce_k = round_strike(spot_close * (1 + otm_pct/100), step)
         pe_k = round_strike(spot_close * (1 - otm_pct/100), step)
