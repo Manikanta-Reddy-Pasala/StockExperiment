@@ -19,7 +19,7 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
@@ -66,12 +66,14 @@ def _place_leg(svc, user_id: int, sig: Dict, product: str, dry: bool,
 
 
 def _audit_leg(model_name: str, fill: Dict, price: float, product: str,
-               dry: bool) -> None:
+               dry: bool, depth: Optional[Dict] = None,
+               margin_inr: Optional[float] = None) -> None:
     try:
         from src.services.audit_service import write_order
     except ImportError:
         log.debug("audit_service.write_order not available, skipping audit")
         return
+    depth = depth or {}
     try:
         write_order(
             model_name=model_name,
@@ -86,9 +88,50 @@ def _audit_leg(model_name: str, fill: Dict, price: float, product: str,
             pricetype=fill.get("pricetype", "MARKET"),
             status="dry-run" if dry else fill.get("status", "unknown"),
             raw_response=fill.get("raw") if isinstance(fill.get("raw"), dict) else None,
+            bid_at_entry=depth.get("bid"),
+            ask_at_entry=depth.get("ask"),
+            spread_pct_at_entry=depth.get("spread_pct"),
+            volume_at_entry=depth.get("volume"),
+            oi_at_entry=depth.get("oi"),
+            margin_blocked_inr=margin_inr,
         )
     except Exception as e:
         log.debug(f"audit write failed: {e}")
+
+
+def _utilized_funds(svc, user_id: int) -> Optional[float]:
+    """Pull Fyers utilized-funds for margin-delta computation.
+
+    Returns None on any failure — audit row will store NULL for margin.
+    """
+    if svc is None:
+        return None
+    try:
+        resp = svc.funds(user_id=user_id)
+    except Exception as e:
+        log.debug(f"funds() failed: {e}")
+        return None
+    if not isinstance(resp, dict):
+        return None
+    # Fyers v3 funds shape: {"s":"ok","fund_limit":[{"id":N,"title":"...","equityAmount":...}]}
+    rows = resp.get("fund_limit") or resp.get("data") or []
+    if isinstance(rows, list):
+        for r in rows:
+            title = str(r.get("title", "")).lower()
+            if "utilized" in title or "used" in title:
+                v = r.get("equityAmount") or r.get("commodityAmount") or r.get("amount")
+                try:
+                    return float(v)
+                except (TypeError, ValueError):
+                    continue
+    # Fallback: try top-level fields
+    for k in ("utilized", "utilizedAmount", "marginUtilized"):
+        if k in resp:
+            try:
+                return float(resp[k])
+            except (TypeError, ValueError):
+                pass
+    return None
 
 
 def main() -> int:
@@ -150,6 +193,7 @@ def main() -> int:
     # Pre-trade liquidity gate (only when we have a live svc — otherwise
     # nothing to query). Abort the basket if any leg fails — partial fills
     # in defined-risk strategies leave open undefined risk.
+    depth_by_symbol: Dict[str, Dict] = {}
     if svc is not None and not args.no_depth_gate:
         from tools.live.option_depth_check import gate_basket
         ok, report = gate_basket(
@@ -163,6 +207,7 @@ def main() -> int:
                      f"bid={r.get('bid',0)} ask={r.get('ask',0)} "
                      f"spread={r.get('spread_pct',0)}% vol={r.get('volume',0)} "
                      f"oi={r.get('oi',0)} -> {r['reason']}")
+            depth_by_symbol[r["symbol"]] = r
         if not ok:
             log.error("DEPTH GATE FAILED — aborting basket")
             try:
@@ -177,16 +222,23 @@ def main() -> int:
                 pass
             return 3
 
+    # Snapshot Fyers utilized-funds before placing — basket margin delta
+    # will be computed after all legs are placed and stamped on every row.
+    util_before = _utilized_funds(svc, args.user_id)
+    if util_before is not None:
+        log.info(f"  margin: utilized-before = ₹{util_before:,.2f}")
+
     placed = 0
     errors = 0
+    audit_queue: List[tuple] = []  # [(fill, price, depth), ...] for post-margin stamp
     for sig in signals_sorted:
         # SELL legs (shorts) — liquid strikes near ATM, MARKET is fine.
         # BUY legs (long wings) — thin strikes, use LIMIT-walk to control slip.
         use_walk = (not args.no_limit_walk) and sig["side"].upper() == "BUY"
         fill = _place_leg(svc, args.user_id, sig, args.product, args.dry_run,
                           use_limit_walk=use_walk)
-        _audit_leg(args.model_name, fill, float(sig.get("price", 0) or 0),
-                   args.product, args.dry_run)
+        leg_depth = depth_by_symbol.get(sig["symbol"])
+        audit_queue.append((fill, float(sig.get("price", 0) or 0), leg_depth))
         if fill["status"] in ("ok", "success", "dry-run"):
             placed += 1
             log.info(f"  {fill['side']:4} {fill['symbol']:30} qty={fill['qty']:>4} "
@@ -194,6 +246,20 @@ def main() -> int:
         else:
             errors += 1
             log.error(f"  FAIL {fill['side']} {fill['symbol']}: {fill['status']}")
+
+    # Snapshot Fyers utilized-funds after — delta is the margin blocked by
+    # this basket (Iron-Condor margin is netted, much smaller than per-leg sum).
+    margin_basket: Optional[float] = None
+    util_after = _utilized_funds(svc, args.user_id)
+    if util_before is not None and util_after is not None:
+        margin_basket = max(0.0, util_after - util_before)
+        log.info(f"  margin: utilized-after = ₹{util_after:,.2f} "
+                 f"delta = ₹{margin_basket:,.2f}")
+
+    # Now write audit rows with full depth + basket margin.
+    for fill, price, leg_depth in audit_queue:
+        _audit_leg(args.model_name, fill, price, args.product, args.dry_run,
+                   depth=leg_depth, margin_inr=margin_basket)
 
     log.info(f"Done: placed={placed} errors={errors} "
              f"(live={live}, dry_run={args.dry_run}, "

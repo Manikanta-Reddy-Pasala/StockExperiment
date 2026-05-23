@@ -42,8 +42,19 @@ def write_order(model_name: Optional[str], symbol: str, side: str, qty: int,
                 signal_id: Optional[int] = None,
                 error_text: Optional[str] = None,
                 raw_request: Optional[Dict[str, Any]] = None,
-                raw_response: Optional[Dict[str, Any]] = None) -> Optional[int]:
-    """Insert an audit_orders row. Returns row id or None on failure."""
+                raw_response: Optional[Dict[str, Any]] = None,
+                bid_at_entry: Optional[float] = None,
+                ask_at_entry: Optional[float] = None,
+                spread_pct_at_entry: Optional[float] = None,
+                volume_at_entry: Optional[int] = None,
+                oi_at_entry: Optional[int] = None,
+                margin_blocked_inr: Optional[float] = None) -> Optional[int]:
+    """Insert an audit_orders row. Returns row id or None on failure.
+
+    Optional depth/margin kwargs let the F&O multi-leg executor stamp the
+    L1 snapshot + basket margin alongside the order. Equity callers omit
+    them and the columns remain NULL.
+    """
     try:
         from src.models.database import get_database_manager
         from src.models.audit_models import AuditOrder
@@ -87,6 +98,12 @@ def write_order(model_name: Optional[str], symbol: str, side: str, qty: int,
                 raw_response=raw_response,
                 charges_inr=_safe_dec(charges_total),
                 charges_breakdown=charges_breakdown,
+                bid_at_entry=_safe_dec(bid_at_entry),
+                ask_at_entry=_safe_dec(ask_at_entry),
+                spread_pct_at_entry=_safe_dec(spread_pct_at_entry),
+                volume_at_entry=_safe_int(volume_at_entry),
+                oi_at_entry=_safe_int(oi_at_entry),
+                margin_blocked_inr=_safe_dec(margin_blocked_inr),
             )
             s.add(row)
             s.flush()

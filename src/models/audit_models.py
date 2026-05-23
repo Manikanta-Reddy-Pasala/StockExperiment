@@ -50,6 +50,16 @@ class AuditOrder(Base):
     # Total rupees + full breakdown JSON (brokerage/stt/exchange/sebi/stamp/gst/dp).
     charges_inr = Column(Numeric(14, 4))
     charges_breakdown = Column(JSONB)
+    # Depth-gate snapshot at signal time (F&O multi-leg executor only).
+    # Equity orders leave these NULL.
+    bid_at_entry = Column(Numeric(14, 4))
+    ask_at_entry = Column(Numeric(14, 4))
+    spread_pct_at_entry = Column(Numeric(8, 4))
+    volume_at_entry = Column(Integer)
+    oi_at_entry = Column(Integer)
+    # Basket margin (Fyers utilized-funds delta). Same value on every leg of
+    # the same basket — aggregate with MAX, not SUM.
+    margin_blocked_inr = Column(Numeric(14, 4))
 
 
 class AuditRebalanceDecision(Base):
