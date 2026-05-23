@@ -61,9 +61,14 @@ def load_spot(u: str, a: str, b: str) -> pd.DataFrame:
 
 
 def opt_daily(symbol: str) -> pd.DataFrame:
+    """Daily OHLCV+OI for an option contract. Includes volume + oi so the
+    backtest can filter out illiquid leg-days that wouldn't have actually
+    been fillable in live trading."""
     eng = _get_engine()
     q = text(
-        "SELECT candle_time::date AS date, close FROM historical_options "
+        "SELECT candle_time::date AS date, close, "
+        "       COALESCE(volume, 0) AS volume, COALESCE(oi, 0) AS oi "
+        "FROM historical_options "
         "WHERE symbol=:s AND interval='D' ORDER BY candle_time"
     )
     with eng.connect() as conn:
@@ -161,7 +166,21 @@ def compute_ic_margin(ce_short_k: float, pe_short_k: float,
 def run_ic(underlying: str, start: str, end: str,
            otm_pct: float, wing_width: int, stop_mult: float,
            slip: float, capital: float, lots: int,
-           realistic_slip: bool = False) -> pd.DataFrame:
+           realistic_slip: bool = False,
+           min_leg_volume: int = 0,
+           min_leg_oi: int = 0) -> pd.DataFrame:
+    """Backtest a monthly Iron Condor on `underlying`.
+
+    The volume/OI filters reject historical leg-days that wouldn't have
+    been fillable in live trading. Without this guard the backtest happily
+    "trades" against options with zero contracts changing hands that day —
+    purely a mark-to-market fantasy. With min_leg_volume=100 a real bid
+    actually existed at the recorded close (live order would have hit).
+
+    `min_leg_volume` checks ENTRY-day volume on all 4 legs (rejects entry)
+    and EXIT-day volume on the exiting leg (forces hold-to-expiry instead
+    of an impossible SL fill).
+    """
     spot = load_spot(underlying, start, end)
     spot["dow"] = pd.to_datetime(spot["date"]).dt.dayofweek
     cands = spot[spot["dow"] == 0]  # Mondays
@@ -214,26 +233,48 @@ def run_ic(underlying: str, start: str, end: str,
         else:
             short_slip = wing_slip = slip
         try:
-            ce_e = float(ce_b[ce_b["date"] == entry_day].iloc[0]["close"]) * (1 - short_slip)
-            pe_e = float(pe_b[pe_b["date"] == entry_day].iloc[0]["close"]) * (1 - short_slip)
-            wce_e = float(wce_b[wce_b["date"] == entry_day].iloc[0]["close"]) * (1 + wing_slip)
-            wpe_e = float(wpe_b[wpe_b["date"] == entry_day].iloc[0]["close"]) * (1 + wing_slip)
+            ce_row = ce_b[ce_b["date"] == entry_day].iloc[0]
+            pe_row = pe_b[pe_b["date"] == entry_day].iloc[0]
+            wce_row = wce_b[wce_b["date"] == entry_day].iloc[0]
+            wpe_row = wpe_b[wpe_b["date"] == entry_day].iloc[0]
+            ce_e = float(ce_row["close"]) * (1 - short_slip)
+            pe_e = float(pe_row["close"]) * (1 - short_slip)
+            wce_e = float(wce_row["close"]) * (1 + wing_slip)
+            wpe_e = float(wpe_row["close"]) * (1 + wing_slip)
         except (IndexError, KeyError):
             continue
         if min(ce_e, pe_e) <= 0.5:
             continue
+        # Per-leg liquidity gate at entry day. Reject the whole basket if any
+        # leg had near-zero volume on the day — live broker couldn't have
+        # filled at the recorded close.
+        if min_leg_volume > 0:
+            entry_vols = [int(ce_row.get("volume", 0)),
+                          int(pe_row.get("volume", 0)),
+                          int(wce_row.get("volume", 0)),
+                          int(wpe_row.get("volume", 0))]
+            if min(entry_vols) < min_leg_volume:
+                continue
+        if min_leg_oi > 0:
+            entry_ois = [int(ce_row.get("oi", 0)), int(pe_row.get("oi", 0)),
+                         int(wce_row.get("oi", 0)), int(wpe_row.get("oi", 0))]
+            if min(entry_ois) < min_leg_oi:
+                continue
         net_credit = (ce_e + pe_e) - (wce_e + wpe_e)
         if net_credit <= 0:
             continue
 
-        # Build pair trajectory
-        pair = ce_b[(ce_b["date"] >= entry_day) & (ce_b["date"] <= exp)][
-            ["date", "close"]].rename(columns={"close": "ce_close"})
-        for df_o, col in [(pe_b, "pe_close"), (wce_b, "wce_close"), (wpe_b, "wpe_close")]:
-            pair = pair.merge(
-                df_o[(df_o["date"] >= entry_day) & (df_o["date"] <= exp)][["date", "close"]]
-                    .rename(columns={"close": col}),
-                on="date", how="left")
+        # Build pair trajectory — includes per-leg volume so we can refuse
+        # to take an SL on a day with no actual liquidity (forces hold-to-
+        # expiry, same as if live broker had no fill).
+        def _legcols(df: pd.DataFrame, prefix: str) -> pd.DataFrame:
+            return (df[(df["date"] >= entry_day) & (df["date"] <= exp)]
+                      [["date", "close", "volume"]]
+                      .rename(columns={"close": f"{prefix}_close",
+                                       "volume": f"{prefix}_vol"}))
+        pair = _legcols(ce_b, "ce")
+        for df_o, prefix in [(pe_b, "pe"), (wce_b, "wce"), (wpe_b, "wpe")]:
+            pair = pair.merge(_legcols(df_o, prefix), on="date", how="left")
         pair = pair.ffill().fillna(0)
         pair["pv"] = (pair["ce_close"] + pair["pe_close"]
                       - pair["wce_close"] - pair["wpe_close"])
@@ -245,6 +286,16 @@ def run_ic(underlying: str, start: str, end: str,
         exit_slip = (short_slip + wing_slip) / 2 if realistic_slip else slip
         for pr in pair.itertuples():
             if pr.pv >= net_credit * stop_mult:
+                # Refuse SL when ANY leg has zero volume on this day —
+                # live order to BUY back the short or SELL the wing won't
+                # fill, so the strategy holds to expiry instead.
+                if min_leg_volume > 0:
+                    leg_vols = [int(getattr(pr, "ce_vol", 0)),
+                                int(getattr(pr, "pe_vol", 0)),
+                                int(getattr(pr, "wce_vol", 0)),
+                                int(getattr(pr, "wpe_vol", 0))]
+                    if min(leg_vols) < min_leg_volume:
+                        continue
                 exit_debit = pr.pv * (1 + exit_slip)
                 exit_d = pr.date
                 exit_reason = "SL"

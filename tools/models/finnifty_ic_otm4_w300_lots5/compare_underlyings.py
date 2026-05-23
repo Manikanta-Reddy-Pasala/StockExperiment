@@ -109,13 +109,21 @@ def _rescale_and_summarise(trades_lots1: pd.DataFrame, new_lots: int,
 
 
 def _run_one(u: str, v: tuple, start: str, end: str,
-             capital: float) -> Dict:
+             capital: float, min_leg_volume: int) -> Dict:
     otm, wing, stop, slip, label = v
-    print(f"  running {u:9} {label}…", flush=True)
+    print(f"  running {u:9} {label}… (min_vol={min_leg_volume})", flush=True)
+    raw_unfiltered = run_ic(u, start, end, otm, wing, stop, slip,
+                            capital=capital, lots=1, realistic_slip=True,
+                            min_leg_volume=0)
     raw = run_ic(u, start, end, otm, wing, stop, slip,
-                 capital=capital, lots=1, realistic_slip=True)
+                 capital=capital, lots=1, realistic_slip=True,
+                 min_leg_volume=min_leg_volume)
+    n_unfiltered = len(raw_unfiltered)
+    n_filtered = len(raw)
+    rejected = n_unfiltered - n_filtered
     if raw.empty:
-        return {"underlying": u, "variant": label, "skipped": True}
+        return {"underlying": u, "variant": label, "skipped": True,
+                "reason": f"all_trades_rejected_by_vol_filter ({n_unfiltered}→0)"}
     raw["month"] = pd.to_datetime(raw["entry_date"]).dt.to_period("M").astype(str)
     raw["year"] = pd.to_datetime(raw["entry_date"]).dt.year
     new_lots = _peak_safe_lots(raw, capital)
@@ -126,6 +134,9 @@ def _run_one(u: str, v: tuple, start: str, end: str,
     return {
         "underlying": u, "variant": label, "otm": otm, "wing": wing,
         "stop": stop, "lots": new_lots,
+        "n_unfiltered": n_unfiltered,
+        "n_vol_rejected": rejected,
+        "vol_reject_pct": (rejected / n_unfiltered * 100) if n_unfiltered else 0.0,
         **{k: v for k, v in stats.items() if k != "trades_df"},
         "_trades_df": stats.get("trades_df"),
     }
@@ -136,12 +147,13 @@ def _print_table(rows: List[Dict]) -> None:
     rows_ok.sort(key=lambda r: r["cagr"], reverse=True)
     print()
     print(f"{'rank':>4}  {'underlying':10} {'variant':12} {'lots':>4} "
-          f"{'trades':>6} {'WR%':>5} {'CAGR%':>8} {'Total%':>8} "
+          f"{'trades':>6} {'rej%':>5} {'WR%':>5} {'CAGR%':>8} {'Total%':>8} "
           f"{'MaxDD%':>8} {'avgM':>10} {'peakM':>10}")
-    print("-" * 110)
+    print("-" * 122)
     for i, r in enumerate(rows_ok, 1):
         print(f"{i:>4}  {r['underlying']:10} {r['variant']:12} {r['lots']:>4} "
-              f"{r['trades']:>6} {r['wr']:>5.1f} {r['cagr']:>8.1f} "
+              f"{r['trades']:>6} {r.get('vol_reject_pct',0):>5.1f} "
+              f"{r['wr']:>5.1f} {r['cagr']:>8.1f} "
               f"{r['total_return_pct']:>8.1f} {r['max_dd_pct']:>8.1f} "
               f"₹{r['avg_margin']:>8,.0f} ₹{r['peak_margin']:>8,.0f}")
     skipped = [r for r in rows if r.get("skipped")]
@@ -194,6 +206,10 @@ def main() -> int:
     ap.add_argument("--end", default="2026-05-15")
     ap.add_argument("--top", type=int, default=3,
                     help="How many top-CAGR variants to write as export folders")
+    ap.add_argument("--min-leg-volume", type=int, default=100,
+                    help="Reject historical leg-days with volume below this "
+                         "threshold (0 = no filter). Default 100 — keeps "
+                         "out fantasy fills on zero-volume bars.")
     args = ap.parse_args()
 
     print(f"=== Comparing IC variants across underlyings ===")
@@ -207,7 +223,8 @@ def main() -> int:
         print(f"\n[{u}] lot size today = {lot_size_for(u, datetime.today().date())}")
         for v in VARIANTS:
             try:
-                rows.append(_run_one(u, v, args.start, args.end, args.capital))
+                rows.append(_run_one(u, v, args.start, args.end,
+                                     args.capital, args.min_leg_volume))
             except Exception as e:
                 print(f"  ! {u} {v[4]} failed: {e}")
                 rows.append({"underlying": u, "variant": v[4],
