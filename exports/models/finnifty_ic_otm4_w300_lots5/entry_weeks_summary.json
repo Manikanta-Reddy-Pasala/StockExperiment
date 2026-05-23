@@ -4,44 +4,53 @@
     "trades": 35,
     "wins": 20,
     "wr_pct": 57.1,
-    "total_pnl": 1577190.34,
-    "total_return_pct": 788.6,
+    "total_pnl": 1602643.69,
+    "total_return_pct": 801.32,
     "avg_volume_per_leg": {
-      "ce_short": 141625.0,
-      "pe_short": 61219.0,
-      "wce_long": 155807.0,
-      "wpe_long": 138737.0
+      "ce_short": 141359.0,
+      "pe_short": 61138.0,
+      "wce_long": 155397.0,
+      "wpe_long": 138499.0
     },
-    "pct_held_days_zero_volume": 33.27
+    "pct_held_days_zero_volume": 33.35,
+    "pct_held_days_our_share_over_10pct_of_traded": 22.89,
+    "median_avg_trade_size_inr": 7355.0,
+    "median_num_trades_per_leg_day": 497
   },
   {
     "entry_week": 2,
     "trades": 35,
     "wins": 27,
     "wr_pct": 77.1,
-    "total_pnl": 2082528.26,
-    "total_return_pct": 1041.26,
+    "total_pnl": 2067115.14,
+    "total_return_pct": 1033.56,
     "avg_volume_per_leg": {
-      "ce_short": 162222.0,
-      "pe_short": 162127.0,
-      "wce_long": 377144.0,
-      "wpe_long": 157528.0
+      "ce_short": 162197.0,
+      "pe_short": 162445.0,
+      "wce_long": 377133.0,
+      "wpe_long": 157602.0
     },
-    "pct_held_days_zero_volume": 22.18
+    "pct_held_days_zero_volume": 22.37,
+    "pct_held_days_our_share_over_10pct_of_traded": 20.16,
+    "median_avg_trade_size_inr": 5448.0,
+    "median_num_trades_per_leg_day": 843
   },
   {
     "entry_week": 3,
     "trades": 36,
     "wins": 27,
     "wr_pct": 75.0,
-    "total_pnl": 1743203.64,
-    "total_return_pct": 871.6,
+    "total_pnl": 1726659.19,
+    "total_return_pct": 863.33,
     "avg_volume_per_leg": {
-      "ce_short": 445454.0,
-      "pe_short": 169691.0,
-      "wce_long": 631653.0,
-      "wpe_long": 208594.0
+      "ce_short": 442347.0,
+      "pe_short": 168411.0,
+      "wce_long": 627238.0,
+      "wpe_long": 207198.0
     },
-    "pct_held_days_zero_volume": 10.92
+    "pct_held_days_zero_volume": 10.84,
+    "pct_held_days_our_share_over_10pct_of_traded": 14.16,
+    "median_avg_trade_size_inr": 3432.0,
+    "median_num_trades_per_leg_day": 1351
   }
 ]
