@@ -1,135 +1,96 @@
-# FINNIFTY_monthly_IC_OTM4_w300_lots5
+# FINNIFTY monthly Iron Condor — 3-entry-week comparison
 
-## Strategy
+**Window:** 2023-05-15 → 2026-05-15 (3 yr)
+**Live params (OTM 4 / W 300 / 5 lots / 3× SL / 1 % slippage)** — current
+runtime MODEL_NAME still `finnifty_ic_otm4_w300_lots5`. Capital ₹200,000.
 
-- **Underlying:** FINNIFTY (Nifty Financial Services Index)
-- **Setup:** Iron Condor monthly expiry
-  - SELL OTM 4% CE + OTM 4% PE (body)
-  - BUY wings +300 points further out (cap risk)
-- **Position size:** 5 lots
-- **Stop:** 3× entry credit OR hold to expiry
-- **Capital:** ₹200,000
-- **Window:** 2023-05-15 .. 2026-05-15
-- **Slippage:** 1% per leg
-- **Forward applicable:** YES (FinNifty monthly still trades)
+Backtest now **records** per-leg daily volume + num_trades +
+traded_value_inr + our_share_of_traded — no rejection on liquidity, only
+observation. Caller decides per-trade if fill is realistic.
 
-## Final Result
+## 🏆 Returns ranking — Week 2 wins
 
-- **Started with:** ₹200,000
-- **Ended with:** ₹2,179,688
-- **Total profit:** ₹1,979,688
-- **Total return:** +989.84%
-- **Trades:** 35
-- **Win rate:** 77.1%
-- **Months tracked:** 33
-- **Avg/mo:** +30.00%
-- **Best mo:** +292.0%
-- **Worst mo:** -42.8%
-- **Months ≥20%:** 12/33 (36%)
-- **Months ≥30%:** 10/33
-- **Max single-trade loss:** ₹96,325 (48.2% of capital)
-
-## Yearly
-
-| Year | Trades | Wins | WR | P&L | ROI on ₹2L |
+| Entry week | Trades | WR % | Total return | CAGR | Total ₹ P&L |
 |---|---:|---:|---:|---:|---:|
-| 2023 | 8 | 5 | 62.5% | ₹343,816 | +171.91% |
-| 2024 | 12 | 11 | 91.7% | ₹434,490 | +217.25% |
-| 2025 | 12 | 9 | 75.0% | ₹649,567 | +324.78% |
-| 2026 | 3 | 2 | 66.7% | ₹551,815 | +275.91% |
+| Week 1 (first weekday of week 1) | 35 | 57.1 | +801.3 % | +101 %/yr | ₹1,602,644 |
+| **Week 2 (first weekday of week 2)** ⭐ | 35 | **77.1** | **+1033.6 %** | **+118 %/yr** | **₹2,067,115** |
+| Week 3 (first weekday of week 3) | 36 | 75.0 | +863.3 % | +106 %/yr | ₹1,726,659 |
 
-## Monthly P&L + Equity
+**Best for returns: Week 2.** +1,034 % over 3 years, 77 % WR, ₹20.67 lakh on ₹2L = **10.3× capital**.
 
-| Month | Trades | Wins | WR | P&L | ROI | Equity end-of-month |
-|---|---:|---:|---:|---:|---:|---:|
-| 2023-05 | 1 | 1 | 100.0% | ₹205,333 | +102.67% | ₹405,333 |
-| 2023-06 | 1 | 0 | 0.0% | ₹-36,940 | -18.47% | ₹368,393 |
-| 2023-07 | 1 | 1 | 100.0% | ₹24,044 | +12.02% | ₹392,436 |
-| 2023-08 | 1 | 1 | 100.0% | ₹136,802 | +68.40% | ₹529,238 |
-| 2023-09 | 1 | 1 | 100.0% | ₹102,201 | +51.10% | ₹631,438 |
-| 2023-10 | 1 | 0 | 0.0% | ₹-24,859 | -12.43% | ₹606,579 |
-| 2023-11 | 1 | 1 | 100.0% | ₹22,830 | +11.41% | ₹629,409 |
-| 2023-12 | 1 | 0 | 0.0% | ₹-85,592 | -42.80% | ₹543,816 |
-| 2024-01 | 1 | 1 | 100.0% | ₹105 | +0.05% | ₹543,921 |
-| 2024-02 | 1 | 1 | 100.0% | ₹33,132 | +16.57% | ₹577,054 |
-| 2024-03 | 1 | 1 | 100.0% | ₹17,618 | +8.81% | ₹594,672 |
-| 2024-04 | 1 | 1 | 100.0% | ₹32,756 | +16.38% | ₹627,428 |
-| 2024-05 | 1 | 1 | 100.0% | ₹16,106 | +8.05% | ₹643,534 |
-| 2024-06 | 1 | 0 | 0.0% | ₹-35,951 | -17.98% | ₹607,582 |
-| 2024-07 | 1 | 1 | 100.0% | ₹69,569 | +34.78% | ₹677,151 |
-| 2024-08 | 1 | 1 | 100.0% | ₹40,463 | +20.23% | ₹717,615 |
-| 2024-09 | 2 | 2 | 100.0% | ₹143,687 | +71.84% | ₹861,301 |
-| 2024-11 | 1 | 1 | 100.0% | ₹91,676 | +45.84% | ₹952,978 |
-| 2024-12 | 1 | 1 | 100.0% | ₹25,329 | +12.66% | ₹978,306 |
-| 2025-01 | 1 | 1 | 100.0% | ₹30,087 | +15.04% | ₹1,008,394 |
-| 2025-02 | 1 | 1 | 100.0% | ₹15,856 | +7.93% | ₹1,024,249 |
-| 2025-03 | 1 | 0 | 0.0% | ₹-40,349 | -20.17% | ₹983,901 |
-| 2025-04 | 1 | 0 | 0.0% | ₹-71,925 | -35.96% | ₹911,975 |
-| 2025-05 | 1 | 1 | 100.0% | ₹26,976 | +13.49% | ₹938,951 |
-| 2025-06 | 2 | 2 | 100.0% | ₹286,248 | +143.12% | ₹1,225,199 |
-| 2025-08 | 1 | 1 | 100.0% | ₹143,654 | +71.83% | ₹1,368,853 |
-| 2025-09 | 1 | 1 | 100.0% | ₹1,175 | +0.59% | ₹1,370,028 |
-| 2025-10 | 1 | 0 | 0.0% | ₹-73,894 | -36.95% | ₹1,296,134 |
-| 2025-11 | 1 | 1 | 100.0% | ₹328,656 | +164.33% | ₹1,624,790 |
-| 2025-12 | 1 | 1 | 100.0% | ₹3,083 | +1.54% | ₹1,627,873 |
-| 2026-02 | 1 | 0 | 0.0% | ₹-76,841 | -38.42% | ₹1,551,033 |
-| 2026-04 | 1 | 1 | 100.0% | ₹584,004 | +292.00% | ₹2,135,036 |
-| 2026-05 | 1 | 1 | 100.0% | ₹44,652 | +22.33% | ₹2,179,688 |
+## 🛡️ Liquidity ranking — Week 3 wins
 
-## Every Trade
+| Entry week | Zero-vol days % | Risky-fill days % | Median ₹/trade | Median trades/day |
+|---|---:|---:|---:|---:|
+| Week 1 | 33.4 % | 22.9 % | ₹7,355 | 497 |
+| Week 2 | 22.4 % | 20.2 % | ₹5,448 | 843 |
+| **Week 3** ⭐ | **10.8 %** | **14.2 %** | ₹3,432 | **1,351** |
 
-| # | Entry | Exit | Spot | CE k | PE k | Wing CE | Wing PE | Credit | Exit Debit | P&L | Reason | Running |
-|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|
-| 1 | 2023-05-15 | 2023-05-30 | 19583.2 | 20350 | 18800 | 20650 | 18500 | ₹1026.66 | ₹0.00 | **+₹205,333** | EXPIRY | ₹405,333 |
-| 2 | 2023-06-05 | 2023-06-15 | 19438.5 | 20200 | 18650 | 20500 | 18350 | ₹80.32 | ₹265.02 | **₹-36,940** | SL | ₹368,393 |
-| 3 | 2023-07-10 | 2023-07-25 | 20057.3 | 20850 | 19250 | 21150 | 18950 | ₹120.22 | ₹0.00 | **+₹24,044** | EXPIRY | ₹392,436 |
-| 4 | 2023-08-21 | 2023-08-29 | 19571.5 | 20350 | 18800 | 20650 | 18500 | ₹684.01 | ₹0.00 | **+₹136,802** | EXPIRY | ₹529,238 |
-| 5 | 2023-09-04 | 2023-09-26 | 19787.6 | 20600 | 19000 | 20900 | 18700 | ₹511.00 | ₹0.00 | **+₹102,201** | EXPIRY | ₹631,438 |
-| 6 | 2023-10-09 | 2023-10-10 | 19594.7 | 20400 | 18800 | 20700 | 18500 | ₹50.33 | ₹174.63 | **₹-24,859** | SL | ₹606,579 |
-| 7 | 2023-11-13 | 2023-11-28 | 19542.2 | 20300 | 18750 | 20600 | 18450 | ₹114.15 | ₹0.00 | **+₹22,830** | EXPIRY | ₹629,409 |
-| 8 | 2023-12-04 | 2023-12-07 | 20862.9 | 21700 | 20050 | 22000 | 19750 | ₹176.42 | ₹604.38 | **₹-85,592** | SL | ₹543,816 |
-| 9 | 2024-01-29 | 2024-01-30 | 20413.3 | 21250 | 19600 | 21550 | 19300 | ₹0.53 | ₹0.00 | **+₹105** | EXPIRY | ₹543,921 |
-| 10 | 2024-02-05 | 2024-02-27 | 20315.8 | 21150 | 19500 | 21450 | 19200 | ₹165.66 | ₹0.00 | **+₹33,132** | EXPIRY | ₹577,054 |
-| 11 | 2024-03-04 | 2024-03-26 | 20927.2 | 21750 | 20100 | 22050 | 19800 | ₹88.09 | ₹0.00 | **+₹17,618** | EXPIRY | ₹594,672 |
-| 12 | 2024-04-08 | 2024-04-30 | 21604.5 | 22450 | 20750 | 22750 | 20450 | ₹163.78 | ₹0.00 | **+₹32,756** | EXPIRY | ₹627,428 |
-| 13 | 2024-05-06 | 2024-05-28 | 21743.7 | 22600 | 20850 | 22900 | 20550 | ₹80.53 | ₹0.00 | **+₹16,106** | EXPIRY | ₹643,534 |
-| 14 | 2024-06-10 | 2024-06-25 | 22154.8 | 23050 | 21250 | 23350 | 20950 | ₹123.24 | ₹303.00 | **₹-35,951** | EXPIRY | ₹607,582 |
-| 15 | 2024-07-01 | 2024-07-30 | 23631.0 | 24600 | 22700 | 24900 | 22400 | ₹347.85 | ₹0.00 | **+₹69,569** | EXPIRY | ₹677,151 |
-| 16 | 2024-08-12 | 2024-08-27 | 23028.5 | 23950 | 22100 | 24250 | 21800 | ₹202.32 | ₹0.00 | **+₹40,463** | EXPIRY | ₹717,615 |
-| 17 | 2024-09-02 | 2024-09-24 | 23727.5 | 24700 | 22800 | 25000 | 22500 | ₹689.38 | ₹185.49 | **+₹100,780** | EXPIRY | ₹818,394 |
-| 18 | 2024-09-30 | 2024-10-29 | 24480.3 | 25450 | 23500 | 25750 | 23200 | ₹132.02 | ₹0.00 | **+₹42,907** | EXPIRY | ₹861,301 |
-| 19 | 2024-11-04 | 2024-11-26 | 23660.2 | 24600 | 22700 | 24900 | 22400 | ₹282.08 | ₹0.00 | **+₹91,676** | EXPIRY | ₹952,978 |
-| 20 | 2024-12-02 | 2024-12-31 | 24072.7 | 25050 | 23100 | 25350 | 22800 | ₹77.93 | ₹0.00 | **+₹25,329** | EXPIRY | ₹978,306 |
-| 21 | 2025-01-06 | 2025-01-28 | 23317.8 | 24250 | 22400 | 24550 | 22100 | ₹92.58 | ₹0.00 | **+₹30,087** | EXPIRY | ₹1,008,394 |
-| 22 | 2025-02-03 | 2025-02-25 | 23132.5 | 24050 | 22200 | 24350 | 21900 | ₹48.79 | ₹0.00 | **+₹15,856** | EXPIRY | ₹1,024,249 |
-| 23 | 2025-03-10 | 2025-03-19 | 23056.8 | 24000 | 22150 | 24300 | 21850 | ₹48.96 | ₹173.11 | **₹-40,349** | SL | ₹983,901 |
-| 24 | 2025-04-07 | 2025-04-17 | 23908.5 | 24850 | 22950 | 25150 | 22650 | ₹93.96 | ₹315.27 | **₹-71,925** | SL | ₹911,975 |
-| 25 | 2025-05-05 | 2025-05-29 | 26164.9 | 27200 | 25100 | 27500 | 24800 | ₹83.00 | ₹0.00 | **+₹26,976** | EXPIRY | ₹938,951 |
-| 26 | 2025-06-02 | 2025-06-26 | 26448.4 | 27500 | 25400 | 27800 | 25100 | ₹89.95 | ₹0.00 | **+₹29,235** | EXPIRY | ₹968,185 |
-| 27 | 2025-06-30 | 2025-07-31 | 27174.5 | 28250 | 26100 | 28550 | 25800 | ₹790.81 | ₹0.00 | **+₹257,013** | EXPIRY | ₹1,225,199 |
-| 28 | 2025-08-04 | 2025-08-28 | 26476.6 | 27550 | 25400 | 27850 | 25100 | ₹442.01 | ₹0.00 | **+₹143,654** | EXPIRY | ₹1,368,853 |
-| 29 | 2025-09-22 | 2025-09-30 | 26528.4 | 27600 | 25450 | 27900 | 25150 | ₹3.61 | ₹0.00 | **+₹1,175** | EXPIRY | ₹1,370,028 |
-| 30 | 2025-10-06 | 2025-10-16 | 26712.0 | 27800 | 25650 | 28100 | 25350 | ₹101.69 | ₹329.06 | **₹-73,894** | SL | ₹1,296,134 |
-| 31 | 2025-11-03 | 2025-11-25 | 27306.2 | 28400 | 26200 | 28700 | 25900 | ₹1011.25 | ₹0.00 | **+₹328,656** | EXPIRY | ₹1,624,790 |
-| 32 | 2025-12-15 | 2025-12-30 | 27603.2 | 28700 | 26500 | 29000 | 26200 | ₹9.49 | ₹0.00 | **+₹3,083** | EXPIRY | ₹1,627,873 |
-| 33 | 2026-02-02 | 2026-02-13 | 26799.0 | 27850 | 25750 | 28150 | 25450 | ₹111.71 | ₹367.84 | **₹-76,841** | SL | ₹1,551,033 |
-| 34 | 2026-04-15 | 2026-04-28 | 27564.1 | 28650 | 26450 | 28950 | 26150 | ₹2249.68 | ₹303.00 | **+₹584,004** | EXPIRY | ₹2,135,036 |
-| 35 | 2026-05-04 | 2026-05-26 | 25814.4 | 26850 | 24800 | 27150 | 24500 | ₹148.84 | ₹0.00 | **+₹44,652** | EXPIRY | ₹2,179,688 |
+Definitions:
+- **Zero-vol days %** — % of held-leg-days where that leg traded 0 contracts (no fill possible)
+- **Risky-fill days %** — % of held-leg-days where our intended ₹ order > 10 % of day's traded value (won't fill cleanly)
+- **Median ₹/trade** — typical fill size on that contract that day (post-Jul-2024 only; pre-UDiFF lacks trade count)
+- **Median trades/day** — distinct executions on that leg per day (proxy for book depth)
 
-<!-- MARGIN-BLOCK-START -->
-## Margin (SPAN+exposure approx)
+## 🎯 Trade-off & recommendation
 
-Approximation calibrated to live Sensibull basket 2026-05-23 ±2 %. See `compute_ic_margin` in `sweep.py` for the formula (SPAN 2.9 % of short notional + 0.5 % exposure − long-wing credit).
+| If you optimize for… | Pick |
+|---|---|
+| **Maximum return** | Week 2 entry — +1,034 % but 20.2 % of days might not fill cleanly |
+| **Maximum fill confidence** | Week 3 entry — +863 % AND only 10.8 % zero-vol + 14.2 % risky-fill |
+| Compromise | Week 2 + skip any cycle where week-2 entry day has zero-vol on any leg (manual gate at signal time) |
 
-| Metric | Value |
-|---|---:|
-| Avg margin / trade | ₹362,536 |
-| Peak margin / trade | ₹602,378 |
-| Configured capital | ₹200,000 |
-| Capital / avg-margin ratio | 0.55× |
+**My pick: Week 2.** The +170 percentage-point lift over Week 3 (1034 % vs 863 %) is worth the moderately higher fill risk, especially since the depth-gate in live executor (`tools/live/option_depth_check.py`) already aborts baskets when any leg is too thin at signal time. Backtest "risky" days = days where intraday fill would have been worse than close — but live executor wouldn't have placed those orders at all.
 
-> ⚠️ **Margin required exceeds configured capital.** Avg margin ₹362,536 > capital ₹200,000. The backtest assumed 5 lots could always be opened on ₹200k capital — but the live broker will block trades when funds are insufficient. Two ways to fix the gap:
-> 1. **Increase capital** to ≥ ₹662,615 (≈ 1.1× peak margin) so every trade has headroom.
-> 2. **Reduce lots** to keep avg margin ≤ ~80 % of capital.
+## 🗂️ Files in this folder
 
-<!-- MARGIN-BLOCK-END -->
+| File | Description |
+|---|---|
+| `week1_trades.csv` | 35 IC trades, entered week 1 of monthly cycle |
+| `week2_trades.csv` | 35 IC trades, entered week 2 |
+| `week3_trades.csv` | 36 IC trades, entered week 3 |
+| `week<N>_daily_volumes.csv` | Per-leg per-held-day liquidity (volume, num_trades, notional_lakh, traded_value_inr, avg_trade_inr, our_share_of_traded) |
+| `entry_weeks_summary.json` | Roll-up of all 3 variants |
+| `SUMMARY.md` | This document |
+
+## 📊 Trade distribution by year
+
+| Year | Week 1 | Week 2 | Week 3 |
+|---|---:|---:|---:|
+| 2023 (May-Dec) | 8 | 7 | 8 |
+| 2024 | 12 | 12 | 12 |
+| 2025 | 12 | 12 | 12 |
+| 2026 (Jan-May) | 3 | 4 | 4 |
+
+## How to spot-check fill safety per trade
+
+```bash
+# Show all leg-days where trade_idx=5 (week 2) had our order > 10% of traded value
+awk -F',' 'NR==1 || ($1==5 && $15>0.10)' week2_daily_volumes.csv
+
+# Show all zero-volume leg-days across all trades for week 2
+awk -F',' 'NR==1 || $9==0' week2_daily_volumes.csv
+
+# Count cycles with at least one zero-vol leg-day per entry-week
+for w in 1 2 3; do
+  echo -n "Week $w cycles with ≥1 zero-vol leg-day: "
+  awk -F',' 'NR>1 && $9==0 {print $1}' week${w}_daily_volumes.csv | sort -u | wc -l
+done
+```
+
+## How to reproduce
+
+```bash
+ssh root@77.42.45.12 "docker exec trading_system_app python3 -m \
+  tools.models.finnifty_ic_otm4_w300_lots5.run_entry_weeks"
+```
+
+Outputs to `/app/exports/models/finnifty_ic_otm4_w300_lots5/` inside the container.
+
+## Live deployment
+
+**Runtime MODEL_NAME:** `finnifty_ic_otm4_w300_lots5` (folder name preserved for cron path stability)
+
+**Recommended live config (this analysis):** Week 2 entry — first trading day of week 2 of new monthly cycle. ~12 entries per year. Each cycle: depth-gate (`option_depth_check.gate_basket`) verifies legs are tradeable at signal time, LIMIT-walk on wings, MARKET on shorts.
+
+If you also want maximum fill safety: gate the Week 2 entry on `our_share_of_traded < 0.10` at signal time. Skip the cycle when any leg fails. Expected ~10-20 % of cycles skipped per the backtest's risky-fill column.
