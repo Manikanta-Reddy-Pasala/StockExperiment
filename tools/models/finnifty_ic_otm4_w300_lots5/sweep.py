@@ -168,7 +168,11 @@ def run_ic(underlying: str, start: str, end: str,
            slip: float, capital: float, lots: int,
            realistic_slip: bool = False,
            min_leg_volume: int = 0,
-           min_leg_oi: int = 0) -> pd.DataFrame:
+           min_leg_oi: int = 0,
+           entry_dow: int = -1) -> pd.DataFrame:
+    """
+    `entry_dow` filters entry weekday: -1 = any (default), 0..4 = Mon..Fri only.
+    """
     """Backtest a monthly Iron Condor on `underlying`.
 
     The volume/OI filters reject historical leg-days that wouldn't have
@@ -183,11 +187,12 @@ def run_ic(underlying: str, start: str, end: str,
     """
     spot = load_spot(underlying, start, end)
     spot["dow"] = pd.to_datetime(spot["date"]).dt.dayofweek
-    # Walk EVERY trading day, not just Mondays. If Monday's wings have no
-    # volume, we naturally fall through to Tue/Wed/Thu/Fri until a day in
-    # this cycle has fillable legs. seen_exp guards against multiple entries
-    # per expiry. Preserves "earliest viable entry per cycle" semantics.
-    cands = spot[spot["dow"] < 5]  # all weekdays
+    # Walk weekdays. entry_dow narrows the set: -1 = any (default — fall
+    # through Mon→Tue→… if Mon thin), 0..4 = restrict to that weekday only.
+    if entry_dow >= 0:
+        cands = spot[spot["dow"] == entry_dow]
+    else:
+        cands = spot[spot["dow"] < 5]
     step = STRIKE_STEP[underlying]
 
     trades = []
