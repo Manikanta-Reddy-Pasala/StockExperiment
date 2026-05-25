@@ -62,6 +62,8 @@ SMA_LONG   = 200
 TRAIL_PCT  = 0.20
 PROFIT_TRIG = 0.10
 TARGET_PCT = 1.00
+STOP_PCT   = 0.20  # Catastrophe stop (sweep-chosen). Fires rarely — clear of the -15.7%
+                   # deepest winner dip — so 0 CAGR cost on 3yr while capping the tail.
 MAX_HOLD   = 120  # Was 90. 120d max-hold sweep-tested as winner: +141% CAGR / 8% DD / Calmar 17.46.
 USE_SMA_EXIT = False
 
@@ -166,6 +168,8 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
             reason = None
             if ret_e >= TARGET_PCT:
                 reason = "TARGET"
+            elif STOP_PCT > 0 and ret_e <= -STOP_PCT:
+                reason = "STOP"
             elif ret_e >= PROFIT_TRIG and ret_pk >= TRAIL_PCT:
                 reason = "TRAIL"
             if reason is None and age >= MAX_HOLD:

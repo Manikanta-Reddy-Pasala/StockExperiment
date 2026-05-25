@@ -43,6 +43,9 @@ USE_SMA_EXIT = False  # V2: disabled — leaked winners on dips
 TRAIL_PCT = 0.20
 PROFIT_TRIGGER = 0.10
 TARGET_PCT = 1.00
+STOP_PCT = 0.20  # Catastrophe stop: exit if down >=20% from entry. Sweep-chosen —
+                 # fires rarely (clear of the -15.7% deepest winner dip), 0 CAGR cost,
+                 # caps the otherwise-unbounded downside on a held position.
 MAX_HOLD_DAYS = 120
 
 
@@ -113,6 +116,8 @@ def check_exit(pos: Dict, df_sym: pd.DataFrame) -> Optional[Dict]:
 
     if ret_entry >= TARGET_PCT:
         return {"reason": "TARGET", "price": close, "ret_pct": ret_entry * 100}
+    if STOP_PCT > 0 and ret_entry <= -STOP_PCT:
+        return {"reason": "STOP", "price": close, "ret_pct": ret_entry * 100}
     if ret_entry >= PROFIT_TRIGGER and ret_peak >= TRAIL_PCT:
         return {"reason": "TRAIL", "price": close, "ret_pct": ret_entry * 100}
     if USE_SMA_EXIT and sma20 > 0 and close < sma20:
