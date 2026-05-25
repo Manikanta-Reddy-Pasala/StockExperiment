@@ -85,7 +85,7 @@ async function loadModels() {
     enabled.forEach(m => {
       const opt = document.createElement('option');
       opt.value = m.model_name;
-      opt.textContent = m.model_name;
+      opt.textContent = modelLabel(m.model_name);
       sel.appendChild(opt);
     });
     // Default to first enabled model.

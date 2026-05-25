@@ -429,7 +429,7 @@ const fmtPct = n => (n>=0?"+":"") + Number(n||0).toFixed(2) + "%";
 const MODEL_META = {
   'momentum_n100_top5_max1': {
     universe: 'Nifty 100 (live)', kind: 'equity',
-    title: 'N100 Top-5 (mc=1) + mid-month',
+    title: 'Nifty 100 Momentum',
     rules: { top_n: 5, max_concurrent: 1, lookback: '30d',
              rebalance: '1st weekday/mo + day-15 (5pp lead)',
              stop: 'None', target: 'None',
@@ -448,7 +448,7 @@ const MODEL_META = {
   },
   'momentum_pseudo_n100_adv': {
     universe: 'Pseudo-N100 ADV', kind: 'equity',
-    title: 'Pseudo-N100 ADV (mc=1)',
+    title: 'Liquid 100 Momentum',
     rules: { top_n: 5, max_concurrent: 1, lookback: '30d',
              rebalance: '1st weekday/mo (no mid-month)',
              stop: 'None', target: 'None',
@@ -466,22 +466,22 @@ const MODEL_META = {
     ],
   },
   'midcap_narrow_60d_breakout': {
-    universe: 'Midcap-narrow (60d HH)', kind: 'equity',
-    title: 'Midcap 60d Breakout',
-    rules: { top_n: 5, max_concurrent: 1, lookback: '60d high',
-             rebalance: 'Event-driven', stop: 'None', target: 'None',
-             exit: '< 200d SMA' },
+    universe: 'Midcap 40d-high breakout', kind: 'equity',
+    title: 'Midcap Breakout',
+    rules: { top_n: 1, max_concurrent: 1, lookback: '40d high',
+             rebalance: 'Event-driven', stop: '-20%', target: '+100%',
+             exit: 'STOP -20% / TRAIL / +100% / 120d max-hold' },
     strategy: [
-      ['Ranker', '60-day high + vol surge + above 200d SMA'],
-      ['Universe', 'Midcap narrow basket'],
-      ['Entry', 'Event-driven on breakout'],
-      ['Exit', 'Close below 200d SMA'],
-      ['Style', 'Swing trend-following'],
+      ['Ranker', '40-day high + vol surge (≥2×) + above 200d SMA'],
+      ['Universe', 'Top-100 ADV from N500 minus Nifty-100 (~42 midcaps)'],
+      ['Entry', 'Event-driven on a fresh 40-day-high breakout'],
+      ['Exit', 'STOP -20% / TRAIL (after +10%, -20% from peak) / +100% target / 120-day max-hold'],
+      ['Style', 'Swing trend-following, hold-to-exit (no rotation)'],
     ],
   },
   'n20_daily_large_only': {
     universe: 'Top-20 ADV ∩ N100', kind: 'equity',
-    title: 'N20 Daily ADV ∩ N100',
+    title: 'Daily Top-20',
     rules: { top_n: 1, max_concurrent: 1, lookback: '30d',
              rebalance: 'Daily', stop: 'None', target: 'None',
              exit: 'Rank-1 changes' },
@@ -530,8 +530,9 @@ async function loadAllocations() {
       `;
       tr.innerHTML = `
         <td class="col-model">
-          <strong>${m.model_name}</strong>${enabledBadge}${warnBadge}
+          <strong>${modelLabel(m.model_name)}</strong>${enabledBadge}${warnBadge}
           <span class="universe-tag">${meta.universe} · ${meta.kind}</span>
+          <div class="text-muted" style="font-size:.65rem;font-family:monospace;">${m.model_name}</div>
         </td>
         <td class="text-end num">${fmtINR(m.allocated_capital)}</td>
         <td class="text-end num">${fmtINR(m.cash)}</td>

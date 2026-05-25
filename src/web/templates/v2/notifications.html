@@ -75,7 +75,7 @@ async function loadNtf(){
       const lvl = it.level || 'info';
       const tg = it.telegram_ok === true ? '<span class="chip" title="sent to Telegram"><i class="bi bi-telegram"></i></span>'
                : (it.telegram_ok === false ? '<span class="chip" title="Telegram failed" style="color:#d4453a">TG ✕</span>' : '');
-      const model = it.model ? `<code>${esc(it.model)}</code>` : '';
+      const model = it.model ? `<code>${esc(modelLabel(it.model))}</code>` : '';
       html += `<div class="ntf ntf-${esc(lvl)}">
         <div class="d-flex justify-content-between align-items-start">
           <div class="ntf-title">${esc(it.title)}</div>

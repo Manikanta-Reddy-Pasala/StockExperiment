@@ -31,8 +31,15 @@
 <!-- Header -->
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <div>
-    <h2 class="h4 mb-1"><code>{{ model_name }}</code></h2>
-    <div class="text-muted small">{{ label }}</div>
+    <h2 class="h4 mb-1"><span id="model-friendly-title">{{ model_name }}</span></h2>
+    <div class="text-muted small"><code>{{ model_name }}</code> {{ label }}</div>
+    <script>
+      // Show the friendly label (falls back to the raw key).
+      (function () {
+        var el = document.getElementById('model-friendly-title');
+        if (el && window.modelLabel) el.textContent = window.modelLabel({{ model_name | tojson }});
+      })();
+    </script>
   </div>
   <div class="d-flex align-items-center gap-2">
     <span id="enabled_badge" class="live-badge">…</span>
@@ -319,7 +326,7 @@ async function loadTradeHistory() {
       return `
         <tr>
           <td>${fmtDate(t.trade_at)}</td>
-          <td><span class="model-tag">${t.model_name || MODEL_NAME}</span></td>
+          <td><span class="model-tag">${modelLabel(t.model_name || MODEL_NAME)}</span></td>
           <td><span class="side-badge side-${side}">${side || '—'}</span></td>
           <td><code>${sym}</code></td>
           <td class="text-end">${qty}</td>

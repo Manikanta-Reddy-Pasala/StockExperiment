@@ -137,7 +137,7 @@ const cls = n => n>0?"pos":(n<0?"neg":"neutral");
 const MODEL_META = {
   'momentum_n100_top5_max1':     { universe: 'Nifty 100 (live)',       kind: 'equity'  },
   'momentum_pseudo_n100_adv':    { universe: 'Pseudo-N100 ADV',        kind: 'equity' },
-  'midcap_narrow_60d_breakout':  { universe: 'Midcap-narrow 60d HH',   kind: 'equity'  },
+  'midcap_narrow_60d_breakout':  { universe: 'Midcap 40d-high breakout', kind: 'equity'  },
   'n20_daily_large_only':        { universe: 'Top-20 ADV ∩ N100',      kind: 'equity'  },
 };
 // Display order: 4 equity models.
@@ -200,7 +200,7 @@ function renderModelCard(m, sig) {
                title="Click to expand balance sheet">
             <div class="d-flex justify-content-between align-items-start">
               <div>
-                <div class="ttl">${m.model_name}${warn} <i class="bi bi-chevron-down ms-1"></i></div>
+                <div class="ttl">${modelLabel(m.model_name)}${warn} <i class="bi bi-chevron-down ms-1"></i></div>
                 <div class="uni">${meta.universe} · ${meta.kind}</div>
               </div>
               <div class="text-end">${enableBadge}${refOnly}</div>
@@ -344,7 +344,7 @@ function renderSignalsWidget(data) {
           <span class="side fw-bold ${sideCls}">${side || '—'}</span>
           <code>${sym}</code>
           <span class="text-muted small">${note}${price}</span>
-          <span class="ms-auto model">${grp.model_name}</span>
+          <span class="ms-auto model">${modelLabel(grp.model_name)}</span>
         </div>
       `);
     });
