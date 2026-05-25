@@ -548,7 +548,6 @@ const MODEL_LABELS = {
   'n20_daily_large_only':       'N20 Daily ADV ∩ N100',
   'midcap_narrow_60d_breakout': 'Midcap 60d Breakout',
   'momentum_pseudo_n100_adv':   'Pseudo-N100 ADV (mc=1)',
-  'finnifty_ic_otm4_w300_lots5': 'FinNifty Iron Condor',
 };
 
 function _ts(s) {
@@ -614,8 +613,8 @@ async function loadTriggers() {
   const body = document.getElementById('triggers_body');
   body.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Loading…</td></tr>`;
   // Discover all models from portfolio endpoint (single source of truth).
-  // No hardcoded model list — finnifty options + future models surface
-  // automatically with NOT WIRED badge if triggers/status returns error.
+  // No hardcoded model list — future models surface automatically with a
+  // NOT WIRED badge if triggers/status returns error.
   let pfRes;
   try {
     pfRes = await (await fetch('/admin/models/portfolio')).json();

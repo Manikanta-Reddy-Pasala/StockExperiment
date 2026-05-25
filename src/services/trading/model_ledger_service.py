@@ -66,6 +66,15 @@ KNOWN_MODELS = [
     },
 ]
 
+# Models intentionally removed from the system. ensure_models_seeded() purges
+# their settings+ledger rows on boot IF they carry no trade history — so a
+# stale row (left behind by an incomplete cleanup, or seeded by an old image)
+# can never silently resurrect a retired model in the UI with a phantom
+# allocation. Rows WITH trades are left intact (forensic safety) and logged.
+RETIRED_MODELS = [
+    "finnifty_ic_otm4_w300_lots5",  # FinNifty options IC — removed 2026-05-25
+]
+
 
 def ensure_models_seeded() -> None:
     """Create settings+ledger rows for any KNOWN_MODELS missing from DB.
@@ -99,6 +108,24 @@ def ensure_models_seeded() -> None:
             s.flush()
             log.info(f"Seeded ledger for {m['name']} cap={m['default_capital']} "
                      f"enabled={m.get('enabled', True)}")
+
+        # Purge retired models so they can't linger in the UI with a phantom
+        # allocation. Only delete rows with NO trade history.
+        for name in RETIRED_MODELS:
+            settings = s.query(ModelSettings).filter_by(model_name=name).first()
+            ledger = s.query(ModelLedger).filter_by(model_name=name).first()
+            if not settings and not ledger:
+                continue
+            trades = s.query(ModelTrade).filter_by(model_name=name).count()
+            if trades > 0:
+                log.warning(f"Retired model {name} has {trades} trades — "
+                            "leaving rows intact (manual review needed)")
+                continue
+            if ledger:
+                s.delete(ledger)
+            if settings:
+                s.delete(settings)
+            log.info(f"Purged retired model {name} (0 trades)")
 
 
 # ---- Settings ----

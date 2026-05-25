@@ -112,7 +112,6 @@ const fmtPct = n => (n>=0?"+":"") + Number(n||0).toFixed(2) + "%";
 const cls = n => n>0?"pos":(n<0?"neg":"neutral");
 
 // Models with wired live_signal + executor (i.e., per-model rebalance works).
-// finnifty options model has different flow; rebalance button hidden for it.
 const WIRED_MODELS = new Set([
   'momentum_n100_top5_max1',
   'momentum_pseudo_n100_adv',

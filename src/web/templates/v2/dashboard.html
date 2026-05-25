@@ -139,15 +139,13 @@ const MODEL_META = {
   'momentum_pseudo_n100_adv':    { universe: 'Pseudo-N100 ADV',        kind: 'equity' },
   'midcap_narrow_60d_breakout':  { universe: 'Midcap-narrow 60d HH',   kind: 'equity'  },
   'n20_daily_large_only':        { universe: 'Top-20 ADV ∩ N100',      kind: 'equity'  },
-  'finnifty_ic_otm4_w300_lots5': { universe: 'FinNifty Options IC',    kind: 'options' },
 };
-// Display order: 4 equity first then options.
+// Display order: 4 equity models.
 const MODEL_ORDER = [
   'momentum_n100_top5_max1',
   'momentum_pseudo_n100_adv',
   'midcap_narrow_60d_breakout',
   'n20_daily_large_only',
-  'finnifty_ic_otm4_w300_lots5',
 ];
 
 let _signalsByModel = {};

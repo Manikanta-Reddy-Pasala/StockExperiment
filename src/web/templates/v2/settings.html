@@ -493,19 +493,6 @@ const MODEL_META = {
       ['MAX_PRICE filter', '₹2.5K cap'],
     ],
   },
-  'finnifty_ic_otm4_w300_lots5': {
-    universe: 'FinNifty Options', kind: 'options',
-    title: 'FinNifty Iron Condor',
-    rules: { top_n: '—', max_concurrent: 1, lookback: '—',
-             rebalance: 'Monthly expiry', stop: 'None', target: 'None',
-             exit: 'Expiry / breach' },
-    strategy: [
-      ['Strategy', 'Iron Condor on FinNifty monthly'],
-      ['Strikes', 'OTM 4% / wings 300pt'],
-      ['Size', '5 lots'],
-      ['Cycle', 'Monthly expiry'],
-    ],
-  },
 };
 
 async function loadAllocations() {
