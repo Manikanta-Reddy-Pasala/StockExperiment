@@ -11,10 +11,17 @@ Targets mid + small-cap NSE stocks (rank 31-130 by 20-day ADV, minus Large-caps)
 1. Take all Nifty 500 stocks (`src/data/symbols/nifty500.csv`)
 2. Compute 20-day **average daily ₹ value traded** per stock
 3. Sort descending by ADV
-4. **Skip top-30** (already covered by `momentum_n100_top5_max1`)
-5. **Take next 100** = "pseudo-midcap" pool (~ADV-rank 31-130)
-6. **NEW — Exclude Large-caps**: drop stocks in NSE Nifty 100 (`src/data/symbols/nifty100.csv`)
-7. **Data fix for ANGELONE** applied at load time (NOT excluded): prices in window 2024-12-23 → 2026-02-25 divided by 10 to fix reverse-split-adjustment inconsistency. With clean data, ANGELONE is fully eligible — it just doesn't qualify for breakout entries naturally.
+4. **Take top-100** by ADV
+5. **Exclude Large-caps**: drop stocks in NSE Nifty 100 (`src/data/symbols/nifty100.csv`) → **~42 genuine midcaps**
+6. **Data fix for ANGELONE** applied at load time (NOT excluded): prices in window 2024-12-23 → 2026-02-25 divided by 10 to fix reverse-split-adjustment inconsistency. With clean data, ANGELONE is fully eligible — it just doesn't qualify for breakout entries naturally.
+
+> **⚠️ Live↔backtest alignment (fixed 2026-05-26):** `build_universe.py` is the
+> single source of the live universe and now uses the EXACT method above
+> (`--skip-top 0 --top 100`, then minus Nifty-100) so the live universe matches
+> `backtest.py`. The previous builder used `skip-top-30, keep-100, NO large-cap
+> exclusion` → 100 contaminated names (TITAN/MARUTI/ITC/TRITURBINE) the backtest
+> never traded, so live (~+83%/22%DD) diverged from the headline +141.73%/8.1%DD.
+> If you edit the universe rule, change it in BOTH files.
 
 End-2026 universe first 10: SUZLON, SHRIRAMFIN (no wait — Large), … (Large-cap names filtered out by V2)
 
@@ -24,7 +31,7 @@ End-2026 universe first 10: SUZLON, SHRIRAMFIN (no wait — Large), … (Large-c
 
 | Knob | Value | vs |
 |---|---|---|
-| Universe pool | Pseudo-midcap (skip top-30 ADV, next 100) | same |
+| Universe pool | Top-100 ADV from N500, **minus Nifty-100** (~42 names) | aligned to backtest |
 | **Cap filter (NEW)** | **Exclude Nifty 100 (Large)** | NEW |
 | ANGELONE handling | **Data fix at load** (price ÷10 in corrupted window) — NOT excluded | data integrity, not strategy choice |
 | Breakout window | **40-day high** | was 60d |

@@ -2,6 +2,15 @@
 
 **Mid+Small breakout swing. Top-100 ADV from N500 MINUS Large. 40d breakout, +100% target, -20% trail, 120d max-hold, no SMA20 exit.**
 
+> **Live↔backtest aligned 2026-05-26.** `build_universe.py` previously emitted a
+> different live universe (skip-top-30, keep-100, **no large-cap exclusion** → 100
+> contaminated names incl TITAN/MARUTI/ITC/TRITURBINE) than this backtest uses, so
+> live ran ~+83%/yr at 22% DD instead of the figures below. The builder now mirrors
+> the backtest exactly (top-100 ADV minus Nifty-100 → ~42 midcaps). Backtest
+> reconfirmed 2026-05-26 on the aligned universe: **+141.73% CAGR / 8.12% DD /
+> Calmar 17.46 / 8 trades / 75% WR** (3yr to 2026-05-15; the +137.85% below is the
+> same run to 2026-05-12).
+
 ## Backtest window & trade frequency
 
 | Metric | Value |
