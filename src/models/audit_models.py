@@ -168,3 +168,35 @@ class AuditSystemEvent(Base):
     event_type = Column(String(32), index=True)          # BOOT / TOKEN_REFRESH / CRON_FIRED / DEPLOY / FYERS_AUTH_FAIL
     component = Column(String(64))                       # data_scheduler / trading_system / executor
     metadata_json = Column("metadata", JSONB)            # 'metadata' is reserved on SA Base; column kept as 'metadata' in DB
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 — unified notification feed
+# ---------------------------------------------------------------------------
+
+class Notification(Base):
+    """Single notification funnel — one row per user-facing event.
+
+    Every notable event (a placed/failed order, a model's rebalance decision,
+    a no-change "still holding" tick, a skipped non-rebalance day) is written
+    here by src/services/notification_service.py. The PWA in-app feed reads the
+    last 7 days; the Telegram channel mirrors the meaningful subset.
+    """
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True)
+    created_at = Column(DateTime, default=datetime.now, index=True)
+    trading_date = Column(Date, index=True)              # session this belongs to
+    model_name = Column(String(64), index=True)          # NULL for system/order events
+    event_type = Column(String(24), index=True)          # SIGNAL/NO_CHANGE/SKIP/ORDER_PLACED/ORDER_FAILED/SYSTEM
+    level = Column(String(12))                            # info / success / warning / error / muted
+    title = Column(String(200))
+    body = Column(Text)
+    channels = Column(JSONB)                             # ["db"] or ["db","telegram"]
+    telegram_ok = Column(Boolean)                        # True / False / None (not attempted)
+    dedupe_key = Column(String(160), index=True)         # per-(model,day) idempotency
+    meta = Column(JSONB)
+
+    __table_args__ = (
+        Index("ix_notifications_date_model", "trading_date", "model_name"),
+    )

@@ -348,6 +348,20 @@ def main() -> int:
                              reason="no signal emitted")
     except Exception as _e:
         log.debug(f"audit hook failed: {_e}")
+
+    # Notification funnel — ping the verdict even on no breakout (trading day
+    # only). Fires twice daily (09:25/15:25); the funnel dedupes identical
+    # verdicts per day, so a quiet holding day pings once.
+    if not args.force:
+        try:
+            from src.services.notification_service import notify_model_decision
+            _held = pos["open_symbol"] if pos else None
+            notify_model_decision(
+                MODEL_NAME, signals, held_symbol=_held, trigger="CRON",
+                note=None if signals else "no qualifying breakout today",
+            )
+        except Exception as _ne:
+            log.debug(f"notify decision failed: {_ne}")
     return 0
 
 

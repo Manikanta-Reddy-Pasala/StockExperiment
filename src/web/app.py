@@ -427,6 +427,69 @@ def create_app():
         """Settings page."""
         return render_template('v2/settings.html')
 
+    # --- Notifications feed (unified notification service) ---
+    @app.route('/notifications')
+    @login_required
+    def notifications_page():
+        """In-app notification feed (last 7 days)."""
+        return render_template('v2/notifications.html')
+
+    @app.route('/api/notifications')
+    @login_required
+    def api_notifications():
+        """Last-N-days notifications, newest first. ?days=7 (default), ?model=,
+        ?event= filters."""
+        from datetime import timedelta
+        from src.models.database import get_database_manager
+        from src.models.audit_models import Notification
+        try:
+            days = max(1, min(int(request.args.get('days', 7)), 90))
+        except (TypeError, ValueError):
+            days = 7
+        model = request.args.get('model')
+        event = request.args.get('event')
+        cutoff = datetime.now() - timedelta(days=days)
+        try:
+            db = get_database_manager()
+            with db.get_session() as s:
+                q = s.query(Notification).filter(Notification.created_at >= cutoff)
+                if model:
+                    q = q.filter(Notification.model_name == model)
+                if event:
+                    q = q.filter(Notification.event_type == event)
+                rows = q.order_by(Notification.created_at.desc()).limit(500).all()
+                items = [{
+                    'id': r.id,
+                    'created_at': r.created_at.isoformat() if r.created_at else None,
+                    'trading_date': r.trading_date.isoformat() if r.trading_date else None,
+                    'model': r.model_name,
+                    'event_type': r.event_type,
+                    'level': r.level,
+                    'title': r.title,
+                    'body': r.body,
+                    'channels': r.channels or [],
+                    'telegram_ok': r.telegram_ok,
+                } for r in rows]
+            return jsonify({'ok': True, 'days': days, 'count': len(items), 'items': items})
+        except Exception as e:
+            return jsonify({'ok': False, 'error': str(e), 'items': []}), 200
+
+    @app.route('/api/notifications/count')
+    @login_required
+    def api_notifications_count():
+        """Badge count — notifications in the last 24h."""
+        from datetime import timedelta
+        from src.models.database import get_database_manager
+        from src.models.audit_models import Notification
+        try:
+            db = get_database_manager()
+            cutoff = datetime.now() - timedelta(hours=24)
+            with db.get_session() as s:
+                n = s.query(Notification).filter(Notification.created_at >= cutoff).count()
+            return jsonify({'ok': True, 'count': int(n)})
+        except Exception as e:
+            return jsonify({'ok': False, 'count': 0, 'error': str(e)}), 200
+
     # Keep /v2/ paths as aliases for bookmarks
     @app.route('/v2/')
     @login_required

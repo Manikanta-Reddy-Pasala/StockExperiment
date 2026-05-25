@@ -74,9 +74,15 @@
                     <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" width="32" height="32" class="me-2" style="object-fit:contain;">
                     <span class="fw-semibold">Trading Journal</span>
                 </a>
-                <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar">
-                    <i class="bi bi-list fs-5"></i>
-                </button>
+                <div class="d-flex align-items-center gap-2">
+                    <a href="/notifications" class="btn btn-sm btn-outline-secondary position-relative" aria-label="Notifications">
+                        <i class="bi bi-bell fs-6"></i>
+                        <span id="ntf-badge-m" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
+                    </a>
+                    <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar">
+                        <i class="bi bi-list fs-5"></i>
+                    </button>
+                </div>
             </nav>
 
             <!-- Mobile offcanvas sidebar -->
@@ -91,6 +97,7 @@
                         <li class="nav-item"><a class="nav-link" href="/picks"><i class="bi bi-lightbulb"></i> Today's Picks</a></li>
                         <li class="nav-item"><a class="nav-link" href="/portfolio"><i class="bi bi-journal-text"></i> Portfolio</a></li>
                         <li class="nav-item"><a class="nav-link" href="/history"><i class="bi bi-clock-history"></i> History</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/notifications"><i class="bi bi-bell"></i> Notifications</a></li>
                         <li class="nav-item"><a class="nav-link" href="/settings"><i class="bi bi-gear"></i> Settings</a></li>
                         {% if current_user.is_admin %}
                         <li class="nav-item"><a class="nav-link" href="/admin"><i class="bi bi-sliders"></i> Admin Triggers</a></li>
@@ -123,6 +130,9 @@
                             <a class="nav-link" href="/history"><i class="bi bi-clock-history"></i> History</a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link" href="/notifications"><i class="bi bi-bell"></i> Notifications</a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link" href="/settings"><i class="bi bi-gear"></i> Settings</a>
                         </li>
                         {% if current_user.is_admin %}
@@ -144,7 +154,11 @@
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">{% block page_title %}Dashboard{% endblock %}</h1>
-                    <div class="btn-toolbar mb-2 mb-md-0 d-none d-md-flex">
+                    <div class="btn-toolbar mb-2 mb-md-0 d-none d-md-flex align-items-center">
+                        <a href="/notifications" class="btn btn-sm btn-outline-secondary position-relative me-2" aria-label="Notifications" title="Notifications">
+                            <i class="bi bi-bell"></i>
+                            <span id="ntf-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
+                        </a>
                         <div class="dropdown">
                             <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-person-circle"></i> {{ current_user.username }}
@@ -212,6 +226,25 @@
           const r = a.getAttribute('data-route');
           if (r && (path === r || path.startsWith(r + '/'))) a.classList.add('active');
         });
+      })();
+
+      // Notification badge — count of last-24h notifications on the bell.
+      (function notificationBadge() {
+        async function refresh() {
+          try {
+            const r = await fetch('/api/notifications/count');
+            const j = await r.json();
+            const n = (j && j.count) || 0;
+            ['ntf-badge', 'ntf-badge-m'].forEach(id => {
+              const el = document.getElementById(id);
+              if (!el) return;
+              if (n > 0) { el.textContent = n > 99 ? '99+' : n; el.style.display = ''; }
+              else { el.style.display = 'none'; }
+            });
+          } catch (e) { /* silent — badge is best-effort */ }
+        }
+        refresh();
+        setInterval(refresh, 60000);
       })();
 
       // Pull-to-refresh: vertical drag at top of page reloads the page.

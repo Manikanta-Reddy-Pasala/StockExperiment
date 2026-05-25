@@ -21,6 +21,7 @@ from .audit_models import (  # noqa: F401
     AuditOrder, AuditRebalanceDecision,
     AuditModelRanking, AuditModelSignal,
     AuditConfigChange, AuditDataQuality, AuditSystemEvent,
+    Notification,
 )
 
 

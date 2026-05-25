@@ -275,6 +275,11 @@ def main() -> int:
                  "writing empty signals file and exiting.")
         Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
         Path(args.signals_out).write_text(json.dumps([]))
+        try:
+            from src.services.notification_service import notify_skip
+            notify_skip(MODEL_NAME, "model disabled")
+        except Exception as _ne:
+            log.debug(f"notify_skip failed: {_ne}")
         return 0
 
     # Monthly rebalance gate
@@ -283,6 +288,11 @@ def main() -> int:
             log.info("Not rebalance day (need day<=7 + weekday). Skipping.")
             Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
             Path(args.signals_out).write_text(json.dumps([]))
+            try:
+                from src.services.notification_service import notify_skip
+                notify_skip(MODEL_NAME, "not rebalance day")
+            except Exception as _ne:
+                log.debug(f"notify_skip failed: {_ne}")
             return 0
 
     pos = get_current_position()
@@ -319,6 +329,17 @@ def main() -> int:
                              reason="no signal emitted")
     except Exception as _e:
         log.debug(f"audit hook failed: {_e}")
+
+    # Notification funnel — ping the verdict even on no-change (eval day only).
+    if not args.force:
+        try:
+            from src.services.notification_service import notify_model_decision
+            _held = pos.get("open_symbol") if pos else None
+            _ret = next((r[2] for r in ranks if r[1] == _held), None) if _held else None
+            notify_model_decision(MODEL_NAME, signals, held_symbol=_held,
+                                  held_ret=_ret, trigger="CRON")
+        except Exception as _ne:
+            log.debug(f"notify decision failed: {_ne}")
     return 0
 
 

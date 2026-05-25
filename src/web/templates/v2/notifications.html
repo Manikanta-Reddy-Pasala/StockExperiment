@@ -1,0 +1,96 @@
+{% extends "v2/base.html" %}
+{% block title %}Notifications{% endblock %}
+{% block page_title %}Notifications{% endblock %}
+
+{% block content %}
+<style>
+  .small-mute { font-size: 0.78rem; color: #8b95a5; }
+  .ntf { border-left: 4px solid #c9d2de; padding: 10px 12px; border-radius: 8px;
+         background: #fff; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+  .ntf .ntf-title { font-weight: 600; }
+  .ntf .ntf-body { white-space: pre-wrap; color: #3a4250; font-size: .88rem; }
+  .ntf .ntf-meta { font-size: .72rem; color: #8b95a5; }
+  .ntf-success { border-left-color: #15a36b; }
+  .ntf-error   { border-left-color: #d4453a; }
+  .ntf-warning { border-left-color: #e0a800; }
+  .ntf-info    { border-left-color: #2a7de1; }
+  .ntf-muted   { border-left-color: #c9d2de; opacity: .82; }
+  .day-head { font-size: .8rem; font-weight: 700; color: #4f5868; margin: 14px 0 6px; }
+  .chip { font-size: .68rem; padding: 1px 7px; border-radius: 10px; background:#eef1f6; color:#4f5868; }
+  code { font-size: .82rem; }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+  <div class="small-mute">
+    <i class="bi bi-bell me-1"></i> Signals, no-change ticks, skipped days, orders &amp; failures.
+  </div>
+  <div class="d-flex align-items-center gap-2">
+    <select id="days" class="form-select form-select-sm w-auto" onchange="loadNtf()">
+      <option value="1">Today</option>
+      <option value="7" selected>Last 7 days</option>
+      <option value="30">Last 30 days</option>
+    </select>
+    <select id="event" class="form-select form-select-sm w-auto" onchange="loadNtf()">
+      <option value="">All events</option>
+      <option value="SIGNAL">Signals</option>
+      <option value="NO_CHANGE">No change</option>
+      <option value="SKIP">Skipped</option>
+      <option value="ORDER_PLACED">Orders</option>
+      <option value="ORDER_FAILED">Failures</option>
+      <option value="SYSTEM">System</option>
+    </select>
+    <span class="badge bg-secondary" id="ntf_count">…</span>
+  </div>
+</div>
+
+<div id="ntf_list"><div class="small-mute py-4 text-center">Loading…</div></div>
+
+<script>
+const EVENT_LABEL = {
+  SIGNAL: 'Signal', NO_CHANGE: 'No change', SKIP: 'Skipped',
+  ORDER_PLACED: 'Order', ORDER_FAILED: 'Failed', SYSTEM: 'System'
+};
+function esc(s){ const d=document.createElement('div'); d.textContent=s==null?'':s; return d.innerHTML; }
+function fmtTime(iso){ if(!iso) return ''; const d=new Date(iso);
+  return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
+function dayKey(iso){ if(!iso) return ''; return new Date(iso).toLocaleDateString([], {weekday:'short', day:'2-digit', month:'short'}); }
+
+async function loadNtf(){
+  const days = document.getElementById('days').value;
+  const event = document.getElementById('event').value;
+  const list = document.getElementById('ntf_list');
+  list.innerHTML = '<div class="small-mute py-4 text-center">Loading…</div>';
+  let url = `/api/notifications?days=${days}`;
+  if (event) url += `&event=${event}`;
+  try {
+    const r = await fetch(url);
+    const j = await r.json();
+    document.getElementById('ntf_count').textContent = j.count || 0;
+    if (!j.ok) { list.innerHTML = `<div class="alert alert-warning small">${esc(j.error||'error')}</div>`; return; }
+    if (!j.items.length) { list.innerHTML = '<div class="small-mute py-4 text-center">No notifications in this window.</div>'; return; }
+    let html = '', lastDay = null;
+    for (const it of j.items) {
+      const dk = dayKey(it.created_at);
+      if (dk !== lastDay) { html += `<div class="day-head">${esc(dk)}</div>`; lastDay = dk; }
+      const lvl = it.level || 'info';
+      const tg = it.telegram_ok === true ? '<span class="chip" title="sent to Telegram"><i class="bi bi-telegram"></i></span>'
+               : (it.telegram_ok === false ? '<span class="chip" title="Telegram failed" style="color:#d4453a">TG ✕</span>' : '');
+      const model = it.model ? `<code>${esc(it.model)}</code>` : '';
+      html += `<div class="ntf ntf-${esc(lvl)}">
+        <div class="d-flex justify-content-between align-items-start">
+          <div class="ntf-title">${esc(it.title)}</div>
+          <div class="ntf-meta text-nowrap ms-2">${fmtTime(it.created_at)} ${tg}</div>
+        </div>
+        ${it.body ? `<div class="ntf-body">${esc(it.body)}</div>` : ''}
+        <div class="ntf-meta mt-1"><span class="chip">${esc(EVENT_LABEL[it.event_type]||it.event_type)}</span> ${model}</div>
+      </div>`;
+    }
+    list.innerHTML = html;
+  } catch (e) {
+    list.innerHTML = `<div class="alert alert-danger small">${esc(e.message)}</div>`;
+  }
+}
+loadNtf();
+setInterval(loadNtf, 60000);
+</script>
+{% endblock %}

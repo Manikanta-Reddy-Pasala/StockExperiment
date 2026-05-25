@@ -581,12 +581,19 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
 # --------- Ledger hooks ---------
 
 def _tg_safe(text: str):
-    """Best-effort Telegram notify — never raises."""
+    """Best-effort notify — funnels through the unified notification service
+    (DB feed + Telegram). Never raises. Falls back to bare Telegram if the
+    service import fails."""
     try:
-        from tools.live.telegram_notify import send
-        send(text)
+        from src.services.notification_service import notify_order
+        notify_order(text)
     except Exception as e:
-        log.debug(f"tg notify skipped: {e}")
+        log.debug(f"notify funnel skipped ({e}); trying bare telegram")
+        try:
+            from tools.live.telegram_notify import send
+            send(text)
+        except Exception as e2:
+            log.debug(f"tg notify skipped: {e2}")
 
 
 def _backfill_audit_fill(order_id: str, fill_price: float, fill_qty: int,

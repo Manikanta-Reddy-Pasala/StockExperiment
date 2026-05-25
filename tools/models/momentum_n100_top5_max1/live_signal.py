@@ -208,6 +208,11 @@ def main():
             Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
             with open(args.signals_out, "w") as f:
                 json.dump([], f)
+            try:
+                from src.services.notification_service import notify_skip
+                notify_skip("momentum_n100_top5_max1", "not rebalance day")
+            except Exception as _ne:
+                log.debug(f"notify_skip failed: {_ne}")
             return 0
 
     stocks = load_universe(args.universe_file)
@@ -297,6 +302,26 @@ def main():
                              reason="no signal emitted")
     except Exception as _e:
         log.debug(f"audit hook failed: {_e}")
+
+    # Notification funnel — ping the verdict even on no-change (eval day only).
+    # n100's live_signal runs stateless (held=[]) so it always emits ENTRY1;
+    # the ledger is the truth. If already holding, the ENTRY won't execute
+    # (max_concurrent=1) → that's a no-change tick.
+    if not args.force:
+        try:
+            from src.services.notification_service import (
+                notify_model_decision, current_held,
+            )
+            _held = current_held("momentum_n100_top5_max1")
+            _eff = [] if _held else signals
+            _ret = next((r[2] for r in ranks if r[0] == _held), None) if _held else None
+            notify_model_decision(
+                "momentum_n100_top5_max1", _eff, held_symbol=_held,
+                held_ret=_ret,
+                trigger="MID_MONTH" if args.mid_month_check else "CRON",
+            )
+        except Exception as _ne:
+            log.debug(f"notify decision failed: {_ne}")
     return 0
 
 
