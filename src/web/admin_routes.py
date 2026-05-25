@@ -2406,22 +2406,22 @@ def admin_model_ranking(model_name):
         ran_now = False
         if need_run and paths.get("live_signal"):
             ts = datetime.now().strftime("%Y%m%dT%H%M%S")
-            # Write to the canonical signals dir so the NEXT scheduled
-            # executor run (09:30 IST or manual rebalance) actually sees
-            # the fresh signal. Previously this wrote to /tmp and the
-            # cron executor missed it — model picked rank-1 but never
-            # placed an order.
-            sig_dir = Path(paths.get("signals_dir") or f"/tmp")
-            sig_dir.mkdir(parents=True, exist_ok=True)
-            today_iso = datetime.now().strftime("%Y-%m-%d")
-            # Match each model's cron file-naming convention by checking
-            # what cron.py writes; fall back to a model-suffixed default.
-            existing = sorted(sig_dir.glob(f"{today_iso}*.json"),
-                              key=lambda p: p.stat().st_mtime, reverse=True)
-            if existing:
-                signals_out = str(existing[0])
-            else:
-                signals_out = str(sig_dir / f"{today_iso}_{model_name}.json")
+            # DISPLAY-ONLY refresh. The signal file this emits goes to a
+            # throwaway /tmp path and is NEVER written to the canonical
+            # signals dir. Writing canonical here was the "VEDL on the 25th"
+            # bug: this run does not pass --rebalance-only, so on a
+            # non-rebalance day it emits a fresh ENTRY that the gated cron
+            # would have suppressed — and the old code dropped it into the
+            # exact file the 09:30 cron executor reads, turning a mere page
+            # view into a live off-cycle order.
+            #
+            # Order-eligible signals are produced ONLY by the schedule-gated
+            # cron emit (--rebalance-only / --mid-month-check) or an explicit
+            # user Rebalance. The Today's Picks card reads the ranking file
+            # (top_n), which live_signal still writes to ranking_dir as a
+            # side effect of this run — so the display works on any day
+            # without ever injecting an order.
+            signals_out = f"/tmp/ranking_display_{model_name}_{ts}.json"
             cmd = [
                 "python3", paths["live_signal"],
                 *paths["extra_args"],
