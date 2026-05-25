@@ -344,6 +344,67 @@ def _cancel_order(svc, user_id: int, order_id: str) -> bool:
         return False
 
 
+def _cancel_and_confirm(svc, user_id: int, order_id: str,
+                        timeout_s: int = 8, poll_s: float = 1.0) -> str:
+    """Cancel `order_id` and poll until its margin is actually released.
+
+    Fyers cancel is asynchronous — a working order keeps reserving margin
+    until the cancel is acknowledged. Placing a replacement before that
+    confirmation makes the account hold BOTH reservations, which is the 2x
+    "Margin Shortfall" that rejected the VEDL retry on 2026-05-25 (the prior
+    LIMIT @330.6 stayed PENDING while the retry/MARKET orders were placed).
+
+    Callers MUST NOT place a replacement unless this returns 'cancelled'.
+
+    Returns:
+      'cancelled'  — order gone (cancelled/rejected/expired); margin freed.
+      'filled'     — order filled during the cancel race; caller must treat it
+                     as a live position and NOT place a replacement.
+      'still_live' — cancel not confirmed within timeout; do NOT place a
+                     replacement (would double-reserve margin).
+    """
+    if not order_id:
+        return 'cancelled'  # nothing to cancel
+    FILLED_STR = {"COMPLETE", "FILLED", "TRADED"}
+    GONE_INT = {1, 5, 7}
+    GONE_STR = {"CANCELLED", "CANCELED", "REJECTED", "EXPIRED"}
+
+    def _terminal(row) -> Optional[str]:
+        if not row:
+            return None
+        st = row.get("status")
+        st_norm = (st.upper() if isinstance(st, str) else st)
+        try:
+            fq = int(row.get("filled_quantity") or row.get("filledQty") or 0)
+            qq = int(row.get("quantity") or row.get("qty") or 0)
+            if qq > 0 and fq >= qq:
+                return 'filled'
+        except (TypeError, ValueError):
+            pass
+        if st_norm == 2 or st_norm in FILLED_STR:
+            return 'filled'
+        if st_norm in GONE_INT or st_norm in GONE_STR:
+            return 'cancelled'
+        return None
+
+    # Two cancel attempts: the first request can race a still-transitioning
+    # order; re-send once partway through the poll window.
+    _cancel_order(svc, user_id, order_id)
+    deadline = time.time() + timeout_s
+    resent = False
+    while time.time() < deadline:
+        term = _terminal(_get_order_status(svc, user_id, order_id))
+        if term:
+            return term
+        if not resent and time.time() > deadline - (timeout_s / 2):
+            _cancel_order(svc, user_id, order_id)
+            resent = True
+        time.sleep(poll_s)
+    log.error(f"  cancel NOT confirmed for {order_id} — order still live; "
+              f"skipping replacement to avoid double-margin reservation")
+    return 'still_live'
+
+
 def _snap_tick(px: float, tick: float = 0.05) -> float:
     """Snap price to NSE equity tick size (default 0.05)."""
     return round(round(px / tick) * tick, 2)
@@ -431,17 +492,34 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
         # Order is already gone — try a fresh widened LIMIT
         log.warning(f"  LIMIT {symbol} terminal={term}, retry with widened tol")
     else:
-        # Still pending — try modify first, cancel+replace as fallback
-        if not _modify_order_limit(svc, user_id, order_id, retry_px):
-            _cancel_order(svc, user_id, order_id)
+        # Still pending — try modify first (reuses the SAME order, so no
+        # extra margin). Only if modify is unsupported do we cancel+replace,
+        # and that replacement must wait for the cancel to actually free the
+        # margin first (else 2x reservation -> Margin Shortfall).
+        if _modify_order_limit(svc, user_id, order_id, retry_px):
+            log.info(f"  LIMIT {symbol} modified to {retry_px}")
+        else:
+            conf = _cancel_and_confirm(svc, user_id, order_id)
+            if conf == 'filled':
+                return {"filled": True, "status": "limit_filled",
+                        "order_id": order_id, "fill_price": first_px,
+                        "reason": "filled_during_cancel"}
+            if conf != 'cancelled':
+                # Prior order's margin not released — do NOT stack a second
+                # order. Leave the existing LIMIT working; reconciler will
+                # pick up any later fill.
+                return {"filled": False, "status": "limit_cancel_unconfirmed",
+                        "order_id": order_id, "fill_price": None,
+                        "reason": "prior LIMIT not cancelled; skipped replacement to avoid double-margin"}
             res2 = _placeorder(svc, user_id, symbol, qty, side,
                                pricetype="LIMIT", price=retry_px, tag=tag)
             if _is_ok(res2):
                 order_id = _extract_order_id(res2)
             else:
                 log.error(f"  LIMIT retry place failed for {symbol}: {res2}")
-        else:
-            log.info(f"  LIMIT {symbol} modified to {retry_px}")
+                return {"filled": False, "status": "limit_retry_place_failed",
+                        "order_id": order_id, "fill_price": None,
+                        "reason": str(res2)}
 
     log.info(f"  LIMIT {side} {symbol} re-quote px={retry_px} "
              f"(retry_tol={rm_cfg.limit_retry_pct}%)")
@@ -452,8 +530,20 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
                 "fill_price": traded_px if traded_px is not None else retry_px,
                 "reason": "retry_tol"}
 
-    # MARKET fallback
-    _cancel_order(svc, user_id, order_id)
+    # MARKET fallback — confirm the prior LIMIT is cancelled (margin freed)
+    # BEFORE placing the MARKET order, else the account holds both and Fyers
+    # rejects the MARKET for Margin Shortfall (the VEDL 2026-05-25 failure).
+    conf = _cancel_and_confirm(svc, user_id, order_id)
+    if conf == 'filled':
+        return {"filled": True, "status": "limit_retry_filled",
+                "order_id": order_id, "fill_price": retry_px,
+                "reason": "filled_before_market_fallback"}
+    if conf != 'cancelled':
+        log.error(f"  MARKET fallback SKIPPED for {symbol}: prior order "
+                  f"{order_id} not cancelled — avoiding double-margin")
+        return {"filled": False, "status": "market_skipped_cancel_unconfirmed",
+                "order_id": order_id, "fill_price": None,
+                "reason": "prior LIMIT not cancelled; skipped MARKET to avoid double-margin"}
     log.warning(f"  MARKET fallback for {side} {symbol} qty={qty} "
                 f"(last={last_price}, prior order={order_id})")
     res3 = _placeorder(svc, user_id, symbol, qty, side, pricetype="MARKET", tag=tag)
