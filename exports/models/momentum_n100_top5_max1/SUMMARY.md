@@ -2,6 +2,13 @@
 
 **Real NSE Nifty 100 monthly momentum rotation (top-1 by 30d ret). No price filter — honest baseline.**
 
+## When it SELLS (exit rules)
+
+Monthly rotation, single position (holds the rank-1 stock). **Sells only on rank rotation — there is NO price stop or target:**
+- At each **monthly rebalance** (1st–7th weekday): SELLS the held stock **only if it dropped out of the top-5** by 30-day return; if still top-5, keeps holding.
+- At the **mid-month day-15 check**: rotates **only if the new rank-1 leads the held by ≥5pp** of 30-day return.
+- SELL is labelled `TARGET_HIT`/`STOP_HIT` only by whether exit price is above/below entry — the **trigger is the rank drop, not a price level.** A held stock can fall hard and is NOT sold while it stays in the top-5.
+
 ## Backtest window & trade frequency
 
 | Metric | Value |

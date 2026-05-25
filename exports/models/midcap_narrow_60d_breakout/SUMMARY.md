@@ -11,6 +11,21 @@
 > Calmar 17.46 / 8 trades / 75% WR** (3yr to 2026-05-15; the +137.85% below is the
 > same run to 2026-05-12).
 
+## When it SELLS (exit rules)
+
+Breakout swing, single position, checked every run (09:25 + 15:25). Unlike the rotation
+models, it does **NOT** sell to chase a new breakout — it rides each position until one of
+these fires (first wins):
+- **TARGET** — up **≥ +100%** from entry.
+- **STOP** — down **≥ −20%** from entry (catastrophe stop, added 2026-05-26; fires rarely,
+  caps the otherwise-unbounded downside).
+- **TRAIL** — only **after the trade is ≥ +10% in profit**, then it drops **≥20% from its peak**.
+- **MAX_HOLD** — **120 days** held → force-exit at market.
+- SMA20 exit is **disabled**.
+
+So a position is held until target/stop/trail/max-hold — a fresh breakout elsewhere is ignored
+until the current one exits.
+
 ## Backtest window & trade frequency
 
 | Metric | Value |

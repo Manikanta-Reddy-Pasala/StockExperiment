@@ -2,6 +2,12 @@
 
 **Top-20 ADV + uptrend + Nifty 100. Daily rotation top-1 by 30d ret. No price filter — honest baseline.**
 
+## When it SELLS (exit rules)
+
+Daily rotation, single position. **Sells only on rank rotation — NO price stop or target:**
+- **Every weekday**: SELLS the held stock the moment it is **no longer rank-1** (top-1 by 30-day return within the top-20 ADV ∩ Nifty-100 uptrend pool), and buys the new rank-1. If the held stock is still rank-1, keeps it.
+- SELL labelled `TARGET_HIT`/`STOP_HIT` by exit-vs-entry price only — the **trigger is losing the #1 rank, not a price level.** Highest churn of the four models.
+
 ## Backtest window & trade frequency
 
 | Metric | Value |

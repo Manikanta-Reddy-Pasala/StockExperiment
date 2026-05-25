@@ -2,6 +2,12 @@
 
 **Pseudo-N100 (top-100 ADV from N500 − Smallcap) + uptrend + MAX_PRICE≤₹3,000. Monthly rotation top-1 by 30d ret.**
 
+## When it SELLS (exit rules)
+
+Monthly rotation, single position (holds the rank-1 stock). **Sells only on rank rotation — NO price stop or target:**
+- At each **monthly rebalance** (1st–7th weekday): SELLS the held stock **only if it dropped out of the top-5** by 30-day return; otherwise keeps holding.
+- SELL labelled `TARGET_HIT`/`STOP_HIT` by exit-vs-entry price only — the **trigger is the rank drop, not a price level.** A held stock can fall and is NOT sold while it stays in the top-5.
+
 ## Backtest window & trade frequency
 
 | Metric | Value |
