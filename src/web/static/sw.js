@@ -1,6 +1,6 @@
 // Service worker — fast shell + SWR for HTML pages + cache-first for static.
 // Bump CACHE_VERSION on any UI change so old clients refetch.
-const CACHE_VERSION = 'v11-2026-05-23-new-icons';
+const CACHE_VERSION = 'v12-2026-05-25-redirect-safe-nav';
 const STATIC_CACHE = 'trading-pwa-static-' + CACHE_VERSION;
 const PAGE_CACHE   = 'trading-pwa-pages-'  + CACHE_VERSION;
 // Bump ?v= on every icon-affecting change. URL-keyed, so any old cached
@@ -30,7 +30,10 @@ self.addEventListener('install', (event) => {
     const pc = await caches.open(PAGE_CACHE);
     await Promise.all(PRECACHE_PAGES.map((p) =>
       fetch(p, { credentials: 'include' })
-        .then((r) => r.ok && pc.put(p, r.clone()))
+        // Never cache a 302->/login redirect under the page's own key, and
+        // never cache a `redirected` Response — handing one to a navigation
+        // later makes the browser render a blank page.
+        .then((r) => r.ok && !r.redirected && pc.put(p, r.clone()))
         .catch(() => {})
     ));
     await self.skipWaiting();
@@ -72,10 +75,47 @@ function isCacheablePage(pathname) {
   return pathname === '/' || PRECACHE_PAGES.includes(pathname);
 }
 
+// A service worker MUST NOT hand a `redirected` Response back to a navigation
+// request — the browser rejects it and the PWA launches to a blank screen.
+// This bites our auth-gated start_url (/picks -> 302 /login when logged out).
+// Rebuild a fresh, non-redirected Response from the same body so it renders.
+async function stripRedirect(res) {
+  if (!res || !res.redirected) return res;
+  const body = await res.blob();
+  return new Response(body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers: res.headers,
+  });
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+
+  // 0. Navigations (PWA launch + tab taps) — network-first, redirect-safe.
+  //    Whatever the server returns (target page OR the /login it redirects to
+  //    when the session is gone) is rendered as a clean response, never blank.
+  if (req.mode === 'navigate') {
+    event.respondWith((async () => {
+      try {
+        const res = await fetch(req);
+        // Only cache genuine, non-redirected page HTML for offline launch.
+        if (res.ok && !res.redirected && isCacheablePage(url.pathname)) {
+          const c = await caches.open(PAGE_CACHE);
+          c.put(req, res.clone());
+        }
+        return await stripRedirect(res);
+      } catch (e) {
+        const cached = await caches.match(req);
+        return cached || new Response(
+          '<h1>Offline</h1><p>No cached copy. Reconnect and retry.</p>',
+          { headers: { 'Content-Type': 'text/html' } });
+      }
+    })());
+    return;
+  }
 
   // 1. Static assets — cache-first.
   if (url.pathname.startsWith('/static/') || url.pathname === '/favicon.ico') {
@@ -100,7 +140,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith((async () => {
       const cached = await caches.match(req);
       const fetchPromise = fetch(req).then((res) => {
-        if (res.ok) caches.open(PAGE_CACHE).then((c) => c.put(req, res.clone()));
+        if (res.ok && !res.redirected) caches.open(PAGE_CACHE).then((c) => c.put(req, res.clone()));
         return res;
       }).catch(() => cached);
       return cached || fetchPromise;
