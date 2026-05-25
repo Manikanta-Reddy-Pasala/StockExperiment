@@ -64,12 +64,6 @@ KNOWN_MODELS = [
         "enabled": True,
         "description": "Equity daily rotation top-20-ADV ∩ Nifty 100 by 30d return",
     },
-    {
-        "name": "finnifty_ic_otm4_w300_lots5",
-        "default_capital": 30000,
-        "enabled": True,
-        "description": "FinNifty monthly Iron Condor — OTM 4% / wings 300pt / 5 lots",
-    },
 ]
 
 

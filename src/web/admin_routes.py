@@ -482,7 +482,7 @@ def trigger_model_data_pull(model_name):
     """Trigger data pulls for a specific deployed model.
 
     model_name: momentum_n100_top5_max1 | midcap_narrow_60d_breakout |
-                finnifty_ic_otm4_w300_lots5
+                n20_daily_large_only | momentum_pseudo_n100_adv
     """
     allowed = {
         "momentum_n100_top5_max1": [
@@ -496,12 +496,6 @@ def trigger_model_data_pull(model_name):
              "tools.models.midcap_narrow_60d_breakout.data_pull", "pull_daily_ohlcv"),
             ("midcap_narrow universe refresh (skip top-30, take next 100)",
              "tools.models.midcap_narrow_60d_breakout.data_pull", "refresh_universe"),
-        ],
-        "finnifty_ic_otm4_w300_lots5": [
-            ("Index spots (NIFTY/BN/FN)", "tools.models.finnifty_ic_otm4_w300_lots5.data_pull",
-             "fetch_index_spots"),
-            ("Option bhavcopy (NIFTY/BN/FN)", "tools.models.finnifty_ic_otm4_w300_lots5.data_pull",
-             "fetch_option_bhav"),
         ],
         "n20_daily_large_only": [
             ("Equity OHLCV (N500 — covers N20 top-ADV)",
@@ -557,12 +551,6 @@ def models_status():
       Loads N100 universe file. For each of 100 stocks, counts distinct
       trading-day bars in last 150 calendar days. Requires >= 90 trading
       days (≈ 100 trading days × 90% NSE holiday/listing tolerance).
-
-    finnifty_ic_otm4_w300_lots5:
-      - FINNIFTY spot: last 30 cal days requires >= 18 trading days.
-      - FINNIFTY option chain: for the *current* monthly expiry, count
-        unique strikes within ±5% of last spot. Require >= 5 strikes
-        with at least 3 days of bars.
 
     midcap_narrow_60d_breakout:
       Loads midcap_narrow universe file (~100 NSE midcaps). For each
@@ -780,91 +768,6 @@ def models_status():
                      "ok": mc_stale_days <= 3,
                      "extra": f"{mc_stale_days}d old"},
                 ],
-            })
-
-            # ============================================================
-            # Model 3: finnifty_ic_otm4_w300_lots5 (options)
-            # ============================================================
-            # Spot sufficiency: last 30 calendar days >= 18 trading days
-            spot_since = today - timedelta(days=30)
-            spot_items = []
-            spots_ok = True
-            for sym in ("NSE:NIFTY50-INDEX", "NSE:NIFTYBANK-INDEX", "NSE:FINNIFTY-INDEX"):
-                r = session.execute(text("""
-                    SELECT COUNT(DISTINCT date) days, MAX(date) latest
-                    FROM historical_data WHERE symbol = :s AND date >= :since
-                """), {"s": sym, "since": spot_since}).fetchone()
-                days = int(r.days) if r and r.days else 0
-                latest = r.latest if r else None
-                stale = (today - latest).days if latest else 999
-                short = sym.replace("NSE:", "").replace("-INDEX", "")
-                ok = days >= 18 and stale <= 3
-                if not ok:
-                    spots_ok = False
-                spot_items.append({
-                    "label": f"{short} spot trading days (30d)",
-                    "value": days,
-                    "required": ">= 18 (≈ 22 - holidays)",
-                    "ok": ok,
-                    "extra": (latest.isoformat() if latest else "—") + f" • {stale}d old",
-                })
-
-            # Current monthly expiry availability per underlying
-            opt_items = []
-            opts_ok = True
-            current_finnifty_spot = session.execute(text("""
-                SELECT close FROM historical_data
-                WHERE symbol='NSE:FINNIFTY-INDEX' ORDER BY date DESC LIMIT 1
-            """)).fetchone()
-            fn_spot_val = float(current_finnifty_spot.close) if current_finnifty_spot else 0
-
-            for u in ("NIFTY", "BANKNIFTY", "FINNIFTY"):
-                # Next monthly expiry from option_universe
-                next_exp_row = session.execute(text("""
-                    SELECT MIN(expiry) AS exp FROM option_universe
-                    WHERE underlying = :u AND expiry_kind = 'monthly'
-                      AND expiry >= :today
-                """), {"u": u, "today": today}).fetchone()
-                next_exp = next_exp_row.exp if next_exp_row else None
-
-                if next_exp is None:
-                    opt_items.append({
-                        "label": f"{u} next monthly expiry",
-                        "value": "—",
-                        "required": "exists",
-                        "ok": False,
-                    })
-                    opts_ok = False
-                    continue
-
-                # Strike coverage for that expiry: count distinct strikes that
-                # have at least 1 bar in last 7 calendar days
-                strike_cov = session.execute(text("""
-                    SELECT COUNT(DISTINCT strike) AS strikes
-                    FROM historical_options
-                    WHERE underlying = :u AND expiry = :exp
-                      AND candle_time::date >= :since
-                """), {"u": u, "exp": next_exp,
-                       "since": today - timedelta(days=7)}).fetchone()
-                strikes = int(strike_cov.strikes) if strike_cov else 0
-                ok = strikes >= 5
-                if not ok:
-                    opts_ok = False
-                opt_items.append({
-                    "label": f"{u} {next_exp.isoformat()} strikes (last 7d)",
-                    "value": strikes,
-                    "required": ">= 5 strikes",
-                    "ok": ok,
-                    "extra": f"expires {(next_exp - today).days}d",
-                })
-
-            fn_ok = spots_ok and opts_ok
-            models.append({
-                "name": "finnifty_ic_otm4_w300_lots5",
-                "type": "options",
-                "wired": _wired("finnifty_ic_otm4_w300_lots5"),
-                "data_sufficient": bool(fn_ok),
-                "items": spot_items + opt_items,
             })
 
             # ============================================================
@@ -1735,9 +1638,6 @@ _SIGNAL_PATHS = {
         "/app/logs/n20_daily/signals/{date}_n20.json",
         "/app/logs/n20_daily_large_only/signals/{date}.json",
     ],
-    "finnifty_ic_otm4_w300_lots5": [
-        "/app/logs/finnifty_ic_otm4_w300_lots5/signals/{date}.json",
-    ],
 }
 
 
@@ -2402,7 +2302,7 @@ def admin_model_ranking(model_name):
                     need_run = True
             except Exception:
                 need_run = True
-        # Skip auto-run for the finnifty options model (no live_signal flow).
+        # Only models that declare a live_signal entry can auto-run.
         ran_now = False
         if need_run and paths.get("live_signal"):
             ts = datetime.now().strftime("%Y%m%dT%H%M%S")

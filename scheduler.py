@@ -341,7 +341,6 @@ def run_scheduler():
     logger.info("  - momentum_pseudo_n100_adv:   signal 09:25 + execute 09:30 (monthly rebal)")
     logger.info("  - midcap_narrow_60d_breakout: signal 09:25 + execute 09:32 + EOD signal 15:25")
     logger.info("  - n20_daily_large_only:       signal 09:25 + execute 09:30 (daily rotation)")
-    logger.info("  - finnifty_ic_otm4_w300_lots5: signal 09:25 + 14:30 (Monday entry / daily stop)")
     logger.info("")
     logger.info("Maintenance:")
     logger.info("  - Cleanup Old Snapshots: Weekly (Sunday) at 03:00 AM")
@@ -371,14 +370,10 @@ def run_scheduler():
     from tools.models.n20_daily_large_only.cron import (
         register_trading_jobs as register_n20_daily_jobs,
     )
-    from tools.models.finnifty_ic_otm4_w300_lots5.cron import (
-        register_trading_jobs as register_fn_ic_otm4_jobs,
-    )
     register_momentum_n100_jobs(schedule)
     register_pseudo_n100_jobs(schedule)
     register_midcap_narrow_jobs(schedule)
     register_n20_daily_jobs(schedule)
-    register_fn_ic_otm4_jobs(schedule)
 
     # Position reconciler — mirrors Fyers truth into model_ledger every 5 min
     # during market hours (09:30–15:30 IST). Catches drift when record_buy /
