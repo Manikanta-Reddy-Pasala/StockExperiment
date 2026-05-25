@@ -128,7 +128,11 @@ def check_exit(pos: Dict, df_sym: pd.DataFrame) -> Optional[Dict]:
 
 
 def scan_entry_candidate(df: pd.DataFrame, symbols: List[str]) -> Optional[Dict]:
-    """Find best fresh 60d-high breakout with vol surge today.
+    """Find best fresh 40-day-high breakout with vol surge today.
+
+    NOTE: the model is *named* "60d" for legacy reasons (v1 used a 60-day high);
+    the live/v2 logic uses HH_WINDOW=40. The name is not renamed because it is
+    the DB key (model_settings/model_ledger/model_trades) + holds a live position.
 
     Side effects (stashed on the function so the picks UI can show short-lists):
       - `last_candidates`     — stocks that fully qualify (rare on quiet days)
