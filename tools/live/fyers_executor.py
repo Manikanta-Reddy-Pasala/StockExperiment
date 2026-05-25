@@ -458,10 +458,11 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
 
     if side.upper() == "BUY":
         first_px = _snap_tick(last_price * (1.0 + tol))
-        retry_px = _snap_tick(last_price * (1.0 + retry))
     else:
         first_px = _snap_tick(last_price * (1.0 - tol))
-        retry_px = _snap_tick(last_price * (1.0 - retry))
+    # retry_px is computed later from a FRESH live LTP (the price can move
+    # during the first window), not the stale t=0 last_price.
+    retry_px = first_px
 
     log.info(f"  LIMIT {side} {symbol} qty={qty} px={first_px} "
              f"(last={last_price}, tol={rm_cfg.limit_tol_pct}%)")
@@ -488,6 +489,18 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
         return {"filled": True, "status": "limit_filled", "order_id": order_id,
                 "fill_price": traded_px if traded_px is not None else first_px,
                 "reason": "tol"}
+
+    # Re-quote off a FRESH live price. The LTP can move during the first
+    # window, so widening off the stale t=0 price could sit away from the
+    # current market and never fill. Fall back to last_price on quote failure.
+    requote_ltp = _fetch_live_ltp(svc, user_id, symbol) or last_price
+    if side.upper() == "BUY":
+        retry_px = _snap_tick(requote_ltp * (1.0 + retry))
+    else:
+        retry_px = _snap_tick(requote_ltp * (1.0 - retry))
+    log.info(f"  re-quote price refresh {symbol}: ltp={requote_ltp} "
+             f"retry_px={retry_px} (+{rm_cfg.limit_retry_pct}%)")
+
     if term in ("rejected", "cancelled", "expired"):
         # Order is already gone — try a fresh widened LIMIT
         log.warning(f"  LIMIT {symbol} terminal={term}, retry with widened tol")
