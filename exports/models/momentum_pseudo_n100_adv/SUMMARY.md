@@ -35,7 +35,7 @@
 | Trades closed | 27 |
 | Wins / Losses | 24 / 3 |
 | Win rate | 88.9% |
-| Live deployment | NO |
+| Live deployment | YES (live since 2026-05) |
 | Open position | **ADANIGREEN** qty 11,743 entry Rs.1,290.70 (2026-05-04) last Rs.1,308.00 unrealized +203,154 |
 
 ## NSE cap segment breakdown

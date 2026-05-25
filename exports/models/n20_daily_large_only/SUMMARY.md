@@ -34,7 +34,7 @@
 | Trades closed | 138 |
 | Wins / Losses | 60 / 76 |
 | Win rate | 44.1% |
-| Live deployment | NO |
+| Live deployment | YES (live since 2026-05) |
 | Open position | **ADANIPOWER** qty 65,141 entry Rs.181.35 (2026-04-13) last Rs.209.63 unrealized +1,842,187 |
 
 ## NSE cap segment breakdown
