@@ -2,12 +2,25 @@
 
 **Real NSE Nifty 100 monthly momentum rotation (top-1 by 30d ret). No price filter — honest baseline.**
 
+## When it BUYS (entry rules)
+
+Single position (`max_concurrent=1`). When flat at a rebalance:
+1. Universe = real NSE Nifty 100 (`src/data/symbols/nifty100.csv`, ~104 stocks). No price/SMA/ADV filter — honest baseline.
+2. Rank every stock by **30-day return** (`lookback_days=30`).
+3. Buy **rank-1** (`--top-n 5` defines the retention band for exits, but only the #1 stock is bought).
+- Code: `rank_universe()` + `emit_signals()` in `live_signal.py:100-169`.
+
 ## When it SELLS (exit rules)
 
 Monthly rotation, single position (holds the rank-1 stock). **Sells only on rank rotation — there is NO price stop or target:**
 - At each **monthly rebalance** (1st–7th weekday): SELLS the held stock **only if it dropped out of the top-5** by 30-day return; if still top-5, keeps holding.
-- At the **mid-month day-15 check**: rotates **only if the new rank-1 leads the held by ≥5pp** of 30-day return.
+- At the **mid-month day-15 check**: rotates **only if the new rank-1 leads the held by ≥5pp** of 30-day return (`MID_MONTH_LEAD_PCT=5.0`).
 - SELL is labelled `TARGET_HIT`/`STOP_HIT` only by whether exit price is above/below entry — the **trigger is the rank drop, not a price level.** A held stock can fall hard and is NOT sold while it stays in the top-5.
+
+> **⚠️ Live vs backtest exit mismatch:** the headline CAGR below comes from `backtest.py`, which
+> exits the moment the held stock is **not rank-1** (`top != hold`, line 115). **Live keeps the
+> stock while it stays in the top-5** (`live_signal.py:129/136`). Live is laxer — it holds longer
+> and trades less — so live results can diverge from the published backtest.
 
 ## Backtest window & trade frequency
 

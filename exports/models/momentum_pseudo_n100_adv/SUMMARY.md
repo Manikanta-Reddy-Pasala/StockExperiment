@@ -2,11 +2,26 @@
 
 **Pseudo-N100 (top-100 ADV from N500 − Smallcap) + uptrend + MAX_PRICE≤₹3,000. Monthly rotation top-1 by 30d ret.**
 
+## When it BUYS (entry rules)
+
+Single position (`max_concurrent=1`). When flat at a rebalance:
+1. Universe = pseudo-N100 = top-100 by 20-day ADV from N500, rebuilt yearly-PIT at year start.
+2. Drop NSE **Smallcap 250** members.
+3. **Uptrend gate** — close > 200-day SMA (`SMA_LONG=200`; fail-closed if <200 closes).
+4. **Max-price** — drop close > **₹3,000** (`MAX_PRICE=3000`).
+5. Rank survivors by **30-day return**, buy **rank-1** (`--top-n 5` = exit retention band).
+- Code: `rank_universe()` + `emit_signals()` in `live_signal.py:124-218`.
+
 ## When it SELLS (exit rules)
 
 Monthly rotation, single position (holds the rank-1 stock). **Sells only on rank rotation — NO price stop or target:**
 - At each **monthly rebalance** (1st–7th weekday): SELLS the held stock **only if it dropped out of the top-5** by 30-day return; otherwise keeps holding.
 - SELL labelled `TARGET_HIT`/`STOP_HIT` by exit-vs-entry price only — the **trigger is the rank drop, not a price level.** A held stock can fall and is NOT sold while it stays in the top-5.
+
+> **⚠️ Live vs backtest exit mismatch:** the headline CAGR below comes from `backtest.py`, which
+> exits the moment the held stock is **not rank-1** (`top != hold`, line 119). **Live keeps the
+> stock while it stays in the top-5** (`live_signal.py:181/186`). Live is laxer — holds longer,
+> trades less — so live can diverge from the published backtest.
 
 ## Backtest window & trade frequency
 

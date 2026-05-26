@@ -8,16 +8,19 @@ Entry (single concurrent position, max_conc=1):
   - Volume on breakout day > 2.0x 20-day avg volume
   - Close > 200-day SMA (Stage 2 trend filter)
 
-Exit (whichever fires first):
-  - Profit target: +100% from entry (was +60% in V1)
-  - Trailing stop: -20% from peak, activated after +10% gain (was -15% in V1)
-  - MAX_HOLD: 90 trading days (was 30 in V1)
+Exit (whichever fires first, in this precedence):
+  - TARGET:   +100% from entry (was +60% in V1)
+  - STOP:     -20% from entry — catastrophe stop (added 2026-05-26)
+  - TRAIL:    -20% from PEAK PRICE, armed once trade is >=+10% in profit (was -15% in V1)
+              NOTE: 20% off the peak close, not a 20% drop in the gain-number.
+              Peak +40% -> exits at +12% from entry, not +30%.
+  - MAX_HOLD: 120 calendar days (was 30 in V1, then 90); age = (today - entry).days
   - SMA20 exit: DISABLED (was enabled — leaked winners on dips)
 
 Universe:
-  - Pseudo-midcap pool: top-100 from N500 by 20d ADV, skip top-30 large-caps
-  - V2 cap filter: Exclude NSE Nifty 100 members (keep Mid + Small caps only)
-  - Exclude ANGELONE (corp-action data anomaly)
+  - Pseudo-midcap pool: top-100 from N500 by 20d ADV (SKIP_TOP=0)
+  - V2 cap filter: Exclude NSE Nifty 100 members (keep Mid + Small caps only) -> ~42 names
+  - ANGELONE: no longer excluded — historical_data restored split-adjusted 2026-05-17
 
 Costs: 10 bps slippage, 0.10% STT on sells, ₹20/order brokerage.
 

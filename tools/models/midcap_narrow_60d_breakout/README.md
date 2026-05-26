@@ -38,11 +38,17 @@ End-2026 universe first 10: SUZLON, SHRIRAMFIN (no wait — Large), … (Large-c
 | Volume confirm | ≥ 2× 20-day avg | same |
 | Long-term filter | close > 200-day SMA | same |
 | Position | max_concurrent=1 | same |
-| **Target** | **+100%** | was +60% |
-| Trail | **-20% from peak** (armed after +10%) | was -15% |
+| **Target** | **+100%** from entry | was +60% |
+| **STOP** | **−20% from entry** (catastrophe stop) | NEW 2026-05-26 |
+| Trail | **−20% from PEAK PRICE**, armed once trade is ≥+10% in profit | was -15% |
 | **SMA20 exit** | **DISABLED** | was enabled |
-| **Max hold** | **90 trading days** | was 30 |
+| **Max hold** | **120 days** | was 30 |
 | Slippage | 10 bps + ₹20 brokerage + 0.10% STT | same |
+
+**Exit precedence (first wins):** TARGET → STOP → TRAIL → MAX_HOLD. Trail is 20% off the
+highest close since entry (NOT a 20% drop in the gain-number): peak +40% → exits at +12%, not
++30%. Full mechanic + worked example in `exports/models/midcap_narrow_60d_breakout/SUMMARY.md`.
+Code: `check_exit()` / `scan_entry_candidate()` in `live_signal.py`.
 
 ## Backtest result (V2, 2023-05-15 → 2026-05-15, ₹10L start)
 
@@ -74,11 +80,15 @@ wins on ALL three metrics (CAGR, DD, Calmar).
 
 | File | Purpose |
 |---|---|
-| `backtest.py` | standalone reproducer (40d/100%/20%/no-SMA/90d + cap filter) |
-| `build_universe.py` | Pseudo-midcap universe builder (will need cap filter applied at use time) |
-| `live_signal.py` | Daily breakout signal emitter (not deployed) |
-| `data_pull.py` / `cron.py` | Scheduler registration (not wired) |
-| `trade_ledger.json` | 12 trades + summary |
+| `backtest.py` | standalone reproducer (40d / +100% / −20% trail / −20% stop / no-SMA / 120d + cap filter) |
+| `build_universe.py` | Live universe builder — top-100 ADV from N500 minus Nifty-100 (mirrors backtest) |
+| `live_signal.py` | Daily breakout signal emitter — `scan_entry_candidate()` (entry) + `check_exit()` (exit) |
+| `data_pull.py` / `cron.py` | Scheduler registration — **WIRED**: trading jobs in `scheduler.py:367-375`, data jobs in `data_scheduler.py:650-658` |
+| `trade_ledger.json` | trade ledger + summary |
+
+**Scheduled (live):** `cron.py register_trading_jobs` runs `live_signal.py` daily at **09:25**
+(after open) and **15:25** (near close), with Fyers execute at 09:32. Data: N500 OHLCV pull
+20:45 daily, universe refresh on the 1st of month.
 
 ## Reproduce
 

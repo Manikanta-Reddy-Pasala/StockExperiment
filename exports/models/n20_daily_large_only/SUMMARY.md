@@ -2,11 +2,21 @@
 
 **Top-20 ADV + uptrend + Nifty 100. Daily rotation top-1 by 30d ret. No price filter — honest baseline.**
 
+## When it BUYS (entry rules)
+
+Single position (`max_concurrent=1`). **Every weekday** (no monthly gate):
+1. Universe = top-**20** by 20-day ADV from N500, rebuilt daily (`UNIV_SIZE=20`).
+2. **Uptrend gate** — close > 200-day SMA (`SMA_LONG=200`).
+3. **Large-cap gate** — stock must be in NSE Nifty 100.
+4. Rank survivors by **30-day return** (`LOOKBACK_RET=30`), buy **rank-1** (`--top-n 1`).
+- Code: `build_pit_universe_and_rank()` + `emit_signals()` in `live_signal.py:99-191`.
+
 ## When it SELLS (exit rules)
 
 Daily rotation, single position. **Sells only on rank rotation — NO price stop or target:**
 - **Every weekday**: SELLS the held stock the moment it is **no longer rank-1** (top-1 by 30-day return within the top-20 ADV ∩ Nifty-100 uptrend pool), and buys the new rank-1. If the held stock is still rank-1, keeps it.
 - SELL labelled `TARGET_HIT`/`STOP_HIT` by exit-vs-entry price only — the **trigger is losing the #1 rank, not a price level.** Highest churn of the four models.
+- Live and backtest exit logic **agree** here (both top-1) — no live-vs-backtest mismatch.
 
 ## Backtest window & trade frequency
 

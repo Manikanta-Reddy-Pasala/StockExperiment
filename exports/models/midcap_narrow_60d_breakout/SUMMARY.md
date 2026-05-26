@@ -11,20 +11,57 @@
 > Calmar 17.46 / 8 trades / 75% WR** (3yr to 2026-05-15; the +137.85% below is the
 > same run to 2026-05-12).
 
+## When it BUYS (entry rules)
+
+Single position (`max_concurrent=1`). When **flat**, every run scans the universe (~42 midcaps
+= top-100 ADV from N500 minus Nifty-100) for a **fresh breakout** and buys the strongest:
+- **40-day high** — today's close is above the highest high of the prior 40 days (`HH_WINDOW=40`).
+- **Volume surge** — today's volume **≥ 2× the 20-day avg volume** (`VOL_MULT=2.0`).
+- **Stage-2 trend** — close **> 200-day SMA** (`SMA_LONG=200`).
+- All three must fire the same day. If several stocks qualify, it picks the one with the
+  **highest volume ratio** (`vol_ratio`). Backtest enters next-day at the open; live enters at
+  the breakout close.
+- Code: `scan_entry_candidate()` in `live_signal.py:130-210`, mirrored in `backtest.py:197-227`.
+
+> Name is "60d" for legacy reasons (v1 used a 60-day high); the live/v2 logic uses a **40-day**
+> window. Not renamed because the name is the DB key (model_settings / model_ledger / model_trades).
+
 ## When it SELLS (exit rules)
 
 Breakout swing, single position, checked every run (09:25 + 15:25). Unlike the rotation
 models, it does **NOT** sell to chase a new breakout — it rides each position until one of
-these fires (first wins):
-- **TARGET** — up **≥ +100%** from entry.
-- **STOP** — down **≥ −20%** from entry (catastrophe stop, added 2026-05-26; fires rarely,
-  caps the otherwise-unbounded downside).
-- **TRAIL** — only **after the trade is ≥ +10% in profit**, then it drops **≥20% from its peak**.
-- **MAX_HOLD** — **120 days** held → force-exit at market.
-- SMA20 exit is **disabled**.
+these fires (first wins). Code: `check_exit()` in `live_signal.py:92-127`, mirrored in
+`backtest.py:160-176`:
+
+| Reason | Fires when | Constant |
+|---|---|---|
+| **TARGET** | current close **≥ +100%** above entry | `TARGET_PCT=1.00` |
+| **STOP** | current close **≤ −20%** below entry (catastrophe stop, added 2026-05-26; fires rarely, caps unbounded downside) | `STOP_PCT=0.20` |
+| **TRAIL** | trade is **≥ +10% in profit** AND current close is **≥ 20% below the peak close** since entry | `PROFIT_TRIGGER=0.10`, `TRAIL_PCT=0.20` |
+| **MAX_HOLD** | **120 calendar days** held → force-exit at market | `MAX_HOLD_DAYS=120` |
+| SMA20 | **disabled** (leaked winners on dips) | `USE_SMA_EXIT=False` |
 
 So a position is held until target/stop/trail/max-hold — a fresh breakout elsewhere is ignored
 until the current one exits.
+
+### How TRAIL calculates (the part that confuses people)
+
+The trail is **20% off the PEAK PRICE**, not a 20% drop in the gain-number. Each run it
+tracks `peak = highest close since entry`, then:
+
+```
+ret_entry = (close − entry) / entry      # gain vs entry
+ret_peak  = (peak − close) / peak         # drop vs peak
+TRAIL fires when  ret_entry ≥ +10%  AND  ret_peak ≥ 20%
+```
+
+**Worked example — peak hit +40%:**
+- Peak price = 1.40 × entry. 20% below that peak = 1.40 × 0.80 = **1.12 = +12% from entry**.
+- So TRAIL fires when price falls back to **+12%**, NOT at +30%.
+- At +30% (price 1.30) the drop-from-peak is only (1.40−1.30)/1.40 = **7.1% < 20% → no exit**.
+
+The `+10%` arm and the `20%-off-peak` test must both hold at once. Below +10% the TRAIL never
+fires — the **STOP** (−20% from entry) handles deep losers instead.
 
 ## Backtest window & trade frequency
 
