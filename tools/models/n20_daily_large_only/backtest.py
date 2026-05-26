@@ -16,7 +16,7 @@ import pandas as pd
 from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
 from tools.shared.universes import nifty500_symbols
-from tools.shared.rotation_strategy import decide_rotation
+from tools.shared.backtest_engine import run_rotation_backtest
 
 
 UNIV_SIZE = 20
@@ -61,96 +61,33 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
     dates = cl.index
 
     trading = [d for d in dates if start <= d.date() <= end]
-    cap = capital
-    hold = None; qty = 0; entry_px = 0.0; entry_date = None
-    trades = []
-    nav_series = [capital]
+    calendar = [(d, "full") for d in trading]
 
-    for d in trading:
-        di = dates.get_loc(d)
-        if di < max(LOOKBACK, SMA_LONG): continue
-
-        nav = cap + (qty*float(cl[hold].iloc[di]) if hold and pd.notna(cl[hold].iloc[di]) else 0)
-        nav_series.append(nav)
-
-        pit_adv = adv20.iloc[di].dropna().sort_values(ascending=False)
-        pit_univ = pit_adv.head(UNIV_SIZE).index.tolist()
-        # Uptrend filter
+    # SELECTION: daily top-20 ADV ∩ Nifty-100, uptrend (>200d SMA), 30d-ret rank.
+    # EXECUTION + daily MTM drawdown come from the shared engine.
+    def rank_at(di):
+        if di < max(LOOKBACK, SMA_LONG):
+            return []
+        pit_univ = (adv20.iloc[di].dropna().sort_values(ascending=False)
+                    .head(UNIV_SIZE).index.tolist())
         up = sma200.iloc[di] < cl.iloc[di]
         pit_univ = [s for s in pit_univ if bool(up.get(s, False))]
-        # NEW: NSE Nifty 100 filter
-        pit_univ = [s for s in pit_univ if s.replace("NSE:","").replace("-EQ","") in n100]
-        if not pit_univ: continue
-
+        pit_univ = [s for s in pit_univ
+                    if s.replace("NSE:", "").replace("-EQ", "") in n100]
+        if not pit_univ:
+            return []
         rets = cl.iloc[di].reindex(pit_univ) / cl.iloc[di - LOOKBACK].reindex(pit_univ) - 1
-        rk = rets.dropna().sort_values(ascending=False)
-        if rk.empty: continue
-        top = rk.index[0]
-        # Rotation decision via the SHARED core (same rule live_signal.py uses).
-        if decide_rotation(hold, list(rk.index), retain_top_n=1).is_noop:
-            continue
+        return list(rets.dropna().sort_values(ascending=False).index)
 
-        if top != hold:
-            if hold and qty > 0:
-                sx = cl[hold].iloc[di]
-                if pd.notna(sx):
-                    sx = float(sx)
-                    proc = qty * sx
-                    cap += proc
-                    pnl = proc - qty * entry_px
-                    pct = (sx / entry_px - 1) * 100
-                    trades.append({
-                        "entry_date": entry_date,
-                        "exit_date":  d.date().isoformat(),
-                        "sym":        hold.replace("NSE:", "").replace("-EQ", ""),
-                        "qty":        qty,
-                        "entry_px":   round(entry_px, 2),
-                        "exit_px":    round(sx, 2),
-                        "pnl":        round(pnl, 0),
-                        "ret_pct":    round(pct, 2),
-                        "cap_after":  round(cap, 0),
-                    })
-                    hold = None; qty = 0
-            bx = cl[top].iloc[di]
-            if pd.notna(bx):
-                bx = float(bx)
-                q = int(cap / bx)
-                if q >= 1 and q * bx <= cap:
-                    cap -= q * bx
-                    qty = q; hold = top
-                    entry_px = bx
-                    entry_date = d.date().isoformat()
-
-    final = cap
-    open_pos = None
-    if hold:
-        last = float(cl[hold].iloc[-1])
-        final = cap + qty * last
-        open_pos = {
-            "sym": hold.replace("NSE:", "").replace("-EQ", ""),
-            "qty": qty, "entry_px": round(entry_px, 2),
-            "entry_date": entry_date,
-            "last_px": round(last, 2),
-            "mtm_value": round(qty * last, 0),
-            "unrealized_pnl": round(qty * (last - entry_px), 0),
-        }
-
-    wins   = sum(1 for t in trades if t["pnl"] > 0)
-    losses = sum(1 for t in trades if t["pnl"] < 0)
-    yrs    = (end - start).days / 365.25
-    cagr   = ((final / capital) ** (1 / yrs) - 1) * 100
-
-    # Mark-to-market daily NAV DD (primary metric for daily rebal)
-    nav_arr = pd.Series(nav_series)
-    roll_max = nav_arr.cummax()
-    dd_series = (roll_max - nav_arr) / roll_max
-    mdd_nav = float(dd_series.max()) * 100
-    # Rebal-day cap_after DD (realized only)
-    peak = capital; mdd_realized = 0.0
-    for t in trades:
-        peak = max(peak, t["cap_after"])
-        dd = (peak - t["cap_after"]) / peak * 100
-        mdd_realized = max(mdd_realized, dd)
+    res = run_rotation_backtest(
+        dates=dates, close=cl, calendar=calendar, rank_at=rank_at,
+        capital=capital, start=start, end=end, retain_top_n=1,
+    )
+    final, cagr = res.final_nav, res.cagr_pct
+    trades, yrs, wins, losses, open_pos = (res.trades, res.years, res.wins,
+                                           res.losses, res.open_position)
+    mdd_nav = res.max_dd_mtm_pct        # daily MTM DD — primary metric for daily rebal
+    mdd_realized = res.max_dd_pct       # rebal cap_after DD
     calmar = cagr / max(0.01, mdd_nav)
 
     print(f"\n## v2 Large-only RESULTS")

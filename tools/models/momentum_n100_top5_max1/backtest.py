@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT))
 import pandas as pd
 from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
-from tools.shared.rotation_strategy import decide_rotation, midmonth_lead_ok
+from tools.shared.backtest_engine import run_rotation_backtest
 
 LOOKBACK = 30
 N100_CSV = str(ROOT / "src" / "data" / "symbols" / "nifty100.csv")
@@ -92,95 +92,32 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
     rebal = [d for d, _ in calendar]
     rebal_kind = {d: k for d, k in calendar}
 
-    cap = capital
-    hold = None; qty = 0; entry_px = 0.0; entry_date = None
-    trades = []
-
-    for d in rebal:
-        di = dates.get_loc(d)
+    # SELECTION layer: model supplies the per-date ranking; EXECUTION is the
+    # shared engine (tools/shared/backtest_engine). Universe = full present
+    # Nifty 100 (no filter), ranked by 30-day return.
+    def rank_at(di):
         if di < LOOKBACK:
-            continue
-
-        # Universe = full present Nifty 100 (no filter)
+            return []
         univ = [s for s in present if pd.notna(cl[s].iloc[di])]
         if not univ:
-            continue
+            return []
+        rets = cl.iloc[di].reindex(univ) / cl.iloc[di - LOOKBACK].reindex(univ) - 1
+        return list(rets.dropna().sort_values(ascending=False).index)
 
+    def midret_at(di):
+        univ = [s for s in present if pd.notna(cl[s].iloc[di])]
         rets = cl.iloc[di].reindex(univ) / cl.iloc[di - LOOKBACK].reindex(univ) - 1
         rk = rets.dropna().sort_values(ascending=False)
-        if rk.empty:
-            continue
-        top = rk.index[0]
-        # Rotation decision via the SHARED core (same rule live_signal.py uses).
-        if rebal_kind.get(d) == "mid":
-            # Mid-month: lead-gated rotation (independent of retain band).
-            ranked_ret = [(s, float(rk[s]) * 100) for s in rk.index]
-            if not midmonth_lead_ok(hold, ranked_ret, mid_month_lead_pct):
-                continue
-            if decide_rotation(hold, list(rk.index), retain_top_n=1).is_noop:
-                continue
-        else:
-            if decide_rotation(hold, list(rk.index), retain_top_n).is_noop:
-                continue
+        return [(s, float(rk[s]) * 100) for s in rk.index]
 
-        if top != hold:
-            if hold and qty > 0:
-                sx = cl[hold].iloc[di]
-                if pd.notna(sx):
-                    sx = float(sx)
-                    proc = qty * sx
-                    cap += proc
-                    pnl = proc - qty * entry_px
-                    pct = (sx / entry_px - 1) * 100
-                    trades.append({
-                        "sym":        hold.replace("NSE:", "").replace("-EQ", ""),
-                        "entry_date": entry_date,
-                        "exit_date":  d.date().isoformat(),
-                        "qty":        qty,
-                        "entry_px":   round(entry_px, 2),
-                        "exit_px":    round(sx, 2),
-                        "pnl":        round(pnl, 0),
-                        "ret_pct":    round(pct, 2),
-                        "cap_after":  round(cap, 0),
-                        "exit_reason": "MIDCHECK" if rebal_kind.get(d) == "mid" else "ROTATE",
-                    })
-                    hold = None; qty = 0
-
-            bx = cl[top].iloc[di]
-            if pd.notna(bx):
-                bx = float(bx)
-                q = int(cap / bx)
-                if q >= 1 and q * bx <= cap:
-                    cap -= q * bx
-                    qty = q; hold = top
-                    entry_px = bx
-                    entry_date = d.date().isoformat()
-
-    final = cap
-    open_pos = None
-    if hold:
-        last = float(cl[hold].iloc[-1])
-        final = cap + qty * last
-        open_pos = {
-            "sym": hold.replace("NSE:", "").replace("-EQ", ""),
-            "qty": qty, "entry_px": round(entry_px, 2),
-            "entry_date": entry_date,
-            "last_px": round(last, 2),
-            "mtm_value": round(qty * last, 0),
-            "unrealized_pnl": round(qty * (last - entry_px), 0),
-        }
-
-    wins   = sum(1 for t in trades if t["pnl"] > 0)
-    losses = sum(1 for t in trades if t["pnl"] < 0)
-    yrs    = (end - start).days / 365.25
-    cagr   = ((final / capital) ** (1 / yrs) - 1) * 100
-
-    peak = capital; mdd = 0.0
-    for t in trades:
-        peak = max(peak, t["cap_after"])
-        dd = (peak - t["cap_after"]) / peak * 100
-        mdd = max(mdd, dd)
-    calmar = cagr / max(0.01, mdd)
+    res = run_rotation_backtest(
+        dates=dates, close=cl, calendar=calendar, rank_at=rank_at,
+        capital=capital, start=start, end=end, retain_top_n=retain_top_n,
+        midmonth_ret_at=midret_at, midmonth_lead_pct=mid_month_lead_pct,
+    )
+    final, cagr, mdd, calmar = res.final_nav, res.cagr_pct, res.max_dd_pct, res.calmar
+    trades, yrs, wins, losses, open_pos = (res.trades, res.years, res.wins,
+                                           res.losses, res.open_position)
 
     print(f"\n## RESULTS")
     print(f"  Final NAV:    Rs.{final:,.0f}")

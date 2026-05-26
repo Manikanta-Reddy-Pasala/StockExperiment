@@ -15,7 +15,7 @@ import pandas as pd
 from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
 from tools.shared.universes import nifty500_symbols
-from tools.shared.rotation_strategy import decide_rotation
+from tools.shared.backtest_engine import run_rotation_backtest
 
 
 LOOKBACK = 30
@@ -103,88 +103,30 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
     sd = pd.Timestamp(start)
     if sd in dates: rebal_set.add(sd)
     rebal = sorted(rebal_set)
+    calendar = [(d, "full") for d in rebal]
 
-    cap = capital
-    hold = None; qty = 0; entry_px = 0.0; entry_date = None
-    trades = []
-
-    for d in rebal:
-        di = dates.get_loc(d)
-        if di < max(LOOKBACK, 200): continue
-        univ = pick_universe(d)
-        # Uptrend filter: keep only stocks with close > 200d SMA
+    # SELECTION layer: yearly-PIT pseudo-N100, uptrend (>200d SMA) + MAX_PRICE
+    # filter, ranked by 30-day return. EXECUTION is the shared engine.
+    def rank_at(di):
+        if di < max(LOOKBACK, 200):
+            return []
+        univ = pick_universe(dates[di])
         up = sma200.iloc[di] < cl.iloc[di]
         univ = [s for s in univ if bool(up.get(s, False))]
-        # Max-price filter — high-px (>₹3000) stocks were net-loss in backtest (DIXON/MARUTI)
-        univ = [s for s in univ if pd.notna(cl[s].iloc[di]) and float(cl[s].iloc[di]) <= MAX_PRICE]
-        if not univ: continue
+        univ = [s for s in univ
+                if pd.notna(cl[s].iloc[di]) and float(cl[s].iloc[di]) <= MAX_PRICE]
+        if not univ:
+            return []
         rets = cl.iloc[di].reindex(univ) / cl.iloc[di - LOOKBACK].reindex(univ) - 1
-        rk = rets.dropna().sort_values(ascending=False)
-        if rk.empty: continue
-        top = rk.index[0]
-        # Rotation decision via the SHARED core (same rule live_signal.py uses).
-        if decide_rotation(hold, list(rk.index), retain_top_n).is_noop:
-            continue  # held still in top-N retention band -> keep, no trade
+        return list(rets.dropna().sort_values(ascending=False).index)
 
-        if top != hold:
-            if hold and qty > 0:
-                sx = cl[hold].iloc[di]
-                if pd.notna(sx):
-                    sx = float(sx)
-                    proc = qty * sx
-                    cap += proc
-                    pnl = proc - qty * entry_px
-                    pct = (sx / entry_px - 1) * 100
-                    trades.append({
-                        "entry_date": entry_date,
-                        "exit_date":  d.date().isoformat(),
-                        "sym":        hold.replace("NSE:", "").replace("-EQ", ""),
-                        "qty":        qty,
-                        "entry_px":   round(entry_px, 2),
-                        "exit_px":    round(sx, 2),
-                        "pnl":        round(pnl, 0),
-                        "ret_pct":    round(pct, 2),
-                        "cap_after":  round(cap, 0),
-                    })
-                    hold = None; qty = 0
-
-            bx = cl[top].iloc[di]
-            if pd.notna(bx):
-                bx = float(bx)
-                q = int(cap / bx)
-                if q >= 1 and q * bx <= cap:
-                    cap -= q * bx
-                    qty = q; hold = top
-                    entry_px = bx
-                    entry_date = d.date().isoformat()
-
-    final = cap
-    open_pos = None
-    if hold:
-        last = float(cl[hold].iloc[-1])
-        final = cap + qty * last
-        open_pos = {
-            "sym": hold.replace("NSE:", "").replace("-EQ", ""),
-            "qty": qty,
-            "entry_px": round(entry_px, 2),
-            "entry_date": entry_date,
-            "last_px": round(last, 2),
-            "mtm_value": round(qty * last, 0),
-            "unrealized_pnl": round(qty * (last - entry_px), 0),
-        }
-
-    wins   = sum(1 for t in trades if t["pnl"] > 0)
-    losses = sum(1 for t in trades if t["pnl"] < 0)
-    yrs    = (end - start).days / 365.25
-    cagr   = ((final / capital) ** (1 / yrs) - 1) * 100
-
-    # Rebal-day cap_after DD (realized only; matches old reporting)
-    peak = capital; mdd = 0.0
-    for t in trades:
-        peak = max(peak, t["cap_after"])
-        dd = (peak - t["cap_after"]) / peak * 100
-        mdd = max(mdd, dd)
-    calmar = cagr / max(0.01, mdd)
+    res = run_rotation_backtest(
+        dates=dates, close=cl, calendar=calendar, rank_at=rank_at,
+        capital=capital, start=start, end=end, retain_top_n=retain_top_n,
+    )
+    final, cagr, mdd, calmar = res.final_nav, res.cagr_pct, res.max_dd_pct, res.calmar
+    trades, yrs, wins, losses, open_pos = (res.trades, res.years, res.wins,
+                                           res.losses, res.open_position)
 
     print(f"\nFinal NAV: Rs.{final:,.0f}")
     print(f"Total: {(final/capital-1)*100:+.2f}%  CAGR: {cagr:+.2f}%")
