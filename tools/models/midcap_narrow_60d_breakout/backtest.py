@@ -70,7 +70,7 @@ TARGET_PCT = 1.00
 STOP_PCT   = 0.20  # Catastrophe stop (sweep-chosen). Fires rarely — clear of the -15.7%
                    # deepest winner dip — so 0 CAGR cost on 3yr while capping the tail.
 MAX_HOLD   = 120  # Was 90. 120d max-hold sweep-tested as winner: +141% CAGR / 8% DD / Calmar 17.46.
-USE_SMA_EXIT = False
+# SMA20 exit was tried and DISABLED (leaked winners on dips); exit lives in the shared core.
 
 # Universe params (V3 winner: top-100 ADV minus Large, was skip-30+take-100)
 ADV_WIN    = 20

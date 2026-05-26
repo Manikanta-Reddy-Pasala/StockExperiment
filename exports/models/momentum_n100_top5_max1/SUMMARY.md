@@ -8,7 +8,7 @@ Single position (`max_concurrent=1`). When flat at a rebalance:
 1. Universe = real NSE Nifty 100 (`src/data/symbols/nifty100.csv`, ~104 stocks). No price/SMA/ADV filter — honest baseline.
 2. Rank every stock by **30-day return** (`lookback_days=30`).
 3. Buy **rank-1**.
-- Code: `rank_universe()` + `emit_signals()` in `live_signal.py:100-178`.
+- Code: SELECTION (universe/filters/rank) in `live_signal.py` + `backtest.py`; RULE = shared `tools/shared/rotation_strategy.decide_rotation` + `midmonth_lead_ok` (same calls live + backtest make); backtest EXECUTION = shared `tools/shared/backtest_engine`. Parity-tested.
 
 ## When it SELLS (exit rules)
 

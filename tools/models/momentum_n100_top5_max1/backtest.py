@@ -89,8 +89,6 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
     calendar = sorted({(d, "full") for d in rebal_set} |
                       {(d, "mid") for d in mid_month_set if d not in rebal_set},
                       key=lambda x: x[0])
-    rebal = [d for d, _ in calendar]
-    rebal_kind = {d: k for d, k in calendar}
 
     # SELECTION layer: model supplies the per-date ranking; EXECUTION is the
     # shared engine (tools/shared/backtest_engine). Universe = full present

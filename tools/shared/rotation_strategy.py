@@ -18,7 +18,7 @@ unit-test and to assert parity between the two execution paths.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional, Sequence, Tuple
+from typing import Optional, Sequence, Tuple
 
 
 @dataclass(frozen=True)

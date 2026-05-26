@@ -39,8 +39,7 @@ MODEL_NAME = "midcap_narrow_60d_breakout"
 HH_WINDOW = 40
 VOL_MULT = 2.0
 SMA_LONG = 200
-SMA_EXIT = 20
-USE_SMA_EXIT = False  # V2: disabled — leaked winners on dips
+# SMA20 exit was tried and DISABLED (leaked winners on dips); not in the core.
 TRAIL_PCT = 0.20
 PROFIT_TRIGGER = 0.10
 TARGET_PCT = 1.00
@@ -107,7 +106,6 @@ def check_exit(pos: Dict, df_sym: pd.DataFrame) -> Optional[Dict]:
     peak = float(since_entry["close"].max()) if not since_entry.empty else close
 
     # Exit rule via the SHARED breakout core (same call backtest.py makes).
-    # SMA20 exit stays disabled (USE_SMA_EXIT=False) and is not part of the core.
     reason = breakout_exit_reason(
         entry_price, close, peak, age,
         target_pct=TARGET_PCT, stop_pct=STOP_PCT, trail_pct=TRAIL_PCT,

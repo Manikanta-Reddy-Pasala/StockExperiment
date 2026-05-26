@@ -21,7 +21,7 @@ Single position (`max_concurrent=1`). When **flat**, every run scans the univers
 - All three must fire the same day. If several stocks qualify, it picks the one with the
   **highest volume ratio** (`vol_ratio`). Backtest enters next-day at the open; live enters at
   the breakout close.
-- Code: `scan_entry_candidate()` in `live_signal.py:130-210`, mirrored in `backtest.py:197-227`.
+- Code: entry RULE = shared `tools/shared/breakout_strategy.is_breakout` — called by BOTH `scan_entry_candidate()` (live) and the backtest scan loop. SELECTION (universe) is per-model. Parity-tested.
 
 > Name is "60d" for legacy reasons (v1 used a 60-day high); the live/v2 logic uses a **40-day**
 > window. Not renamed because the name is the DB key (model_settings / model_ledger / model_trades).
@@ -30,8 +30,8 @@ Single position (`max_concurrent=1`). When **flat**, every run scans the univers
 
 Breakout swing, single position, checked every run (09:25 + 15:25). Unlike the rotation
 models, it does **NOT** sell to chase a new breakout — it rides each position until one of
-these fires (first wins). Code: `check_exit()` in `live_signal.py:92-127`, mirrored in
-`backtest.py:160-176`:
+these fires (first wins). Code: exit RULE = shared `tools/shared/breakout_strategy.breakout_exit_reason`
+— called by BOTH `check_exit()` (live) and the backtest loop, so they can't drift:
 
 | Reason | Fires when | Constant |
 |---|---|---|

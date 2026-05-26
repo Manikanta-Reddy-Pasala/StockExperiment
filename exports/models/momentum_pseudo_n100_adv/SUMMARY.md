@@ -10,7 +10,7 @@ Single position (`max_concurrent=1`). When flat at a rebalance:
 3. **Uptrend gate** — close > 200-day SMA (`SMA_LONG=200`; fail-closed if <200 closes).
 4. **Max-price** — drop close > **₹3,000** (`MAX_PRICE=3000`).
 5. Rank survivors by **30-day return**, buy **rank-1**.
-- Code: `rank_universe()` + `emit_signals()` in `live_signal.py:124-220`.
+- Code: SELECTION (universe/filters/rank) in `live_signal.py` + `backtest.py`; RULE = shared `tools/shared/rotation_strategy.decide_rotation` (same call live + backtest make); backtest EXECUTION = shared `tools/shared/backtest_engine`. Parity-tested.
 
 ## When it SELLS (exit rules)
 

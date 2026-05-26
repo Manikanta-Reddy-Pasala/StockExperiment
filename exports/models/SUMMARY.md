@@ -12,6 +12,21 @@
 > rotation), and n100 reads its DB position. Headline numbers below are the live-faithful figures.
 > **Requires redeploy** for the prod container to pick up the change.
 
+## Code architecture (KISS / separation of concerns)
+
+Each model is 3 layers; backtest and live share the decision so they cannot drift:
+
+| Layer | Where | Shared? |
+|---|---|---|
+| SELECTION — universe + filters + ranking | each model's `backtest.py` / `live_signal.py` | per-model config |
+| RULE — entry/exit decision | `tools/shared/rotation_strategy.py` (n100/pseudo/n20), `tools/shared/breakout_strategy.py` (midcap) | ✅ backtest + live |
+| EXECUTION — backtest accounting/metrics | `tools/shared/backtest_engine.py` (rotation models) | ✅ |
+| EXECUTION — live orders | `tools/live/fyers_executor.py` | ✅ all models |
+
+Guarded by `tests/test_rotation_parity.py` + `tests/test_breakout_parity.py` (26 cases):
+the rule a backtest tests is the exact code that trades live. All backtests reproduce these
+headline numbers to the rupee after the refactor.
+
 ## Headline — deploy ₹10L per model
 
 | # | Model | Universe | Rebalance | Final NAV | CAGR | Max DD | LIVE |

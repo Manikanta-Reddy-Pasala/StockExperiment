@@ -9,7 +9,7 @@ Single position (`max_concurrent=1`). **Every weekday** (no monthly gate):
 2. **Uptrend gate** — close > 200-day SMA (`SMA_LONG=200`).
 3. **Large-cap gate** — stock must be in NSE Nifty 100.
 4. Rank survivors by **30-day return** (`LOOKBACK_RET=30`), buy **rank-1** (`--top-n 1`).
-- Code: `build_pit_universe_and_rank()` + `emit_signals()` in `live_signal.py:99-191`.
+- Code: SELECTION (universe/filters/rank) in `live_signal.py` + `backtest.py`; RULE = shared `tools/shared/rotation_strategy.decide_rotation` (same call live + backtest make); backtest EXECUTION = shared `tools/shared/backtest_engine`. Parity-tested.
 
 ## When it SELLS (exit rules)
 
