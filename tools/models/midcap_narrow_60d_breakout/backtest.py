@@ -52,11 +52,13 @@ import sys
 from pathlib import Path
 from datetime import date, timedelta
 
-sys.path.insert(0, "/app")
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
 import pandas as pd
 from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
 from tools.shared.universes import nifty500_symbols
+from tools.shared.breakout_strategy import is_breakout, breakout_exit_reason
 
 # Strategy params (V2 winner)
 HH_WIN     = 40
@@ -80,7 +82,7 @@ KEEP_NEXT  = 100   # Take top 100. Large filter applied below via NSE Nifty 100 
 # data anomalies if Fyers serves bad data again.
 DATA_FIXES = {}
 
-N100_CSV = "/app/src/data/symbols/nifty100.csv"
+N100_CSV = str(ROOT / "src" / "data" / "symbols" / "nifty100.csv")
 
 DEFAULT_START = date(2023, 5, 15)
 DEFAULT_END   = date(2026, 5, 15)
@@ -167,16 +169,11 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
             pos["peak"] = max(pos["peak"], close)
             age = (d.date() - pos["entry_date"]).days
             ret_e = (close - pos["entry_px"]) / pos["entry_px"]
-            ret_pk = (pos["peak"] - close) / pos["peak"] if pos["peak"] > 0 else 0
-            reason = None
-            if ret_e >= TARGET_PCT:
-                reason = "TARGET"
-            elif STOP_PCT > 0 and ret_e <= -STOP_PCT:
-                reason = "STOP"
-            elif ret_e >= PROFIT_TRIG and ret_pk >= TRAIL_PCT:
-                reason = "TRAIL"
-            if reason is None and age >= MAX_HOLD:
-                reason = "MAX_HOLD"
+            # Exit rule via the SHARED breakout core (same call live_signal.py makes).
+            reason = breakout_exit_reason(
+                pos["entry_px"], close, pos["peak"], age,
+                target_pct=TARGET_PCT, stop_pct=STOP_PCT, trail_pct=TRAIL_PCT,
+                profit_trigger=PROFIT_TRIG, max_hold_days=MAX_HOLD)
             if reason:
                 exit_px = close * (1 - slip)
                 proc = pos["qty"] * exit_px
@@ -211,11 +208,11 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
                     continue
                 c_v = float(c_v); sma_v = float(sma_v); hh_v = float(hh_v)
                 va_v = float(va_v); v_v = float(v_v)
-                if c_v <= hh_v or c_v <= sma_v:
+                # Entry qualification via the SHARED breakout core.
+                ok, vr = is_breakout(c_v, hh_v, sma_v, v_v, va_v, vol_mult=VOL_MULT)
+                if not ok:
                     continue
-                if v_v < VOL_MULT * va_v:
-                    continue
-                cands.append({"sym": sym, "vr": v_v / va_v})
+                cands.append({"sym": sym, "vr": vr})
             cands.sort(key=lambda c: -c["vr"])
             if cands:
                 top = cands[0]["sym"]

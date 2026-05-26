@@ -29,6 +29,7 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
 from tools.shared.ohlcv_cache import _get_engine  # noqa: E402
+from tools.shared.breakout_strategy import is_breakout, breakout_exit_reason  # noqa: E402
 
 log = logging.getLogger("midcap_breakout_signal")
 
@@ -101,29 +102,18 @@ def check_exit(pos: Dict, df_sym: pd.DataFrame) -> Optional[Dict]:
 
     ret_entry = (close - entry_price) / entry_price
 
-    # SMA20 for SMA-exit
-    df_sym = df_sym.copy()
-    df_sym["sma20"] = df_sym["close"].rolling(SMA_EXIT).mean()
-    sma20 = (
-        float(df_sym.iloc[-1]["sma20"])
-        if pd.notna(df_sym.iloc[-1]["sma20"]) else 0.0
-    )
-
     # Track peak by scanning closes since entry
     since_entry = df_sym[df_sym["date"] >= pd.Timestamp(entry_date)]
     peak = float(since_entry["close"].max()) if not since_entry.empty else close
-    ret_peak = (peak - close) / peak if peak > 0 else 0
 
-    if ret_entry >= TARGET_PCT:
-        return {"reason": "TARGET", "price": close, "ret_pct": ret_entry * 100}
-    if STOP_PCT > 0 and ret_entry <= -STOP_PCT:
-        return {"reason": "STOP", "price": close, "ret_pct": ret_entry * 100}
-    if ret_entry >= PROFIT_TRIGGER and ret_peak >= TRAIL_PCT:
-        return {"reason": "TRAIL", "price": close, "ret_pct": ret_entry * 100}
-    if USE_SMA_EXIT and sma20 > 0 and close < sma20:
-        return {"reason": "SMA", "price": close, "ret_pct": ret_entry * 100}
-    if age >= MAX_HOLD_DAYS:
-        return {"reason": "MAX_HOLD", "price": close, "ret_pct": ret_entry * 100}
+    # Exit rule via the SHARED breakout core (same call backtest.py makes).
+    # SMA20 exit stays disabled (USE_SMA_EXIT=False) and is not part of the core.
+    reason = breakout_exit_reason(
+        entry_price, close, peak, age,
+        target_pct=TARGET_PCT, stop_pct=STOP_PCT, trail_pct=TRAIL_PCT,
+        profit_trigger=PROFIT_TRIGGER, max_hold_days=MAX_HOLD_DAYS)
+    if reason:
+        return {"reason": reason, "price": close, "ret_pct": ret_entry * 100}
     return None
 
 
@@ -179,10 +169,12 @@ def scan_entry_candidate(df: pd.DataFrame, symbols: List[str]) -> Optional[Dict]
                     ret_30d_pct = (close / close_30d_ago - 1.0) * 100
             except Exception:
                 pass
-        # Strict qualification: needs full SMA_LONG AND all 3 filters
+        # Strict qualification: full SMA_LONG history + the SHARED breakout core
+        # (close > 40d-high, close > 200d SMA, volume >= VOL_MULT x avg).
         has_full_sma = len(g) >= SMA_LONG and pd.notna(r["sma_long"])
-        qualifies = (has_full_sma and close > hh
-                     and close > sma_long and vol_ratio >= VOL_MULT)
+        bo_ok, _ = is_breakout(close, hh, sma_long, float(r["volume"]),
+                               vol_avg, vol_mult=VOL_MULT)
+        qualifies = has_full_sma and bo_ok
         info = {
             "symbol": sym,
             "close": close,
