@@ -36,8 +36,8 @@ class RiskConfig:
     min_price: float = 50.0
     enable_short: bool = False
     # LIMIT-with-tolerance + MARKET-fallback knobs (Phase 2 Task 6)
-    limit_tol_pct: float = 0.5          # initial LIMIT slack vs last price
-    limit_retry_pct: float = 1.0        # widened slack on first re-quote
+    limit_tol_pct: float = 0.1          # initial LIMIT slack vs last price (standard)
+    limit_retry_pct: float = 0.2        # widened slack on first re-quote (standard)
     limit_fallback_s: int = 20          # total seconds before MARKET fallback
     # Hard ceiling: total BUY exposure must never exceed allocated capital +
     # cumulative realized P&L. Set per-model in from_model(); kept at -1 for
@@ -70,8 +70,8 @@ class RiskManager:
             max_daily_loss_pct=float(os.environ.get("MAX_DAILY_LOSS_PCT", -5.0)),
             min_price=float(os.environ.get("MIN_PRICE", 50.0)),
             enable_short=os.environ.get("ENABLE_SHORT", "false").lower() == "true",
-            limit_tol_pct=float(os.environ.get("LIMIT_TOL_PCT", 0.5)),
-            limit_retry_pct=float(os.environ.get("LIMIT_RETRY_PCT", 1.0)),
+            limit_tol_pct=float(os.environ.get("LIMIT_TOL_PCT", 0.1)),
+            limit_retry_pct=float(os.environ.get("LIMIT_RETRY_PCT", 0.2)),
             limit_fallback_s=int(os.environ.get("LIMIT_FALLBACK_S", 20)),
         )
         return cls(cfg)
@@ -135,8 +135,8 @@ class RiskManager:
             max_daily_loss_pct=float(os.environ.get("MAX_DAILY_LOSS_PCT", -5.0)),
             min_price=float(os.environ.get("MIN_PRICE", 50.0)),
             enable_short=os.environ.get("ENABLE_SHORT", "false").lower() == "true",
-            limit_tol_pct=float(os.environ.get("LIMIT_TOL_PCT", 0.5)),
-            limit_retry_pct=float(os.environ.get("LIMIT_RETRY_PCT", 1.0)),
+            limit_tol_pct=float(os.environ.get("LIMIT_TOL_PCT", 0.1)),
+            limit_retry_pct=float(os.environ.get("LIMIT_RETRY_PCT", 0.2)),
             limit_fallback_s=int(os.environ.get("LIMIT_FALLBACK_S", 20)),
             max_total_buy_inr=max_total_buy,
         )
