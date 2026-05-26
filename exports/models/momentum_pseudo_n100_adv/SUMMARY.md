@@ -9,19 +9,20 @@ Single position (`max_concurrent=1`). When flat at a rebalance:
 2. Drop NSE **Smallcap 250** members.
 3. **Uptrend gate** — close > 200-day SMA (`SMA_LONG=200`; fail-closed if <200 closes).
 4. **Max-price** — drop close > **₹3,000** (`MAX_PRICE=3000`).
-5. Rank survivors by **30-day return**, buy **rank-1** (`--top-n 5` = exit retention band).
-- Code: `rank_universe()` + `emit_signals()` in `live_signal.py:124-218`.
+5. Rank survivors by **30-day return**, buy **rank-1**.
+- Code: `rank_universe()` + `emit_signals()` in `live_signal.py:124-220`.
 
 ## When it SELLS (exit rules)
 
 Monthly rotation, single position (holds the rank-1 stock). **Sells only on rank rotation — NO price stop or target:**
-- At each **monthly rebalance** (1st–7th weekday): SELLS the held stock **only if it dropped out of the top-5** by 30-day return; otherwise keeps holding.
-- SELL labelled `TARGET_HIT`/`STOP_HIT` by exit-vs-entry price only — the **trigger is the rank drop, not a price level.** A held stock can fall and is NOT sold while it stays in the top-5.
+- At each **monthly rebalance** (1st–7th weekday): SELLS the held stock **the moment it is no longer rank-1** by 30-day return, and buys the new rank-1 (`retain_top_n=1`). If still rank-1, keeps it.
+- SELL labelled `TARGET_HIT`/`STOP_HIT` by exit-vs-entry price only — the **trigger is the rank drop, not a price level.**
 
-> **⚠️ Live vs backtest exit mismatch:** the headline CAGR below comes from `backtest.py`, which
-> exits the moment the held stock is **not rank-1** (`top != hold`, line 119). **Live keeps the
-> stock while it stays in the top-5** (`live_signal.py:181/186`). Live is laxer — holds longer,
-> trades less — so live can diverge from the published backtest.
+> **✅ Live == backtest (aligned 2026-05-26).** Previously live used a **top-5** retention band
+> (`live_signal.py`) while the backtest rotated on **top-1** — live quietly held laggards ~2 extra
+> months and delivered only **+85.06% CAGR** vs the +149.15% headline (verified on real fyers data).
+> Live `emit_signals` now defaults to `retain_top_n=1` (top-1 rotation), matching this backtest.
+> **Requires redeploy** to take effect on the prod container.
 
 ## Backtest window & trade frequency
 

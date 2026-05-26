@@ -124,9 +124,34 @@ def load_held(ledger_path: Path) -> List[Dict]:
         return []
 
 
+def held_from_db() -> List[Dict]:
+    """Current open position from model_ledger (DB) as emit_signals' held list.
+
+    This makes the model STATEFUL: it reads what it actually holds so it can
+    emit a rotation SELL when the held stock drops out of the top-N. Without
+    this the executor (max_concurrent=1) silently skips the new BUY and the
+    position never rotates. Mirrors momentum_pseudo_n100_adv.get_current_position.
+    """
+    try:
+        from src.services.trading.model_ledger_service import get_ledger
+        l = get_ledger("momentum_n100_top5_max1")
+        if l and l.get("open_symbol"):
+            return [{
+                "symbol": l["open_symbol"],
+                "entry_price": float(l.get("open_entry_px") or 0),
+            }]
+    except Exception as e:
+        log.warning(f"DB ledger read failed: {e}; treating as flat")
+    return []
+
+
 def emit_signals(top_picks: List[tuple], held: List[Dict],
-                  top_n: int) -> List[Dict]:
-    top_syms = {p[0] for p in top_picks[:top_n]}
+                  top_n: int, retain_top_n: int = 1) -> List[Dict]:
+    # retain_top_n = exit retention band. Hold while the position stays in the
+    # top-N by 30d return; rotate (sell + buy rank-1) when it drops OUT.
+    # retain_top_n=1 == top-1 rotation, matching backtest.py. Was top-5 (=top_n)
+    # before 2026-05-26.
+    top_syms = {p[0] for p in top_picks[:retain_top_n]}
     held_syms = {h["symbol"] for h in held}
     today_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     signals = []
@@ -142,11 +167,11 @@ def emit_signals(top_picks: List[tuple], held: List[Dict],
                 "symbol": h["symbol"],
                 "company": h["symbol"],
                 "ts": today_str,
-                "side": "BUY",
+                "side": "SELL",
                 "signal": kind,
                 "price": float(price),
                 "sl": 0.0, "target": 0.0,
-                "note": f"rotation exit (dropped out of top-{top_n})",
+                "note": f"rotation exit (dropped out of top-{retain_top_n})",
             })
 
     # Entries: rank-1 stock if no held position already in top-N
@@ -172,7 +197,12 @@ def emit_signals(top_picks: List[tuple], held: List[Dict],
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--universe-file", required=True)
-    ap.add_argument("--top-n", type=int, default=5)
+    ap.add_argument("--top-n", type=int, default=5,
+                    help="Ranking display size only.")
+    ap.add_argument("--retain-top-n", type=int, default=1,
+                    help="Exit retention band: hold while in top-N by 30d ret, "
+                         "rotate when out. 1=top-1 rotation (matches backtest). "
+                         "Default 1.")
     ap.add_argument("--signals-out", required=True)
     ap.add_argument("--ledger", default=None,
                     help="Paper ledger JSON to read current holdings")
@@ -218,7 +248,8 @@ def main():
     stocks = load_universe(args.universe_file)
     log.info(f"Universe: {len(stocks)} symbols from {args.universe_file}")
 
-    held = load_held(Path(args.ledger)) if args.ledger else []
+    # Stateful: prefer file ledger if explicitly passed, else read DB ledger.
+    held = load_held(Path(args.ledger)) if args.ledger else held_from_db()
     log.info(f"Currently held: {[h['symbol'] for h in held]}")
 
     today_ts = int(today.timestamp())
@@ -227,7 +258,7 @@ def main():
     for i, (sym, name, ret, price) in enumerate(ranks[:args.top_n], 1):
         log.info(f"  {i}. {sym:<14} {ret:+7.2f}%  @ ₹{price:.2f}")
 
-    signals = emit_signals(ranks, held, args.top_n)
+    signals = emit_signals(ranks, held, args.top_n, retain_top_n=args.retain_top_n)
 
     # Mid-month lead-threshold filter:
     # If today is the mid-month check day, suppress rotation unless the

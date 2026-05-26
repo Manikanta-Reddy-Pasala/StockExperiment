@@ -177,8 +177,13 @@ def is_model_enabled() -> bool:
 
 
 def emit_signals(top_picks: List[tuple], pos: Optional[Dict],
-                 top_n: int) -> List[Dict]:
-    top_syms = {p[0] for p in top_picks[:top_n]}
+                 top_n: int, retain_top_n: int = 1) -> List[Dict]:
+    # retain_top_n = exit retention band. Hold while the position stays in the
+    # top-N by 30d return; rotate (sell + buy rank-1) when it drops OUT.
+    # retain_top_n=1 == top-1 rotation, which matches backtest.py (the canonical
+    # +149% run). Was top-5 (=top_n) before 2026-05-26; that quietly held
+    # laggards 2 extra months and bled ~64pp/yr vs the published number.
+    top_syms = {p[0] for p in top_picks[:retain_top_n]}
     today_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     signals: List[Dict] = []
 
@@ -197,7 +202,7 @@ def emit_signals(top_picks: List[tuple], pos: Optional[Dict],
             "signal": kind,
             "price": float(price),
             "sl": 0.0, "target": 0.0,
-            "note": f"rotation exit (dropped out of top-{top_n})",
+            "note": f"rotation exit (dropped out of top-{retain_top_n})",
         })
 
     # Entry: rank-1 if not already held
@@ -224,7 +229,12 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--universes-file", required=True,
                     help="Path to yearly_universes.json (PIT universe map)")
-    ap.add_argument("--top-n", type=int, default=5)
+    ap.add_argument("--top-n", type=int, default=5,
+                    help="Ranking display size only.")
+    ap.add_argument("--retain-top-n", type=int, default=1,
+                    help="Exit retention band: hold while in top-N by 30d ret, "
+                         "rotate when out. 1=top-1 rotation (matches backtest). "
+                         "Default 1.")
     ap.add_argument("--signals-out", required=True)
     ap.add_argument("--rebalance-only", action="store_true",
                     help="Skip if today is not rebalance trigger day")
@@ -302,7 +312,7 @@ def main() -> int:
     for i, (sym, name, ret, price) in enumerate(ranks[:args.top_n], 1):
         log.info(f"  {i}. {sym:<20} {ret:+7.2f}%  @ ₹{price:.2f}")
 
-    signals = emit_signals(ranks, pos, args.top_n)
+    signals = emit_signals(ranks, pos, args.top_n, retain_top_n=args.retain_top_n)
     log.info(f"Emitting {len(signals)} signals")
 
     Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)

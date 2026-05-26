@@ -9,7 +9,8 @@ import sys, json, argparse
 from pathlib import Path
 from datetime import date, timedelta
 
-sys.path.insert(0, "/app")
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
 import pandas as pd
 from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
@@ -22,7 +23,7 @@ UNIV_SIZE = 100
 MAX_PRICE = 3000  # skip stocks > ₹3000 at entry (DIXON/MARUTI etc were big losers)
 # Drop Small-cap NSE Nifty Smallcap 250 stocks from universe (free +2pp CAGR, DD unchanged).
 import csv as _csv
-_SML_PATH = "/app/src/data/symbols/nifty_smallcap250.csv"
+_SML_PATH = str(ROOT / "src" / "data" / "symbols" / "nifty_smallcap250.csv")
 def _load_smallcap():
     out = set()
     try:
@@ -39,7 +40,11 @@ DEFAULT_END   = date(2026, 5, 12)
 DEFAULT_CAP   = 1_000_000.0
 
 
-def run(start: date, end: date, capital: float, out_dir: Path | None = None):
+def run(start: date, end: date, capital: float, out_dir: Path | None = None,
+        retain_top_n: int = 1, data_source: str = "fyers"):
+    # retain_top_n: hold while in top-N by 30d return; rotate (sell + buy rank-1)
+    # only when held drops OUT of top-N. 1=legacy (rotate off rank-1, canonical),
+    # 5=LIVE exit (live_signal.py keeps the stock through top-5). Entry buys rank-1.
     eng = _get_engine()
     n500 = [f"NSE:{s}-EQ" for s, _ in nifty500_symbols()]
     print(f"N500 pool: {len(n500)}")
@@ -47,9 +52,10 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
     with eng.connect() as c:
         df = pd.read_sql(text(
             "SELECT symbol,date,close,volume FROM historical_data "
-            "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b AND data_source='fyers' "
+            "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b AND data_source=:ds "
             "ORDER BY symbol,date"
-        ), c, params={"s": n500, "a": start - timedelta(days=400), "b": end})
+        ), c, params={"s": n500, "a": start - timedelta(days=400), "b": end,
+                      "ds": data_source})
 
     df["date"] = pd.to_datetime(df["date"])
     df["adv_rs"] = df["close"].astype(float) * df["volume"].astype(float)
@@ -115,6 +121,11 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
         rk = rets.dropna().sort_values(ascending=False)
         if rk.empty: continue
         top = rk.index[0]
+        retain_band = set(rk.index[:retain_top_n])  # top-N retention band
+
+        # Held still in top-N band -> KEEP, no trade (LIVE exit when retain=5).
+        if hold is not None and hold in retain_band:
+            continue
 
         if top != hold:
             if hold and qty > 0:
@@ -210,6 +221,14 @@ if __name__ == "__main__":
     ap.add_argument("--to",   dest="end",   default=DEFAULT_END.isoformat())
     ap.add_argument("--capital", type=float, default=DEFAULT_CAP)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--retain-top-n", type=int, default=1,
+                    help="Hold while in top-N by 30d ret; rotate when out. "
+                         "1=legacy (rotate off rank-1), 5=LIVE exit. Default 1.")
+    ap.add_argument("--data-source", default="fyers",
+                    help="historical_data.data_source filter. Default fyers "
+                         "(canonical). Use yfinance only for local dev DBs.")
     a = ap.parse_args()
     run(date.fromisoformat(a.start), date.fromisoformat(a.end), a.capital,
-        Path(a.out) if a.out else None)
+        Path(a.out) if a.out else None,
+        retain_top_n=a.retain_top_n,
+        data_source=a.data_source)

@@ -2,13 +2,20 @@
 
 3-year backtest window: **2023-05-15 → 2026-05-12** · ₹10L per model · Fyers data (4-yr re-pull 2026-05-17)
 
-5 models (4 equity + 1 options). Each has ONE canonical version. Last refreshed 2026-05-17.
+5 models (4 equity + 1 options). Each has ONE canonical version. Last refreshed 2026-05-26.
+
+> **Live↔backtest aligned 2026-05-26.** The two momentum-rotation models were running a **top-5**
+> exit band live while their backtests rotated on **top-1** — on real fyers data that cost pseudo
+> ~64pp/yr (+85% live vs +149% backtest). n100 was additionally **stateless and stuck** (bought
+> ADANIGREEN once, couldn't rotate). Both `live_signal.py` now default to `retain_top_n=1` (top-1
+> rotation), and n100 reads its DB position. Headline numbers below are the live-faithful figures.
+> **Requires redeploy** for the prod container to pick up the change.
 
 ## Headline — deploy ₹10L per model
 
 | # | Model | Universe | Rebalance | Final NAV | CAGR | Max DD | LIVE |
 |--:|---|---|---|---:|---:|---:|:-:|
-| 1 | `momentum_n100_top5_max1` | Real NSE Nifty 100 (no filter) | Monthly | ₹4,483,692 | **+65.10%** | 37.30% | ✅ |
+| 1 | `momentum_n100_top5_max1` | Real NSE Nifty 100 (no filter) | Monthly + mid-month | ₹11,341,351 | **+125.13%** | 28.21% | ✅ |
 | 2 | `momentum_pseudo_n100_adv` | Top-100 ADV from N500 − Small + uptrend + MAX_PRICE≤₹3K | Monthly | ₹15,361,000 | **+149.15%** | **16.17%** | ✅ |
 | 3 | `midcap_narrow_60d_breakout` | Top-100 ADV from N500 − Large | Event-driven | ₹13,456,535 | **+137.85%** | **8.12%** | ✅ |
 | 4 | `finnifty_ic_otm4_w300_lots5` | FINNIFTY options (4 strikes per Mon) | Monthly IC | ₹22,25,673 | **+123.27%** compound | 13.88% | ❌ |
@@ -32,7 +39,7 @@
 | 2 | momentum_pseudo_n100_adv | +149.15% | 16.17% | **9.22** |
 | 3 | finnifty_ic_otm4_w300_lots5 | +123.27% | 13.88% | **8.88** |
 | 4 | n20_daily_large_only | +139.55% | 25.66% | **5.44** |
-| 5 | momentum_n100_top5_max1 | +65.10% | 37.30% | **1.74** |
+| 5 | momentum_n100_top5_max1 | +125.13% | 28.21% | **4.44** |
 
 ## MAX_PRICE filter decision history (2026-05-17)
 
