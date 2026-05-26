@@ -2,7 +2,8 @@
 
 3-year backtest window: **2023-05-15 → 2026-05-12** · ₹10L per model · Fyers data (4-yr re-pull 2026-05-17)
 
-5 models (4 equity + 1 options). Each has ONE canonical version. Last refreshed 2026-05-26.
+4 equity models. Each has ONE canonical version. Last refreshed 2026-05-26.
+(finnifty_ic_otm4_w300_lots5 options model discarded — NIFTY/FinNifty IC abandoned; use equity momentum instead.)
 
 > **Live↔backtest aligned 2026-05-26.** The two momentum-rotation models were running a **top-5**
 > exit band live while their backtests rotated on **top-1** — on real fyers data that cost pseudo
@@ -18,8 +19,7 @@
 | 1 | `momentum_n100_top5_max1` | Real NSE Nifty 100 (no filter) | Monthly + mid-month | ₹11,341,351 | **+125.13%** | 28.21% | ✅ |
 | 2 | `momentum_pseudo_n100_adv` | Top-100 ADV from N500 − Small + uptrend + MAX_PRICE≤₹3K | Monthly | ₹15,361,000 | **+149.15%** | **16.17%** | ✅ |
 | 3 | `midcap_narrow_60d_breakout` | Top-100 ADV from N500 − Large | Event-driven | ₹13,456,535 | **+137.85%** | **8.12%** | ✅ |
-| 4 | `finnifty_ic_otm4_w300_lots5` | FINNIFTY options (4 strikes per Mon) | Monthly IC | ₹22,25,673 | **+123.27%** compound | 13.88% | ❌ |
-| 5 | `n20_daily_large_only` | Top-20 ADV + uptrend + NSE Nifty 100 | Daily | ₹13,655,640 | **+139.55%** | 25.66% | ✅ |
+| 4 | `n20_daily_large_only` | Top-20 ADV + uptrend + NSE Nifty 100 | Daily | ₹13,655,640 | **+139.55%** | 25.66% | ✅ |
 
 ## Unique stock-filtering approach per model
 
@@ -28,7 +28,6 @@
 | `momentum_n100_top5_max1` | NSE Nifty 100 official list (no derived filter) | Only model using REAL NSE constituents — large-cap pure baseline |
 | `momentum_pseudo_n100_adv` | Top-100 ADV from N500, drop Small, uptrend, price ≤ ₹3,000 | Liquidity + trend + price gate; only model retaining MAX_PRICE filter (justified by share-count floor heuristic) |
 | `midcap_narrow_60d_breakout` | Top-100 ADV from N500, drop Large | Highest-liquidity mid/small breakouts; event-driven |
-| `finnifty_ic_otm4_w300_lots5` | Spot-derived 4 strikes (±4% OTM + ±300pt wings) | No equity universe — options chain auto-built per Monday |
 | `n20_daily_large_only` | Top-20 ADV + close>200d SMA + NSE Nifty 100 | Smallest universe (20); strictest gate; daily rebuild |
 
 ## Composite ranking — risk-adjusted Calmar (CAGR / Max DD)
@@ -37,9 +36,8 @@
 |--:|---|---:|---:|---:|
 | 1 | midcap_narrow_60d_breakout | +137.85% | 8.12% | **16.98** |
 | 2 | momentum_pseudo_n100_adv | +149.15% | 16.17% | **9.22** |
-| 3 | finnifty_ic_otm4_w300_lots5 | +123.27% | 13.88% | **8.88** |
-| 4 | n20_daily_large_only | +139.55% | 25.66% | **5.44** |
-| 5 | momentum_n100_top5_max1 | +125.13% | 28.21% | **4.44** |
+| 3 | n20_daily_large_only | +139.55% | 25.66% | **5.44** |
+| 4 | momentum_n100_top5_max1 | +125.13% | 28.21% | **4.44** |
 
 ## MAX_PRICE filter decision history (2026-05-17)
 
@@ -57,7 +55,6 @@ Initially applied MAX_PRICE filter to all 3 momentum models. Reviewed and remove
 | **Live equity — best risk-adjusted CAGR** | `momentum_pseudo_n100_adv` (LIVE, Calmar 9+) |
 | **Live equity — best Calmar overall** | `midcap_narrow_60d_breakout` (LIVE, Calmar 17+) |
 | **Live equity — highest absolute CAGR (daily)** | `n20_daily_large_only` (LIVE) |
-| **Defined-risk income (options)** | `finnifty_ic_otm4_w300_lots5` |
 
 ## Stock Overlap Across Models
 
@@ -120,8 +117,6 @@ exports/models/
 ├── midcap_narrow_60d_breakout/
 │   ├── SUMMARY.md
 │   └── TRADE_LEDGER.md
-├── finnifty_ic_otm4_w300_lots5/
-│   ├── SUMMARY.md + MONTHLY_INVESTED.md + trades.csv + monthly.csv
 └── n20_daily_large_only/
     ├── SUMMARY.md
     └── TRADE_LEDGER.md

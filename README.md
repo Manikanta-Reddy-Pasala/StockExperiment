@@ -12,11 +12,10 @@ Production: `77.42.45.12` · App: <https://stock.oneshell.in> · Bot: `@stocks_m
 
 | Model | Universe | Cadence | Product | Hold | Signal |
 |-------|----------|---------|---------|------|--------|
-| `momentum_n100_top5_max1` | Real Nifty 100 | Monthly (1st weekday) | CNC delivery | until rank-1 changes | top-5 by 30d return, hold rank-1 |
-| `momentum_pseudo_n100_adv` | Top-100 ADV from N500 minus Smallcap-250, yearly PIT rebuild, close > 200d SMA | Monthly | CNC | until rank-1 changes | top-5 by 30d return + uptrend gate |
+| `momentum_n100_top5_max1` | Real Nifty 100 | Monthly (1st weekday) + mid-month | CNC delivery | until it drops below rank-1 | rank by 30d return, hold rank-1 (top-1 rotation) |
+| `momentum_pseudo_n100_adv` | Top-100 ADV from N500 minus Smallcap-250, yearly PIT rebuild, close > 200d SMA | Monthly | CNC | until it drops below rank-1 | rank by 30d return, hold rank-1 (top-1) + uptrend + ≤₹3K |
 | `midcap_narrow_60d_breakout` | ~100 NSE midcaps (top-100 ADV minus Nifty 100) | Event-driven (daily check) | CNC | up to 120d / target +100% / trail -20% from peak | 40d-high + vol >2× + 200d SMA, ALL must fire |
-| `n20_daily_large_only` | Top-20 ADV ∩ Nifty 100 | Daily | CNC | until rank-1 changes | rank by 30d return + 200d SMA uptrend filter (PIT) |
-| `finnifty_ic_otm4_w300_lots5` | FinNifty weekly | Weekly expiry | Options multi-leg | weekly | OTM4 iron condor, 300pt wing, 5 lots (executor not yet wired — currently DISABLED) |
+| `n20_daily_large_only` | Top-20 ADV ∩ Nifty 100 | Daily | CNC | until it drops below rank-1 | rank by 30d return + 200d SMA uptrend filter (PIT) |
 
 **Capital model (per model):**
 - `Allocated / Invested` = user-deposited principal (`ModelSettings.invested_amount`). Default ₹30,000 per active model.

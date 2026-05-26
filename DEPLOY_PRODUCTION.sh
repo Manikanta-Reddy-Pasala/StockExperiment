@@ -93,7 +93,15 @@ scp $IMAGE_FILE $SERVER_USER@$SERVER_IP:$REMOTE_DIR/
 
 # Transfer configuration files
 scp docker-compose.yml $SERVER_USER@$SERVER_IP:$REMOTE_DIR/
-scp .env.production $SERVER_USER@$SERVER_IP:$REMOTE_DIR/.env
+# NEVER overwrite a live .env — it holds rotated Fyers tokens / LIVE_TRADING /
+# TOTP / Telegram secrets that .env.production (a stale template) does not.
+# Only seed .env from the template on a FIRST deploy where none exists.
+if ssh $SERVER_USER@$SERVER_IP "test -f $REMOTE_DIR/.env"; then
+    echo -e "${GREEN}✓ Remote .env exists — PRESERVED (not overwritten)${NC}"
+else
+    echo -e "${YELLOW}No remote .env — seeding from .env.production (first deploy)${NC}"
+    scp .env.production $SERVER_USER@$SERVER_IP:$REMOTE_DIR/.env
+fi
 scp -r init-scripts/* $SERVER_USER@$SERVER_IP:$REMOTE_DIR/init-scripts/
 scp scheduler.py data_scheduler.py run_pipeline.py $SERVER_USER@$SERVER_IP:$REMOTE_DIR/
 
