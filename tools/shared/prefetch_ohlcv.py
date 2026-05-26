@@ -40,7 +40,22 @@ from tools.shared.ohlcv_cache import (  # noqa: E402
 
 
 def load_universe(name: str) -> List[Tuple[str, str]]:
-    """Return [(plain_ticker, company_name), ...] for the requested universe."""
+    """Resolve a universe name to its list of (plain_ticker, company_name).
+
+    Recognized names: ``n50``/``nifty50``, ``n500``/``nifty500``, and
+    ``all``/``all-stocks``/``all_stocks`` (every NSE-EQ symbol in the ``stocks``
+    master table).
+
+    Args:
+        name: Universe identifier (see recognized names above).
+
+    Returns:
+        List of (plain_ticker, company_name) tuples for the universe.
+
+    Raises:
+        ValueError: If ``name`` is not a recognized universe.
+        RuntimeError: For the 'all' universe when the DB engine is unavailable.
+    """
     from tools.shared.universes import (
         NIFTY50_SYMBOLS, nifty500_symbols,
     )
@@ -63,6 +78,7 @@ def load_universe(name: str) -> List[Tuple[str, str]]:
             )).fetchall()
         out = []
         for sym, name_ in rows:
+            # Strip the NSE:...-EQ wrapper so output matches n50/n500 plain-ticker form.
             plain = sym.replace("NSE:", "").replace("-EQ", "")
             out.append((plain, name_ or plain))
         return out
@@ -70,10 +86,29 @@ def load_universe(name: str) -> List[Tuple[str, str]]:
 
 
 def fetch_one(symbol: str, interval: str, days: int, user_id: int = 1):
-    """Direct Fyers fetch (bypasses cache check). Returns DataFrame."""
+    """Fetch one symbol+interval directly from Fyers (bypasses the cache check).
+
+    Dispatches to the appropriate ``universes`` fetcher with the interval's
+    correct chunk-day cap (1h/15m via the generic fetcher, daily via the raw
+    daily fetcher).
+
+    Args:
+        symbol: Plain/Yahoo/Fyers ticker.
+        interval: One of "1h", "15m", "D"/"daily".
+        days: Calendar days of history to pull.
+        user_id: Broker account user id (also stashed into the Fyers cache so
+            the lazy service inits against the right account).
+
+    Returns:
+        OHLCV DataFrame from Fyers (may be empty on no-data / service failure).
+
+    Raises:
+        ValueError: For an unsupported interval.
+    """
     from tools.shared.universes import (
         _fetch_fyers_interval, _FYERS_CACHE, _fetch_daily_fyers_raw,
     )
+    # Point the lazy Fyers service at the requested account before any fetch.
     _FYERS_CACHE["user_id"] = user_id
     if interval == "1h":
         return _fetch_fyers_interval(symbol, days, user_id,
@@ -87,8 +122,19 @@ def fetch_one(symbol: str, interval: str, days: int, user_id: int = 1):
 
 
 def current_coverage(symbol: str, interval: str, days: int) -> int:
-    """Return cached row count for the requested window (used to skip
-    already-prefetched symbols)."""
+    """Count cached bars already present for a symbol over the target window.
+
+    Used by the skip-logic to avoid re-fetching symbols that are already
+    sufficiently backfilled.
+
+    Args:
+        symbol: Plain/Fyers ticker.
+        interval: Interval code ("1h", "15m", "D").
+        days: Calendar days back from now defining the window.
+
+    Returns:
+        Number of cached rows in [now - days, now] for that symbol+interval.
+    """
     from datetime import datetime, timedelta
     end_dt = datetime.now()
     start_dt = end_dt - timedelta(days=days)
@@ -98,6 +144,20 @@ def current_coverage(symbol: str, interval: str, days: int) -> int:
 
 
 def expected_bars(interval: str, days: int) -> int:
+    """Estimate how many bars a fully-covered window should contain.
+
+    Approximates ~250 trading days per calendar year, then multiplies by a
+    per-interval bar count (1H≈6/day, 15m≈25/day, 5m≈75/day, daily=1/day). The
+    skip-logic compares :func:`current_coverage` against a fraction of this.
+
+    Args:
+        interval: Interval code ("1h", "15m", "5m", "D").
+        days: Calendar days in the window.
+
+    Returns:
+        Expected bar count; falls back to trading_days for unknown intervals.
+    """
+    # Convert calendar days to trading days (~250 trading days / 365 calendar).
     trading_days = max(1, int(days * 250 / 365))
     return {
         "1h":  trading_days * 6,
@@ -108,6 +168,17 @@ def expected_bars(interval: str, days: int) -> int:
 
 
 def main() -> int:
+    """CLI entry point: bulk-prefetch OHLCV for one or more universes into the DB.
+
+    Resolves the requested universe(s) to a de-duplicated symbol list, then for
+    each symbol+interval it (a) skips symbols already sufficiently cached
+    (unless the window is too small / 'incremental' mode), (b) fetches the rest
+    from Fyers via :func:`fetch_one`, and (c) writes new bars through the cache
+    layer. Prints per-symbol progress with ETA and a final summary.
+
+    Returns:
+        Process exit code: 0 on success, 1 if no DB engine is available.
+    """
     ap = argparse.ArgumentParser()
     ap.add_argument("--universe", default="n50,n500",
                     help="Comma-sep: n50,n500. Use 'all' for both.")

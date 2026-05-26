@@ -1,4 +1,10 @@
-"""Data pulls for midcap_narrow_60d_breakout.
+"""Data pulls for midcap_narrow_60d_breakout — STEP 1 of the model flow.
+
+Pipeline position (data_pull -> build_universe -> live_signal -> cron -> backtest):
+  This is the very first stage. It refreshes the raw OHLCV the rest of the
+  model reads from, and triggers the universe rebuild. Everything downstream
+  (build_universe ADV ranking, live_signal breakout scan, backtest replay)
+  reads the `historical_data` table this module keeps current.
 
 Daily (post-market close):
   - NIFTY 500 daily close OHLCV (shared with momentum_n100_top5_max1 via
@@ -9,6 +15,10 @@ Daily (post-market close):
 
 Monthly (1st trading day):
   - Refresh midcap_narrow.json universe (ADV rank drift)
+
+Both functions here are thin subprocess wrappers; the heavy lifting lives in
+tools/shared/prefetch_ohlcv.py (OHLCV) and build_universe.py (universe). They
+are invoked by cron.py's register_data_jobs().
 """
 from __future__ import annotations
 
@@ -28,6 +38,19 @@ KEEP_NEXT = 100
 
 
 def _run(cmd: list, label: str, timeout: int = 1800) -> bool:
+    """Run a child process, log a tidy pass/fail line, and report success.
+
+    Args:
+        cmd: argv list passed straight to subprocess.run (no shell).
+        label: human-readable name used in the success/failure log lines.
+        timeout: seconds before the child is killed (default 1800 = 30 min,
+            sized for a full N500 OHLCV pull).
+
+    Returns:
+        True if the child exited 0, else False. All failure modes
+        (non-zero exit, timeout, unexpected exception) are caught and logged
+        so a single failed pull never crashes the scheduler thread.
+    """
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         if r.returncode == 0:
@@ -44,7 +67,14 @@ def _run(cmd: list, label: str, timeout: int = 1800) -> bool:
 
 
 def pull_daily_ohlcv():
-    """Incremental N500 daily OHLCV (2 days lookback). Covers midcap_narrow."""
+    """Incremental N500 daily OHLCV pull. Covers the midcap_narrow subset.
+
+    Shells out to the shared prefetcher with --days 5 (small lookback so the
+    last few sessions are refreshed/back-filled, not the whole history). Runs
+    daily post-close via cron.py register_data_jobs(). No return value — result
+    is logged by _run; the refreshed `historical_data` table is the side effect
+    every other stage consumes.
+    """
     log.info("=" * 80)
     log.info("midcap_narrow_60d_breakout daily OHLCV pull (N500)")
     log.info("=" * 80)
@@ -57,7 +87,18 @@ def pull_daily_ohlcv():
 
 
 def refresh_universe():
-    """Rebuild midcap_narrow by ADV (skip top-30, take next 100). Monthly."""
+    """Rebuild the midcap_narrow universe JSON by ADV ranking. Monthly.
+
+    Shells out to build_universe.py with this module's SKIP_TOP/KEEP_NEXT
+    constants and writes UNIVERSE_OUT. Re-running monthly lets the universe
+    drift as liquidity (ADV) ranks change. No return value — result logged by
+    _run; the produced JSON is what live_signal.py loads each day.
+
+    NOTE: these SKIP_TOP=30/KEEP_NEXT=100 constants pre-date the V3 universe
+    rule (top-100 ADV minus Large = SKIP_TOP=0 in backtest.py). build_universe.py
+    itself treats large-cap removal as the Nifty-100 exclusion, so the net band
+    still lands on ~42 midcaps.
+    """
     log.info("=" * 80)
     log.info("midcap_narrow universe refresh (ADV-ranked, skip large caps)")
     log.info("=" * 80)

@@ -29,7 +29,22 @@ log = logging.getLogger(__name__)
 # ---- Trading-side jobs (technical_scheduler) ----
 
 def emit_signal(force: bool = False):
-    """Emit Model 3 signal. Rebalance-gated unless force=True."""
+    """Emit Model 3 signal. Rebalance-gated unless force=True.
+
+    Shells out to live_signal.py with --rebalance-only so the signal file is
+    only populated on the monthly rebalance trigger day; live_signal itself
+    decides whether today qualifies and writes an empty file otherwise. This
+    is the SIGNAL half of the daily trading pair (execute_orders is the
+    EXECUTION half, fired 5 minutes later).
+
+    Args:
+        force: pass --force instead of --rebalance-only, bypassing the
+            monthly date gate (used for initial deploy / manual reruns). Note:
+            forced runs are intentionally NOT audited inside live_signal.
+
+    Side effects: writes /app/logs/momrot/signals/{today}_momrot_n100.json.
+    Subprocess failures are logged, never raised — the scheduler keeps running.
+    """
     label = "Model 3 momentum signal" + (" (FORCE)" if force else " (rebalance-gated)")
     log.info("\n" + "=" * 80)
     log.info(f"RUNNING {label}")
@@ -45,6 +60,8 @@ def emit_signal(force: bool = False):
         "--universe-file", universe, "--top-n", "5",
         "--signals-out", str(signals_out),
     ]
+    # Gate the signal: forced runs ignore the date; normal runs self-skip
+    # unless today is the monthly rebalance trigger.
     cmd.append("--force" if force else "--rebalance-only")
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
@@ -64,7 +81,16 @@ def emit_signal(force: bool = False):
 
 
 def execute_orders():
-    """Place Fyers orders from today's signal file."""
+    """Place Fyers orders from today's signal file.
+
+    EXECUTION half of the monthly pair. Reads the signal file emit_signal
+    wrote and hands it to tools/live/fyers_executor.py, which places the
+    real BUY/SELL orders (max_concurrent=1, so a duplicate ENTRY1 for an
+    already-held symbol is a no-op). No return value; failures are logged.
+
+    Gotcha: on non-rebalance days the file is absent (or empty), so this
+    correctly skips — the missing file is the gate, not an error.
+    """
     today = datetime.now().strftime("%Y-%m-%d")
     signals_file = Path(f"/app/logs/momrot/signals/{today}_momrot_n100.json")
     if not signals_file.exists():
@@ -92,7 +118,16 @@ def execute_orders():
 # ---- Registration entrypoints ----
 
 def register_data_jobs(schedule):
-    """Daily/monthly data pulls. Called by data_scheduler."""
+    """Daily/monthly data pulls. Called by data_scheduler.
+
+    Args:
+        schedule: the `schedule` library instance owned by data_scheduler.py;
+            we attach our jobs to it so all model data jobs share one clock.
+
+    Registers the data-stage jobs (stage 1 of the model flow): a nightly
+    OHLCV refresh and a daily universe-refresh wrapper that self-gates to the
+    1st of the month. No return value.
+    """
     # Equity OHLCV — daily after market close (saga step 3 also covers this;
     # this is the model-explicit fallback)
     schedule.every().day.at("20:30").do(pull_daily_ohlcv)
@@ -101,15 +136,28 @@ def register_data_jobs(schedule):
 
 
 def _monthly_universe():
-    """Wrapper that only runs universe refresh on 1st of month."""
-    if datetime.now().day == 1:
+    """Wrapper that only runs universe refresh on 1st of month.
+
+    The scheduler fires this every day at 06:30; the day-of-month guard turns
+    it into an effective monthly job without needing a monthly cron primitive.
+    No-op on days 2-31.
+    """
+    if datetime.now().day == 1:  # only the 1st triggers the actual refresh
         refresh_universe()
 
 
 def emit_mid_month_signal():
     """Day-15 weekday mid-month check. Live_signal applies the 5pp
     lead gate; on non-day-15 it writes an empty signals file. Cron
-    can fire daily and the model self-skips."""
+    can fire daily and the model self-skips.
+
+    This is the SIGNAL half of the second (mid-cycle) rebalance opportunity.
+    It runs live_signal.py with --mid-month-check, which both date-gates to
+    the first weekday on/after the 15th AND only rotates when the new rank-1
+    leads the held stock by >= MID_MONTH_LEAD_PCT (see live_signal). Writes to
+    a SEPARATE *_midmonth.json file so it never collides with the monthly
+    signal. No return value; subprocess failures are logged.
+    """
     log.info("\n" + "=" * 80)
     log.info("RUNNING Model 3 mid-month check")
     log.info("=" * 80)
@@ -144,13 +192,22 @@ def emit_mid_month_signal():
 
 def execute_mid_month_orders():
     """Execute mid-month signal file (separate from monthly to avoid
-    double-execution race)."""
+    double-execution race).
+
+    EXECUTION half of the mid-cycle pair. Reads the *_midmonth.json file and
+    places its orders via fyers_executor.py. Most days the file is empty
+    (gate not met) so this is usually a no-op. Using a distinct file from the
+    monthly path is deliberate: it stops the 09:30 monthly executor and the
+    09:35 mid-month executor from racing on the same signal. No return value.
+    """
     today = datetime.now().strftime("%Y-%m-%d")
     signals_file = Path(f"/app/logs/momrot/signals/{today}_momrot_n100_midmonth.json")
     if not signals_file.exists():
         log.info(f"Model 3 mid-month execute: no signal at {signals_file}, skipping.")
         return
-    # Skip if empty (most days will be).
+    # Skip if the file exists but holds an empty list (the common case — the
+    # mid-month gate suppressed rotation). Parse errors fall through and let
+    # the executor decide.
     try:
         import json as _j
         sigs = _j.loads(signals_file.read_text())

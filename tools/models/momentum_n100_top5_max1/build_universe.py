@@ -36,7 +36,23 @@ log = logging.getLogger("build_universe")
 
 
 def compute_adv(symbol: str, end_dt: datetime, days: int = 60) -> float:
-    """Return avg daily ₹ value traded over last `days` calendar days, in lakh."""
+    """Return avg daily ₹ value traded over last `days` calendar days, in lakh.
+
+    Args:
+        symbol: NSE symbol in cache format (e.g. "NSE:RELIANCE-EQ").
+        end_dt: as-of date; ADV is measured looking back from here.
+        days: calendar-day lookback window for the OHLCV fetch (default 60;
+            ~40 trading sessions, enough to land 20 valid bars after holidays).
+
+    Returns:
+        Average daily turnover in lakh rupees, or 0.0 if data is missing.
+
+    Gotcha: this value is INFORMATIONAL ONLY (shown when --include-adv is set).
+    Selection no longer narrows by ADV — the universe is the official NSE
+    Nifty 100 list. See the module docstring on why the old ADV-ranking was
+    dropped. Any fetch error or thin history is swallowed and returns 0.0 so a
+    single bad symbol can't abort the whole build.
+    """
     start_dt = end_dt - timedelta(days=days)
     try:
         df = read_cached(symbol, "D", int(start_dt.timestamp()), int(end_dt.timestamp()))
@@ -44,11 +60,25 @@ def compute_adv(symbol: str, end_dt: datetime, days: int = 60) -> float:
         return 0.0
     if df.empty or len(df) < 5:
         return 0.0
+    # Per-bar turnover = close * volume; ADV = mean of the last 20 sessions...
     df["value"] = df["close"].astype(float) * df["volume"].astype(float)
+    # ...divided by 1e5 to convert rupees -> lakh for display.
     return float(df["value"].tail(20).mean()) / 1e5
 
 
 def main():
+    """CLI entrypoint: write the Nifty 100 universe JSON consumed by the model.
+
+    Reads the real NSE constituent list (tools.shared.universes.nifty100_symbols,
+    backed by src/data/symbols/nifty100.csv) and serialises it to --out as a
+    {"stocks": [{symbol, name[, adv_lakh]}, ...]} payload that live_signal.py /
+    backtest.py rank. The file format must stay in sync with
+    live_signal.load_universe (which reads payload["stocks"]).
+
+    Returns:
+        int exit code — 0 on success, 1 if the constituent list is empty (a
+        signal that tools/refresh_nifty100.py needs to run first).
+    """
     ap = argparse.ArgumentParser()
     ap.add_argument("--end-date", default=None, help="YYYY-MM-DD (for ADV calc only)")
     ap.add_argument("--out", required=True)
@@ -59,11 +89,14 @@ def main():
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
 
+    # As-of date only matters for the optional ADV calc; defaults to now.
     end_dt = (datetime.strptime(args.end_date, "%Y-%m-%d")
               if args.end_date else datetime.now())
 
     n100 = nifty100_symbols()
     if not n100:
+        # Empty list => the source CSV is missing/stale. Fail loudly so the
+        # caller refreshes it instead of writing an empty universe.
         log.error("Real Nifty 100 list empty. Run tools/refresh_nifty100.py first.")
         return 1
 
@@ -73,6 +106,7 @@ def main():
     for i, (sym, name) in enumerate(n100):
         entry = {"symbol": sym, "name": name}
         if args.include_adv:
+            # Progress log every 20 symbols since per-symbol ADV is a slow DB read.
             if i % 20 == 0:
                 log.info(f"  ADV {i}/{len(n100)}")
             entry["adv_lakh"] = compute_adv(sym, end_dt)

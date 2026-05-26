@@ -1,4 +1,12 @@
-"""Cron registration for midcap_narrow_60d_breakout.
+"""Cron registration for midcap_narrow_60d_breakout — STEP 4 of the flow.
+
+Pipeline position (data_pull -> build_universe -> live_signal -> cron -> backtest):
+  This module is the SCHEDULER glue. It registers two families of jobs on the
+  shared `schedule` instance so the rest of the pipeline runs automatically:
+    - data jobs wrap data_pull.py (OHLCV refresh + monthly universe rebuild)
+    - trading jobs run live_signal.py (the breakout scan) then the Fyers
+      executor against the signals file it produced.
+  backtest.py is offline/manual and is intentionally NOT scheduled here.
 
 Data side:
   register_data_jobs(schedule) — daily N500 OHLCV + monthly universe refresh.

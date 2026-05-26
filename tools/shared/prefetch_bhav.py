@@ -46,19 +46,51 @@ MONTH_CODE_WEEKLY = {1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6",
 
 
 def fetch_zip(url: str) -> Optional[bytes]:
+    """Download a bhavcopy zip from NSE archives.
+
+    Sends a browser-like User-Agent (NSE blocks default urllib headers) and
+    treats a 404 as "no file for this date" rather than a hard error — many
+    weekdays are exchange holidays with no bhavcopy.
+
+    Args:
+        url: Fully-formatted NSE archive URL for the day's FO bhavcopy zip.
+
+    Returns:
+        Raw zip bytes, or None on HTTP 404 (file simply not published).
+
+    Raises:
+        urllib.error.HTTPError: For any non-404 HTTP failure.
+    """
     req = urllib.request.Request(url, headers=UA)
     try:
         return urllib.request.urlopen(req, timeout=30).read()
     except urllib.error.HTTPError as e:
+        # 404 = no bhavcopy for this date (holiday / not yet published) → skip.
         if e.code == 404:
             return None
         raise
 
 
 def parse_old(txt: str, underlying_set: set, instrument_set: set) -> List[dict]:
+    """Parse a pre-2024-07-07 (legacy positional) FO bhavcopy CSV.
+
+    The old format is a fixed-column layout (no UDiFF headers): col0=instrument,
+    col1=underlying, col2=expiry, col3=strike, col4=opt type, col5..8=OHLC,
+    col10=volume, col11=turnover (lakhs), col12=OI, col14=trade date.
+
+    Args:
+        txt: Decoded CSV text of one day's bhavcopy.
+        underlying_set: Underlyings to keep (e.g. {"BANKNIFTY"}).
+        instrument_set: Instrument codes to keep (e.g. {"OPTIDX"}).
+
+    Returns:
+        List of option-bar dicts (one per matching CE/PE row) ready for
+        :func:`bulk_insert`. Malformed rows are silently skipped.
+    """
     rows = list(csv.reader(io.StringIO(txt)))
     out = []
-    for r in rows[1:]:
+    for r in rows[1:]:  # skip header row
+        # Defensive: skip short/garbled lines that lack the trade-date column.
         if len(r) < 15:
             continue
         if r[0].strip() not in instrument_set:
@@ -70,6 +102,7 @@ def parse_old(txt: str, underlying_set: set, instrument_set: set) -> List[dict]:
             td = datetime.strptime(r[14].strip(), "%d-%b-%Y").date()
             strike = int(float(r[3]))
             ot = r[4].strip()
+            # Options only — skip futures (FUT rows have no CE/PE option type).
             if ot not in ("CE", "PE"):
                 continue
             # r[11] = VAL_INLAKH (total turnover in rupees-lakhs)
@@ -93,13 +126,29 @@ def parse_old(txt: str, underlying_set: set, instrument_set: set) -> List[dict]:
 
 
 def parse_new(txt: str, underlying_set: set, instrument_set: set) -> List[dict]:
-    """New UDiFF: FinInstrmTp IDF=Future Index, IDO=Option Index,
-                  STF=Future Stock, STO=Option Stock."""
+    """Parse a post-2024-07-07 UDiFF (header-based) FO bhavcopy CSV.
+
+    The new UDiFF format is column-named, so fields are located by header
+    lookup instead of fixed positions. Instrument type codes:
+    FinInstrmTp IDF=Future Index, IDO=Option Index, STF=Future Stock,
+    STO=Option Stock — so old OPTIDX/OPTSTK requests are remapped to IDO/STO.
+
+    Args:
+        txt: Decoded CSV text of one day's bhavcopy.
+        underlying_set: Underlyings to keep (matched on ``TckrSymb``).
+        instrument_set: Old-style instrument codes (OPTIDX/OPTSTK) to keep;
+            remapped internally to the new IDO/STO codes.
+
+    Returns:
+        List of option-bar dicts (one per matching CE/PE row) ready for
+        :func:`bulk_insert`. Malformed rows are silently skipped.
+    """
     rows = list(csv.reader(io.StringIO(txt)))
     if not rows:
         return []
     header = rows[0]
     def idx(n):
+        # Column index by header name, or -1 if the column is absent.
         try: return header.index(n)
         except ValueError: return -1
     iSym = idx("TckrSymb"); iTp = idx("FinInstrmTp"); iXpry = idx("XpryDt")
@@ -158,20 +207,63 @@ def parse_new(txt: str, underlying_set: set, instrument_set: set) -> List[dict]:
 
 
 def is_monthly(exp: date) -> bool:
+    """Decide whether an expiry date is a monthly (vs weekly) contract.
+
+    NSE monthly expiries fall in the last week of the month on Tue/Wed/Thu.
+    The heuristic: within 6 days of month-end AND a mid-week weekday.
+
+    Args:
+        exp: Contract expiry date.
+
+    Returns:
+        True if the expiry looks monthly, False if it's a weekly contract.
+    """
     import calendar
-    last = calendar.monthrange(exp.year, exp.month)[1]
+    last = calendar.monthrange(exp.year, exp.month)[1]  # last calendar day of month
+    # Within the final week (<=6 days from month-end) and Tue(1)/Wed(2)/Thu(3).
     return (last - exp.day) <= 6 and exp.weekday() in (1, 2, 3)
 
 
 def build_symbol(underlying: str, exp: date, strike: int, opt_type: str, mn: bool) -> str:
+    """Build the Fyers option symbol matching NSE's monthly/weekly conventions.
+
+    Monthly contracts encode the 3-letter month (e.g. ``BANKNIFTY24JUL48000CE``);
+    weekly contracts use a single month code plus zero-padded day
+    (e.g. ``BANKNIFTY24O0348000CE`` where ``O`` is October's weekly code).
+
+    Args:
+        underlying: Underlying name (e.g. ``BANKNIFTY``).
+        exp: Contract expiry date.
+        strike: Strike price (whole number).
+        opt_type: ``CE`` or ``PE``.
+        mn: True for monthly format, False for weekly (from :func:`is_monthly`).
+
+    Returns:
+        Fully-qualified Fyers option symbol string (``NSE:`` prefixed).
+    """
     yy = exp.strftime("%y")
     if mn:
+        # Monthly: YY + 3-letter month (e.g. 24JUL).
         return f"NSE:{underlying}{yy}{MON3U[exp.month]}{strike}{opt_type}"
+    # Weekly: YY + single month code (O/N/D for Oct/Nov/Dec) + 2-digit day.
     m = MONTH_CODE_WEEKLY[exp.month]
     return f"NSE:{underlying}{yy}{m}{exp.day:02d}{strike}{opt_type}"
 
 
 def fetch_day(d: date) -> Optional[str]:
+    """Download and unzip one trading day's FO bhavcopy CSV.
+
+    Picks the legacy vs UDiFF archive URL based on ``OLD_CUTOFF`` (NSE switched
+    formats on 2024-07-07), downloads the zip, and returns the first member's
+    decoded CSV text.
+
+    Args:
+        d: Trading date to fetch.
+
+    Returns:
+        Decoded CSV text, or None if no bhavcopy exists for that date (404).
+    """
+    # Pick legacy vs new-UDiFF URL by the format-switch cutoff date.
     if d <= OLD_CUTOFF:
         url = OLD_URL.format(yyyy=d.year, mon3u=MON3U[d.month], dd=f"{d.day:02d}")
     else:
@@ -179,11 +271,31 @@ def fetch_day(d: date) -> Optional[str]:
     b = fetch_zip(url)
     if b is None:
         return None
+    # Bhavcopy zips contain a single CSV member; read it and tolerate bad bytes.
     z = zipfile.ZipFile(io.BytesIO(b))
     return z.read(z.namelist()[0]).decode("utf-8", errors="ignore")
 
 
 def bulk_insert(eng, rows: List[dict]) -> int:
+    """Upsert a day's parsed option bars into ``historical_options`` + ``option_universe``.
+
+    For each row it derives the Fyers symbol and a 15:30 IST close timestamp,
+    then does two ``executemany`` upserts inside one transaction:
+      * ``historical_options`` — the OHLC/OI bars (ON CONFLICT updates the
+        late-arriving num_trades / turnover_lakh fields).
+      * ``option_universe`` — marks the symbol as having daily data fetched.
+    Uses a raw psycopg connection for ``executemany`` batching speed.
+
+    Args:
+        eng: SQLAlchemy engine (raw connection borrowed from it).
+        rows: Parsed option-bar dicts from :func:`parse_old`/:func:`parse_new`.
+
+    Returns:
+        Number of ``historical_options`` rows affected (insert + update).
+
+    Raises:
+        Exception: Re-raised after rollback if either bulk upsert fails.
+    """
     if not rows:
         return 0
     opt_payload = []
@@ -192,6 +304,7 @@ def bulk_insert(eng, rows: List[dict]) -> int:
         mn = is_monthly(r["expiry"])
         sym = build_symbol(r["underlying"], r["expiry"], r["strike"],
                            r["opt_type"], mn)
+        # Stamp every daily bar at 15:30 IST (market close) for a stable timestamp.
         ts = int(datetime(r["trade_date"].year, r["trade_date"].month,
                           r["trade_date"].day, 15, 30).timestamp())
         ct = datetime(r["trade_date"].year, r["trade_date"].month,
@@ -206,9 +319,11 @@ def bulk_insert(eng, rows: List[dict]) -> int:
             sym, r["underlying"], r["expiry"],
             "monthly" if mn else "weekly", r["strike"], r["opt_type"],
         ))
+    # Raw psycopg connection lets us batch via executemany (faster than the ORM).
     raw = eng.raw_connection()
     try:
         cur = raw.cursor()
+        # Upsert the OHLC/OI bars; on conflict refresh the late-added metadata cols.
         cur.executemany(
             "INSERT INTO historical_options "
             "(symbol, underlying, expiry, strike, opt_type, interval, "
@@ -221,6 +336,7 @@ def bulk_insert(eng, rows: List[dict]) -> int:
             opt_payload,
         )
         inserted = cur.rowcount or len(opt_payload)
+        # Register each symbol in the universe table, flagging daily data present.
         cur.executemany(
             "INSERT INTO option_universe "
             "(symbol, underlying, expiry, expiry_kind, strike, opt_type, fetched_d) "
@@ -238,14 +354,33 @@ def bulk_insert(eng, rows: List[dict]) -> int:
 
 
 def daterange(start: date, end: date):
+    """Yield weekdays (Mon-Fri) in [start, end] inclusive.
+
+    Weekends are skipped since NSE publishes no bhavcopy then (exchange
+    holidays still appear and are handled by the 404 path in :func:`fetch_zip`).
+
+    Args:
+        start: Inclusive first date.
+        end: Inclusive last date.
+
+    Yields:
+        Each weekday ``date`` in the range, ascending.
+    """
     d = start
     while d <= end:
-        if d.weekday() < 5:
+        if d.weekday() < 5:  # 0-4 == Mon-Fri; skip Sat/Sun
             yield d
         d += timedelta(days=1)
 
 
 def main():
+    """CLI entry point: backfill FO option bhavcopy for a date range.
+
+    Parses ``--from``/``--to`` plus ``--underlying`` (comma-separated),
+    ``--instrument`` (OPTIDX/OPTSTK) and an optional ``--limit``, then for each
+    weekday downloads the bhavcopy, parses it with the era-appropriate parser,
+    and bulk-upserts the bars — printing periodic progress and a final summary.
+    """
     ap = argparse.ArgumentParser()
     ap.add_argument("--from", dest="frm", required=True)
     ap.add_argument("--to", dest="to", required=True)
@@ -275,6 +410,7 @@ def main():
             if txt is None:
                 misses += 1
                 continue
+            # Choose the parser matching the file format era (pre/post UDiFF switch).
             if d <= OLD_CUTOFF:
                 rows = parse_old(txt, underlying_set, instrument_set)
             else:

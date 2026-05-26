@@ -85,11 +85,34 @@ def is_mid_month_check_day(today: datetime) -> bool:
 
 
 def load_universe(path: str) -> List[Dict]:
+    """Load the ranking universe from a JSON universe file.
+
+    Args:
+        path: Path to the universe JSON (the n100 constituents snapshot).
+
+    Returns:
+        list[dict]: The "stocks" array, each entry having at least a "symbol"
+        and usually a "name".
+    """
     with open(path) as f:
         return json.load(f)["stocks"]
 
 
 def get_close_at(symbol: str, target_ts: int) -> float:
+    """Fetch the most recent daily close at/just before a unix timestamp.
+
+    Reads a 90-day window from the cached daily OHLCV and returns the last
+    available close in that window.
+
+    Args:
+        symbol: Fyers symbol, e.g. "NSE:RELIANCE-EQ".
+        target_ts: Unix epoch seconds for the "as of" date.
+
+    Returns:
+        float: Last close in the window, or 0.0 if no data is cached.
+    """
+    # Pull a 90-day trailing window so a missing exact day still yields the
+    # last traded close (last row), not a gap.
     df = read_cached(symbol, "D", target_ts - 90 * 86400, target_ts)
     if df.empty:
         return 0.0
@@ -98,21 +121,47 @@ def get_close_at(symbol: str, target_ts: int) -> float:
 
 def rank_universe(stocks: List[Dict], today_ts: int,
                   lookback_days: int = 30) -> List[tuple]:
-    """Return [(symbol, name, 30d_return%, current_price)] sorted desc."""
-    lookback_ts = today_ts - lookback_days * 86400
+    """Rank the universe by trailing 30-day return (the live ranking step).
+
+    Mirrors backtest.py's rank_at: for each stock, return = close_now /
+    close_30d_ago - 1, then sort best-first. Stocks lacking either price are
+    dropped.
+
+    Args:
+        stocks: Universe entries (each with "symbol", optional "name").
+        today_ts: Unix epoch seconds for "now".
+        lookback_days: Momentum lookback window (default 30, matches backtest).
+
+    Returns:
+        list[tuple]: (symbol, name, 30d_return_pct, current_price) sorted
+        descending by return.
+    """
+    lookback_ts = today_ts - lookback_days * 86400  # 30d ago in epoch seconds
     rows = []
     for s in stocks:
         sym = s["symbol"]
         c_now = get_close_at(sym, today_ts)
         c_past = get_close_at(sym, lookback_ts)
-        if c_now > 0 and c_past > 0:
-            ret = (c_now / c_past - 1) * 100
+        if c_now > 0 and c_past > 0:  # need both endpoints to compute a return
+            ret = (c_now / c_past - 1) * 100  # 30d return in percentage points
             rows.append((sym, s.get("name", sym), ret, c_now))
-    rows.sort(key=lambda r: -r[2])
+    rows.sort(key=lambda r: -r[2])  # best 30d return first
     return rows
 
 
 def load_held(ledger_path: Path) -> List[Dict]:
+    """Read currently-held positions from a file-based paper ledger.
+
+    Used only when an explicit --ledger path is passed; otherwise the model
+    reads the DB ledger via held_from_db(). Fails soft to flat (empty) on any
+    read/parse error.
+
+    Args:
+        ledger_path: Path to the paper-ledger JSON, or None.
+
+    Returns:
+        list[dict]: The ledger's "open" positions, or [] if missing/unreadable.
+    """
     if not ledger_path or not ledger_path.exists():
         return []
     try:
@@ -120,7 +169,7 @@ def load_held(ledger_path: Path) -> List[Dict]:
             return json.load(f).get("open", [])
     except Exception as e:
         log.warning(f"ledger read fail: {e}")
-        return []
+        return []  # treat unreadable ledger as flat rather than crashing
 
 
 def held_from_db() -> List[Dict]:
@@ -135,21 +184,42 @@ def held_from_db() -> List[Dict]:
         from src.services.trading.model_ledger_service import get_ledger
         l = get_ledger("momentum_n100_top5_max1")
         if l and l.get("open_symbol"):
+            # Shape matches load_held() output so emit_signals treats file and
+            # DB ledgers identically: one held position with its entry price.
             return [{
                 "symbol": l["open_symbol"],
                 "entry_price": float(l.get("open_entry_px") or 0),
             }]
     except Exception as e:
         log.warning(f"DB ledger read failed: {e}; treating as flat")
-    return []
+    return []  # no open position (or read failed) -> model runs as flat
 
 
 def emit_signals(top_picks: List[tuple], held: List[Dict],
                   top_n: int, retain_top_n: int = 1) -> List[Dict]:
+    """Turn a ranking + current holding into SELL/BUY signal dicts.
+
+    Delegates the keep/rotate decision to the shared decide_rotation core so
+    live and backtest stay in lockstep, then materialises the resulting sell
+    and/or buy into the signal dict shape that fyers_executor consumes.
+
+    Args:
+        top_picks: Output of rank_universe — (symbol, name, ret_pct, price)
+            best-first.
+        held: Current holding list (0 or 1 entry) from the ledger/DB.
+        top_n: Display ranking size (informational; not the exit band).
+        retain_top_n: Exit retention band passed to decide_rotation; 1 == top-1
+            rotation (matches the canonical backtest).
+
+    Returns:
+        list[dict]: 0–2 signal dicts. A SELL (rotation exit) is emitted when the
+        held stock drops out of the retention band; a BUY (ENTRY1) for the new
+        rank-1 when it differs from what's held.
+    """
     # Decision via the SHARED rotation core — same rule backtest.py uses, so
     # live and backtest cannot drift. retain_top_n=1 == top-1 rotation.
-    ranked = [p[0] for p in top_picks]
-    by_sym = {p[0]: p for p in top_picks}
+    ranked = [p[0] for p in top_picks]          # just the symbols, rank order
+    by_sym = {p[0]: p for p in top_picks}       # symbol -> full pick tuple
     held_sym = held[0]["symbol"] if held else None
     held_entry = float(held[0].get("entry_price", 0)) if held else 0.0
     dec = decide_rotation(held_sym, ranked, retain_top_n)
@@ -159,7 +229,10 @@ def emit_signals(top_picks: List[tuple], held: List[Dict],
 
     if dec.sell:
         price = get_close_at(dec.sell, int(datetime.now().timestamp()))
+        # Label the exit by P&L vs entry: at/above entry = TARGET_HIT, below =
+        # STOP_HIT. Both are rotation exits (no real SL/target in this model).
         kind = "TARGET_HIT" if price >= held_entry else "STOP_HIT"
+        # SELL signal dict shape consumed by fyers_executor (side=SELL).
         signals.append({
             "model": "momentum_rotation",
             "universe": "n100_real",
@@ -175,6 +248,7 @@ def emit_signals(top_picks: List[tuple], held: List[Dict],
 
     if dec.buy:
         sym, name, ret, price = by_sym[dec.buy]
+        # BUY signal dict shape consumed by fyers_executor (side=BUY, ENTRY1).
         signals.append({
             "model": "momentum_rotation",
             "universe": "n100_real",
@@ -192,6 +266,23 @@ def emit_signals(top_picks: List[tuple], held: List[Dict],
 
 
 def main():
+    """CLI entry point — gate on the date, rank, emit signals, persist + notify.
+
+    Flow:
+      1. Apply the date gate (mid-month check OR rebalance-only, unless --force).
+         If gated out, write an empty signals file (+ skip notification) and
+         return early.
+      2. Load the universe and the current holding (file ledger if --ledger,
+         else the DB ledger — this is what makes the model stateful).
+      3. Rank by 30d return and emit SELL/BUY signals via emit_signals.
+      4. Apply the mid-month lead-threshold filter when in mid-month mode.
+      5. Write the signals JSON, persist the top-N ranking for the UI, and fire
+         the audit + notification hooks (scheduled runs only).
+
+    Returns:
+        int: 0 on success (also the early-return exit code), suitable for
+        SystemExit.
+    """
     ap = argparse.ArgumentParser()
     ap.add_argument("--universe-file", required=True)
     ap.add_argument("--top-n", type=int, default=5,
@@ -245,11 +336,13 @@ def main():
     stocks = load_universe(args.universe_file)
     log.info(f"Universe: {len(stocks)} symbols from {args.universe_file}")
 
-    # Stateful: prefer file ledger if explicitly passed, else read DB ledger.
+    # Stateful: prefer file ledger if explicitly passed, else read DB ledger
+    # (held_from_db) so a rotation SELL can fire when the held stock falls out.
     held = load_held(Path(args.ledger)) if args.ledger else held_from_db()
     log.info(f"Currently held: {[h['symbol'] for h in held]}")
 
     today_ts = int(today.timestamp())
+    # 30d-return ranking of the whole universe, best-first.
     ranks = rank_universe(stocks, today_ts)
     log.info(f"Ranked {len(ranks)} stocks. Top-{args.top_n}:")
     for i, (sym, name, ret, price) in enumerate(ranks[:args.top_n], 1):
@@ -275,6 +368,7 @@ def main():
 
     log.info(f"Emitting {len(signals)} signals")
 
+    # Canonical signals file the cron executor (fyers_executor) reads & acts on.
     Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
     with open(args.signals_out, "w") as f:
         json.dump(signals, f, indent=2, default=str)
@@ -303,7 +397,7 @@ def main():
     ranking_path.write_text(json.dumps(top_payload, indent=2, default=str))
     log.info(f"Wrote ranking -> {ranking_path}")
 
-    # Audit hook
+    # Audit hook — record the ranking snapshot and each signal (or a HOLD).
     try:
         from src.services.audit_service import write_rankings, write_signal
         write_rankings("momentum_n100_top5_max1", today.date(),
@@ -318,6 +412,7 @@ def main():
                                  _sig.get("side", ""), price=_sig.get("price"),
                                  reason=(_sig.get("note") or "")[:120])
             else:
+                # No signal this run -> log an explicit HOLD row for the audit.
                 write_signal("momentum_n100_top5_max1", today.date(), "HOLD", "", "NONE",
                              reason="no signal emitted")
     except Exception as _e:
@@ -333,7 +428,10 @@ def main():
                 notify_model_decision, current_held,
             )
             _held = current_held("momentum_n100_top5_max1")
+            # If already holding, max_concurrent=1 means the BUY won't execute,
+            # so the effective signal set is empty (a no-change tick).
             _eff = [] if _held else signals
+            # 30d return of the held stock for the notification context.
             _ret = next((r[2] for r in ranks if r[0] == _held), None) if _held else None
             notify_model_decision(
                 "momentum_n100_top5_max1", _eff, held_symbol=_held,

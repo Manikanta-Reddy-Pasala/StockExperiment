@@ -50,14 +50,37 @@ MAX_HOLD_DAYS = 120
 
 
 def load_universe(uf: str) -> List[str]:
+    """Load the midcap_narrow universe from its JSON file.
+
+    Args:
+        uf: Path to the universe JSON (has a top-level ``stocks`` list, each
+            item carrying a ``symbol``).
+
+    Returns:
+        list[str]: Fyers-form symbols (``NSE:<TICKER>-EQ``). Symbols already in
+        Fyers form are passed through unchanged; bare tickers are wrapped.
+    """
     d = json.load(open(uf))
     return [
+        # Normalise to Fyers form unless already prefixed with NSE:.
         f"NSE:{s['symbol']}-EQ" if not s["symbol"].startswith("NSE:") else s["symbol"]
         for s in d.get("stocks", [])
     ]
 
 
 def load_daily(symbols: List[str], days_back: int = 90) -> pd.DataFrame:
+    """Fetch recent daily OHLCV bars for the given symbols from historical_data.
+
+    Args:
+        symbols: Fyers-form symbols to query.
+        days_back: Desired number of TRADING days of history. The actual
+            calendar window pulled is widened (see below) so weekend/holiday
+            gaps and indicator warm-up don't starve the rolling windows.
+
+    Returns:
+        pd.DataFrame: Long-form rows (symbol, date, open, high, low, close,
+        volume) ordered by symbol then date, with ``date`` as datetime.
+    """
     eng = _get_engine()
     end = datetime.now().date()
     # Calendar days → trading days ratio is ~5/7 minus holidays.
@@ -78,7 +101,14 @@ def load_daily(symbols: List[str], days_back: int = 90) -> pd.DataFrame:
 
 
 def get_current_position() -> Optional[Dict]:
-    """Read model's open position from model_ledger via service."""
+    """Read this model's open position from the model ledger.
+
+    Returns:
+        dict | None: The ledger record (carries ``open_symbol``, ``open_qty``,
+        ``open_entry_px``, ``open_entry_date``) when the model currently holds a
+        position; otherwise None (flat, or the ledger read failed — failures are
+        logged and swallowed so a ledger outage degrades to "scan for entries").
+    """
     try:
         from src.services.trading.model_ledger_service import get_ledger
         l = get_ledger(MODEL_NAME)
@@ -90,18 +120,34 @@ def get_current_position() -> Optional[Dict]:
 
 
 def check_exit(pos: Dict, df_sym: pd.DataFrame) -> Optional[Dict]:
-    """Return exit-signal dict if any exit condition fires for this position."""
+    """Decide whether the held position should exit today.
+
+    Delegates the rule to the SHARED ``breakout_exit_reason`` core (identical to
+    the call backtest.py makes) using the latest close, the peak close since
+    entry, and the calendar-day hold age.
+
+    Args:
+        pos: The open-position ledger record (``open_entry_px``,
+            ``open_entry_date``).
+        df_sym: Daily bars for the held symbol, ascending by date.
+
+    Returns:
+        dict | None: ``{"reason", "price", "ret_pct"}`` when an exit fires
+        (reason is TARGET/STOP/TRAIL/MAX_HOLD), else None to keep holding.
+        Returns None if there are no bars for the symbol.
+    """
     if df_sym.empty:
         return None
     last = df_sym.iloc[-1]
-    close = float(last["close"])
+    close = float(last["close"])                  # latest available close
     entry_price = float(pos["open_entry_px"])
     entry_date = datetime.strptime(pos["open_entry_date"], "%Y-%m-%d").date()
-    age = (datetime.now().date() - entry_date).days
+    age = (datetime.now().date() - entry_date).days   # calendar-day hold age
 
     ret_entry = (close - entry_price) / entry_price
 
-    # Track peak by scanning closes since entry
+    # Peak = highest close seen since the entry date. TRAIL exits 20% off THIS
+    # peak price (not a 20% drop in the gain): peak +40% -> exits at +12%.
     since_entry = df_sym[df_sym["date"] >= pd.Timestamp(entry_date)]
     peak = float(since_entry["close"].max()) if not since_entry.empty else close
 
@@ -139,11 +185,14 @@ def scan_entry_candidate(df: pd.DataFrame, symbols: List[str]) -> Optional[Dict]
         g = g.sort_values("date").reset_index(drop=True)
         if len(g) < MIN_NEAR_MISS_DAYS:
             continue
-        # Use shorter SMA if not enough history for SMA_LONG
+        # Use shorter SMA if not enough history for SMA_LONG (near-miss only;
+        # strict qualification below still demands the full 200d SMA).
         sma_window = SMA_LONG if len(g) >= SMA_LONG else max(20, len(g) // 2)
         g["sma_long"] = g["close"].rolling(sma_window).mean()
+        # Prior-40d HIGH (shift(1) excludes today, so a fresh break needs
+        # today's close to clear the previous 40 days' high).
         g["hh"] = g["high"].rolling(HH_WINDOW).max().shift(1)
-        g["vol_avg20"] = g["volume"].rolling(20).mean()
+        g["vol_avg20"] = g["volume"].rolling(20).mean()   # 20d avg vol surge baseline
         row = g[g["date"] == today]
         if row.empty:
             continue
@@ -154,9 +203,9 @@ def scan_entry_candidate(df: pd.DataFrame, symbols: List[str]) -> Optional[Dict]
         hh = float(r["hh"])
         sma_long = float(r["sma_long"]) if pd.notna(r["sma_long"]) else 0.0
         vol_avg = float(r["vol_avg20"])
-        vol_ratio = float(r["volume"]) / vol_avg if vol_avg > 0 else 0.0
-        hh_ratio = close / hh if hh > 0 else 0.0  # >1 = above prior 60d high
-        sma_ratio = close / sma_long if sma_long > 0 else 0.0  # >1 = above SMA
+        vol_ratio = float(r["volume"]) / vol_avg if vol_avg > 0 else 0.0  # today's volume vs 20d avg
+        hh_ratio = close / hh if hh > 0 else 0.0  # >1 = above prior 40d high (legacy "60d" label)
+        sma_ratio = close / sma_long if sma_long > 0 else 0.0  # >1 = above 200d SMA
         # True 30d return — distinct from headroom-vs-HH. Other models use the
         # same field name; align so UI labels stay correct.
         ret_30d_pct = 0.0
@@ -167,8 +216,9 @@ def scan_entry_candidate(df: pd.DataFrame, symbols: List[str]) -> Optional[Dict]
                     ret_30d_pct = (close / close_30d_ago - 1.0) * 100
             except Exception:
                 pass
-        # Strict qualification: full SMA_LONG history + the SHARED breakout core
-        # (close > 40d-high, close > 200d SMA, volume >= VOL_MULT x avg).
+        # Strict qualification (what actually triggers an ENTRY): a full 200d
+        # SMA history AND the SHARED breakout core firing — close > prior 40d
+        # high AND close > 200d SMA AND volume >= 2x 20d avg.
         has_full_sma = len(g) >= SMA_LONG and pd.notna(r["sma_long"])
         bo_ok, _ = is_breakout(close, hh, sma_long, float(r["volume"]),
                                vol_avg, vol_mult=VOL_MULT)
@@ -186,21 +236,43 @@ def scan_entry_candidate(df: pd.DataFrame, symbols: List[str]) -> Optional[Dict]
         }
         if qualifies:
             cands.append(info)
-        # Near-miss score = how close to ALL 3 conditions firing.
-        # Higher = closer to a breakout. Below-HH stocks get penalized.
+        # Near-miss score (UI only): weighted distance from ALL 3 conditions
+        # firing. Each (ratio - 1) is signed headroom above the threshold —
+        # weighted 50/20/10 so being above the 40d high dominates, then SMA,
+        # then volume. Higher = closer to (or further past) a breakout; below-HH
+        # stocks score negative on that term.
         score = (hh_ratio - 1) * 50 + (sma_ratio - 1) * 20 + (vol_ratio - 1) * 10
         info["near_miss_score"] = score
         near_miss.append(info)
-    cands.sort(key=lambda c: -c["vol_ratio"])
-    near_miss.sort(key=lambda c: -c["near_miss_score"])
+    cands.sort(key=lambda c: -c["vol_ratio"])         # highest volume surge wins the entry
+    near_miss.sort(key=lambda c: -c["near_miss_score"])  # closest-to-breakout first for UI
+    # Stash results on the function object so main() can build the picks UI
+    # rows without re-scanning.
     scan_entry_candidate.last_candidates = cands  # type: ignore[attr-defined]
     scan_entry_candidate.last_near_miss = near_miss[:5]  # type: ignore[attr-defined]
     if not cands:
         return None
-    return cands[0]
+    return cands[0]   # the single best qualifying breakout (or None)
 
 
 def main() -> int:
+    """Generate today's signals, picks ranking, audit + notifications.
+
+    Flow:
+      1. Load the universe and recent daily bars (enough for the 200d SMA).
+      2. If the model holds a position -> check_exit; emit a SELL signal
+         (TARGET_HIT / STOP_HIT) when an exit fires, else hold.
+      3. If flat -> scan_entry_candidate; emit an ENTRY1 BUY signal for the best
+         breakout, else no signal.
+      4. Write the signals JSON (consumed by the Fyers executor), persist the
+         top-5 picks ranking for the UI (held -> qualifying breakouts ->
+         near-miss fallback), and fire audit + notification hooks (skipped for
+         manual ``--force`` re-runs to avoid history/notification spam).
+
+    Returns:
+        int: 0 on success, 1 if no historical data was available (empty signals
+        file written).
+    """
     ap = argparse.ArgumentParser()
     ap.add_argument("--universe-file", required=True)
     ap.add_argument("--signals-out", required=True)
@@ -273,11 +345,13 @@ def main() -> int:
     near_miss = getattr(scan_entry_candidate, "last_near_miss", []) or []
     top_rows = []
     if pos:
+        # Held name always occupies rank 1, tagged "(HELD)", showing live P&L.
         held_sym = pos["open_symbol"]
+        # Latest close for the held name (fall back to entry px if no bars).
         last_close = float(
             df[df["symbol"] == held_sym].sort_values("date").iloc[-1]["close"]
         ) if not df[df["symbol"] == held_sym].empty else float(pos["open_entry_px"])
-        ret_held = (last_close / float(pos["open_entry_px"]) - 1) * 100
+        ret_held = (last_close / float(pos["open_entry_px"]) - 1) * 100  # return since entry, %
         top_rows.append({
             "rank": 1,
             "symbol": held_sym,

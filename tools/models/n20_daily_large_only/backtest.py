@@ -5,6 +5,30 @@ Halves Max DD vs v1 baseline by constraining universe to large-cap.
 
 Same machinery as v1 (n20_daily_30d_mc1_uptrend) plus one filter:
 must be in NSE Nifty 100 (src/data/symbols/nifty100.csv).
+
+Role in the model flow (data_pull -> live_signal -> cron -> backtest)
+---------------------------------------------------------------------
+This is the HISTORICAL evaluation leg, not part of the live trading path.
+It replays the exact same selection rule the live path uses against full
+price history to produce the published CAGR / drawdown / Calmar numbers and
+the trade ledger (trade_ledger.json / summary.json).
+
+  - data_pull.py  : keeps the N500 daily OHLCV (the PIT ranking pool) fresh.
+  - live_signal.py: emits today's SELL/ENTRY1 signal for real trading.
+  - cron.py       : schedules data_pull + live_signal jobs.
+  - backtest.py   : (this file) offline what-if over a date range.
+
+The actual entry/exit decision is NOT re-implemented here. Selection (which
+stocks are candidates and in what order) is computed locally in `rank_at`,
+but the per-day rotation execution and the daily mark-to-market drawdown that
+n20 reports are delegated to the SHARED engine
+(tools/shared/backtest_engine.run_rotation_backtest), which internally calls
+the SHARED rotation core decide_rotation — the same core live_signal.py uses.
+This guarantees backtest and live cannot drift.
+
+This is the highest-churn model in the suite: it rotates DAILY holding only
+rank-1, so its primary risk metric is the daily NAV mark-to-market drawdown
+(max_dd_mtm_pct) rather than the rebalance-day realized drawdown.
 """
 import sys, json, csv, argparse
 from pathlib import Path
@@ -30,22 +54,51 @@ DEFAULT_CAP   = 1_000_000.0
 
 
 def load_n100():
+    """Load the NSE Nifty 100 constituent set from the local CSV.
+
+    Reads src/data/symbols/nifty100.csv and keeps only equity rows
+    (Series == "EQ"), returning plain symbols (no NSE:/-EQ wrapping).
+
+    Returns:
+        set[str]: plain Nifty 100 symbols used as the large-cap filter.
+    """
     out = set()
     with open(N100_CSV) as f:
         for r in csv.DictReader(f):
+            # Only cash-equity rows; skip non-EQ series (e.g. BE/BZ).
             if r.get("Series","").strip()=="EQ":
                 out.add(r["Symbol"].strip())
     return out
 
 
 def run(start: date, end: date, capital: float, out_dir: Path | None = None):
+    """Replay the n20 daily-rotation strategy over [start, end] and report.
+
+    Loads the N500 daily price/volume panel, builds the rolling 20d-ADV and
+    200d-SMA matrices, defines a point-in-time selection closure (`rank_at`),
+    and hands selection + capital to the shared rotation engine which performs
+    the daily execution and computes the daily mark-to-market drawdown.
+
+    Args:
+        start: first trading date to evaluate (inclusive).
+        end: last trading date to evaluate (inclusive).
+        capital: starting capital in rupees.
+        out_dir: optional directory; if given, trade_ledger.json and
+            summary.json are written there.
+
+    Returns:
+        tuple[float, float, list]: (final_nav, cagr_pct, trades).
+    """
     n100 = load_n100()
     print(f"NSE Nifty 100 filter: {len(n100)} stocks")
 
     eng = _get_engine()
+    # PIT ranking pool is the full Nifty 500 (wrapped to fyers symbol form).
     n500 = [f"NSE:{s}-EQ" for s, _ in nifty500_symbols()]
 
     with eng.connect() as c:
+        # Pull 400 extra calendar days before `start` so the 200d SMA and the
+        # rolling 20d ADV are fully warmed up on the first evaluated day.
         df = pd.read_sql(text(
             "SELECT symbol,date,close,volume FROM historical_data "
             "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b AND data_source='fyers' "
@@ -53,32 +106,52 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
         ), c, params={"s": n500, "a": start - timedelta(days=400), "b": end})
 
     df["date"] = pd.to_datetime(df["date"])
+    # ADV proxy in rupees = close * volume (rupee turnover, not share count).
     df["adv_rs"] = df["close"].astype(float) * df["volume"].astype(float)
     cl = df.pivot(index="date", columns="symbol", values="close").ffill()
     adv_rs = df.pivot(index="date", columns="symbol", values="adv_rs").fillna(0)
-    adv20 = adv_rs.rolling(ADV_WIN).mean()
-    sma200 = cl.rolling(SMA_LONG).mean()
+    adv20 = adv_rs.rolling(ADV_WIN).mean()      # 20-day average daily turnover
+    sma200 = cl.rolling(SMA_LONG).mean()        # 200-day SMA (long uptrend ref)
     dates = cl.index
 
     trading = [d for d in dates if start <= d.date() <= end]
+    # Daily rebalance: every trading day is a "full" rebalance opportunity.
     calendar = [(d, "full") for d in trading]
 
     # SELECTION: daily top-20 ADV ∩ Nifty-100, uptrend (>200d SMA), 30d-ret rank.
     # EXECUTION + daily MTM drawdown come from the shared engine.
     def rank_at(di):
+        """Point-in-time selection for day index `di` (no look-ahead).
+
+        Args:
+            di: integer position into `dates`/`cl` for the evaluated day.
+
+        Returns:
+            list[str]: candidate symbols ordered best-first by 30d return,
+            after the ADV / uptrend / Nifty-100 filters. Empty before the
+            warm-up window or when no candidate survives the filters. The
+            shared engine treats element 0 as rank-1.
+        """
+        # Need full SMA200 + 30d-return history before we can rank anything.
         if di < max(LOOKBACK, SMA_LONG):
             return []
+        # Top-20 by 20d ADV, rebuilt fresh from this day's turnover snapshot.
         pit_univ = (adv20.iloc[di].dropna().sort_values(ascending=False)
                     .head(UNIV_SIZE).index.tolist())
+        # Uptrend filter: keep only names trading above their 200d SMA.
         up = sma200.iloc[di] < cl.iloc[di]
         pit_univ = [s for s in pit_univ if bool(up.get(s, False))]
+        # Large-cap filter: intersect with the NSE Nifty 100 constituents.
         pit_univ = [s for s in pit_univ
                     if s.replace("NSE:", "").replace("-EQ", "") in n100]
         if not pit_univ:
             return []
+        # Rank survivors by trailing 30-day return, highest first.
         rets = cl.iloc[di].reindex(pit_univ) / cl.iloc[di - LOOKBACK].reindex(pit_univ) - 1
         return list(rets.dropna().sort_values(ascending=False).index)
 
+    # retain_top_n=1 -> pure top-1 daily rotation (sell as soon as held drops
+    # below rank-1). Same knob the live path passes to decide_rotation.
     res = run_rotation_backtest(
         dates=dates, close=cl, calendar=calendar, rank_at=rank_at,
         capital=capital, start=start, end=end, retain_top_n=1,
@@ -86,8 +159,11 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
     final, cagr = res.final_nav, res.cagr_pct
     trades, yrs, wins, losses, open_pos = (res.trades, res.years, res.wins,
                                            res.losses, res.open_position)
+    # Daily MTM DD is the headline risk metric for this high-churn daily model;
+    # mdd_realized (rebal-day cap_after DD) is reported only as a secondary view.
     mdd_nav = res.max_dd_mtm_pct        # daily MTM DD — primary metric for daily rebal
     mdd_realized = res.max_dd_pct       # rebal cap_after DD
+    # Calmar = CAGR / drawdown; clamp denominator so a ~0 DD can't divide-by-zero.
     calmar = cagr / max(0.01, mdd_nav)
 
     print(f"\n## v2 Large-only RESULTS")

@@ -90,22 +90,61 @@ DEFAULT_CAP   = 1_000_000.0
 
 
 def load_n100():
+    """Load the NSE Nifty 100 (Large-cap) exclusion list from the CSV.
+
+    The V2 universe is "mid + small cap only", so the bare ticker symbols of
+    Nifty 100 members are later subtracted from the ADV-ranked pool.
+
+    Returns:
+        set[str]: Bare ticker symbols (e.g. "RELIANCE") of equity-series
+        Nifty 100 constituents. Only rows with Series == "EQ" are kept (skips
+        non-equity series); symbols are stripped of surrounding whitespace.
+    """
     out = set()
     with open(N100_CSV) as f:
         for r in csv.DictReader(f):
+            # Only the cash-equity series counts as a Large-cap to exclude.
             if r.get("Series", "").strip() == "EQ":
                 out.add(r["Symbol"].strip())
     return out
 
 
 def run(start: date, end: date, capital: float, out_dir: Path | None = None):
+    """Back-test the mid/small-cap breakout swing over a date range.
+
+    Single concurrent position (max_conc=1). Each trading day:
+      1. If holding, ask the SHARED ``breakout_exit_reason`` core whether any
+         exit (TARGET/STOP/TRAIL/MAX_HOLD) fires today; if so, sell.
+      2. If flat, scan every universe name for a qualifying breakout via the
+         SHARED ``is_breakout`` core, pick the highest volume-ratio candidate,
+         and enter at NEXT day's open (realistic — the signal forms on today's
+         close, so you cannot fill until tomorrow).
+
+    Costs applied per trade: 10 bps slippage on both legs, 0.10% STT on sells,
+    ₹20/order brokerage.
+
+    Args:
+        start: First trading date to simulate (inclusive).
+        end: Last trading date to simulate (inclusive).
+        capital: Starting cash (₹). Position sizing is all-in on the single pick.
+        out_dir: If given, the trade ledger is written to
+            ``out_dir/trade_ledger.json``.
+
+    Returns:
+        tuple[float, float, list[dict]]: ``(final_nav, cagr_pct, trades)`` where
+        ``final_nav`` marks any still-open position to the last close, ``cagr_pct``
+        is annualised return, and ``trades`` is the per-trade ledger.
+    """
     n100 = load_n100()
     print(f"NSE Nifty 100 (Large-cap exclusion list): {len(n100)} stocks")
 
     eng = _get_engine()
+    # Start the search pool from the full Nifty 500 (Fyers symbol form).
     n500 = [f"NSE:{s}-EQ" for s, _ in nifty500_symbols()]
 
     with eng.connect() as c:
+        # Pull 400 extra calendar days BEFORE `start` so the 200d SMA and other
+        # rolling windows are already warmed up on the first simulated day.
         df = pd.read_sql(text(
             "SELECT symbol,date,open,high,low,close,volume FROM historical_data "
             "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b ORDER BY symbol,date"
@@ -113,7 +152,9 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
 
     df["date"] = pd.to_datetime(df["date"])
 
-    # Apply data fixes
+    # Apply data fixes — correct known price/volume discontinuities (e.g. a
+    # missed split) for specific symbol/date windows before computing anything.
+    # Currently empty (DATA_FIXES = {}); the loop is preserved for future use.
     for sym, fixes in DATA_FIXES.items():
         for fx in fixes:
             mask = (df["symbol"] == sym) & \
@@ -122,10 +163,14 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
             n_rows = mask.sum()
             if n_rows > 0:
                 print(f"  Applied data fix to {sym}: {n_rows} rows / price ÷{fx['price_div']}, vol ×{fx['vol_mul']}")
+                # Divide prices and multiply volume to undo the split distortion.
                 df.loc[mask, ["open","high","low","close"]] /= fx["price_div"]
                 df.loc[mask, "volume"] *= fx["vol_mul"]
 
+    # Average Daily Value traded (₹) = close × volume; used to rank liquidity.
     df["adv_rs"] = df["close"].astype(float) * df["volume"].astype(float)
+    # Pivot long rows -> date × symbol matrices, one per field, for vectorised
+    # rolling computations. Close is forward-filled to bridge missing bars.
     cl  = df.pivot(index="date", columns="symbol", values="close").ffill()
     hi  = df.pivot(index="date", columns="symbol", values="high")
     op_p = df.pivot(index="date", columns="symbol", values="open")
@@ -133,12 +178,17 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
     adv_rs = df.pivot(index="date", columns="symbol", values="adv_rs").fillna(0)
     dates = cl.index
 
-    sma_long = cl.rolling(SMA_LONG).mean()
+    sma_long = cl.rolling(SMA_LONG).mean()       # 200d SMA — Stage-2 trend filter
+    # Prior HH_WIN(=40)-day HIGH, shifted by 1 so "today" is compared against
+    # the high of the PRIOR 40 days (today's own high is excluded -> fresh break).
     hh = hi.rolling(HH_WIN).max().shift(1)
-    vol_avg20 = vol.rolling(20).mean()
-    adv20 = adv_rs.rolling(ADV_WIN).mean()
+    vol_avg20 = vol.rolling(20).mean()           # 20d avg volume — surge baseline
+    adv20 = adv_rs.rolling(ADV_WIN).mean()       # 20d avg ₹-value traded — liquidity rank
 
-    # Pseudo-midcap pool: skip top-30 ADV, take next 100, at end-of-data snapshot
+    # Build the pseudo-midcap pool from a single end-of-data liquidity snapshot:
+    # rank all N500 names by their latest 20d ADV, then take ranks
+    # [SKIP_TOP, SKIP_TOP+KEEP_NEXT) = top-100 (SKIP_TOP=0). Large caps are
+    # removed afterwards via the Nifty 100 list, leaving mid + small caps.
     last_di = len(dates) - 1
     last_adv = adv20.iloc[last_di].dropna().sort_values(ascending=False)
     midcap_pool = last_adv.iloc[SKIP_TOP:SKIP_TOP + KEEP_NEXT].index.tolist()
@@ -153,9 +203,10 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
     print(f"V2 universe (pseudo-midcap minus Large): {len(midcap_band)} stocks")
     print(f"First 10: {[s.replace('NSE:','').replace('-EQ','') for s in midcap_band[:10]]}")
 
+    # Restrict the iteration to the requested window (warm-up rows fall away).
     trading = [d for d in dates if start <= d.date() <= end]
     cap = capital; pos = None; trades = []
-    slip, br, stt = 0.001, 20, 0.001
+    slip, br, stt = 0.001, 20, 0.001   # 10 bps slippage, ₹20 brokerage, 0.10% STT
 
     for d in trading:
         di = dates.get_loc(d)
@@ -166,8 +217,10 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
             if pd.isna(c_today):
                 continue
             close = float(c_today)
+            # Track the highest close since entry — this peak is what TRAIL
+            # measures the drawdown against (20% off the PEAK price).
             pos["peak"] = max(pos["peak"], close)
-            age = (d.date() - pos["entry_date"]).days
+            age = (d.date() - pos["entry_date"]).days   # calendar-day hold age
             ret_e = (close - pos["entry_px"]) / pos["entry_px"]
             # Exit rule via the SHARED breakout core (same call live_signal.py makes).
             reason = breakout_exit_reason(
@@ -175,11 +228,11 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
                 target_pct=TARGET_PCT, stop_pct=STOP_PCT, trail_pct=TRAIL_PCT,
                 profit_trigger=PROFIT_TRIG, max_hold_days=MAX_HOLD)
             if reason:
-                exit_px = close * (1 - slip)
-                proc = pos["qty"] * exit_px
-                fees = proc * stt + br
+                exit_px = close * (1 - slip)        # sell fills below close by slippage
+                proc = pos["qty"] * exit_px         # gross sale proceeds
+                fees = proc * stt + br              # STT on the proceeds + flat brokerage
                 pnl = proc - fees - pos["qty"] * pos["entry_px"]
-                cap += proc - fees
+                cap += proc - fees                  # net proceeds back into cash
                 trades.append({
                     "entry_date": pos["entry_date"].isoformat(),
                     "exit_date":  d.date().isoformat(),
@@ -195,47 +248,59 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
                 pos = None
 
         if pos is None:
+            # Flat: scan every universe name for a qualifying breakout TODAY.
             cands = []
             for sym in midcap_band:
                 if sym not in cl.columns:
                     continue
+                # Pull today's close, 200d SMA, prior-40d high, 20d avg vol, vol.
                 c_v = cl[sym].iloc[di]
                 sma_v = sma_long[sym].iloc[di] if sym in sma_long.columns else None
                 hh_v = hh[sym].iloc[di] if sym in hh.columns else None
                 va_v = vol_avg20[sym].iloc[di] if sym in vol_avg20.columns else None
                 v_v = vol[sym].iloc[di] if sym in vol.columns else None
+                # Skip names not yet warmed up (any indicator still NaN).
                 if any(pd.isna(x) for x in [c_v, sma_v, hh_v, va_v, v_v]):
                     continue
                 c_v = float(c_v); sma_v = float(sma_v); hh_v = float(hh_v)
                 va_v = float(va_v); v_v = float(v_v)
-                # Entry qualification via the SHARED breakout core.
+                # Entry qualification via the SHARED breakout core: close > 40d
+                # high AND close > 200d SMA AND volume >= 2x 20d avg. vr is the
+                # volume ratio used to rank competing breakouts.
                 ok, vr = is_breakout(c_v, hh_v, sma_v, v_v, va_v, vol_mult=VOL_MULT)
                 if not ok:
                     continue
                 cands.append({"sym": sym, "vr": vr})
-            cands.sort(key=lambda c: -c["vr"])
+            cands.sort(key=lambda c: -c["vr"])   # highest volume-surge ratio wins
             if cands:
                 top = cands[0]["sym"]
+                # Enter at NEXT day's open: the signal forms on today's close,
+                # so the earliest realistic fill is tomorrow's opening print.
                 if di + 1 < len(dates):
                     op_n = op_p[top].iloc[di + 1] if top in op_p.columns else None
                     if pd.notna(op_n):
-                        entry_px = float(op_n) * (1 + slip)
-                        q = int(cap / entry_px)
+                        entry_px = float(op_n) * (1 + slip)   # buy fills above open by slippage
+                        q = int(cap / entry_px)               # all-in share count
+                        # Only enter if we can afford >=1 share plus brokerage.
                         if q >= 1 and q * entry_px + br <= cap:
                             cap -= q * entry_px + br
+                            # peak seeded at entry so TRAIL has a baseline from day 1.
                             pos = {"sym": top, "qty": q, "entry_px": entry_px,
                                    "entry_date": dates[di + 1].date(), "peak": entry_px}
 
     final = cap
     if pos:
+        # Mark any still-open position to the last available close.
         last = float(cl[pos["sym"]].iloc[-1])
         final = cap + pos["qty"] * last
 
     wins = sum(1 for t in trades if t["pnl"] > 0)
     losses = sum(1 for t in trades if t["pnl"] < 0)
     yrs = (end - start).days / 365.25
-    cagr = ((final / capital) ** (1 / yrs) - 1) * 100
+    cagr = ((final / capital) ** (1 / yrs) - 1) * 100   # annualised return
 
+    # Max drawdown from the post-trade equity curve (cap_after snapshots):
+    # running peak minus current, as a % of the running peak.
     peak = capital; mdd = 0
     for t in trades:
         peak = max(peak, t["cap_after"])

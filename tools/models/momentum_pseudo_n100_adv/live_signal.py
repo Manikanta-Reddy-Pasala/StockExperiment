@@ -17,6 +17,21 @@ Usage:
     --universes-file tools/models/momentum_pseudo_n100_adv/yearly_universes.json \
     --top-n 5 --rebalance-only \
     --signals-out /app/logs/momrot_pseudo/signals/$(date +%F)_pseudo_n100.json
+
+Model flow / where this file sits:
+  data_pull.py    -> daily N500 OHLCV + yearly_universes.json rebuild
+  build_universe.py -> produces the PIT top-100-by-ADV snapshot
+  live_signal.py  -> (THIS FILE) the production decision step. Reads the PIT
+                     universe, ranks it (same filters as backtest.py), reads
+                     the model's open position from the DB
+                     (model_ledger_service), and emits SELL / ENTRY1 signals
+                     to a JSON file that fyers_executor.py later acts on.
+  cron.py         -> schedules emit (09:25, rebalance-gated) + execute (09:30)
+  backtest.py     -> offline validation of this exact selection logic
+
+The actual hold/rotate decision is delegated to the SHARED rotation core
+(tools/shared/rotation_strategy.decide_rotation) — identical to backtest.py —
+so the live path and the backtest can never diverge.
 """
 from __future__ import annotations
 
@@ -44,7 +59,12 @@ SMALLCAP_CSV = "/app/src/data/symbols/nifty_smallcap250.csv"
 
 def _load_smallcap_set() -> set:
     """Backtest excludes Nifty Smallcap 250 names (+2pp CAGR, DD unchanged).
-    Live must mirror. Returns empty set on file missing — fail-soft."""
+    Live must mirror. Returns empty set on file missing — fail-soft.
+
+    Returns:
+        set[str]: plain NSE symbols (EQ series only) to subtract from the
+        pseudo-N100 universe. Empty if the CSV is absent (no filter applied).
+    """
     import csv as _csv
     out: set = set()
     try:
@@ -63,40 +83,81 @@ _SMALLCAP_SET = _load_smallcap_set()
 # ---- Helpers ----
 
 def is_rebalance_day(today: datetime, last_rotation: datetime = None) -> bool:
-    """True if today is monthly rebalance trigger (1st-7th + weekday)."""
+    """True if today is the monthly rebalance trigger (1st-7th + weekday).
+
+    Mirrors the backtest's "first trading day of the month" calendar with a
+    weekday + 1st-week window, and de-dupes so a month rotates at most once.
+
+    Args:
+        today: The date being evaluated.
+        last_rotation: Date of the previous rotation, if known. If it falls in
+            the same calendar month as `today`, this returns False (already
+            rebalanced this month).
+
+    Returns:
+        bool: True only on a weekday within the first 7 days of an
+        un-rotated month.
+    """
     if (last_rotation and last_rotation.year == today.year
             and last_rotation.month == today.month):
-        return False
-    if today.day <= 7 and today.weekday() < 5:
+        return False  # already rebalanced this calendar month
+    if today.day <= 7 and today.weekday() < 5:  # first week + Mon-Fri
         return True
     return False
 
 
 def load_yearly_universes(path: str) -> Dict[str, List[str]]:
-    """Read yearly PIT universe dict {year_start_iso: [symbol, ...]}."""
+    """Read the yearly PIT universe map from disk.
+
+    Args:
+        path: Path to yearly_universes.json.
+
+    Returns:
+        Dict[str, List[str]]: {year_start_iso: [symbol, ...]} mapping.
+    """
     with open(path) as f:
         return json.load(f)
 
 
 def pick_universe_for(today: datetime,
                       yearly: Dict[str, List[str]]) -> Tuple[str, List[str]]:
-    """Pick most-recent year_start key <= today. Returns (key, symbols)."""
+    """Select the PIT universe in force today (latest year-start key <= today).
+
+    Args:
+        today: Current date.
+        yearly: The {year_start_iso: [symbols]} map from load_yearly_universes.
+
+    Returns:
+        Tuple[str, List[str]]: (chosen_year_key, symbols). Falls back to the
+        earliest key if no key is <= today (e.g. backtesting before the first
+        rebuild date).
+    """
     today_d = today.date()
     chosen_key: Optional[str] = None
     for key in sorted(yearly.keys()):
         try:
             d = datetime.strptime(key, "%Y-%m-%d").date()
         except ValueError:
-            continue
+            continue  # ignore non-date keys defensively
         if d <= today_d:
-            chosen_key = key
+            chosen_key = key  # keep advancing to the most recent past year-start
     if chosen_key is None:
-        chosen_key = sorted(yearly.keys())[0]
+        chosen_key = sorted(yearly.keys())[0]  # before first rebuild: use earliest
     return chosen_key, yearly[chosen_key]
 
 
 def get_close_at(symbol: str, target_ts: int) -> float:
-    """Return last close at/before target_ts for symbol (0.0 if missing)."""
+    """Return the last cached close at/before target_ts for a symbol.
+
+    Args:
+        symbol: Fyers symbol, e.g. "NSE:RELIANCE-EQ".
+        target_ts: Unix seconds; the close on/before this instant is returned.
+
+    Returns:
+        float: Most recent close within a 90-day window ending at target_ts,
+        or 0.0 if no cached data exists.
+    """
+    # 90-day window back from target_ts is enough to find the most recent bar.
     df = read_cached(symbol, "D", target_ts - 90 * 86400, target_ts)
     if df.empty:
         return 0.0
@@ -112,13 +173,21 @@ def _close_above_sma200(symbol: str, today_ts: int) -> bool:
     Lookback: 200 trading days × ~7/5 calendar:trading ratio + holidays
     buffer = 420 calendar days. Tighter window misses SMA200 for some names
     (Indian markets ~250 trading days/yr).
+
+    Args:
+        symbol: Fyers symbol, e.g. "NSE:RELIANCE-EQ".
+        today_ts: Unix seconds for "now".
+
+    Returns:
+        bool: True if the latest close exceeds the 200d SMA; False if it does
+        not, or if fewer than 200 cached closes exist (fail-CLOSED).
     """
-    lookback = int(SMA_LONG * 1.6 + 100) * 86400  # calendar-day buffer
+    lookback = int(SMA_LONG * 1.6 + 100) * 86400  # ~420 calendar days -> ≥200 trading bars
     df = read_cached(symbol, "D", today_ts - lookback, today_ts)
     if df.empty or len(df) < SMA_LONG:
-        return False
+        return False  # insufficient history — skip (backtest does the same)
     closes = df["close"].astype(float)
-    sma = closes.iloc[-SMA_LONG:].mean()
+    sma = closes.iloc[-SMA_LONG:].mean()  # mean of the last 200 daily closes
     return float(closes.iloc[-1]) > float(sma)
 
 
@@ -130,24 +199,33 @@ def rank_universe(symbols: List[str], today_ts: int,
       - Drop Nifty Smallcap 250 names
       - Drop current_price > MAX_PRICE
       - Drop names where close ≤ 200d SMA (uptrend gate)
+
+    Args:
+        symbols: Plain NSE symbols from the PIT universe (e.g. "RELIANCE").
+        today_ts: Unix seconds for "now" (price + ranking anchor).
+        lookback_days: Momentum window for the return calc (default 30).
+
+    Returns:
+        List[tuple]: (fyers_symbol, plain_symbol, ret_30d_pct, current_price)
+        ordered highest-return first. Rank-1 is the entry candidate.
     """
-    lookback_ts = today_ts - lookback_days * 86400
+    lookback_ts = today_ts - lookback_days * 86400  # 30 calendar days back
     rows = []
     for plain_sym in symbols:
         if plain_sym in _SMALLCAP_SET:
-            continue
+            continue  # smallcap exclusion (backtest parity)
         fyers_sym = f"NSE:{plain_sym}-EQ"
         c_now = get_close_at(fyers_sym, today_ts)
         c_past = get_close_at(fyers_sym, lookback_ts)
         if c_now <= 0 or c_past <= 0:
-            continue
+            continue  # missing price on either anchor — cannot rank
         if c_now > MAX_PRICE:
-            continue
+            continue  # MAX_PRICE (₹3000) gate — share-count floor / giant-loser guard
         if not _close_above_sma200(fyers_sym, today_ts):
-            continue
-        ret = (c_now / c_past - 1) * 100
+            continue  # 200d-SMA uptrend gate
+        ret = (c_now / c_past - 1) * 100  # 30-day trailing return %
         rows.append((fyers_sym, plain_sym, ret, c_now))
-    rows.sort(key=lambda r: -r[2])
+    rows.sort(key=lambda r: -r[2])  # rank by 30d return, descending
     return rows
 
 

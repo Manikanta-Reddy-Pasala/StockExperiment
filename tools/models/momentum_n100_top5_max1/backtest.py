@@ -31,9 +31,18 @@ DEFAULT_CAP   = 1_000_000.0
 
 
 def load_n100():
+    """Load the real NSE Nifty 100 universe from the bundled CSV.
+
+    Reads N100_CSV and keeps only equity (Series == "EQ") rows, formatting
+    each into the Fyers symbol convention used by historical_data.
+
+    Returns:
+        list[str]: Fyers-style symbols, e.g. "NSE:RELIANCE-EQ".
+    """
     out = []
     with open(N100_CSV) as f:
         for r in csv.DictReader(f):
+            # Only cash-equity rows count; skip any non-EQ series in the file.
             if r.get("Series", "").strip() == "EQ":
                 out.append(f"NSE:{r['Symbol'].strip()}-EQ")
     return out
@@ -42,6 +51,32 @@ def load_n100():
 def run(start: date, end: date, capital: float, out_dir: Path | None = None,
         mid_month_check: bool = False, mid_month_lead_pct: float = 5.0,
         retain_top_n: int = 1, data_source: str = "fyers"):
+    """Run the full Nifty 100 momentum-rotation backtest and report metrics.
+
+    Loads close prices, builds the monthly (+ optional mid-month) rebalance
+    calendar, defines a per-date 30-day-return ranking closure, then delegates
+    position-keeping and NAV accounting to the shared run_rotation_backtest
+    engine. Optionally writes a trade ledger and summary JSON.
+
+    Args:
+        start: Inclusive backtest start date (first day positions can be held).
+        end: Inclusive backtest end date.
+        capital: Starting NAV in rupees.
+        out_dir: Directory to write trade_ledger.json and summary.json; None
+            skips file output.
+        mid_month_check: If True, add a day-15 weekday rank check to the
+            calendar (rotates only when the lead gate passes).
+        mid_month_lead_pct: Minimum lead in percentage points for a mid-month
+            rotation to fire.
+        retain_top_n: Exit retention band — hold while the position stays in
+            the top-N by 30d return, rotate when it drops out. 1 == legacy
+            "rotate off rank-1" (canonical); 5 mirrors the LIVE exit.
+        data_source: historical_data.data_source filter ("fyers" canonical).
+
+    Returns:
+        tuple: (final_nav, cagr_pct, trades) — final NAV in rupees, CAGR in
+        percent, and the list of trade dicts from the engine.
+    """
     # retain_top_n: hold the position while it stays in the top-N by 30d return;
     # rotate (sell + buy new rank-1) only when it drops OUT of the top-N band.
     # retain_top_n=1 == legacy "rotate whenever held isn't rank-1" (canonical
@@ -52,6 +87,8 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
 
     eng = _get_engine()
     with eng.connect() as c:
+        # Pull 400 extra calendar days before `start` so the 30d lookback has
+        # warm-up history available for the earliest rebalance dates.
         df = pd.read_sql(text(
             "SELECT symbol,date,close,volume FROM historical_data "
             "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b AND data_source=:ds "
@@ -60,19 +97,27 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
                       "ds": data_source})
 
     df["date"] = pd.to_datetime(df["date"])
+    # Wide close-price matrix: rows = trading days, cols = symbols. ffill carries
+    # the last known close forward over gaps so ranking never sees NaN holes.
     cl = df.pivot(index="date", columns="symbol", values="close").ffill()
     dates = cl.index
+    # Keep only universe symbols that actually have price columns loaded.
     present = [s for s in n100_syms if s in cl.columns]
     print(f"Loaded {len(dates)} days × {len(present)} symbols")
 
+    # ---- Build the rebalance calendar -------------------------------------
+    # Walk month by month from `start`. For each month, the "full" rebalance
+    # day is the first actual trading day on/after the 1st; the optional "mid"
+    # check day is the first trading day on/after the 15th.
     rebal_set = set()
     mid_month_set = set()
     y, m = start.year, start.month
     while True:
         target = pd.Timestamp(y, m, 1)
+        # First trading day on/after the 1st of this month.
         fut = dates[dates >= target]
         if len(fut) == 0 or fut[0].date() > end:
-            break
+            break  # ran past the loaded price history / end date
         if fut[0].date() >= start:
             rebal_set.add(fut[0])
         # Mid-month: first trading day on/after the 15th
@@ -82,10 +127,12 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
             if len(fut_mid) > 0 and fut_mid[0].date() <= end:
                 mid_month_set.add(fut_mid[0])
         m += 1
-        if m > 12: m = 1; y += 1
+        if m > 12: m = 1; y += 1  # roll over December -> next January
     sd = pd.Timestamp(start)
-    if sd in dates: rebal_set.add(sd)
-    # Combined rotation calendar with per-day flag
+    if sd in dates: rebal_set.add(sd)  # ensure the very first day is a rebalance
+    # Combined rotation calendar with per-day flag: each entry is (date, kind)
+    # where kind is "full" (monthly) or "mid". A "mid" day is dropped if it
+    # coincides with a "full" day so the engine never double-fires.
     calendar = sorted({(d, "full") for d in rebal_set} |
                       {(d, "mid") for d in mid_month_set if d not in rebal_set},
                       key=lambda x: x[0])
@@ -94,18 +141,46 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
     # shared engine (tools/shared/backtest_engine). Universe = full present
     # Nifty 100 (no filter), ranked by 30-day return.
     def rank_at(di):
+        """Rank the universe by 30-day return at day-index `di` (the closure
+        the shared engine calls to pick what to hold).
+
+        Args:
+            di: Integer row index into `cl` / `dates` for the rebalance day.
+
+        Returns:
+            list[str]: Symbols ordered best-to-worst by 30d return; empty if
+            there is not enough warm-up history (di < LOOKBACK) or no symbol
+            has a valid price.
+        """
         if di < LOOKBACK:
-            return []
+            return []  # not enough history for a 30-day lookback yet
+        # Only rank symbols with a live price on this day.
         univ = [s for s in present if pd.notna(cl[s].iloc[di])]
         if not univ:
             return []
+        # 30-day return = close[di] / close[di-30] - 1, per symbol.
         rets = cl.iloc[di].reindex(univ) / cl.iloc[di - LOOKBACK].reindex(univ) - 1
+        # Drop symbols missing a past price, then sort descending (best first).
         return list(rets.dropna().sort_values(ascending=False).index)
 
     def midret_at(di):
+        """Return (symbol, 30d_return_pct) pairs sorted desc for the mid-month
+        lead-gate check.
+
+        Same 30d-return ranking as rank_at but returns the numeric return (in
+        percent) alongside each symbol so the engine can apply the lead gate.
+
+        Args:
+            di: Integer row index into `cl` / `dates` for the mid-month day.
+
+        Returns:
+            list[tuple[str, float]]: (symbol, 30d_return_percent) best-first.
+        """
         univ = [s for s in present if pd.notna(cl[s].iloc[di])]
         rets = cl.iloc[di].reindex(univ) / cl.iloc[di - LOOKBACK].reindex(univ) - 1
         rk = rets.dropna().sort_values(ascending=False)
+        # Multiply by 100 to express the return as percentage points (the unit
+        # the lead-pct gate compares against).
         return [(s, float(rk[s]) * 100) for s in rk.index]
 
     res = run_rotation_backtest(
@@ -128,7 +203,9 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
     if out_dir:
         out_dir = Path(out_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
+        # Full per-trade ledger (one record per buy/sell) for later inspection.
         (out_dir / "trade_ledger.json").write_text(json.dumps(trades, indent=2))
+        # Headline metrics consumed by the model comparison/leaderboard tooling.
         summary = {
             "model": "momentum_n100_top5_max1",
             "start": start.isoformat(), "end": end.isoformat(),

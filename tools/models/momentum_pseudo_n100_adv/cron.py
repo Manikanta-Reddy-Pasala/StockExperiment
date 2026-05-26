@@ -1,5 +1,13 @@
 """Cron registration for momentum_pseudo_n100_adv.
 
+Pipeline position (data_pull -> build_universe -> live_signal -> cron -> backtest):
+  This is the scheduling glue that wires the model into the two running
+  schedulers. It does no analytics itself — it registers timed jobs that call
+  data_pull (OHLCV cache top-up + yearly universe rebuild) and live_signal
+  (daily signal emit), then hands the resulting signal file to the Fyers
+  executor. backtest is the offline counterpart that replays the same
+  universe/signal logic on history.
+
 Two register functions:
   register_data_jobs(schedule)   -- called by data_scheduler.py
   register_trading_jobs(schedule) -- called by scheduler.py (technical_scheduler)
@@ -32,9 +40,24 @@ SIGNALS_DIR = Path("/app/logs/momrot_pseudo/signals")
 # ---- Trading-side jobs ----
 
 def emit_signal(force: bool = False):
-    """Emit pseudo-N100 momentum signal. Rebalance-gated unless force=True.
+    """Run live_signal.py to produce today's pseudo-N100 momentum signal file.
 
-    Also short-circuits if model_settings.enabled is False.
+    Args:
+        force: When True, pass --force so live_signal emits regardless of the
+            monthly rotation cadence. When False (the scheduled path), pass
+            --rebalance-only so live_signal only acts on its rebalance day.
+
+    Returns:
+        None. Side effect: writes today's signal JSON to SIGNALS_DIR and logs
+        the outcome. live_signal itself further short-circuits if
+        model_settings.enabled is False and sends the Telegram/PWA ping.
+
+    Non-obvious logic:
+        - --top-n 5: live_signal ranks candidates and the model holds rank-1
+          from the top-5 (monthly rotation); this caps the candidate slice.
+        - subprocess timeout 600s guards against a hung signal computation.
+        - Only the last 500 chars of stdout/stderr are logged to keep cron
+          logs bounded.
     """
     label = ("pseudo-N100 momentum signal"
              + (" (FORCE)" if force else " (rebalance-gated)"))
@@ -50,6 +73,7 @@ def emit_signal(force: bool = False):
         "--top-n", "5",
         "--signals-out", str(signals_out),
     ]
+    # Gate selector: force always emits; otherwise defer to the rebalance day.
     cmd.append("--force" if force else "--rebalance-only")
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
@@ -68,9 +92,20 @@ def emit_signal(force: bool = False):
 
 
 def execute_orders():
-    """Place Fyers orders from today's signal file."""
+    """Place Fyers orders from today's signal file, if one exists.
+
+    Returns:
+        None. No-op (logs and returns) when emit_signal produced no file for
+        today — e.g. a non-rebalance day where the gate suppressed the signal.
+
+    Non-obvious logic:
+        - Reads USER_ID from env (default "1") so the executor books to the
+          right account; --model-name tags audit_orders for this model.
+        - subprocess timeout 300s; only the last 500 chars of output logged.
+    """
     today = datetime.now().strftime("%Y-%m-%d")
     signals_file = SIGNALS_DIR / f"{today}_pseudo_n100.json"
+    # No signal file today (gate suppressed it) -> nothing to execute.
     if not signals_file.exists():
         log.info(f"{MODEL_NAME} execute: no signal at {signals_file}, skipping.")
         return
@@ -96,7 +131,21 @@ def execute_orders():
 # ---- Data-side helpers ----
 
 def _yearly_universe():
-    """Rebuild PIT universe only in May (NSE rebalance proxy)."""
+    """Rebuild the yearly PIT universe, but only on the May rebalance date.
+
+    Wraps refresh_universe behind a date gate so the same daily-scheduled job
+    is a no-op every day except May 15. May 15 is used as a proxy for the NSE
+    semi-annual index rebalance.
+
+    Returns:
+        None. Triggers data_pull.refresh_universe() only on May 15.
+
+    Non-obvious logic:
+        - The check is intentionally inside the daily job (rather than a
+          once-a-year schedule) so the scheduler library only needs simple
+          daily timers.
+    """
+    # Date gate: fire the rebuild on May 15 only; no-op every other day.
     if datetime.now().month == 5 and datetime.now().day == 15:
         refresh_universe()
 
@@ -104,13 +153,41 @@ def _yearly_universe():
 # ---- Registration entrypoints ----
 
 def register_data_jobs(schedule):
-    """Daily OHLCV + yearly universe refresh."""
-    schedule.every().day.at("20:35").do(pull_daily_ohlcv)
+    """Register the data-side timers on the data_scheduler's schedule object.
+
+    Args:
+        schedule: The shared `schedule` library instance owned by
+            data_scheduler.py.
+
+    Returns:
+        None. Registers two daily jobs (mutates `schedule`).
+
+    Non-obvious logic:
+        - 20:35 OHLCV pull runs post-market-close (IST) so the cache holds the
+          day's settled bars before any ranking.
+        - 06:32 universe job runs daily but is internally gated to May 15 by
+          _yearly_universe (no-op on all other days).
+    """
+    schedule.every().day.at("20:35").do(pull_daily_ohlcv)  # post-close cache top-up
     # PIT universe rebuild — May 15 only (no-op other days)
     schedule.every().day.at("06:32").do(_yearly_universe)
 
 
 def register_trading_jobs(schedule):
-    """Signal at 09:25 (rebalance-gated) + execute at 09:30."""
-    schedule.every().day.at("09:25").do(emit_signal)
-    schedule.every().day.at("09:30").do(execute_orders)
+    """Register the trading-side timers on the technical_scheduler's schedule.
+
+    Args:
+        schedule: The shared `schedule` library instance owned by scheduler.py
+            (the technical_scheduler).
+
+    Returns:
+        None. Registers two daily jobs (mutates `schedule`).
+
+    Non-obvious logic:
+        - 09:25 emit runs just before the 09:15 open settles (rebalance-gated:
+          emit_signal defaults force=False -> only acts on the rotation day).
+        - 09:30 execute runs 5 minutes later so the signal file is ready;
+          it no-ops on days where the gate produced no signal.
+    """
+    schedule.every().day.at("09:25").do(emit_signal)   # rebalance-gated signal emit
+    schedule.every().day.at("09:30").do(execute_orders)  # place orders 5 min later
