@@ -583,7 +583,7 @@ function renderModelCard(m) {
     <div class="col-lg-6">
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <span><strong>${m.name}</strong> <small class="text-muted">(${m.type})</small></span>
+                <span><strong>${modelLabel(m.name)}</strong> <small class="text-muted">(${m.type})</small> <code class="text-muted" style="font-size:.6rem;">${m.name}</code></span>
                 <span>${badge} ${wired}</span>
             </div>
             <div class="card-body p-0">

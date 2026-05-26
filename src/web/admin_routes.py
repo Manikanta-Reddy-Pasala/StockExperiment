@@ -724,7 +724,7 @@ def models_status():
                 len(mc_ok_syms) / len(mc_fyers_syms) * 100
             ) if mc_fyers_syms else 0
             mc_ok = (
-                len(mc_syms_plain) >= 80
+                len(mc_syms_plain) >= 40
                 and mc_cov_pct >= 90
                 and mc_stale_days <= 3
                 and mc_uni_age_days is not None and mc_uni_age_days <= 35
@@ -744,8 +744,8 @@ def models_status():
                 "items": [
                     {"label": "midcap_narrow universe size",
                      "value": len(mc_syms_plain),
-                     "required": ">= 80 syms",
-                     "ok": len(mc_syms_plain) >= 80,
+                     "required": ">= 40 syms",
+                     "ok": len(mc_syms_plain) >= 40,
                      "extra": f"file age {mc_uni_age_days}d" if mc_uni_age_days is not None else "missing"},
                     {"label": f"Symbols w/ >= {mc_min_trading_days} trading days "
                               f"(last {window_calendar_days}d)",
