@@ -20,6 +20,7 @@ sys.path.insert(0, str(ROOT))
 import pandas as pd
 from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
+from tools.shared.rotation_strategy import decide_rotation, midmonth_lead_ok
 
 LOOKBACK = 30
 N100_CSV = str(ROOT / "src" / "data" / "symbols" / "nifty100.csv")
@@ -110,19 +111,17 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
         if rk.empty:
             continue
         top = rk.index[0]
-        retain_band = set(rk.index[:retain_top_n])  # top-N retention band
-
-        if rebal_kind.get(d) == "mid" and hold is not None and top != hold:
-            # Mid-month aggressive rotation (independent of retain band, matches
-            # live): rotate only if top1 leads held by >= threshold.
-            top_ret_pct = float(rk.iloc[0]) * 100
-            held_ret_pct = float(rk[hold]) * 100 if hold in rk.index else None
-            if held_ret_pct is not None and (top_ret_pct - held_ret_pct) < mid_month_lead_pct:
-                continue  # not enough edge; skip
-            # else: held dropped from ranking OR enough lead -> fall through, rotate
-        elif hold is not None and hold in retain_band:
-            # Monthly full rebalance: held still in top-N band -> KEEP, no trade.
-            continue
+        # Rotation decision via the SHARED core (same rule live_signal.py uses).
+        if rebal_kind.get(d) == "mid":
+            # Mid-month: lead-gated rotation (independent of retain band).
+            ranked_ret = [(s, float(rk[s]) * 100) for s in rk.index]
+            if not midmonth_lead_ok(hold, ranked_ret, mid_month_lead_pct):
+                continue
+            if decide_rotation(hold, list(rk.index), retain_top_n=1).is_noop:
+                continue
+        else:
+            if decide_rotation(hold, list(rk.index), retain_top_n).is_noop:
+                continue
 
         if top != hold:
             if hold and qty > 0:

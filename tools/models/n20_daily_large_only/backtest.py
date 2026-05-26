@@ -10,18 +10,20 @@ import sys, json, csv, argparse
 from pathlib import Path
 from datetime import date, timedelta
 
-sys.path.insert(0, "/app")
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
 import pandas as pd
 from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
 from tools.shared.universes import nifty500_symbols
+from tools.shared.rotation_strategy import decide_rotation
 
 
 UNIV_SIZE = 20
 LOOKBACK  = 30
 ADV_WIN   = 20
 SMA_LONG  = 200
-N100_CSV  = "/app/src/data/symbols/nifty100.csv"
+N100_CSV  = str(ROOT / "src" / "data" / "symbols" / "nifty100.csv")
 DEFAULT_START = date(2023, 5, 15)
 DEFAULT_END   = date(2026, 5, 12)
 DEFAULT_CAP   = 1_000_000.0
@@ -84,6 +86,9 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
         rk = rets.dropna().sort_values(ascending=False)
         if rk.empty: continue
         top = rk.index[0]
+        # Rotation decision via the SHARED core (same rule live_signal.py uses).
+        if decide_rotation(hold, list(rk.index), retain_top_n=1).is_noop:
+            continue
 
         if top != hold:
             if hold and qty > 0:

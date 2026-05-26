@@ -15,6 +15,7 @@ import pandas as pd
 from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
 from tools.shared.universes import nifty500_symbols
+from tools.shared.rotation_strategy import decide_rotation
 
 
 LOOKBACK = 30
@@ -121,11 +122,9 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
         rk = rets.dropna().sort_values(ascending=False)
         if rk.empty: continue
         top = rk.index[0]
-        retain_band = set(rk.index[:retain_top_n])  # top-N retention band
-
-        # Held still in top-N band -> KEEP, no trade (LIVE exit when retain=5).
-        if hold is not None and hold in retain_band:
-            continue
+        # Rotation decision via the SHARED core (same rule live_signal.py uses).
+        if decide_rotation(hold, list(rk.index), retain_top_n).is_noop:
+            continue  # held still in top-N retention band -> keep, no trade
 
         if top != hold:
             if hold and qty > 0:

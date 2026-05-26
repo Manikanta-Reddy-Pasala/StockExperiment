@@ -38,6 +38,7 @@ sys.path.insert(0, str(ROOT))
 
 from tools.shared.ohlcv_cache import _get_engine  # noqa: E402
 from tools.shared.universes import nifty100_symbols, nifty500_symbols  # noqa: E402
+from tools.shared.rotation_strategy import decide_rotation  # noqa: E402
 
 log = logging.getLogger("n20_daily_signal")
 
@@ -145,25 +146,25 @@ def build_pit_universe_and_rank(df: pd.DataFrame, n100: set
 
 def emit_signals(top_picks: List[tuple], pos: Optional[Dict],
                  top_n: int) -> List[Dict]:
-    top_syms = {p[0] for p in top_picks[:top_n]}
+    # Decision via the SHARED rotation core — same rule backtest.py uses, so
+    # live and backtest cannot drift. top_n is the retention band (=1 live).
+    ranked = [p[0] for p in top_picks]
+    by_sym = {p[0]: p for p in top_picks}
+    held_sym = pos.get("open_symbol") if pos else None
+    dec = decide_rotation(held_sym, ranked, retain_top_n=top_n)
+
     today_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     signals: List[Dict] = []
 
-    held_sym = pos.get("open_symbol") if pos else None
-    if held_sym and held_sym not in top_syms:
-        # Re-read latest price for exit
-        exit_price = 0.0
-        for p in top_picks:
-            if p[0] == held_sym:
-                exit_price = p[3]
-                break
-        entry_px = float(pos.get("open_entry_px") or 0)
+    if dec.sell:
+        exit_price = float(by_sym[dec.sell][3]) if dec.sell in by_sym else 0.0
+        entry_px = float(pos.get("open_entry_px") or 0) if pos else 0.0
         kind = "TARGET_HIT" if exit_price >= entry_px else "STOP_HIT"
         signals.append({
             "model": MODEL_NAME,
             "universe": "n20_adv_n100",
-            "symbol": held_sym,
-            "company": held_sym,
+            "symbol": dec.sell,
+            "company": dec.sell,
             "ts": today_str,
             "side": "SELL",
             "signal": kind,
@@ -172,9 +173,8 @@ def emit_signals(top_picks: List[tuple], pos: Optional[Dict],
             "note": f"daily rotation exit (dropped out of top-{top_n})",
         })
 
-    # Entry: rank-1 if not already held
-    if (not held_sym or held_sym not in top_syms) and top_picks:
-        sym, name, ret, price = top_picks[0]
+    if dec.buy:
+        sym, name, ret, price = by_sym[dec.buy]
         signals.append({
             "model": MODEL_NAME,
             "universe": "n20_adv_n100",

@@ -32,6 +32,7 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
 from tools.shared.ohlcv_cache import read_cached  # noqa: E402
+from tools.shared.rotation_strategy import decide_rotation  # noqa: E402
 
 log = logging.getLogger("momrot_pseudo_signal")
 
@@ -178,25 +179,26 @@ def is_model_enabled() -> bool:
 
 def emit_signals(top_picks: List[tuple], pos: Optional[Dict],
                  top_n: int, retain_top_n: int = 1) -> List[Dict]:
-    # retain_top_n = exit retention band. Hold while the position stays in the
-    # top-N by 30d return; rotate (sell + buy rank-1) when it drops OUT.
-    # retain_top_n=1 == top-1 rotation, which matches backtest.py (the canonical
-    # +149% run). Was top-5 (=top_n) before 2026-05-26; that quietly held
-    # laggards 2 extra months and bled ~64pp/yr vs the published number.
-    top_syms = {p[0] for p in top_picks[:retain_top_n]}
+    # Decision comes from the SHARED rotation core (tools/shared/rotation_strategy)
+    # — the exact same rule backtest.py uses, so live and backtest cannot drift.
+    # retain_top_n=1 = top-1 rotation. Was top-5 before 2026-05-26.
+    ranked = [p[0] for p in top_picks]
+    by_sym = {p[0]: p for p in top_picks}
+    held_sym = pos.get("open_symbol") if pos else None
+    dec = decide_rotation(held_sym, ranked, retain_top_n)
+
     today_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     signals: List[Dict] = []
 
-    held_sym = pos.get("open_symbol") if pos else None
-    if held_sym and held_sym not in top_syms:
-        price = get_close_at(held_sym, int(datetime.now().timestamp()))
-        entry_px = float(pos.get("open_entry_px") or 0)
+    if dec.sell:
+        price = get_close_at(dec.sell, int(datetime.now().timestamp()))
+        entry_px = float(pos.get("open_entry_px") or 0) if pos else 0.0
         kind = "TARGET_HIT" if price >= entry_px else "STOP_HIT"
         signals.append({
             "model": MODEL_NAME,
             "universe": "pseudo_n100",
-            "symbol": held_sym,
-            "company": held_sym,
+            "symbol": dec.sell,
+            "company": dec.sell,
             "ts": today_str,
             "side": "SELL",
             "signal": kind,
@@ -205,22 +207,20 @@ def emit_signals(top_picks: List[tuple], pos: Optional[Dict],
             "note": f"rotation exit (dropped out of top-{retain_top_n})",
         })
 
-    # Entry: rank-1 if not already held
-    if not held_sym or held_sym not in top_syms:
-        if top_picks:
-            sym, name, ret, price = top_picks[0]
-            signals.append({
-                "model": MODEL_NAME,
-                "universe": "pseudo_n100",
-                "symbol": sym,
-                "company": name,
-                "ts": today_str,
-                "side": "BUY",
-                "signal": "ENTRY1",
-                "price": float(price),
-                "sl": 0.0, "target": 0.0,
-                "note": f"30d momentum rank-1 ({ret:+.2f}%) — pseudo-N100",
-            })
+    if dec.buy:
+        sym, name, ret, price = by_sym[dec.buy]
+        signals.append({
+            "model": MODEL_NAME,
+            "universe": "pseudo_n100",
+            "symbol": sym,
+            "company": name,
+            "ts": today_str,
+            "side": "BUY",
+            "signal": "ENTRY1",
+            "price": float(price),
+            "sl": 0.0, "target": 0.0,
+            "note": f"30d momentum rank-1 ({ret:+.2f}%) — pseudo-N100",
+        })
 
     return signals
 

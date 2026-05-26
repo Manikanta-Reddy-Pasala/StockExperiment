@@ -42,6 +42,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from tools.shared.ohlcv_cache import read_cached  # noqa: E402
+from tools.shared.rotation_strategy import decide_rotation, midmonth_lead_ok  # noqa: E402
 
 log = logging.getLogger("momrot_signal")
 
@@ -147,40 +148,38 @@ def held_from_db() -> List[Dict]:
 
 def emit_signals(top_picks: List[tuple], held: List[Dict],
                   top_n: int, retain_top_n: int = 1) -> List[Dict]:
-    # retain_top_n = exit retention band. Hold while the position stays in the
-    # top-N by 30d return; rotate (sell + buy rank-1) when it drops OUT.
-    # retain_top_n=1 == top-1 rotation, matching backtest.py. Was top-5 (=top_n)
-    # before 2026-05-26.
-    top_syms = {p[0] for p in top_picks[:retain_top_n]}
-    held_syms = {h["symbol"] for h in held}
+    # Decision via the SHARED rotation core — same rule backtest.py uses, so
+    # live and backtest cannot drift. retain_top_n=1 == top-1 rotation.
+    ranked = [p[0] for p in top_picks]
+    by_sym = {p[0]: p for p in top_picks}
+    held_sym = held[0]["symbol"] if held else None
+    held_entry = float(held[0].get("entry_price", 0)) if held else 0.0
+    dec = decide_rotation(held_sym, ranked, retain_top_n)
+
     today_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     signals = []
 
-    # Exits: held but no longer in top-N
-    for h in held:
-        if h["symbol"] not in top_syms:
-            price = get_close_at(h["symbol"], int(datetime.now().timestamp()))
-            kind = "TARGET_HIT" if price >= h["entry_price"] else "STOP_HIT"
-            signals.append({
-                "model": "momentum_rotation",
-                "universe": "n100_real",
-                "symbol": h["symbol"],
-                "company": h["symbol"],
-                "ts": today_str,
-                "side": "SELL",
-                "signal": kind,
-                "price": float(price),
-                "sl": 0.0, "target": 0.0,
-                "note": f"rotation exit (dropped out of top-{retain_top_n})",
-            })
-
-    # Entries: rank-1 stock if no held position already in top-N
-    # (max_concurrent=1 means take rank-1 if not held)
-    if not any(h["symbol"] in top_syms for h in held) and top_picks:
-        sym, name, ret, price = top_picks[0]
+    if dec.sell:
+        price = get_close_at(dec.sell, int(datetime.now().timestamp()))
+        kind = "TARGET_HIT" if price >= held_entry else "STOP_HIT"
         signals.append({
             "model": "momentum_rotation",
-            "universe": "n100_pseudo",
+            "universe": "n100_real",
+            "symbol": dec.sell,
+            "company": dec.sell,
+            "ts": today_str,
+            "side": "SELL",
+            "signal": kind,
+            "price": float(price),
+            "sl": 0.0, "target": 0.0,
+            "note": f"rotation exit (dropped out of top-{retain_top_n})",
+        })
+
+    if dec.buy:
+        sym, name, ret, price = by_sym[dec.buy]
+        signals.append({
+            "model": "momentum_rotation",
+            "universe": "n100_real",
             "symbol": sym,
             "company": name,
             "ts": today_str,
@@ -267,22 +266,14 @@ def main():
     # genuine new winners that broke out mid-cycle.
     if args.mid_month_check and held and signals:
         held_sym = held[0]["symbol"]
-        held_ret = next((r[2] for r in ranks if r[0] == held_sym), None)
-        top1_sym, top1_name, top1_ret, top1_price = ranks[0] if ranks else (None, None, None, None)
-        if held_sym == top1_sym:
-            log.info(f"mid-month: already holding rank-1 ({held_sym}). No rotation.")
-            signals = []
-        elif held_ret is None:
-            log.info(f"mid-month: held {held_sym} dropped from ranking. Allowing rotation.")
+        ranked_ret = [(r[0], r[2]) for r in ranks]
+        if midmonth_lead_ok(held_sym, ranked_ret, MID_MONTH_LEAD_PCT):
+            log.info(f"mid-month: ROTATE — rank-1 leads held {held_sym} "
+                     f"by >= {MID_MONTH_LEAD_PCT}pp (or held dropped from ranking).")
         else:
-            lead = top1_ret - held_ret
-            if lead < MID_MONTH_LEAD_PCT:
-                log.info(f"mid-month: rank-1 {top1_sym} leads held {held_sym} "
-                         f"by {lead:.2f}pp (< {MID_MONTH_LEAD_PCT}pp). No rotation.")
-                signals = []
-            else:
-                log.info(f"mid-month: ROTATE — {top1_sym} leads {held_sym} "
-                         f"by {lead:.2f}pp (>= {MID_MONTH_LEAD_PCT}pp).")
+            log.info(f"mid-month: no rotation for held {held_sym} "
+                     f"(already rank-1, or lead < {MID_MONTH_LEAD_PCT}pp). Suppressing.")
+            signals = []
 
     log.info(f"Emitting {len(signals)} signals")
 
