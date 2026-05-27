@@ -35,23 +35,37 @@ function _ymdLocal(d) {
   return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
 }
 
-// First weekday on/after a given local date.
+// NSE weekday trading holidays — mirror of tools/shared/nse_calendar.py
+// (refresh yearly when NSE publishes the next circular). Weekend-only
+// holidays are covered by the Sat/Sun check, so only weekday closures listed.
+const NSE_HOLIDAYS = new Set([
+  '2025-10-21','2025-10-22','2025-11-05','2025-12-25',
+  '2026-01-15','2026-01-26','2026-03-03','2026-03-26','2026-03-31','2026-04-03',
+  '2026-04-14','2026-05-01','2026-05-28','2026-06-26','2026-09-14','2026-10-02',
+  '2026-10-20','2026-11-10','2026-11-24','2026-12-25',
+]);
+function _isTradingDay(d) {
+  if (d.getDay() === 0 || d.getDay() === 6) return false;  // weekend
+  return !NSE_HOLIDAYS.has(_ymdLocal(d));                   // NSE holiday
+}
+
+// First NSE TRADING day on/after a given local date (skips weekends + holidays).
 function _firstWeekday(d) {
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  while (x.getDay() === 0 || x.getDay() === 6) x.setDate(x.getDate()+1);
+  while (!_isTradingDay(x)) x.setDate(x.getDate()+1);
   return x;
 }
 
-// Trading (week)days from tomorrow through `target` inclusive. Weekday-based
-// (NSE holidays not subtracted — rare in a 1-2 week window); more meaningful
-// for a trading model than raw calendar days.
+// NSE trading days from tomorrow through `target` inclusive — skips weekends
+// AND NSE holidays (via _isTradingDay). More meaningful for a trading model
+// than raw calendar days.
 function _tradingDaysUntil(target) {
   const now = new Date();
   let cur = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   let n = 0;
   while (cur < target) {
     cur.setDate(cur.getDate() + 1);
-    if (cur.getDay() !== 0 && cur.getDay() !== 6) n++;
+    if (_isTradingDay(cur)) n++;   // skip weekends AND NSE holidays
   }
   return n;
 }

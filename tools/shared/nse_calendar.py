@@ -37,23 +37,26 @@ NSE_HOLIDAYS = frozenset({
     date(2025, 11, 5),   # Guru Nanak Jayanti
     date(2025, 12, 25),  # Christmas
 
-    # ---- 2026 (best-known NSE dates; refresh when NSE publishes final list) ----
-    date(2026, 1, 26),   # Republic Day
-    date(2026, 3, 4),    # Holi
-    date(2026, 3, 19),   # Id-ul-Fitr (approx.)
-    date(2026, 3, 26),   # Ram Navami
-    date(2026, 3, 31),   # Mahavir Jayanti
-    date(2026, 4, 3),    # Good Friday
-    date(2026, 4, 14),   # Dr. Ambedkar Jayanti
-    date(2026, 5, 1),    # Maharashtra Day
-    date(2026, 8, 15),   # Independence Day (Saturday — harmless, weekend rule covers)
-    date(2026, 9, 14),   # Ganesh Chaturthi (approx.)
-    date(2026, 10, 2),   # Mahatma Gandhi Jayanti
-    date(2026, 10, 20),  # Dussehra (approx.)
-    date(2026, 11, 9),   # Diwali Laxmi Pujan (approx.)
-    date(2026, 11, 10),  # Diwali Balipratipada (approx.)
-    date(2026, 11, 24),  # Guru Nanak Jayanti (approx.)
-    date(2026, 12, 25),  # Christmas
+    # ---- 2026 (per NSE official trading-holiday circular — weekday closures.
+    # Weekend-only holidays (Mahashivratri 02-15 Sun, Id-ul-Fitr 03-21 Sat,
+    # Independence 08-15 Sat, Diwali-Laxmi-Pujan 11-08 Sun) are covered by the
+    # weekday rule and not listed.) ----
+    date(2026, 1, 15),   # Maharashtra municipal elections (Thu)
+    date(2026, 1, 26),   # Republic Day (Mon)
+    date(2026, 3, 3),    # Holi (Tue)
+    date(2026, 3, 26),   # Shri Ram Navami (Thu)
+    date(2026, 3, 31),   # Mahavir Jayanti (Tue)
+    date(2026, 4, 3),    # Good Friday (Fri)
+    date(2026, 4, 14),   # Dr. Ambedkar Jayanti (Tue)
+    date(2026, 5, 1),    # Maharashtra Day (Fri)
+    date(2026, 5, 28),   # Bakri Id (Thu)
+    date(2026, 6, 26),   # Muharram (Fri)
+    date(2026, 9, 14),   # Ganesh Chaturthi (Mon)
+    date(2026, 10, 2),   # Mahatma Gandhi Jayanti (Fri)
+    date(2026, 10, 20),  # Dussehra (Tue)
+    date(2026, 11, 10),  # Diwali Balipratipada (Tue)
+    date(2026, 11, 24),  # Guru Nanak Jayanti (Tue)
+    date(2026, 12, 25),  # Christmas (Fri)
 })
 
 
