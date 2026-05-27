@@ -44,44 +44,40 @@ Pure monthly rotation misses stocks that break out *during* the month and become
 
 ## Backtest result (REAL Nifty 100, 2023-05-15 → 2026-05-12)
 
-Two configurations supported — same engine, mid-month flag toggles behaviour:
+Two configurations supported — same engine, mid-month flag toggles behaviour. **The LIVE cron runs
+both the monthly rebalance and the mid-month check (`emit_signal` + `emit_mid_month_signal` +
+`execute_orders` + `execute_mid_month_orders`), so Section A — mid-month — is the live-faithful headline.**
 
-### A. Plain monthly (no mid-month check) — `--from 2023-05-15 --to 2026-05-12`
+### A. Monthly + mid-month check (LIVE config) — `--mid-month-check --mid-month-lead-pct 5.0`
 
-| Period | NAV end | Yearly ROI |
-|---|---:|---:|
-| Start | ₹10,00,000 | — |
-| Y1 (2023-05 → 2024-05) | ₹24,16,397 | **+141.64%** |
-| Y2 (2024-05 → 2025-05) | ₹26,56,524 | **+9.94%** |
-| Y3 (2025-05 → 2026-05) | ₹44,83,692 | **+68.79%** |
-| **3-yr CAGR** | | **+65.10%** |
-| Total return | | **+348.37%** |
+| Metric | Value |
+|---|---:|
+| Final NAV (cap + open MTM) | **₹1,13,41,351** |
+| Total return | **+1034.14%** |
+| **3-yr CAGR** | **+125.13%** |
+| Max DD | **28.21%** |
+| Calmar (CAGR / Max DD) | **4.44** |
+| Round-trips | 42 (~14/yr) |
+| Wins / Losses | 28 / 14 |
+| Win rate | 66.7% |
 
-**31 round-trips · 71.0% WR · Max DD 37.30% · Calmar 1.75**
+The mid-month check rotates only when the new rank-1 leads the held name's 30d return by ≥5pp,
+capturing bull-trend continuations that plain monthly misses while keeping turnover contained.
 
-Y2 chop: 3 consecutive losers (BAJAJ-AUTO -19%, HINDZINC -10%, MAZDOCK round-2 -4%). Strategy mean-reverts.
+> **Per-year ROI table needs regeneration** from the `--mid-month-check` ledger (the prior table was
+> computed under the monthly-only run and does not match this headline).
 
-### B. With mid-month check — `--mid-month-check`
+### B. Plain monthly (legacy reference, no mid-month check) — `--from 2023-05-15 --to 2026-05-12`
 
-Honest-cost backtest (slip 0.10% × 2 + STT 0.10% + ₹20 brokerage + 20% STCG yearly):
-
-| Variant | NAV | CAGR | MaxDD | Calmar | Trades |
-|---|---:|---:|---:|---:|---:|
-| Plain monthly (with costs) | ₹44L | **+61.75%** | -47.00% | 1.31 | 27 |
-| **+ mid-month check (5pp)** | **₹62L** | **+81.44%** | -46.52% | **1.75** | 38 |
-
-Mid-month rotation fired 13 times in 38 months. **Improvement: +19.7pp CAGR, Calmar 1.31 → 1.75, DD ~unchanged.**
-
-Year-by-year:
-
-| Variant | 2023-24 | 2024-25 | 2025-26 |
-|---|---:|---:|---:|
-| Plain monthly | +121% | -8% | +87% |
-| **+ mid-month check** | **+242%** | -6% | +70% |
-
-Mid-month captures big bull-trend continuations (2023-24 doubled the year). Cost slightly in choppy 2025-26 (-17pp vs plain).
+Monthly-only run (not live): **+65.10% CAGR · +348.37% total · 31 round-trips · 71.0% WR ·
+Max DD 37.30% · Calmar 1.75 · NAV ₹44,83,692**. Kept as a baseline reference only — the live model
+runs the mid-month check (Section A), so this is NOT the deployed figure.
 
 ## Top losers (unfiltered)
+
+> **NOTE:** the winners/losers tables below were computed under the monthly-only (31-trade) run and
+> do not match the canonical mid-month (42-trade) headline. **Needs regeneration** from the
+> `--mid-month-check` ledger.
 
 | Symbol | Entry → Exit | Entry ₹ | Ret | PnL |
 |---|---|---:|---:|---:|
@@ -110,7 +106,8 @@ BAJAJ-AUTO is the worst — single-share concentration cost (only 10 shares for 
 | Pre-2026-05-17 | Universe rebuilt with TODAY's ADV applied retroactively; 60d lookback | — | +518% claimed (lookahead) |
 | 2026-05-17 (am) | Yearly-PIT pseudo-N100 (ADV from N500 at year start); 30d lookback | Drop daily ADV refresh | +136.39% (still pseudo) |
 | 2026-05-17 (pm) | Pseudo-N100 had 47/100 stocks NOT in real index (HFCL, BSE, GROWW etc.) | NSE CSV → real N100 | +64.90% (honest, deployable) |
-| 2026-05-17 (eve) | Tested MAX_PRICE=₹3,000 filter — CAGR +85.85% but threshold curve-fit on backtest losses | Reverted to no filter | **+65.10%** (current; clean, no in-sample bias) |
+| 2026-05-17 (eve) | Tested MAX_PRICE=₹3,000 filter — CAGR +85.85% but threshold curve-fit on backtest losses | Reverted to no filter | +65.10% monthly-only baseline (clean, no in-sample bias) |
+| 2026-05-27 | Monthly-only figure was not live-faithful — live cron runs the mid-month check too | Canonical = `--mid-month-check` run | **+125.13%** (current; live config: monthly + mid-month) |
 
 ## Files
 
@@ -121,7 +118,7 @@ BAJAJ-AUTO is the worst — single-share concentration cost (only 10 shares for 
 | `live_signal.py` | Daily live signal emitter (30d lookback, real N100, no filter) |
 | `data_pull.py` | Refresh NSE CSV + rebuild universe + OHLCV pull |
 | `cron.py` | Scheduled rotation |
-| `trade_ledger.json` | 31 trades + summary |
+| `trade_ledger.json` | trades + summary (regenerate under `--mid-month-check` for the 42-trade live ledger) |
 | `summary.json` | Authoritative metrics output |
 
 ## How to reproduce
@@ -162,10 +159,10 @@ In-container scheduler (scheduler.py + this model's cron.py) calls `live_signal.
 
 ## Honest caveats
 
-- **Max DD 37.30%** — single-stock concentration. Y2 mean-reversion painful.
+- **Max DD 28.21%** (mid-month live config) — single-stock concentration. Y2 mean-reversion painful.
 - **Universe drift**: backtest uses today's real N100 retroactively. ~5-8% turnover/yr — small lookahead bias.
 - **No PIT historical N100**: NSE doesn't expose historical constituents easily. True PIT N100 would give slightly lower CAGR.
-- **31 trades / 3yr**: costs ~1-2%/yr drag. Post-cost CAGR ≈ +63%.
+- **42 trades / 3yr** (~14/yr, mid-month config): costs ~1-2%/yr drag.
 - **Slippage**: backtest fills at close. Real ~10-30 bps round-trip drag.
-- **Y2 weakness recurring**: strategy fragile to choppy mid-cap regimes. Plan for 30-40% DD.
+- **Y2 weakness recurring**: strategy fragile to choppy mid-cap regimes. Plan for ~28-40% DD.
 - **High-priced stocks (>₹3K)**: known to lose disproportionately in this regime (BAJAJ-AUTO ₹12K, ENRIN ₹2.97K, BAJAJFINSV ₹1.97K), but threshold filter intentionally NOT applied since it's curve-fit on past data.

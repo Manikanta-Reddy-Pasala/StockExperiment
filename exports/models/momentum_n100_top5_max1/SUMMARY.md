@@ -1,6 +1,6 @@
 # momentum_n100_top5_max1 — SUMMARY
 
-**Real NSE Nifty 100 monthly momentum rotation (top-1 by 30d ret). No price filter — honest baseline.**
+**Real NSE Nifty 100 momentum rotation (top-1 by 30d ret), monthly + mid-month check. No price filter — honest baseline.**
 
 ## When it BUYS (entry rules)
 
@@ -24,8 +24,9 @@ Monthly rotation, single position. **Sells only on rank rotation — there is NO
 >    Fixed: `live_signal.py` now reads its open position from the DB (`held_from_db()`).
 > 2. **Top-5 band:** exit used `top_picks[:5]`; backtest used top-1. Fixed: `retain_top_n=1`.
 >
-> With both fixes live now does top-1 rotation + mid-month, matching `backtest.py --retain-top-n 1
-> --mid-month-check` (**+125.13%** on real fyers data). **Requires redeploy** to take effect.
+> With both fixes live now does top-1 rotation, matching `backtest.py --retain-top-n 1 --mid-month-check`
+> (**+125.13%** on real fyers data — the live cron runs both the monthly rebalance and the mid-month
+> check, so the mid-month backtest is the live-faithful figure). **Requires redeploy** to take effect.
 
 ## Backtest window & trade frequency
 
@@ -35,9 +36,9 @@ Monthly rotation, single position. **Sells only on rank rotation — there is NO
 | First entry | 2023-05-15 |
 | Last exit | 2026-05-04 |
 | Total trades | 42 |
-| Trades per year | ~14.0 |
+| Trades per year | ~14 |
 | Rebalance | Monthly (1st trading day) + mid-month day-15 check |
-| Config | top-1 rotation + mid-month (`--retain-top-n 1 --mid-month-check`) = live |
+| Config | top-1 rotation + mid-month check (`--retain-top-n 1 --mid-month-check`) = live |
 | Data source | **Fyers (split-adjusted cont_flag=1)** |
 
 ## Stock pick logic
@@ -47,7 +48,7 @@ Monthly rotation, single position. **Sells only on rank rotation — there is NO
 3. Rebalance: 1st trading day of month + mid-month day-15 check (lead ≥5pp)
 4. Exit: rotation only — sell when not rank-1 (top-1 retention)
 
-## Headline result (live config: top-1 + mid-month, real fyers data)
+## Headline result (live config: top-1 rotation + mid-month check, real fyers data)
 
 | Metric | Value |
 |---|---:|
@@ -60,16 +61,16 @@ Monthly rotation, single position. **Sells only on rank rotation — there is NO
 | Wins / Losses | 28 / 14 |
 | Win rate | 66.7% |
 | Live deployment | YES (top-1 fix pending redeploy) |
-| Open position | **ADANIGREEN** qty 8,670 entry Rs.1,290.70 (2026-05-04) last Rs.1,308.00 unrealized +149,991 |
-
-> Prior published figure was **+65.10%** — that was the monthly-only (no mid-month) top-1 run.
-> Live runs the mid-month check too, so the live-faithful number is **+125.13%**.
 
 ## NSE cap segment breakdown
 
 | Cap | Trades | Wins | Losses | WR |
 |---|---:|---:|---:|---:|
 | **Large** | 42 | 28 | 14 | 66.7% |
+
+> **NOTE:** the winners/losers tables below were computed under the monthly-only (31-trade) run and
+> do NOT match the canonical mid-month (42-trade) headline above. **Needs regeneration** from the
+> `--mid-month-check` ledger.
 
 ## Top 5 winners
 

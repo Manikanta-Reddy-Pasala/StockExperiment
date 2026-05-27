@@ -1,6 +1,6 @@
 # midcap_narrow_60d_breakout
 
-**Indian mid/small-cap breakout swing strategy.** winner config — Exclude Large-caps + Exclude ANGELONE + 40d breakout + 90d max-hold + no SMA20 exit.
+**Indian mid/small-cap breakout swing strategy.** winner config — Exclude Large-caps + 40d breakout + +100% target + -20% stop + -20% trail + 120d max-hold + no SMA20 exit.
 
 ## Stock category: MID + SMALL CAP
 
@@ -52,29 +52,26 @@ Code: `check_exit()` / `scan_entry_candidate()` in `live_signal.py`.
 
 ## Backtest result (V2, 2023-05-15 → 2026-05-15, ₹10L start)
 
-| Period | NAV end | Yearly ROI |
-|---|---:|---:|
-| Start | ₹10,00,000 | — |
-| Y1 (2023-24) | ₹33,43,026 | **+234.30%** |
-| Y2 (2024-25) | ₹50,73,918 | **+51.78%** |
-| Y3 (2025-26) | ₹65,00,421 | **-5.55%** ish (cap_after end) |
-| **3-yr CAGR** | | **+86.63%** |
-| Total return | | **+550%** |
+| Metric | Value |
+|---|---:|
+| Final NAV | **₹1,41,34,367** |
+| Total return | **+1313.44%** |
+| **3-yr CAGR** | **+141.73%** |
+| Max DD | **8.12%** |
+| Calmar | **17.46** |
+| Trades | 8 |
+| WR | 75.0% (6W / 2L) |
 
-**12 round-trips · 75% WR · Max DD 15.15% · Calmar 5.72**
+> **Per-year ROI breakdown needs regeneration** — the prior Y1/Y2/Y3 table (₹33.4L /
+> ₹50.7L / ₹65.0L, +234.30% / +51.78% / -5.55%) was from a superseded run that no
+> longer reconciles to the aligned headline above. Re-run `backtest.py` to regenerate.
 
-## Cap-filter sweep results (6 variants)
+## Cap-filter sweep results
 
-| Variant | CAGR | DD | Calmar | NAV |
-|---|---:|---:|---:|---:|
-| **Exclude Large (this)** | **+86.63%** | **15.15%** | **5.72** | ₹65L |
-| Exclude Small (Large+Mid) | +78.26% | 15.49% | 5.05 | ₹57L |
-| Baseline (all caps) ARCHIVED | +68.60% | 17.83% | 3.85 | ₹48L |
-| Large only | +59.26% | 28.67% | 2.07 | ₹40L |
-| Mid only | +38.71% | 20.01% | 1.93 | ₹27L |
-| Small only | +9.99% | 48.08% | 0.21 | ₹13L |
-
-wins on ALL three metrics (CAGR, DD, Calmar).
+> **Needs regeneration** — the prior 6-variant sweep table (Exclude Large +86.63% /
+> 15.15% / 5.72 / ₹65L, etc.) was computed on a superseded run and no longer matches
+> the aligned headline (Exclude Large = +141.73% / 8.12% / 17.46 / ₹1,41,34,367).
+> Re-run the cap-filter sweep to regenerate the comparison.
 
 ## Files
 

@@ -1,6 +1,6 @@
 # StockExperiment — Multi-Model Live Trading + Audit
 
-NSE momentum & breakout trading system running **4 active equity models** + 1 disabled options scaffold in parallel against a single Fyers brokerage account. Each model has its own capital pool, own ledger, own ranking signal, own rebalance cadence. Live orders fire daily via cron 09:30 IST; every decision is captured in a 7-table audit trail.
+NSE momentum & breakout trading system running **4 active equity models** in parallel against a single Fyers brokerage account. Each model has its own capital pool, own ledger, own ranking signal, own rebalance cadence. Live orders fire daily via cron 09:30 IST; every decision is captured in a 7-table audit trail.
 
 **Charges are approximate** (formula-based — Fyers SEBI rates), deducted from per-model cash at fill time. Not chased to broker-exact.
 
@@ -136,7 +136,7 @@ Retention:
 | Today's Picks | `/picks` | Per-model collapsible card with top-5 ranking + Re-calculate button |
 | Portfolio | `/portfolio` | Aggregate table + live Fyers funds widget + open positions + per-model Rebalance |
 | Model Detail | `/admin/models/<m>/detail` | Balance sheet + trade history per model |
-| Admin Triggers | `/admin` | Per-Model Data Status (5 models) + manual pulls |
+| Admin Triggers | `/admin` | Per-Model Data Status (4 models) + manual pulls |
 | Audit | `/admin/audit` | 7-tab forensics dashboard (orders, decisions, rankings, signals, config, data quality, system) |
 | History | `/history` | Closed-trade ledger across all models |
 | Settings | `/settings` | Per-model enable/disable, capital top-up/withdraw, seed/clear position |

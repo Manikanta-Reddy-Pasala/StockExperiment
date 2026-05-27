@@ -8,8 +8,7 @@
 > live ran ~+83%/yr at 22% DD instead of the figures below. The builder now mirrors
 > the backtest exactly (top-100 ADV minus Nifty-100 → ~42 midcaps). Backtest
 > reconfirmed 2026-05-26 on the aligned universe: **+141.73% CAGR / 8.12% DD /
-> Calmar 17.46 / 8 trades / 75% WR** (3yr to 2026-05-15; the +137.85% below is the
-> same run to 2026-05-12).
+> Calmar 17.46 / 8 trades / 75% WR** (3yr to 2026-05-15; the headline below).
 
 ## When it BUYS (entry rules)
 
@@ -79,15 +78,19 @@ fires — the **STOP** (−20% from entry) handles deep losers instead.
 
 | Metric | Value |
 |---|---:|
-| Final NAV | **₹13,456,535** |
-| Total return | **+1245.65%** |
-| **3-yr CAGR** | **+137.85%/yr** |
+| Final NAV | **₹14,134,367** |
+| Total return | **+1313.44%** |
+| **3-yr CAGR** | **+141.73%/yr** |
 | Max DD (cash NAV) | 8.12% |
-| Calmar | 16.98 |
+| Calmar | 17.46 |
 | Trades | 8 |
 | WR | 75.0% (6W / 2L) |
 
 ## Yearly money flow
+
+> **Needs regeneration** — the per-year table below closes at ₹13,456,535, the superseded
+> 2026-05-12 run. The aligned headline final NAV is **₹1,41,34,367** (3-yr to 2026-05-15).
+> Re-run `backtest.py` to regenerate the per-year open/close/ROI rows.
 
 | Year | Open | Close | ROI | Trades |
 |---|---:|---:|---:|---:|

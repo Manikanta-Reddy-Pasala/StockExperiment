@@ -9,7 +9,8 @@
 > exit band live while their backtests rotated on **top-1** — on real fyers data that cost pseudo
 > ~64pp/yr (+85% live vs +149% backtest). n100 was additionally **stateless and stuck** (bought
 > ADANIGREEN once, couldn't rotate). Both `live_signal.py` now default to `retain_top_n=1` (top-1
-> rotation), and n100 reads its DB position. Headline numbers below are the live-faithful figures.
+> rotation), and n100 reads its DB position. The held position is **rank-1 (top-1)**; the `top5` in
+> the model name is only the display ranking depth. Headline numbers below are the live-faithful figures.
 > **Requires redeploy** for the prod container to pick up the change.
 
 ## Code architecture (KISS / separation of concerns)
@@ -33,7 +34,7 @@ headline numbers to the rupee after the refactor.
 |--:|---|---|---|---:|---:|---:|:-:|
 | 1 | `momentum_n100_top5_max1` | Real NSE Nifty 100 (no filter) | Monthly + mid-month | ₹11,341,351 | **+125.13%** | 28.21% | ✅ |
 | 2 | `momentum_pseudo_n100_adv` | Top-100 ADV from N500 − Small + uptrend + MAX_PRICE≤₹3K | Monthly | ₹15,361,000 | **+149.15%** | **16.17%** | ✅ |
-| 3 | `midcap_narrow_60d_breakout` | Top-100 ADV from N500 − Large | Event-driven | ₹13,456,535 | **+137.85%** | **8.12%** | ✅ |
+| 3 | `midcap_narrow_60d_breakout` | Top-100 ADV from N500 − Large | Event-driven | ₹14,134,367 | **+141.73%** | **8.12%** | ✅ |
 | 4 | `n20_daily_large_only` | Top-20 ADV + uptrend + NSE Nifty 100 | Daily | ₹13,655,640 | **+139.55%** | 25.66% | ✅ |
 
 ## Unique stock-filtering approach per model
@@ -49,7 +50,7 @@ headline numbers to the rupee after the refactor.
 
 | Rank | Model | CAGR | MaxDD | Calmar |
 |--:|---|---:|---:|---:|
-| 1 | midcap_narrow_60d_breakout | +137.85% | 8.12% | **16.98** |
+| 1 | midcap_narrow_60d_breakout | +141.73% | 8.12% | **17.46** |
 | 2 | momentum_pseudo_n100_adv | +149.15% | 16.17% | **9.22** |
 | 3 | n20_daily_large_only | +139.55% | 25.66% | **5.44** |
 | 4 | momentum_n100_top5_max1 | +125.13% | 28.21% | **4.44** |

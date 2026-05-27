@@ -8,7 +8,6 @@ Generic broker + execution scripts. Always-live Fyers order placement.
 | File | Purpose |
 |---|---|
 | `fyers_executor.py` | Real Fyers equity order placement (BUY/SELL with limit-walk fallback) |
-| `fyers_executor_options.py` | Multi-leg options executor (Iron Condor etc.) |
 | `risk_manager.py` | Pre-trade risk check (capital lock, kill-switch) |
 | `daily_summary.py` | Read live ledger from DB, emit NAV/P&L |
 | `telegram_notify.py` | Optional Telegram notifications for signals/fills |

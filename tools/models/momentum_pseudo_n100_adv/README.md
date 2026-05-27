@@ -76,10 +76,10 @@ Aggressive variant of `momentum_n100_top5_max1`. Same monthly rotation strategy,
 | Metric | momentum_n100_top5_max1 (real N100) | **momentum_pseudo_n100_adv (this — LIVE)** |
 |---|---:|---:|
 | Universe | NSE official 104 stocks | Top-100 by ADV from N500 minus Smallcap |
-| CAGR | +65.10% | **+149.15%** |
-| Max DD (rebal) | 37.30% | **16.17%** |
-| WR | 71.0% | **88.9%** |
-| Trades | 31 | 27 |
+| CAGR | +125.13% | **+149.15%** |
+| Max DD (rebal) | 28.21% | **16.17%** |
+| WR | 66.7% | **88.9%** |
+| Trades | 42 | 27 |
 | MAX_PRICE filter | none | ₹3,000 (share-count heuristic) |
 
 Pseudo wins both axes (return + DD). The ADV-ranked universe includes liquid mid-caps (BSE, MAZDOCK, NETWEB, GRSE etc.) that the official NSE Nifty 100 excludes because NSE uses free-float market cap, not traded volume. Going forward, the yearly-PIT rebuild keeps the universe honest — only data observable at year-start is used.
@@ -87,7 +87,7 @@ Pseudo wins both axes (return + DD). The ADV-ranked universe includes liquid mid
 ## Why this is the LIVE model
 
 1. **PIT-safe rebuild** — universe rebuilds at each year-start using only data available then. No future information at decision time.
-2. **Better risk-adjusted return** — Calmar 9.22 vs 1.74 on real-N100.
+2. **Better risk-adjusted return** — Calmar 9.22 vs 4.44 on real-N100.
 3. **Wider liquidity pool** — captures volume-traded mid-caps that NSE's free-float methodology misses.
 4. **Position-sizing floor** — MAX_PRICE ₹3,000 keeps share count ≥10 at ₹30K capital, preventing 1-share concentration risk.
 
