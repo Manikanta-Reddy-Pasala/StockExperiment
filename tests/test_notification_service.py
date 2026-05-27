@@ -67,7 +67,24 @@ def captured(monkeypatch):
         return {"ok": True, "id": len(calls)}
 
     monkeypatch.setattr(ns, "notify", fake_notify)
+    # Verdict pings (plan / no-change / skip) are env-gated so ONLY the
+    # scheduled cron emit notifies — diagnostic/preview runs stay silent.
+    # The routing tests emulate that cron context.
+    monkeypatch.setenv("MOMROT_TG_NOTIFY", "1")
     return calls
+
+
+def test_verdict_notifications_gated_off_without_env(monkeypatch):
+    """No MOMROT_TG_NOTIFY => verdict producers are silent (leak guard)."""
+    monkeypatch.delenv("MOMROT_TG_NOTIFY", raising=False)
+    calls = []
+    monkeypatch.setattr(ns, "notify", lambda *a, **k: calls.append(1))
+    r1 = ns.notify_model_decision("m", [], held_symbol="BSE",
+                                  today=datetime(2026, 5, 25))
+    r2 = ns.notify_skip("m", "x", today=datetime(2026, 5, 25))
+    assert r1["skipped"] and r1["reason"] == "notify_gated"
+    assert r2["skipped"] and r2["reason"] == "notify_gated"
+    assert calls == []
 
 
 def test_decision_weekend_is_silent(captured):

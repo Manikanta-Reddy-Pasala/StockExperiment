@@ -186,6 +186,7 @@ def _extract_traded_price(row: Dict) -> Optional[float]:
     if not isinstance(row, dict):
         return None
     for key in ("tradedPrice", "traded_price", "avgPrice", "avg_price",
+                "average_price", "avgprice",  # standardized orderbook avg fill
                 "executedPrice", "executed_price", "fillPrice", "fill_price"):
         val = row.get(key)
         if val is None or val == "":
@@ -478,11 +479,15 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
     if not order_id:
         order_id = _resolve_recent_order_id(svc, user_id, symbol, qty, side)
     if not order_id:
-        log.warning(f"  LIMIT {symbol} placed but no orderId returned — "
-                    f"recording as placed (will rely on Fyers fills).")
-        return {"filled": True, "status": "limit_no_id",
-                "order_id": "", "fill_price": first_px,
-                "reason": "no_orderid"}
+        # Cannot confirm a fill without an order id. Recording it as filled
+        # books a phantom position (and on an EXIT lets PASS-2 buy phantom
+        # cash). Treat as UNFILLED — the 5-min reconciler mirrors any real
+        # fill that did go through. Fail-safe over fail-convenient.
+        log.error(f"  LIMIT {symbol} placed but no orderId returned — treating "
+                  f"as UNFILLED (reconciler will mirror any real fill).")
+        return {"filled": False, "status": "limit_no_id_unconfirmed",
+                "order_id": "", "fill_price": None,
+                "reason": "no_orderid_unconfirmed"}
     filled, term, traded_px = _wait_for_fill(svc, user_id, order_id,
                                               timeout_s=first_window_s, poll_s=2.0)
     if filled:
@@ -676,21 +681,34 @@ def main() -> int:
     # If today's historical_data coverage is below threshold, abort entries.
     if not args.dry_run and os.environ.get("SKIP_DQ_GATE", "false").lower() != "true":
         gate_path = "/app/logs/data_quality_gate.json"
-        if os.path.exists(gate_path):
+        # FAIL-CLOSED: missing / unreadable / not-ok / stale marker all abort.
+        # A missing or yesterday's marker means the 09:00 data job did not run
+        # or produced nothing today — trading on stale data is the worse risk.
+        _abort = None
+        if not os.path.exists(gate_path):
+            _abort = "gate marker missing (data_scheduler 09:00 job not run?)"
+        else:
             try:
                 with open(gate_path) as _gf:
                     _gate = json.load(_gf)
                 if not _gate.get("ok"):
-                    log.error(f"Data quality gate FAILED: {_gate.get('msg')} — "
-                              f"aborting trade execution. Set SKIP_DQ_GATE=true to override.")
-                    try:
-                        from tools.live.telegram_notify import send as _tg
-                        _tg(f"🛑 *Trade execution aborted*\nData quality gate: {_gate.get('msg')}")
-                    except Exception:
-                        pass
-                    return 3
+                    _abort = f"gate not ok: {_gate.get('msg')}"
+                else:
+                    _ts = str(_gate.get("ts") or _gate.get("date") or "")
+                    _today = datetime.now().strftime("%Y-%m-%d")
+                    if _today not in _ts:
+                        _abort = f"gate stale (ts={_ts!r}, today={_today})"
             except Exception as _e:
-                log.warning(f"data_quality_gate read failed: {_e} — proceeding")
+                _abort = f"gate unreadable: {_e}"
+        if _abort:
+            log.error(f"Data quality gate ABORT (fail-closed): {_abort}. "
+                      f"Set SKIP_DQ_GATE=true to override.")
+            try:
+                from tools.live.telegram_notify import send as _tg
+                _tg(f"🛑 *Trade execution aborted (fail-closed)*\nDQ gate: {_abort}")
+            except Exception:
+                pass
+            return 3
 
     # ---- Build RiskManager (per-model if provided, else env) ----
     rm = RiskManager.for_model_or_env(args.model_name)
@@ -707,11 +725,42 @@ def main() -> int:
         signals = json.load(f)
 
     if not args.dry_run:
+        # (#1) Enabled BACKSTOP — live_signal already gates, but the canonical
+        # signals file could be stale from when the model was enabled. Refuse
+        # to place orders for a disabled model. Fail-closed on read error.
+        if args.model_name:
+            try:
+                from src.services.trading.model_ledger_service import get_all_settings
+                _en = next((s.get("enabled") for s in get_all_settings()
+                            if s["model_name"] == args.model_name), None)
+                if not _en:
+                    log.error(f"{args.model_name}: model_settings.enabled is "
+                              f"False/missing — refusing to execute (backstop).")
+                    return 2
+            except Exception as _ee:
+                log.error(f"enabled backstop read failed: {_ee} — refusing "
+                          f"to execute (fail-closed).")
+                return 2
         from src.services.brokers.fyers_service import FyersService
         svc = FyersService()
         cfg = svc.get_broker_config(args.user_id)
         if not cfg or not cfg.get("access_token"):
             log.error(f"No Fyers token for user_id={args.user_id} — aborting")
+            return 2
+        # (#7) Token PRE-FLIGHT — a token can EXIST yet be expired. Probe a
+        # reference quote before placing ANY real order; abort if it fails so
+        # we never fire blind on a dead token (the only working refresh is
+        # data_scheduler's 03:30 TOTP job — this catches its failure).
+        _probe = _fetch_live_ltp(svc, args.user_id, "NSE:SBIN-EQ")
+        if not _probe or _probe <= 0:
+            log.error("Fyers token pre-flight FAILED (reference quote NSE:SBIN "
+                      "empty) — token likely expired; aborting.")
+            try:
+                from tools.live.telegram_notify import send as _tg
+                _tg("🛑 *Trade execution aborted*\nFyers token pre-flight failed "
+                    "— token likely expired (reference quote empty).")
+            except Exception:
+                pass
             return 2
     else:
         svc = None

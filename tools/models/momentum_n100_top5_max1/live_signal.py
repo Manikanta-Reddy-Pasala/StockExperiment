@@ -98,6 +98,36 @@ def load_universe(path: str) -> List[Dict]:
         return json.load(f)["stocks"]
 
 
+def is_model_enabled() -> bool:
+    """model_settings.enabled for this model. Fail-CLOSED on error/missing row
+    so a disabled model (or a config/DB problem) can never place real orders.
+    """
+    try:
+        from src.services.trading.model_ledger_service import get_all_settings
+        for s in get_all_settings():
+            if s["model_name"] == "momentum_n100_top5_max1":
+                return bool(s.get("enabled"))
+        return False
+    except Exception as e:
+        log.warning(f"enabled-flag read failed: {e} — defaulting to OFF")
+        return False
+
+
+def _last_rotation_date():
+    """Entry date of the current open position (None if flat), used to dedup
+    the monthly rebalance to at most once per calendar month (else the day-1-7
+    gate re-fires every weekday in the first week).
+    """
+    try:
+        from src.services.trading.model_ledger_service import get_ledger
+        l = get_ledger("momentum_n100_top5_max1")
+        if l and l.get("open_entry_date"):
+            return datetime.fromisoformat(l["open_entry_date"])
+    except Exception as e:
+        log.debug(f"last_rotation read failed: {e}")
+    return None
+
+
 def get_close_at(symbol: str, target_ts: int) -> float:
     """Fetch the most recent daily close at/just before a unix timestamp.
 
@@ -119,6 +149,23 @@ def get_close_at(symbol: str, target_ts: int) -> float:
     return float(df.iloc[-1]["close"])
 
 
+def get_close_trading_days_ago(symbol: str, today_ts: int, n: int) -> float:
+    """Close exactly `n` TRADING days before the latest cached bar.
+
+    Matches backtest.py's `cl.iloc[di - LOOKBACK]` (trading-day index). The
+    old path subtracted `n` CALENDAR days (~30% shorter window, drifting with
+    weekends/holidays) — that made the live signal diverge from the backtest.
+
+    Returns 0.0 if fewer than n+1 bars are cached (cannot form the ratio).
+    """
+    # Wide window so >= n+1 trading bars are present (n trading days span ~7/5
+    # calendar; +90d cushions holidays/IPO gaps).
+    df = read_cached(symbol, "D", today_ts - (n * 3 + 90) * 86400, today_ts)
+    if len(df) < n + 1:
+        return 0.0
+    return float(df.iloc[-(n + 1)]["close"])
+
+
 def rank_universe(stocks: List[Dict], today_ts: int,
                   lookback_days: int = 30) -> List[tuple]:
     """Rank the universe by trailing 30-day return (the live ranking step).
@@ -136,12 +183,12 @@ def rank_universe(stocks: List[Dict], today_ts: int,
         list[tuple]: (symbol, name, 30d_return_pct, current_price) sorted
         descending by return.
     """
-    lookback_ts = today_ts - lookback_days * 86400  # 30d ago in epoch seconds
     rows = []
     for s in stocks:
         sym = s["symbol"]
         c_now = get_close_at(sym, today_ts)
-        c_past = get_close_at(sym, lookback_ts)
+        # 30 TRADING days back (backtest parity), not 30 calendar days.
+        c_past = get_close_trading_days_ago(sym, today_ts, lookback_days)
         if c_now > 0 and c_past > 0:  # need both endpoints to compute a return
             ret = (c_now / c_past - 1) * 100  # 30d return in percentage points
             rows.append((sym, s.get("name", sym), ret, c_now))
@@ -310,6 +357,15 @@ def main():
     log.info(f"momentum_rotation_signal run: today={today.date()} "
              f"weekday={today.strftime('%A')} day_of_month={today.day}")
 
+    # Enabled gate (fail-closed) — a model toggled OFF must not emit/trade.
+    if not args.force and not is_model_enabled():
+        log.warning("momentum_n100_top5_max1: model_settings.enabled is False "
+                    "— writing empty signals file and exiting.")
+        Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
+        with open(args.signals_out, "w") as f:
+            json.dump([], f)
+        return 0
+
     # Mid-month gate (mutually exclusive with rebalance-only; --force still
     # overrides). Only emit on day-15 weekday AND lead >= threshold.
     if args.mid_month_check and not args.force:
@@ -321,8 +377,9 @@ def main():
             return 0
 
     if args.rebalance_only and not args.force and not args.mid_month_check:
-        if not is_rebalance_day(today):
-            log.info(f"Not rebalance day (need day<=7 + weekday). Skipping.")
+        if not is_rebalance_day(today, _last_rotation_date()):
+            log.info(f"Not rebalance day (need day<=7 weekday + not already "
+                     f"rotated this month). Skipping.")
             Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
             with open(args.signals_out, "w") as f:
                 json.dump([], f)

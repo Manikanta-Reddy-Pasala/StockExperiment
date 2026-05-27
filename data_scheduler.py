@@ -199,8 +199,17 @@ def pre_market_data_quality_gate():
                 "SELECT COUNT(DISTINCT symbol) AS n FROM historical_data WHERE date = :d"
             ), {"d": latest}).first()
             n_syms = int(r.n) if r else 0
-        ok = n_syms >= MIN_SYMBOLS
-        msg = f"latest={latest} syms={n_syms} (need>={MIN_SYMBOLS})"
+        # Staleness guard: a TOTAL pull failure leaves MAX(date) at an older,
+        # fully-covered day — which would PASS the coverage check and let
+        # trading run on stale data. At 09:00 IST the freshest bar is the prior
+        # trading day, so allow up to 4 calendar days (long weekend / holiday);
+        # beyond that the nightly pull clearly failed.
+        import datetime as _dt
+        _age_days = (_dt.date.today() - latest).days
+        stale = _age_days > 4
+        ok = (n_syms >= MIN_SYMBOLS) and not stale
+        msg = (f"latest={latest} ({_age_days}d old) syms={n_syms} "
+               f"(need>={MIN_SYMBOLS}, max_age=4d)" + (" STALE" if stale else ""))
         if ok:
             logger.info(f"data_quality_gate: PASS {msg}")
         else:

@@ -133,8 +133,12 @@ def read_cached(symbol: str, interval: str,
             with eng.connect() as conn:
                 df = pd.read_sql(q, conn, params={"sym": sym, "a": from_ts, "b": to_ts})
         else:  # daily table keys on a date column, not the unix timestamp
-            from_d = datetime.utcfromtimestamp(from_ts).date()  # ts bounds -> dates
-            to_d   = datetime.utcfromtimestamp(to_ts).date()
+            # Daily 'date' rows are keyed on the IST trading date. Convert the
+            # ts bounds with LOCAL time (container TZ=Asia/Kolkata), NOT UTC:
+            # utcfromtimestamp().date() yields yesterday for any read before
+            # 05:30 IST, silently dropping today's bar (stale ranking).
+            from_d = datetime.fromtimestamp(from_ts).date()
+            to_d   = datetime.fromtimestamp(to_ts).date()
             q = text(
                 f"SELECT timestamp, date, open, high, low, close, volume "
                 f"FROM {table} "

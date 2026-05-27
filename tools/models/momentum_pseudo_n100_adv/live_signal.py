@@ -164,6 +164,17 @@ def get_close_at(symbol: str, target_ts: int) -> float:
     return float(df.iloc[-1]["close"])
 
 
+def get_close_trading_days_ago(symbol: str, today_ts: int, n: int) -> float:
+    """Close exactly `n` TRADING days before the latest cached bar (backtest
+    parity with cl.iloc[di-LOOKBACK]). The old calendar-day subtraction gave a
+    ~30% shorter, weekend-drifting window. 0.0 if fewer than n+1 bars cached.
+    """
+    df = read_cached(symbol, "D", today_ts - (n * 3 + 90) * 86400, today_ts)
+    if len(df) < n + 1:
+        return 0.0
+    return float(df.iloc[-(n + 1)]["close"])
+
+
 def _close_above_sma200(symbol: str, today_ts: int) -> bool:
     """200d SMA uptrend gate (backtest parity).
 
@@ -209,14 +220,14 @@ def rank_universe(symbols: List[str], today_ts: int,
         List[tuple]: (fyers_symbol, plain_symbol, ret_30d_pct, current_price)
         ordered highest-return first. Rank-1 is the entry candidate.
     """
-    lookback_ts = today_ts - lookback_days * 86400  # 30 calendar days back
     rows = []
     for plain_sym in symbols:
         if plain_sym in _SMALLCAP_SET:
             continue  # smallcap exclusion (backtest parity)
         fyers_sym = f"NSE:{plain_sym}-EQ"
         c_now = get_close_at(fyers_sym, today_ts)
-        c_past = get_close_at(fyers_sym, lookback_ts)
+        # 30 TRADING days back (backtest parity), not 30 calendar days.
+        c_past = get_close_trading_days_ago(fyers_sym, today_ts, lookback_days)
         if c_now <= 0 or c_past <= 0:
             continue  # missing price on either anchor — cannot rank
         if c_now > MAX_PRICE:
@@ -238,6 +249,18 @@ def get_current_position() -> Optional[Dict]:
             return l
     except Exception as e:
         log.warning(f"ledger read failed: {e}")
+    return None
+
+
+def _last_rotation_date():
+    """Entry date of the open position (None if flat) — dedups the monthly
+    rebalance to once per calendar month (else day 1-7 re-fires each weekday)."""
+    try:
+        pos = get_current_position()
+        if pos and pos.get("open_entry_date"):
+            return datetime.fromisoformat(pos["open_entry_date"])
+    except Exception as e:
+        log.debug(f"last_rotation read failed: {e}")
     return None
 
 
@@ -372,8 +395,9 @@ def main() -> int:
 
     # Monthly rebalance gate
     if args.rebalance_only and not args.force:
-        if not is_rebalance_day(today):
-            log.info("Not rebalance day (need day<=7 + weekday). Skipping.")
+        if not is_rebalance_day(today, _last_rotation_date()):
+            log.info("Not rebalance day (need day<=7 weekday + not already "
+                     "rotated this month). Skipping.")
             Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
             Path(args.signals_out).write_text(json.dumps([]))
             try:

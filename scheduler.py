@@ -386,7 +386,10 @@ def run_scheduler():
         if now.weekday() >= 5:
             return
         hm = now.hour * 60 + now.minute
-        if hm < (9 * 60 + 30) or hm > (15 * 60 + 30):
+        # Start at 09:45, NOT 09:30 — executes run 09:30-09:35 (+ n100 mid-month
+        # 09:35). Reconciling during placement races record_buy/record_sell and
+        # can clobber ledger cash/qty mid-cycle. Reconcile only after they settle.
+        if hm < (9 * 60 + 45) or hm > (15 * 60 + 30):
             return
         try:
             import subprocess
