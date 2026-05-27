@@ -1,30 +1,25 @@
 {
   "model": "momentum_n100_top5_max1",
   "start": "2023-05-15",
-  "end": "2026-05-15",
+  "end": "2026-05-12",
   "years": 2.992,
   "capital": 1000000.0,
-  "final_nav": 22814268,
+  "final_nav": 22814268.0,
   "total_return_pct": 2181.43,
   "cagr_pct": 184.36,
   "max_dd_pct": 14.89,
   "calmar": 12.38,
   "trades": 57,
-  "total_trades": 57,
   "wins": 37,
   "losses": 20,
   "win_rate_pct": 64.9,
-  "lookback_days": 15,
-  "config": "monthly + mid-month check (--mid-month-check --mid-month-lead-pct 5.0), 15-trading-day lookback, live-faithful",
-  "_honest_max_dd_note": "3yr max_dd_pct of 14.89 UNDERSTATES real risk — it never saw the 2022 correction. The honest 6-year (2020-05-15 → 2026-05-15) backtest shows max DD ~45.69% (CAGR +151.72%, Calmar 3.32). Size positions for ~46% DD, not 15%.",
-  "_open_position_note": "open_position below is STALE — from the prior LB=30 monthly-only run. Needs regeneration from the --mid-month-check LB=15 ledger.",
   "open_position": {
-    "sym": "ADANIGREEN",
-    "qty": 3427,
-    "entry_px": 1290.7,
+    "sym": "ADANIPOWER",
+    "qty": 108831,
+    "entry_px": 227.3,
     "entry_date": "2026-05-04",
-    "last_px": 1308.0,
-    "mtm_value": 4482516.0,
-    "unrealized_pnl": 59287.0
+    "last_px": 209.63,
+    "mtm_value": 22814243.0,
+    "unrealized_pnl": -1923044.0
   }
 }

@@ -1,6 +1,6 @@
 # midcap_narrow_60d_breakout — Trade Ledger
 
-₹10L → ₹13,456,535 (+1245.65%) · CAGR +137.85% · 8 trades · Max DD 8.12% · WR 75.0%
+₹10L → ₹14,134,367 (+1313.44%) · CAGR +141.73% · 8 trades · Max DD 8.12% · WR 75.0%
 
 Data: Fyers, 4yr re-pull, cont_flag=1.
 

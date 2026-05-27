@@ -8,7 +8,7 @@ Data: Fyers (split-adjusted cont_flag=1). Top-20 ADV + uptrend + Nifty 100. Dail
 
 | Cap | Trades | Wins | Losses | WR | Total PnL ₹ |
 |---|---:|---:|---:|---:|---:|
-| **Large** | 138 | 60 | 76 | 44% | +10,813,445 |
+| **Large** | 138 | 60 | 76 | 43% | +10,813,445 |
 
 ## All 138 trades
 

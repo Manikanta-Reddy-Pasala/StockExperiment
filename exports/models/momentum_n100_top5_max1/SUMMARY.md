@@ -69,6 +69,7 @@ Monthly rotation, single position. **Sells only on rank rotation — there is NO
 | Wins / Losses | 37 / 20 |
 | Win rate | 64.9% |
 | Live deployment | YES (top-1 fix pending redeploy) |
+| Open position | **ADANIPOWER** qty 108,831 entry Rs.227.30 (2026-05-04) last Rs.209.63 unrealized -1,923,044 |
 
 > ## ⚠️ Drawdown — honest 6-year risk
 >
@@ -86,28 +87,26 @@ Monthly rotation, single position. **Sells only on rank rotation — there is NO
 |---|---:|---:|---:|---:|
 | **Large** | 57 | 37 | 20 | 64.9% |
 
-> **NOTE — STALE TABLES:** the winners/losers tables below were computed under the **prior LB=30** run
-> (different trades) and do NOT match the canonical LB=15 mid-month (57-trade) headline above.
-> **Needs regeneration under LB=15** from the `--mid-month-check` ledger. Do not rely on these figures.
+Regenerated 2026-05-27 from the LB=15 `--mid-month-check` 57-trade ledger (`trade_ledger.json`).
 
 ## Top 5 winners
 
 | Symbol | Entry → Exit | Entry ₹ | Ret % | PnL ₹ |
 |---|---|---:|---:|---:|
-| ADANIPOWER   | 2026-04-01 → 2026-05-04 | 157.11 | +44.68% | +3,455,875 |
-| SOLARINDS    | 2025-05-15 → 2025-07-01 | 13,880.00 | +23.89% | +1,376,140 |
-| MAZDOCK      | 2024-06-18 → 2024-08-16 | 2,089.13 | +19.07% | +916,205 |
-| SOLARINDS    | 2025-04-01 → 2025-05-02 | 11,131.60 | +17.22% | +782,299 |
-| SHRIRAMFIN   | 2026-02-01 → 2026-02-16 | 997.60 | +8.80% | +688,879 |
+| MAZDOCK      | 2024-06-03 → 2024-08-01 | 1,628.80 | +56.79% | +4,891,506 |
+| ADANIGREEN   | 2026-04-15 → 2026-05-04 | 1,096.05 | +17.76% | +3,730,467 |
+| ADANIPOWER   | 2026-04-01 → 2026-04-15 | 157.11 | +16.75% | +3,014,219 |
+| IRFC         | 2024-01-01 → 2024-02-15 | 100.40 | +58.27% | +2,381,944 |
+| MAZDOCK      | 2025-05-02 → 2025-06-02 | 2,996.60 | +12.94% | +1,761,454 |
 
 ## Top 5 losses
 
 | Symbol | Entry → Exit | Entry ₹ | Ret % | PnL ₹ |
 |---|---|---:|---:|---:|
-| CGPOWER      | 2024-10-15 → 2024-11-01 | 832.70 | -13.46% | -718,561 |
-| ENRIN        | 2026-03-02 → 2026-03-16 | 2,972.70 | -6.22% | -521,885 |
-| HINDZINC     | 2024-11-01 → 2024-11-18 | 558.25 | -11.09% | -512,161 |
-| ETERNAL      | 2024-08-16 → 2024-09-02 | 264.43 | -7.56% | -432,287 |
-| VEDL         | 2026-01-16 → 2026-02-01 | 255.69 | -4.04% | -329,218 |
+| ADANIENSOL   | 2024-08-01 → 2024-08-16 | 1,275.20 | -14.89% | -2,011,041 |
+| HINDZINC     | 2024-11-01 → 2024-11-18 | 558.25 | -11.09% | -1,449,017 |
+| ENRIN        | 2026-03-02 → 2026-03-16 | 2,972.70 | -6.22% | -1,222,850 |
+| CGPOWER      | 2025-09-15 → 2025-10-01 | 791.35 | -6.51% | -1,172,505 |
+| HINDZINC     | 2025-10-15 → 2025-11-03 | 513.20 | -6.34% | -1,102,241 |
 
 Full trade-by-trade ledger: see [TRADE_LEDGER.md](TRADE_LEDGER.md).

@@ -88,9 +88,11 @@ fires — the **STOP** (−20% from entry) handles deep losers instead.
 
 ## Yearly money flow
 
-> **Needs regeneration** — the per-year table below closes at ₹13,456,535, the superseded
-> 2026-05-12 run. The aligned headline final NAV is **₹1,41,34,367** (3-yr to 2026-05-15).
-> Re-run `backtest.py` to regenerate the per-year open/close/ROI rows.
+> Regenerated 2026-05-27 from the fresh 8-trade `trade_ledger.json` (bucketed by exit
+> fiscal year, Apr 1 – Mar 31). The per-year rows close on **realised** cap after each
+> exit; the final-row close of **₹13,456,535** is the last closed-trade NAV. The headline
+> final NAV of **₹14,134,367** adds the still-open **OIL** position (qty 27,270, entry
+> ₹493.44 on 2026-01-29, last ₹518.30, unrealised **+₹677,852**) marked to the last close.
 
 | Year | Open | Close | ROI | Trades |
 |---|---:|---:|---:|---:|
