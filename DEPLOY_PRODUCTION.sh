@@ -70,11 +70,20 @@ fi
 # [2/4] Sync source (NO --delete: preserves VM-only files like scripts/, .env*,
 # logs/, exports/). .env and runtime/build artefacts are excluded.
 echo -e "\n${BLUE}[2/4] Syncing source -> $REMOTE_DIR ...${NC}"
-rsync -az --no-perms --omit-dir-times \
+# Flags chosen deliberately:
+#   -rlz          recurse + symlinks + compress (NO -a: -a implies -ogtp which,
+#                 run as root, would chown VM files to the local macOS uid/gid
+#                 and rewrite perms — we must leave VM ownership/perms intact).
+#   --checksum    decide by content hash, not mtime — local(macOS) vs VM mtimes
+#                 always differ, so without this every file re-transfers each
+#                 run; with it, identical files are skipped (idempotent).
+#   --no-owner --no-group --no-perms   never touch VM ownership / permissions.
+#   (no --delete) VM-only files survive: scripts/, .env, .env.bak.*, ml_models/.
+rsync -rlz --checksum --no-owner --no-group --no-perms \
   --exclude='.git/' \
   --exclude='.env' --exclude='.env.*' \
-  --exclude='logs/' --exclude='exports/' \
-  --exclude='__pycache__/' --exclude='*.pyc' --exclude='*.pyo' \
+  --exclude='logs/' --exclude='exports/' --exclude='ml_models/' \
+  --exclude='__pycache__/' --exclude='*.pyc' --exclude='*.pyo' --exclude='.pytest_cache/' \
   --exclude='.venv/' --exclude='venv/' --exclude='node_modules/' \
   --exclude='*.tar' --exclude='.DS_Store' \
   ./ "$SERVER_USER@$SERVER_IP:$REMOTE_DIR/"
