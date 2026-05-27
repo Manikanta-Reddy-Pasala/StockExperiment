@@ -92,7 +92,17 @@ def _fyers_positions_by_symbol(svc, user_id: int = 1) -> Dict[str, Dict]:
             _merge_pos(out, res.get("data", []), source)
         except Exception as e:
             log.error(f"fyers {fn_name} fetch failed: {e}")
-    return out
+    # Long-only CNC models never short. A net qty <= 0 is a SELL leg still
+    # settling (a same-day CNC sell shows as negative in positions() until the
+    # T+1 delivery nets it out) or a fluke — NOT a holding the ledger should
+    # claim. Dropping these (after summing pos+hold so partial sells still net
+    # correctly) prevents false FYERS_ORPHAN / LEDGER_AHEAD alerts, e.g. the
+    # "-68 ADANIPOWER @ 247.90" orphan ping right after a rotation sell.
+    dropped = {k: v["qty"] for k, v in out.items() if v["qty"] <= 0}
+    if dropped:
+        log.info(f"reconciler: ignoring non-positive net positions "
+                 f"(settling sells / shorts): {dropped}")
+    return {k: v for k, v in out.items() if v["qty"] > 0}
 
 
 def reconcile_once(user_id: int = 1, dry_run: bool = False) -> List[Dict]:

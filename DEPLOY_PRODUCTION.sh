@@ -1,218 +1,112 @@
 #!/bin/bash
 
 ################################################################################
-# Production Deployment Script for Stock Trading System
-# Server: 77.42.45.12
-# Timezone: Asia/Kolkata (IST)
+# Production Deployment — Stock Trading System
+# Server: 77.42.45.12  ·  Timezone: Asia/Kolkata (IST)
+#
+# WORKFLOW (locked 2026-05-27):
+#   - LOCAL git is the source of truth. Commit before you deploy.
+#   - The VM NEVER runs git. Source is rsync'd to /opt/trading_system and baked
+#     into images via `docker compose build` on the VM (the "docker model").
+#   - .env on the VM holds live secrets (rotated Fyers token, LIVE_TRADING,
+#     TOTP, Telegram) — it is NEVER synced or overwritten.
+#
+# Three separate images / five containers:
+#   trading_system  ·  technical_scheduler  ·  data_scheduler   (built here)
+#   db  ·  dragonfly                                            (untouched)
+# App-only change (web / templates / admin_routes) -> `--app-only` rebuilds
+# just trading_system. Shared / model / executor / scheduler code -> rebuild
+# all three (default).
+#
+# Usage:
+#   ./DEPLOY_PRODUCTION.sh              # sync + build all 3 + recreate
+#   ./DEPLOY_PRODUCTION.sh --app-only   # sync + build trading_system only
+#   ./DEPLOY_PRODUCTION.sh --no-build   # sync source only (hotfix already cp'd)
+#   ./DEPLOY_PRODUCTION.sh -h
 ################################################################################
 
-set -e  # Exit on error
+set -euo pipefail
 
-# Configuration
 SERVER_IP="77.42.45.12"
 SERVER_USER="root"
 REMOTE_DIR="/opt/trading_system"
-IMAGE_NAME="stockexperiment-trading_system"
-IMAGE_TAG="latest"
+ALL_SERVICES="trading_system technical_scheduler data_scheduler"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
 
-# Print banner
+SERVICES="$ALL_SERVICES"
+DO_BUILD=1
+case "${1:-}" in
+  -h|--help)
+    grep '^#' "$0" | sed 's/^# \{0,1\}//' | sed -n '2,40p'; exit 0 ;;
+  --app-only) SERVICES="trading_system" ;;
+  --no-build) DO_BUILD=0 ;;
+  "") ;;
+  *) echo -e "${RED}Unknown arg: $1 (use -h)${NC}"; exit 1 ;;
+esac
+
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║   Stock Trading System - Production Deployment            ║${NC}"
-echo -e "${BLUE}║   Server: $SERVER_IP                                ║${NC}"
-echo -e "${BLUE}║   Timezone: Asia/Kolkata (IST)                            ║${NC}"
+echo -e "${BLUE}║   Stock Trading System — Deploy (sync + build on VM)       ║${NC}"
+echo -e "${BLUE}║   Server: $SERVER_IP   ·   build: ${SERVICES}${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
-echo ""
 
-# Function to show usage
-usage() {
-    echo "Usage: $0"
-    echo ""
-    echo "This script will:"
-    echo "  1. Build Docker image locally"
-    echo "  2. Export and transfer to production server"
-    echo "  3. Load image and start all containers"
-    echo "  4. Verify deployment"
-    echo ""
-    echo "Prerequisites:"
-    echo "  - SSH key access to root@$SERVER_IP"
-    echo "  - Docker installed locally and on server"
-    echo ""
-    exit 1
-}
-
-# Check if help requested
-if [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
-    usage
+# Warn on uncommitted local changes — local git is the source of truth.
+if command -v git >/dev/null && git rev-parse --git-dir >/dev/null 2>&1; then
+  if ! git diff --quiet || ! git diff --cached --quiet; then
+    echo -e "${YELLOW}⚠ Uncommitted local changes — local git is the source of truth.${NC}"
+    echo -e "${YELLOW}  Commit first so git matches what you deploy. Continuing anyway.${NC}"
+  fi
+  echo -e "${BLUE}Local HEAD:${NC} $(git rev-parse --short HEAD) on $(git rev-parse --abbrev-ref HEAD)"
 fi
 
-# Step 1: Test SSH connection
-echo -e "${BLUE}[1/8] Testing SSH connection to $SERVER_IP...${NC}"
-if ssh -o ConnectTimeout=5 -o BatchMode=yes $SERVER_USER@$SERVER_IP echo "SSH OK" 2>/dev/null; then
-    echo -e "${GREEN}✓ SSH connection successful${NC}"
+# [1/4] SSH check
+echo -e "\n${BLUE}[1/4] SSH to $SERVER_IP...${NC}"
+if ssh -o ConnectTimeout=5 -o BatchMode=yes "$SERVER_USER@$SERVER_IP" 'echo ok' >/dev/null 2>&1; then
+  echo -e "${GREEN}✓ SSH ok${NC}"
 else
-    echo -e "${RED}✗ SSH connection failed!${NC}"
-    echo -e "${YELLOW}Run: ssh-add ~/.ssh/your_key${NC}"
-    exit 1
+  echo -e "${RED}✗ SSH failed — run: ssh-add ~/.ssh/your_key${NC}"; exit 1
 fi
 
-# Step 2: Build Docker image
-echo ""
-echo -e "${BLUE}[2/8] Building Docker image locally...${NC}"
-echo -e "${YELLOW}This may take 5-10 minutes...${NC}"
-docker build --platform linux/amd64 -t $IMAGE_NAME:$IMAGE_TAG .
-echo -e "${GREEN}✓ Image built successfully${NC}"
+# [2/4] Sync source (NO --delete: preserves VM-only files like scripts/, .env*,
+# logs/, exports/). .env and runtime/build artefacts are excluded.
+echo -e "\n${BLUE}[2/4] Syncing source -> $REMOTE_DIR ...${NC}"
+rsync -az --no-perms --omit-dir-times \
+  --exclude='.git/' \
+  --exclude='.env' --exclude='.env.*' \
+  --exclude='logs/' --exclude='exports/' \
+  --exclude='__pycache__/' --exclude='*.pyc' --exclude='*.pyo' \
+  --exclude='.venv/' --exclude='venv/' --exclude='node_modules/' \
+  --exclude='*.tar' --exclude='.DS_Store' \
+  ./ "$SERVER_USER@$SERVER_IP:$REMOTE_DIR/"
+echo -e "${GREEN}✓ Source synced (.env preserved, not touched)${NC}"
 
-# Step 3: Export image
-echo ""
-echo -e "${BLUE}[3/8] Exporting Docker image...${NC}"
-IMAGE_FILE="trading_system_image.tar"
-docker save -o $IMAGE_FILE $IMAGE_NAME:$IMAGE_TAG
-IMAGE_SIZE=$(du -h $IMAGE_FILE | cut -f1)
-echo -e "${GREEN}✓ Image exported: $IMAGE_FILE ($IMAGE_SIZE)${NC}"
-
-# Step 4: Create remote directories
-echo ""
-echo -e "${BLUE}[4/8] Creating remote directory structure...${NC}"
-ssh $SERVER_USER@$SERVER_IP "mkdir -p $REMOTE_DIR/{logs,exports,ml_models,init-scripts}"
-echo -e "${GREEN}✓ Directories created${NC}"
-
-# Step 5: Transfer files
-echo ""
-echo -e "${BLUE}[5/8] Transferring files to server...${NC}"
-echo -e "${YELLOW}Transferring $IMAGE_SIZE - this may take several minutes...${NC}"
-
-# Transfer Docker image
-scp $IMAGE_FILE $SERVER_USER@$SERVER_IP:$REMOTE_DIR/
-
-# Transfer configuration files
-scp docker-compose.yml $SERVER_USER@$SERVER_IP:$REMOTE_DIR/
-# NEVER overwrite a live .env — it holds rotated Fyers tokens / LIVE_TRADING /
-# TOTP / Telegram secrets that .env.production (a stale template) does not.
-# Only seed .env from the template on a FIRST deploy where none exists.
-if ssh $SERVER_USER@$SERVER_IP "test -f $REMOTE_DIR/.env"; then
-    echo -e "${GREEN}✓ Remote .env exists — PRESERVED (not overwritten)${NC}"
+# [3/4] Build on VM + recreate. A stale image-pinning override from old
+# tar-deploys would disable `build:` — remove it so build works.
+if [[ "$DO_BUILD" -eq 1 ]]; then
+  echo -e "\n${BLUE}[3/4] Building [$SERVICES] on VM + recreating...${NC}"
+  echo -e "${YELLOW}Build runs on the server; a few minutes.${NC}"
+  ssh "$SERVER_USER@$SERVER_IP" "cd $REMOTE_DIR && \
+    if [ -f docker-compose.override.yml ] && grep -q 'build:' docker-compose.override.yml; then \
+      echo 'Removing stale image-pinning docker-compose.override.yml'; rm -f docker-compose.override.yml; fi && \
+    docker compose build $SERVICES && \
+    docker compose up -d --force-recreate $SERVICES"
+  echo -e "${GREEN}✓ Built + recreated${NC}"
 else
-    echo -e "${YELLOW}No remote .env — seeding from .env.production (first deploy)${NC}"
-    scp .env.production $SERVER_USER@$SERVER_IP:$REMOTE_DIR/.env
+  echo -e "\n${BLUE}[3/4] --no-build: recreating [$SERVICES] from current images...${NC}"
+  ssh "$SERVER_USER@$SERVER_IP" "cd $REMOTE_DIR && docker compose up -d $SERVICES"
+  echo -e "${GREEN}✓ Recreated${NC}"
 fi
-scp -r init-scripts/* $SERVER_USER@$SERVER_IP:$REMOTE_DIR/init-scripts/
-scp scheduler.py data_scheduler.py run_pipeline.py $SERVER_USER@$SERVER_IP:$REMOTE_DIR/
 
-echo -e "${GREEN}✓ Files transferred${NC}"
+# [4/4] Verify
+echo -e "\n${BLUE}[4/4] Verifying...${NC}"
+ssh "$SERVER_USER@$SERVER_IP" "cd $REMOTE_DIR && docker compose ps --format 'table {{.Name}}\t{{.Status}}'"
+HTTP=$(ssh "$SERVER_USER@$SERVER_IP" "curl -s -o /dev/null -w '%{http_code}' http://localhost:5001/ 2>/dev/null || echo 000")
+echo -e "${BLUE}Web UI (localhost:5001 on VM):${NC} HTTP $HTTP"
+echo -e "${BLUE}Scheduler boot (last lines):${NC}"
+ssh "$SERVER_USER@$SERVER_IP" "docker logs trading_system_technical_scheduler --since 1m 2>&1 | grep -iE 'running|registered|error|NameError' | tail -5 || true"
 
-# Clean up local tar file
-rm -f $IMAGE_FILE
-echo -e "${GREEN}✓ Local tar file cleaned up${NC}"
-
-# Step 6: Ensure Docker is installed on server
-echo ""
-echo -e "${BLUE}[6/8] Checking Docker on server...${NC}"
-ssh $SERVER_USER@$SERVER_IP << 'EOF'
-    if ! command -v docker &> /dev/null; then
-        echo "Installing Docker..."
-        curl -fsSL https://get.docker.com -o get-docker.sh
-        sh get-docker.sh
-        rm get-docker.sh
-        systemctl enable docker
-        systemctl start docker
-        echo "✓ Docker installed"
-    else
-        echo "✓ Docker already installed"
-    fi
-
-    if ! docker compose version &> /dev/null; then
-        echo "Installing Docker Compose..."
-        apt-get update
-        apt-get install -y docker-compose-plugin
-        echo "✓ Docker Compose installed"
-    else
-        echo "✓ Docker Compose already installed"
-    fi
-EOF
-echo -e "${GREEN}✓ Docker environment ready${NC}"
-
-# Step 7: Load image and start services
-echo ""
-echo -e "${BLUE}[7/8] Loading image and starting services...${NC}"
-
-ssh $SERVER_USER@$SERVER_IP << EOF
-    cd $REMOTE_DIR
-
-    # Create override file for image-based deployment (preserves original docker-compose.yml)
-    cat > docker-compose.override.yml << 'OVERRIDE'
-services:
-  trading_system:
-    image: $IMAGE_NAME:$IMAGE_TAG
-    build: !reset null
-  technical_scheduler:
-    image: $IMAGE_NAME:$IMAGE_TAG
-    build: !reset null
-  data_scheduler:
-    image: $IMAGE_NAME:$IMAGE_TAG
-    build: !reset null
-OVERRIDE
-    sed -i "s|\\\$IMAGE_NAME|$IMAGE_NAME|g; s|\\\$IMAGE_TAG|$IMAGE_TAG|g" docker-compose.override.yml
-
-    echo "Loading Docker image..."
-    docker load -i trading_system_image.tar
-
-    echo "Removing image tar file..."
-    rm -f trading_system_image.tar
-
-    echo "Stopping existing containers..."
-    docker compose down 2>/dev/null || true
-
-    echo "Starting services..."
-    docker compose up -d
-
-    echo "Waiting for services to be healthy..."
-    sleep 15
-
-    echo ""
-    echo "Container status:"
-    docker compose ps
-EOF
-echo -e "${GREEN}✓ Services started${NC}"
-
-# Step 8: Verify deployment
-echo ""
-echo -e "${BLUE}[8/8] Verifying deployment...${NC}"
-
-# Get container status
-CONTAINER_COUNT=$(ssh $SERVER_USER@$SERVER_IP "cd $REMOTE_DIR && docker compose ps -q | wc -l" | tr -d ' ')
-
-# Test web UI
-HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://$SERVER_IP:5001/ || echo "000")
-
-echo ""
-echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║          DEPLOYMENT SUCCESSFUL!                            ║${NC}"
+echo -e "\n${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${GREEN}║                 DEPLOYMENT COMPLETE                        ║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
-echo ""
-echo -e "${BLUE}Deployment Summary:${NC}"
-echo -e "  Containers Running: $CONTAINER_COUNT/5"
-echo -e "  Web UI Status: HTTP $HTTP_STATUS"
-echo ""
-echo -e "${BLUE}Access Your System:${NC}"
-echo -e "  Web UI:  ${GREEN}http://$SERVER_IP:5001${NC}"
-echo -e "  Username: ${GREEN}admin${NC}"
-echo -e "  Password: ${YELLOW}See ADMIN_CREDENTIALS.md${NC}"
-echo ""
-echo -e "${BLUE}Next Steps:${NC}"
-echo -e "  1. Configure Fyers credentials via web UI"
-echo -e "  2. Monitor logs: ${GREEN}./manage_production.sh logs${NC}"
-echo -e "  3. Wait for first data pipeline at 9:00 PM IST"
-echo ""
-echo -e "${BLUE}Container Timezone:${NC}"
-ssh $SERVER_USER@$SERVER_IP "cd $REMOTE_DIR && docker compose exec -T trading_system date 2>/dev/null || echo 'Containers still starting...'"
-echo ""
-echo -e "${YELLOW}For management commands, see: ./manage_production.sh${NC}"
-echo ""
-echo -e "${GREEN}Deployment complete!${NC}"
+echo -e "  Built: ${GREEN}${SERVICES}${NC}"
+echo -e "  Reminder: the VM does NOT track git — local git is the record."
