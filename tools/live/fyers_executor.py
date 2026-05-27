@@ -602,7 +602,7 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
     # arbitrarily far from intent. intended_price = the last LIMIT price we used
     # (retry_px). If the FRESH live LTP has moved more than MAX_SLIPPAGE_PCT off
     # that, abort instead of placing MARKET (fail-safe over fail-convenient).
-    max_slip_pct = float(os.environ.get("MAX_SLIPPAGE_PCT", "2.0"))
+    max_slip_pct = rm_cfg.max_slippage_pct   # per-model (RiskConfig, env-overridable)
     intended_price = retry_px
     ltp_now = _fetch_live_ltp(svc, user_id, symbol)
     if ltp_now and intended_price and ltp_now > 0:
@@ -966,7 +966,7 @@ def main() -> int:
         pnl = (fill_price - held.entry_price) * actual_qty * (
             1 if held.side == "BUY" else -1
         )
-        model_for_signal = args.model_name or sig.get("model", "momentum_n100_top5_max1")
+        model_for_signal = args.model_name or sig.get("model") or "(env)"
         _append_history({
             "ts": datetime.now().isoformat(),
             "event": "EXIT", "reason": sig_type, "pass": 1,
@@ -1209,7 +1209,7 @@ def main() -> int:
                 )
 
         entry_ts = datetime.now().isoformat()
-        model_for_signal = args.model_name or sig.get("model", "momentum_n100_top5_max1")
+        model_for_signal = args.model_name or sig.get("model") or "(env)"
         _append_history({
             "ts": entry_ts, "event": "ENTRY", "signal": sig.get("signal"),
             "pass": 2,

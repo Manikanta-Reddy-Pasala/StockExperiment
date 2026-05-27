@@ -489,23 +489,19 @@ def main():
     except Exception as _e:
         log.debug(f"audit hook failed: {_e}")
 
-    # Notification funnel — ping the verdict even on no-change (eval day only).
-    # n100's live_signal runs stateless (held=[]) so it always emits ENTRY1;
-    # the ledger is the truth. If already holding, the ENTRY won't execute
-    # (max_concurrent=1) → that's a no-change tick.
+    # Notification funnel — ping the verdict on the scheduled eval. n100 is now
+    # STATEFUL (held_from_db), and `signals` already reflects it: empty on a
+    # no-change hold, [SELL,BUY] on a rotation, [BUY] when entering flat. Pass
+    # `signals` straight through — the old `_eff = [] if held else signals` hack
+    # wrongly suppressed the rotation ping whenever a position was held.
     if not args.force:
         try:
-            from src.services.notification_service import (
-                notify_model_decision, current_held,
-            )
-            _held = current_held("momentum_n100_top5_max1")
-            # If already holding, max_concurrent=1 means the BUY won't execute,
-            # so the effective signal set is empty (a no-change tick).
-            _eff = [] if _held else signals
+            from src.services.notification_service import notify_model_decision
+            _held = held[0]["symbol"] if held else None
             # 30d return of the held stock for the notification context.
             _ret = next((r[2] for r in ranks if r[0] == _held), None) if _held else None
             notify_model_decision(
-                "momentum_n100_top5_max1", _eff, held_symbol=_held,
+                "momentum_n100_top5_max1", signals, held_symbol=_held,
                 held_ret=_ret,
                 trigger="MID_MONTH" if args.mid_month_check else "CRON",
             )

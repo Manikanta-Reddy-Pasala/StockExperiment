@@ -27,6 +27,23 @@ from typing import Dict, List, Optional
 log = logging.getLogger("risk_manager")
 
 
+def _env_model(model_name, key, default, cast=float):
+    """Per-model env override with global fallback. Looks up
+    ``<MODEL>_<KEY>`` first (model upper-cased, '-' -> '_'), then the global
+    ``<KEY>``, else ``default``. Lets a thin midcap use a wider slippage/LIMIT
+    band than a liquid n100 without a DB schema change — set e.g.
+    ``MIDCAP_NARROW_60D_BREAKOUT_MAX_SLIPPAGE_PCT=3`` in .env.
+    """
+    mn = (model_name or "").upper().replace("-", "_")
+    for k in ((f"{mn}_{key}" if mn else None), key):
+        if k and k in os.environ:
+            try:
+                return cast(os.environ[k])
+            except (TypeError, ValueError):
+                pass
+    return default
+
+
 @dataclass
 class RiskConfig:
     capital_inr: int = 1_000_000        # ₹10L locked-in pool
@@ -35,10 +52,13 @@ class RiskConfig:
     max_daily_loss_pct: float = -5.0    # kill switch
     min_price: float = 50.0
     enable_short: bool = False
-    # LIMIT-with-tolerance + MARKET-fallback knobs (Phase 2 Task 6)
+    # LIMIT-with-tolerance + MARKET-fallback knobs (Phase 2 Task 6).
+    # Per-model overridable via env: <MODEL>_LIMIT_TOL_PCT etc (see _env_model);
+    # falls back to the global env knob, then these defaults.
     limit_tol_pct: float = 0.1          # initial LIMIT slack vs last price (standard)
     limit_retry_pct: float = 0.2        # widened slack on first re-quote (standard)
     limit_fallback_s: int = 20          # total seconds before MARKET fallback
+    max_slippage_pct: float = 2.0       # abort MARKET fallback if LTP moved > this
     # Hard ceiling: total BUY exposure must never exceed allocated capital +
     # cumulative realized P&L. Set per-model in from_model(); kept at -1 for
     # env-based callers (treated as 'no cap' for backward-compat).
@@ -81,6 +101,7 @@ class RiskManager:
             limit_tol_pct=float(os.environ.get("LIMIT_TOL_PCT", 0.1)),
             limit_retry_pct=float(os.environ.get("LIMIT_RETRY_PCT", 0.2)),
             limit_fallback_s=int(os.environ.get("LIMIT_FALLBACK_S", 20)),
+            max_slippage_pct=float(os.environ.get("MAX_SLIPPAGE_PCT", 2.0)),
         )
         return cls(cfg)
 
@@ -143,9 +164,10 @@ class RiskManager:
             max_daily_loss_pct=float(os.environ.get("MAX_DAILY_LOSS_PCT", -5.0)),
             min_price=float(os.environ.get("MIN_PRICE", 50.0)),
             enable_short=os.environ.get("ENABLE_SHORT", "false").lower() == "true",
-            limit_tol_pct=float(os.environ.get("LIMIT_TOL_PCT", 0.1)),
-            limit_retry_pct=float(os.environ.get("LIMIT_RETRY_PCT", 0.2)),
-            limit_fallback_s=int(os.environ.get("LIMIT_FALLBACK_S", 20)),
+            limit_tol_pct=_env_model(model_name, "LIMIT_TOL_PCT", 0.1),
+            limit_retry_pct=_env_model(model_name, "LIMIT_RETRY_PCT", 0.2),
+            limit_fallback_s=_env_model(model_name, "LIMIT_FALLBACK_S", 20, int),
+            max_slippage_pct=_env_model(model_name, "MAX_SLIPPAGE_PCT", 2.0),
             max_total_buy_inr=max_total_buy,
         )
         log.info(
