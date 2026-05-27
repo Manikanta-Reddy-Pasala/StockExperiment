@@ -42,6 +42,20 @@ function _firstWeekday(d) {
   return x;
 }
 
+// Trading (week)days from tomorrow through `target` inclusive. Weekday-based
+// (NSE holidays not subtracted — rare in a 1-2 week window); more meaningful
+// for a trading model than raw calendar days.
+function _tradingDaysUntil(target) {
+  const now = new Date();
+  let cur = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let n = 0;
+  while (cur < target) {
+    cur.setDate(cur.getDate() + 1);
+    if (cur.getDay() !== 0 && cur.getDay() !== 6) n++;
+  }
+  return n;
+}
+
 // Compute next rebalance date+days for a given schedule. Mirrors backend
 // _next_rebalance() logic so UI doesn't need an extra API round trip.
 function nextRebalance(schedule) {
@@ -59,7 +73,7 @@ function nextRebalance(schedule) {
     if (mid > startOfToday) { target = mid; kind = 'mid-month'; }
     else                    { target = next; kind = 'monthly'; }
     const days = Math.max(0, Math.ceil((target - startOfToday) / 86400000));
-    return {label: _ymdLocal(target), days, kind};
+    return {label: _ymdLocal(target), days, tradingDays: _tradingDaysUntil(target), kind};
   }
 
   if (schedule === "monthly") {
@@ -67,7 +81,7 @@ function nextRebalance(schedule) {
       ? _firstWeekday(startOfToday)
       : _firstWeekday(new Date(today.getFullYear(), today.getMonth()+1, 1));
     const days = Math.max(0, Math.ceil((target - startOfToday) / 86400000));
-    return {label: _ymdLocal(target), days, kind: 'monthly'};
+    return {label: _ymdLocal(target), days, tradingDays: _tradingDaysUntil(target), kind: 'monthly'};
   }
 
   if (schedule === "daily") {
@@ -75,7 +89,7 @@ function nextRebalance(schedule) {
     target.setDate(target.getDate() + 1);
     target = _firstWeekday(target);
     const days = Math.ceil((target - startOfToday) / 86400000);
-    return {label: _ymdLocal(target), days, kind: 'daily'};
+    return {label: _ymdLocal(target), days, tradingDays: _tradingDaysUntil(target), kind: 'daily'};
   }
 
   return {label: 'event-driven', days: null, kind: 'event'};
@@ -147,7 +161,7 @@ function renderCard(m, idx, ranking, status) {
   const schedPill = _sched.kind === 'event'
     ? `<span class="badge bg-secondary ms-1" title="Trades only when 40-day-high + vol + SMA all fire">event-driven</span>`
     : `<span class="badge bg-secondary ms-1" title="${_sched.kind} rotation">
-         ${_sched.kind}: ${_sched.label}${_sched.days != null ? ` (in ${_sched.days}d)` : ''}
+         ${_sched.kind}: ${_sched.label}${_sched.tradingDays != null ? ` (${_sched.tradingDays} td)` : ''}
        </span>`;
 
   // Top pick summary shown when collapsed — gives operator the most important
@@ -186,7 +200,7 @@ function renderCard(m, idx, ranking, status) {
     const sched = nextRebalance(m.schedule);
     const rebalLine = sched.kind === 'event'
       ? 'Rebalance: event-driven (on next breakout trigger)'
-      : `Next auto-rebalance: <strong>${sched.label}</strong> ${sched.days != null ? `(in ${sched.days} day${sched.days===1?'':'s'})` : ''} · ${sched.kind}`;
+      : `Next auto-rebalance: <strong>${sched.label}</strong> ${sched.tradingDays != null ? `(${sched.tradingDays} trading day${sched.tradingDays===1?'':'s'} left)` : ''} · ${sched.kind}`;
 
     const originLine = isManual
       ? `<span class="badge bg-info">MANUAL</span> Held <strong>${heldNorm}</strong> linked from broker on ${entryDate} (reason: <code>${reason}</code>) — NOT a model pick.`
