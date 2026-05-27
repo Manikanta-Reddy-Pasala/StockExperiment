@@ -56,8 +56,16 @@ class Position:
 
 
 class RiskManager:
-    def __init__(self, config: Optional[RiskConfig] = None):
+    def __init__(self, config: Optional[RiskConfig] = None,
+                 capital_is_net_cash: bool = False):
         self.cfg = config or RiskConfig.from_env()
+        # When True, cfg.capital_inr was sourced from live NET cash (from_model:
+        # ledger.cash), which is ALREADY debited for any open position at
+        # record_buy. In that case size_position must NOT subtract the open
+        # position value again (that double-counts and starves a 2nd slot when
+        # max_concurrent>1). The env path uses GROSS capital, so it keeps the
+        # original behaviour (subtract used).
+        self._capital_is_net_cash = capital_is_net_cash
 
     @classmethod
     def from_env(cls):
@@ -146,7 +154,8 @@ class RiskManager:
             model_name, f"{capital:,}", max_concurrent,
             f"{max_per_trade:,}", f"{max_total_buy:,}",
         )
-        return cls(cfg)
+        # capital came from live NET cash → don't re-subtract open positions.
+        return cls(cfg, capital_is_net_cash=True)
 
     # Convenience: build from explicit model when name given, else env
     @classmethod
@@ -186,7 +195,11 @@ class RiskManager:
         allocated_capital + cumulative_realized_pnl.
         """
         used = sum(p.qty * p.entry_price for p in open_positions)
-        cash = self.cfg.capital_inr - used
+        # Net-cash capital (from_model) is already net of open positions, so
+        # subtracting `used` again would double-count. Gross capital (env path)
+        # still needs the subtraction to reserve cash for existing positions.
+        cash = self.cfg.capital_inr if self._capital_is_net_cash \
+            else self.cfg.capital_inr - used
         slots_left = self.cfg.max_concurrent - len(open_positions)
         if slots_left <= 0 or cash <= 0:
             return 0

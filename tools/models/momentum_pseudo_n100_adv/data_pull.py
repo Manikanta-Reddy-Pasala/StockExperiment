@@ -119,8 +119,19 @@ def refresh_universe():
     log.info("=" * 80)
     log.info("momentum_pseudo_n100_adv yearly PIT universe refresh")
     log.info("=" * 80)
-    # Today's date doubles as both the build's PIT as-of date and the merge key.
+    # PIT as-of date for the BUILD = today (only data observable now is used).
     end_date = datetime.now().strftime("%Y-%m-%d")
+    # Merge KEY = this year's rebalance ANCHOR (May 1), NOT today's build date.
+    # pick_universe_for() selects the latest key <= today, so keying by the
+    # build date would make ANY ad-hoc/--force re-run on a random day inject a
+    # brand-new key that instantly becomes the live universe (e.g. a build on
+    # 2026-05-27 would create '2026-05-27' and supersede the intended
+    # '2026-05-xx' May anchor). Keying by the fixed May-1 anchor means a re-run
+    # UPDATES the correct yearly key instead of creating a spurious live one.
+    # May 1 is the model's documented yearly-rebalance month; prior keys were
+    # mid-May trading dates (2023-05-15, 2024-05-13, 2025-05-13) — May 1 is a
+    # stable, deterministic anchor <= all of those, preserving ordering.
+    anchor_key = f"{datetime.now().year}-05-01"
     out_file = f"/app/exports/backtests/pseudo_n100_{end_date}.json"
     Path(out_file).parent.mkdir(parents=True, exist_ok=True)
     ok = _run(
@@ -148,12 +159,13 @@ def refresh_universe():
             log.warning(f"build_universe returned only {len(symbols)} — skipping merge")
             return
         yearly = {}
-        # Preserve prior year keys — load existing file before adding today's.
+        # Preserve prior year keys — load existing file before adding this year's.
         if Path(UNIVERSES_FILE).exists():
             yearly = json.loads(Path(UNIVERSES_FILE).read_text())
-        # Add/replace only today's key; live_signal looks it up by date.
-        yearly[end_date] = [{"symbol": s} for s in symbols]
+        # Add/replace only THIS YEAR'S anchor key (May 1); live_signal looks it
+        # up by date via pick_universe_for (latest key <= today).
+        yearly[anchor_key] = [{"symbol": s} for s in symbols]
         Path(UNIVERSES_FILE).write_text(json.dumps(yearly, indent=2))
-        log.info(f"  merged {len(symbols)} symbols into yearly_universes.json as '{end_date}'")
+        log.info(f"  merged {len(symbols)} symbols into yearly_universes.json as '{anchor_key}'")
     except Exception as e:
         log.error(f"  yearly_universes.json merge failed: {e}", exc_info=True)

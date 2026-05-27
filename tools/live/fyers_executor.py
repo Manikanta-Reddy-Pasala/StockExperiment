@@ -645,13 +645,18 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
 
 # --------- Ledger hooks ---------
 
-def _tg_safe(text: str):
+def _tg_safe(text: str, is_fail: bool = None):
     """Best-effort notify — funnels through the unified notification service
     (DB feed + Telegram). Never raises. Falls back to bare Telegram if the
-    service import fails."""
+    service import fails.
+
+    is_fail: when the caller KNOWS the outcome, pass True (clear failure) or
+    False (success) so notify_order classifies the event explicitly instead of
+    guessing from substrings. None (default) keeps the heuristic — existing
+    callers are unaffected."""
     try:
         from src.services.notification_service import notify_order
-        notify_order(text)
+        notify_order(text, is_fail=is_fail)
     except Exception as e:
         log.debug(f"notify funnel skipped ({e}); trying bare telegram")
         try:
@@ -689,11 +694,13 @@ def _record_model_buy(model_name, symbol, qty, price, order_id, svc=None, user_i
         _tg_safe(
             f"✅ *BUY {model_name}*\n"
             f"`{symbol}` x{qty} @ ₹{float(price):.2f} = ₹{float(qty)*float(price):,.0f}\n"
-            f"order_id=`{order_id or '—'}`"
+            f"order_id=`{order_id or '—'}`",
+            is_fail=False,
         )
     except Exception as e:
         log.warning(f"  ledger record_buy failed for {model_name}: {e}")
-        _tg_safe(f"⚠️ BUY {model_name} {symbol} x{qty} placed but ledger write FAILED: {e}")
+        _tg_safe(f"⚠️ BUY {model_name} {symbol} x{qty} placed but ledger write FAILED: {e}",
+                 is_fail=True)
 
 
 def _record_model_sell(model_name, exit_price, reason, order_id, qty=None,
@@ -709,11 +716,13 @@ def _record_model_sell(model_name, exit_price, reason, order_id, qty=None,
         _tg_safe(
             f"💰 *SELL {model_name}*\n"
             f"@ ₹{float(exit_price):.2f}  reason=`{reason}`\n"
-            f"order_id=`{order_id or '—'}`"
+            f"order_id=`{order_id or '—'}`",
+            is_fail=False,
         )
     except Exception as e:
         log.warning(f"  ledger record_sell failed for {model_name}: {e}")
-        _tg_safe(f"⚠️ SELL {model_name} order placed but ledger write FAILED: {e}")
+        _tg_safe(f"⚠️ SELL {model_name} order placed but ledger write FAILED: {e}",
+                 is_fail=True)
 
 
 # --------- main ---------
@@ -1260,7 +1269,8 @@ def main() -> int:
                     _lines.append(f"Cash left: ₹{float(_lg.cash):,.0f}")
         except Exception:
             pass
-        _tg_safe("\n".join(_lines))
+        # Known-success: classify explicitly so the feed never misreads it.
+        _tg_safe("\n".join(_lines), is_fail=False)
 
     # HOLD audit — when cron runs but no entry/exit was taken, still log
     # the decision so audit_rebalance_decisions has one row per (model, day).

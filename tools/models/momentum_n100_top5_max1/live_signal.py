@@ -339,6 +339,11 @@ def main():
                          "rotate when out. 1=top-1 rotation (matches backtest). "
                          "Default 1.")
     ap.add_argument("--signals-out", required=True)
+    ap.add_argument("--ranking-out", default=None,
+                    help="Where to write the Today's Picks ranking JSON. "
+                         "Default = the canonical ranking dir. The admin "
+                         "display path passes a /tmp path so a page view never "
+                         "clobbers the morning's audited ranking snapshot.")
     ap.add_argument("--ledger", default=None,
                     help="Paper ledger JSON to read current holdings")
     ap.add_argument("--rebalance-only", action="store_true",
@@ -433,9 +438,15 @@ def main():
 
     # Persist top-N ranking for the Today's Picks UI. Always written (even
     # on non-rebalance days the user wants to *see* the current ranking).
-    ranking_dir = Path("/app/logs/momrot/ranking")
-    ranking_dir.mkdir(parents=True, exist_ok=True)
-    ranking_path = ranking_dir / f"{today.strftime('%Y-%m-%d')}.json"
+    # --ranking-out overrides the canonical path so display-only runs (admin
+    # Today's Picks) can route to /tmp and not clobber the audited snapshot.
+    if args.ranking_out:
+        ranking_path = Path(args.ranking_out)
+        ranking_path.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        ranking_dir = Path("/app/logs/momrot/ranking")
+        ranking_dir.mkdir(parents=True, exist_ok=True)
+        ranking_path = ranking_dir / f"{today.strftime('%Y-%m-%d')}.json"
     top_payload = {
         "model": "momentum_n100_top5_max1",
         "date": today.strftime("%Y-%m-%d"),

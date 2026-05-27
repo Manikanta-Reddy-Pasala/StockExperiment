@@ -2304,6 +2304,7 @@ def admin_model_ranking(model_name):
                 need_run = True
         # Only models that declare a live_signal entry can auto-run.
         ran_now = False
+        ranking_out = None  # set below when a display run is actually launched
         if need_run and paths.get("live_signal"):
             ts = datetime.now().strftime("%Y%m%dT%H%M%S")
             # DISPLAY-ONLY refresh. The signal file this emits goes to a
@@ -2322,10 +2323,17 @@ def admin_model_ranking(model_name):
             # side effect of this run — so the display works on any day
             # without ever injecting an order.
             signals_out = f"/tmp/ranking_display_{model_name}_{ts}.json"
+            # Route the ranking JSON to /tmp too. Without --ranking-out,
+            # live_signal writes the canonical ranking_dir/{today}.json as a
+            # side effect — so merely opening Today's Picks would overwrite the
+            # morning's AUDITED ranking snapshot. We read the canonical file
+            # below regardless; this display run only needs a throwaway copy.
+            ranking_out = f"/tmp/ranking_display_rank_{model_name}_{ts}.json"
             cmd = [
                 "python3", paths["live_signal"],
                 *paths["extra_args"],
                 "--signals-out", signals_out,
+                "--ranking-out", ranking_out,
             ]
             if recalc:
                 cmd.append("--force")
@@ -2344,21 +2352,31 @@ def admin_model_ranking(model_name):
             except Exception as e:
                 logger.warning(f"auto live_signal for {model_name} crashed: {e}")
 
-        d = ranking_dir
-        if not d.exists():
-            return jsonify({
-                "success": True,
-                "model": model_name,
-                "label": paths.get("label", model_name),
-                "ranking": [],
-                "ran_now": ran_now,
-                "note": f"No ranking dir yet ({paths['ranking_dir']}) — "
-                        "scheduler will create it on next live_signal run, "
-                        "or hit /admin/<m>/run-signal.",
-            })
-
-        files = sorted(d.glob("*.json"), key=lambda p: p.stat().st_mtime,
-                       reverse=True)
+        # Prefer the fresh /tmp ranking this display run just produced (if any)
+        # so the page shows TODAY's picks without writing the canonical file.
+        # The canonical ranking_dir/{today}.json is written ONLY by the
+        # schedule-gated cron — never by a page view — preserving the audit
+        # trail. If the display run didn't produce a file, fall back to the
+        # latest canonical file (yesterday's, with live LTP overlaid below).
+        display_ranking_path = Path(ranking_out) if (ran_now and ranking_out) \
+            else None
+        if display_ranking_path and display_ranking_path.exists():
+            files = [display_ranking_path]
+        else:
+            d = ranking_dir
+            if not d.exists():
+                return jsonify({
+                    "success": True,
+                    "model": model_name,
+                    "label": paths.get("label", model_name),
+                    "ranking": [],
+                    "ran_now": ran_now,
+                    "note": f"No ranking dir yet ({paths['ranking_dir']}) — "
+                            "scheduler will create it on next live_signal run, "
+                            "or hit /admin/<m>/run-signal.",
+                })
+            files = sorted(d.glob("*.json"),
+                           key=lambda p: p.stat().st_mtime, reverse=True)
         if not files:
             return jsonify({
                 "success": True, "model": model_name,

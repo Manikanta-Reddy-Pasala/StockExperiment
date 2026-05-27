@@ -973,16 +973,26 @@ class FyersAPI:
         Per Fyers API v3 docs:
           1 = Cancelled
           2 = Traded / Filled
+          3 = (not documented as standard; observed as a transient/partial
+               state — map to PENDING so the wait loop keeps polling rather
+               than treating it as a fill)
           4 = Transit
           5 = Rejected
           6 = Pending
+          7 = Expired (order lapsed without filling — a TERMINAL state)
+
+        7 must NOT fall through to PENDING: an EXPIRED order would otherwise
+        look PENDING and make _wait_for_fill burn its full timeout instead of
+        terminating promptly. 3 is intentionally mapped to PENDING (transient).
         """
         status_mapping = {
             1: 'CANCELLED',
             2: 'COMPLETE',
+            3: 'PENDING',     # transient/partial — keep polling
             4: 'TRANSIT',
             5: 'REJECTED',
             6: 'PENDING',
+            7: 'EXPIRED',     # terminal — stop waiting immediately
         }
         return status_mapping.get(status, 'PENDING')
     

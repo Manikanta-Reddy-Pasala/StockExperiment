@@ -336,6 +336,11 @@ def main() -> int:
                          "rotate when out. 1=top-1 rotation (matches backtest). "
                          "Default 1.")
     ap.add_argument("--signals-out", required=True)
+    ap.add_argument("--ranking-out", default=None,
+                    help="Where to write the Today's Picks ranking JSON. "
+                         "Default = the canonical ranking dir. The admin "
+                         "display path passes a /tmp path so a page view never "
+                         "clobbers the morning's audited ranking snapshot.")
     ap.add_argument("--rebalance-only", action="store_true",
                     help="Skip if today is not rebalance trigger day")
     ap.add_argument("--force", action="store_true",
@@ -358,9 +363,15 @@ def main() -> int:
     ranks = rank_universe(symbols, today_ts)
     log.info(f"PIT universe: {universe_key} → {len(symbols)} symbols")
 
-    ranking_dir = Path("/app/logs/momrot_pseudo/ranking")
-    ranking_dir.mkdir(parents=True, exist_ok=True)
-    ranking_path = ranking_dir / f"{today.strftime('%Y-%m-%d')}.json"
+    # --ranking-out overrides the canonical path so display-only runs (admin
+    # Today's Picks) route to /tmp and don't clobber the audited snapshot.
+    if args.ranking_out:
+        ranking_path = Path(args.ranking_out)
+        ranking_path.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        ranking_dir = Path("/app/logs/momrot_pseudo/ranking")
+        ranking_dir.mkdir(parents=True, exist_ok=True)
+        ranking_path = ranking_dir / f"{today.strftime('%Y-%m-%d')}.json"
     ranking_payload = {
         "model": MODEL_NAME,
         "date": today.strftime("%Y-%m-%d"),

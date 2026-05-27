@@ -77,6 +77,50 @@ def emit_signal():
         _alert(f"❌ {MODEL_NAME} emit_signal error: {e}")
 
 
+def emit_signal_eod():
+    """15:25 IST end-of-day breakout/exit scan — DISPLAY/AUDIT ONLY.
+
+    Mirrors the n100 mid-month separate-file pattern. Writes to a SEPARATE
+    `{today}_midcap_narrow_eod.json` file that execute_orders() never reads,
+    so this run can never clobber the morning's audited canonical signal.
+
+    Why a separate file: execute_orders() runs ~09:32 against the 09:25
+    canonical file. The original 15:25 emit reused that SAME path, recomputing
+    against the now-held position and overwriting the morning signal with an
+    EXIT that nothing executes — corrupting the audit trail. Routing the EOD
+    scan to its own file keeps the canonical morning signal intact while still
+    surfacing end-of-day SMA-break exits in the PWA/Telegram feed.
+    """
+    log.info("\n" + "=" * 80)
+    log.info(f"RUNNING {MODEL_NAME} EOD signal (display/audit only)")
+    log.info("=" * 80)
+    SIGNALS_DIR.mkdir(parents=True, exist_ok=True)
+    today = datetime.now().strftime("%Y-%m-%d")
+    # Separate file — NEVER read by execute_orders (canonical is the 09:25 file).
+    signals_out = SIGNALS_DIR / f"{today}_midcap_narrow_eod.json"
+    cmd = [
+        "python3",
+        "tools/models/midcap_narrow_60d_breakout/live_signal.py",
+        "--universe-file", UNIVERSE_FILE,
+        "--signals-out", str(signals_out),
+    ]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600,
+                           env={**os.environ, "MOMROT_TG_NOTIFY": "1"})
+        if r.returncode == 0:
+            log.info(f"✅ {MODEL_NAME} EOD signal -> {signals_out}")
+            if r.stdout:
+                log.info(r.stdout[-500:])
+        else:
+            log.error(f"❌ {MODEL_NAME} EOD signal failed ({r.returncode})")
+            if r.stderr:
+                log.error(r.stderr[-500:])
+            _alert(f"❌ {MODEL_NAME} emit_signal_eod failed (rc={r.returncode})")
+    except Exception as e:
+        log.error(f"❌ {MODEL_NAME} EOD signal error: {e}")
+        _alert(f"❌ {MODEL_NAME} emit_signal_eod error: {e}")
+
+
 def execute_orders():
     """Place Fyers orders from today's signal file."""
     today = datetime.now().strftime("%Y-%m-%d")
@@ -132,5 +176,7 @@ def register_trading_jobs(schedule):
     schedule.every().day.at("09:25").do(emit_signal)
     # Execute orders
     schedule.every().day.at("09:32").do(execute_orders)
-    # Also check exit conditions at market close (catches end-of-day SMA breaks)
-    schedule.every().day.at("15:25").do(emit_signal)
+    # Also check exit conditions at market close (catches end-of-day SMA breaks).
+    # DISPLAY/AUDIT ONLY — writes a SEPARATE *_eod.json so it never clobbers the
+    # morning canonical signal that execute_orders reads.
+    schedule.every().day.at("15:25").do(emit_signal_eod)

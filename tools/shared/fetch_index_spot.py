@@ -29,6 +29,36 @@ sys.path.insert(0, str(ROOT))
 from tools.shared.ohlcv_cache import _get_engine  # noqa: E402
 
 
+def _history_with_retry(svc, symbol: str, start_str: str, end_str: str,
+                        max_retries: int = 3) -> dict | None:
+    """Call ``svc.history()`` for one chunk with exponential-backoff retry.
+
+    Mirrors ``tools.shared.universes._history_with_retry``. Without this a
+    single network blip or transient Fyers 429/503 drops the whole chunk
+    silently → a permanent index-data gap. Backoff sleeps: 2s, 4s.
+
+    Returns the Fyers response dict on the first ``status == "success"``
+    attempt, or None if every attempt failed.
+    """
+    import time as _time
+    last_err = None
+    for attempt in range(max_retries):
+        try:
+            res = svc.history(user_id=1, symbol=symbol, exchange="NSE",
+                              interval="D",
+                              start_date=start_str, end_date=end_str)
+            if res and res.get("status") == "success":
+                return res
+            last_err = (res or {}).get("message", "no response")
+        except Exception as e:
+            last_err = str(e)
+        # Back off before the next attempt (skip sleep after the last try).
+        if attempt < max_retries - 1:
+            _time.sleep(2 ** (attempt + 1))
+    print(f"  FAIL {start_str}..{end_str} after {max_retries} retries: {last_err}")
+    return None
+
+
 def fetch(symbol: str, start: str, end: str) -> pd.DataFrame:
     """Fetch daily index spot OHLC from Fyers over the [start, end] window.
 
@@ -55,16 +85,15 @@ def fetch(symbol: str, start: str, end: str) -> pd.DataFrame:
     # Walk the window in 360-day slices to stay under Fyers's daily request cap.
     while cursor <= ed:
         chunk_end = min(cursor + timedelta(days=360), ed)
-        res = svc.history(user_id=1, symbol=symbol, exchange="NSE",
-                          interval="D",
-                          start_date=cursor.strftime("%Y-%m-%d"),
-                          end_date=chunk_end.strftime("%Y-%m-%d"))
-        if res and res.get("status") == "success":
+        # Retry transient failures so one blip doesn't leave a permanent gap.
+        res = _history_with_retry(svc, symbol,
+                                  cursor.strftime("%Y-%m-%d"),
+                                  chunk_end.strftime("%Y-%m-%d"))
+        if res:
             cs = (res.get("data") or {}).get("candles") or []
             chunks.extend(cs)
             print(f"  {cursor}..{chunk_end}: {len(cs)} bars")
-        else:
-            print(f"  FAIL {cursor}..{chunk_end}: {(res or {}).get('message')}")
+        # _history_with_retry already prints a FAIL line after exhausting retries.
         # +1 day so the next chunk starts after this chunk's inclusive end.
         cursor = chunk_end + timedelta(days=1)
     if not chunks:

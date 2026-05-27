@@ -571,8 +571,34 @@ def snapshot_data_quality_audit():
         logger.error(f"snapshot_data_quality_audit error: {e}", exc_info=True)
 
 
+def _assert_ist_or_die():
+    """Refuse to start unless the process timezone is IST (UTC+05:30).
+
+    Every schedule.at("HH:MM") job and every date gate here assumes the
+    container clock is Asia/Kolkata. A wrong TZ fires the token refresh, data
+    pulls and pre-market quality gate at the wrong wall-clock time, which
+    cascades into the trading scheduler (stale tokens, missing gate marker).
+    NOT running is safer than running off-schedule, so on a mismatch we alert
+    and exit(1).
+    """
+    offset = datetime.now().astimezone().utcoffset()
+    if offset != timedelta(hours=5, minutes=30):
+        msg = (
+            "🛑 *data_scheduler REFUSING TO START* — process timezone is NOT "
+            f"IST. utcoffset={offset} (expected +05:30, %z={time.strftime('%z')}). "
+            "All job times + date gates assume Asia/Kolkata. Fix "
+            "TZ=Asia/Kolkata and restart."
+        )
+        logger.critical(msg)
+        _tg_alert(msg)
+        sys.exit(1)
+    logger.info(f"TZ check OK: utcoffset=+05:30 (%z={time.strftime('%z')})")
+
+
 def run_scheduler():
     """Main scheduler loop."""
+    # Fail-safe: verify IST before registering any time-gated jobs.
+    _assert_ist_or_die()
     logger.info("=" * 80)
     logger.info("Data Pipeline Scheduler Started")
     logger.info("=" * 80)

@@ -258,21 +258,30 @@ def notify_skip(model_name, reason, *, today=None, telegram=False) -> dict:
     )
 
 
-def notify_order(text, *, today=None) -> dict:
+def notify_order(text, *, today=None, is_fail=None) -> dict:
     """Funnel for executor Telegram messages → DB feed + Telegram.
 
     Infers level/event from the leading emoji so existing _tg_safe call sites
     stay unchanged. Always sent to Telegram (executor messages are
     user-critical) and recorded in the feed.
+
+    Args:
+        is_fail: Optional explicit failure flag. When the caller KNOWS the
+            outcome (executor passes True on a clear failure ping, False on the
+            EXECUTED success ping), pass it to bypass the brittle substring
+            heuristic — e.g. a future "Margin available" success would otherwise
+            be misclassified as ORDER_FAILED. When None (default), fall back to
+            the leading-emoji + keyword heuristic for backward compatibility.
     """
     text = text or ""
     stripped = text.strip()
     first = (stripped.splitlines() or [""])[0][:200]
     rest = "\n".join(stripped.splitlines()[1:])
-    is_fail = (
-        stripped.startswith("⚠️") or stripped.startswith("❌")
-        or "FAIL" in text or "Margin" in text or "Shortfall" in text
-    )
+    if is_fail is None:
+        is_fail = (
+            stripped.startswith("⚠️") or stripped.startswith("❌")
+            or "FAIL" in text or "Margin" in text or "Shortfall" in text
+        )
     event = ORDER_FAILED if is_fail else ORDER_PLACED
     level = "error" if is_fail else "success"
     # Strip leading emoji + markdown stars from the title for the feed.

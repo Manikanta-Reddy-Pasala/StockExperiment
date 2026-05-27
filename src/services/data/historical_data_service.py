@@ -539,11 +539,19 @@ class HistoricalDataService:
                 if 'timestamp' in df.columns:
                     # Convert string timestamps to integers first
                     timestamps_int = [int(ts) for ts in df['timestamp'].tolist()]
-                    # Convert to datetime using manual conversion to avoid pandas issues
+                    # Normalize to int so _store_historical_data can persist the
+                    # REAL Unix timestamp. Previously this column was dropped here
+                    # (`df.drop('timestamp', ...)`), so the later
+                    # `row.get('timestamp', 0)` at insert time ALWAYS fell back to
+                    # 0. Keep the column intact.
+                    df['timestamp'] = timestamps_int
+                    # Derive the trading date in IST-local (container TZ=Asia/
+                    # Kolkata) via datetime.fromtimestamp — matches ohlcv_cache's
+                    # convention, not server-UTC. Manual conversion avoids pandas
+                    # quirks.
                     from datetime import datetime
                     dates = [datetime.fromtimestamp(ts).date() for ts in timestamps_int]
                     df['date'] = dates
-                    df = df.drop('timestamp', axis=1)
                 elif 'date' in df.columns:
                     df['date'] = pd.to_datetime(df['date']).dt.date
 

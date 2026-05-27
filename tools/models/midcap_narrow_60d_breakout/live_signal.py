@@ -276,6 +276,11 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--universe-file", required=True)
     ap.add_argument("--signals-out", required=True)
+    ap.add_argument("--ranking-out", default=None,
+                    help="Where to write the Today's Picks ranking JSON. "
+                         "Default = the canonical ranking dir. The admin "
+                         "display path passes a /tmp path so a page view never "
+                         "clobbers the morning's audited ranking snapshot.")
     ap.add_argument("--force", action="store_true",
                     help="no-op flag (midcap has no rebalance gate); "
                     "accepted for symmetry with other models")
@@ -391,12 +396,19 @@ def main() -> int:
     }
     if note:
         ranking_payload["note"] = note
-    ranking_dir = Path("/app/logs/midcap_narrow/ranking")
-    ranking_dir.mkdir(parents=True, exist_ok=True)
-    (ranking_dir / f"{today_str}.json").write_text(
+    # --ranking-out overrides the canonical path so display-only runs (admin
+    # Today's Picks) route to /tmp and don't clobber the audited snapshot.
+    if args.ranking_out:
+        ranking_path = Path(args.ranking_out)
+        ranking_path.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        ranking_dir = Path("/app/logs/midcap_narrow/ranking")
+        ranking_dir.mkdir(parents=True, exist_ok=True)
+        ranking_path = ranking_dir / f"{today_str}.json"
+    ranking_path.write_text(
         json.dumps(ranking_payload, indent=2, default=str)
     )
-    log.info(f"Wrote ranking -> {ranking_dir / (today_str + '.json')}")
+    log.info(f"Wrote ranking -> {ranking_path}")
 
     # Audit hook
     try:

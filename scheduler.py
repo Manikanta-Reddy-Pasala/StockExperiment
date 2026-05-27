@@ -331,8 +331,133 @@ def refresh_all_fyers_tokens():
     logger.info("=" * 80)
 
 
+# Canonical morning signal files written by each model's emit_signal (cron.py).
+# Used ONLY for boot-time miss DETECTION (M3) — keep in sync with the per-model
+# cron.py SIGNALS_DIR + filename. {today} is substituted at check time.
+_MODEL_SIGNAL_FILES = {
+    "momentum_n100_top5_max1":   "/app/logs/momrot/signals/{today}_momrot_n100.json",
+    "momentum_pseudo_n100_adv":  "/app/logs/momrot_pseudo/signals/{today}_pseudo_n100.json",
+    "midcap_narrow_60d_breakout": "/app/logs/midcap_narrow/signals/{today}_midcap_narrow.json",
+    "n20_daily_large_only":      "/app/logs/n20_daily/signals/{today}_n20.json",
+}
+
+
+def _detect_missed_trade_window():
+    """Boot-time SAFE catch-up DETECTION (M3) — alert only, never auto-trade.
+
+    The `schedule` library does NOT run missed jobs. A container restart at,
+    say, 09:31 IST silently drops that day's 09:25 emit + 09:30 execute with no
+    catch-up. Auto-PLACING orders on restart is unsafe (we can't know what
+    already executed before the crash), so this only DETECTS a likely miss and
+    sends ONE Telegram alert for a human to check.
+
+    Conditions to alert (all must hold):
+      - today is an NSE trading day, AND
+      - now > 09:35 IST (the morning emit 09:25 + execute 09:30/09:32 window
+        has passed), AND
+      - for at least one model: its canonical signal file for today is MISSING
+        (emit never ran), OR a signal file exists but NO audit_orders row was
+        placed today (execute never ran).
+
+    We deliberately do NOT re-run emit here: before 09:35 the registered 09:25
+    job still fires normally, and after the window a fresh emit could mislead
+    (it would scan against an intra-day state). execute_orders is NEVER invoked
+    from catch-up.
+    """
+    try:
+        from tools.shared.nse_calendar import is_trading_day
+    except Exception as e:
+        logger.warning(f"M3 catch-up: nse_calendar import failed ({e}); skipping")
+        return
+    now = datetime.now()
+    if not is_trading_day(now):
+        return
+    # 09:35 IST = end of the morning emit(09:25)+execute(09:30/09:32) window.
+    window_end_min = 9 * 60 + 35
+    if (now.hour * 60 + now.minute) <= window_end_min:
+        return  # still before/within the window — registered jobs will run.
+
+    today = now.strftime("%Y-%m-%d")
+    # Best-effort: which models placed an order today (DB). Empty set on any
+    # failure — detection then relies on the signal-file presence alone.
+    ordered_models = set()
+    try:
+        from src.models.database import get_database_manager
+        from src.models.audit_models import AuditOrder
+        from sqlalchemy import func
+        db = get_database_manager()
+        with db.get_session() as s:
+            rows = (s.query(AuditOrder.model_name)
+                    .filter(func.date(AuditOrder.placed_at) == now.date())
+                    .distinct().all())
+            ordered_models = {r[0] for r in rows if r[0]}
+    except Exception as e:
+        logger.warning(f"M3 catch-up: audit_orders lookup failed ({e}); "
+                       "using signal-file check only")
+
+    suspects = []
+    for model, tmpl in _MODEL_SIGNAL_FILES.items():
+        sig_path = Path(tmpl.format(today=today))
+        if not sig_path.exists():
+            suspects.append(f"{model}: morning signal file MISSING")
+        elif model not in ordered_models:
+            # Signal emitted but no order row today — execute may have been
+            # skipped. NOTE: legitimately no-trade days (no rotation) also have
+            # a signal file + no order; this is a soft heuristic, hence "check".
+            suspects.append(f"{model}: signal present but no order placed today")
+
+    if not suspects:
+        logger.info("M3 catch-up: morning window passed, all models look intact")
+        return
+
+    msg = (
+        "⚠️ *Scheduler restarted AFTER the trade window*\n"
+        f"Time now: {now.strftime('%H:%M')} IST (> 09:35). The `schedule` lib "
+        "does not run missed jobs, so today's signals/orders MAY have been "
+        "missed. *No orders were auto-placed* (unsafe on restart). Manual check "
+        "needed:\n" + "\n".join(f"- {s}" for s in suspects)
+    )
+    logger.warning(msg.replace("*", ""))
+    try:
+        from tools.live.telegram_notify import send as _tg
+        _tg(msg)
+    except Exception as e:
+        logger.error(f"M3 catch-up: telegram alert failed: {e}")
+
+
+def _assert_ist_or_die():
+    """Refuse to start unless the process timezone is IST (UTC+05:30).
+
+    Every schedule.at("HH:MM") job and every date gate in this system assumes
+    the container clock is Asia/Kolkata. If the TZ is wrong, jobs fire at the
+    wrong wall-clock time (e.g. a 09:30 execute would run hours off) and date
+    gates misfire — silently trading at the wrong moment. NOT trading is far
+    safer than trading at the wrong time, so on a mismatch we alert and exit(1)
+    rather than continue.
+    """
+    offset = datetime.now().astimezone().utcoffset()
+    if offset != timedelta(hours=5, minutes=30):
+        msg = (
+            "🛑 *technical_scheduler REFUSING TO START* — process timezone is "
+            f"NOT IST. utcoffset={offset} (expected +05:30, %z="
+            f"{time.strftime('%z')}). Every job time + date gate assumes "
+            "Asia/Kolkata; running with the wrong TZ would fire orders at the "
+            "wrong time. Fix TZ=Asia/Kolkata and restart."
+        )
+        logger.critical(msg)
+        try:
+            from tools.live.telegram_notify import send as _tg
+            _tg(msg)
+        except Exception as _e:
+            logger.error(f"tg alert on TZ-exit failed: {_e}")
+        sys.exit(1)
+    logger.info(f"TZ check OK: utcoffset=+05:30 (%z={time.strftime('%z')})")
+
+
 def run_scheduler():
     """Main scheduler loop."""
+    # Fail-safe: verify IST before registering any time-gated jobs.
+    _assert_ist_or_die()
     logger.info("=" * 80)
     logger.info("📊 TECHNICAL SCHEDULER — per-model trading jobs")
     logger.info("=" * 80)
@@ -374,6 +499,10 @@ def run_scheduler():
     register_pseudo_n100_jobs(schedule)
     register_midcap_narrow_jobs(schedule)
     register_n20_daily_jobs(schedule)
+
+    # M3 — SAFE catch-up: if we restarted after the morning trade window on a
+    # trading day, ALERT (never auto-execute) so a human can check for misses.
+    _detect_missed_trade_window()
 
     # Position reconciler — mirrors Fyers truth into model_ledger every 5 min
     # during market hours (09:30–15:30 IST). Catches drift when record_buy /

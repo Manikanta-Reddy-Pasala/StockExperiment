@@ -315,6 +315,11 @@ def main() -> int:
     """
     ap = argparse.ArgumentParser()
     ap.add_argument("--signals-out", required=True)
+    ap.add_argument("--ranking-out", default=None,
+                    help="Where to write the Today's Picks ranking JSON. "
+                         "Default = the canonical ranking dir. The admin "
+                         "display path passes a /tmp path so a page view never "
+                         "clobbers the morning's audited ranking snapshot.")
     ap.add_argument("--top-n", type=int, default=1)
     ap.add_argument("--force", action="store_true",
                     help="Bypass weekday + enabled checks")
@@ -383,8 +388,6 @@ def main() -> int:
 
     # Per-model ranking JSON for Today's Picks UI. Top-5 always written so
     # the picks page works even on weekends / when the model is disabled.
-    ranking_dir = Path("/app/logs/n20_daily/ranking")
-    ranking_dir.mkdir(parents=True, exist_ok=True)
     today_str = today.strftime("%Y-%m-%d")
     ranking_payload = {
         "model": MODEL_NAME,
@@ -401,10 +404,19 @@ def main() -> int:
             for i, (_fyers_sym, plain, ret, price) in enumerate(ranks[:5])
         ],
     }
-    (ranking_dir / f"{today_str}.json").write_text(
+    # --ranking-out overrides the canonical path so display-only runs (admin
+    # Today's Picks) route to /tmp and don't clobber the audited snapshot.
+    if args.ranking_out:
+        ranking_path = Path(args.ranking_out)
+        ranking_path.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        ranking_dir = Path("/app/logs/n20_daily/ranking")
+        ranking_dir.mkdir(parents=True, exist_ok=True)
+        ranking_path = ranking_dir / f"{today_str}.json"
+    ranking_path.write_text(
         json.dumps(ranking_payload, indent=2, default=str)
     )
-    log.info(f"Wrote ranking -> {ranking_dir / (today_str + '.json')}")
+    log.info(f"Wrote ranking -> {ranking_path}")
 
     # Audit: persist rankings + signals to DB
     try:
