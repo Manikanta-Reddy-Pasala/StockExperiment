@@ -57,10 +57,12 @@ def load_universe(name: str) -> List[Tuple[str, str]]:
         RuntimeError: For the 'all' universe when the DB engine is unavailable.
     """
     from tools.shared.universes import (
-        NIFTY50_SYMBOLS, nifty500_symbols,
+        NIFTY50_SYMBOLS, nifty100_symbols, nifty500_symbols,
     )
     if name in ("n50", "nifty50"):
         return list(NIFTY50_SYMBOLS)
+    if name in ("n100", "nifty100"):
+        return nifty100_symbols()
     if name in ("n500", "nifty500"):
         return nifty500_symbols()
     if name in ("all", "all-stocks", "all_stocks"):

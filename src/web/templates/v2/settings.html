@@ -430,12 +430,12 @@ const MODEL_META = {
   'momentum_n100_top5_max1': {
     universe: 'Nifty 100 (live)', kind: 'equity',
     title: 'Nifty 100 Momentum',
-    rules: { top_n: 5, max_concurrent: 1, lookback: '30d',
-             rebalance: '1st weekday/mo + day-15 (5pp lead)',
+    rules: { top_n: 5, max_concurrent: 1, lookback: '15 trading days',
+             rebalance: '1st trading day/mo + day-15 (5pp lead)',
              stop: 'None', target: 'None',
              exit: 'Rank drop-out OR mid-month rotation' },
     strategy: [
-      ['Ranker', '30-day return descending across live Nifty 100'],
+      ['Ranker', '15-trading-day return descending across live Nifty 100'],
       ['Universe', 'Official NSE Nifty 100 (104 stocks)'],
       ['Selection', 'Hold rank-1, max 1 concurrent position'],
       ['Entry (monthly)', '1st weekday of month — unconditional rotate'],
@@ -449,12 +449,12 @@ const MODEL_META = {
   'momentum_pseudo_n100_adv': {
     universe: 'Pseudo-N100 ADV', kind: 'equity',
     title: 'Liquid 100 Momentum',
-    rules: { top_n: 5, max_concurrent: 1, lookback: '30d',
-             rebalance: '1st weekday/mo (no mid-month)',
+    rules: { top_n: 5, max_concurrent: 1, lookback: '30 trading days',
+             rebalance: '1st trading day/mo (no mid-month)',
              stop: 'None', target: 'None',
              exit: 'Rank drop-out' },
     strategy: [
-      ['Ranker', '30-day return descending'],
+      ['Ranker', '30-trading-day return descending (~6 weeks)'],
       ['Universe', 'Top-100 ADV from N500 (yearly PIT rebuild)'],
       ['Smallcap filter', 'Drop NSE Nifty Smallcap 250 members'],
       ['MAX_PRICE filter', '₹3K cap at entry'],

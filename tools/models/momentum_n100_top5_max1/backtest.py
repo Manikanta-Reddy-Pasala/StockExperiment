@@ -22,7 +22,10 @@ from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
 from tools.shared.backtest_engine import run_rotation_backtest
 
-LOOKBACK = 30
+# 15 TRADING days (~3 weeks). Set 2026-05-27 from a 6-year (2020-2026) sweep:
+# 15td beat 30td on CAGR (+151.7% vs +129.0%) AND max DD (45.7% vs 57.3%).
+# Must match live_signal.rank_universe lookback_days (live/backtest parity).
+LOOKBACK = 15
 N100_CSV = str(ROOT / "src" / "data" / "symbols" / "nifty100.csv")
 
 DEFAULT_START = date(2023, 5, 15)

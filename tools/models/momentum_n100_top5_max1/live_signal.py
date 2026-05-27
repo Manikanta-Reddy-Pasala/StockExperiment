@@ -167,17 +167,20 @@ def get_close_trading_days_ago(symbol: str, today_ts: int, n: int) -> float:
 
 
 def rank_universe(stocks: List[Dict], today_ts: int,
-                  lookback_days: int = 30) -> List[tuple]:
-    """Rank the universe by trailing 30-day return (the live ranking step).
+                  lookback_days: int = 15) -> List[tuple]:
+    """Rank the universe by trailing 15-trading-day return (the live ranking step).
 
     Mirrors backtest.py's rank_at: for each stock, return = close_now /
-    close_30d_ago - 1, then sort best-first. Stocks lacking either price are
-    dropped.
+    close_15td_ago - 1, then sort best-first. Stocks lacking either price are
+    dropped. Lookback = 15 TRADING days (~3 weeks), set 2026-05-27 from a 6-year
+    (2020-2026) sweep where 15td beat 30td on both CAGR (+151.7% vs +129.0%) and
+    max DD (45.7% vs 57.3%). Must stay in lockstep with backtest.LOOKBACK.
 
     Args:
         stocks: Universe entries (each with "symbol", optional "name").
         today_ts: Unix epoch seconds for "now".
-        lookback_days: Momentum lookback window (default 30, matches backtest).
+        lookback_days: Momentum lookback window (default 15 trading days,
+            matches backtest LOOKBACK).
 
     Returns:
         list[tuple]: (symbol, name, 30d_return_pct, current_price) sorted

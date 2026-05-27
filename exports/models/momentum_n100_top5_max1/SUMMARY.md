@@ -1,20 +1,20 @@
 # momentum_n100_top5_max1 — SUMMARY
 
-**Real NSE Nifty 100 momentum rotation (top-1 by 30d ret), monthly + mid-month check. No price filter — honest baseline.**
+**Real NSE Nifty 100 momentum rotation (top-1 by 15-trading-day ret), monthly + mid-month check. No price filter — honest baseline.**
 
 ## When it BUYS (entry rules)
 
 Single position (`max_concurrent=1`). When flat at a rebalance:
 1. Universe = real NSE Nifty 100 (`src/data/symbols/nifty100.csv`, ~104 stocks). No price/SMA/ADV filter — honest baseline.
-2. Rank every stock by **30-day return** (`lookback_days=30`).
+2. Rank every stock by **15-trading-day return** (`lookback_days=15`, ~3 weeks).
 3. Buy **rank-1**.
 - Code: SELECTION (universe/filters/rank) in `live_signal.py` + `backtest.py`; RULE = shared `tools/shared/rotation_strategy.decide_rotation` + `midmonth_lead_ok` (same calls live + backtest make); backtest EXECUTION = shared `tools/shared/backtest_engine`. Parity-tested.
 
 ## When it SELLS (exit rules)
 
 Monthly rotation, single position. **Sells only on rank rotation — there is NO price stop or target:**
-- At each **monthly rebalance** (1st–7th weekday): SELLS the held stock **the moment it is no longer rank-1** by 30-day return, and buys the new rank-1 (`retain_top_n=1`). If still rank-1, keeps it.
-- At the **mid-month day-15 check**: rotates **only if the new rank-1 leads the held by ≥5pp** of 30-day return (`MID_MONTH_LEAD_PCT=5.0`).
+- At each **monthly rebalance** (1st–7th weekday): SELLS the held stock **the moment it is no longer rank-1** by 15-trading-day return, and buys the new rank-1 (`retain_top_n=1`). If still rank-1, keeps it.
+- At the **mid-month day-15 check**: rotates **only if the new rank-1 leads the held by ≥5pp** of 15-trading-day return (`MID_MONTH_LEAD_PCT=5.0`, unchanged).
 - SELL labelled `TARGET_HIT`/`STOP_HIT` by exit-vs-entry price only — the **trigger is the rank drop, not a price level.**
 
 > **✅ Live == backtest (fixed 2026-05-26).** Two live bugs, now corrected:
@@ -25,52 +25,70 @@ Monthly rotation, single position. **Sells only on rank rotation — there is NO
 > 2. **Top-5 band:** exit used `top_picks[:5]`; backtest used top-1. Fixed: `retain_top_n=1`.
 >
 > With both fixes live now does top-1 rotation, matching `backtest.py --retain-top-n 1 --mid-month-check`
-> (**+125.13%** on real fyers data — the live cron runs both the monthly rebalance and the mid-month
-> check, so the mid-month backtest is the live-faithful figure). **Requires redeploy** to take effect.
+> — the live cron runs both the monthly rebalance and the mid-month check, so the mid-month backtest
+> is the live-faithful figure. **Requires redeploy** to take effect.
+> *(The previously-quoted **+125.13%** was the LB=30 figure; the momentum lookback is now **15 trading
+> days** — see the headline table below for the LB=15 result.)*
 
 ## Backtest window & trade frequency
 
 | Metric | Value |
 |---|---|
-| Backtest window | **2023-05-15 → 2026-05-12** (~3.00 years) |
+| Backtest window | **2023-05-15 → 2026-05-15** (~3.00 years) |
 | First entry | 2023-05-15 |
-| Last exit | 2026-05-04 |
-| Total trades | 42 |
-| Trades per year | ~14 |
+| Total trades | 57 |
+| Trades per year | ~19 |
+| Lookback | **15 trading days (~3 weeks)** — changed 2026-05-27 from 30 (see note) |
 | Rebalance | Monthly (1st trading day) + mid-month day-15 check |
 | Config | top-1 rotation + mid-month check (`--retain-top-n 1 --mid-month-check`) = live |
 | Data source | **Fyers (split-adjusted cont_flag=1)** |
 
+> **Lookback chosen via 6-year sweep (2020-2026):** 15 trading days (+151.72% CAGR / 45.69% max DD)
+> beat 30 trading days (+129.01% CAGR / 57.29% max DD), so the momentum window was changed 30→15 on
+> 2026-05-27 (`live_signal.rank_universe lookback_days=15`, `backtest.LOOKBACK=15`).
+
 ## Stock pick logic
 
 1. Universe: src/data/symbols/nifty100.csv (104 NSE Nifty 100 stocks)
-2. Rank by 30-day return, pick top-1
+2. Rank by 15-trading-day return, pick top-1
 3. Rebalance: 1st trading day of month + mid-month day-15 check (lead ≥5pp)
 4. Exit: rotation only — sell when not rank-1 (top-1 retention)
 
-## Headline result (live config: top-1 rotation + mid-month check, real fyers data)
+## Headline result (live config: top-1 rotation + mid-month check, 15-trading-day lookback, real fyers data)
+
+3-year standard window (**2023-05-15 → 2026-05-15**):
 
 | Metric | Value |
 |---|---:|
-| Final NAV (cap + open MTM) | **Rs.11,341,351** |
-| Total return | **+1034.14%** |
-| 2.99-yr CAGR | **+125.13%** |
-| Max DD | **28.21%** |
-| Calmar (CAGR / Max DD) | **4.44** |
-| Trades closed | 42 |
-| Wins / Losses | 28 / 14 |
-| Win rate | 66.7% |
+| Final NAV (cap + open MTM) | **Rs.22,814,268** |
+| Total return | **+2181.43%** |
+| 3-yr CAGR | **+184.36%** |
+| Max DD (3yr) | **14.89%** (UNDERSTATES real risk — see note) |
+| Calmar (CAGR / Max DD) | **12.38** |
+| Trades closed | 57 |
+| Wins / Losses | 37 / 20 |
+| Win rate | 64.9% |
 | Live deployment | YES (top-1 fix pending redeploy) |
+
+> ## ⚠️ Drawdown — honest 6-year risk
+>
+> **The 3yr Max DD of 14.89% UNDERSTATES real risk** — the 2023-2026 window never saw a major
+> correction. The honest 6-year backtest (**2020-05-15 → 2026-05-15**) shows the true max drawdown is
+> **~45.69%**: the 2022 correction cut this model roughly **-40% in a year**. Over that full 6-year
+> window the model returned **+151.72% CAGR with 45.69% max DD (Calmar 3.32)**.
+>
+> **Size positions for ~46% max drawdown, not the optimistic ~15%.** This applies to BOTH the new
+> LB=15 and the old LB=30 configs — it was simply hidden by the short 3-year window.
 
 ## NSE cap segment breakdown
 
 | Cap | Trades | Wins | Losses | WR |
 |---|---:|---:|---:|---:|
-| **Large** | 42 | 28 | 14 | 66.7% |
+| **Large** | 57 | 37 | 20 | 64.9% |
 
-> **NOTE:** the winners/losers tables below were computed under the monthly-only (31-trade) run and
-> do NOT match the canonical mid-month (42-trade) headline above. **Needs regeneration** from the
-> `--mid-month-check` ledger.
+> **NOTE — STALE TABLES:** the winners/losers tables below were computed under the **prior LB=30** run
+> (different trades) and do NOT match the canonical LB=15 mid-month (57-trade) headline above.
+> **Needs regeneration under LB=15** from the `--mid-month-check` ledger. Do not rely on these figures.
 
 ## Top 5 winners
 
