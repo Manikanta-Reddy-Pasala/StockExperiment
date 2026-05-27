@@ -64,7 +64,8 @@ def emit_signal(force: bool = False):
     # unless today is the monthly rebalance trigger.
     cmd.append("--force" if force else "--rebalance-only")
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600,
+                           env={**os.environ, "MOMROT_TG_NOTIFY": "1"})
         if r.returncode == 0:
             log.info(f"✅ Model 3 signal -> {signals_out}")
             if r.stdout:
@@ -174,7 +175,8 @@ def emit_mid_month_signal():
         "--mid-month-check",
     ]
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600,
+                           env={**os.environ, "MOMROT_TG_NOTIFY": "1"})
         if r.returncode == 0:
             log.info("✅ Model 3 mid-month check complete")
             if r.stdout:

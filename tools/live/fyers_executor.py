@@ -694,6 +694,7 @@ def main() -> int:
 
     # ---- Build RiskManager (per-model if provided, else env) ----
     rm = RiskManager.for_model_or_env(args.model_name)
+    live = not args.dry_run
     log.info(f"Risk: model={args.model_name or '(env)'} "
              f"capital=₹{rm.cfg.capital_inr:,} "
              f"max_concurrent={rm.cfg.max_concurrent} live={live} "
@@ -764,6 +765,11 @@ def main() -> int:
     placed = 0
     closed = 0
     skipped = 0
+    # Real fills collected for the post-run EXECUTED confirmation (Part of the
+    # TG alignment: a separate ping for what ACTUALLY filled, vs the pre-exec
+    # PLAN ping emitted by live_signal.py).
+    exec_exits: List[dict] = []
+    exec_entries: List[dict] = []
 
     # ---- PASS 1: EXITS FIRST (block on each fill) ----
     for sig in exit_signals:
@@ -834,6 +840,11 @@ def main() -> int:
                  f"entry={held.entry_price} exit={fill_price} pnl=₹{pnl:.0f} "
                  f"reason={sig_type}")
         closed += 1
+        if not args.dry_run:
+            _pct = ((fill_price / held.entry_price - 1) * 100
+                    if held.entry_price else 0.0) * (1 if held.side == "BUY" else -1)
+            exec_exits.append({"sym": sym, "qty": held.qty,
+                               "exit": fill_price, "pnl": pnl, "pct": _pct})
 
     # ---- After all sells confirmed: rebuild RiskManager from refreshed DB ----
     if closed > 0 and args.model_name and not args.dry_run:
@@ -1006,6 +1017,9 @@ def main() -> int:
         log.info(f"{'DRY-RUN' if args.dry_run else 'PLACED'} PASS-2 {side} {sym} "
                  f"qty={qty} @ {fill_price} status={status}")
         placed += 1
+        if not args.dry_run:
+            exec_entries.append({"sym": sym, "qty": qty,
+                                 "fill": fill_price, "side": side})
         new_pos = Position(
             symbol=sym, qty=qty, entry_price=fill_price, side=side,
             sl=float(sig.get("sl", 0) or 0),
@@ -1021,6 +1035,32 @@ def main() -> int:
     log.info(f"Done: placed={placed} closed={closed} skipped={skipped} "
              f"(live={live}, dry_run={args.dry_run}, "
              f"model={args.model_name or '(env)'})")
+
+    # EXECUTED confirmation — fires only on real fills, so the TG feed reflects
+    # what the broker actually did (not just the 09:25 PLAN). Failure paths
+    # already ping via _tg_safe above; this is the success counterpart.
+    if not args.dry_run and (exec_exits or exec_entries):
+        _m = args.model_name or "(env)"
+        _lines = [f"✅ *EXECUTED* `{_m}`"]
+        for _e in exec_exits:
+            _p = _e["sym"].replace("NSE:", "").replace("-EQ", "")
+            _lines.append(f"SOLD {_e['qty']} `{_p}` @ ₹{_e['exit']:,.2f} "
+                          f"({_e['pct']:+.1f}%, ₹{_e['pnl']:+,.0f})")
+        for _e in exec_entries:
+            _p = _e["sym"].replace("NSE:", "").replace("-EQ", "")
+            _lines.append(f"BOUGHT {_e['qty']} `{_p}` @ ₹{_e['fill']:,.2f}")
+        try:
+            from src.models.database import get_database_manager
+            from src.models.model_ledger_models import ModelLedger
+            _db = get_database_manager()
+            with _db.get_session() as _s:
+                _lg = _s.query(ModelLedger).filter_by(
+                    model_name=args.model_name).first()
+                if _lg and _lg.cash is not None:
+                    _lines.append(f"Cash left: ₹{float(_lg.cash):,.0f}")
+        except Exception:
+            pass
+        _tg_safe("\n".join(_lines))
 
     # HOLD audit — when cron runs but no entry/exit was taken, still log
     # the decision so audit_rebalance_decisions has one row per (model, day).

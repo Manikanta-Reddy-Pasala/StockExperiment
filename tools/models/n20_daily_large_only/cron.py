@@ -60,7 +60,8 @@ def emit_signal():
         "--signals-out", str(signals_out), "--top-n", "1",
     ]
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600,
+                           env={**os.environ, "MOMROT_TG_NOTIFY": "1"})
         if r.returncode == 0:
             log.info(f"✅ {MODEL_NAME} signal -> {signals_out}")
             if r.stdout:

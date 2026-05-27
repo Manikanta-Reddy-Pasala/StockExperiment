@@ -76,7 +76,8 @@ def emit_signal(force: bool = False):
     # Gate selector: force always emits; otherwise defer to the rebalance day.
     cmd.append("--force" if force else "--rebalance-only")
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600,
+                           env={**os.environ, "MOMROT_TG_NOTIFY": "1"})
         if r.returncode == 0:
             log.info(f"✅ {MODEL_NAME} signal -> {signals_out}")
             if r.stdout:

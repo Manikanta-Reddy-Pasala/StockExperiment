@@ -19,9 +19,19 @@ Design:
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime
 
 log = logging.getLogger("notify")
+
+
+# Verdict notifications (plan ping / no-change) fire ONLY when the scheduled
+# cron emit sets this env flag — diagnostic / preview / UI display runs of
+# live_signal stay silent so they cannot leak a Telegram or PWA-feed row.
+# Execution + failure pings (notify_order via the executor) are NOT gated.
+def _verdict_notify_enabled() -> bool:
+    return os.environ.get("MOMROT_TG_NOTIFY") == "1"
+
 
 # ---- event types -----------------------------------------------------------
 SIGNAL = "SIGNAL"              # a tradable action was emitted (ENTRY/ROTATE/EXIT)
@@ -103,8 +113,8 @@ def _decision_message(model_name, signals, held_symbol, held_ret, note):
             lines.append(f"`{sig}` {side} `{sym}`{px_txt}")
         if len(signals) > 5:
             lines.append(f"…+{len(signals) - 5} more")
-        title = f"{model_name}: action"
-        body = "\n".join(lines)
+        title = f"📋 {model_name}: plan"
+        body = "Planned for execution (09:30):\n" + "\n".join(lines)
     else:
         title = f"{model_name}: no change"
         if held_symbol:
@@ -203,6 +213,8 @@ def notify_model_decision(model_name, signals, *, held_symbol=None,
     Weekend-silent; deduped per (model, verdict, day) so a model that fires
     twice a day with the same verdict notifies once.
     """
+    if not _verdict_notify_enabled():
+        return {"ok": True, "skipped": True, "reason": "notify_gated"}
     today = today or datetime.now()
     if not is_trading_day(today):
         return {"ok": True, "skipped": True, "reason": "weekend"}
@@ -226,6 +238,8 @@ def notify_skip(model_name, reason, *, today=None, telegram=False) -> dict:
     the PWA feed so the user can confirm the model evaluated, but don't spam
     Telegram every non-rebalance weekday.
     """
+    if not _verdict_notify_enabled():
+        return {"ok": True, "skipped": True, "reason": "notify_gated"}
     today = today or datetime.now()
     if not is_trading_day(today):
         return {"ok": True, "skipped": True, "reason": "weekend"}

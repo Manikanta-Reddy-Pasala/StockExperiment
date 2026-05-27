@@ -194,10 +194,18 @@ function renderCard(m, idx, ranking, status) {
         ? `<span class="badge bg-primary">MODEL PICK</span> Entered <strong>${heldNorm}</strong> on ${entryDate} via <code>${reason}</code>.`
         : `Entered <strong>${heldNorm}</strong> on ${entryDate}.`;
 
+    // Rotation models (monthly/mid-month/daily) hold ONLY rank-1 — being
+    // anywhere in the top-5 is NOT "safe". Event-driven (midcap breakout)
+    // holds until its own exit, so top-5 membership is the right gauge there.
+    const heldIsRank1 = !!rank1 &&
+      rank1.symbol.replace('NSE:','').replace('-EQ','') === heldNorm;
+    const isEvent = sched.kind === 'event';
     let actionLine;
     let bannerCls;
-    if (inTop) {
-      actionLine = `Still in today's top-5 — no rotation needed.`;
+    if (heldIsRank1 || (isEvent && inTop)) {
+      actionLine = isEvent
+        ? `Holding ${heldNorm} — exits on breakdown, not rank rotation.`
+        : `Still rank-1 today — no rotation needed.`;
       bannerCls = 'alert-success';
     } else if (rank1) {
       const waitOrSell = sched.kind === 'monthly'

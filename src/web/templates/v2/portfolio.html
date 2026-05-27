@@ -270,8 +270,10 @@ async function rebalanceModel(model) {
         x<strong>${estQty}</strong> @ ${fmtINR(rank1.price)}
         = ${fmtINR(estCost)}
       </div>`;
-    } else if (inTop) {
-      actionRow = `<div class="text-muted">Already holding <strong>${m.open_symbol}</strong> (in top-5). No action.</div>`;
+    } else if (rank1 && _norm(rank1.symbol) === heldNorm) {
+      // Rotation models hold rank-1 only; a force-rebalance rotates whenever
+      // the held name is not today's rank-1 (top-5 membership is irrelevant).
+      actionRow = `<div class="text-muted">Already holding <strong>${m.open_symbol}</strong> (rank-1). No action.</div>`;
     } else {
       actionRow = `<div>
         <span class="badge bg-danger">SELL</span> <strong>${m.open_symbol}</strong> x${m.open_qty}
