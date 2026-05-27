@@ -7,13 +7,12 @@ Constraints (configurable via env or YAML):
   - CAPITAL_INR: locked-in pool (no add/withdraw)
   - MAX_CONCURRENT: simultaneous open positions cap
   - MAX_PER_TRADE_INR: per-position size cap
-  - MAX_DAILY_LOSS_PCT: kill-switch if today's P&L < -X% of capital
   - MIN_PRICE: penny filter
   - MIN_ADV_INR: liquidity filter (skip illiquid)
 
 Usage:
   rm = RiskManager(capital=200000, max_concurrent=2)
-  if rm.can_enter(symbol, price, open_positions, day_pnl):
+  if rm.can_enter(symbol, price, side, open_positions):
       qty = rm.size_position(price, open_positions)
       place_order(...)
 """
@@ -49,7 +48,6 @@ class RiskConfig:
     capital_inr: int = 1_000_000        # ₹10L locked-in pool
     max_concurrent: int = 2
     max_per_trade_inr: int = 500_000    # capital / max_concurrent
-    max_daily_loss_pct: float = -5.0    # kill switch
     min_price: float = 50.0
     enable_short: bool = False
     # LIMIT-with-tolerance + MARKET-fallback knobs (Phase 2 Task 6).
@@ -95,7 +93,6 @@ class RiskManager:
             max_per_trade_inr=int(os.environ.get("MAX_PER_TRADE_INR",
                 int(os.environ.get("CAPITAL_INR", 1_000_000)) //
                 int(os.environ.get("MAX_CONCURRENT", 2)))),
-            max_daily_loss_pct=float(os.environ.get("MAX_DAILY_LOSS_PCT", -5.0)),
             min_price=float(os.environ.get("MIN_PRICE", 50.0)),
             enable_short=os.environ.get("ENABLE_SHORT", "false").lower() == "true",
             limit_tol_pct=float(os.environ.get("LIMIT_TOL_PCT", 0.1)),
@@ -161,7 +158,6 @@ class RiskManager:
             capital_inr=capital,
             max_concurrent=max_concurrent,
             max_per_trade_inr=max_per_trade,
-            max_daily_loss_pct=float(os.environ.get("MAX_DAILY_LOSS_PCT", -5.0)),
             min_price=float(os.environ.get("MIN_PRICE", 50.0)),
             enable_short=os.environ.get("ENABLE_SHORT", "false").lower() == "true",
             limit_tol_pct=_env_model(model_name, "LIMIT_TOL_PCT", 0.1),
@@ -187,7 +183,7 @@ class RiskManager:
         return cls.from_env()
 
     def can_enter(self, symbol: str, price: float, side: str,
-                   open_positions: List[Position], day_pnl: float = 0.0) -> tuple:
+                   open_positions: List[Position]) -> tuple:
         """Returns (allow: bool, reason: str)."""
         if price < self.cfg.min_price:
             return False, f"price {price} < min_price {self.cfg.min_price}"
@@ -195,10 +191,6 @@ class RiskManager:
             return False, "shorting disabled"
         if len(open_positions) >= self.cfg.max_concurrent:
             return False, f"max_concurrent {self.cfg.max_concurrent} reached"
-        # Daily loss kill-switch
-        day_loss_pct = (day_pnl / max(1, self.cfg.capital_inr)) * 100
-        if day_loss_pct <= self.cfg.max_daily_loss_pct:
-            return False, f"daily loss kill-switch ({day_loss_pct:.1f}%)"
         # Already in position on this symbol?
         for p in open_positions:
             if p.symbol == symbol:
