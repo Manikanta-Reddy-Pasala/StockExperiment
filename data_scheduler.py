@@ -162,6 +162,17 @@ def refresh_nse_holidays_job():
         )
 
 
+def refresh_nse_holidays_monthly():
+    """Monthly NSE-holiday refresh — the 04:00 daily timer self-gates to the
+    1st of the month. Holidays change ~yearly (rare mid-year edits), so monthly
+    is ample AND gentler on the NSE API than a daily pull from a datacenter IP,
+    while still guaranteeing each month starts with a current list. Boot also
+    refreshes separately, and the hardcoded fallback covers any gap."""
+    import datetime as _dt
+    if _dt.datetime.now().day == 1:
+        refresh_nse_holidays_job()
+
+
 def daily_universe_csv_check():
     """Daily 06:00 IST check: any universe CSV >7d stale → refresh now.
 
@@ -658,10 +669,12 @@ def run_scheduler():
     # token expires silently → all downstream pulls/orders fail with no rows.
     schedule.every().day.at("03:30").do(refresh_fyers_token_job)
 
-    # Daily NSE trading-holiday refresh (04:00 IST, off-peak). PRIMARY holiday
-    # source — caches /app/logs/nse_holidays.json from the NSE official API.
-    # is_trading_day() falls back to the hardcoded list if the fetch ever fails.
-    schedule.every().day.at("04:00").do(refresh_nse_holidays_job)
+    # MONTHLY NSE trading-holiday refresh — the 04:00 daily timer self-gates to
+    # the 1st of the month (refresh_nse_holidays_monthly). PRIMARY holiday
+    # source: caches /app/logs/nse_holidays.json from the NSE official API.
+    # Monthly is ample (holidays change ~yearly) + gentle on the NSE API; boot
+    # refreshes too; is_trading_day() falls back to the hardcoded list on fail.
+    schedule.every().day.at("04:00").do(refresh_nse_holidays_monthly)
 
     # Weekly symbol master update (Monday 6 AM) — refreshes NSE_CM_symbols.json cache
     schedule.every().monday.at("06:00").do(update_symbol_master)
