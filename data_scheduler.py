@@ -249,7 +249,6 @@ def pre_market_data_quality_gate():
         # trading run on stale data. At 09:00 IST the freshest bar is the prior
         # trading day, so allow up to 4 calendar days (long weekend / holiday);
         # beyond that the nightly pull clearly failed.
-        import datetime as _dt
         _age_days = (_dt.date.today() - latest).days
         stale = _age_days > 4
         ok = (n_syms >= MIN_SYMBOLS) and not stale
@@ -479,7 +478,6 @@ def refresh_universe_csvs():
         "tools/refresh_nifty_midcap150.py",
         "tools/refresh_nifty_smallcap250.py",
     ]
-    import subprocess
     for s in scripts:
         try:
             r = subprocess.run(["python3", s], capture_output=True,

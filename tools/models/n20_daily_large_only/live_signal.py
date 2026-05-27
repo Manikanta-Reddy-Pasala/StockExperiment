@@ -443,7 +443,7 @@ def main() -> int:
         try:
             from src.services.notification_service import notify_model_decision
             _held = pos.get("open_symbol") if pos else None
-            _ret = next((r[2] for r in ranks if r[1] == _held), None) if _held else None
+            _ret = next((r[2] for r in ranks if r[0] == _held), None) if _held else None
             notify_model_decision(MODEL_NAME, signals, held_symbol=_held,
                                   held_ret=_ret, trigger="CRON")
         except Exception as _ne:

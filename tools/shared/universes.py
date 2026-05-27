@@ -11,7 +11,6 @@ from __future__ import annotations
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
-from types import SimpleNamespace
 from typing import List, Optional, Tuple
 
 import pandas as pd
@@ -282,51 +281,6 @@ def _fetch_fyers_interval(symbol: str, days: int, user_id: int,
                "close", "volume"]]
 
 
-def fetch_1h_fyers(symbol: str, days: int = 720, user_id: int = 1) -> pd.DataFrame:
-    """Fetch 1H candles, Postgres-cached — only hits Fyers on cache miss.
-
-    Args:
-        symbol: Plain/Yahoo/Fyers ticker.
-        days: Calendar days of history to ensure are cached.
-        user_id: Broker account user id authorizing any live fetch.
-
-    Returns:
-        OHLCV DataFrame from the cache, with missing bars backfilled from Fyers.
-    """
-    try:
-        from tools.shared.ohlcv_cache import get_or_fetch
-    except Exception:
-        # No cache layer available → fetch directly from Fyers each time.
-        return _fetch_fyers_interval(symbol, days, user_id, interval="1h", chunk_days=95)
-    # Cache wrapper calls the lambda only for the uncached portion of the window.
-    return get_or_fetch(symbol, "1h", days,
-                        lambda s, d: _fetch_fyers_interval(s, d, user_id,
-                                                            interval="1h", chunk_days=95))
-
-
-def fetch_15m_fyers(symbol: str, days: int = 30, user_id: int = 1) -> pd.DataFrame:
-    """Fetch 15m candles, Postgres-cached. Fyers caps intraday at ~30-day chunks.
-
-    Args:
-        symbol: Plain/Yahoo/Fyers ticker.
-        days: Calendar days of history to ensure are cached (default 30, the
-            practical intraday ceiling).
-        user_id: Broker account user id authorizing any live fetch.
-
-    Returns:
-        OHLCV DataFrame from the cache, with missing bars backfilled from Fyers.
-    """
-    try:
-        from tools.shared.ohlcv_cache import get_or_fetch
-    except Exception:
-        # No cache layer available → fetch directly from Fyers each time.
-        return _fetch_fyers_interval(symbol, days, user_id, interval="15m", chunk_days=30)
-    # 30-day chunk_days matches Fyers's intraday per-request span limit.
-    return get_or_fetch(symbol, "15m", days,
-                        lambda s, d: _fetch_fyers_interval(s, d, user_id,
-                                                            interval="15m", chunk_days=30))
-
-
 def _fetch_daily_fyers_raw(symbol: str, days: int, user_id: int = 1,
                             chunk_days: int = 360) -> pd.DataFrame:
     """Fetch daily candles directly from Fyers (no cache). Used by prefetch.
@@ -390,31 +344,3 @@ def _fetch_daily_fyers_raw(symbol: str, days: int, user_id: int = 1,
     df["volume"] = df["volume"].fillna(0).astype("int64")
     df["timestamp"] = df["timestamp"].astype("int64")
     return df[["timestamp", "candle_time", "open", "high", "low", "close", "volume"]]
-
-
-def df_to_candles(df: pd.DataFrame) -> List[SimpleNamespace]:
-    """Convert an OHLCV DataFrame into lightweight row objects.
-
-    Produces ``SimpleNamespace`` instances that duck-type the ORM's
-    ``HistoricalData1H`` rows (same attribute names) so backtest/signal code can
-    consume freshly fetched candles without touching the database.
-
-    Args:
-        df: DataFrame with timestamp, candle_time, open, high, low, close,
-            volume columns (as returned by the Fyers fetchers).
-
-    Returns:
-        List of row-like ``SimpleNamespace`` objects, one per DataFrame row.
-    """
-    return [
-        SimpleNamespace(
-            timestamp=int(r.timestamp),
-            candle_time=r.candle_time,
-            open=float(r.open),
-            high=float(r.high),
-            low=float(r.low),
-            close=float(r.close),
-            volume=int(r.volume or 0),
-        )
-        for r in df.itertuples()
-    ]

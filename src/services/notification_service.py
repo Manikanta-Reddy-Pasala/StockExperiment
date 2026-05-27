@@ -73,22 +73,6 @@ def is_trading_day(d: datetime = None) -> bool:
         return d.weekday() < 5
 
 
-def current_held(model_name: str):
-    """DB-truth held symbol for a model (model_ledger.open_symbol), or None.
-
-    Used so a model's decision notification reflects the real position even
-    when its live_signal runs stateless (e.g. n100 runs without --ledger and
-    always emits ENTRY1 — only the ledger knows it's already holding)."""
-    try:
-        from src.services.trading.model_ledger_service import get_ledger
-        ledger = get_ledger(model_name)
-        if ledger and ledger.get("open_symbol"):
-            return ledger["open_symbol"]
-    except Exception as e:  # pragma: no cover - defensive
-        log.debug(f"current_held({model_name}): {e}")
-    return None
-
-
 # ---- pure helpers (unit-tested without DB) ---------------------------------
 
 def _decision_signature(signals, held_symbol) -> str:

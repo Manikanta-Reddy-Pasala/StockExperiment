@@ -868,16 +868,6 @@ def main() -> int:
             log.warning(f"DB open_positions load failed: {_le}; "
                         "treating as flat")
 
-    def _save_ledger():
-        # No-op: record_buy / record_sell persist DB state. In-memory
-        # open_positions kept only for intra-execution sizing.
-        return
-
-    def _append_history(rec: dict):
-        # No-op: model_trades table is canonical history. Inserted by
-        # record_buy / record_sell in model_ledger_service.
-        return
-
     # Partition signals into exits and entries (preserve order within each)
     exit_signals = [s for s in signals
                     if s.get("signal") in ("STOP_HIT", "TARGET_HIT", "EXIT")]
@@ -967,21 +957,11 @@ def main() -> int:
             1 if held.side == "BUY" else -1
         )
         model_for_signal = args.model_name or sig.get("model") or "(env)"
-        _append_history({
-            "ts": datetime.now().isoformat(),
-            "event": "EXIT", "reason": sig_type, "pass": 1,
-            "symbol": sym, "qty": actual_qty,
-            "entry_price": held.entry_price, "exit_price": fill_price,
-            "pnl": round(pnl, 2),
-            "order_id": order_id, "status": status,
-            "model": model_for_signal,
-        })
         if not args.dry_run:
             _record_model_sell(model_for_signal, fill_price,
                                sig.get("reason", sig_type), order_id,
                                qty=actual_qty, svc=svc, user_id=args.user_id)
         open_positions = [p for p in open_positions if p.symbol != sym]
-        _save_ledger()
         log.info(f"{'DRY-RUN' if args.dry_run else 'CLOSED'} PASS-1 {sym} qty={actual_qty} "
                  f"entry={held.entry_price} exit={fill_price} pnl=₹{pnl:.0f} "
                  f"reason={sig_type}")
@@ -1210,14 +1190,6 @@ def main() -> int:
 
         entry_ts = datetime.now().isoformat()
         model_for_signal = args.model_name or sig.get("model") or "(env)"
-        _append_history({
-            "ts": entry_ts, "event": "ENTRY", "signal": sig.get("signal"),
-            "pass": 2,
-            "symbol": sym, "side": side, "qty": actual_qty, "price": fill_price,
-            "sl": sig.get("sl"), "target": sig.get("target"),
-            "order_id": order_id, "status": status,
-            "model": model_for_signal,
-        })
         if not args.dry_run and side == "BUY":
             _record_model_buy(model_for_signal, sym, actual_qty, fill_price, order_id,
                               svc=svc, user_id=args.user_id)
@@ -1242,7 +1214,6 @@ def main() -> int:
         except Exception:
             pass
         open_positions.append(new_pos)
-        _save_ledger()
 
     log.info(f"Done: placed={placed} closed={closed} skipped={skipped} "
              f"(live={live}, dry_run={args.dry_run}, "

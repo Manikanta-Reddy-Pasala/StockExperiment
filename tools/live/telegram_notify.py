@@ -45,38 +45,6 @@ def _post(token: str, chat_id: str, text: str, parse_mode: str = None) -> dict:
         return {"ok": False, "error": str(e), "body": body}
 
 
-def notify_signals(model_name: str, signals_file: str) -> dict:
-    """Read a signals JSON file and send a TG summary. No-op if empty.
-
-    Returns the send() result or {"ok": True, "skipped": True} when nothing
-    to notify (file missing / empty array / read error).
-    """
-    import json
-    from pathlib import Path
-    try:
-        p = Path(signals_file)
-        if not p.exists():
-            return {"ok": True, "skipped": True, "reason": "file_missing"}
-        sigs = json.loads(p.read_text() or "[]")
-        if not sigs:
-            return {"ok": True, "skipped": True, "reason": "empty"}
-        lines = [f"*Signal* `{model_name}`"]
-        for s in sigs[:5]:
-            sig_t = s.get("signal", "?")
-            sym = s.get("symbol", "?")
-            side = s.get("side", "?")
-            price = s.get("price")
-            reason = s.get("reason", "")
-            px_txt = f" @ ₹{float(price):,.2f}" if price else ""
-            r_txt = f" ({reason})" if reason else ""
-            lines.append(f"`{sig_t}` {side} `{sym}`{px_txt}{r_txt}")
-        if len(sigs) > 5:
-            lines.append(f"_…+{len(sigs)-5} more_")
-        return send("\n".join(lines), parse_mode="Markdown")
-    except Exception as e:
-        return {"ok": False, "error": f"notify_signals: {e}"}
-
-
 def send(text: str, parse_mode: str = "Markdown",
          token: str = None, chat_id: str = None) -> dict:
     """Send Telegram message. On Markdown parse failure, retry as plain text."""

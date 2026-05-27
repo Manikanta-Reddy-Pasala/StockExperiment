@@ -24,20 +24,16 @@ Universe:
 
 Costs: 10 bps slippage, 0.10% STT on sells, ₹20/order brokerage.
 
-Result (V2, ₹10L start, 2023-05-15 → 2026-05-15)
-================================================
+Result (current, ₹10L start, 2023-05-15 → 2026-05-15)
+=====================================================
 
 | Metric    | Value           |
 |-----------|----------------:|
-| Final NAV | ₹65,00,421      |
-| CAGR      | **+86.63%**     |
-| Max DD    | **15.15%**      |
-| Calmar    | **5.72**        |
-| Trades    | 12 (~4/yr)      |
-| WR        | 75% (9W / 3L)   |
-| 2023-24   | +234.30%        |
-| 2024-25   | +51.78%         |
-| 2025-26   | -5.55%          |
+| CAGR      | **+141.73%**    |
+| Max DD    | **8.12%**       |
+| Calmar    | **17.46**       |
+| Trades    | 8               |
+| WR        | 75% (6W / 2L)   |
 
 CLI usage
 ---------
@@ -76,11 +72,6 @@ MAX_HOLD   = 120  # Was 90. 120d max-hold sweep-tested as winner: +141% CAGR / 8
 ADV_WIN    = 20
 SKIP_TOP   = 0     # V3: top-100 ADV from N500 (instead of skip-top-30)
 KEEP_NEXT  = 100   # Take top 100. Large filter applied below via NSE Nifty 100 CSV.
-
-# DATA_FIXES no longer needed for ANGELONE — historical_data was restored
-# from yfinance (split-adjusted) on 2026-05-17. Pattern preserved for future
-# data anomalies if Fyers serves bad data again.
-DATA_FIXES = {}
 
 N100_CSV = str(ROOT / "src" / "data" / "symbols" / "nifty100.csv")
 
@@ -152,21 +143,6 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
 
     df["date"] = pd.to_datetime(df["date"])
 
-    # Apply data fixes — correct known price/volume discontinuities (e.g. a
-    # missed split) for specific symbol/date windows before computing anything.
-    # Currently empty (DATA_FIXES = {}); the loop is preserved for future use.
-    for sym, fixes in DATA_FIXES.items():
-        for fx in fixes:
-            mask = (df["symbol"] == sym) & \
-                   (df["date"] >= pd.Timestamp(fx["start"])) & \
-                   (df["date"] <= pd.Timestamp(fx["end"]))
-            n_rows = mask.sum()
-            if n_rows > 0:
-                print(f"  Applied data fix to {sym}: {n_rows} rows / price ÷{fx['price_div']}, vol ×{fx['vol_mul']}")
-                # Divide prices and multiply volume to undo the split distortion.
-                df.loc[mask, ["open","high","low","close"]] /= fx["price_div"]
-                df.loc[mask, "volume"] *= fx["vol_mul"]
-
     # Average Daily Value traded (₹) = close × volume; used to rank liquidity.
     df["adv_rs"] = df["close"].astype(float) * df["volume"].astype(float)
     # FIX 6 — staleness filter. The close pivot below is forward-filled, which
@@ -207,8 +183,8 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
     midcap_pool = last_adv.iloc[SKIP_TOP:SKIP_TOP + KEEP_NEXT].index.tolist()
 
     # V2 filter: exclude Large (NSE Nifty 100). ANGELONE no longer needs explicit
-    # exclusion since DATA_FIXES normalize the price discontinuity; with clean data
-    # ANGELONE never qualifies for a breakout entry anyway.
+    # exclusion since historical_data was restored split-adjusted (2026-05-17);
+    # with clean data ANGELONE never qualifies for a breakout entry anyway.
     midcap_band = [
         s for s in midcap_pool
         if s.replace("NSE:", "").replace("-EQ", "") not in n100

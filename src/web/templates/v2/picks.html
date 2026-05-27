@@ -108,24 +108,21 @@ function nextRebalance(schedule) {
     let target, kind;
     if (mid > startOfToday) { target = mid; kind = 'mid-month'; }
     else                    { target = next; kind = 'monthly'; }
-    const days = Math.max(0, Math.ceil((target - startOfToday) / 86400000));
-    return {label: _ymdLocal(target), days, tradingDays: _tradingDaysUntil(target), kind};
+    return {label: _ymdLocal(target), tradingDays: _tradingDaysUntil(target), kind};
   }
 
   if (schedule === "monthly") {
     let target = today.getDate() <= 7
       ? _firstWeekday(startOfToday)
       : _firstWeekday(new Date(today.getFullYear(), today.getMonth()+1, 1));
-    const days = Math.max(0, Math.ceil((target - startOfToday) / 86400000));
-    return {label: _ymdLocal(target), days, tradingDays: _tradingDaysUntil(target), kind: 'monthly'};
+    return {label: _ymdLocal(target), tradingDays: _tradingDaysUntil(target), kind: 'monthly'};
   }
 
   if (schedule === "daily") {
     let target = new Date(today);
     target.setDate(target.getDate() + 1);
     target = _firstWeekday(target);
-    const days = Math.ceil((target - startOfToday) / 86400000);
-    return {label: _ymdLocal(target), days, tradingDays: _tradingDaysUntil(target), kind: 'daily'};
+    return {label: _ymdLocal(target), tradingDays: _tradingDaysUntil(target), kind: 'daily'};
   }
 
   return {label: 'event-driven', days: null, kind: 'event'};
