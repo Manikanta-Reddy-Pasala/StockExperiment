@@ -41,22 +41,22 @@ sys.path.insert(0, str(ROOT))
 
 from tools.shared.ohlcv_cache import read_cached  # noqa: E402
 from tools.shared.rotation_strategy import decide_rotation, midmonth_lead_ok  # noqa: E402
+from tools.shared.nse_calendar import is_first_trading_day_of_month  # noqa: E402
 
 log = logging.getLogger("momrot_signal")
 
 
 def is_rebalance_day(today: datetime, last_rotation: datetime = None) -> bool:
-    """True if today is rebalance trigger.
+    """True if today is the monthly rebalance trigger.
 
-    Rule: rebalance once per month. Trigger on first weekday on/after
-    the 1st of month. If last rotation was this month already, skip.
+    Rule: rebalance once per month, on the FIRST NSE TRADING DAY of the month
+    (holiday-aware via nse_calendar). If we already rotated this calendar
+    month, skip (the dedup that stops the trigger re-firing).
     """
     if last_rotation and last_rotation.year == today.year and last_rotation.month == today.month:
         return False
-    # Today is 1st-7th of month and weekday (Mon-Fri)
-    if today.day <= 7 and today.weekday() < 5:
-        return True
-    return False
+    # First NSE trading day of the month (skips a 1st that is a weekend/holiday).
+    return is_first_trading_day_of_month(today)
 
 
 # Mid-month check: trigger an extra rank check on the first weekday on/after
@@ -378,8 +378,8 @@ def main():
 
     if args.rebalance_only and not args.force and not args.mid_month_check:
         if not is_rebalance_day(today, _last_rotation_date()):
-            log.info(f"Not rebalance day (need day<=7 weekday + not already "
-                     f"rotated this month). Skipping.")
+            log.info(f"Not rebalance day (need first NSE trading day of month "
+                     f"+ not already rotated this month). Skipping.")
             Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
             with open(args.signals_out, "w") as f:
                 json.dump([], f)

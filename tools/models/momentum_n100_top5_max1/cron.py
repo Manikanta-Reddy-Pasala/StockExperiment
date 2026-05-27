@@ -26,6 +26,16 @@ from tools.models.momentum_n100_top5_max1.data_pull import (  # noqa: E402
 log = logging.getLogger(__name__)
 
 
+def _alert(msg: str):
+    """FIX 9 — best-effort Telegram alert for scheduler failures. Wrapped so a
+    notify failure never crashes the scheduler thread (log-only was silent)."""
+    try:
+        from tools.live.telegram_notify import send as _tg
+        _tg(msg)
+    except Exception as e:
+        log.debug(f"tg alert skipped: {e}")
+
+
 # ---- Trading-side jobs (technical_scheduler) ----
 
 def emit_signal(force: bool = False):
@@ -77,8 +87,11 @@ def emit_signal(force: bool = False):
             log.error(f"❌ Model 3 signal failed ({r.returncode})")
             if r.stderr:
                 log.error(r.stderr[-500:])
+            _alert(f"❌ momentum_n100_top5_max1 emit_signal failed "
+                   f"(rc={r.returncode})")
     except Exception as e:
         log.error(f"❌ Model 3 signal error: {e}")
+        _alert(f"❌ momentum_n100_top5_max1 emit_signal error: {e}")
 
 
 def execute_orders():
@@ -112,8 +125,11 @@ def execute_orders():
             log.error(f"❌ Model 3 Fyers execute failed ({r.returncode})")
             if r.stderr:
                 log.error(r.stderr[-500:])
+            _alert(f"❌ momentum_n100_top5_max1 execute failed "
+                   f"(rc={r.returncode}) — orders may not be placed")
     except Exception as e:
         log.error(f"❌ Model 3 Fyers execute error: {e}")
+        _alert(f"❌ momentum_n100_top5_max1 execute error: {e}")
 
 
 # ---- Registration entrypoints ----
@@ -188,8 +204,11 @@ def emit_mid_month_signal():
             log.error(f"❌ Model 3 mid-month check failed ({r.returncode})")
             if r.stderr:
                 log.error(r.stderr[-500:])
+            _alert(f"❌ momentum_n100_top5_max1 mid-month emit failed "
+                   f"(rc={r.returncode})")
     except Exception as e:
         log.error(f"❌ Model 3 mid-month error: {e}")
+        _alert(f"❌ momentum_n100_top5_max1 mid-month emit error: {e}")
 
 
 def execute_mid_month_orders():
@@ -233,8 +252,11 @@ def execute_mid_month_orders():
             log.error(f"❌ Model 3 mid-month execute failed ({r.returncode})")
             if r.stderr:
                 log.error(r.stderr[-500:])
+            _alert(f"❌ momentum_n100_top5_max1 mid-month execute failed "
+                   f"(rc={r.returncode}) — orders may not be placed")
     except Exception as e:
         log.error(f"❌ Model 3 mid-month execute error: {e}")
+        _alert(f"❌ momentum_n100_top5_max1 mid-month execute error: {e}")
 
 
 def register_trading_jobs(schedule):

@@ -48,6 +48,7 @@ sys.path.insert(0, str(ROOT))
 
 from tools.shared.ohlcv_cache import read_cached  # noqa: E402
 from tools.shared.rotation_strategy import decide_rotation  # noqa: E402
+from tools.shared.nse_calendar import is_first_trading_day_of_month  # noqa: E402
 
 log = logging.getLogger("momrot_pseudo_signal")
 
@@ -83,10 +84,11 @@ _SMALLCAP_SET = _load_smallcap_set()
 # ---- Helpers ----
 
 def is_rebalance_day(today: datetime, last_rotation: datetime = None) -> bool:
-    """True if today is the monthly rebalance trigger (1st-7th + weekday).
+    """True if today is the monthly rebalance trigger.
 
-    Mirrors the backtest's "first trading day of the month" calendar with a
-    weekday + 1st-week window, and de-dupes so a month rotates at most once.
+    The backtest rebalances on the FIRST TRADING DAY of the month; live now
+    matches exactly via nse_calendar (holiday-aware), and de-dupes so a month
+    rotates at most once.
 
     Args:
         today: The date being evaluated.
@@ -95,15 +97,12 @@ def is_rebalance_day(today: datetime, last_rotation: datetime = None) -> bool:
             rebalanced this month).
 
     Returns:
-        bool: True only on a weekday within the first 7 days of an
-        un-rotated month.
+        bool: True only on the first NSE trading day of an un-rotated month.
     """
     if (last_rotation and last_rotation.year == today.year
             and last_rotation.month == today.month):
         return False  # already rebalanced this calendar month
-    if today.day <= 7 and today.weekday() < 5:  # first week + Mon-Fri
-        return True
-    return False
+    return is_first_trading_day_of_month(today)
 
 
 def load_yearly_universes(path: str) -> Dict[str, List[str]]:

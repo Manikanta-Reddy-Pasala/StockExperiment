@@ -170,10 +170,13 @@ def write_rows(symbol: str, interval: str, df: pd.DataFrame) -> int:
     """Upsert fetched OHLCV rows into the matching ``historical_data*`` table.
 
     Inserts every row in ``df``, stamping ``data_source='fyers'``, with
-    ``ON CONFLICT DO NOTHING`` on the table's natural key — so re-running a
-    prefetch only adds bars that aren't already cached (idempotent). Intraday
-    tables conflict on ``(symbol, timestamp)``; the daily table on
-    ``(symbol, date)`` (date derived from ``candle_time``).
+    ``ON CONFLICT DO UPDATE`` (upsert) on the table's natural key — so a fresh
+    pull OVERWRITES any existing bar's OHLCV. This self-heals corporate-action
+    discontinuities: Fyers serves a split-adjusted continuous series, so
+    re-pulling after a split rescales the old cached bars instead of leaving a
+    stale pre-split step (which produced false breakouts). Intraday tables
+    conflict on ``(symbol, timestamp)``; the daily table on ``(symbol, date)``
+    (date derived from ``candle_time``).
 
     Args:
         symbol: Ticker in any accepted form (normalized to Fyers form internally).
@@ -200,7 +203,9 @@ def write_rows(symbol: str, interval: str, df: pd.DataFrame) -> int:
                 f"INSERT INTO {table} "
                 f"(symbol, timestamp, candle_time, open, high, low, close, volume, data_source) "
                 f"VALUES (:sym, :ts, :ct, :o, :h, :l, :c, :v, 'fyers') "
-                f"ON CONFLICT (symbol, timestamp) DO NOTHING"
+                f"ON CONFLICT (symbol, timestamp) DO UPDATE SET "
+                f"open=EXCLUDED.open, high=EXCLUDED.high, low=EXCLUDED.low, "
+                f"close=EXCLUDED.close, volume=EXCLUDED.volume"
             )
             params = [{
                 "sym": sym, "ts": int(r.timestamp), "ct": r.candle_time,
@@ -213,7 +218,9 @@ def write_rows(symbol: str, interval: str, df: pd.DataFrame) -> int:
                 f"INSERT INTO {table} "
                 f"(symbol, date, timestamp, open, high, low, close, volume, data_source) "
                 f"VALUES (:sym, :dt, :ts, :o, :h, :l, :c, :v, 'fyers') "
-                f"ON CONFLICT (symbol, date) DO NOTHING"
+                f"ON CONFLICT (symbol, date) DO UPDATE SET "
+                f"open=EXCLUDED.open, high=EXCLUDED.high, low=EXCLUDED.low, "
+                f"close=EXCLUDED.close, volume=EXCLUDED.volume"
             )
             params = [{
                 "sym": sym, "dt": pd.to_datetime(r.candle_time).date(),

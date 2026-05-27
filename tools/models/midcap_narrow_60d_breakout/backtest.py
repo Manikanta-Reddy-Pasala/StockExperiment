@@ -169,6 +169,17 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
 
     # Average Daily Value traded (₹) = close × volume; used to rank liquidity.
     df["adv_rs"] = df["close"].astype(float) * df["volume"].astype(float)
+    # FIX 6 — staleness filter. The close pivot below is forward-filled, which
+    # carries a delisted/suspended name's last close forward as a flat line; it
+    # could then rank into the pool or be held at a phantom price. From the RAW
+    # df (pre-ffill), keep only names whose true last bar is within
+    # STALE_SESSIONS trading sessions of the panel's latest date.
+    STALE_SESSIONS = 5
+    _all_dates = sorted(df["date"].unique())
+    _cutoff_date = (_all_dates[-(STALE_SESSIONS + 1)]
+                    if len(_all_dates) > STALE_SESSIONS else _all_dates[0])
+    _last_seen = df.groupby("symbol")["date"].max()
+    fresh_syms = set(_last_seen[_last_seen >= _cutoff_date].index)
     # Pivot long rows -> date × symbol matrices, one per field, for vectorised
     # rolling computations. Close is forward-filled to bridge missing bars.
     cl  = df.pivot(index="date", columns="symbol", values="close").ffill()
@@ -191,6 +202,8 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
     # removed afterwards via the Nifty 100 list, leaving mid + small caps.
     last_di = len(dates) - 1
     last_adv = adv20.iloc[last_di].dropna().sort_values(ascending=False)
+    # FIX 6 — exclude stale/delisted names before slicing the pool.
+    last_adv = last_adv[last_adv.index.isin(fresh_syms)]
     midcap_pool = last_adv.iloc[SKIP_TOP:SKIP_TOP + KEEP_NEXT].index.tolist()
 
     # V2 filter: exclude Large (NSE Nifty 100). ANGELONE no longer needs explicit

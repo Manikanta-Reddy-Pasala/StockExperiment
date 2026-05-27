@@ -175,6 +175,20 @@ def build_pit_universe_and_rank(df: pd.DataFrame, n100: set
     # ADV proxy in rupees = close * volume (rupee turnover, not share count).
     df["adv_rs"] = df["close"].astype(float) * df["volume"].astype(float)
 
+    # FIX 6 — staleness filter. pivot().ffill() (below) carries the last close
+    # of a delisted/suspended name forward as a flat line, so it could rank or
+    # be held at a phantom price. From the RAW df (pre-ffill), keep only names
+    # whose true last bar is within STALE_SESSIONS trading sessions of the
+    # panel's latest date; drop the rest from the candidate universe.
+    STALE_SESSIONS = 5
+    all_dates = sorted(df["date"].unique())
+    if len(all_dates) > STALE_SESSIONS:
+        cutoff_date = all_dates[-(STALE_SESSIONS + 1)]  # STALE_SESSIONS back
+    else:
+        cutoff_date = all_dates[0]
+    last_seen = df.groupby("symbol")["date"].max()
+    fresh_syms = set(last_seen[last_seen >= cutoff_date].index)
+
     cl = df.pivot(index="date", columns="symbol", values="close").ffill()
     adv = df.pivot(index="date", columns="symbol", values="adv_rs").fillna(0)
     if cl.empty:
@@ -184,7 +198,10 @@ def build_pit_universe_and_rank(df: pd.DataFrame, n100: set
 
     today_row = cl.iloc[-1]
     # Top-20 by 20d ADV, rebuilt fresh from the latest day's turnover snapshot.
+    # FIX 6 — only rank names that actually traded recently (exclude stale/
+    # delisted symbols the ffill would otherwise carry forward at a phantom px).
     pit_adv = adv20.iloc[-1].dropna().sort_values(ascending=False)
+    pit_adv = pit_adv[pit_adv.index.isin(fresh_syms)]
     pit_univ = pit_adv.head(UNIV_SIZE).index.tolist()
 
     # Uptrend filter: keep only names trading above their 200d SMA today.

@@ -27,6 +27,17 @@ from tools.models.midcap_narrow_60d_breakout.data_pull import (
 
 log = logging.getLogger(__name__)
 
+
+def _alert(msg: str):
+    """FIX 9 — best-effort Telegram alert for scheduler failures. Wrapped so a
+    notify failure never crashes the scheduler thread (log-only was silent)."""
+    try:
+        from tools.live.telegram_notify import send as _tg
+        _tg(msg)
+    except Exception as e:
+        log.debug(f"tg alert skipped: {e}")
+
+
 MODEL_NAME = "midcap_narrow_60d_breakout"
 UNIVERSE_FILE = "/app/logs/momrot/universes/midcap_narrow.json"
 SIGNALS_DIR = Path("/app/logs/midcap_narrow/signals")
@@ -60,8 +71,10 @@ def emit_signal():
             log.error(f"❌ {MODEL_NAME} signal failed ({r.returncode})")
             if r.stderr:
                 log.error(r.stderr[-500:])
+            _alert(f"❌ {MODEL_NAME} emit_signal failed (rc={r.returncode})")
     except Exception as e:
         log.error(f"❌ {MODEL_NAME} signal error: {e}")
+        _alert(f"❌ {MODEL_NAME} emit_signal error: {e}")
 
 
 def execute_orders():
@@ -89,8 +102,11 @@ def execute_orders():
             log.error(f"❌ {MODEL_NAME} Fyers execute failed ({r.returncode})")
             if r.stderr:
                 log.error(r.stderr[-500:])
+            _alert(f"❌ {MODEL_NAME} execute failed (rc={r.returncode}) — "
+                   f"orders may not be placed")
     except Exception as e:
         log.error(f"❌ {MODEL_NAME} Fyers execute error: {e}")
+        _alert(f"❌ {MODEL_NAME} execute error: {e}")
 
 
 # ---- Data-side jobs ----

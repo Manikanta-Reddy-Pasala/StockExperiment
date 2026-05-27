@@ -30,6 +30,17 @@ from tools.models.momentum_pseudo_n100_adv.data_pull import (  # noqa: E402
 
 log = logging.getLogger(__name__)
 
+
+def _alert(msg: str):
+    """FIX 9 — best-effort Telegram alert for scheduler failures. Wrapped so a
+    notify failure never crashes the scheduler thread (log-only was silent)."""
+    try:
+        from tools.live.telegram_notify import send as _tg
+        _tg(msg)
+    except Exception as e:
+        log.debug(f"tg alert skipped: {e}")
+
+
 MODEL_NAME = "momentum_pseudo_n100_adv"
 UNIVERSES_FILE = (
     "/app/tools/models/momentum_pseudo_n100_adv/yearly_universes.json"
@@ -88,8 +99,10 @@ def emit_signal(force: bool = False):
             log.error(f"❌ {MODEL_NAME} signal failed ({r.returncode})")
             if r.stderr:
                 log.error(r.stderr[-500:])
+            _alert(f"❌ {MODEL_NAME} emit_signal failed (rc={r.returncode})")
     except Exception as e:
         log.error(f"❌ {MODEL_NAME} signal error: {e}")
+        _alert(f"❌ {MODEL_NAME} emit_signal error: {e}")
 
 
 def execute_orders():
@@ -125,8 +138,11 @@ def execute_orders():
             log.error(f"❌ {MODEL_NAME} Fyers execute failed ({r.returncode})")
             if r.stderr:
                 log.error(r.stderr[-500:])
+            _alert(f"❌ {MODEL_NAME} execute failed (rc={r.returncode}) — "
+                   f"orders may not be placed")
     except Exception as e:
         log.error(f"❌ {MODEL_NAME} Fyers execute error: {e}")
+        _alert(f"❌ {MODEL_NAME} execute error: {e}")
 
 
 # ---- Data-side helpers ----
@@ -191,4 +207,6 @@ def register_trading_jobs(schedule):
           it no-ops on days where the gate produced no signal.
     """
     schedule.every().day.at("09:25").do(emit_signal)   # rebalance-gated signal emit
-    schedule.every().day.at("09:30").do(execute_orders)  # place orders 5 min later
+    # 09:31 (staggered off n100's 09:30) — all 4 models share one scheduler
+    # thread + one Fyers account; distinct minutes stop later models filling late.
+    schedule.every().day.at("09:31").do(execute_orders)

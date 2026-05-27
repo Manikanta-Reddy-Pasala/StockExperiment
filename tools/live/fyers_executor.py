@@ -35,7 +35,7 @@ import logging
 import os
 import sys
 import time
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -43,6 +43,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from tools.live.risk_manager import RiskManager, Position  # noqa: E402
+from tools.shared import nse_calendar  # noqa: E402
 
 log = logging.getLogger("fyers_executor")
 
@@ -286,17 +287,19 @@ def _fyers_holds_symbol(svc, user_id: int, symbol: str) -> Tuple[bool, int, floa
 
 def _wait_for_fill(svc, user_id: int, order_id: str,
                    timeout_s: int = 60, poll_s: float = 2.0
-                   ) -> Tuple[bool, str, Optional[float]]:
+                   ) -> Tuple[bool, str, Optional[float], int]:
     """Poll Fyers order book until status is terminal.
 
-    Returns (filled: bool, terminal_status: str, traded_price: float | None).
-    `terminal_status` is one of: 'filled', 'cancelled', 'rejected', 'expired',
-    'timeout', 'not_found'.
+    Returns (filled: bool, terminal_status: str, traded_price: float | None,
+    fill_qty: int). `terminal_status` is one of: 'filled', 'cancelled',
+    'rejected', 'expired', 'timeout', 'not_found'.
     `traded_price` is the average fill price reported by Fyers on a filled
     order; None when the order didn't fill or the field is absent.
+    `fill_qty` is the actual filled quantity Fyers reports (0 when unfilled or
+    unknown) — used to detect/record PARTIAL fills (FIX 2).
     """
     if not order_id:
-        return False, "not_found", None
+        return False, "not_found", None, 0
     deadline = time.time() + timeout_s
     last_status = "unknown"
     # Service layer may return raw Fyers int OR mapped string. Treat both.
@@ -312,26 +315,28 @@ def _wait_for_fill(svc, user_id: int, order_id: str,
         if row:
             st = row.get("status")
             st_norm = (st.upper() if isinstance(st, str) else st)
-            # filledQty == qty fallback (status lag protection)
+            # Filled quantity Fyers reports for this order (0 if absent).
+            fq = 0
             try:
                 fq = int(row.get("filled_quantity") or row.get("filledQty") or 0)
                 qq = int(row.get("quantity") or row.get("qty") or 0)
+                # filledQty == qty fallback (status lag protection)
                 if qq > 0 and fq >= qq:
-                    return True, "filled", _extract_traded_price(row)
+                    return True, "filled", _extract_traded_price(row), fq
             except (TypeError, ValueError):
-                pass
+                fq = 0
             if st_norm == 2 or st_norm in FILLED_STR:
-                return True, "filled", _extract_traded_price(row)
+                return True, "filled", _extract_traded_price(row), fq
             if st_norm == 1 or st_norm in CANCELLED_STR:
-                return False, "cancelled", None
+                return False, "cancelled", None, fq
             if st_norm == 5 or st_norm in REJECTED_STR:
-                return False, "rejected", None
+                return False, "rejected", None, fq
             if st_norm == 7 or st_norm in EXPIRED_STR:
-                return False, "expired", None
+                return False, "expired", None, fq
             last_status = f"status={st}"
         time.sleep(poll_s)
     log.warning(f"_wait_for_fill timeout after {timeout_s}s on order {order_id} (last={last_status})")
-    return False, "timeout", None
+    return False, "timeout", None, 0
 
 
 def _cancel_order(svc, user_id: int, order_id: str) -> bool:
@@ -437,6 +442,28 @@ def _fetch_live_ltp(svc, user_id: int, symbol: str) -> Optional[float]:
         return None
 
 
+def _fetch_account_available_cash(svc, user_id: int) -> Optional[float]:
+    """Account-wide available cash from Fyers funds(). Returns None on any
+    error (FIX 5 fail-safe: caller proceeds without the margin gate rather than
+    blocking trading on a funds-API hiccup — the broker still rejects
+    over-margin orders).
+
+    FyersService.funds() standardized shape:
+      {"status":"success","data":{"available_cash":"<num>", ...}}
+    where 'available_cash' maps to the Fyers 'Available Balance' fund title.
+    """
+    try:
+        res = svc.funds(user_id) or {}
+        if str(res.get("status") or "").lower() != "success":
+            return None
+        data = res.get("data") or {}
+        avail = float(data.get("available_cash") or 0)
+        return avail if avail > 0 else None
+    except Exception as e:
+        log.warning(f"funds() fetch failed: {e}")
+        return None
+
+
 # --------- LIMIT-with-tolerance + MARKET-fallback ---------
 
 def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
@@ -444,7 +471,8 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
                               tag: str = "") -> Dict:
     """Place a LIMIT order with tolerance; widen once; MARKET as last resort.
 
-    Returns dict: {filled, status, order_id, fill_price (best-effort), reason}.
+    Returns dict: {filled, status, order_id, fill_price (best-effort),
+    fill_qty (actual filled qty; 0 if unknown — FIX 2), reason}.
 
     Timeline (total = `rm_cfg.limit_fallback_s` seconds, default 20s):
       t=0      : place LIMIT @ tol_pct off last_price
@@ -471,7 +499,7 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
                       pricetype="LIMIT", price=first_px, tag=tag)
     if not _is_ok(res):
         return {"filled": False, "status": "place_failed", "order_id": "",
-                "fill_price": None, "reason": str(res)}
+                "fill_price": None, "fill_qty": 0, "reason": str(res)}
     order_id = _extract_order_id(res)
     # Fyers may return success + empty orderid synchronously; that still means
     # the order was accepted. Try to recover the real id from the order book
@@ -486,14 +514,14 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
         log.error(f"  LIMIT {symbol} placed but no orderId returned — treating "
                   f"as UNFILLED (reconciler will mirror any real fill).")
         return {"filled": False, "status": "limit_no_id_unconfirmed",
-                "order_id": "", "fill_price": None,
+                "order_id": "", "fill_price": None, "fill_qty": 0,
                 "reason": "no_orderid_unconfirmed"}
-    filled, term, traded_px = _wait_for_fill(svc, user_id, order_id,
-                                              timeout_s=first_window_s, poll_s=2.0)
+    filled, term, traded_px, fill_qty = _wait_for_fill(
+        svc, user_id, order_id, timeout_s=first_window_s, poll_s=2.0)
     if filled:
         return {"filled": True, "status": "limit_filled", "order_id": order_id,
                 "fill_price": traded_px if traded_px is not None else first_px,
-                "reason": "tol"}
+                "fill_qty": fill_qty, "reason": "tol"}
 
     # Re-quote off a FRESH live price. The LTP can move during the first
     # window, so widening off the stale t=0 price could sit away from the
@@ -519,15 +547,18 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
         else:
             conf = _cancel_and_confirm(svc, user_id, order_id)
             if conf == 'filled':
+                # Filled during the cancel race. _cancel_and_confirm doesn't
+                # surface a qty; fill_qty=0 means "unknown" -> caller falls back
+                # to intended qty (FIX 2). A full LIMIT fill is the common case.
                 return {"filled": True, "status": "limit_filled",
                         "order_id": order_id, "fill_price": first_px,
-                        "reason": "filled_during_cancel"}
+                        "fill_qty": 0, "reason": "filled_during_cancel"}
             if conf != 'cancelled':
                 # Prior order's margin not released — do NOT stack a second
                 # order. Leave the existing LIMIT working; reconciler will
                 # pick up any later fill.
                 return {"filled": False, "status": "limit_cancel_unconfirmed",
-                        "order_id": order_id, "fill_price": None,
+                        "order_id": order_id, "fill_price": None, "fill_qty": 0,
                         "reason": "prior LIMIT not cancelled; skipped replacement to avoid double-margin"}
             res2 = _placeorder(svc, user_id, symbol, qty, side,
                                pricetype="LIMIT", price=retry_px, tag=tag)
@@ -536,17 +567,17 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
             else:
                 log.error(f"  LIMIT retry place failed for {symbol}: {res2}")
                 return {"filled": False, "status": "limit_retry_place_failed",
-                        "order_id": order_id, "fill_price": None,
+                        "order_id": order_id, "fill_price": None, "fill_qty": 0,
                         "reason": str(res2)}
 
     log.info(f"  LIMIT {side} {symbol} re-quote px={retry_px} "
              f"(retry_tol={rm_cfg.limit_retry_pct}%)")
-    filled, term, traded_px = _wait_for_fill(svc, user_id, order_id,
-                                              timeout_s=second_window_s, poll_s=2.0)
+    filled, term, traded_px, fill_qty = _wait_for_fill(
+        svc, user_id, order_id, timeout_s=second_window_s, poll_s=2.0)
     if filled:
         return {"filled": True, "status": "limit_retry_filled", "order_id": order_id,
                 "fill_price": traded_px if traded_px is not None else retry_px,
-                "reason": "retry_tol"}
+                "fill_qty": fill_qty, "reason": "retry_tol"}
 
     # MARKET fallback — confirm the prior LIMIT is cancelled (margin freed)
     # BEFORE placing the MARKET order, else the account holds both and Fyers
@@ -555,22 +586,48 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
     if conf == 'filled':
         return {"filled": True, "status": "limit_retry_filled",
                 "order_id": order_id, "fill_price": retry_px,
-                "reason": "filled_before_market_fallback"}
+                "fill_qty": 0, "reason": "filled_before_market_fallback"}
     if conf != 'cancelled':
         log.error(f"  MARKET fallback SKIPPED for {symbol}: prior order "
                   f"{order_id} not cancelled — avoiding double-margin")
         return {"filled": False, "status": "market_skipped_cancel_unconfirmed",
-                "order_id": order_id, "fill_price": None,
+                "order_id": order_id, "fill_price": None, "fill_qty": 0,
                 "reason": "prior LIMIT not cancelled; skipped MARKET to avoid double-margin"}
+
+    # FIX 3 — slippage cap before the uncapped MARKET fallback. On thin midcaps
+    # the price can run away during the LIMIT windows; a blind MARKET then fills
+    # arbitrarily far from intent. intended_price = the last LIMIT price we used
+    # (retry_px). If the FRESH live LTP has moved more than MAX_SLIPPAGE_PCT off
+    # that, abort instead of placing MARKET (fail-safe over fail-convenient).
+    max_slip_pct = float(os.environ.get("MAX_SLIPPAGE_PCT", "2.0"))
+    intended_price = retry_px
+    ltp_now = _fetch_live_ltp(svc, user_id, symbol)
+    if ltp_now and intended_price and ltp_now > 0:
+        slip_pct = abs(ltp_now / intended_price - 1.0) * 100
+        if slip_pct > max_slip_pct:
+            log.error(f"  MARKET fallback ABORTED for {symbol}: LTP {ltp_now} "
+                      f"moved {slip_pct:.2f}% from intended {intended_price} "
+                      f"(> {max_slip_pct}% cap)")
+            _tg_safe(
+                f"🛑 *MARKET fallback aborted — slippage cap*\n"
+                f"Symbol: `{symbol}` {side} qty={qty}\n"
+                f"Intended: ₹{intended_price:,.2f}  LTP: ₹{ltp_now:,.2f} "
+                f"({slip_pct:.2f}% > {max_slip_pct}% cap)\n"
+                f"No MARKET order placed."
+            )
+            return {"filled": False, "status": "slippage_abort", "order_id": "",
+                    "fill_price": None, "fill_qty": 0,
+                    "reason": f"LTP moved >{max_slip_pct}% from intended"}
+
     log.warning(f"  MARKET fallback for {side} {symbol} qty={qty} "
                 f"(last={last_price}, prior order={order_id})")
     res3 = _placeorder(svc, user_id, symbol, qty, side, pricetype="MARKET", tag=tag)
     if not _is_ok(res3):
         return {"filled": False, "status": "market_failed", "order_id": "",
-                "fill_price": None, "reason": str(res3)}
+                "fill_price": None, "fill_qty": 0, "reason": str(res3)}
     market_id = _extract_order_id(res3)
-    filled, term, traded_px = _wait_for_fill(svc, user_id, market_id,
-                                              timeout_s=30, poll_s=2.0)
+    filled, term, traded_px, fill_qty = _wait_for_fill(
+        svc, user_id, market_id, timeout_s=30, poll_s=2.0)
     return {
         "filled": filled,
         "status": "market_filled" if filled else f"market_{term}",
@@ -579,6 +636,9 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
         # last_price is a placeholder if Fyers omits it on this SDK version.
         "fill_price": (traded_px if traded_px is not None
                        else (last_price if filled else None)),
+        # MARKET fill_qty from Fyers; default to intended qty if Fyers omits it
+        # but the order filled (a MARKET that fills almost always fills in full).
+        "fill_qty": (fill_qty if fill_qty else (qty if filled else 0)),
         "reason": "market_fallback",
     }
 
@@ -672,6 +732,14 @@ def main() -> int:
 
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
+
+    # Holiday guard (FIX 4): never place real orders on an NSE holiday/weekend.
+    # Calendar is the single source of truth (tools.shared.nse_calendar).
+    # Dry-run is exempt so manual paper checks still work on closed days.
+    if not args.dry_run and not nse_calendar.is_trading_day(date.today()):
+        log.info(f"NSE non-trading day ({date.today()}) — skipping execution "
+                 f"(no orders placed).")
+        return 0
 
     # Make model name visible to nested helpers (audit_orders rows).
     global _CURRENT_MODEL
@@ -838,6 +906,9 @@ def main() -> int:
         order_id = "DRY"
         status = "dry-run"
         fill_price = price
+        # FIX 2 — record the ACTUAL filled qty, not the intended. Dry-run fills
+        # the whole intended qty.
+        actual_qty = held.qty
 
         if args.dry_run:
             log.info(f"DRY-RUN PASS-1 EXIT {sym} qty={held.qty} "
@@ -865,15 +936,29 @@ def main() -> int:
                 # Best-effort save of what we did so far, then bail.
                 return 3
             fill_price = res.get("fill_price") or price
+            # FIX 2 — actual filled qty (fall back to intended when Fyers omits
+            # it). Warn + alert on a genuine partial so the operator knows the
+            # exit is incomplete and shares remain held at the broker.
+            fq = int(res.get("fill_qty") or 0)
+            actual_qty = fq if fq > 0 else held.qty
+            if 0 < fq < held.qty:
+                log.warning(f"PARTIAL EXIT {sym}: filled {fq}/{held.qty} — "
+                            f"recording partial; {held.qty - fq} shares still held")
+                _tg_safe(
+                    f"⚠️ *PARTIAL EXIT fill*\n"
+                    f"Model: `{args.model_name or '(env)'}`\n"
+                    f"Symbol: `{sym}` filled {fq}/{held.qty} @ ₹{fill_price:,.2f}\n"
+                    f"{held.qty - fq} shares still held — manual review."
+                )
 
-        pnl = (fill_price - held.entry_price) * held.qty * (
+        pnl = (fill_price - held.entry_price) * actual_qty * (
             1 if held.side == "BUY" else -1
         )
         model_for_signal = args.model_name or sig.get("model", "momentum_n100_top5_max1")
         _append_history({
             "ts": datetime.now().isoformat(),
             "event": "EXIT", "reason": sig_type, "pass": 1,
-            "symbol": sym, "qty": held.qty,
+            "symbol": sym, "qty": actual_qty,
             "entry_price": held.entry_price, "exit_price": fill_price,
             "pnl": round(pnl, 2),
             "order_id": order_id, "status": status,
@@ -882,17 +967,17 @@ def main() -> int:
         if not args.dry_run:
             _record_model_sell(model_for_signal, fill_price,
                                sig.get("reason", sig_type), order_id,
-                               qty=held.qty, svc=svc, user_id=args.user_id)
+                               qty=actual_qty, svc=svc, user_id=args.user_id)
         open_positions = [p for p in open_positions if p.symbol != sym]
         _save_ledger()
-        log.info(f"{'DRY-RUN' if args.dry_run else 'CLOSED'} PASS-1 {sym} qty={held.qty} "
+        log.info(f"{'DRY-RUN' if args.dry_run else 'CLOSED'} PASS-1 {sym} qty={actual_qty} "
                  f"entry={held.entry_price} exit={fill_price} pnl=₹{pnl:.0f} "
                  f"reason={sig_type}")
         closed += 1
         if not args.dry_run:
             _pct = ((fill_price / held.entry_price - 1) * 100
                     if held.entry_price else 0.0) * (1 if held.side == "BUY" else -1)
-            exec_exits.append({"sym": sym, "qty": held.qty,
+            exec_exits.append({"sym": sym, "qty": actual_qty,
                                "exit": fill_price, "pnl": pnl, "pct": _pct})
 
     # ---- After all sells confirmed: rebuild RiskManager from refreshed DB ----
@@ -902,6 +987,16 @@ def main() -> int:
                  f"(after {closed} exit fills)")
 
     # ---- PASS 2: ENTRIES with refreshed sizing ----
+    # FIX 5 — account-wide margin gate. All 4 models share ONE Fyers account;
+    # the per-model ₹30k cap is software-only and nothing checks the shared
+    # broker cash. Fetch available cash once, then decrement by each buy
+    # actually placed. None = funds API unavailable -> gate disabled (fail-safe:
+    # the broker still rejects genuine over-margin orders).
+    _acct_avail = None if args.dry_run else _fetch_account_available_cash(
+        svc, args.user_id)
+    if _acct_avail is not None:
+        log.info(f"Account available cash (Fyers): ₹{_acct_avail:,.2f}")
+
     for sig in entry_signals:
         sym = sig["symbol"]
         signal_price = float(sig.get("price") or 0)
@@ -1002,6 +1097,40 @@ def main() -> int:
             )
             continue
 
+        # FIX 5 — account-wide margin gate (BUY only). The per-model cap already
+        # sized `qty`; this is the SHARED-account backstop so 4 models don't
+        # collectively overdraw one Fyers account. Skip the buy if its cost
+        # exceeds the running available cash; only decrement when a buy is
+        # actually placed (below). Disabled when funds() was unavailable.
+        if (side == "BUY" and not args.dry_run and _acct_avail is not None
+                and qty * price > _acct_avail):
+            log.warning(
+                f"SKIP BUY {sym}: account margin insufficient — cost "
+                f"₹{qty * price:,.2f} > available ₹{_acct_avail:,.2f} "
+                f"(shared Fyers account)"
+            )
+            _tg_safe(
+                f"⚠️ *Account margin insufficient — BUY skipped*\n"
+                f"Model: `{args.model_name or '(env)'}`\n"
+                f"Symbol: `{sym}` qty={qty} @ ₹{price:,.2f} = ₹{qty * price:,.0f}\n"
+                f"Account available: ₹{_acct_avail:,.2f} (shared across 4 models)"
+            )
+            skipped += 1
+            try:
+                from src.services.audit_service import write_rebalance_decision
+                write_rebalance_decision(
+                    model_name=args.model_name or "(env)",
+                    trigger="CRON" if not args.dry_run else "DRY",
+                    decision="SKIP_ACCOUNT_MARGIN",
+                    reason=(f"cost ₹{qty * price:,.2f} > account available "
+                            f"₹{_acct_avail:,.2f}"),
+                    rank1_symbol=sym, rank1_price=price,
+                    qty_sized=qty, qty_clamped=0, clamp_reason="ACCOUNT_MARGIN",
+                )
+            except Exception:
+                pass
+            continue
+
         # Decision audit — BUY allowed
         try:
             from src.services.audit_service import write_rebalance_decision
@@ -1023,6 +1152,9 @@ def main() -> int:
         order_id = "DRY"
         status = "dry-run"
         fill_price = price
+        # FIX 2 — record the ACTUAL filled qty, not the intended. Dry-run fills
+        # the whole intended qty.
+        actual_qty = qty
 
         if args.dry_run:
             log.info(f"DRY-RUN PASS-2 ENTRY {sym} qty={qty} "
@@ -1049,28 +1181,47 @@ def main() -> int:
                 skipped += 1
                 continue
             fill_price = res.get("fill_price") or price
+            # FIX 2 — actual filled qty (fall back to intended when Fyers omits
+            # it). Warn + alert on a genuine partial so the ledger records what
+            # actually filled, not the intended size.
+            fq = int(res.get("fill_qty") or 0)
+            actual_qty = fq if fq > 0 else qty
+            if 0 < fq < qty:
+                log.warning(f"PARTIAL ENTRY {sym}: filled {fq}/{qty} — "
+                            f"recording partial qty in ledger")
+                _tg_safe(
+                    f"⚠️ *PARTIAL ENTRY fill*\n"
+                    f"Model: `{args.model_name or '(env)'}`\n"
+                    f"Symbol: `{sym}` filled {fq}/{qty} @ ₹{fill_price:,.2f}\n"
+                    f"Ledger records the partial; review remaining sizing."
+                )
 
         entry_ts = datetime.now().isoformat()
         model_for_signal = args.model_name or sig.get("model", "momentum_n100_top5_max1")
         _append_history({
             "ts": entry_ts, "event": "ENTRY", "signal": sig.get("signal"),
             "pass": 2,
-            "symbol": sym, "side": side, "qty": qty, "price": fill_price,
+            "symbol": sym, "side": side, "qty": actual_qty, "price": fill_price,
             "sl": sig.get("sl"), "target": sig.get("target"),
             "order_id": order_id, "status": status,
             "model": model_for_signal,
         })
         if not args.dry_run and side == "BUY":
-            _record_model_buy(model_for_signal, sym, qty, fill_price, order_id,
+            _record_model_buy(model_for_signal, sym, actual_qty, fill_price, order_id,
                               svc=svc, user_id=args.user_id)
+            # FIX 5 — decrement the shared-account running cash by the buy that
+            # actually went through, so later buys this cycle see the reduced
+            # balance without re-hitting the funds API.
+            if _acct_avail is not None:
+                _acct_avail = max(0.0, _acct_avail - actual_qty * fill_price)
         log.info(f"{'DRY-RUN' if args.dry_run else 'PLACED'} PASS-2 {side} {sym} "
-                 f"qty={qty} @ {fill_price} status={status}")
+                 f"qty={actual_qty} @ {fill_price} status={status}")
         placed += 1
         if not args.dry_run:
-            exec_entries.append({"sym": sym, "qty": qty,
+            exec_entries.append({"sym": sym, "qty": actual_qty,
                                  "fill": fill_price, "side": side})
         new_pos = Position(
-            symbol=sym, qty=qty, entry_price=fill_price, side=side,
+            symbol=sym, qty=actual_qty, entry_price=fill_price, side=side,
             sl=float(sig.get("sl", 0) or 0),
             target=float(sig.get("target", 0) or 0),
         )

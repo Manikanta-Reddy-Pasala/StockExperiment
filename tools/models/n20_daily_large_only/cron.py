@@ -35,6 +35,17 @@ from tools.models.n20_daily_large_only.data_pull import (  # noqa: E402
 
 log = logging.getLogger(__name__)
 
+
+def _alert(msg: str):
+    """FIX 9 — best-effort Telegram alert for scheduler failures. Wrapped so a
+    notify failure never crashes the scheduler thread (log-only was silent)."""
+    try:
+        from tools.live.telegram_notify import send as _tg
+        _tg(msg)
+    except Exception as e:
+        log.debug(f"tg alert skipped: {e}")
+
+
 MODEL_NAME = "n20_daily_large_only"
 SIGNALS_DIR = Path("/app/logs/n20_daily/signals")
 
@@ -72,8 +83,10 @@ def emit_signal():
             log.error(f"❌ {MODEL_NAME} signal failed ({r.returncode})")
             if r.stderr:
                 log.error(r.stderr[-500:])
+            _alert(f"❌ {MODEL_NAME} emit_signal failed (rc={r.returncode})")
     except Exception as e:
         log.error(f"❌ {MODEL_NAME} signal error: {e}")
+        _alert(f"❌ {MODEL_NAME} emit_signal error: {e}")
 
 
 def execute_orders():
@@ -106,8 +119,11 @@ def execute_orders():
             log.error(f"❌ {MODEL_NAME} Fyers execute failed ({r.returncode})")
             if r.stderr:
                 log.error(r.stderr[-500:])
+            _alert(f"❌ {MODEL_NAME} execute failed (rc={r.returncode}) — "
+                   f"orders may not be placed")
     except Exception as e:
         log.error(f"❌ {MODEL_NAME} Fyers execute error: {e}")
+        _alert(f"❌ {MODEL_NAME} execute error: {e}")
 
 
 # ---- Data-side helpers ----
@@ -152,4 +168,6 @@ def register_trading_jobs(schedule):
     inside live_signal.py.
     """
     schedule.every().day.at("09:25").do(emit_signal)
-    schedule.every().day.at("09:30").do(execute_orders)
+    # 09:33 (staggered off n100 09:30 / pseudo 09:31 / midcap 09:32) — one
+    # scheduler thread runs these serially, so each model gets its own minute.
+    schedule.every().day.at("09:33").do(execute_orders)

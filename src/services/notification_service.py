@@ -59,10 +59,18 @@ def _ensure_schema() -> None:
 
 
 def is_trading_day(d: datetime = None) -> bool:
-    """Mon-Fri. (NSE holidays not modelled — weekend cover is enough to kill
-    the bulk of off-session noise.)"""
+    """NSE trading day (Mon-Fri minus NSE holidays).
+
+    Delegates to the single calendar source of truth (tools.shared.nse_calendar)
+    so holiday logic lives in exactly one place. Fails soft to the weekday-only
+    rule if that import is unavailable (keeps notifications non-blocking)."""
     d = d or datetime.now()
-    return d.weekday() < 5
+    try:
+        from tools.shared.nse_calendar import is_trading_day as _itd
+        return _itd(d)
+    except Exception as e:  # pragma: no cover - defensive
+        log.debug(f"nse_calendar unavailable, weekday-only fallback: {e}")
+        return d.weekday() < 5
 
 
 def current_held(model_name: str):

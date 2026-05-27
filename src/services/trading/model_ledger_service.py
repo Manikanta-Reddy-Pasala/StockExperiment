@@ -527,6 +527,31 @@ def record_buy(model_name: str, symbol: str, qty: int, price: float,
             except Exception:
                 pass
         l.cash = l.cash - cost
+        # FIX 7 — absorbing the cost can drive cash negative (ledger MUST follow
+        # broker truth). A negative balance means the model can no longer enter
+        # and needs manual reconciliation, so escalate it as a CRITICAL alert
+        # (not the quiet shortfall line above). notify_order funnels to DB +
+        # Telegram; both calls are guarded so a notify/log issue never breaks
+        # the ledger write.
+        if l.cash < 0:
+            new_cash = float(l.cash)
+            try:
+                log.error(
+                    f"{model_name}: ledger cash NEGATIVE (₹{new_cash:.2f}) after "
+                    f"{symbol} buy — model will stop entering; manual "
+                    f"reconciliation needed"
+                )
+            except Exception:
+                pass
+            try:
+                from src.services.notification_service import notify_order
+                notify_order(
+                    f"🚨 CRITICAL: {model_name} ledger cash NEGATIVE "
+                    f"(₹{new_cash:.2f}) after {symbol} buy — model will stop "
+                    f"entering; manual reconciliation needed"
+                )
+            except Exception:
+                pass
         if l.open_symbol == norm and l.open_qty:
             # Accumulate same-symbol fill: weighted-average entry price.
             prev_qty = Decimal(str(l.open_qty))
