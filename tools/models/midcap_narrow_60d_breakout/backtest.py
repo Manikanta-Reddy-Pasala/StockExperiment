@@ -332,6 +332,31 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
         out_dir = Path(out_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / "trade_ledger.json").write_text(json.dumps(trades, indent=2))
+        # summary.json — same shape the other 3 models emit (this model used to
+        # write only the trade ledger; now self-generates the summary too).
+        open_pos = None
+        if pos:
+            _last = float(cl[pos["sym"]].iloc[-1])
+            open_pos = {
+                "symbol": pos["sym"].replace("NSE:", "").replace("-EQ", ""),
+                "qty": pos["qty"], "entry_px": round(pos["entry_px"], 2),
+                "entry_date": pos["entry_date"].isoformat(),
+                "last": round(_last, 2),
+                "unrealized": round((_last - pos["entry_px"]) * pos["qty"], 0),
+            }
+        summary = {
+            "model": "midcap_narrow_60d_breakout",
+            "start": start.isoformat(), "end": end.isoformat(),
+            "years": round(yrs, 3), "capital": capital,
+            "final_nav": round(final, 0),
+            "total_return_pct": round((final / capital - 1) * 100, 2),
+            "cagr_pct": round(cagr, 2), "max_dd_pct": round(mdd, 2),
+            "calmar": round(cagr / max(0.01, mdd), 2),
+            "trades": len(trades), "wins": wins, "losses": losses,
+            "win_rate_pct": round(wins / max(1, wins + losses) * 100, 1),
+            "open_position": open_pos,
+        }
+        (out_dir / "summary.json").write_text(json.dumps(summary, indent=2, default=str))
 
     return final, cagr, trades
 

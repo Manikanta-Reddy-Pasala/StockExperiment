@@ -73,13 +73,17 @@ def _merge_pos(out: Dict[str, Dict], rows, source: str) -> None:
                         "source": source}
 
 
-def _fyers_positions_by_symbol(svc, user_id: int = 1) -> Dict[str, Dict]:
+def _fyers_positions_by_symbol(svc, user_id: int = 1):
     """Union of intraday positions + settled holdings. Both are real exposure
     and the model_ledger should match the sum.
 
     Background: CNC orders show in positions() on the day of purchase, then
     move to holdings() after T+1 settlement. Reconciler must check both or
     it will think the position vanished (false LEDGER_AHEAD alert).
+
+    Returns (positives, negatives): positives = {sym: {qty>0,...}} real long
+    holdings; negatives = {sym: net_qty<0} net-short symbols (settling sell or
+    over-sell) surfaced for a distinct claimed-symbol alert.
     """
     out: Dict[str, Dict] = {}
     for fn_name, source in [("positions", "pos"), ("holdings", "hold")]:
@@ -98,11 +102,18 @@ def _fyers_positions_by_symbol(svc, user_id: int = 1) -> Dict[str, Dict]:
     # claim. Dropping these (after summing pos+hold so partial sells still net
     # correctly) prevents false FYERS_ORPHAN / LEDGER_AHEAD alerts, e.g. the
     # "-68 ADANIPOWER @ 247.90" orphan ping right after a rotation sell.
-    dropped = {k: v["qty"] for k, v in out.items() if v["qty"] <= 0}
-    if dropped:
-        log.info(f"reconciler: ignoring non-positive net positions "
-                 f"(settling sells / shorts): {dropped}")
-    return {k: v for k, v in out.items() if v["qty"] > 0}
+    # Split: positives = real long holdings (feed orphan/drift checks).
+    # negatives (net < 0) = a settling same-day CNC sell OR a genuine over-sell;
+    # surfaced separately so a LEDGER-CLAIMED symbol that nets negative gets a
+    # distinct "possible external double-sell" alert instead of being silently
+    # dropped (an UNCLAIMED negative stays ignored — it's a settling sell, not
+    # an orphan). net == 0 = flat, ignored.
+    negatives = {k: v["qty"] for k, v in out.items() if v["qty"] < 0}
+    if negatives:
+        log.info(f"reconciler: net-negative positions (settling sell or "
+                 f"over-sell): {negatives}")
+    positives = {k: v for k, v in out.items() if v["qty"] > 0}
+    return positives, negatives
 
 
 def reconcile_once(user_id: int = 1, dry_run: bool = False) -> List[Dict]:
@@ -112,7 +123,7 @@ def reconcile_once(user_id: int = 1, dry_run: bool = False) -> List[Dict]:
     from src.services.brokers.fyers_service import FyersService
 
     svc = FyersService()
-    fyers = _fyers_positions_by_symbol(svc, user_id)
+    fyers, fyers_neg = _fyers_positions_by_symbol(svc, user_id)
 
     db = get_database_manager()
     corrections: List[Dict] = []
@@ -135,6 +146,20 @@ def reconcile_once(user_id: int = 1, dry_run: bool = False) -> List[Dict]:
 
             claimed_syms.add(expected_sym)
             actual = fyers.get(expected_sym)
+
+            if expected_sym in fyers_neg:
+                # Ledger holds it, but Fyers nets NEGATIVE — an over-sell beyond
+                # what we hold (possible external/duplicate SELL). Distinct from
+                # plain LEDGER_AHEAD (flat): the broker shows a short position.
+                corrections.append({
+                    "model": l.model_name,
+                    "type": "FYERS_NET_NEGATIVE",
+                    "before": f"{expected_sym} x{expected_qty} @ {expected_px:.2f}",
+                    "after": f"Fyers NET SHORT x{fyers_neg[expected_sym]} "
+                             f"(possible external/double SELL)",
+                    "action": "MANUAL: check Fyers tradebook — over-sold vs ledger",
+                })
+                continue
 
             if not actual:
                 # Ledger thinks holding, Fyers shows nothing. External SELL?
