@@ -91,7 +91,8 @@ def load_daily(symbols: List[str], days_back: int = 90) -> pd.DataFrame:
         df = pd.read_sql(
             text(
                 "SELECT symbol,date,open,high,low,close,volume FROM historical_data "
-                "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b ORDER BY symbol,date"
+                "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b "
+                "AND data_source='fyers' ORDER BY symbol,date"
             ),
             c,
             params={"s": symbols, "a": start, "b": end},

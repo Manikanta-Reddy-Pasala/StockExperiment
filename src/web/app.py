@@ -504,9 +504,13 @@ def create_app():
         try:
             with open(HOLIDAY_CACHE_PATH) as f:
                 payload = _json.load(f)
-            holidays = sorted(set(payload.get('holidays', [])))
-            if holidays:
-                return jsonify({'holidays': holidays, 'source': 'nse_cache'})
+            cached = set(payload.get('holidays', []))
+            if cached:
+                # UNION with the offline fallback (mirrors _load_holidays) so a
+                # partial/forward-only cache can never drop a known holiday from
+                # the UI's "trading days left" math.
+                cached |= {d.isoformat() for d in _FALLBACK_HOLIDAYS}
+                return jsonify({'holidays': sorted(cached), 'source': 'nse_cache'})
         except Exception:
             pass
         # Fallback to the hardcoded offline list.

@@ -457,8 +457,11 @@ def _fetch_account_available_cash(svc, user_id: int) -> Optional[float]:
         if str(res.get("status") or "").lower() != "success":
             return None
         data = res.get("data") or {}
-        avail = float(data.get("available_cash") or 0)
-        return avail if avail > 0 else None
+        # Return the real number — including 0.0 for a drained account, which
+        # must BLOCK buys (qty*price > 0 always true). None is reserved for an
+        # API failure (handled above), so the margin gate only DISABLES on a
+        # genuine hiccup, never silently at exactly zero balance.
+        return float(data.get("available_cash") or 0)
     except Exception as e:
         log.warning(f"funds() fetch failed: {e}")
         return None
