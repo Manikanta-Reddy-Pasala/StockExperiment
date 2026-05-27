@@ -127,12 +127,13 @@
             <th class="text-end">Price</th>
             <th class="text-end">Value</th>
             <th class="text-end">P&amp;L</th>
+            <th class="text-end">P&amp;L %</th>
             <th>Reason</th>
             <th>Order ID</th>
           </tr>
         </thead>
         <tbody id="txn_body">
-          <tr><td colspan="10" class="empty-state">Loading transactions…</td></tr>
+          <tr><td colspan="11" class="empty-state">Loading transactions…</td></tr>
         </tbody>
       </table>
     </div>
@@ -309,7 +310,7 @@ async function loadTradeHistory() {
     const body = document.getElementById('txn_body');
     if (!trades.length) {
       body.innerHTML =
-        '<tr><td colspan="10" class="empty-state">No trades yet for this model.</td></tr>';
+        '<tr><td colspan="11" class="empty-state">No trades yet for this model.</td></tr>';
       return;
     }
 
@@ -319,6 +320,17 @@ async function loadTradeHistory() {
       const pnlCell = pnlVal == null
         ? '<span class="text-muted">—</span>'
         : `<span class="${cls(pnlVal)}">${fmtINR(pnlVal)}</span>`;
+      // P&L % on a SELL = realized pnl / cost basis, where cost = value - pnl
+      // (value = sell proceeds = qty×sell_px; cost = qty×buy_px). BUY/cashflow
+      // rows have no pnl → blank.
+      let pnlPctCell = '<span class="text-muted">—</span>';
+      if (pnlVal != null) {
+        const cost = Number(t.value || 0) - Number(pnlVal);
+        if (cost > 0) {
+          const pct = (Number(pnlVal) / cost) * 100;
+          pnlPctCell = `<span class="${cls(pnlVal)}">${fmtPct(pct)}</span>`;
+        }
+      }
       const isCashflow = side === 'DEPOSIT' || side === 'WITHDRAW';
       const sym = isCashflow ? '<span class="text-muted">—</span>' : (t.symbol || '—');
       const qty = isCashflow ? '—' : fmtNum(t.qty);
@@ -333,6 +345,7 @@ async function loadTradeHistory() {
           <td class="text-end">${px}</td>
           <td class="text-end">${fmtINR(t.value)}</td>
           <td class="text-end">${pnlCell}</td>
+          <td class="text-end">${pnlPctCell}</td>
           <td><small class="text-muted">${t.reason || ''}</small></td>
           <td><small class="text-muted">${t.fyers_order_id || ''}</small></td>
         </tr>
@@ -342,7 +355,7 @@ async function loadTradeHistory() {
   } catch (e) {
     console.error('trade-history load failed', e);
     document.getElementById('txn_body').innerHTML =
-      `<tr><td colspan="10" class="empty-state text-danger">Error: ${e.message || e}</td></tr>`;
+      `<tr><td colspan="11" class="empty-state text-danger">Error: ${e.message || e}</td></tr>`;
   }
 }
 
