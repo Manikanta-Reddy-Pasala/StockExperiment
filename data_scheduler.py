@@ -285,14 +285,6 @@ def _write_gate_marker(ok: bool, msg: str):
         logger.warning(f"gate marker write failed: {e}")
 
 
-def run_data_pipeline():
-    """Run complete data pipeline (Daily at 9:00 PM after market close)."""
-    logger.info("=" * 80)
-    logger.info("Starting Data Pipeline (4-Step Saga)")
-    logger.info("=" * 80)
-    _run_subprocess_with_retry(['python3', 'run_pipeline.py'], 'Data Pipeline', timeout=3600, max_retries=2)
-
-
 def backfill_full_history():
     """Ensure ALL NSE-EQ stocks have 4 years (1500d) of daily OHLCV.
 
@@ -752,13 +744,13 @@ def run_scheduler():
     register_midcap_narrow_data(schedule)
     register_n20_daily_data(schedule)
 
-    # Legacy 4-step saga (kept for admin UI compat — populates technical_indicators,
-    # stocks.market_cap/PE/PB/ROE used by /admin and /suggested-stocks dashboards).
-    # Model 3 needs only step 3 (HISTORICAL_DATA), which is also covered by the
-    # per-model data_pull above as a fallback.
-    schedule.every().day.at("21:00").do(run_data_pipeline)
+    # Legacy 4-step saga (run_pipeline.py / pipeline_saga) REMOVED here: it was
+    # redundant for the 4 live models (their historical_data is filled by the
+    # per-model 20:30-20:45 data_pull + Sunday backfill above). It only refreshed
+    # the dead-for-trading /admin + /suggested-stocks dashboards. Still runnable
+    # on demand via the admin route if those dashboards are ever revived.
 
-    # Export CSV & validate quality (10 PM - after pipeline completes)
+    # Export CSV & validate quality (10 PM)
     schedule.every().day.at("22:00").do(export_daily_csv)
     schedule.every().day.at("22:00").do(validate_data_quality)
     schedule.every().day.at("22:05").do(snapshot_data_quality_audit)
