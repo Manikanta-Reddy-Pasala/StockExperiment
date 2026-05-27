@@ -35,15 +35,37 @@ function _ymdLocal(d) {
   return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
 }
 
-// NSE weekday trading holidays — mirror of tools/shared/nse_calendar.py
-// (refresh yearly when NSE publishes the next circular). Weekend-only
-// holidays are covered by the Sat/Sun check, so only weekday closures listed.
-const NSE_HOLIDAYS = new Set([
+// NSE trading holidays. SOURCE: /api/nse-holidays (served from the
+// scheduler-maintained cache of the NSE official API, with a server-side
+// hardcoded fallback). Populated on page load BEFORE the cards render so
+// _isTradingDay / nextRebalance see the correct set. Starts empty and is
+// filled by loadHolidays() — never reference it before that resolves.
+const NSE_HOLIDAYS = new Set();
+
+// Baked offline fallback (mirror of tools/shared/nse_calendar._FALLBACK_HOLIDAYS,
+// weekday closures only). Used ONLY if the /api/nse-holidays fetch fails, so the
+// page still computes sane next-rebalance dates without a network round trip.
+const _FALLBACK_HOLIDAYS_JS = [
   '2025-10-21','2025-10-22','2025-11-05','2025-12-25',
   '2026-01-15','2026-01-26','2026-03-03','2026-03-26','2026-03-31','2026-04-03',
   '2026-04-14','2026-05-01','2026-05-28','2026-06-26','2026-09-14','2026-10-02',
   '2026-10-20','2026-11-10','2026-11-24','2026-12-25',
-]);
+];
+
+// Fetch the holiday list and populate NSE_HOLIDAYS. Fail-safe: on ANY error,
+// seed from the baked fallback so the page never breaks. Resolves before render.
+async function loadHolidays() {
+  NSE_HOLIDAYS.clear();
+  try {
+    const r = await fetch('/api/nse-holidays', {cache: 'no-store'});
+    const d = await r.json();
+    const list = (d && Array.isArray(d.holidays) && d.holidays.length) ? d.holidays : _FALLBACK_HOLIDAYS_JS;
+    list.forEach(x => NSE_HOLIDAYS.add(x));
+  } catch (e) {
+    _FALLBACK_HOLIDAYS_JS.forEach(x => NSE_HOLIDAYS.add(x));
+  }
+}
+
 function _isTradingDay(d) {
   if (d.getDay() === 0 || d.getDay() === 6) return false;  // weekend
   return !NSE_HOLIDAYS.has(_ymdLocal(d));                   // NSE holiday
@@ -308,6 +330,10 @@ function renderCard(m, idx, ranking, status) {
 
 async function load() {
   const container = document.getElementById('picks_container');
+
+  // Holidays drive nextRebalance() inside renderCard — load them FIRST so the
+  // cards compute correct next-rebalance dates. Cheap + fail-safe.
+  await loadHolidays();
 
   // Use portfolio.enabled as authoritative source for which models render.
   // triggers/status remains useful for ranking page context (NAV, P&L, pos).

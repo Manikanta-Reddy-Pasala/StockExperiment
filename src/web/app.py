@@ -490,6 +490,29 @@ def create_app():
         except Exception as e:
             return jsonify({'ok': False, 'count': 0, 'error': str(e)}), 200
 
+    @app.route('/api/nse-holidays')
+    @login_required
+    def api_nse_holidays():
+        """NSE equity trading holidays as ISO date strings — single source of
+        truth for the picks UI (replaces the hardcoded JS list).
+
+        Reads the scheduler-maintained cache (HOLIDAY_CACHE_PATH); if absent or
+        corrupt, falls back to the hardcoded _FALLBACK_HOLIDAYS so the page
+        always gets a usable set. Never errors out — fail-safe."""
+        import json as _json
+        from tools.shared.nse_calendar import HOLIDAY_CACHE_PATH, _FALLBACK_HOLIDAYS
+        try:
+            with open(HOLIDAY_CACHE_PATH) as f:
+                payload = _json.load(f)
+            holidays = sorted(set(payload.get('holidays', [])))
+            if holidays:
+                return jsonify({'holidays': holidays, 'source': 'nse_cache'})
+        except Exception:
+            pass
+        # Fallback to the hardcoded offline list.
+        holidays = sorted(d.isoformat() for d in _FALLBACK_HOLIDAYS)
+        return jsonify({'holidays': holidays, 'source': 'fallback'})
+
     # Keep /v2/ paths as aliases for bookmarks
     @app.route('/v2/')
     @login_required

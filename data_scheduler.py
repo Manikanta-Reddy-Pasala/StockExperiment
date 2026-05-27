@@ -128,6 +128,40 @@ def refresh_fyers_token_job():
         )
 
 
+def refresh_nse_holidays_job():
+    """Refresh the NSE trading-holiday cache from the official NSE API.
+
+    Runs the nse_calendar module as a subprocess (its __main__ does the
+    cookie-primed fetch + writes /app/logs/nse_holidays.json). Fail-safe:
+    a failure here NEVER blocks trading — is_trading_day() simply keeps the
+    hardcoded offline fallback. We still TG-alert so a persistent API outage
+    (e.g. NSE changed the endpoint) is visible before the fallback goes stale.
+
+    Runs on BOOT (so the cache exists) + daily at 04:00 IST (off-peak, after
+    the 03:30 token refresh, well before the 09:00 quality gate / market open).
+    The hardcoded list rarely needs same-day accuracy, so daily is ample.
+    """
+    logger.info("=" * 80)
+    logger.info("Refreshing NSE trading holidays from NSE official API")
+    logger.info("=" * 80)
+    ok = _run_subprocess_with_retry(
+        ['python3', '/app/tools/shared/nse_calendar.py'],
+        'refresh_nse_holidays',
+        timeout=60,
+        max_retries=2,
+        alert_on_fail=False,  # custom, more-actionable alert below
+    )
+    if not ok:
+        _tg_alert(
+            "⚠️ *NSE holiday refresh FAILED (2 attempts)*\n"
+            "Trading is NOT blocked — the hardcoded fallback holiday list "
+            "remains in effect. Refresh the fallback in "
+            "`tools/shared/nse_calendar.py` if NSE's API stays down.\n"
+            "Manual fix: `docker exec trading_system_app python "
+            "/app/tools/shared/nse_calendar.py`"
+        )
+
+
 def daily_universe_csv_check():
     """Daily 06:00 IST check: any universe CSV >7d stale → refresh now.
 
@@ -610,6 +644,7 @@ def run_scheduler():
     except Exception as _e:
         logger.debug(f"audit BOOT failed: {_e}")
     logger.info("Scheduled Tasks:")
+    logger.info("  - NSE Holiday Refresh:     Daily at 04:00 AM + on boot (NSE official API)")
     logger.info("  - Symbol Master Update:    Weekly (Monday) at 06:00 AM")
     logger.info("  - Universe CSV Refresh:    Weekly (Saturday) at 06:00 AM (nifty100/500/midcap/smallcap)")
     logger.info("  - Boot catch-up:           Auto-refresh any cache >7d old on startup")
@@ -622,6 +657,11 @@ def run_scheduler():
     # Daily Fyers TOTP token refresh (03:30 IST, pre-market). Without this,
     # token expires silently → all downstream pulls/orders fail with no rows.
     schedule.every().day.at("03:30").do(refresh_fyers_token_job)
+
+    # Daily NSE trading-holiday refresh (04:00 IST, off-peak). PRIMARY holiday
+    # source — caches /app/logs/nse_holidays.json from the NSE official API.
+    # is_trading_day() falls back to the hardcoded list if the fetch ever fails.
+    schedule.every().day.at("04:00").do(refresh_nse_holidays_job)
 
     # Weekly symbol master update (Monday 6 AM) — refreshes NSE_CM_symbols.json cache
     schedule.every().monday.at("06:00").do(update_symbol_master)
@@ -638,6 +678,14 @@ def run_scheduler():
     # Writes /app/logs/data_quality_gate.json — fyers_executor reads it
     # before placing entries. Aborts trading if today's coverage < 400 syms.
     schedule.every().day.at("09:00").do(pre_market_data_quality_gate)
+
+    # Refresh the NSE holiday cache on BOOT so /app/logs/nse_holidays.json
+    # exists immediately (the daily 04:00 job keeps it current thereafter).
+    # Fail-safe: a failure leaves the hardcoded fallback list in effect.
+    try:
+        refresh_nse_holidays_job()
+    except Exception as e:
+        logger.error(f"Boot NSE holiday refresh failed: {e}", exc_info=True)
 
     # Catch-up on startup: if any universe CSV or symbol cache is >7 days old,
     # refresh immediately (so container restarts heal stale files automatically).
