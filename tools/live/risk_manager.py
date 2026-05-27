@@ -69,8 +69,6 @@ class Position:
     qty: int
     entry_price: float
     side: str = "BUY"
-    sl: float = 0.0
-    target: float = 0.0
 
 
 class RiskManager:

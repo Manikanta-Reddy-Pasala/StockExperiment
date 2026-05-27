@@ -197,9 +197,12 @@ def create_app():
         import threading
         def run_complete_stock_initialization():
             try:
-                # Check if startup pipeline is disabled via env var
-                if os.environ.get('SKIP_STARTUP_PIPELINE', '').lower() in ('true', '1', 'yes'):
-                    app.logger.info("⏭️ Startup pipeline SKIPPED (SKIP_STARTUP_PIPELINE=true)")
+                # Startup pipeline is OPT-IN. The 4 live models read historical_data,
+                # which is kept fresh by the per-model 20:30 data_pull + weekly
+                # backfill; this legacy saga is redundant here and only slows cold
+                # boots. Run it only when explicitly requested (e.g. fresh-DB bootstrap).
+                if os.environ.get('RUN_STARTUP_PIPELINE', '').lower() not in ('true', '1', 'yes'):
+                    app.logger.info("⏭️ Startup pipeline SKIPPED (opt-in via RUN_STARTUP_PIPELINE=true)")
                     return
 
                 # Check data freshness - only run if data is more than 2 days old

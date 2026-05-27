@@ -1206,8 +1206,6 @@ def main() -> int:
                                  "fill": fill_price, "side": side})
         new_pos = Position(
             symbol=sym, qty=actual_qty, entry_price=fill_price, side=side,
-            sl=float(sig.get("sl", 0) or 0),
-            target=float(sig.get("target", 0) or 0),
         )
         try:
             object.__setattr__(new_pos, "entry_ts", entry_ts)
