@@ -53,7 +53,7 @@ def load_n100():
 
 def run(start: date, end: date, capital: float, out_dir: Path | None = None,
         mid_month_check: bool = False, mid_month_lead_pct: float = 5.0,
-        retain_top_n: int = 1, data_source: str = "fyers"):
+        retain_top_n: int = 3, data_source: str = "fyers"):
     """Run the full Nifty 100 momentum-rotation backtest and report metrics.
 
     Loads close prices, builds the monthly (+ optional mid-month) rebalance
@@ -238,9 +238,12 @@ if __name__ == "__main__":
                     help="Enable day-15 weekday rank check with lead gate")
     ap.add_argument("--mid-month-lead-pct", type=float, default=5.0,
                     help="Minimum lead (pp) for mid-month rotation. Default 5.0")
-    ap.add_argument("--retain-top-n", type=int, default=1,
-                    help="Hold while in top-N by 30d ret; rotate when out. "
-                         "1=legacy (rotate off rank-1), 5=LIVE exit. Default 1.")
+    ap.add_argument("--retain-top-n", type=int, default=3,
+                    help="Hold while in top-N by 15d ret; rotate when out. "
+                         "3 = current canonical (2026-05-28 sweep): wins BOTH "
+                         "3yr and 10yr vs retain=1 (3yr +245% vs +184%, 10yr "
+                         "+86.8% vs +67.1%, DD 53% vs 61%). 1 = legacy. "
+                         "5 = pre-2026-05-26 live exit band.")
     ap.add_argument("--data-source", default="fyers",
                     help="historical_data.data_source filter. Default fyers "
                          "(canonical). Use yfinance only for local dev DBs.")

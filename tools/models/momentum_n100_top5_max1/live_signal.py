@@ -246,7 +246,7 @@ def held_from_db() -> List[Dict]:
 
 
 def emit_signals(top_picks: List[tuple], held: List[Dict],
-                  top_n: int, retain_top_n: int = 1) -> List[Dict]:
+                  top_n: int, retain_top_n: int = 3) -> List[Dict]:
     """Turn a ranking + current holding into SELL/BUY signal dicts.
 
     Delegates the keep/rotate decision to the shared decide_rotation core so
@@ -337,10 +337,12 @@ def main():
     ap.add_argument("--universe-file", required=True)
     ap.add_argument("--top-n", type=int, default=5,
                     help="Ranking display size only.")
-    ap.add_argument("--retain-top-n", type=int, default=1,
-                    help="Exit retention band: hold while in top-N by 30d ret, "
-                         "rotate when out. 1=top-1 rotation (matches backtest). "
-                         "Default 1.")
+    ap.add_argument("--retain-top-n", type=int, default=3,
+                    help="Exit retention band: hold while in top-N by 15d ret, "
+                         "rotate when out. 3 = current canonical (2026-05-28 "
+                         "sweep): 3yr +245% / 10yr +86.8% / 10yr DD 53.07% "
+                         "(vs legacy retain=1: +184% / +67.1% / 60.9%). "
+                         "Default 3.")
     ap.add_argument("--signals-out", required=True)
     ap.add_argument("--ranking-out", default=None,
                     help="Where to write the Today's Picks ranking JSON. "

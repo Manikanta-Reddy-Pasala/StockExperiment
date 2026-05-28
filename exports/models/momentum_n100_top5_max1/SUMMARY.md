@@ -1,6 +1,6 @@
 # momentum_n100_top5_max1 — SUMMARY
 
-**Real NSE Nifty 100 momentum rotation (top-1 by 15-trading-day ret), monthly + mid-month check. No price filter — honest baseline.**
+**Real NSE Nifty 100 momentum rotation (top-1 BUY, top-3 retention band by 15-trading-day ret), monthly + mid-month check. No price filter — honest baseline.**
 
 ## When it BUYS (entry rules)
 
@@ -12,35 +12,39 @@ Single position (`max_concurrent=1`). When flat at a rebalance:
 
 ## When it SELLS (exit rules)
 
-Monthly rotation, single position. **Sells only on rank rotation — there is NO price stop or target:**
-- At each **monthly rebalance** (1st–7th weekday): SELLS the held stock **the moment it is no longer rank-1** by 15-trading-day return, and buys the new rank-1 (`retain_top_n=1`). If still rank-1, keeps it.
+Monthly rotation, single position. **Sells only on rank drop — there is NO price stop or target:**
+- At each **monthly rebalance** (1st–7th weekday): keeps the held stock while it stays inside the **top-3 by 15-trading-day return** (`retain_top_n=3`). Only when it drops to rank-4 or worse does it sell + buy the new rank-1.
 - At the **mid-month day-15 check**: rotates **only if the new rank-1 leads the held by ≥5pp** of 15-trading-day return (`MID_MONTH_LEAD_PCT=5.0`, unchanged).
 - SELL labelled `TARGET_HIT`/`STOP_HIT` by exit-vs-entry price only — the **trigger is the rank drop, not a price level.**
 
-> **✅ Live == backtest (fixed 2026-05-26).** Two live bugs, now corrected:
-> 1. **Stateless / stuck:** live `emit_signals` got `held=[]` (cron passed no ledger), so it never
->    emitted a rotation SELL — the executor (`max_concurrent=1`) then silently skipped the new
->    rank-1 BUY. The model bought once (ADANIGREEN, 2026-05-04) and **could not rotate**.
->    Fixed: `live_signal.py` now reads its open position from the DB (`held_from_db()`).
-> 2. **Top-5 band:** exit used `top_picks[:5]`; backtest used top-1. Fixed: `retain_top_n=1`.
+> **2026-05-28 change: `retain_top_n` 1 → 3.** Sweep across LB=15/20/25/30/35/40/45 × retain=1/2/3/5 showed retain=3 wins **both** the 3yr AND the 10yr window vs canonical retain=1, with no trade-off:
 >
-> With both fixes live now does top-1 rotation, matching `backtest.py --retain-top-n 1 --mid-month-check`
-> — the live cron runs both the monthly rebalance and the mid-month check, so the mid-month backtest
-> is the live-faithful figure. **Requires redeploy** to take effect.
-> *(The previously-quoted **+125.13%** was the LB=30 figure; the momentum lookback is now **15 trading
-> days** — see the headline table below for the LB=15 result.)*
+> | Window | retain=1 (old) | retain=3 (new) | Δ |
+> |---|---:|---:|---:|
+> | 3yr CAGR | +184.36% | **+245.47%** | +61.1pp |
+> | 3yr Max DD | 14.89% | **14.89%** | 0 |
+> | 3yr Calmar | 12.38 | **16.48** | +4.10 |
+> | 10yr CAGR | +67.14% | **+86.84%** | +19.7pp |
+> | 10yr Max DD | 60.89% | **53.07%** | −7.82pp |
+> | 10yr Calmar | 1.10 | **1.64** | +0.54 |
+>
+> Mechanism: held drops to rank-2 or rank-3 = STILL strong momentum; rotating away whipsaws trade cost + misses recoveries when it climbs back to rank-1.
+
+> **✅ Live == backtest.** Live cron runs `--mid-month-check` with `retain_top_n=3` (default since 2026-05-28). Headline numbers below are the live-faithful figures. **Requires redeploy** after `retain_top_n` flips from 1 to 3.
 
 ## Backtest window & trade frequency
 
 | Metric | Value |
 |---|---|
-| Backtest window | **2023-05-15 → 2026-05-15** (~3.00 years) |
-| First entry | 2023-05-15 |
-| Total trades | 57 |
-| Trades per year | ~19 |
-| Lookback | **15 trading days (~3 weeks)** — changed 2026-05-27 from 30 (see note) |
+| Backtest window | **2023-05-15 → 2026-05-12** (~2.99 years) + 10yr (2016-05-15 → 2026-05-12) |
+| First entry | 2023-05-15 (3yr) / 2016-05-15 (10yr) |
+| Total trades 3yr | 50 |
+| Total trades 10yr | 177 |
+| Trades per year | ~17 |
+| Lookback | **15 trading days (~3 weeks)** — chosen 2026-05-27 via 6yr walk-forward |
+| Retention band | **top-3 by 15td return** (`retain_top_n=3`) — chosen 2026-05-28 via lookback × retain grid |
 | Rebalance | Monthly (1st trading day) + mid-month day-15 check |
-| Config | top-1 rotation + mid-month check (`--retain-top-n 1 --mid-month-check`) = live |
+| Config | LB=15 + retain=3 + mid-month (`--retain-top-n 3 --mid-month-check`) = live |
 | Data source | **Fyers (split-adjusted cont_flag=1)** |
 
 > **Lookback chosen via 6-year sweep (2020-2026):** 15 trading days (+151.72% CAGR / 45.69% max DD)
@@ -50,26 +54,42 @@ Monthly rotation, single position. **Sells only on rank rotation — there is NO
 ## Stock pick logic
 
 1. Universe: src/data/symbols/nifty100.csv (104 NSE Nifty 100 stocks)
-2. Rank by 15-trading-day return, pick top-1
+2. Rank by 15-trading-day return, BUY rank-1
 3. Rebalance: 1st trading day of month + mid-month day-15 check (lead ≥5pp)
-4. Exit: rotation only — sell when not rank-1 (top-1 retention)
+4. Exit: rotation only — sell when held drops OUT of top-3 by 15td ret (retain band = 3)
 
 ## Headline result (live config: top-1 rotation + mid-month check, 15-trading-day lookback, real fyers data)
 
 3-year standard window (**2023-05-15 → 2026-05-15**):
 
+### 3-year (2023-05-15 → 2026-05-12, ₹10L start)
+
 | Metric | Value |
 |---|---:|
-| Final NAV (cap + open MTM) | **Rs.22,814,268** |
-| Total return | **+2181.43%** |
-| 3-yr CAGR | **+184.36%** |
-| Max DD (3yr) | **14.89%** (UNDERSTATES real risk — see note) |
-| Calmar (CAGR / Max DD) | **12.38** |
-| Trades closed | 57 |
-| Wins / Losses | 37 / 20 |
-| Win rate | 64.9% |
-| Live deployment | YES (top-1 fix pending redeploy) |
-| Open position | **ADANIPOWER** qty 108,831 entry Rs.227.30 (2026-05-04) last Rs.209.63 unrealized -1,923,044 |
+| Final NAV (cap + open MTM) | **Rs.40,849,591** |
+| Total return | **+3984.96%** |
+| 3-yr CAGR | **+245.47%** |
+| Max DD (3yr) | **14.89%** (UNDERSTATES real risk — see 6yr / 10yr below) |
+| Calmar (CAGR / Max DD) | **16.48** |
+| Trades closed | 50 |
+| Wins / Losses | 32 / 18 |
+| Win rate | 64.0% |
+| Live deployment | YES (retain_top_n 1→3 ships 2026-05-28) |
+
+### 10-year (2016-05-15 → 2026-05-12, ₹10L start) — honest decade including 2017-2019 regime hostility
+
+| Metric | Value |
+|---|---:|
+| Final NAV | **Rs.515,293,966** (₹51.5Cr) |
+| Total return | **+51,429%** |
+| 10-yr CAGR | **+86.84%** |
+| Max DD (10yr) | **53.07%** |
+| Calmar | **1.64** |
+| Trades closed | 177 |
+| Wins / Losses | 99 / 78 |
+| Win rate | 55.9% |
+
+> 10yr universe is today's `nifty100.csv` snapshot → ~5-15pp CAGR survivorship inflation (IRFC / MAZDOCK / ETERNAL / LIC etc. didn't trade pre-2020). DD figures stay reliable.
 
 > ## ⚠️ Drawdown — honest 6-year risk
 >
