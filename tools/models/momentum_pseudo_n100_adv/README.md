@@ -73,16 +73,17 @@ Aggressive variant of `momentum_n100_top5_max1`. Same monthly rotation strategy,
 
 ## Comparison vs sibling model
 
-| Metric | momentum_n100_top5_max1 (real N100) | **momentum_pseudo_n100_adv (this — LIVE)** |
+| Metric | momentum_n100_top5_max1 (real N100, LB=15td + mid-month) | **momentum_pseudo_n100_adv (this — LIVE)** |
 |---|---:|---:|
 | Universe | NSE official 104 stocks | Top-100 by ADV from N500 minus Smallcap |
-| CAGR | +125.13% | **+149.15%** |
-| Max DD (rebal) | 28.21% | **16.17%** |
-| WR | 66.7% | **88.9%** |
-| Trades | 42 | 27 |
+| CAGR | **+184.36%** | +149.15% |
+| Max DD (rebal) | **14.89%** | 16.17% |
+| Calmar | **12.38** | 9.22 |
+| WR | 64.9% | **88.9%** |
+| Trades | 57 | 27 |
 | MAX_PRICE filter | none | ₹3,000 (share-count heuristic) |
 
-Pseudo wins both axes (return + DD). The ADV-ranked universe includes liquid mid-caps (BSE, MAZDOCK, NETWEB, GRSE etc.) that the official NSE Nifty 100 excludes because NSE uses free-float market cap, not traded volume. Going forward, the yearly-PIT rebuild keeps the universe honest — only data observable at year-start is used.
+n100 now wins on return (+184 vs +149) AND DD (14.89 vs 16.17) after the 2026-05-27 LOOKBACK 30→15 switch (6yr walk-forward validated). Pseudo's edges are higher WR (88.9% vs 64.9%) and tighter Calmar via the yearly-PIT ADV-from-N500 rebuild — only data observable at year-start is used, so it captures liquid mid-caps (BSE, MAZDOCK, NETWEB, GRSE etc.) that the NSE free-float Nifty 100 excludes.
 
 ## Why this is the LIVE model
 

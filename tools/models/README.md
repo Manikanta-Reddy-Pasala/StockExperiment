@@ -1,15 +1,19 @@
 # Trading Models
 
-**4 equity models.** All but the real-N100 baseline deliver ≥ 130% CAGR over 3-year backtest (2023-05-15 → 2026-05-12; midcap to 2026-05-15). Each subfolder is self-contained: data ingest, backtest, live signal, scheduler, and docs. (The options model `finnifty_ic_otm4_w300_lots5` was removed 2026-05-25 — NIFTY/FinNifty IC abandoned; use equity momentum instead.)
+**4 equity models.** All deliver ≥ +139% CAGR over the 3-year backtest (2023-05-15 → 2026-05-12; midcap to 2026-05-15). Each subfolder is self-contained: data ingest, backtest, live signal, scheduler, and docs. (The options model `finnifty_ic_otm4_w300_lots5` was removed 2026-05-25 — NIFTY/FinNifty IC abandoned; use equity momentum instead.)
 
-## Models
+10-year backtest results (2016-05-15 → 2026-05-12) live in `/README.md` "10-Year Backtest Appendix". 10yr CAGR is materially lower than 3yr for all 4 — 2017-2019 was regime-hostile across every model.
 
-| # | Folder | Category | Universe | CAGR (3yr) | Max DD | LIVE |
-|--:|---|---|---|---:|---:|:-:|
-| 1 | `momentum_n100_top5_max1` | Large-cap equity | Real NSE Nifty 100 | **+125.13%** | 28.21% | ✅ |
-| 2 | `momentum_pseudo_n100_adv` | Large/mid blend | Top-100 ADV from N500 MINUS Small | **+149.15%** | 16.17% | ✅ |
-| 3 | `midcap_narrow_60d_breakout` | Mid+small equity | Top-100 ADV from N500 MINUS Large | **+141.73%** | 8.12% | ✅ |
-| 4 | `n20_daily_large_only` | Top-20 ADV + Nifty 100 | Top-20 ADV + uptrend + NSE Nifty 100 | **+139.55%** | 25.66% | ✅ |
+## Models (3-year backtest, ranked by Calmar)
+
+| # | Folder | Category | Universe | CAGR (3yr) | Max DD | Calmar | LIVE |
+|--:|---|---|---|---:|---:|---:|:-:|
+| 1 | `midcap_narrow_60d_breakout` | Mid+small equity | Top-100 ADV from N500 MINUS Large | +141.73% | 8.12% | **17.46** | ✅ |
+| 2 | `momentum_n100_top5_max1` | Large-cap equity | Real NSE Nifty 100 (LB=15td + mid-month check) | **+184.36%** | **14.89%** | **12.38** | ✅ |
+| 3 | `momentum_pseudo_n100_adv` | Large/mid blend | Top-100 ADV from N500 MINUS Small | +149.15% | 16.17% | 9.22 | ✅ |
+| 4 | `n20_daily_large_only` | Top-20 ADV + Nifty 100 | Top-20 ADV + uptrend + NSE Nifty 100 | +139.55% | 25.66% | 5.44 | ✅ |
+
+> n100's row was previously published as **+125.13% / 28.21% / Calmar 4.44** (LOOKBACK=30 + mid-month). Superseded 2026-05-27 by the 6-year walk-forward-validated lookback switch to 15 trading days. The new canonical numbers above are read directly from each model's `summary.json`. See `momentum_n100_top5_max1/README.md` > "Change history" for the journey.
 
 ## How universes are constructed (per model)
 
