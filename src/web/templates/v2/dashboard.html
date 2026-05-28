@@ -58,6 +58,18 @@
   .totals-detail code { background: #fff; border: 1px solid #e3e6ef; padding: 2px 6px; border-radius: 4px; font-size: 0.78rem; }
 </style>
 
+<!-- Market status banner — visible only on weekends / NSE holidays. Source:
+     /api/nse-holidays (same feed picks.html uses). Hidden on trading days so
+     it never adds noise to a normal session. -->
+<div id="market_status_banner" class="alert alert-warning d-none align-items-center mb-3"
+     role="alert" style="border-left:4px solid #f59e0b;">
+  <i class="bi bi-calendar-x me-2 fs-5"></i>
+  <div>
+    <strong id="msb_title">Markets closed today</strong>
+    <div class="small text-muted" id="msb_detail">—</div>
+  </div>
+</div>
+
 <!-- Today's signals widget (T10) -->
 <div class="card mb-4 signals-widget">
   <div class="card-header d-flex justify-content-between align-items-center">
@@ -429,5 +441,51 @@ function load() {
 }
 load();
 setInterval(load, 30000);
+
+// ---- Market status banner -------------------------------------------------
+// Mirrors picks.html's holiday handling: weekend OR NSE holiday => banner ON
+// with the next trading day. Trading day => stay hidden. Fail-safe — if the
+// /api/nse-holidays fetch fails, the weekend check still works on its own.
+(async function initMarketStatus() {
+  const banner = document.getElementById('market_status_banner');
+  if (!banner) return;
+  const title  = document.getElementById('msb_title');
+  const detail = document.getElementById('msb_detail');
+  const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
+                 + `-${String(d.getDate()).padStart(2,'0')}`;
+  const niceDate = d => d.toLocaleDateString('en-IN',
+    {weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'});
+  let holidays = new Set();
+  try {
+    const r = await fetch('/api/nse-holidays', {cache: 'no-store'});
+    const j = await r.json();
+    (j.holidays || []).forEach(x => holidays.add(x));
+  } catch (e) {
+    // fall-through: weekend banner still works without the holiday list
+  }
+  const isTradingDay = d => {
+    const dow = d.getDay();
+    if (dow === 0 || dow === 6) return false;
+    return !holidays.has(ymd(d));
+  };
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (isTradingDay(today)) {
+    banner.classList.add('d-none');
+    return;
+  }
+  // Closed today — walk forward to the next trading day (skips weekends AND
+  // back-to-back holidays).
+  const next = new Date(today);
+  do { next.setDate(next.getDate() + 1); } while (!isTradingDay(next));
+  const dow = today.getDay();
+  const reason = (dow === 0 || dow === 6)
+    ? `Weekend (${niceDate(today)})`
+    : `NSE holiday (${niceDate(today)})`;
+  title.textContent  = `Markets closed today — ${reason}`;
+  detail.textContent = `No signals / executions will run. `
+                     + `Next trading day: ${niceDate(next)}.`;
+  banner.classList.remove('d-none');
+})();
 </script>
 {% endblock %}
