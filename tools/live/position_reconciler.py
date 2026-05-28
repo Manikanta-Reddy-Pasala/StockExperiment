@@ -46,6 +46,96 @@ def _normalize(sym: str) -> str:
     return s
 
 
+def sibling_qty_for(ledgers, model_name: str, symbol: str) -> int:
+    """Sum open_qty across OTHER ledger rows holding the same (normalized) symbol.
+
+    Used by the reconciler to attribute a merged Fyers holding back to each
+    claiming model when the shared account has 2+ model_ledger rows on one
+    symbol. record_buy / record_sell already stamp each model's own slice at
+    fill time; this helper recovers the per-model expected qty by subtracting
+    sibling claims from the broker net.
+
+    Args:
+        ledgers: iterable of ModelLedger-like rows (.model_name, .open_symbol,
+            .open_qty). Disabled rows are still counted — what matters is
+            whether the row claims open shares on the shared account.
+        model_name: this row's model_name (excluded from the sum).
+        symbol: target symbol; both sides are run through _normalize() before
+            comparing so a ledger storing the plain "ADANIPOWER" form still
+            collides with one storing the full "NSE:ADANIPOWER-EQ" form.
+
+    Returns:
+        Total sibling open_qty (0 if no siblings hold the same symbol).
+    """
+    target = _normalize(symbol)
+    total = 0
+    for L in ledgers:
+        if L.model_name == model_name:
+            continue
+        if not L.open_symbol:
+            continue
+        if _normalize(L.open_symbol) == target:
+            total += int(L.open_qty or 0)
+    return total
+
+
+def decide_drift(expected_qty: int, expected_px: float,
+                 actual_qty: int, actual_px: float,
+                 sibling_qty: int = 0):
+    """Pure: classify drift between ledger (expected) and broker (actual).
+
+    When ``sibling_qty == 0`` this is the pre-overlap behaviour: qty + px both
+    reconcile against the broker numbers (an extra fill / px drift triggers
+    AUTO_MIRROR; an external partial sell triggers QTY_REDUCED).
+
+    When ``sibling_qty > 0`` other ledger rows also claim the same symbol on
+    the shared Fyers account, so the broker's net qty has to be RATIONED
+    before compare: this model's "actual" is ``actual_qty - sibling_qty``.
+    The broker's avg_price is a merge across multiple models' buys and is NOT
+    this model's truth, so the helper refuses to write entry_px under overlap
+    (``fix_px`` stays None — caller leaves the ledger's per-model entry_px
+    alone, which keeps that model's cash math consistent).
+
+    Args:
+        expected_qty / expected_px: what THIS model_ledger row claims it owns.
+        actual_qty / actual_px:     Fyers net across all models on this symbol.
+        sibling_qty: qty other ledger rows claim on the same symbol; 0 if
+            this model is the only claimant.
+
+    Returns:
+        (kind, fix_qty, fix_px). ``fix_qty`` / ``fix_px`` is the value to
+        write into the ledger; ``None`` means "do not update that field".
+        ``kind`` is one of:
+          NO_DRIFT          — ledger matches broker (after sibling subtract).
+          AUTO_MIRROR       — broker has more on our slice; mirror qty (and
+                              px when no siblings).
+          QTY_REDUCED       — broker has less on our slice; alert, no auto-fix
+                              (we don't know the external sell price).
+          SIBLING_OVERCLAIM — siblings claim more than the broker net; some
+                              ledger lies. Don't auto-fix; surface for manual
+                              cross-check.
+    """
+    if sibling_qty > 0:
+        # Overlap path: ration broker qty between this model and its siblings.
+        if sibling_qty > actual_qty:
+            # Some ledger row is lying — auto-fixing here would write a
+            # negative my_share. Surface and stop.
+            return ("SIBLING_OVERCLAIM", None, None)
+        my_share = actual_qty - sibling_qty
+        if my_share == expected_qty:
+            return ("NO_DRIFT", None, None)
+        if my_share < expected_qty:
+            return ("QTY_REDUCED", None, None)
+        # AUTO_MIRROR but keep entry_px — broker avg is the cross-model blend.
+        return ("AUTO_MIRROR", my_share, None)
+    # No overlap — reconcile qty AND px against the broker (legacy behaviour).
+    if actual_qty == expected_qty and abs(actual_px - expected_px) < 0.01:
+        return ("NO_DRIFT", None, None)
+    if actual_qty < expected_qty:
+        return ("QTY_REDUCED", None, None)
+    return ("AUTO_MIRROR", actual_qty, actual_px)
+
+
 def _merge_pos(out: Dict[str, Dict], rows, source: str) -> None:
     """Merge Fyers position/holding rows into {symbol: {qty, avg_price,
     last_price, source}}. Same symbol in both: sum qty + weighted-avg price."""
@@ -175,44 +265,74 @@ def reconcile_once(user_id: int = 1, dry_run: bool = False) -> List[Dict]:
 
             actual_qty = actual["qty"]
             actual_px = actual["avg_price"]
+            # Cross-model attribution: if a sibling ledger also claims this
+            # symbol on the shared Fyers account, ration the broker net before
+            # comparing. Without this, two models holding the same name would
+            # each AUTO_MIRROR the merged total into their own row (each
+            # claiming 2x what it actually owns) on every reconcile pass.
+            sibling_qty = sibling_qty_for(ledgers, l.model_name, expected_sym)
 
-            if actual_qty == expected_qty and abs(actual_px - expected_px) < 0.01:
-                continue  # no drift
+            kind, fix_qty, fix_px = decide_drift(
+                expected_qty, expected_px, actual_qty, actual_px, sibling_qty,
+            )
 
-            # Drift detected — auto-fix only when safe.
-            # SAFE: Fyers qty >= ledger qty (extra BUY captured) — mirror.
-            # SAFE: ledger has same symbol but stale price — mirror.
-            # UNSAFE: Fyers qty < ledger qty (external partial SELL) — alert.
-            if actual_qty < expected_qty:
+            if kind == "NO_DRIFT":
+                continue
+
+            if kind == "QTY_REDUCED":
+                slice_after = (f"my slice x{actual_qty - sibling_qty} of broker "
+                               f"x{actual_qty} (sibling claim x{sibling_qty})"
+                               if sibling_qty
+                               else f"{expected_sym} x{actual_qty} @ {actual_px:.2f}")
                 corrections.append({
                     "model": l.model_name,
                     "type": "QTY_REDUCED",
                     "before": f"{expected_sym} x{expected_qty} @ {expected_px:.2f}",
-                    "after": f"{expected_sym} x{actual_qty} @ {actual_px:.2f}",
+                    "after": slice_after,
                     "action": "MANUAL: partial external SELL, run record_sell for diff",
                 })
                 continue
 
-            # Auto-fix path
+            if kind == "SIBLING_OVERCLAIM":
+                corrections.append({
+                    "model": l.model_name,
+                    "type": "SIBLING_OVERCLAIM",
+                    "before": (f"{expected_sym} x{expected_qty} "
+                               f"(sibling claim x{sibling_qty})"),
+                    "after": (f"broker net only x{actual_qty} — "
+                              f"some ledger row is lying"),
+                    "action": "MANUAL: cross-check all model_ledger rows vs "
+                              "Fyers tradebook for this symbol",
+                })
+                continue
+
+            # AUTO_MIRROR path. Under overlap fix_px is None and we keep the
+            # ledger's own per-model entry_px (broker avg is a cross-model
+            # blend and would corrupt this model's P&L if written here).
+            new_qty = fix_qty
+            effective_px = fix_px if fix_px is not None else expected_px
             invested = float(cfg.invested_amount or 0)
             realized = float(l.realized_pnl or 0)
-            new_cost = actual_qty * actual_px
+            new_cost = new_qty * effective_px
             new_cash = max(0.0, invested + realized - new_cost)
 
+            overlap_note = (f" (overlap: kept entry_px, sibling x{sibling_qty})"
+                            if sibling_qty else "")
             corrections.append({
                 "model": l.model_name,
                 "type": "AUTO_MIRROR",
                 "before": (f"{expected_sym} x{expected_qty} @ {expected_px:.2f} "
                            f"cash=₹{float(l.cash or 0):.2f}"),
-                "after": (f"{expected_sym} x{actual_qty} @ {actual_px:.2f} "
-                          f"cash=₹{new_cash:.2f}"),
+                "after": (f"{expected_sym} x{new_qty} @ {effective_px:.2f} "
+                          f"cash=₹{new_cash:.2f}{overlap_note}"),
                 "action": "applied" if not dry_run else "would-apply",
             })
 
             if not dry_run:
                 l.open_symbol = expected_sym
-                l.open_qty = actual_qty
-                l.open_entry_px = Decimal(str(round(actual_px, 4)))
+                l.open_qty = new_qty
+                if fix_px is not None:
+                    l.open_entry_px = Decimal(str(round(fix_px, 4)))
                 if not l.open_entry_date:
                     l.open_entry_date = date.today()
                 l.cash = Decimal(str(round(new_cash, 2)))
