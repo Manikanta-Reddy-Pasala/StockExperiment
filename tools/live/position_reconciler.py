@@ -294,15 +294,32 @@ def reconcile_once(user_id: int = 1, dry_run: bool = False) -> List[Dict]:
                 continue
 
             if kind == "SIBLING_OVERCLAIM":
+                # Build the full claimant table so the alert points at the
+                # offending row, not just "some ledger lies". One reconciler
+                # pass on an overclaim hits every claimant model with the
+                # same alert — including the breakdown lets the operator
+                # spot which row's open_qty exceeds its share of the broker
+                # net.
+                claimants = []
+                for sib in ledgers:
+                    if not sib.open_symbol:
+                        continue
+                    if _normalize(sib.open_symbol) != expected_sym:
+                        continue
+                    claimants.append(
+                        f"{sib.model_name}={int(sib.open_qty or 0)}"
+                    )
+                breakdown = ", ".join(claimants) if claimants else "(none)"
                 corrections.append({
                     "model": l.model_name,
                     "type": "SIBLING_OVERCLAIM",
                     "before": (f"{expected_sym} x{expected_qty} "
-                               f"(sibling claim x{sibling_qty})"),
-                    "after": (f"broker net only x{actual_qty} — "
-                              f"some ledger row is lying"),
-                    "action": "MANUAL: cross-check all model_ledger rows vs "
-                              "Fyers tradebook for this symbol",
+                               f"(siblings claim x{sibling_qty})"),
+                    "after": (f"broker net only x{actual_qty} — claimants: "
+                              f"[{breakdown}], total x{sibling_qty + expected_qty}"),
+                    "action": "MANUAL: a ledger row's open_qty exceeds its "
+                              "share of the broker net; cross-check Fyers "
+                              "tradebook + run record_sell on the stale row",
                 })
                 continue
 
@@ -382,9 +399,21 @@ def main() -> int:
     if args.tg_on_fix:
         try:
             from tools.live.telegram_notify import send
+            # Per-kind glyph to make the digest scannable on mobile. New
+            # cross-model SIBLING_OVERCLAIM gets a dedicated red-flag icon so
+            # it stands apart from the routine AUTO_MIRROR rows.
+            _icon = {
+                "AUTO_MIRROR":        "🔄",
+                "QTY_REDUCED":        "⚠️",
+                "LEDGER_AHEAD":       "❓",
+                "FYERS_NET_NEGATIVE": "🛑",
+                "SIBLING_OVERCLAIM":  "🚩",
+                "FYERS_ORPHAN":       "👻",
+            }
             lines = [f"*Ledger reconciler* — {len(corrections)} item(s)"]
             for c in corrections[:8]:
-                lines.append(f"`{c['type']}` `{c['model']}`")
+                glyph = _icon.get(c["type"], "•")
+                lines.append(f"{glyph} `{c['type']}` `{c['model']}`")
                 lines.append(f"  was: {c['before']}")
                 lines.append(f"  now: {c['after']}")
                 lines.append(f"  → {c['action']}")

@@ -198,9 +198,19 @@ def withdraw(model_name: str, amount: float) -> Dict:
             raise ValueError(f"Unknown model: {model_name}")
         delta = Decimal(str(amount))
         if ledger.cash < delta:
+            # Cash is `idle` only — money already sunk into an open position
+            # is locked at the broker until that position is sold. Tell the
+            # caller exactly that rather than the bare "insufficient cash".
+            locked = ""
+            if ledger.open_qty and ledger.open_qty > 0:
+                pos_cost = float(Decimal(str(ledger.open_qty)) *
+                                 (ledger.open_entry_px or Decimal(0)))
+                locked = (f" ({ledger.open_symbol} x{int(ledger.open_qty)} "
+                          f"locks ₹{pos_cost:,.0f}; sell first to free cash)")
             raise ValueError(
-                f"Insufficient cash in {model_name}: have ₹{float(ledger.cash):,.0f}, "
-                f"want to withdraw ₹{amount:,.0f}"
+                f"Insufficient cash in {model_name}: have "
+                f"₹{float(ledger.cash):,.0f}, want to withdraw "
+                f"₹{amount:,.0f}{locked}"
             )
         ledger.cash = ledger.cash - delta
         settings.invested_amount = max(

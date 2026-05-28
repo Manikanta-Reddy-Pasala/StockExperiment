@@ -162,6 +162,28 @@ def cleanup_old_snapshots():
     except Exception as e:
         logger.error(f"❌ Snapshot cleanup failed: {e}", exc_info=True)
 
+    # Also prune the cross-model overlap analysis artefacts the operator may
+    # have generated from analyze_model_overlap.py / combined_portfolio_sim.py
+    # — they're regenerable JSON, no need to keep more than two weeks of runs.
+    try:
+        import os, time
+        cutoff = time.time() - 14 * 86400
+        overlap_dir = "/app/exports/overlap"
+        if os.path.isdir(overlap_dir):
+            n = 0
+            for root, _, files in os.walk(overlap_dir):
+                for fn in files:
+                    p = os.path.join(root, fn)
+                    try:
+                        if os.path.getmtime(p) < cutoff:
+                            os.remove(p); n += 1
+                    except OSError:
+                        pass
+            if n:
+                logger.info(f"✅ Pruned {n} stale overlap-analysis file(s) (>14 days)")
+    except Exception as e:
+        logger.warning(f"overlap-artefact prune skipped: {e}")
+
 
 def check_broker_token_status():
     """Check Fyers broker token status and warn if expiring soon."""
@@ -511,9 +533,21 @@ def run_scheduler():
     def _reconcile_market_hours():
         from datetime import datetime as _dt
         now = _dt.now()
-        # Weekday + 09:30-15:30 IST window (container TZ assumed IST/UTC+5:30)
+        # Weekday + NSE-trading-day + 09:30-15:30 IST window (container TZ
+        # assumed IST/UTC+5:30). The NSE-holiday guard catches Bakri Id /
+        # Muharram / etc. where the weekday-only check would still fire a
+        # 5-min loop into a closed market — Fyers quotes() would 200-OK with
+        # SYMBOL_NOT_FOUND and the reconciler would spam noise.
         if now.weekday() >= 5:
             return
+        try:
+            from tools.shared.nse_calendar import is_trading_day
+            if not is_trading_day(now.date()):
+                return
+        except Exception:
+            # Fail-open: if the calendar module can't be reached, fall back to
+            # the weekday-only gate so the reconciler still runs on normal days.
+            pass
         hm = now.hour * 60 + now.minute
         # Start at 09:45, NOT 09:30 — executes run 09:30-09:35 (+ n100 mid-month
         # 09:35). Reconciling during placement races record_buy/record_sell and

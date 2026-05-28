@@ -446,15 +446,34 @@ setInterval(load, 30000);
 // Mirrors picks.html's holiday handling: weekend OR NSE holiday => banner ON
 // with the next trading day. Trading day => stay hidden. Fail-safe — if the
 // /api/nse-holidays fetch fails, the weekend check still works on its own.
+//
+// IST-pinned. The NSE market lives in Asia/Kolkata; a user viewing this from
+// any other timezone would otherwise see whichever date their browser thinks
+// "today" is — so a viewer in PT at 22:00 Thursday (= 10:30 IST Friday) would
+// wrongly see "weekend banner" on a real trading day. All "today" math here
+// runs through Intl with timeZone:'Asia/Kolkata'.
 (async function initMarketStatus() {
   const banner = document.getElementById('market_status_banner');
   if (!banner) return;
   const title  = document.getElementById('msb_title');
   const detail = document.getElementById('msb_detail');
-  const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
-                 + `-${String(d.getDate()).padStart(2,'0')}`;
-  const niceDate = d => d.toLocaleDateString('en-IN',
-    {weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'});
+
+  // YYYY-MM-DD in IST regardless of viewer's local TZ.
+  const IST_YMD = new Intl.DateTimeFormat('en-CA',
+    {timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'});
+  // Friendly "Thu, 28 May 2026" in IST regardless of viewer TZ.
+  const IST_NICE = new Intl.DateTimeFormat('en-IN',
+    {timeZone: 'Asia/Kolkata', weekday: 'short', day: '2-digit',
+     month: 'short', year: 'numeric'});
+  // Day-of-week NUMBER in IST. Intl exposes the short name; map to 0..6 with
+  // 0 = Sunday to match the legacy Date.getDay() convention used elsewhere.
+  const _DOW_MAP = {Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6};
+  const IST_DOW = new Intl.DateTimeFormat('en-US',
+    {timeZone: 'Asia/Kolkata', weekday: 'short'});
+  const ymdIST = d => IST_YMD.format(d);
+  const niceIST = d => IST_NICE.format(d);
+  const dowIST = d => _DOW_MAP[IST_DOW.format(d)];
+
   let holidays = new Set();
   try {
     const r = await fetch('/api/nse-holidays', {cache: 'no-store'});
@@ -464,12 +483,15 @@ setInterval(load, 30000);
     // fall-through: weekend banner still works without the holiday list
   }
   const isTradingDay = d => {
-    const dow = d.getDay();
+    const dow = dowIST(d);
     if (dow === 0 || dow === 6) return false;
-    return !holidays.has(ymd(d));
+    return !holidays.has(ymdIST(d));
   };
+
+  // `today` is a Date *instant* — its identity stays consistent across the
+  // forward walk (each setDate() bump still maps to a stable IST date via
+  // IST_YMD). We never compare it as a local-TZ Date again.
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
   if (isTradingDay(today)) {
     banner.classList.add('d-none');
     return;
@@ -478,13 +500,13 @@ setInterval(load, 30000);
   // back-to-back holidays).
   const next = new Date(today);
   do { next.setDate(next.getDate() + 1); } while (!isTradingDay(next));
-  const dow = today.getDay();
+  const dow = dowIST(today);
   const reason = (dow === 0 || dow === 6)
-    ? `Weekend (${niceDate(today)})`
-    : `NSE holiday (${niceDate(today)})`;
+    ? `Weekend (${niceIST(today)} IST)`
+    : `NSE holiday (${niceIST(today)} IST)`;
   title.textContent  = `Markets closed today — ${reason}`;
   detail.textContent = `No signals / executions will run. `
-                     + `Next trading day: ${niceDate(next)}.`;
+                     + `Next trading day: ${niceIST(next)} IST.`;
   banner.classList.remove('d-none');
 })();
 </script>
