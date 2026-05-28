@@ -285,29 +285,34 @@ Run after the 2026-05-28 Fyers backfill that extended `historical_data` back to 
 
 Calmar < 1 across the board — no model is "amazing" risk-adjusted over a full decade. n20's 0.85 is the strongest. Pseudo's 88% DD is the catastrophic outlier — the 200d SMA + MAX_PRICE filters were tuned on recent data and whipsawed badly in 2017-2020 (see below).
 
-### Year-by-year breakdown (return %)
+### Year-by-year breakdown (return %, true MTM)
+
+NAV at each year-end = cash + held_qty × close_price_on_Dec_31 (queried from `historical_data`). This corrects the cash-only proxy — positions held across Dec 31 contribute their unrealized P&L to the year they span, not deferred until the close trade. Especially material for midcap (60-120d holds straddle year-ends frequently) and any final-year open position. See `tools/analysis/yearly_breakdown_mtm.py`.
 
 |  Year | n100 | pseudo | n20 | midcap |
 |---:|---:|---:|---:|---:|
-| 2016 (partial) | +37.74 | — | — | — |
-| 2017 | −1.97 | **−58.65** | −7.84 | −21.97 |
-| 2018 | −13.64 | −27.68 | +2.57 | −19.38 |
-| 2019 | −29.61 | −24.51 | −18.27 | +14.62 |
-| 2020 | **+215.48** | −11.48 | +32.78 | +28.28 |
-| 2021 | −2.14 | +15.68 | +85.24 | +55.86 |
-| 2022 | +31.08 | −21.04 | +46.36 | −45.09 |
-| 2023 | **+166.75** | **+104.58** | **+221.99** | +5.76 |
-| 2024 | +133.45 | +124.37 | **+206.00** | +60.32 |
-| 2025 | +37.22 | +69.13 | +30.81 | **+157.28** |
-| 2026 (partial) | −3.84 | +95.14 | +0.74 | +32.15 |
+| 2016 (partial) | +39.08 | 0.00 | 0.00 | 0.00 |
+| 2017 | +8.32 | **−60.22** | −5.62 | −3.93 |
+| 2018 | −29.71 | −22.42 | +3.20 | **−34.52** |
+| 2019 | −1.74 | −23.07 | −20.67 | +14.62 |
+| 2020 | **+153.41** | −12.95 | +37.52 | +26.36 |
+| 2021 | −20.46 | +15.50 | +79.13 | +58.24 |
+| 2022 | +50.72 | −21.36 | +52.20 | −45.43 |
+| 2023 | **+193.67** | **+108.41** | **+209.16** | +34.78 |
+| 2024 | +144.08 | +137.51 | **+191.69** | +18.63 |
+| 2025 | +25.28 | +90.73 | +38.58 | **+214.06** |
+| 2026 (partial, to 05-12) | +28.29 | +58.11 | +15.32 | +69.98 |
 
 ### Honest takeaways
 
-1. **2017-2019 was regime-hostile.** All 4 models cumulative ~flat-to-negative across those 3 years. The momentum-rotation thesis broke down in the post-demonetisation / GST / pre-COVID grind. Real users running these models 2017-2019 would have given up.
-2. **2020+ drove the headline.** 2023 alone was +166% / +105% / +222% / +6%. The +136% 3yr combined CAGR was the 2023-2025 fat-tail halo; honest 10yr combined is 39%.
-3. **Pseudo's 2017 −58.65% is the killer.** MAX_PRICE ₹3k + SMA200 uptrend forced concentrated bets in a flat regime. Worth a research pass on regime-detection or removing the SMA200 gate for 2017-style markets — but parity with live behavior wins for now.
-4. **Midcap broke down in 2022 (−45%).** 40d-high breakouts misfire in a declining mid-cap regime; the −20% stop fires but the cumulative whipsaw bleeds equity.
-5. **n100 and n20 are the survivors.** Both posted 3+ losing years yet compounded to 43% / 45% CAGR via fat-tail winners.
+Compound returns 2017-2019 (3-year, MTM-corrected): n100 **−25.2%**, pseudo **−76.3%**, n20 **−22.7%**, midcap **−27.9%**. The 2017-2019 stretch was hostile to all four, with pseudo crushed. Detail:
+
+1. **Pseudo 2017 −60.22% is the catastrophe.** SMA200 + MAX_PRICE ₹3k filters force concentrated bets in a flat regime; the model never recovers — it limps along through 2022 before the 2023+ momentum era pulls it back. Worth a research pass on regime-detection or removing the SMA200 gate for 2017-style markets, but parity with live wins for now.
+2. **2020+ drove the headline.** 2023 alone (MTM): +194% / +108% / +209% / +35%. The 3yr combined +136% CAGR was the 2023-2025 fat-tail halo; honest 10yr combined is 39%.
+3. **Midcap broke down in 2022 (−45.43%) and 2018 (−34.52%).** 40d-high breakouts misfire in declining mid-cap regimes; the −20% stop limits per-trade damage but cumulative whipsaw bleeds equity.
+4. **n100 holds up better than the others in 2017-2019** (just −25% cumulative). Pure 15td rank-1 rotation on real Nifty 100 has the least filter-induced fragility.
+5. **n20 highest churn (519 trades)** absorbs regime noise; daily rotation rotates out of losers fast, which is why it survives 2017-2019 with only −22.7% cumulative.
+6. **Calmar < 1 on all 4 models.** Even n20's best Calmar 0.85 means a year of CAGR-equivalent gain matched by a year of equivalent DD risk. Real expectation: chunky equity curves with multi-year recoveries from regime mismatches.
 
 ### Combined-portfolio 10yr (3-bucket, ₹30k each, live cap)
 
