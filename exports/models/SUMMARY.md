@@ -39,14 +39,51 @@ headline numbers to the rupee after the refactor.
 | 3 | `midcap_narrow_60d_breakout` | Top-100 ADV from N500 − Large | Event-driven | ₹14,134,367 | **+141.73%** | **8.12%** | ✅ |
 | 4 | `n20_daily_large_only` | Top-20 ADV + uptrend + NSE Nifty 100 | Daily | ₹13,655,640 | **+139.55%** | 25.66% | ✅ |
 
-### 10-year backtest (2016-05-15 → 2026-05-12, MTM)
+### 10-year backtest (2016-05-15 → 2026-05-12, canonical configs)
 
-| # | Model | CAGR | Max DD | Calmar |
-|--:|---|---:|---:|---:|
-| 1 | `n20_daily_large_only` | **+45.28%** | 53.54% | 0.85 |
-| 2 | `momentum_n100_top5_max1` | +43.31% | 59.98% | 0.72 |
-| 3 | `midcap_narrow_60d_breakout` | +21.00% | 53.14% | 0.40 |
-| 4 | `momentum_pseudo_n100_adv` | +10.87% | **88.04%** | 0.12 |
+| # | Model | CAGR | Max DD | Calmar | Trades | WR |
+|--:|---|---:|---:|---:|---:|---:|
+| 1 | `momentum_n100_top5_max1` (LB=15 + mid-month — LIVE) | **+67.14%** | 60.89% | 1.10 | 201 | 54.7% |
+| 2 | `n20_daily_large_only` | +45.28% | 53.54% | 0.85 | 519 | 47.1% |
+| 3 | `midcap_narrow_60d_breakout` | +21.00% | 53.14% | 0.40 | 29 | 65.5% |
+| 4 | `momentum_pseudo_n100_adv` | +10.87% | **88.04%** | 0.12 | 97 | 59.8% |
+
+> Previous 10yr appendix showed n100 +43.31% / 60% DD — that was the WITHOUT-mid-month canonical default. The WITH-mid-month variant (what `live_signal.py` actually runs) is +67.14% / 60.89% / Calmar 1.10. Pseudo / n20 / midcap unchanged.
+
+### n100 lookback sweep (2026-05-28 research — NOT yet live)
+
+The 2026-05-27 switch to LB=15 was based on a **6-year** walk-forward (2020-2026, bull-only). With full 10-year data including the regime-hostile 2017-2019, **LB=30 outperforms LB=15** on every 10yr metric:
+
+| n100 LOOKBACK | 10yr CAGR | 10yr Max DD | 10yr Calmar | 3yr CAGR | 3yr Max DD |
+|---:|---:|---:|---:|---:|---:|
+| 15 (LIVE) | +67.14% | 60.89% | 1.10 | **+184.36%** | **14.89%** |
+| 20 | +58.37% | 53.17% | 1.10 | +118.66% | 15.93% |
+| 25 | +46.64% | 61.70% | 0.76 | +129.25% | 22.24% |
+| **30** | **+91.27%** | 57.30% | **1.59** | +125.13% | 28.21% |
+| 35 | +73.91% | **46.48%** | 1.59 | +86.23% | 21.90% |
+| 40 | +64.00% | 58.22% | 1.10 | +98.76% | 19.39% |
+| 45 | +61.69% | 43.23% | 1.43 | +76.84% | 19.39% |
+
+**Findings**:
+- **LB=30 is best 10yr** (+91.27% CAGR vs LB=15's +67.14% = +24pp uplift, AND tighter DD 57.30 vs 60.89).
+- **LB=15 is best 3yr** (+184.36% — wins the 2023-2025 bull window decisively over LB=30's +125.13%).
+- Trade-off is regime-recency vs decade-robustness. Live currently runs LB=15 (recency-optimized). NOT yet changed.
+
+### Other variants tested 2026-05-28 (research only)
+
+| Model | Variant | 10yr CAGR | 10yr DD | Calmar | Notes |
+|---|---|---:|---:|---:|---|
+| pseudo | top-5 equal-weight | +16.27% | 52.15% | 0.31 | Best pseudo 10yr; 2017 cut from -60% to -10% (multi-position diversifies away single-stock concentration). 3yr cost: +149 → +57. |
+| pseudo | TIER L=400/M=200/S=100 ₹Cr ADV gate | +14.99% | 75.17% | 0.20 | Per-tier liquidity filter; 2017 cut to -29%. 3yr cost: +149 → +137. |
+| n20 | TIER L=200/M=100/S=50 ADV gate | +47.85% | 51.34% | 0.93 | Small free 10yr win; 3yr unchanged. |
+| n100 | top-3 equal-weight + mid-month | +40.33% | 36.31% | 1.11 | Best Calmar; DD halved vs canonical; CAGR lower. |
+| n100 | top-3 + LB=30 + mid-month (combo) | not yet run | | | Potential further sweet spot |
+
+**60-150% 10yr target reality check**:
+- Only `momentum_n100_top5_max1` LB=30 hits the band (+91% inside 60-150).
+- Pseudo / n20 / midcap CANNOT clear 60% over 10yr without leverage or fundamentally new architecture (sector rotation, factor overlays, multi-factor scoring).
+- Indian momentum literature (Capitalmind premium service) caps at ~35% CAGR / decade. n100 LB=30's 91% is exceptional and partly survivorship-inflated.
+- Leverage estimate on n100 LB=30: 1.25× = ~118% / DD 75; 1.5× = ~137% / DD 87. Brings 60-150 target inside reach but DD scales linearly.
 
 10yr numbers carry **survivorship bias of ~5-15pp** (universes are today's CSVs; IRFC / MAZDOCK / ETERNAL / LIC etc. didn't trade pre-2020). DD figures stay reliable. See repo root `/README.md` > "10-Year Backtest Appendix" for per-year breakdown.
 
