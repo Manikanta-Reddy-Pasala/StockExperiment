@@ -711,9 +711,8 @@ document.getElementById('btn_triggers_refresh').addEventListener('click', loadTr
 
 // ---------------------------------------------------------------------------
 // Per-Model Data Status — iterates ALL models from /admin/models/portfolio
-// (currently 5 — 4 equity + 1 options). Shows last signal, last data pull,
-// universe size, ranking count. Resilient to missing triggers/ranking
-// endpoints for models not in MODEL_PATHS (e.g. options model).
+// (currently 4 equity models). Shows last signal, last data pull, universe
+// size, ranking count. Resilient to models missing triggers/ranking endpoints.
 // ---------------------------------------------------------------------------
 
 function _dash(v) {
