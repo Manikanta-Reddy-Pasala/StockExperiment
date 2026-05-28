@@ -198,6 +198,11 @@ def main() -> int:
                     help="Seconds to sleep between symbols to avoid Fyers rate-limit.")
     ap.add_argument("--retry-passes", type=int, default=1,
                     help="Number of passes to retry partial-coverage stocks.")
+    ap.add_argument("--parallel", type=int, default=1,
+                    help="Concurrent worker threads. >1 runs the per-symbol "
+                         "fetch loop in a ThreadPoolExecutor (per-call --sleep "
+                         "no longer paces — Fyers API latency throttles "
+                         "naturally). Use 4-8 for a fast wide-universe pull.")
     args = ap.parse_args()
 
     universes = [u.strip() for u in args.universe.split(",") if u.strip()]
@@ -240,36 +245,75 @@ def main() -> int:
         print(f"Incremental mode (--days={args.days} < 30): skip-frac disabled, "
               f"always fetching latest bars.")
 
-    for sym, name in symbols:
-        n_done += 1
-        per_interval_summary = []
+    # Per-symbol unit of work — same logic for both serial and parallel paths.
+    # Returns (sym, summary_str, rows_written, was_skipped, was_fetched).
+    def _process_one(sym_name):
+        sym, _name = sym_name
+        per_iv = []
+        rows_local = 0
+        fetched = False
+        skipped = False
         for iv in intervals:
             exp = expected_bars(iv, args.days)
             have = current_coverage(sym, iv, args.days)
             if skip_enabled and have >= int(exp * args.skip_frac):
-                per_interval_summary.append(f"{iv}=skip({have}/{exp})")
-                n_skipped += 1
+                per_iv.append(f"{iv}=skip({have}/{exp})")
+                skipped = True
                 continue
             try:
                 df = fetch_one(sym, iv, args.days, args.user_id)
             except Exception as e:
-                per_interval_summary.append(f"{iv}=err({e})")
+                per_iv.append(f"{iv}=err({e})")
                 continue
             if df is None or len(df) == 0:
-                per_interval_summary.append(f"{iv}=nodata")
+                per_iv.append(f"{iv}=nodata")
                 continue
             wrote = write_rows(sym, iv, df)
-            total_rows += wrote
-            n_fetched += 1
-            per_interval_summary.append(f"{iv}=+{wrote}")
-        elapsed = time.time() - t_start
-        rate = n_done / max(elapsed, 1)
-        eta = (len(symbols) - n_done) / max(rate, 1e-6)
-        print(f"[{n_done}/{len(symbols)}] {sym}: {' '.join(per_interval_summary)} "
-              f"(elapsed={elapsed/60:.1f}m, eta={eta/60:.1f}m)",
-              flush=True)
-        if args.sleep > 0 and n_done < len(symbols):
-            time.sleep(args.sleep)
+            rows_local += wrote
+            fetched = True
+            per_iv.append(f"{iv}=+{wrote}")
+        return sym, " ".join(per_iv), rows_local, skipped, fetched
+
+    if args.parallel <= 1:
+        for sym_name in symbols:
+            n_done += 1
+            sym, summary, rows_local, skipped, fetched = _process_one(sym_name)
+            total_rows += rows_local
+            if skipped: n_skipped += 1
+            if fetched: n_fetched += 1
+            elapsed = time.time() - t_start
+            rate = n_done / max(elapsed, 1)
+            eta = (len(symbols) - n_done) / max(rate, 1e-6)
+            print(f"[{n_done}/{len(symbols)}] {sym}: {summary} "
+                  f"(elapsed={elapsed/60:.1f}m, eta={eta/60:.1f}m)",
+                  flush=True)
+            if args.sleep > 0 and n_done < len(symbols):
+                time.sleep(args.sleep)
+    else:
+        # Parallel path — Fyers history() is IO-bound, threads are fine. Pool
+        # size capped at args.parallel; Fyers rate-limit absorption is left to
+        # natural per-call latency (no shared sleeper).
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        print(f"Parallel mode: {args.parallel} workers")
+        with ThreadPoolExecutor(max_workers=args.parallel) as ex:
+            futures = {ex.submit(_process_one, sn): sn for sn in symbols}
+            for fut in as_completed(futures):
+                n_done += 1
+                try:
+                    sym, summary, rows_local, skipped, fetched = fut.result()
+                except Exception as e:
+                    sn = futures[fut]
+                    sym = sn[0]; summary = f"crash({e})"
+                    rows_local = 0; skipped = False; fetched = False
+                total_rows += rows_local
+                if skipped: n_skipped += 1
+                if fetched: n_fetched += 1
+                elapsed = time.time() - t_start
+                rate = n_done / max(elapsed, 1)
+                eta = (len(symbols) - n_done) / max(rate, 1e-6)
+                print(f"[{n_done}/{len(symbols)}] {sym}: {summary} "
+                      f"(elapsed={elapsed/60:.1f}m, eta={eta/60:.1f}m)",
+                      flush=True)
     print("---")
     print(f"Prefetch done: {n_done} symbols, "
           f"{n_fetched} fetched, {n_skipped} skipped, "

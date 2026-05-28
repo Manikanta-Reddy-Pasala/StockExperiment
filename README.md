@@ -262,6 +262,88 @@ Env-only changes: `docker compose up -d --force-recreate trading_system`.
 
 ---
 
+## 10-Year Backtest Appendix (2016-05 → 2026-05)
+
+Run after the 2026-05-28 Fyers backfill that extended `historical_data` back to 2016-04-11 across 504 N500 symbols (~10yr daily, 951K rows added).
+
+**Methodology + caveats** (read first):
+
+- **Universes are today's CSV snapshots** (`nifty100.csv`, `nifty500.csv`, `nifty_smallcap250.csv`). pseudo's yearly-PIT ADV-rank picks top-100 *from today's N500* each year; n100 / n20 / midcap also use today's lists.
+- **Survivorship bias is real and material**. Names like IRFC (IPO 2021), MAZDOCK (2020), ETERNAL/Zomato (2021), LIC (2022), POWERINDIA, ADANIPOWER (post-restructure) didn't trade in 2016-2019 — but their winning post-2023 contribution is still in the headline. True 10yr CAGR is likely **5-15pp lower** than reported below. Drawdown numbers are still reliable (crashes hit the names that DID exist).
+- **2016 partial year** — backtest starts 2016-05-15. **2026 partial year** — ends 2026-05-12.
+- **Pseudo / n20 / midcap need 200d SMA warmup**, so they're effectively flat until ~Feb 2017.
+- **Capital ₹10L per model** (research scale); combined sim re-run at live ₹30k confirmed direction (see [Cross-Model Overlap](#cross-model-overlap)).
+
+### Per-model 10yr headline
+
+| Model | CAGR | Max DD | Calmar | Trades | WR |
+|---|---:|---:|---:|---:|---:|
+| `momentum_n100_top5_max1` (15td lookback) | **+43.31%** | 59.98% | 0.72 | 113 | 57.5% |
+| `momentum_pseudo_n100_adv` (30d + SMA200 + ≤₹3k) | +10.87% | **88.04%** | 0.12 | 97 | 59.8% |
+| `n20_daily_large_only` (daily, top-20 ADV ∩ N100) | **+45.28%** | 53.54% | 0.85 | 519 | 47.1% |
+| `midcap_narrow_60d_breakout` (40d-high + 2× vol) | +21.00% | 53.14% | 0.40 | 29 | 65.5% |
+
+Calmar < 1 across the board — no model is "amazing" risk-adjusted over a full decade. n20's 0.85 is the strongest. Pseudo's 88% DD is the catastrophic outlier — the 200d SMA + MAX_PRICE filters were tuned on recent data and whipsawed badly in 2017-2020 (see below).
+
+### Year-by-year breakdown (return %)
+
+|  Year | n100 | pseudo | n20 | midcap |
+|---:|---:|---:|---:|---:|
+| 2016 (partial) | +37.74 | — | — | — |
+| 2017 | −1.97 | **−58.65** | −7.84 | −21.97 |
+| 2018 | −13.64 | −27.68 | +2.57 | −19.38 |
+| 2019 | −29.61 | −24.51 | −18.27 | +14.62 |
+| 2020 | **+215.48** | −11.48 | +32.78 | +28.28 |
+| 2021 | −2.14 | +15.68 | +85.24 | +55.86 |
+| 2022 | +31.08 | −21.04 | +46.36 | −45.09 |
+| 2023 | **+166.75** | **+104.58** | **+221.99** | +5.76 |
+| 2024 | +133.45 | +124.37 | **+206.00** | +60.32 |
+| 2025 | +37.22 | +69.13 | +30.81 | **+157.28** |
+| 2026 (partial) | −3.84 | +95.14 | +0.74 | +32.15 |
+
+### Honest takeaways
+
+1. **2017-2019 was regime-hostile.** All 4 models cumulative ~flat-to-negative across those 3 years. The momentum-rotation thesis broke down in the post-demonetisation / GST / pre-COVID grind. Real users running these models 2017-2019 would have given up.
+2. **2020+ drove the headline.** 2023 alone was +166% / +105% / +222% / +6%. The +136% 3yr combined CAGR was the 2023-2025 fat-tail halo; honest 10yr combined is 39%.
+3. **Pseudo's 2017 −58.65% is the killer.** MAX_PRICE ₹3k + SMA200 uptrend forced concentrated bets in a flat regime. Worth a research pass on regime-detection or removing the SMA200 gate for 2017-style markets — but parity with live behavior wins for now.
+4. **Midcap broke down in 2022 (−45%).** 40d-high breakouts misfire in a declining mid-cap regime; the −20% stop fires but the cumulative whipsaw bleeds equity.
+5. **n100 and n20 are the survivors.** Both posted 3+ losing years yet compounded to 43% / 45% CAGR via fat-tail winners.
+
+### Combined-portfolio 10yr (3-bucket, ₹30k each, live cap)
+
+| Policy | CAGR | Max DD | Calmar | Final ₹ |
+|---|---:|---:|---:|---:|
+| **allow** | **+39.12%** | 65.68% | 0.60 | 2,437,313 |
+| block | +29.01% | 55.61% | 0.52 | 1,146,223 |
+| rank2 | +33.10% | 60.49% | 0.55 | 1,566,549 |
+
+`allow` still wins on CAGR + Calmar over the full decade. Margin shrinks vs the 3yr sim (136% → 39%) because dedup's missed concentration in 2023-2025 winners is offset by smaller advantages in the regime-hostile 2017-2019 period — but the strategy verdict holds.
+
+**Honest combined DD = 65.68%** (vs 25.91% on 3yr) — this is what you should plan for, not the 3yr figure.
+
+### Artefacts
+
+- `exports/bt10yr/<model>/{summary,trade_ledger}.json` — per-model full ledgers
+- `exports/bt10yr/combined_30k.json` — 3-policy combined sim output
+- `tools/analysis/yearly_breakdown.py` — post-processor (reproduce any year table)
+- `tools/backtests/combined_portfolio_sim.py` — combined-portfolio engine
+
+To reproduce:
+
+```bash
+# inside trading_system_app container (where the DB is reachable)
+for m in momentum_n100_top5_max1 momentum_pseudo_n100_adv \
+         n20_daily_large_only midcap_narrow_60d_breakout; do
+  python tools/models/$m/backtest.py --from 2016-05-15 --to 2026-05-12 \
+    --capital 1000000 --out /app/exports/bt10yr/$m
+done
+python tools/backtests/combined_portfolio_sim.py \
+  --from 2016-05-15 --to 2026-05-12 --capital 30000 \
+  --out /app/exports/bt10yr/combined_30k.json
+```
+
+---
+
 ## Realistic Caveats
 
 - Backtests are 3-year samples — 2018-style momentum crashes underrepresented. n100 has a 6-year backfill but its honest max DD is ~46%, not the 14.89% 3-year figure.
