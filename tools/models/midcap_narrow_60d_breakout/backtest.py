@@ -53,8 +53,9 @@ sys.path.insert(0, str(ROOT))
 import pandas as pd
 from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
-from tools.shared.universes import nifty500_symbols
+from tools.shared.universes import nifty500_symbols  # noqa: F401
 from tools.shared.breakout_strategy import is_breakout, breakout_exit_reason
+from tools.shared.index_membership import eligible_at, universe_union
 
 # Strategy params (V2 winner)
 HH_WIN     = 40
@@ -80,24 +81,9 @@ DEFAULT_END   = date(2026, 5, 15)
 DEFAULT_CAP   = 1_000_000.0
 
 
-def load_n100():
-    """Load the NSE Nifty 100 (Large-cap) exclusion list from the CSV.
-
-    The V2 universe is "mid + small cap only", so the bare ticker symbols of
-    Nifty 100 members are later subtracted from the ADV-ranked pool.
-
-    Returns:
-        set[str]: Bare ticker symbols (e.g. "RELIANCE") of equity-series
-        Nifty 100 constituents. Only rows with Series == "EQ" are kept (skips
-        non-equity series); symbols are stripped of surrounding whitespace.
-    """
-    out = set()
-    with open(N100_CSV) as f:
-        for r in csv.DictReader(f):
-            # Only the cash-equity series counts as a Large-cap to exclude.
-            if r.get("Series", "").strip() == "EQ":
-                out.add(r["Symbol"].strip())
-    return out
+def load_n100_pit(d: date) -> set[str]:
+    """Point-in-time NSE Nifty 100 exclusion set for date `d`."""
+    return set(eligible_at("n100", d))
 
 
 def run(start: date, end: date, capital: float, out_dir: Path | None = None):
@@ -126,12 +112,12 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
         ``final_nav`` marks any still-open position to the last close, ``cagr_pct``
         is annualised return, and ``trades`` is the per-trade ledger.
     """
-    n100 = load_n100()
-    print(f"NSE Nifty 100 (Large-cap exclusion list): {len(n100)} stocks")
+    print("Large-cap exclusion source: PIT n100 (eligible_at per scan day)")
 
     eng = _get_engine()
-    # Start the search pool from the full Nifty 500 (Fyers symbol form).
-    n500 = [f"NSE:{s}-EQ" for s, _ in nifty500_symbols()]
+    # PIT n500 union — every symbol that was ever an n500 member.
+    n500 = [f"NSE:{s}-EQ" for s in sorted(universe_union("n500"))]
+    print(f"N500 union pool (PIT): {len(n500)}")
 
     with eng.connect() as c:
         # Pull 400 extra calendar days BEFORE `start` so the 200d SMA and other
@@ -172,25 +158,49 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
     vol_avg20 = vol.rolling(20).mean()           # 20d avg volume — surge baseline
     adv20 = adv_rs.rolling(ADV_WIN).mean()       # 20d avg ₹-value traded — liquidity rank
 
-    # Build the pseudo-midcap pool from a single end-of-data liquidity snapshot:
-    # rank all N500 names by their latest 20d ADV, then take ranks
-    # [SKIP_TOP, SKIP_TOP+KEEP_NEXT) = top-100 (SKIP_TOP=0). Large caps are
-    # removed afterwards via the Nifty 100 list, leaving mid + small caps.
-    last_di = len(dates) - 1
-    last_adv = adv20.iloc[last_di].dropna().sort_values(ascending=False)
-    # FIX 6 — exclude stale/delisted names before slicing the pool.
-    last_adv = last_adv[last_adv.index.isin(fresh_syms)]
-    midcap_pool = last_adv.iloc[SKIP_TOP:SKIP_TOP + KEEP_NEXT].index.tolist()
+    # Yearly-PIT midcap pool: at each year-start, rank PIT n500 members by
+    # 20d-ADV and take top-100 minus PIT n100. Replaces the previous single
+    # end-of-data snapshot which silently included future winners (ZOMATO,
+    # NUVAMA etc.) and excluded delisted members of the early era.
+    year_pools: dict[pd.Timestamp, list[str]] = {}
+    ys_cursor = start
+    year_starts = []
+    while ys_cursor <= end:
+        year_starts.append(pd.Timestamp(ys_cursor))
+        ys_cursor = ys_cursor.replace(year=ys_cursor.year + 1)
+    for ys in year_starts:
+        fut = dates[dates >= ys]
+        if len(fut) == 0:
+            continue
+        di_ys = dates.get_loc(fut[0])
+        ys_date = fut[0].date()
+        # PIT n500 eligible on year-start.
+        n500_elig = {f"NSE:{s}-EQ" for s in eligible_at("n500", ys_date)}
+        adv_at_ys = adv20.iloc[di_ys].dropna().sort_values(ascending=False)
+        adv_at_ys = adv_at_ys[adv_at_ys.index.isin(n500_elig)]
+        adv_at_ys = adv_at_ys[adv_at_ys.index.isin(fresh_syms)]
+        midcap_pool = adv_at_ys.iloc[SKIP_TOP:SKIP_TOP + KEEP_NEXT].index.tolist()
+        # PIT n100 exclusion on year-start.
+        n100_pit = load_n100_pit(ys_date)
+        year_pools[ys] = [
+            s for s in midcap_pool
+            if s.replace("NSE:", "").replace("-EQ", "") not in n100_pit
+        ]
 
-    # V2 filter: exclude Large (NSE Nifty 100). ANGELONE no longer needs explicit
-    # exclusion since historical_data was restored split-adjusted (2026-05-17);
-    # with clean data ANGELONE never qualifies for a breakout entry anyway.
-    midcap_band = [
-        s for s in midcap_pool
-        if s.replace("NSE:", "").replace("-EQ", "") not in n100
-    ]
-    print(f"V2 universe (pseudo-midcap minus Large): {len(midcap_band)} stocks")
-    print(f"First 10: {[s.replace('NSE:','').replace('-EQ','') for s in midcap_band[:10]]}")
+    def pick_band(d) -> list[str]:
+        """Return the PIT midcap_band in force on date `d` (latest year-start
+        on/before `d`).
+        """
+        chosen = year_starts[0]
+        for ys in year_starts:
+            if d >= ys:
+                chosen = ys
+        return year_pools.get(chosen, [])
+
+    initial = pick_band(year_starts[0])
+    print(f"V2 universe (PIT pseudo-midcap minus PIT large), year-1 size = "
+          f"{len(initial)} stocks")
+    print(f"First 10: {[s.replace('NSE:','').replace('-EQ','') for s in initial[:10]]}")
 
     # Restrict the iteration to the requested window (warm-up rows fall away).
     trading = [d for d in dates if start <= d.date() <= end]
@@ -238,6 +248,8 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
 
         if pos is None:
             # Flat: scan every universe name for a qualifying breakout TODAY.
+            # The PIT midcap_band rolls forward at each year-start.
+            midcap_band = pick_band(d)
             cands = []
             for sym in midcap_band:
                 if sym not in cl.columns:

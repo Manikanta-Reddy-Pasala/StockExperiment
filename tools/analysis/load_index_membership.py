@@ -64,7 +64,7 @@ def main() -> None:
                 conn.execute(text(s))
         conn.execute(text("TRUNCATE index_membership"))
         total = 0
-        for idx in ("n100", "n500"):
+        for idx in ("n100", "n200", "n500"):
             rows = load_csv(idx)
             # Bulk insert.
             conn.execute(
@@ -77,7 +77,7 @@ def main() -> None:
             total += len(rows)
     # Verify
     with eng.connect() as c:
-        for idx in ("n100", "n500"):
+        for idx in ("n100", "n200", "n500"):
             r = c.execute(text(
                 "SELECT COUNT(*) FROM index_membership WHERE index_name=:i"
             ), {"i": idx}).scalar()
@@ -85,7 +85,7 @@ def main() -> None:
         # Smoke-test eligibility query at a few dates
         for d in ("2017-01-01", "2018-06-01", "2020-01-01",
                   "2023-01-01", "2026-05-01"):
-            for idx in ("n100", "n500"):
+            for idx in ("n100", "n200", "n500"):
                 cnt = c.execute(text(
                     "SELECT COUNT(*) FROM index_membership "
                     "WHERE index_name=:i AND start_date <= :d "

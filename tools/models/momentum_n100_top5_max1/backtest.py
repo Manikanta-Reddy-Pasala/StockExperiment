@@ -1,15 +1,23 @@
-"""Standalone backtest: REAL NSE Nifty 100 momentum rotation.
+"""Standalone backtest: REAL NSE Nifty 100 momentum rotation — POINT-IN-TIME.
 
 Strategy:
-  Universe: FULL Real NSE Nifty 100 (src/data/symbols/nifty100.csv, 104 stocks)
-  Signal:   Rank by 30-day return, pick top-1
+  Universe: POINT-IN-TIME NSE Nifty 100 membership per rebalance date,
+            loaded from src/data/symbols/n100_membership.csv. The model
+            ranks ONLY symbols that were actually in n100 on the rebalance
+            date (no survivorship bias). A symbol drops out of the eligible
+            set the moment it leaves the index; the model also force-sells
+            a held symbol that drops out (DELIST exit).
+  Signal:   Rank by 15-day return, pick top-1
   Position: max_concurrent=1
   Rebalance: 1st trading day of each month
   OPTIONAL: --mid-month-check adds a day-15 weekday rank check; rotates
-            only if rank-1 leads current held's 30d return by >= 5pp.
+            only if rank-1 leads current held's 15d return by >= 5pp.
 
-Pure NSE-official Nifty 100 list. No ADV narrowing, no price filter (distinct
-from momentum_pseudo_n100_adv which retains MAX_PRICE filter).
+Set 2026-05-28: switched from today's nifty100.csv to PIT membership table
+(built by tools/analysis/build_membership_table.py). The old behaviour
+inflated 10yr CAGR ~80pp by silently including stocks that joined the
+index after the ranking date (Adani group, Zomato, NUVAMA, etc.) and
+excluding stocks that had left (YESBANK, IL&FS, DHFL, etc.).
 """
 import sys, json, csv, argparse
 from pathlib import Path
@@ -21,11 +29,15 @@ import pandas as pd
 from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
 from tools.shared.backtest_engine import run_rotation_backtest
+from tools.shared.index_membership import eligible_at, universe_union
 
 # 15 TRADING days (~3 weeks). Set 2026-05-27 from a 6-year (2020-2026) sweep:
 # 15td beat 30td on CAGR (+151.7% vs +129.0%) AND max DD (45.7% vs 57.3%).
 # Must match live_signal.rank_universe lookback_days (live/backtest parity).
 LOOKBACK = 15
+# Today's published n100 list — kept for live signal compatibility only.
+# THE BACKTEST DOES NOT USE THIS FILE; it pulls PIT membership via
+# tools.shared.index_membership.eligible_at instead.
 N100_CSV = str(ROOT / "src" / "data" / "symbols" / "nifty100.csv")
 
 DEFAULT_START = date(2023, 5, 15)
@@ -33,27 +45,27 @@ DEFAULT_END   = date(2026, 5, 12)
 DEFAULT_CAP   = 1_000_000.0
 
 
-def load_n100():
-    """Load the real NSE Nifty 100 universe from the bundled CSV.
+def load_n100_union(index_name: str = "n100"):
+    """Load the union of every symbol that was EVER in `index_name`.
 
-    Reads N100_CSV and keeps only equity (Series == "EQ") rows, formatting
-    each into the Fyers symbol convention used by historical_data.
+    Source: tools.shared.index_membership.universe_union(index_name) (built
+    from Wayback snapshots). The backtest filters this superset down to the
+    point-in-time eligible set via eligible_at(d) at every rebalance date.
+
+    Args:
+        index_name: 'n100' (default), 'n200', or 'n500'. Selects which NSE
+            broad-market index drives membership at each rebalance date.
 
     Returns:
         list[str]: Fyers-style symbols, e.g. "NSE:RELIANCE-EQ".
     """
-    out = []
-    with open(N100_CSV) as f:
-        for r in csv.DictReader(f):
-            # Only cash-equity rows count; skip any non-EQ series in the file.
-            if r.get("Series", "").strip() == "EQ":
-                out.append(f"NSE:{r['Symbol'].strip()}-EQ")
-    return out
+    return [f"NSE:{s}-EQ" for s in sorted(universe_union(index_name))]
 
 
 def run(start: date, end: date, capital: float, out_dir: Path | None = None,
         mid_month_check: bool = False, mid_month_lead_pct: float = 5.0,
-        retain_top_n: int = 3, data_source: str = "fyers"):
+        retain_top_n: int = 3, data_source: str = "fyers",
+        index_name: str = "n100"):
     """Run the full Nifty 100 momentum-rotation backtest and report metrics.
 
     Loads close prices, builds the monthly (+ optional mid-month) rebalance
@@ -85,8 +97,8 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
     # retain_top_n=1 == legacy "rotate whenever held isn't rank-1" (canonical
     # backtest). retain_top_n=5 mirrors the LIVE exit (live_signal.py keeps the
     # stock through top-5). Entry always buys rank-1.
-    n100_syms = load_n100()
-    print(f"NSE Nifty 100 universe: {len(n100_syms)} stocks")
+    n100_syms = load_n100_union(index_name)
+    print(f"NSE {index_name.upper()} universe (union of all snapshots): {len(n100_syms)} symbols")
 
     eng = _get_engine()
     with eng.connect() as c:
@@ -141,45 +153,55 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
                       key=lambda x: x[0])
 
     # SELECTION layer: model supplies the per-date ranking; EXECUTION is the
-    # shared engine (tools/shared/backtest_engine). Universe = full present
-    # Nifty 100 (no filter), ranked by 30-day return.
+    # shared engine (tools/shared/backtest_engine). Universe at each rebal =
+    # POINT-IN-TIME n100 members (eligible_at), ranked by 15-day return.
+    def _pit_universe(di):
+        """Symbols actually in NSE Nifty 100 on the date at row index `di`.
+
+        Intersects eligible_at(d) (membership at that date) with the symbols
+        that have a non-null price loaded for this day. Returns Fyers-style
+        symbols matching `cl.columns`.
+        """
+        on_date = dates[di].date()
+        elig = eligible_at(index_name, on_date)
+        return [f"NSE:{s}-EQ" for s in elig
+                if f"NSE:{s}-EQ" in cl.columns
+                and pd.notna(cl[f"NSE:{s}-EQ"].iloc[di])]
+
     def rank_at(di):
-        """Rank the universe by 30-day return at day-index `di` (the closure
-        the shared engine calls to pick what to hold).
+        """Rank POINT-IN-TIME n100 by 15-day return at day-index `di`.
 
         Args:
             di: Integer row index into `cl` / `dates` for the rebalance day.
 
         Returns:
-            list[str]: Symbols ordered best-to-worst by 30d return; empty if
+            list[str]: Symbols ordered best-to-worst by 15d return; empty if
             there is not enough warm-up history (di < LOOKBACK) or no symbol
             has a valid price.
+
+        A held symbol that has left the index simply will not appear here;
+        decide_rotation in the shared engine will then sell it and buy rank-1
+        (no special delist branch needed).
         """
         if di < LOOKBACK:
-            return []  # not enough history for a 30-day lookback yet
-        # Only rank symbols with a live price on this day.
-        univ = [s for s in present if pd.notna(cl[s].iloc[di])]
+            return []  # not enough history for a 15-day lookback yet
+        univ = _pit_universe(di)
         if not univ:
             return []
-        # 30-day return = close[di] / close[di-30] - 1, per symbol.
         rets = cl.iloc[di].reindex(univ) / cl.iloc[di - LOOKBACK].reindex(univ) - 1
-        # Drop symbols missing a past price, then sort descending (best first).
         return list(rets.dropna().sort_values(ascending=False).index)
 
     def midret_at(di):
-        """Return (symbol, 30d_return_pct) pairs sorted desc for the mid-month
-        lead-gate check.
-
-        Same 30d-return ranking as rank_at but returns the numeric return (in
-        percent) alongside each symbol so the engine can apply the lead gate.
+        """Return (symbol, 15d_return_pct) pairs sorted desc for the mid-month
+        lead-gate check, restricted to POINT-IN-TIME n100.
 
         Args:
             di: Integer row index into `cl` / `dates` for the mid-month day.
 
         Returns:
-            list[tuple[str, float]]: (symbol, 30d_return_percent) best-first.
+            list[tuple[str, float]]: (symbol, 15d_return_percent) best-first.
         """
-        univ = [s for s in present if pd.notna(cl[s].iloc[di])]
+        univ = _pit_universe(di)
         rets = cl.iloc[di].reindex(univ) / cl.iloc[di - LOOKBACK].reindex(univ) - 1
         rk = rets.dropna().sort_values(ascending=False)
         # Multiply by 100 to express the return as percentage points (the unit
@@ -247,10 +269,15 @@ if __name__ == "__main__":
     ap.add_argument("--data-source", default="fyers",
                     help="historical_data.data_source filter. Default fyers "
                          "(canonical). Use yfinance only for local dev DBs.")
+    ap.add_argument("--index", default="n100", choices=["n100", "n200", "n500"],
+                    help="PIT index membership universe. Default n100 (canon). "
+                         "n200/n500 broaden the candidate pool to the wider "
+                         "NSE indices using the same rotation rule.")
     a = ap.parse_args()
     run(date.fromisoformat(a.start), date.fromisoformat(a.end), a.capital,
         Path(a.out) if a.out else None,
         mid_month_check=a.mid_month_check,
         mid_month_lead_pct=a.mid_month_lead_pct,
         retain_top_n=a.retain_top_n,
-        data_source=a.data_source)
+        data_source=a.data_source,
+        index_name=a.index)

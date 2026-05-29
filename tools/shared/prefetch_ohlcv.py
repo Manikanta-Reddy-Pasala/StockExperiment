@@ -65,6 +65,19 @@ def load_universe(name: str) -> List[Tuple[str, str]]:
         return nifty100_symbols()
     if name in ("n500", "nifty500"):
         return nifty500_symbols()
+    if name in ("n100_union", "n500_union", "membership_union"):
+        # POINT-IN-TIME universe — every symbol that was EVER in n100/n500
+        # across the Wayback snapshot range. Used to backfill historical data
+        # so survivorship-free backtests have full coverage of delisted /
+        # dropped symbols.
+        from tools.shared.index_membership import universe_union
+        if name == "n100_union":
+            syms = universe_union("n100")
+        elif name == "n500_union":
+            syms = universe_union("n500")
+        else:
+            syms = universe_union("n100") | universe_union("n500")
+        return [(s, s) for s in sorted(syms)]
     if name in ("all", "all-stocks", "all_stocks"):
         # Every NSE-EQ symbol from the `stocks` master table. Strips the
         # NSE:...-EQ wrapper so the rest of this pipeline sees plain

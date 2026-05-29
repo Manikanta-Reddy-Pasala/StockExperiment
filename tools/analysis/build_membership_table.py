@@ -129,4 +129,5 @@ def build_membership(idx: str):
 
 if __name__ == "__main__":
     build_membership("100")
+    build_membership("200")
     build_membership("500")

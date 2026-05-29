@@ -26,6 +26,10 @@ URL_PATTERNS = {
         "niftyindices.com/IndexConstituent/ind_nifty100list.csv",
         "archives.nseindia.com/content/indices/ind_nifty100list.csv",
     ],
+    "200": [
+        "niftyindices.com/IndexConstituent/ind_nifty200list.csv",
+        "archives.nseindia.com/content/indices/ind_nifty200list.csv",
+    ],
     "500": [
         "niftyindices.com/IndexConstituent/ind_nifty500list.csv",
         "archives.nseindia.com/content/indices/ind_nifty500list.csv",
@@ -98,7 +102,7 @@ def main() -> None:
                     help="Output directory (default /tmp/n_snapshots)")
     a = ap.parse_args()
     out_root = Path(a.out)
-    for idx in ("100", "500"):
+    for idx in ("100", "200", "500"):
         print(f"=== Nifty {idx} ===")
         fetch_all(idx, out_root / f"n{idx}")
 
