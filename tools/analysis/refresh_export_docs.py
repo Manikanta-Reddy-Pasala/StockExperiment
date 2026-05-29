@@ -42,8 +42,8 @@ DESC = {
     "emerging_momentum": {
         "title": "Emerging Momentum", "live": "LIVE",
         "universe": "Top-100 by 20d ADV from emerging mid/small (PIT N500 minus N100)",
-        "strategy": "Monthly top-3 (K=3), 30d momentum >15%, >200DMA entry; always-on 25% trailing stop, bear (Nifty50<200DMA) adds −10% stop + −15% trail. Retain top-4.",
-        "note": "Multi-holding K=3, emerging mid/small. Full-period 2023-26 ≈ +77% CAGR / 26% DD.",
+        "strategy": "Single-position (max-1) momentum rotation: 15d return >0, price ≤₹3000 (no SMA gate); retain top-3; monthly (1st trading day) + mid-month check that rotates only on a ≥5pp lead.",
+        "note": "Single-position max-1, emerging mid/small, run_rotation engine (like n100). Full-period 2023-26 ≈ +98% CAGR / 23% DD gross.",
     },
     "midcap_narrow_60d_breakout": {
         "title": "Midcap Breakout", "live": "LIVE",

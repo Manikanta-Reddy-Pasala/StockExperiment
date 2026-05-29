@@ -2135,6 +2135,153 @@ def _get_rebalance_lock(model_name: str) -> threading.Lock:
         return lk
 
 
+@admin_bp.route('/models/<model_name>/exit', methods=['POST'])
+def admin_model_exit(model_name):
+    """Liquidate a single model: SELL all its open position(s) at market, then
+    mark the model flat in its ledger.
+
+    Mirrors the manual Sell button (POST /admin/momrot/sell-now) for the broker
+    call — reuses `_fyers_place_market` (LIVE Fyers MARKET order) + `_fyers_live_ltp`
+    — and the executor's ledger pattern (`record_sell` for single-position models,
+    `record_sell_multi` for multi-holding models).
+
+    Position discovery:
+      - SINGLE-position models: model_ledger.open_symbol / open_qty.
+      - MULTI-holding models (e.g. momentum_retest_n500): model_holdings rows.
+    Both are checked, so the endpoint works regardless of model type.
+
+    Fail-safe:
+      - Flat model -> success with "nothing to exit".
+      - If a broker SELL fails, the ledger is NOT marked flat for that symbol;
+        the error is collected and returned. Other symbols still proceed.
+
+    Concurrency: shares the per-model rebalance lock so an exit can't race a
+    rebalance (or a second exit click) for the same model. Returns 409 if busy.
+
+    Body (optional): {user_id: int} — defaults to env USER_ID or 1.
+    """
+    from src.services.trading import model_ledger_service as mls
+    from src.services.trading import multi_holding_service as mhs
+    from src.web.momrot_routes import _fyers_place_market, _fyers_live_ltp
+
+    data = request.get_json(silent=True) or {}
+    try:
+        user_id = int(data.get("user_id", os.environ.get("USER_ID", "1")))
+    except Exception:
+        user_id = 1
+
+    # Discover open positions for BOTH storage shapes.
+    # Single-position: model_ledger.open_symbol. Multi-holding: model_holdings rows.
+    positions = []  # list of {symbol, qty, multi: bool}
+    try:
+        ledger = mls.get_ledger(model_name)
+    except Exception as e:
+        return jsonify({"success": False,
+                        "error": f"Could not read ledger for {model_name}: {e}"}), 500
+    if ledger and ledger.get("open_symbol") and ledger.get("open_qty"):
+        positions.append({
+            "symbol": ledger["open_symbol"],
+            "qty": int(ledger["open_qty"]),
+            "multi": False,
+        })
+    try:
+        for h in mhs.get_holdings(model_name):
+            if h.get("symbol") and h.get("qty"):
+                positions.append({
+                    "symbol": h["symbol"],
+                    "qty": int(h["qty"]),
+                    "multi": True,
+                })
+    except Exception as e:
+        logger.warning(f"exit: get_holdings failed for {model_name}: {e}")
+
+    if not positions:
+        return jsonify({
+            "success": True,
+            "sold": [],
+            "errors": [],
+            "message": f"{model_name} is already flat — nothing to exit.",
+        })
+
+    # Per-model lock: do not let an exit race a rebalance / second exit.
+    lk = _get_rebalance_lock(model_name)
+    if not lk.acquire(blocking=False):
+        return jsonify({
+            "success": False,
+            "error": f"Another operation (rebalance/exit) is in progress for {model_name}.",
+        }), 409
+
+    sold = []
+    errors = []
+    try:
+        for pos in positions:
+            symbol = pos["symbol"]
+            qty = pos["qty"]
+            # LTP for the ledger record (exit price). MARKET order fills near LTP;
+            # this mirrors how _fyers_place_market sources its audit price.
+            ltp = 0.0
+            try:
+                ltp = float(_fyers_live_ltp(symbol, user_id) or 0.0)
+            except Exception as e:
+                logger.warning(f"exit: ltp lookup failed {symbol}: {e}")
+
+            res = _fyers_place_market(symbol, qty, "SELL", user_id,
+                                      model_name=model_name)
+            if not res.get("ok"):
+                err = ((res.get("result") or {}).get("message")
+                       or res.get("error") or "unknown broker error")
+                errors.append({"symbol": symbol, "qty": qty, "error": err})
+                logger.warning(f"exit: SELL failed {model_name} {symbol} x{qty}: {err}")
+                continue
+
+            order_id = (((res.get("result") or {}).get("data") or {}).get("orderid")
+                        or (res.get("result") or {}).get("orderid")
+                        or (res.get("result") or {}).get("id") or "")
+
+            # Record the sell in the correct ledger so the model goes flat.
+            try:
+                if pos["multi"]:
+                    mhs.record_sell_multi(model_name, symbol, ltp,
+                                          reason="EXIT", fyers_order_id=order_id)
+                else:
+                    mls.record_sell(model_name, ltp, "EXIT",
+                                    fyers_order_id=order_id)
+            except Exception as e:
+                # Order DID place on the broker; flag the ledger desync loudly.
+                logger.error(f"exit: record_sell failed for {model_name} {symbol} "
+                             f"(order {order_id} PLACED on broker): {e}")
+                errors.append({
+                    "symbol": symbol, "qty": qty,
+                    "error": (f"SELL placed (order_id={order_id}) but ledger update "
+                              f"failed: {e}"),
+                })
+                continue
+
+            sold.append({"symbol": symbol, "qty": qty,
+                         "order_id": order_id, "exit_price": ltp})
+    finally:
+        try:
+            lk.release()
+        except Exception:
+            pass
+
+    ok = len(errors) == 0
+    if sold:
+        _tg_safe(
+            f"{'✅' if ok else '⚠️'} *Exit* `{model_name}` — "
+            f"sold {len(sold)} position(s)"
+            + (f", {len(errors)} error(s)" if errors else "")
+        )
+    msg = (f"Exited {model_name}: {len(sold)} position(s) sold"
+           + (f", {len(errors)} failed." if errors else "."))
+    return jsonify({
+        "success": ok,
+        "sold": sold,
+        "errors": errors,
+        "message": msg,
+    }), (200 if ok else 207)
+
+
 @admin_bp.route('/<model_name>/rebalance', methods=['POST'])
 def admin_model_rebalance(model_name):
     """Live per-model rebalance: signal then LIVE execute (real Fyers orders).

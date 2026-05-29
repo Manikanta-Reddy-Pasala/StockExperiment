@@ -2,30 +2,27 @@
 
 Single source of truth so the offline backtest and the live signal can never
 drift. backtest.py and live_signal.py both import the params + the universe
-pool build (`build_pools` / `pool_for_date`), selection (`rank_targets`),
-regime (`regime_healthy`) and risk-exit (`hit_trail`, `hit_bear_trail`,
-`hit_bear_stop`) helpers from here.
+pool build (`build_pools` / `pool_for_date`) and the per-date ranking
+(`rank_pool`) from here.
 
-Strategy ("Emerging Momentum"):
+Strategy ("Emerging Momentum") — SINGLE-POSITION rotation (Config 1):
   - Universe: POINT-IN-TIME mid/small caps = top-POOL by 20-day ADV out of
     (eligible_at("n500", d) MINUS eligible_at("n100", d)), rebuilt per year-start
     so survivorship is honest. History is loaded from universe_union("n500").
-  - Rank: LOOKBACK-day return, require ret > MOM_FLOOR (15%). Hold K equal-weight;
-    a held name is kept while it stays in the top-RETAIN rank (winners ride).
-  - Entry filter: close > 200-DMA (skip downtrending names), price <= MAX_PRICE.
-  - Buys happen on the 1st trading day of each month (monthly rebalance), filled
-    at the NEXT-day open. There is NO take-profit — winners run.
-  - EXITS (checked DAILY, in priority order):
-      1. ALWAYS-ON trailing stop: sell if px <= peak*(1-ALWAYS_TRAIL) in ALL
-         regimes (cuts the healthy-regime give-back that drives DD).
-      2. BEAR regime (Nifty50 < 200DMA): hard stop (px <= entry*(1-BEAR_STOP))
-         OR bear trailing stop (px <= peak*(1-BEAR_TRAIL)).
-      3. MONTHLY rank-drop: sell if a holding falls out of the top-RETAIN rank.
+  - Rank: LOOKBACK-day return, require ret > 0. Hold ONE name (max_concurrent=1);
+    a held name is kept while it stays in the top-RETAIN rank (winner rides).
+  - Filter: price in (0, MAX_PRICE]. NO sma200 gate (Config 1 winner = sma OFF).
+  - Rotation: monthly (1st trading day) + MID-MONTH check. The mid-month check
+    rotates only if a new leader beats the held name's LOOKBACK-day return by
+    >= MIDMONTH_LEAD percentage points.
+  - Execution: tools.shared.backtest_engine.run_rotation_backtest (same engine
+    as momentum_n100_top5_max1); live path = tools/live/fyers_executor.py via the
+    single-position model_ledger.
 
-Backtest (PIT N500-minus-N100, net 0.15%/side, next-day-open entry):
-  FULL 2023-05..2026-05 : ~+77% CAGR / ~26% DD
-    per-year 2023 ~+129, 2024 ~+19, 2025 ~+81, 2026 ~+11 (partial)
-  WINDOW Mar-2025..May-2026 : ~+84% CAGR / ~16% DD
+Backtest (PIT N500-minus-N100, gross-of-fee rotation engine, same-day close):
+  FULL 2023-05-15..2026-05-12 : ~+98% CAGR / ~23% DD / Calmar ~4.2
+  WINDOW Mar-2025..May-2026    : ~+56% CAGR
+Reproduces tools/analysis/emerging_variants.py CONFIG 1 (lb15, sma off).
 """
 from __future__ import annotations
 
@@ -38,30 +35,25 @@ from tools.shared.index_membership import eligible_at
 
 ROOT = Path(__file__).resolve().parents[3]
 
-# ---- Strategy parameters (the locked winner: sma200 + momfloor15 + trail25) ----
+# ---- Strategy parameters (Config 1: max-1, lb15, retain-3, mid-month +5%, sma OFF) ----
 POOL = 100           # universe pool = top-100 by 20d ADV from (N500 minus N100)
-K = 3                # hold 3 positions, equal-weight
-RETAIN = 4           # keep a name while it stays in the top-4 rank
-LOOKBACK = 30        # momentum ranking window (trading days)
-MOM_FLOOR = 0.15     # require LOOKBACK-day return > 15% (stronger-momentum only)
+TOPN = 100           # alias for POOL (display/compat with n100-style naming)
+RETAIN = 3           # keep the held name while it stays in the top-3 rank
+LOOKBACK = 15        # momentum ranking window (TRADING days). Config 1 winner.
 MAX_PRICE = 3000.0   # skip names priced above this at entry
 ADV_WIN = 20         # ADV averaging window
-ENTRY_SMA = 200      # entry gate: close must be above its 200-DMA
+MIDMONTH_LEAD = 5.0  # rotate mid-month only if new rank-1 leads held by >= 5pp
 
 # Canonical anchor for the per-year PIT pool rebuild. The pool is rebuilt every
 # 12 months stepping from THIS date (not the eval-window start and not calendar
 # Jan-1), so any sub-window backtest uses the exact same pools the full
-# 2023-05-15.. backtest used — matching tools/analysis/emerging_momentum_dd.py
+# 2023-05-15.. backtest used — matching tools/analysis/emerging_variants.py
 # (which always builds pools over its FULL range regardless of eval window).
 POOL_ANCHOR_START = date(2023, 5, 15)
 
-# ---- Regime + risk ----
+# Index symbol kept only for the equity-trading-day mask in load_panels (the
+# index trades on days some equities don't and would poison rolling windows).
 INDEX = "NSE:NIFTY50-INDEX"
-REGIME_SMA = 200     # index trend gate
-ALWAYS_TRAIL = 0.25  # ALL-regime trailing stop: sell if px <= peak*(1-0.25)
-BEAR_STOP = 0.10     # bear-regime hard stop: sell if px <= entry*(1-0.10)
-BEAR_TRAIL = 0.15    # bear-regime trailing stop: sell if px <= peak*(1-0.15)
-# (healthy regime: only the always-on 25% trail; no take-profit — winners ride)
 
 
 def indicators(cl: pd.DataFrame, adv_rs: pd.DataFrame):
@@ -71,20 +63,16 @@ def indicators(cl: pd.DataFrame, adv_rs: pd.DataFrame):
         cl: close price panel (date x symbol).
         adv_rs: per-bar traded value (close*volume) panel.
     Returns:
-        (adv20, sma200, idx_sma200) — 20d ADV panel, per-symbol 200-DMA panel,
-        and the index 200-DMA series.
+        adv20 — the 20d rolling ADV panel used to pick the per-year ADV pool.
     """
-    adv20 = adv_rs.rolling(ADV_WIN).mean()
-    sma200 = cl.rolling(ENTRY_SMA).mean()
-    idx_sma200 = cl[INDEX].rolling(REGIME_SMA).mean() if INDEX in cl.columns else None
-    return adv20, sma200, idx_sma200
+    return adv_rs.rolling(ADV_WIN).mean()
 
 
 def _year_anchors(end: date):
     """Year anchors stepping by 12 months from POOL_ANCHOR_START up to `end`.
 
     Independent of the eval-window start so sub-window backtests reuse the same
-    pools the full backtest built (matches emerging_momentum_dd.py).
+    pools the full backtest built (matches emerging_variants.py build_pools).
     """
     out = []
     y = POOL_ANCHOR_START
@@ -103,7 +91,7 @@ def build_pools(adv20: pd.DataFrame, dates, end: date):
     For each year anchor we take the first trading day >= anchor, compute the
     eligible mid/small set (eligible_at n500 MINUS eligible_at n100) AS OF that
     day, then keep the top-POOL by 20d ADV on that day. Mirrors
-    emerging_momentum_dd.build_pools exactly (anchors fixed to POOL_ANCHOR_START).
+    emerging_variants.build_pools exactly (anchors fixed to POOL_ANCHOR_START).
 
     Returns (year_anchors, {anchor_ts: [fyers_symbol, ...]}).
     """
@@ -131,22 +119,21 @@ def pool_for_date(anchors, pools, d) -> list[str]:
     return pools.get(chosen, []) if chosen is not None else []
 
 
-def regime_healthy(cl: pd.DataFrame, idx_sma200: pd.Series, di: int) -> bool:
-    """True when Nifty-50 is above its 200-DMA at row `di` (uptrend regime)."""
-    if INDEX not in cl.columns or idx_sma200 is None:
-        return True
-    iv = cl[INDEX].iloc[di]
-    sv = idx_sma200.iloc[di]
-    return bool(pd.notna(iv) and pd.notna(sv) and float(iv) > float(sv))
-
-
-def rank_targets(cl, sma200, pool, di):
-    """Ranked momentum leaders passing all filters, at row index `di`.
+def rank_pool(cl, pool, di):
+    """Ranked momentum leaders passing the filters, at row index `di`.
 
     Universe = the PIT `pool` (top-POOL ADV from N500-minus-N100). Filters:
-    LOOKBACK-day return > MOM_FLOOR, price in (0, MAX_PRICE], close > 200-DMA.
-    Returns Fyers-style symbols ordered best-to-worst by LOOKBACK-day return.
+    LOOKBACK-day return > 0, price in (0, MAX_PRICE]. NO sma200 gate (Config 1
+    winner). Returns Fyers-style symbols ordered best-to-worst by LOOKBACK-day
+    return.
+
+    Args:
+        cl: close price panel (date x symbol), ffilled.
+        pool: the PIT symbol pool in force for this date.
+        di: integer row index into `cl` for the rebalance day.
     """
+    if di < LOOKBACK:
+        return []
     row, rowL = cl.iloc[di], cl.iloc[di - LOOKBACK]
     out = []
     for s in pool:
@@ -154,34 +141,36 @@ def rank_targets(cl, sma200, pool, di):
         if pd.isna(px) or pd.isna(pxl) or pxl <= 0:
             continue
         ret = px / pxl - 1
-        if ret <= MOM_FLOOR:
+        if ret <= 0:
             continue
         if not (0 < float(px) <= MAX_PRICE):
-            continue
-        sm = sma200.iloc[di].get(s)
-        if pd.isna(sm) or float(px) <= float(sm):
             continue
         out.append((s, ret))
     out.sort(key=lambda x: x[1], reverse=True)
     return [s for s, _ in out]
 
 
-def hit_trail(px: float, peak_px: float) -> bool:
-    """ALWAYS-ON trailing stop: True if px has fallen >= ALWAYS_TRAIL off peak."""
-    if px is None or peak_px is None or peak_px <= 0:
-        return False
-    return float(px) <= peak_px * (1 - ALWAYS_TRAIL)
+def midret_pool(cl, pool, di):
+    """(symbol, LOOKBACK-day return %) pairs for the mid-month lead gate.
 
+    Restricted to the PIT `pool`, NO filters and emitted in POOL ORDER (which
+    is 20d-ADV descending from build_pools), NOT sorted by return. This mirrors
+    tools/analysis/emerging_variants.py `mm` EXACTLY (which is what produces the
+    validated Config-1 numbers). The engine's mid-month lead gate
+    (midmonth_lead_ok) compares the held name's LOOKBACK return against this
+    list's first entry; keeping pool order (not return order) is load-bearing —
+    sorting here changes the gate behaviour and breaks Config-1 parity.
 
-def hit_bear_trail(px: float, peak_px: float, healthy: bool) -> bool:
-    """Bear-regime trailing stop: True if (in bear) px fell >= BEAR_TRAIL off peak."""
-    if healthy or px is None or peak_px is None or peak_px <= 0:
-        return False
-    return float(px) <= peak_px * (1 - BEAR_TRAIL)
-
-
-def hit_bear_stop(px: float, entry_px: float, healthy: bool) -> bool:
-    """Bear-regime hard stop: True if (in bear) px fell >= BEAR_STOP below entry."""
-    if healthy or px is None or entry_px is None or entry_px <= 0:
-        return False
-    return float(px) <= entry_px * (1 - BEAR_STOP)
+    Returns list[tuple[str, float]], return expressed in percentage points (the
+    unit MIDMONTH_LEAD compares against).
+    """
+    if di < LOOKBACK:
+        return []
+    row, rowL = cl.iloc[di], cl.iloc[di - LOOKBACK]
+    out = []
+    for s in pool:
+        px, pxl = row.get(s), rowL.get(s)
+        if pd.isna(px) or pd.isna(pxl) or pxl <= 0:
+            continue
+        out.append((s, (px / pxl - 1) * 100))
+    return out

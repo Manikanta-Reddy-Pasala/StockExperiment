@@ -489,7 +489,7 @@ def run_scheduler():
     logger.info("  - midcap_narrow_60d_breakout: signal 09:25 + execute 09:32 + EOD signal 15:25")
     logger.info("  - n20_daily_large_only:       signal 09:25 + execute 09:30 (daily rotation)")
     logger.info("  - momentum_retest_n500:       signal 09:26 + execute 09:34 (K=3 multi, gated by enabled flag)")
-    logger.info("  - emerging_momentum:          signal 09:29 + execute 09:37 (K=3 emerging mid/small multi, gated by enabled flag)")
+    logger.info("  - emerging_momentum:          signal 09:29 + execute 09:37 (single, mid-month; emerging mid/small max-1, gated by enabled flag)")
     logger.info("")
     logger.info("Maintenance:")
     logger.info("  - Cleanup Old Snapshots: Weekly (Sunday) at 03:00 AM")
@@ -527,8 +527,9 @@ def run_scheduler():
         register_trading_jobs as register_mr500_jobs,
         register_data_jobs as register_mr500_data_jobs,
     )
-    # Multi-holding model (K=3, emerging mid/small momentum: PIT N500 minus N100).
-    # Same gating: daily jobs no-op while model_settings.enabled is False.
+    # Single-position rotation model (max-1, mid-month check; emerging mid/small
+    # momentum: PIT N500 minus N100). Same gating: daily jobs no-op while
+    # model_settings.enabled is False.
     from tools.models.emerging_momentum.cron import (
         register_trading_jobs as register_emerging_jobs,
         register_data_jobs as register_emerging_data_jobs,

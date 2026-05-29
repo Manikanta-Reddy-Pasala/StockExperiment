@@ -83,7 +83,7 @@
 
 <div class="alert alert-warning mt-3 py-2 small">
   <i class="bi bi-exclamation-triangle me-1"></i>
-  <strong>LIVE trading active.</strong> Sell + Rebalance buttons place REAL Fyers orders. Confirm dialog required.
+  <strong>LIVE trading active.</strong> Sell + Rebalance + Exit buttons place REAL Fyers orders. Confirm dialog required.
 </div>
 
 <!-- Dedicated rebalance modal — never shared with appModal to avoid
@@ -167,10 +167,17 @@ async function loadAggregate() {
         ? `${m.open_symbol} <span class="text-muted small">x${m.open_qty} @ ${fmtINR(m.open_entry_px)}</span>`
         : '<span class="text-muted">flat</span>';
       const wired = WIRED_MODELS.has(m.model_name);
+      // Exit is offered whenever the model holds anything — independent of the
+      // rebalance wiring (selling does not need live_signal/ranking).
+      const hasPosition = !!m.open_symbol && Number(m.open_qty || 0) > 0;
       const rebalBtn = wired
         ? `<button class="btn btn-sm btn-danger" onclick="rebalanceModel('${m.model_name}')">
              <i class="bi bi-arrow-repeat"></i> Rebalance</button>`
         : '<span class="text-muted small">n/a</span>';
+      const exitBtn = hasPosition
+        ? `<button class="btn btn-sm btn-outline-danger ms-1" onclick="exitModel('${m.model_name}')">
+             <i class="bi bi-box-arrow-right"></i> Exit</button>`
+        : '';
       const posCost = (Number(m.open_qty||0) * Number(m.open_entry_px||0)) || 0;
       tr.innerHTML = `
         <td><strong>${modelLabel(m.model_name)}</strong></td>
@@ -184,7 +191,7 @@ async function loadAggregate() {
         <td class="text-end ${cls(m.pnl_total)}">${fmtINR(m.pnl_total)} (${fmtPct(m.return_pct)})</td>
         <td class="text-end neg" title="Buy ${fmtINR(m.buy_txn_charges)} + Sell ${fmtINR(m.sell_txn_charges)}"><strong>${fmtINR(m.total_txn_charges)}</strong></td>
         <td class="text-end">${m.total_trades} (${m.wins}W/${m.losses}L)</td>
-        <td class="text-center">${rebalBtn}</td>
+        <td class="text-center text-nowrap">${rebalBtn}${exitBtn}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -452,6 +459,56 @@ async function rebalanceModel(model) {
   prog.setTitle(type === 'success' ? 'Rebalance Complete' : 'Rebalance Failed');
   await prog.finish(html, type);
   loadState();
+}
+
+async function exitModel(model) {
+  // Show what will be liquidated so the user knows exactly what gets sold.
+  let posLine = '';
+  try {
+    const pf = await fetch('/admin/models/portfolio', {cache: 'no-store'}).then(r => r.json());
+    const m = (pf.success && (pf.models||[]).find(x => x.model_name === model)) || {};
+    posLine = m.open_symbol
+      ? `<div class="small mb-2"><strong>Current:</strong> ${m.open_symbol} x${m.open_qty} @ ${fmtINR(m.open_entry_px)} · MTM ${fmtINR(m.position_value)}</div>`
+      : '<div class="small mb-2 text-muted">No open position found (will report nothing to exit).</div>';
+  } catch (e) { /* preview is best-effort */ }
+
+  const ok = await appModal.confirm(
+    'LIVE EXIT',
+    posLine + `Exit <strong>${model}</strong>? This places REAL Fyers SELL orders for ` +
+    `<strong>ALL</strong> of its open positions at market and marks the model flat.`,
+    {okLabel: 'Exit (Sell All)', okClass: 'btn-danger', headerCls: 'bg-danger text-white'});
+  if (!ok) return;
+
+  let d;
+  try {
+    const r = await fetch(`/admin/models/${model}/exit`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({}),
+    });
+    d = await r.json();
+  } catch (e) {
+    await appModal.alert('Exit Failed', 'Network error: <strong>' + e.message + '</strong>', 'danger');
+    return;
+  }
+
+  const soldHtml = (d.sold || []).length
+    ? '<ul class="small mb-2">' + d.sold.map(s =>
+        `<li>SOLD <strong>${s.symbol}</strong> x${s.qty}` +
+        (s.order_id ? ` <code class="small">order_id: ${s.order_id}</code>` : '') + '</li>'
+      ).join('') + '</ul>'
+    : '';
+  const errHtml = (d.errors || []).length
+    ? '<div class="small text-danger"><strong>Errors:</strong><ul class="mb-0">' +
+      d.errors.map(e => `<li>${e.symbol} x${e.qty}: ${e.error}</li>`).join('') + '</ul></div>'
+    : '';
+
+  await appModal.alert(
+    d.success ? 'Exit Complete' : 'Exit Partial / Failed',
+    (d.message ? `<div class="mb-2">${d.message}</div>` : '') + soldHtml + errHtml,
+    d.success ? 'success' : 'danger');
+
+  setTimeout(() => loadState(), 3000);
 }
 
 async function sellNow(symbol, qty) {

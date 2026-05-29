@@ -1,0 +1,25 @@
+{
+  "model": "emerging_momentum",
+  "start": "2023-05-15",
+  "end": "2026-05-12",
+  "years": 2.992,
+  "capital": 1000000.0,
+  "final_nav": 7736520.0,
+  "total_return_pct": 673.65,
+  "cagr_pct": 98.12,
+  "max_dd_pct": 23.34,
+  "calmar": 4.2,
+  "trades": 38,
+  "wins": 25,
+  "losses": 13,
+  "win_rate_pct": 65.8,
+  "open_position": {
+    "sym": "BHEL",
+    "qty": 19748,
+    "entry_px": 377.05,
+    "entry_date": "2026-05-04",
+    "last_px": 391.75,
+    "mtm_value": 7736279.0,
+    "unrealized_pnl": 290296.0
+  }
+}

@@ -91,7 +91,11 @@ def reconcile_multi(model_name=DEFAULT_MODEL, user_id=1, dry_run=False):
 def _all_multi_models():
     """Distinct model_names that have any row in model_holdings (the multi-holding
     models). Falls back to the known set if the table is empty/unreachable."""
-    known = [DEFAULT_MODEL, "emerging_momentum"]
+    # emerging_momentum was rebuilt 2026-05-30 as a SINGLE-position rotation
+    # model (max-1, uses model_ledger.open_symbol via fyers_executor.py), so it
+    # is no longer reconciled here — it is handled by the single-position
+    # reconciler. Only momentum_retest_n500 remains multi-holding.
+    known = [DEFAULT_MODEL]
     try:
         from src.models.database import get_database_manager
         from src.models.model_ledger_models import ModelHolding

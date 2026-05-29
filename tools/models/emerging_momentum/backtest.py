@@ -1,20 +1,28 @@
-"""Standalone backtest: EMERGING MOMENTUM (emerging_momentum).
+"""Standalone backtest: EMERGING MOMENTUM — single-position rotation (Config 1).
 
-Offline research/validation path. The UNIVERSE-POOL + SELECTION + REGIME + RISK
-logic lives in the shared core `strategy.py` (build_pools / pool_for_date /
-rank_targets / regime_healthy / hit_trail / hit_bear_trail / hit_bear_stop /
-params) — the SAME code live_signal.py uses, so backtest and live cannot drift.
-This file only owns the offline walk: load panels, build the PIT yearly pools,
-build the monthly calendar, replay buy/sell (NEXT-day-open entry), score.
+Offline research/validation path. The UNIVERSE-POOL + per-date SELECTION lives in
+the shared core `strategy.py` (build_pools / pool_for_date / rank_pool /
+midret_pool / params) — the SAME code live_signal.py uses, so backtest and live
+cannot drift. Position-keeping + NAV accounting are delegated to the shared
+engine tools.shared.backtest_engine.run_rotation_backtest (the same engine
+momentum_n100_top5_max1 uses).
 
-Reproduces emerging_momentum_dd.py winning variant
-(sma_entry=True, mom_floor=0.15, always_trail=0.25), PIT N500-minus-N100,
-net 0.15%/side, next-day-open entry:
-  FULL 2023-05..2026-05 : ~+77% CAGR / ~26% DD
-    per-year 2023 ~+129, 2024 ~+19, 2025 ~+81, 2026 ~+11 (partial)
-  WINDOW Mar-2025..May-2026 : ~+84% CAGR / ~16% DD
+Strategy:
+  Universe: POINT-IN-TIME mid/small caps = top-100 by 20d ADV from
+            (eligible_at n500 MINUS eligible_at n100), rebuilt per year-start.
+  Signal:   rank by 15-trading-day return (ret > 0), price in (0, 3000]; no sma.
+  Position: max_concurrent=1, retain_top_n=3 (hold while in top-3 rank).
+  Rebalance: 1st trading day of each month ("full") + a mid-month ("mid")
+             check on the first trading day with 15<=day<=18; the mid-month
+             rotation fires only when a new leader beats the held name's 15d
+             return by >= 5pp (MIDMONTH_LEAD).
 
-Run: python3 tools/models/emerging_momentum/backtest.py [--start 2023-05-15] [--end 2026-05-12]
+Reproduces tools/analysis/emerging_variants.py CONFIG 1 (lb15, sma off):
+  FULL 2023-05-15..2026-05-12 : ~+98% CAGR / ~23% DD / Calmar ~4.2
+  WINDOW Mar-2025..May-2026    : ~+56% CAGR
+
+Run: python3 tools/models/emerging_momentum/backtest.py \
+       --from 2023-05-15 --to 2026-05-12 --out exports/models/emerging_momentum
 """
 import sys, json, argparse
 from pathlib import Path
@@ -22,144 +30,115 @@ from datetime import date, datetime, timedelta
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
-import numpy as np
 import pandas as pd
 from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
 from tools.shared.index_membership import universe_union
+from tools.shared.backtest_engine import run_rotation_backtest
 from tools.models.emerging_momentum import strategy as S
 
-COST = 0.0015
 DEFAULT_START = date(2023, 5, 15)
 DEFAULT_END = date(2026, 5, 12)
 DEFAULT_CAP = 1_000_000.0
 
 
 def load_panels(eng, start, end):
+    """Load the close panel + ADV panel for the N500 universe (+ index mask).
+
+    History is always loaded back to (POOL_ANCHOR_START - 420d) even for a later
+    eval-window start so the per-year PIT pools (anchored to POOL_ANCHOR_START)
+    and the 20d-ADV warmup match the full run exactly. Index-only date rows are
+    dropped so they don't poison the rolling windows (same guard as live_signal).
+    """
     syms = [f"NSE:{s}-EQ" for s in sorted(universe_union("n500"))] + [S.INDEX]
-    # Always load history back to (POOL_ANCHOR_START - 420d) even for a later
-    # eval-window start: the per-year PIT pools are anchored to POOL_ANCHOR_START
-    # and the 200-DMA/ADV warmup needs ~420 calendar days of lead-in. This keeps
-    # any sub-window backtest using the exact same pools as the full run.
     load_from = min(start, S.POOL_ANCHOR_START) - timedelta(days=420)
     with eng.connect() as c:
         df = pd.read_sql(text(
-            "SELECT symbol,date,open,close,volume FROM historical_data "
+            "SELECT symbol,date,close,volume FROM historical_data "
             "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b AND data_source='fyers' "
             "ORDER BY symbol,date"
         ), c, params={"s": syms, "a": load_from, "b": end})
     df["date"] = pd.to_datetime(df["date"])
     df["adv"] = df["close"].astype(float) * df["volume"].astype(float)
     cl = df.pivot(index="date", columns="symbol", values="close").astype(float)
-    op = df.pivot(index="date", columns="symbol", values="open").astype(float)
     adv_rs = df.pivot(index="date", columns="symbol", values="adv")
-    # Restrict to EQUITY trading days — index-only date rows would poison the
-    # rolling ADV/return windows (same guard as live_signal).
     equity_dates = adv_rs.drop(columns=[S.INDEX], errors="ignore").dropna(how="all").index
     cl = cl.loc[equity_dates].ffill()
-    op = op.loc[equity_dates]
     adv_rs = adv_rs.loc[equity_dates]
-    adv20, sma200, idx_sma200 = S.indicators(cl, adv_rs)
-    return cl, op, adv20, sma200, idx_sma200
-
-
-def month_starts(dates):
-    s = pd.Series(dates, index=dates)
-    return [pd.Timestamp(x) for x in s.groupby([dates.year, dates.month]).first().values]
-
-
-def _px(panel, sym, d):
-    try:
-        v = panel.at[d, sym]
-        return float(v) if pd.notna(v) else 0.0
-    except KeyError:
-        return 0.0
+    adv20 = S.indicators(cl, adv_rs)
+    return cl, adv20
 
 
 def run(start, end, capital, out_dir=None):
+    """Run the single-position emerging-momentum rotation backtest and report."""
     eng = _get_engine()
-    cl, op, adv20, sma200, idx_sma200 = load_panels(eng, start, end)
+    cl, adv20 = load_panels(eng, start, end)
     dates = cl.index
     anchors, pools = S.build_pools(adv20, dates, end)
-    rebal = set(d for d in month_starts(dates) if start <= d.date() <= end)
-    cash = capital
-    pos = {}                     # sym -> {qty, entry_px, entry_date, peak}
-    nav, trades = [], []
 
-    def sell(s, d, px, reason):
-        nonlocal cash
-        if px <= 0:
-            return
-        p = pos[s]
-        cash += p["qty"] * px * (1 - COST)
-        trades.append({"sym": s.replace("NSE:", "").replace("-EQ", ""),
-                       "entry_date": p["entry_date"].date().isoformat(),
-                       "exit_date": d.date().isoformat(),
-                       "ret_pct": round((px / p["entry_px"] - 1) * 100, 2),
-                       "reason": reason})
-        del pos[s]
-
+    # ---- Build the rebalance calendar (full = month-firsts, mid = day 15-18) ----
+    s = pd.Series(dates, index=dates)
+    firsts = {pd.Timestamp(x) for x in s.groupby([dates.year, dates.month]).first().values}
+    full = [d for d in dates if start <= d.date() <= end and d in firsts]
+    mids = []
+    seen = set()
     for d in dates:
-        if d.date() < start or d.date() > end:
-            continue
-        di = dates.get_loc(d)
-        healthy = S.regime_healthy(cl, idx_sma200, di)
-        # DAILY risk exits (priority: always-on trail, then bear stop/trail)
-        for s in list(pos.keys()):
-            px = _px(cl, s, d)
-            if px <= 0:
-                continue
-            p = pos[s]; p["peak"] = max(p["peak"], px)
-            if S.hit_trail(px, p["peak"]):
-                sell(s, d, px, "TRAIL"); continue
-            if S.hit_bear_trail(px, p["peak"], healthy) or S.hit_bear_stop(px, p["entry_px"], healthy):
-                sell(s, d, px, "BEAR"); continue
-        nav.append((d, cash + sum(p["qty"] * (_px(cl, s, d) or p["entry_px"])
-                                  for s, p in pos.items())))
-        if d not in rebal:
-            continue
-        pool = S.pool_for_date(anchors, pools, d)
-        ranked = S.rank_targets(cl, sma200, pool, di)
-        keep = set(ranked[:S.RETAIN])
-        # monthly rank-drop exits (at today's close)
-        for s in list(pos.keys()):
-            if s not in keep:
-                sell(s, d, _px(cl, s, d), "ROTATE")
-        # buy top-K not held — filled at NEXT-day open
-        want = [s for s in ranked if s not in pos][: max(0, S.K - len(pos))]
-        if want and di + 1 < len(dates):
-            nd = dates[di + 1]
-            per = cash / len(want)
-            for s in want:
-                o = _px(op, s, nd)
-                if o <= 0:
-                    continue
-                buy = o * (1 + COST)
-                q = int(per / buy)
-                if q >= 1 and q * buy <= cash:
-                    cash -= q * buy
-                    pos[s] = {"qty": q, "entry_px": buy, "entry_date": nd, "peak": o}
+        if start <= d.date() <= end and 15 <= d.day <= 18 and (d.year, d.month) not in seen:
+            mids.append(d)
+            seen.add((d.year, d.month))
+    # Per-entry kind flag; "mid" days that coincide with a "full" day are dropped
+    # by the sort/dedup so the engine never double-fires.
+    full_set = set(full)
+    calendar = sorted([(d, "full") for d in full]
+                      + [(d, "mid") for d in mids if d not in full_set],
+                      key=lambda x: x[0])
 
-    navs = pd.Series({d: v for d, v in nav}).dropna()
-    final = navs.iloc[-1]
-    days = (navs.index[-1] - navs.index[0]).days
-    cagr = (final / capital) ** (365.25 / max(1, days)) - 1
-    dd = ((navs.cummax() - navs) / navs.cummax()).max()
-    py = {int(y): round((g.iloc[-1] / g.iloc[0] - 1) * 100, 1)
-          for y, g in navs.groupby(navs.index.year)}
-    wins = sum(1 for t in trades if t["ret_pct"] > 0)
+    def rank_at(di):
+        """Rank the PIT pool by 15d return at row `di` (ret>0, price<=MAX_PRICE)."""
+        return S.rank_pool(cl, S.pool_for_date(anchors, pools, dates[di]), di)
+
+    def midret_at(di):
+        """(symbol, 15d_return_pct) best-first for the mid-month lead gate."""
+        return S.midret_pool(cl, S.pool_for_date(anchors, pools, dates[di]), di)
+
+    res = run_rotation_backtest(
+        dates=dates, close=cl, calendar=calendar, rank_at=rank_at,
+        capital=capital, start=start, end=end, retain_top_n=S.RETAIN,
+        midmonth_ret_at=midret_at, midmonth_lead_pct=S.MIDMONTH_LEAD,
+    )
+
+    final, cagr, mdd, calmar = res.final_nav, res.cagr_pct, res.max_dd_pct, res.calmar
+    trades, yrs, wins, losses, open_pos = (res.trades, res.years, res.wins,
+                                           res.losses, res.open_position)
+
+    print(f"\n## RESULTS (emerging_momentum, single-position)")
+    print(f"  Final NAV:    Rs.{final:,.0f}")
+    print(f"  Total return: {(final / capital - 1) * 100:+.2f}%")
+    print(f"  CAGR ({yrs:.2f}y): {cagr:+.2f}%")
+    print(f"  Trades: {len(trades)} (W={wins}, L={losses}, "
+          f"WR={wins / max(1, wins + losses) * 100:.1f}%)")
+    print(f"  Max DD: {mdd:.2f}%")
+    print(f"  Calmar: {calmar:.2f}")
+
     result = {
         "model": "emerging_momentum",
         "start": start.isoformat(), "end": end.isoformat(),
-        "final_nav": round(final, 0), "cagr_pct": round(cagr * 100, 1),
-        "max_dd_pct": round(dd * 100, 1), "calmar": round(cagr * 100 / max(0.01, dd * 100), 2),
-        "trades": len(trades), "win_rate_pct": round(wins / max(1, len(trades)) * 100, 1),
-        "per_year": py,
+        "years": round(yrs, 3),
+        "capital": capital, "final_nav": round(final, 0),
+        "total_return_pct": round((final / capital - 1) * 100, 2),
+        "cagr_pct": round(cagr, 2),
+        "max_dd_pct": round(mdd, 2),
+        "calmar": round(calmar, 2),
+        "trades": len(trades),
+        "wins": wins, "losses": losses,
+        "win_rate_pct": round(wins / max(1, wins + losses) * 100, 1),
+        "open_position": open_pos,
     }
     if out_dir:
-        Path(out_dir).mkdir(parents=True, exist_ok=True)
-        (Path(out_dir) / "summary.json").write_text(json.dumps(result, indent=2))
-        (Path(out_dir) / "trade_ledger.json").write_text(json.dumps(trades, indent=2))
+        out_dir = Path(out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "trade_ledger.json").write_text(json.dumps(trades, indent=2))
+        (out_dir / "summary.json").write_text(json.dumps(result, indent=2))
     return result
 
 
