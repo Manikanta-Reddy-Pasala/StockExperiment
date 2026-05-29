@@ -1,27 +1,19 @@
 {
   "model": "momentum_retest_n500",
-  "start": "2023-05-15",
+  "start": "2025-03-01",
   "end": "2026-05-12",
-  "cagr_pct": 91.06,
-  "max_dd_pct": 18.66,
-  "calmar": 4.88,
-  "total_return_pct": 594.09,
-  "trades": 69,
+  "cagr_pct": 45.46,
+  "max_dd_pct": 16.36,
+  "calmar": 2.78,
+  "total_return_pct": 56.58,
+  "trades": 27,
   "per_year": {
-    "2023": {
-      "ret_pct": 107.7,
-      "dd_pct": 9.3
-    },
-    "2024": {
-      "ret_pct": 139.9,
-      "dd_pct": 15.9
-    },
     "2025": {
-      "ret_pct": 27.5,
-      "dd_pct": 17.6
+      "ret_pct": 41.1,
+      "dd_pct": 16.4
     },
     "2026": {
-      "ret_pct": 10.0,
+      "ret_pct": 9.9,
       "dd_pct": 11.3
     }
   },

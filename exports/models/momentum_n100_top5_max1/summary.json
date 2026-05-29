@@ -1,0 +1,25 @@
+{
+  "model": "momentum_n100_top5_max1",
+  "start": "2025-03-01",
+  "end": "2026-05-12",
+  "years": 1.196,
+  "capital": 1000000.0,
+  "final_nav": 1831156.0,
+  "total_return_pct": 83.12,
+  "cagr_pct": 65.8,
+  "max_dd_pct": 12.05,
+  "calmar": 5.46,
+  "trades": 13,
+  "wins": 9,
+  "losses": 4,
+  "win_rate_pct": 69.2,
+  "open_position": {
+    "sym": "ADANIPOWER",
+    "qty": 8735,
+    "entry_px": 157.11,
+    "entry_date": "2026-04-01",
+    "last_px": 209.63,
+    "mtm_value": 1831118.0,
+    "unrealized_pnl": 458762.0
+  }
+}

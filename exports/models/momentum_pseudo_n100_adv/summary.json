@@ -1,0 +1,25 @@
+{
+  "model": "momentum_pseudo_n100_adv",
+  "start": "2025-03-01",
+  "end": "2026-05-12",
+  "years": 1.196,
+  "capital": 1000000.0,
+  "final_nav": 2541746.0,
+  "total_return_pct": 154.17,
+  "cagr_pct": 118.08,
+  "max_dd_pct": 11.22,
+  "calmar": 10.52,
+  "trades": 11,
+  "wins": 9,
+  "losses": 2,
+  "win_rate_pct": 81.8,
+  "open_position": {
+    "sym": "BHEL",
+    "qty": 6488,
+    "entry_px": 377.05,
+    "entry_date": "2026-05-04",
+    "last_px": 391.75,
+    "mtm_value": 2541674.0,
+    "unrealized_pnl": 95374.0
+  }
+}

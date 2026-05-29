@@ -1,0 +1,24 @@
+{
+  "model": "midcap_narrow_60d_breakout",
+  "start": "2025-03-01",
+  "end": "2026-05-12",
+  "years": 1.196,
+  "capital": 1000000.0,
+  "final_nav": 1313750.0,
+  "total_return_pct": 31.37,
+  "cagr_pct": 25.62,
+  "max_dd_pct": 21.25,
+  "calmar": 1.21,
+  "trades": 4,
+  "wins": 3,
+  "losses": 1,
+  "win_rate_pct": 75.0,
+  "open_position": {
+    "symbol": "DATAPATTNS",
+    "qty": 323,
+    "entry_px": 3848.84,
+    "entry_date": "2026-04-23",
+    "last": 4062.5,
+    "unrealized": 69011.0
+  }
+}

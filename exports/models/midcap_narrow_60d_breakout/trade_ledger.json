@@ -1,0 +1,50 @@
+[
+  {
+    "entry_date": "2025-03-07",
+    "exit_date": "2025-04-08",
+    "sym": "CASTROLIND",
+    "qty": 4077,
+    "entry_px": 245.24,
+    "exit_px": 193.33,
+    "pnl": -212480.0,
+    "ret_pct": -21.09,
+    "reason": "STOP",
+    "cap_after": 787500.0
+  },
+  {
+    "entry_date": "2025-04-16",
+    "exit_date": "2025-08-14",
+    "sym": "KAYNES",
+    "qty": 143,
+    "entry_px": 5504.5,
+    "exit_px": 6110.38,
+    "pnl": 85748.0,
+    "ret_pct": 11.12,
+    "reason": "MAX_HOLD",
+    "cap_after": 873228.0
+  },
+  {
+    "entry_date": "2025-08-19",
+    "exit_date": "2025-12-17",
+    "sym": "ASHOKLEY",
+    "qty": 6620,
+    "entry_px": 131.89,
+    "exit_px": 165.97,
+    "pnl": 224505.0,
+    "ret_pct": 25.97,
+    "reason": "MAX_HOLD",
+    "cap_after": 1097712.0
+  },
+  {
+    "entry_date": "2025-12-22",
+    "exit_date": "2026-04-21",
+    "sym": "SHRIRAMFIN",
+    "qty": 1193,
+    "entry_px": 919.92,
+    "exit_px": 1044.25,
+    "pnl": 147067.0,
+    "ret_pct": 13.63,
+    "reason": "MAX_HOLD",
+    "cap_after": 1244759.0
+  }
+]
