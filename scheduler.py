@@ -489,7 +489,7 @@ def run_scheduler():
     logger.info("  - midcap_narrow_60d_breakout: signal 09:25 + execute 09:32 + EOD signal 15:25")
     logger.info("  - n20_daily_large_only:       signal 09:25 + execute 09:30 (daily rotation)")
     logger.info("  - momentum_retest_n500:       signal 09:26 + execute 09:34 (K=3 multi, gated by enabled flag)")
-    logger.info("  - regime_momentum_n500:       signal 09:27 + execute 09:35 (K=5 regime-adaptive multi, gated by enabled flag)")
+    logger.info("  - emerging_momentum:          signal 09:29 + execute 09:37 (K=3 emerging mid/small multi, gated by enabled flag)")
     logger.info("")
     logger.info("Maintenance:")
     logger.info("  - Cleanup Old Snapshots: Weekly (Sunday) at 03:00 AM")
@@ -527,11 +527,11 @@ def run_scheduler():
         register_trading_jobs as register_mr500_jobs,
         register_data_jobs as register_mr500_data_jobs,
     )
-    # Multi-holding model (K=5, regime-adaptive momentum). Same gating: daily jobs
-    # no-op while model_settings.enabled is False.
-    from tools.models.regime_momentum_n500.cron import (
-        register_trading_jobs as register_regmom_jobs,
-        register_data_jobs as register_regmom_data_jobs,
+    # Multi-holding model (K=3, emerging mid/small momentum: PIT N500 minus N100).
+    # Same gating: daily jobs no-op while model_settings.enabled is False.
+    from tools.models.emerging_momentum.cron import (
+        register_trading_jobs as register_emerging_jobs,
+        register_data_jobs as register_emerging_data_jobs,
     )
     register_momentum_n100_jobs(schedule)
     register_pseudo_n100_jobs(schedule)
@@ -539,8 +539,8 @@ def run_scheduler():
     register_n20_daily_jobs(schedule)
     register_mr500_jobs(schedule)
     register_mr500_data_jobs(schedule)
-    register_regmom_jobs(schedule)
-    register_regmom_data_jobs(schedule)
+    register_emerging_jobs(schedule)
+    register_emerging_data_jobs(schedule)
 
     # M3 — SAFE catch-up: if we restarted after the morning trade window on a
     # trading day, ALERT (never auto-execute) so a human can check for misses.

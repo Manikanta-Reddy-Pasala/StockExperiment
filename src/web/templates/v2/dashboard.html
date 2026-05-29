@@ -152,7 +152,7 @@ const MODEL_META = {
   'midcap_narrow_60d_breakout':  { universe: 'Midcap 40d-high breakout', kind: 'equity'  },
   'n20_daily_large_only':        { universe: 'Top-40 ADV ∩ N100',      kind: 'equity'  },
   'momentum_retest_n500':        { universe: 'Top-120 ADV N500 • retest', kind: 'equity'  },
-  'regime_momentum_n500':        { universe: 'Top-80 ADV N500 • regime-adaptive', kind: 'equity'  },
+  'emerging_momentum':           { universe: 'Top-100 ADV mid/small (N500−N100) • momentum', kind: 'equity'  },
 };
 // Display order: equity models.
 const MODEL_ORDER = [
@@ -161,7 +161,7 @@ const MODEL_ORDER = [
   'midcap_narrow_60d_breakout',
   'n20_daily_large_only',
   'momentum_retest_n500',
-  'regime_momentum_n500',
+  'emerging_momentum',
 ];
 
 let _signalsByModel = {};

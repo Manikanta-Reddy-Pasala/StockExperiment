@@ -39,11 +39,11 @@ DESC = {
         "strategy": "Monthly top-3 (K=3), 30d momentum, buy on 20-EMA pullback/retest, retain top-6 band.",
         "note": "Multi-holding K=3. Full-period 2023-26 ≈ +91% CAGR / 19% DD.",
     },
-    "regime_momentum_n500": {
-        "title": "Regime Momentum", "live": "DISABLED (₹0)",
-        "universe": "Top-80 by 20d ADV from N500",
-        "strategy": "Monthly top-5 (K=5), 30d momentum, no take-profit; regime switch on Nifty50 vs 200DMA (bear: −10% stop + −15% trail). Retain top-6.",
-        "note": "Multi-holding K=5, regime-adaptive. Full-period 2023-26 ≈ +69% CAGR / 27% DD.",
+    "emerging_momentum": {
+        "title": "Emerging Momentum", "live": "LIVE",
+        "universe": "Top-100 by 20d ADV from emerging mid/small (PIT N500 minus N100)",
+        "strategy": "Monthly top-3 (K=3), 30d momentum >15%, >200DMA entry; always-on 25% trailing stop, bear (Nifty50<200DMA) adds −10% stop + −15% trail. Retain top-4.",
+        "note": "Multi-holding K=3, emerging mid/small. Full-period 2023-26 ≈ +77% CAGR / 26% DD.",
     },
     "midcap_narrow_60d_breakout": {
         "title": "Midcap Breakout", "live": "LIVE",
