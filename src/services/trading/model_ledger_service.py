@@ -725,6 +725,7 @@ def get_portfolio_stats(price_lookup=None) -> Dict:
             models.append({
                 "model_name": l.model_name,
                 "enabled": bool(cfg and cfg.enabled),
+                "signals_only": bool(cfg and getattr(cfg, "signals_only", False)),
                 "invested_amount": float(invested),
                 "current_amount": float(current_cache),
                 # Legacy alias for any UI still reading old field name

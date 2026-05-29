@@ -557,7 +557,6 @@ async function loadAllocations() {
       const menuHtml = `
         <li><a class="dropdown-item" href="#" data-action="bootstrap" data-model="${m.model_name}"><i class="bi bi-arrow-down-square me-2"></i>Bootstrap from legacy ledger</a></li>
         <li><a class="dropdown-item" href="#" data-action="toggle" data-model="${m.model_name}" data-enabled="${m.enabled ? '1' : '0'}"><i class="bi ${m.enabled ? 'bi-pause-circle text-warning' : 'bi-play-circle text-success'} me-2"></i>${m.enabled ? 'Disable model' : 'Enable model'}</a></li>
-        <li><a class="dropdown-item" href="#" data-action="signals-only" data-model="${m.model_name}" data-signals-only="${m.signals_only ? '1' : '0'}"><i class="bi ${m.signals_only ? 'bi-cash-coin text-success' : 'bi-eye text-info'} me-2"></i>${m.signals_only ? 'Enable live trading' : 'Observe only (no real trades)'}</a></li>
         <li><hr class="dropdown-divider"></li>
         <li><a class="dropdown-item text-danger" href="#" data-action="reset" data-model="${m.model_name}"><i class="bi bi-trash me-2"></i>Hard reset (zero all)</a></li>
       `;
@@ -961,9 +960,6 @@ document.addEventListener('click', function(ev) {
   } else if (action === 'toggle') {
     const wasEnabled = el.dataset.enabled === '1';
     toggleEnabled(model, !wasEnabled);
-  } else if (action === 'signals-only') {
-    const wasObserve = el.dataset.signalsOnly === '1';
-    toggleSignalsOnly(model, !wasObserve);
   } else if (action === 'reset') {
     resetModel(model);
   }
