@@ -576,6 +576,21 @@ def run_scheduler():
                 logger.info(r.stdout[-400:])
         except Exception as e:
             logger.error(f"reconciler call failed: {e}")
+        # Multi-holding reconciler (K>1 models). Alert-only; no-ops while the
+        # model is disabled. Separate process so single-position reconcile is
+        # never blocked by a multi-holding issue.
+        try:
+            import subprocess
+            rm = subprocess.run(
+                ["python3", "tools/live/position_reconciler_multi.py"],
+                capture_output=True, text=True, timeout=60,
+            )
+            if rm.returncode != 0:
+                logger.error(f"multi-reconciler exit={rm.returncode}: {rm.stderr[-400:]}")
+            elif rm.stdout:
+                logger.info(rm.stdout[-300:])
+        except Exception as e:
+            logger.error(f"multi-reconciler call failed: {e}")
 
     schedule.every(5).minutes.do(_reconcile_market_hours)
 
