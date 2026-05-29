@@ -480,14 +480,14 @@ const MODEL_META = {
     ],
   },
   'n20_daily_large_only': {
-    universe: 'Top-20 ADV ∩ N100', kind: 'equity',
-    title: 'Daily Top-20',
+    universe: 'Top-40 ADV ∩ N100', kind: 'equity',
+    title: 'Daily Top-40',
     rules: { top_n: 1, max_concurrent: 1, lookback: '30d',
              rebalance: 'Daily', stop: 'None', target: 'None',
              exit: 'Rank-1 changes' },
     strategy: [
       ['Ranker', '30d return descending'],
-      ['Universe', 'Top-20 ADV ∩ N100 (PIT each run)'],
+      ['Universe', 'Top-40 ADV ∩ N100 (PIT each run)'],
       ['Entry', 'Daily rotation if rank-1 changes'],
       ['Selection', 'Hold rank-1 only, max 1 concurrent'],
       ['MAX_PRICE filter', '₹2.5K cap'],

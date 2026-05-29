@@ -62,7 +62,8 @@ log = logging.getLogger("n20_daily_signal")
 MODEL_NAME = "n20_daily_large_only"
 
 # Strategy params (must match backtest)
-UNIV_SIZE = 20
+UNIV_SIZE = 40  # was 20 (n20->n40): top-40 ADV-pool beats top-20 on BOTH 2026
+                # (+37% vs +20%) and 3yr (+55% vs +22%) — wider net, better rank-1.
 LOOKBACK_RET = 30
 ADV_WIN = 20
 SMA_LONG = 200

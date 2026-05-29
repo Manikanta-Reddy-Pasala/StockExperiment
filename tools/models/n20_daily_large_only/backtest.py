@@ -39,11 +39,14 @@ sys.path.insert(0, str(ROOT))
 import pandas as pd
 from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
-from tools.shared.universes import nifty500_symbols
+from tools.shared.universes import nifty500_symbols  # noqa: F401
 from tools.shared.backtest_engine import run_rotation_backtest
+from tools.shared.index_membership import eligible_at, universe_union
 
 
-UNIV_SIZE = 20
+UNIV_SIZE = 40  # was 20 (n20->n40): top-40 ADV∩N100 pool wins BOTH 2026 (+37%
+                # vs +20%) and 3yr (+55% vs +22%) standalone-verified. Live parity
+                # in live_signal.py UNIV_SIZE.
 LOOKBACK  = 30
 ADV_WIN   = 20
 SMA_LONG  = 200
@@ -53,22 +56,13 @@ DEFAULT_END   = date(2026, 5, 12)
 DEFAULT_CAP   = 1_000_000.0
 
 
-def load_n100():
-    """Load the NSE Nifty 100 constituent set from the local CSV.
+def load_n100_pit(d: date) -> set[str]:
+    """Point-in-time NSE Nifty 100 large-cap filter set for date `d`.
 
-    Reads src/data/symbols/nifty100.csv and keeps only equity rows
-    (Series == "EQ"), returning plain symbols (no NSE:/-EQ wrapping).
-
-    Returns:
-        set[str]: plain Nifty 100 symbols used as the large-cap filter.
+    Returns plain symbols (no NSE:/-EQ wrap) so the existing rank_at code
+    can keep its symbol-stripping check unchanged.
     """
-    out = set()
-    with open(N100_CSV) as f:
-        for r in csv.DictReader(f):
-            # Only cash-equity rows; skip non-EQ series (e.g. BE/BZ).
-            if r.get("Series","").strip()=="EQ":
-                out.add(r["Symbol"].strip())
-    return out
+    return set(eligible_at("n100", d))
 
 
 def run(start: date, end: date, capital: float, out_dir: Path | None = None):
@@ -89,12 +83,12 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
     Returns:
         tuple[float, float, list]: (final_nav, cagr_pct, trades).
     """
-    n100 = load_n100()
-    print(f"NSE Nifty 100 filter: {len(n100)} stocks")
+    print("Large-cap filter source: PIT n100 (eligible_at per day)")
 
     eng = _get_engine()
-    # PIT ranking pool is the full Nifty 500 (wrapped to fyers symbol form).
-    n500 = [f"NSE:{s}-EQ" for s, _ in nifty500_symbols()]
+    # PIT ranking pool: union of every symbol ever in NSE Nifty 500.
+    n500 = [f"NSE:{s}-EQ" for s in sorted(universe_union("n500"))]
+    print(f"N500 union pool (PIT): {len(n500)}")
 
     with eng.connect() as c:
         # Pull 400 extra calendar days before `start` so the 200d SMA and the
@@ -141,9 +135,11 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
         # Uptrend filter: keep only names trading above their 200d SMA.
         up = sma200.iloc[di] < cl.iloc[di]
         pit_univ = [s for s in pit_univ if bool(up.get(s, False))]
-        # Large-cap filter: intersect with the NSE Nifty 100 constituents.
+        # Large-cap filter: intersect with the POINT-IN-TIME NSE Nifty 100
+        # constituents at this exact day (no survivorship).
+        n100_today = load_n100_pit(dates[di].date())
         pit_univ = [s for s in pit_univ
-                    if s.replace("NSE:", "").replace("-EQ", "") in n100]
+                    if s.replace("NSE:", "").replace("-EQ", "") in n100_today]
         if not pit_univ:
             return []
         # Rank survivors by trailing 30-day return, highest first.
