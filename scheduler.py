@@ -488,6 +488,7 @@ def run_scheduler():
     logger.info("  - momentum_pseudo_n100_adv:   signal 09:25 + execute 09:30 (monthly rebal)")
     logger.info("  - midcap_narrow_60d_breakout: signal 09:25 + execute 09:32 + EOD signal 15:25")
     logger.info("  - n20_daily_large_only:       signal 09:25 + execute 09:30 (daily rotation)")
+    logger.info("  - momentum_retest_n500:       signal 09:26 + execute 09:34 (K=3 multi, gated by enabled flag)")
     logger.info("")
     logger.info("Maintenance:")
     logger.info("  - Cleanup Old Snapshots: Weekly (Sunday) at 03:00 AM")
