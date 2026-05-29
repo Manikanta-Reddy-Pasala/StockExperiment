@@ -90,7 +90,12 @@ def main():
     adv_rs = df.pivot(index="date", columns="symbol", values="adv")
     adv20, idx_sma200 = S.indicators(cl, adv_rs)
     dates = cl.index
-    di = len(dates) - 1                                   # today = last row
+    # Appending NIFTY50-INDEX can extend the calendar to a day where the index
+    # has quoted but equities have NOT posted volume yet (e.g. pre-market / EOD
+    # before the equity feed lands) -> that trailing row has all-NaN ADV. Use the
+    # last row that actually has equity volume as "today".
+    adv_valid = adv_rs.drop(columns=[S.INDEX], errors="ignore").dropna(how="all")
+    di = cl.index.get_loc(adv_valid.index[-1]) if len(adv_valid) else len(dates) - 1
     healthy = S.regime_healthy(cl, idx_sma200, di)
     log.info(f"regime: {'HEALTHY (no stops)' if healthy else 'BEAR (stops armed)'}")
 
