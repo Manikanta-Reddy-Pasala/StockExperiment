@@ -493,6 +493,20 @@ const MODEL_META = {
       ['MAX_PRICE filter', '₹2.5K cap'],
     ],
   },
+  'momentum_retest_n500': {
+    universe: 'Top-120 ADV N500 • retest', kind: 'equity',
+    title: 'Retest Momentum',
+    rules: { top_n: 3, max_concurrent: 3, lookback: '30d',
+             rebalance: 'Monthly + daily retest entry', stop: 'None', target: 'None',
+             exit: 'Drops out of top-6 rank' },
+    strategy: [
+      ['Ranker', '30d return; filters: >200d SMA, ≤₹3000, 30d ret>10%, 10d ret>0'],
+      ['Universe', 'Top-120 ADV from N500 minus Smallcap-250 (PIT, monthly)'],
+      ['Entry', 'Buy monthly top-3 on a pullback: price within −1% to +8% of 20-EMA'],
+      ['Exit', 'Sell when name drops out of the top-6 rank (retain band)'],
+      ['Style', '3-position momentum with pullback/retest entry (true-PIT)'],
+    ],
+  },
 };
 
 async function loadAllocations() {
