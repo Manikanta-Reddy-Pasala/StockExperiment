@@ -86,16 +86,18 @@ def main():
     df = load_panel(syms)
     if df.empty:
         log.error("No data."); sig_path.write_text(empty); return 1
-    cl = df.pivot(index="date", columns="symbol", values="close").ffill()
+    cl = df.pivot(index="date", columns="symbol", values="close")
     adv_rs = df.pivot(index="date", columns="symbol", values="adv")
+    # The NIFTY50-INDEX trades on dates equities sometimes don't (and vice versa);
+    # those index-only rows are all-NaN for equities and would poison the rolling
+    # ADV/return windows. Restrict the panel to EQUITY trading days only (the index
+    # has data on those days too, so the 200-DMA regime gate is unaffected).
+    equity_dates = adv_rs.drop(columns=[S.INDEX], errors="ignore").dropna(how="all").index
+    cl = cl.loc[equity_dates].ffill()
+    adv_rs = adv_rs.loc[equity_dates]
     adv20, idx_sma200 = S.indicators(cl, adv_rs)
     dates = cl.index
-    # Appending NIFTY50-INDEX can extend the calendar to a day where the index
-    # has quoted but equities have NOT posted volume yet (e.g. pre-market / EOD
-    # before the equity feed lands) -> that trailing row has all-NaN ADV. Use the
-    # last row that actually has equity volume as "today".
-    adv_valid = adv_rs.drop(columns=[S.INDEX], errors="ignore").dropna(how="all")
-    di = cl.index.get_loc(adv_valid.index[-1]) if len(adv_valid) else len(dates) - 1
+    di = len(dates) - 1                                   # today = last equity day
     healthy = S.regime_healthy(cl, idx_sma200, di)
     log.info(f"regime: {'HEALTHY (no stops)' if healthy else 'BEAR (stops armed)'}")
 

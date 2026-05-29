@@ -41,8 +41,13 @@ def load_panels(eng, start, end):
         ), c, params={"s": syms, "a": start - timedelta(days=420), "b": end})
     df["date"] = pd.to_datetime(df["date"])
     df["adv"] = df["close"].astype(float) * df["volume"].astype(float)
-    cl = df.pivot(index="date", columns="symbol", values="close").astype(float).ffill()
+    cl = df.pivot(index="date", columns="symbol", values="close").astype(float)
     adv_rs = df.pivot(index="date", columns="symbol", values="adv")
+    # Restrict to EQUITY trading days — index-only date rows would poison the
+    # rolling ADV/return windows (same guard as live_signal).
+    equity_dates = adv_rs.drop(columns=[S.INDEX], errors="ignore").dropna(how="all").index
+    cl = cl.loc[equity_dates].ffill()
+    adv_rs = adv_rs.loc[equity_dates]
     adv20, idx_sma200 = S.indicators(cl, adv_rs)
     return cl, adv20, idx_sma200
 
