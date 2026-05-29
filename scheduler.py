@@ -490,7 +490,6 @@ def run_scheduler():
     logger.info("  - n20_daily_large_only:       signal 09:25 + execute 09:30 (daily rotation)")
     logger.info("  - momentum_retest_n500:       signal 09:26 + execute 09:34 (K=3 multi, gated by enabled flag)")
     logger.info("  - regime_momentum_n500:       signal 09:27 + execute 09:35 (K=5 regime-adaptive multi, gated by enabled flag)")
-    logger.info("  - midcap_breakout_k3:         signal 09:28 + execute 09:36 (K=3 midcap breakout multi, gated by enabled flag)")
     logger.info("")
     logger.info("Maintenance:")
     logger.info("  - Cleanup Old Snapshots: Weekly (Sunday) at 03:00 AM")
@@ -534,12 +533,6 @@ def run_scheduler():
         register_trading_jobs as register_regmom_jobs,
         register_data_jobs as register_regmom_data_jobs,
     )
-    # Multi-holding model (K=3 midcap breakout swing). Daily jobs no-op while
-    # model_settings.enabled is False.
-    from tools.models.midcap_breakout_k3.cron import (
-        register_trading_jobs as register_midk3_jobs,
-        register_data_jobs as register_midk3_data_jobs,
-    )
     register_momentum_n100_jobs(schedule)
     register_pseudo_n100_jobs(schedule)
     register_midcap_narrow_jobs(schedule)
@@ -548,8 +541,6 @@ def run_scheduler():
     register_mr500_data_jobs(schedule)
     register_regmom_jobs(schedule)
     register_regmom_data_jobs(schedule)
-    register_midk3_jobs(schedule)
-    register_midk3_data_jobs(schedule)
 
     # M3 — SAFE catch-up: if we restarted after the morning trade window on a
     # trading day, ALERT (never auto-execute) so a human can check for misses.
