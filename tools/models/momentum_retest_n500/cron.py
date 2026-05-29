@@ -50,13 +50,16 @@ def execute_orders():
                 "momentum_retest_n500 execute_orders")
 
 
-def register_data_jobs(scheduler):
-    scheduler.add_job(pull_daily_ohlcv, "cron", hour=20, minute=42,
-                      id="mr500_pull", replace_existing=True)
+def register_data_jobs(schedule):
+    """Register data-side jobs on the shared `schedule` library instance."""
+    schedule.every().day.at("20:42").do(pull_daily_ohlcv)
 
 
-def register_trading_jobs(scheduler):
-    scheduler.add_job(emit_signal, "cron", hour=9, minute=26,
-                      id="mr500_emit", replace_existing=True)
-    scheduler.add_job(execute_orders, "cron", hour=9, minute=34,
-                      id="mr500_exec", replace_existing=True)
+def register_trading_jobs(schedule):
+    """Register trading-side jobs on the shared `schedule` library instance.
+
+    09:26 emit + 09:34 execute, every weekday; weekend/enabled/monthly gating
+    happens inside live_signal.py.
+    """
+    schedule.every().day.at("09:26").do(emit_signal)
+    schedule.every().day.at("09:34").do(execute_orders)
