@@ -29,6 +29,7 @@ const MODELS = [
   {key: "momentum_pseudo_n100_adv",    title: "Liquid 100 Momentum",  desc: "Monthly rotation • top-100 ADV from N500 • yearly-PIT rebuild",            schedule: "monthly"},
   {key: "momentum_retest_n500",        title: "Retest Momentum",      desc: "Monthly top-3 momentum (top-120 ADV N500) • buy on 20-EMA pullback • retain top-6", schedule: "monthly"},
   {key: "regime_momentum_n500",        title: "Regime Momentum",      desc: "Monthly top-5 momentum (top-80 ADV N500) • regime-adaptive: bear stop−10%/trail−15%, no take-profit • retain top-6", schedule: "monthly"},
+  {key: "midcap_breakout_k3",          title: "Midcap Breakout K3",   desc: "Daily breakout swing • PIT midcap (top-100 ADV − N100) • 40d-high + 2× vol + >200DMA • hold up to 3 • target +100%/stop −20%/trail −20%", schedule: "event"},
 ];
 
 // Format YYYY-MM-DD in local TZ (avoid toISOString → UTC date drift).

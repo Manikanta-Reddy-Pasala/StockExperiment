@@ -91,7 +91,7 @@ def reconcile_multi(model_name=DEFAULT_MODEL, user_id=1, dry_run=False):
 def _all_multi_models():
     """Distinct model_names that have any row in model_holdings (the multi-holding
     models). Falls back to the known set if the table is empty/unreachable."""
-    known = [DEFAULT_MODEL, "regime_momentum_n500"]
+    known = [DEFAULT_MODEL, "regime_momentum_n500", "midcap_breakout_k3"]
     try:
         from src.models.database import get_database_manager
         from src.models.model_ledger_models import ModelHolding
