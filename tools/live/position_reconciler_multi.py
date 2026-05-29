@@ -88,11 +88,32 @@ def reconcile_multi(model_name=DEFAULT_MODEL, user_id=1, dry_run=False):
     return alerts
 
 
+def _all_multi_models():
+    """Distinct model_names that have any row in model_holdings (the multi-holding
+    models). Falls back to the known set if the table is empty/unreachable."""
+    known = [DEFAULT_MODEL, "regime_momentum_n500"]
+    try:
+        from src.models.database import get_database_manager
+        from src.models.model_ledger_models import ModelHolding
+        db = get_database_manager()
+        with db.get_session() as s:
+            rows = s.query(ModelHolding.model_name).distinct().all()
+        found = [r[0] for r in rows]
+        # union: anything in the table + known models (so a disabled-but-registered
+        # model is still checked once it has holdings)
+        return sorted(set(found) | set(known)) if found else known
+    except Exception as e:
+        log.debug(f"model discovery failed, using known set: {e}")
+        return known
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model", default=DEFAULT_MODEL)
+    ap.add_argument("--model", default=None, help="reconcile one model; default = all multi-holding models")
     ap.add_argument("--user-id", type=int, default=1)
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    reconcile_multi(a.model, a.user_id, a.dry_run)
+    models = [a.model] if a.model else _all_multi_models()
+    for m in models:
+        reconcile_multi(m, a.user_id, a.dry_run)
