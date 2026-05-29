@@ -1744,7 +1744,7 @@ MODEL_PATHS = {
         "ranking_dir": "/app/logs/n20_daily/ranking",
         "live_signal": "tools/models/n20_daily_large_only/live_signal.py",
         "extra_args": ["--top-n", "1"],
-        "label": "Top-20 ADV ∩ N100 daily rotation (mc=1)",
+        "label": "Top-40 ADV ∩ N100 daily rotation (mc=1)",
         "universe_path": None,  # PIT built each run from N500 OHLCV
     },
 }

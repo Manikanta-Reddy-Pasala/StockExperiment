@@ -293,7 +293,7 @@ def emit_signals(top_picks: List[tuple], pos: Optional[Dict],
             "signal": "ENTRY1",
             "price": float(price),
             "sl": 0.0, "target": 0.0,
-            "note": f"30d momentum rank-1 ({ret:+.2f}%) — N20 ADV∩N100",
+            "note": f"30d momentum rank-1 ({ret:+.2f}%) — N40 ADV∩N100",
         })
 
     return signals
