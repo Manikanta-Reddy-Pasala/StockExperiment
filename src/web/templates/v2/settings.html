@@ -575,15 +575,15 @@ async function loadAllocations() {
           <span class="pnl-pct">${fmtPct(m.return_pct)}</span>
         </td>
         <td class="text-center">
-          <div class="form-check form-switch d-inline-flex flex-column align-items-center mb-0" style="gap:2px;"
+          <label class="form-check form-switch d-inline-flex flex-column align-items-center mb-0" style="gap:2px;cursor:pointer;"
                title="${m.enabled ? (m.signals_only ? 'OBSERVE — emits signals, places no real orders' : 'LIVE — places real orders') : 'Enable the model first to change its trading mode'}">
-            <input class="form-check-input trade-switch" type="checkbox" role="switch" style="cursor:pointer;"
+            <input class="form-check-input trade-switch" type="checkbox" role="switch" style="cursor:pointer;width:2.5em;height:1.3em;"
               data-model="${m.model_name}"
               ${m.signals_only ? '' : 'checked'} ${m.enabled ? '' : 'disabled'}>
             <span class="small ${m.signals_only ? 'text-info' : 'text-success'}" style="font-size:.65rem;">
               ${m.enabled ? (m.signals_only ? 'Observe' : 'Live') : '—'}
             </span>
-          </div>
+          </label>
         </td>
         <td class="text-end col-actions">
           <div class="action-bar" role="group" aria-label="Capital actions for ${m.model_name}">
@@ -978,12 +978,16 @@ document.addEventListener('change', function(ev) {
 });
 
 async function toggleSignalsOnly(model, signalsOnly) {
-  if (signalsOnly) {
-    const ok = await appModal.confirm('Switch to OBSERVE ONLY?',
-      `<strong>${model}</strong> keeps emitting signals + ranking but places ` +
-      `<strong>NO real orders</strong> (ledger untouched). Re-enable live trading any time.`,
-      {okLabel: 'Observe only', okClass: 'btn-info'});
-    if (!ok) { await loadAllocations(); return; }  // cancelled: re-sync the switch
+  // Switching to OBSERVE (stops real orders) is the safe direction → immediate,
+  // no confirm. Switching to LIVE (will place real orders) → confirm first.
+  if (!signalsOnly) {
+    let ok = true;
+    try {
+      ok = await appModal.confirm('Enable LIVE trading?',
+        `<strong>${model}</strong> will place <strong>REAL orders</strong> at the next signal.`,
+        {okLabel: 'Enable live', okClass: 'btn-success'});
+    } catch (e) { ok = window.confirm(`Enable LIVE trading for ${model}? Places real orders.`); }
+    if (!ok) { await loadAllocations(); return; }   // cancelled → re-sync switch
   }
   try {
     const r = await fetch(`/admin/models/${model}/signals-only`, {
@@ -991,19 +995,12 @@ async function toggleSignalsOnly(model, signalsOnly) {
       body: JSON.stringify({signals_only: signalsOnly})
     });
     const d = await r.json();
-    if (d.success) {
-      await loadAllocations();
-      flashRow(model);
-      await appModal.alert(
-        signalsOnly ? 'Observe-only enabled' : 'Live trading enabled',
-        `<strong>${model}</strong> is now <strong>${signalsOnly ? 'OBSERVE-ONLY (no real trades)' : 'LIVE-TRADING'}</strong>.`,
-        signalsOnly ? 'info' : 'success');
-    } else {
-      await appModal.alert('Toggle Failed', d.error || 'failed', 'danger');
-    }
+    if (!d.success) { alert('Toggle failed: ' + (d.error || 'unknown')); }
   } catch (e) {
-    await appModal.alert('Network Error', e.message, 'danger');
+    alert('Network error toggling trading mode: ' + e.message);
   }
+  await loadAllocations();   // always re-render from DB truth (success or fail)
+  flashRow(model);
 }
 
 </script>
