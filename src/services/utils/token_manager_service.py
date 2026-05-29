@@ -140,8 +140,12 @@ class TokenManagerService:
                 # Try to refresh the token
                 refreshed_token = self.refresh_token(user_id, broker_name, config.refresh_token)
                 if refreshed_token:
-                    # Update database with new token
-                    self._update_token_in_db(session, config, refreshed_token)
+                    # Persist in a FRESH session keyed by (user_id, broker_name).
+                    # refresh_token() opened nested get_session() scopes whose exit
+                    # can close the shared session and DETACH `config`; mutating it
+                    # here raised "Instance is not bound to a Session". Pass
+                    # primitives so the update never touches the detached instance.
+                    self._update_token_in_db(user_id, broker_name, refreshed_token)
                     token_data.update(refreshed_token)
                 else:
                     logger.error(f"Failed to refresh token for user {user_id}, broker {broker_name}")
@@ -203,27 +207,40 @@ class TokenManagerService:
             logger.error(f"Error refreshing token for user {user_id}, broker {broker_name}: {e}")
             return None
     
-    def _update_token_in_db(self, session, config: BrokerConfiguration, new_token_data: Dict[str, Any]):
-        """Update token data in database."""
+    def _update_token_in_db(self, user_id: int, broker_name: str, new_token_data: Dict[str, Any]):
+        """Persist refreshed token using a FRESH session keyed by (user_id, broker_name).
+
+        Never mutates a caller-supplied ORM instance: the config object from an
+        outer/nested session may be DETACHED (nested ``with get_session()`` exits
+        close the shared session), which previously raised "Instance is not bound
+        to a Session" here. Re-querying in a dedicated session is detach-proof and
+        idempotent with the refresh callback's own write (same token, last commit
+        wins).
+        """
         try:
-            if 'access_token' in new_token_data:
-                config.access_token = new_token_data['access_token']
-            if 'refresh_token' in new_token_data:
-                config.refresh_token = new_token_data['refresh_token']
-            if 'is_connected' in new_token_data:
-                config.is_connected = new_token_data['is_connected']
-            if 'connection_status' in new_token_data:
-                config.connection_status = new_token_data['connection_status']
-            
-            config.updated_at = datetime.utcnow()
-            session.commit()
-            
-            logger.info(f"Updated token in database for user {config.user_id}, broker {config.broker_name}")
-            
+            with self.db_manager.get_session() as session:
+                config = session.query(BrokerConfiguration).filter_by(
+                    user_id=user_id, broker_name=broker_name
+                ).first()
+                if not config:
+                    logger.warning(f"No broker config to update for user {user_id}, broker {broker_name}")
+                    return
+
+                if 'access_token' in new_token_data:
+                    config.access_token = new_token_data['access_token']
+                if 'refresh_token' in new_token_data:
+                    config.refresh_token = new_token_data['refresh_token']
+                if 'is_connected' in new_token_data:
+                    config.is_connected = new_token_data['is_connected']
+                if 'connection_status' in new_token_data:
+                    config.connection_status = new_token_data['connection_status']
+
+                config.updated_at = datetime.utcnow()
+                session.commit()
+                logger.info(f"Updated token in database for user {user_id}, broker {broker_name}")
+
         except Exception as e:
             logger.error(f"Error updating token in database: {e}")
-            session.rollback()
-            raise
     
     def start_auto_refresh(self, user_id: int, broker_name: str, check_interval_minutes: int = 30):
         """
