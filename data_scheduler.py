@@ -689,6 +689,18 @@ def run_scheduler():
     except Exception as e:
         logger.error(f"Boot NSE holiday refresh failed: {e}", exc_info=True)
 
+    # Catch-up on startup: re-stamp the data-quality gate immediately. The daily
+    # 09:00 job is the primary stamp, but the `schedule` lib only fires .at("09:00")
+    # if the process is alive at 09:00 — a container restart AFTER 09:00 (e.g. a
+    # deploy during/after market open) would otherwise leave yesterday's marker in
+    # place and fail-close every executor for the rest of the day. Re-stamping on
+    # boot heals that: any restart refreshes the gate with the current data state.
+    try:
+        pre_market_data_quality_gate()
+        logger.info("Boot catch-up: data-quality gate re-stamped on startup")
+    except Exception as e:
+        logger.error(f"Boot data-quality gate stamp failed: {e}", exc_info=True)
+
     # Catch-up on startup: if any universe CSV or symbol cache is >7 days old,
     # refresh immediately (so container restarts heal stale files automatically).
     try:
