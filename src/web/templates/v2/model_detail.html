@@ -25,6 +25,7 @@
   .model-tag { font-size: 0.65rem; padding: 1px 6px; border-radius: 8px; background: #eef2ff; color: #3a4cc8; border: 1px solid #d8e0ff; }
   .live-badge { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.5px; }
   .disabled-badge { background: #f1f3f5; color: #6c757d; border: 1px solid #dee2e6; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+  .observe-badge { background: #cff4fc; color: #055160; border: 1px solid #9eeaf9; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.5px; }
   .empty-state { padding: 30px; text-align: center; color: #6c757d; font-style: italic; }
 </style>
 
@@ -174,12 +175,18 @@ async function loadBalanceSheet() {
 
     // Header badge
     const badge = document.getElementById('enabled_badge');
-    if (data.enabled) {
-      badge.className = 'live-badge';
-      badge.textContent = 'LIVE';
-    } else {
+    if (!data.enabled) {
       badge.className = 'disabled-badge';
       badge.textContent = 'DISABLED';
+      badge.removeAttribute('title');
+    } else if (data.signals_only) {
+      badge.className = 'observe-badge';
+      badge.textContent = 'OBSERVE';
+      badge.title = 'Enabled — emits signals but places no real orders';
+    } else {
+      badge.className = 'live-badge';
+      badge.textContent = 'LIVE';
+      badge.removeAttribute('title');
     }
     document.getElementById('as_of').textContent =
       'as of ' + fmtDate(data.as_of);

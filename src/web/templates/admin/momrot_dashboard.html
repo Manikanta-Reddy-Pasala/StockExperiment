@@ -574,9 +574,11 @@ function _renderTriggerRow(m, st) {
         ${isWiringErr ? 'Model has no live_signal/executor route (MODEL_PATHS).' : err}
       </td></tr>`;
   }
-  const enabledBadge = st.enabled
-    ? '<span class="badge bg-success">ON</span>'
-    : '<span class="badge bg-secondary">DISABLED</span>';
+  const enabledBadge = !st.enabled
+    ? '<span class="badge bg-secondary">DISABLED</span>'
+    : (st.signals_only
+        ? '<span class="badge bg-info text-dark" title="Enabled — emits signals but places no real orders">OBSERVE</span>'
+        : '<span class="badge bg-success">ON</span>');
   const rowStyle = st.enabled ? '' : ' style="opacity:0.55;background:#fafbfc;"';
   const pnlCls = cls(st.pnl_pct);
   const pos = st.current_position
@@ -756,7 +758,7 @@ function _dataPulledBadge(lastSig, rankingCount) {
   return '<span class="badge bg-danger">NO</span>';
 }
 
-async function _loadModelDataStatus(modelName, enabled) {
+async function _loadModelDataStatus(modelName, enabled, signalsOnly) {
   // triggers/status only succeeds for models in MODEL_PATHS (4 equity).
   // Options model returns 400 — fall back to ranking endpoint alone.
   // Use allSettled so a single failed endpoint never drops the model row.
@@ -780,9 +782,11 @@ async function _loadModelDataStatus(modelName, enabled) {
     rankingGenAt = rankingRes.generated_at || rankingRes.date || null;
   }
   const effectiveLastSig = lastSig || rankingGenAt;
-  const enabledBadge = enabled
-    ? '<span class="badge bg-success">ON</span>'
-    : '<span class="badge bg-secondary">OFF</span>';
+  const enabledBadge = !enabled
+    ? '<span class="badge bg-secondary">OFF</span>'
+    : (signalsOnly
+        ? '<span class="badge bg-info text-dark" title="Enabled — emits signals but places no real orders">OBSERVE</span>'
+        : '<span class="badge bg-success">ON</span>');
   const wiredBadge = wired
     ? '<span class="badge bg-info">WIRED</span>'
     : '<span class="badge bg-warning text-dark" title="No live_signal/executor route in MODEL_PATHS">NOT WIRED</span>';
@@ -819,7 +823,7 @@ async function loadDataStatus() {
   // Iterate ALL models — enabled AND disabled, wired AND not — so operators see full picture.
   // allSettled ensures a single bad model never drops the rest.
   const settled = await Promise.allSettled(
-    models.map(m => _loadModelDataStatus(m.model_name, !!m.enabled))
+    models.map(m => _loadModelDataStatus(m.model_name, !!m.enabled, !!m.signals_only))
   );
   const rows = settled.map((r, i) => {
     if (r.status === 'fulfilled') return r.value;

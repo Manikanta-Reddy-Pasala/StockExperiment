@@ -1504,6 +1504,7 @@ def model_balance_sheet(model_name):
             "model_name": model_name,
             "label": label,
             "enabled": bool(per_model.get("enabled")),
+            "signals_only": bool(per_model.get("signals_only")),
             "as_of": stats.get("as_of") or datetime.now().isoformat(),  # IST
             "invested_amount": round(float(invested), 2),
             "cash": round(float(cash), 2),
@@ -1877,6 +1878,7 @@ def model_triggers_status(model_name):
             "model_name": model_name,
             "label": paths.get("label", model_name),
             "enabled": bool(per_model.get("enabled")),
+            "signals_only": bool(per_model.get("signals_only")),
             "last_signal_at": last_signal_at,
             "last_signal_file": last_signal_file,
             "last_execution_at": last_execution_at,

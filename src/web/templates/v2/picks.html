@@ -146,6 +146,8 @@ async function fetchJSON(url) {
 function renderCard(m, idx, ranking, status) {
   const collapseId = "collapse_" + m.key;
   const disabled = status && status.success && status.enabled === false;
+  // OBSERVE: enabled model in signals_only mode — ranks/signals but no real orders.
+  const observe = status && status.success && status.enabled !== false && status.signals_only === true;
   const heldSym = status && status.success && status.current_position
     ? status.current_position.sym
     : null;
@@ -179,6 +181,7 @@ function renderCard(m, idx, ranking, status) {
   // Header badges
   let badges = '';
   if (disabled) badges += ' <span class="badge badge-disabled">DISABLED</span>';
+  if (observe) badges += ' <span class="badge bg-info text-dark" title="Enabled — emits signals but places no real orders">OBSERVE</span>';
   if (heldSym) badges += ` <span class="badge badge-held">HELD: ${heldSym.replace('NSE:','').replace('-EQ','')}</span>`;
   if (ranking && ranking.universe_size) badges += ` <span class="badge bg-secondary">universe ${ranking.universe_size}</span>`;
 

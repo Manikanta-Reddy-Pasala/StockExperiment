@@ -172,9 +172,15 @@ function renderModelCard(m, sig) {
   const pnlCls = cls(m.pnl_total);
   const warn = meta.warn ? `<span class="warn-pill" title="Strategy note">${meta.warn}</span>` : '';
   // B3: prominent DISABLED tag when model_settings.enabled=false.
-  const enableBadge = m.enabled
-    ? '<span class="enable-pill" style="background:#d4edda;color:#155724;border-color:#c3e6cb">LIVE</span>'
-    : '<span class="disabled-tag">DISABLED</span>';
+  // OBSERVE: enabled + signals_only => emits signals/ranking but no real orders.
+  let enableBadge;
+  if (!m.enabled) {
+    enableBadge = '<span class="disabled-tag">DISABLED</span>';
+  } else if (m.signals_only) {
+    enableBadge = '<span class="enable-pill" style="background:#cff4fc;color:#055160;border-color:#9eeaf9" title="Enabled — emits signals but places no real orders">OBSERVE</span>';
+  } else {
+    enableBadge = '<span class="enable-pill" style="background:#d4edda;color:#155724;border-color:#c3e6cb">LIVE</span>';
+  }
   const refOnly = '';
 
   // Signal status is meaningless for a paused model — hide it and show a
