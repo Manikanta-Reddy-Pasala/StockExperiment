@@ -517,10 +517,20 @@ def run_scheduler():
     from tools.models.n20_daily_large_only.cron import (
         register_trading_jobs as register_n20_daily_jobs,
     )
+    # Multi-holding model (K=3). Trading jobs run daily but live_signal.py no-ops
+    # while model_settings.enabled is False — keep it disabled until the position
+    # reconciler is made multi-holding-aware (it currently mirrors a single
+    # position per model and would mishandle this model's 3 holdings).
+    from tools.models.momentum_retest_n500.cron import (
+        register_trading_jobs as register_mr500_jobs,
+        register_data_jobs as register_mr500_data_jobs,
+    )
     register_momentum_n100_jobs(schedule)
     register_pseudo_n100_jobs(schedule)
     register_midcap_narrow_jobs(schedule)
     register_n20_daily_jobs(schedule)
+    register_mr500_jobs(schedule)
+    register_mr500_data_jobs(schedule)
 
     # M3 — SAFE catch-up: if we restarted after the morning trade window on a
     # trading day, ALERT (never auto-execute) so a human can check for misses.

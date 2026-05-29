@@ -55,6 +55,27 @@ class ModelLedger(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class ModelHolding(Base):
+    """One open position of a MULTI-holding model (e.g. momentum_retest_n500 K=3).
+
+    Single-holding models keep their one position in ModelLedger.open_symbol;
+    this table holds the N open positions of multi-holding models — one row per
+    (model_name, symbol). Cash / realized_pnl / cumulative stats still live in
+    ModelLedger (shared), so only the position storage differs. Single-holding
+    flow never touches this table.
+    """
+    __tablename__ = "model_holdings"
+
+    id = Column(Integer, primary_key=True)
+    model_name = Column(String(64), ForeignKey("model_settings.model_name"),
+                        nullable=False, index=True)
+    symbol = Column(String(64), nullable=False)        # normalized NSE:SYM-EQ
+    qty = Column(Integer, nullable=False)
+    entry_px = Column(Numeric(14, 4), nullable=False)
+    entry_date = Column(Date, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class ModelTrade(Base):
     """Audit log of every BUY/SELL routed through a model ledger."""
     __tablename__ = "model_trades"
