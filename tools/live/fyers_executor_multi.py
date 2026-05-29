@@ -41,12 +41,21 @@ def main() -> int:
     model = sig["model"]; sells = sig.get("sells", []); buys = sig.get("buys", [])
     log.info(f"{model}: {len(sells)} sells, {len(buys)} buys (dry_run={a.dry_run})")
 
+    # Init broker svc even in dry-run so we can fetch LTP for realistic sizing;
+    # actual order placement + recording stay gated on `not dry_run`.
     svc = None
-    if not a.dry_run:
+    try:
         from src.services.brokers.fyers_service import FyersService
         svc = FyersService()
         if not svc.get_broker_config(a.user_id):
-            log.error(f"No Fyers token for user {a.user_id} — abort"); return 1
+            if not a.dry_run:
+                log.error(f"No Fyers token for user {a.user_id} — abort"); return 1
+            log.warning("No Fyers token — dry-run sizing will fall back to entry/signal px")
+            svc = None
+    except Exception as e:
+        if not a.dry_run:
+            raise
+        log.warning(f"broker init failed in dry-run: {e}")
 
     held = {h["symbol"]: h for h in get_holdings(model)}
 
@@ -79,7 +88,7 @@ def main() -> int:
         for b in buys:
             sym = b["symbol"]
             ltp = (h["entry_px"] if (h := held.get(sym)) else None)
-            if not a.dry_run:
+            if svc:
                 ltp = _fetch_live_ltp(svc, a.user_id, sym) or ltp
             if not ltp:
                 log.warning(f"  BUY {sym}: no price, skip"); continue
