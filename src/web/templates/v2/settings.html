@@ -179,9 +179,10 @@
                             <th class="col-position">Open Position</th>
                             <th class="text-end num">NAV</th>
                             <th class="text-end num">P&amp;L</th>
+                            <th class="text-center" title="Live = places real orders. Observe = emits signals only, no real trades.">Trading</th>
                             <th class="text-center col-actions">Actions</th>
                         </tr></thead>
-                        <tbody id="alloc_tbody"><tr><td colspan="7" class="text-center text-muted">Loading…</td></tr></tbody>
+                        <tbody id="alloc_tbody"><tr><td colspan="8" class="text-center text-muted">Loading…</td></tr></tbody>
                     </table>
                 </div>
             </div>
@@ -574,6 +575,17 @@ async function loadAllocations() {
           ${fmtINR(m.pnl_total)}
           <span class="pnl-pct">${fmtPct(m.return_pct)}</span>
         </td>
+        <td class="text-center">
+          <div class="form-check form-switch d-inline-flex flex-column align-items-center mb-0" style="gap:2px;"
+               title="${m.enabled ? (m.signals_only ? 'OBSERVE — emits signals, places no real orders' : 'LIVE — places real orders') : 'Model disabled'}">
+            <input class="form-check-input" type="checkbox" role="switch" style="cursor:pointer;"
+              ${m.signals_only ? '' : 'checked'} ${m.enabled ? '' : 'disabled'}
+              onchange="toggleSignalsOnly('${m.model_name}', !this.checked)">
+            <span class="small ${m.signals_only ? 'text-info' : 'text-success'}" style="font-size:.65rem;">
+              ${m.enabled ? (m.signals_only ? 'Observe' : 'Live') : '—'}
+            </span>
+          </div>
+        </td>
         <td class="text-end col-actions">
           <div class="action-bar" role="group" aria-label="Capital actions for ${m.model_name}">
             <button class="btn btn-success" onclick="openCap('${m.model_name}','deposit')" title="Deposit cash" aria-label="Deposit"><i class="bi bi-plus-lg"></i></button>
@@ -963,7 +975,7 @@ async function toggleSignalsOnly(model, signalsOnly) {
       `<strong>${model}</strong> keeps emitting signals + ranking but places ` +
       `<strong>NO real orders</strong> (ledger untouched). Re-enable live trading any time.`,
       {okLabel: 'Observe only', okClass: 'btn-info'});
-    if (!ok) return;
+    if (!ok) { await loadAllocations(); return; }  // cancelled: re-sync the switch
   }
   try {
     const r = await fetch(`/admin/models/${model}/signals-only`, {
