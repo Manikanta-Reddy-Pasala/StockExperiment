@@ -30,6 +30,10 @@ class ModelSettings(Base):
 
     model_name = Column(String(64), primary_key=True)
     enabled = Column(Boolean, default=True, nullable=False)
+    # signals_only: when True the model still emits signals + ranking (observe),
+    # but executors place NO real orders and do not mutate the ledger. Default
+    # False = enabled models trade live; flip per-model in Settings to observe.
+    signals_only = Column(Boolean, default=False, nullable=False)
     invested_amount = Column(Numeric(14, 2), nullable=False)  # principal in
     current_amount = Column(Numeric(14, 2), nullable=False, default=0)  # NAV
     description = Column(String(255))

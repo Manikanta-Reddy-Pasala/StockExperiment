@@ -382,6 +382,21 @@ def set_enabled(model_name: str, enabled: bool) -> Dict:
         return _settings_dict(settings)
 
 
+def set_signals_only(model_name: str, signals_only: bool) -> Dict:
+    """Flip a model to observe-only (signals_only=True) or live (False).
+
+    When True the model still emits signals + ranking, but executors place no
+    real orders and don't mutate the ledger. Independent of `enabled`.
+    """
+    db = get_database_manager()
+    with db.get_session() as s:
+        settings = s.query(ModelSettings).filter_by(model_name=model_name).first()
+        if not settings:
+            raise ValueError(f"Unknown model: {model_name}")
+        settings.signals_only = signals_only
+        return _settings_dict(settings)
+
+
 # ---- Ledger snapshot ----
 
 def get_ledger(model_name: str) -> Optional[Dict]:
@@ -766,6 +781,7 @@ def _settings_dict(s: ModelSettings) -> Dict:
     return {
         "model_name": s.model_name,
         "enabled": s.enabled,
+        "signals_only": bool(getattr(s, "signals_only", False)),
         "invested_amount": float(s.invested_amount or 0),
         "current_amount": float(s.current_amount or 0),
         # Legacy alias for any caller still using old field name

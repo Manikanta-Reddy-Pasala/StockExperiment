@@ -39,6 +39,19 @@ def main() -> int:
 
     sig = json.loads(Path(a.signals).read_text())
     model = sig["model"]; sells = sig.get("sells", []); buys = sig.get("buys", [])
+    # signals_only: per-model observe mode. Placement + ledger writes below are
+    # gated on `not dry_run`, so forcing dry-run here logs intended trades and
+    # places NOTHING, while live_signal still emitted the signals.
+    if not a.dry_run:
+        try:
+            from src.services.trading.model_ledger_service import get_all_settings
+            _so = next((s.get("signals_only") for s in get_all_settings()
+                        if s["model_name"] == model), False)
+            if _so:
+                log.info(f"{model}: signals_only=True — OBSERVE mode (place NOTHING).")
+                a.dry_run = True
+        except Exception as _se:
+            log.warning(f"signals_only read failed ({_se}) — proceeding live.")
     log.info(f"{model}: {len(sells)} sells, {len(buys)} buys (dry_run={a.dry_run})")
 
     # Init broker svc even in dry-run so we can fetch LTP for realistic sizing;

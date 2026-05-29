@@ -542,6 +542,8 @@ async function loadAllocations() {
         : '<span class="text-muted">flat</span>';
       const pnlCls = m.pnl_total > 0 ? 'pos' : (m.pnl_total < 0 ? 'neg' : 'neutral');
       const enabledBadge = m.enabled ? '' : ' <span class="disabled-badge">DISABLED</span>';
+      const observeBadge = (m.enabled && m.signals_only)
+        ? ' <span class="badge bg-info text-dark" title="Emits signals but places no real orders">OBSERVE</span>' : '';
       if (!m.enabled) tr.classList.add('row-disabled');
       const warnBadge = meta.warn ? ` <span class="lookahead-pill" title="Strategy note">${meta.warn}</span>` : '';
       // Position-state-dependent button: clear/sell-mark if holding, seed if flat.
@@ -554,12 +556,13 @@ async function loadAllocations() {
       const menuHtml = `
         <li><a class="dropdown-item" href="#" data-action="bootstrap" data-model="${m.model_name}"><i class="bi bi-arrow-down-square me-2"></i>Bootstrap from legacy ledger</a></li>
         <li><a class="dropdown-item" href="#" data-action="toggle" data-model="${m.model_name}" data-enabled="${m.enabled ? '1' : '0'}"><i class="bi ${m.enabled ? 'bi-pause-circle text-warning' : 'bi-play-circle text-success'} me-2"></i>${m.enabled ? 'Disable model' : 'Enable model'}</a></li>
+        <li><a class="dropdown-item" href="#" data-action="signals-only" data-model="${m.model_name}" data-signals-only="${m.signals_only ? '1' : '0'}"><i class="bi ${m.signals_only ? 'bi-cash-coin text-success' : 'bi-eye text-info'} me-2"></i>${m.signals_only ? 'Enable live trading' : 'Observe only (no real trades)'}</a></li>
         <li><hr class="dropdown-divider"></li>
         <li><a class="dropdown-item text-danger" href="#" data-action="reset" data-model="${m.model_name}"><i class="bi bi-trash me-2"></i>Hard reset (zero all)</a></li>
       `;
       tr.innerHTML = `
         <td class="col-model">
-          <strong>${modelLabel(m.model_name)}</strong>${enabledBadge}${warnBadge}
+          <strong>${modelLabel(m.model_name)}</strong>${enabledBadge}${observeBadge}${warnBadge}
           <span class="universe-tag">${meta.universe} · ${meta.kind}</span>
           <div class="text-muted" style="font-size:.65rem;font-family:monospace;">${m.model_name}</div>
         </td>
@@ -946,9 +949,42 @@ document.addEventListener('click', function(ev) {
   } else if (action === 'toggle') {
     const wasEnabled = el.dataset.enabled === '1';
     toggleEnabled(model, !wasEnabled);
+  } else if (action === 'signals-only') {
+    const wasObserve = el.dataset.signalsOnly === '1';
+    toggleSignalsOnly(model, !wasObserve);
   } else if (action === 'reset') {
     resetModel(model);
   }
 });
+
+async function toggleSignalsOnly(model, signalsOnly) {
+  if (signalsOnly) {
+    const ok = await appModal.confirm('Switch to OBSERVE ONLY?',
+      `<strong>${model}</strong> keeps emitting signals + ranking but places ` +
+      `<strong>NO real orders</strong> (ledger untouched). Re-enable live trading any time.`,
+      {okLabel: 'Observe only', okClass: 'btn-info'});
+    if (!ok) return;
+  }
+  try {
+    const r = await fetch(`/admin/models/${model}/signals-only`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({signals_only: signalsOnly})
+    });
+    const d = await r.json();
+    if (d.success) {
+      await loadAllocations();
+      flashRow(model);
+      await appModal.alert(
+        signalsOnly ? 'Observe-only enabled' : 'Live trading enabled',
+        `<strong>${model}</strong> is now <strong>${signalsOnly ? 'OBSERVE-ONLY (no real trades)' : 'LIVE-TRADING'}</strong>.`,
+        signalsOnly ? 'info' : 'success');
+    } else {
+      await appModal.alert('Toggle Failed', d.error || 'failed', 'danger');
+    }
+  } catch (e) {
+    await appModal.alert('Network Error', e.message, 'danger');
+  }
+}
+
 </script>
 {% endblock %}

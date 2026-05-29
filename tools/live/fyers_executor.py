@@ -790,6 +790,22 @@ def main() -> int:
                 pass
             return 3
 
+    # ---- signals_only: per-model observe mode. If the model is flagged
+    # signals_only in model_settings, force dry-run — the whole pipeline below
+    # keys off args.dry_run, so this logs intended buys/sells + skips real
+    # placement + ledger writes, while live_signal still emitted the signals.
+    if args.model_name and not args.dry_run:
+        try:
+            from src.services.trading.model_ledger_service import get_all_settings
+            _so = next((s.get("signals_only") for s in get_all_settings()
+                        if s["model_name"] == args.model_name), False)
+            if _so:
+                log.info(f"{args.model_name}: signals_only=True — OBSERVE mode "
+                         f"(emit + log intended trades, place NOTHING).")
+                args.dry_run = True
+        except Exception as _se:
+            log.warning(f"signals_only read failed ({_se}) — proceeding live.")
+
     # ---- Build RiskManager (per-model if provided, else env) ----
     rm = RiskManager.for_model_or_env(args.model_name)
     live = not args.dry_run

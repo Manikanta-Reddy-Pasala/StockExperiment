@@ -1209,6 +1209,26 @@ def toggle_model_enabled(model_name):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@admin_bp.route('/models/<model_name>/signals-only', methods=['POST'])
+def toggle_model_signals_only(model_name):
+    """Flip a model to observe-only (signals_only=True) or live (False)."""
+    try:
+        from src.services.trading.model_ledger_service import set_signals_only
+        data = request.get_json() or {}
+        new_state = bool(data.get("signals_only"))
+        settings = set_signals_only(model_name, new_state)
+        _tg_safe(
+            f"{'👁️ *Model OBSERVE-ONLY*' if new_state else '🟢 *Model LIVE-TRADING*'} "
+            f"`{model_name}`"
+        )
+        return jsonify({"success": True, "settings": settings})
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"toggle signals_only error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @admin_bp.route('/models/<model_name>/seed-position', methods=['POST'])
 def seed_model_position(model_name):
     """Bootstrap a model's open position (no Fyers order).
