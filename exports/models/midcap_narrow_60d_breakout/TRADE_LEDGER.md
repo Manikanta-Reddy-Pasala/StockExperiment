@@ -1,25 +1,10 @@
-# midcap_narrow_60d_breakout — Trade Ledger
+# midcap_narrow_60d_breakout — trade ledger (2025-03-01 → 2026-05-12)
 
-₹10L → ₹14,134,367 (+1313.44%) · CAGR +141.73% · 8 trades · Max DD 8.12% · WR 75.0%
+| # | Symbol | Entry | Exit | Return % | Reason |
+|---|---|---|---|---|---|
+| 1 | CASTROLIND | 2025-03-07 | 2025-04-08 | -21.09 | STOP |
+| 2 | KAYNES | 2025-04-16 | 2025-08-14 | 11.12 | MAX_HOLD |
+| 3 | ASHOKLEY | 2025-08-19 | 2025-12-17 | 25.97 | MAX_HOLD |
+| 4 | SHRIRAMFIN | 2025-12-22 | 2026-04-21 | 13.63 | MAX_HOLD |
 
-Data: Fyers, 4yr re-pull, cont_flag=1.
-
-## Returns by NSE cap segment
-
-| Cap | Trades | Wins | Losses | WR | Total PnL ₹ |
-|---|---:|---:|---:|---:|---:|
-| **Mid** | 3 | 3 | 0 | 100% | +4,267,954 |
-| **Small** | 5 | 3 | 2 | 60% | +8,188,741 |
-
-## All 8 trades
-
-| # | Symbol | Cap | Index | Entry | Entry ₹ | Qty | Invested ₹ | Exit | Exit ₹ | PnL ₹ | Ret % |
-|--:|---|---|---|---|---:|---:|---:|---|---:|---:|---:|
-| 1 | GMDCLTD | **Small** | Nifty Smallcap 250 | 2023-05-18 | 168.47 | 5,935 | ₹999,869 | 2023-09-15 | 288.31 | +709,538 | +71.31% |
-| 2 | BANDHANBNK | **Small** | Nifty Smallcap 250 | 2023-09-18 | 249.55 | 6,850 | ₹1,709,418 | 2024-01-16 | 229.52 | -138,791 | -7.93% |
-| 3 | COCHINSHIP | **Mid** | Nifty Midcap 150 | 2024-01-18 | 857.86 | 1,830 | ₹1,569,884 | 2024-05-17 | 1,413.44 | +1,014,101 | +64.93% |
-| 4 | KAYNES | **Small** | Nifty Smallcap 250 | 2024-05-18 | 3,133.13 | 824 | ₹2,581,699 | 2024-09-16 | 5,303.94 | +1,784,358 | +69.46% |
-| 5 | BSE | **Mid** | Nifty Midcap 150 | 2024-09-17 | 1,141.14 | 3,828 | ₹4,368,284 | 2025-01-15 | 1,926.74 | +2,999,886 | +69.01% |
-| 6 | INDUSTOWER | **Mid** | Nifty Midcap 150 | 2025-01-21 | 374.27 | 19,688 | ₹7,368,628 | 2025-05-21 | 387.56 | +253,967 | +3.65% |
-| 7 | GRSE | **Small** | Nifty Smallcap 250 | 2025-05-23 | 2,811.81 | 2,711 | ₹7,622,817 | 2025-09-22 | 2,665.73 | -403,263 | -5.10% |
-| 8 | HINDCOPPER | **Small** | Nifty Smallcap 250 | 2025-09-23 | 298.40 | 24,194 | ₹7,219,490 | 2026-01-21 | 556.74 | +6,236,899 | +86.76% |
+*4 trades. Auto-generated from trade_ledger.json.*

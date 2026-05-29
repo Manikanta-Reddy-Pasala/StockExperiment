@@ -1,72 +1,27 @@
-# Regime Momentum (regime_momentum_n500)
+# Regime Momentum (`regime_momentum_n500`)
 
-Multi-holding (K=5), regime-adaptive momentum on the liquid Nifty-500 pool.
-Higher-beta sibling of `momentum_retest_n500`. Core logic is shared between the
-backtest and the live signal via `tools/models/regime_momentum_n500/strategy.py`
-so they cannot drift.
+**Status:** DISABLED (₹0)  
+Monthly top-5 (K=5), 30d momentum, no take-profit; regime switch on Nifty50 vs 200DMA (bear: −10% stop + −15% trail). Retain top-6.
 
-## How it works
+**Universe:** Top-80 by 20d ADV from N500
 
-**Universe** — top-80 by 20-day ADV (avg traded value = close×volume) within the
-Nifty-500, price ≤ ₹3000. The top-80 ADV cut is deliberate *quality control*:
-backtests showed widening the pool drags in small-cap blow-ups and HURTS returns.
+Backtest window: **2025-03-01 → 2026-05-12** (recent ~14 months: 2025 chop + 2026 bear).
 
-**Ranking** — by 30-day return; require momentum > 0. Hold the top **5**
-equal-weight. A held name is kept while it stays in the **top-6** rank (retain
-band) — so winners ride instead of churning every month.
+## Results (net of costs)
 
-**Rebalance** — buys happen on the **1st trading day of each month**: sell any
-holding that fell out of the top-6, then buy the top-5 not held. **No retest wait,
-no take-profit** — winners run.
-
-**Regime switch** — the Nifty-50 index vs its 200-DMA decides the risk posture:
-
-| | Healthy (Nifty50 > 200DMA) | Bear (Nifty50 < 200DMA) |
-|---|---|---|
-| Stops | none — let trends run | hard stop **−10%** + trailing stop **−15% from peak** |
-| Checked | — | **daily** |
-
-In uptrends the model is pure let-it-ride momentum; in downtrends it arms stops +
-trails (checked every day) to cut losers and lock gains. This regime-conditional
-risk is what lifts the weak years without sacrificing the trend-year compounding.
-
-## Backtest (true N500, net 0.15%/side)
-
-**Full 2023-05 → 2026-05**
-
-| CAGR | maxDD | Calmar | trades | win% |
-|---|---|---|---|---|
-| **+69.1%** | 27.4% | 2.52 | 133 | 60% |
-
-Per-year: 2023 **+111.9%**, 2024 **+77.5%**, 2025 **+23.2%**, 2026 **+3.8%**
-(2026 = partial bear year, Jan-May; Nifty −9% → model still positive).
-
-**Recent windows**
-
-| Window | Total | Annualized | maxDD | vs Nifty |
-|---|---|---|---|---|
-| Mar-2025 → May-2026 | +46.8% | +37.9% | 20.3% | +41 pts |
-| Apr-2025 → Mar-2026 (down year) | +19.5% | +19.6% | 20.2% | +23 pts |
-
-## Profile
-
-Higher-beta than `momentum_retest_n500` (+91%/19% DD, K=3, retest entry). This
-one is K=5, no-retest, regime-adaptive. The asymmetry is the point: ~+15-23% in
-flat/down years, +70-110% in trend years.
-
-## Files
-
-| File | Role |
+| Metric | Value |
 |---|---|
-| `tools/models/regime_momentum_n500/strategy.py` | shared core (params + rank + regime + risk) |
-| `tools/models/regime_momentum_n500/backtest.py` | offline backtest (imports strategy) |
-| `tools/models/regime_momentum_n500/live_signal.py` | daily regime risk + monthly rebalance (imports strategy + multi_holding_service) |
-| `tools/models/regime_momentum_n500/cron.py` | schedule glue (emit 09:27, execute 09:35, data 20:43) |
-| `tools/models/regime_momentum_n500/data_pull.py` | N500 daily prefetch |
-| `tools/live/fyers_executor_multi.py` | shared multi-holding executor (reused) |
-| `tools/live/position_reconciler_multi.py` | shared multi-holding reconciler (reused) |
+| Final NAV (₹10L start) | ₹1,468,285 |
+| CAGR (annualized) | +37.9% |
+| Max drawdown | 20.3% |
+| Calmar | 1.87 |
+| Trades | 56 · 54% win |
 
-## Caveats
+**Per calendar year:** 2025 +40.2% · 2026 +3.8%
 
-- Window 2023-05 → 2026-05 (NIFTY50-INDEX history limit for the 200-DMA regime gate).
-- Backtest, not live-proven. Ship `enabled=false` + ₹0 capital until funded.
+## Note
+
+Multi-holding K=5, regime-adaptive. Full-period 2023-26 ≈ +69% CAGR / 27% DD.
+
+---
+*Auto-generated from summary.json by tools/analysis/refresh_export_docs.py — do not hand-edit.*
