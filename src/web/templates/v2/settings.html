@@ -576,10 +576,10 @@ async function loadAllocations() {
         </td>
         <td class="text-center">
           <div class="form-check form-switch d-inline-flex flex-column align-items-center mb-0" style="gap:2px;"
-               title="${m.enabled ? (m.signals_only ? 'OBSERVE — emits signals, places no real orders' : 'LIVE — places real orders') : 'Model disabled'}">
-            <input class="form-check-input" type="checkbox" role="switch" style="cursor:pointer;"
-              ${m.signals_only ? '' : 'checked'} ${m.enabled ? '' : 'disabled'}
-              onchange="toggleSignalsOnly('${m.model_name}', !this.checked)">
+               title="${m.enabled ? (m.signals_only ? 'OBSERVE — emits signals, places no real orders' : 'LIVE — places real orders') : 'Enable the model first to change its trading mode'}">
+            <input class="form-check-input trade-switch" type="checkbox" role="switch" style="cursor:pointer;"
+              data-model="${m.model_name}"
+              ${m.signals_only ? '' : 'checked'} ${m.enabled ? '' : 'disabled'}>
             <span class="small ${m.signals_only ? 'text-info' : 'text-success'}" style="font-size:.65rem;">
               ${m.enabled ? (m.signals_only ? 'Observe' : 'Live') : '—'}
             </span>
@@ -963,6 +963,18 @@ document.addEventListener('click', function(ev) {
   } else if (action === 'reset') {
     resetModel(model);
   }
+});
+
+// ---- Delegated handler for the per-model Trading switch -----------------
+// Bound once on document so it survives row re-renders (loadAllocations wipes
+// #alloc_tbody.innerHTML). Matches the kebab delegation pattern above.
+// Switch CHECKED = Live (signals_only=false); UNCHECKED = Observe.
+document.addEventListener('change', function(ev) {
+  const sw = ev.target.closest('.trade-switch');
+  if (!sw) return;
+  const model = sw.dataset.model;
+  if (!model) return;
+  toggleSignalsOnly(model, !sw.checked);
 });
 
 async function toggleSignalsOnly(model, signalsOnly) {
