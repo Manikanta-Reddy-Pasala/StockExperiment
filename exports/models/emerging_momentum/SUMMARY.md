@@ -11,18 +11,18 @@ Backtest window: **2025-03-01 → 2026-05-12** (recent ~14 months: 2025 chop + 2
 
 | Metric | Value |
 |---|---|
-| Final NAV (₹10L start) | ₹1,697,234 |
-| Total return | +69.7% |
-| CAGR (annualized) | +55.6% |
+| Final NAV (₹10L start) | ₹1,817,677 |
+| Total return | +81.8% |
+| CAGR (annualized) | +64.8% |
 | Max drawdown | 13.7% |
-| Calmar | 4.05 |
-| Trades | 15 (9W / 6L) · 60% win |
+| Calmar | 4.71 |
+| Trades | 14 (9W / 5L) · 64% win |
 
 ## Note
 
-Single-position max-1, emerging mid/small, run_rotation engine (like n100). Full-period 2023-26 ≈ +98% CAGR / 23% DD gross.
+Single-position max-1, emerging mid/small, run_rotation engine + MCAP-CLIMBER filter (keep only rising-mcap-rank names). Full-period 2023-26 ≈ +111% CAGR / 23% DD gross (climber ON; OFF baseline ≈ +98%).
 
-**Open position at window end:** BHEL qty 4332 entry ₹377.05 on 2026-05-04 (unrealized +63,680)
+**Open position at window end:** BHEL qty 4639 entry ₹377.05 on 2026-05-04 (unrealized +68,193)
 
 ---
 *Auto-generated from summary.json by tools/analysis/refresh_export_docs.py — do not hand-edit.*

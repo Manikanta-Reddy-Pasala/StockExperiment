@@ -4,22 +4,22 @@
   "end": "2026-05-12",
   "years": 1.196,
   "capital": 1000000.0,
-  "final_nav": 1697234.0,
-  "total_return_pct": 69.72,
-  "cagr_pct": 55.6,
+  "final_nav": 1817677.0,
+  "total_return_pct": 81.77,
+  "cagr_pct": 64.78,
   "max_dd_pct": 13.74,
-  "calmar": 4.05,
-  "trades": 15,
+  "calmar": 4.71,
+  "trades": 14,
   "wins": 9,
-  "losses": 6,
-  "win_rate_pct": 60.0,
+  "losses": 5,
+  "win_rate_pct": 64.3,
   "open_position": {
     "sym": "BHEL",
-    "qty": 4332,
+    "qty": 4639,
     "entry_px": 377.05,
     "entry_date": "2026-05-04",
     "last_px": 391.75,
-    "mtm_value": 1697061.0,
-    "unrealized_pnl": 63680.0
+    "mtm_value": 1817328.0,
+    "unrealized_pnl": 68193.0
   }
 }

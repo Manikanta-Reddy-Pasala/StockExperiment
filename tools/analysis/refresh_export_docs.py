@@ -43,7 +43,7 @@ DESC = {
         "title": "Emerging Momentum", "live": "LIVE",
         "universe": "Top-100 by 20d ADV from emerging mid/small (PIT N500 minus N100)",
         "strategy": "Single-position (max-1) momentum rotation: 15d return >0, price ≤₹3000 (no SMA gate); retain top-3; monthly (1st trading day) + mid-month check that rotates only on a ≥5pp lead.",
-        "note": "Single-position max-1, emerging mid/small, run_rotation engine (like n100). Full-period 2023-26 ≈ +98% CAGR / 23% DD gross.",
+        "note": "Single-position max-1, emerging mid/small, run_rotation engine + MCAP-CLIMBER filter (keep only rising-mcap-rank names). Full-period 2023-26 ≈ +111% CAGR / 23% DD gross (climber ON; OFF baseline ≈ +98%).",
     },
     "midcap_narrow_60d_breakout": {
         "title": "Midcap Breakout", "live": "LIVE",

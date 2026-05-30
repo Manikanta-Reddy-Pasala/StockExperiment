@@ -20,12 +20,13 @@ Strategy ("Emerging Momentum") — SINGLE-POSITION rotation (Config 1):
     single-position model_ledger.
 
 Backtest (PIT N500-minus-N100, gross-of-fee rotation engine, same-day close):
-  FULL 2023-05-15..2026-05-12 : ~+98% CAGR / ~23% DD / Calmar ~4.2
-  WINDOW Mar-2025..May-2026    : ~+56% CAGR
-Reproduces tools/analysis/emerging_variants.py CONFIG 1 (lb15, sma off).
+  FULL 2023-05-15..2026-05-12 : ~+111% CAGR / ~23% DD / Calmar ~4.75  (climber ON)
+  (climber OFF baseline = ~+98% CAGR / ~23% DD / Calmar ~4.2)
+Config 1 (lb15, sma off) + MCAP CLIMBER filter (see CLIMBER_ENABLED below).
 """
 from __future__ import annotations
 
+import csv
 from datetime import date
 from pathlib import Path
 
@@ -43,6 +44,19 @@ LOOKBACK = 15        # momentum ranking window (TRADING days). Config 1 winner.
 MAX_PRICE = 3000.0   # skip names priced above this at entry
 ADV_WIN = 20         # ADV averaging window
 MIDMONTH_LEAD = 5.0  # rotate mid-month only if new rank-1 leads held by >= 5pp
+
+# ---- MCAP CLIMBER overlay (validated +13pp CAGR at same DD, 2026-05-30) ------
+# Keep only entry candidates whose free-float MARKET-CAP RANK has RISEN over the
+# last CLIMB_LOOKBACK trading days (genuinely climbing toward index inclusion).
+# Mechanically a cross-sectional price relative-strength filter (FF-shares are
+# frozen at one NSE scrape, exports/nse_mcap.csv); it lifts emerging from ~+98%
+# to ~+111% CAGR at the SAME ~23% DD. A/B across all models showed this edge
+# lives ONLY in this liquid-mid tier. If the scrape CSV is absent the filter
+# no-ops (falls back to pure-momentum baseline) so live never hard-fails.
+CLIMBER_ENABLED = True
+CLIMB_LOOKBACK = 60
+MCAP_CSV = ROOT / "exports" / "nse_mcap.csv"
+_MCAP_RANK_CACHE: dict = {}
 
 # Canonical anchor for the per-year PIT pool rebuild. The pool is rebuilt every
 # 12 months stepping from THIS date (not the eval-window start and not calendar
@@ -119,13 +133,65 @@ def pool_for_date(anchors, pools, d) -> list[str]:
     return pools.get(chosen, []) if chosen is not None else []
 
 
+def _load_ffmcap() -> dict:
+    """Current free-float market cap (₹ Cr) per Fyers symbol from the NSE scrape."""
+    out: dict = {}
+    if not MCAP_CSV.exists():
+        return out
+    with open(MCAP_CSV) as f:
+        for r in csv.DictReader(f):
+            try:
+                ff = float(r["ff_mcap_cr"])
+                if ff > 0:
+                    out[f"NSE:{r['symbol']}-EQ"] = ff
+            except (ValueError, TypeError, KeyError):
+                continue
+    return out
+
+
+def mcap_rank_panel(cl):
+    """Date-indexed FF-mcap RANK panel (1 = biggest), memoized per `cl`.
+
+    FF-shares = current FF-mcap / latest close (the scrape LTP is unreliable),
+    applied to historical close -> ffmcap[t] = shares*close[t] -> daily rank.
+    Returns None if the scrape CSV is missing/empty (climber then no-ops).
+    """
+    key = id(cl)
+    if key in _MCAP_RANK_CACHE:
+        return _MCAP_RANK_CACHE[key]
+    ff = _load_ffmcap()
+    shares = {}
+    for s, v in ff.items():
+        if s in cl.columns:
+            last = cl[s].dropna()
+            if len(last) and last.iloc[-1] > 0:
+                shares[s] = v * 1e7 / last.iloc[-1]
+    rank = None
+    if shares:
+        eq = list(shares)
+        rank = cl[eq].mul(pd.Series(shares), axis=1).rank(axis=1, ascending=False, method="first")
+    _MCAP_RANK_CACHE[key] = rank
+    return rank
+
+
+def _is_climber(rank, s, di) -> bool:
+    """True if `s` IMPROVED (rose) in FF-mcap rank over CLIMB_LOOKBACK days."""
+    if rank is None or s not in rank.columns:
+        return False
+    col = rank.columns.get_loc(s)
+    a = rank.iat[di, col]
+    b = rank.iat[max(0, di - CLIMB_LOOKBACK), col]
+    return pd.notna(a) and pd.notna(b) and a < b
+
+
 def rank_pool(cl, pool, di):
     """Ranked momentum leaders passing the filters, at row index `di`.
 
     Universe = the PIT `pool` (top-POOL ADV from N500-minus-N100). Filters:
     LOOKBACK-day return > 0, price in (0, MAX_PRICE]. NO sma200 gate (Config 1
-    winner). Returns Fyers-style symbols ordered best-to-worst by LOOKBACK-day
-    return.
+    winner). When CLIMBER_ENABLED + the scrape CSV is present, additionally keep
+    only names whose FF-mcap rank has RISEN over CLIMB_LOOKBACK days (the
+    validated +13pp edge). Returns Fyers symbols best-to-worst by LOOKBACK return.
 
     Args:
         cl: close price panel (date x symbol), ffilled.
@@ -147,7 +213,12 @@ def rank_pool(cl, pool, di):
             continue
         out.append((s, ret))
     out.sort(key=lambda x: x[1], reverse=True)
-    return [s for s, _ in out]
+    ranked = [s for s, _ in out]
+    if CLIMBER_ENABLED:
+        rank = mcap_rank_panel(cl)
+        if rank is not None:
+            ranked = [s for s in ranked if _is_climber(rank, s, di)]
+    return ranked
 
 
 def midret_pool(cl, pool, di):
