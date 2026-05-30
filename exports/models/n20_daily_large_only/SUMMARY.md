@@ -22,7 +22,7 @@ Backtest window: **2025-03-01 → 2026-05-12** (recent ~14 months: 2025 chop + 2
 
 Daily rebalance → many trades, lower win-rate, momentum tail carries it.
 
-**Open position at window end:** ? (entry 209.63 on 2026-05-12)
+**Open position at window end:** ADANIPOWER qty 8483 entry ₹209.63 on 2026-05-12 (unrealized +0)
 
 ---
 *Auto-generated from summary.json by tools/analysis/refresh_export_docs.py — do not hand-edit.*

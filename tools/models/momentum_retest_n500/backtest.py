@@ -70,10 +70,22 @@ def run(start, end, capital, out_dir=None):
             for s in list(pos.keys()):                       # exit: out of retain band
                 if s not in retset:
                     px = float(cl[s].iloc[di]); p = pos[s]
-                    cash += p["qty"] * px * (1 - COST)
-                    trades.append({"sym": s.replace("NSE:", "").replace("-EQ", ""),
-                                   "in": p["in"], "out": d.date().isoformat(),
-                                   "ret_pct": round((px / p["entry"] - 1) * 100, 1)})
+                    proc = p["qty"] * px * (1 - COST)
+                    cash += proc
+                    cap_after = cash + sum(
+                        pp["qty"] * float(cl[ss].iloc[di])
+                        for ss, pp in pos.items()
+                        if ss != s and pd.notna(cl[ss].iloc[di]))
+                    trades.append({
+                        "sym": s.replace("NSE:", "").replace("-EQ", ""),
+                        "entry_date": p["in"], "exit_date": d.date().isoformat(),
+                        "qty": p["qty"], "entry_px": round(p["entry"], 2),
+                        "exit_px": round(px, 2),
+                        "pnl": round(proc - p["qty"] * p["entry"], 0),
+                        "ret_pct": round((px / p["entry"] - 1) * 100, 2),
+                        "cap_after": round(cap_after, 0),
+                        "exit_reason": "ROTATE",
+                    })
                     del pos[s]
             watch = [s for s in rk[:S.K] if s not in pos]
         if watch and di >= warm:                              # retest entry (daily)
@@ -105,7 +117,16 @@ def run(start, end, capital, out_dir=None):
         rl = g.cummax()
         years[int(yy)] = {"ret_pct": round((g.iloc[-1] / g.iloc[0] - 1) * 100, 1),
                           "dd_pct": round(float(((rl - g) / rl).max()) * 100, 1)}
-    wins = sum(1 for t in trades if t["ret_pct"] > 0)
+    wins = sum(1 for t in trades if t["pnl"] > 0)
+    losses = sum(1 for t in trades if t["pnl"] < 0)
+    last = cl.iloc[i1 - 1]
+    open_positions = [{
+        "sym": s.replace("NSE:", "").replace("-EQ", ""),
+        "qty": p["qty"], "entry_px": round(p["entry"], 2),
+        "entry_date": p["in"], "last_px": round(float(last[s]), 2),
+        "mtm_value": round(p["qty"] * float(last[s]), 0),
+        "unrealized_pnl": round(p["qty"] * (float(last[s]) - p["entry"]), 0),
+    } for s, p in pos.items() if pd.notna(last.get(s))]
     print("\n## RESULTS (RETEST MOMENTUM, true-PIT, net of cost)")
     print(f"  Final NAV:    Rs.{final:,.0f}")
     print(f"  Total return: {(final/capital-1)*100:+.2f}%")
@@ -119,10 +140,14 @@ def run(start, end, capital, out_dir=None):
         (out_dir / "trade_ledger.json").write_text(json.dumps(trades, indent=2))
         (out_dir / "summary.json").write_text(json.dumps({
             "model": "momentum_retest_n500", "start": start.isoformat(),
-            "end": end.isoformat(), "cagr_pct": round(cagr, 2),
-            "max_dd_pct": round(mdd, 2), "calmar": round(cagr/max(0.01, mdd), 2),
+            "end": end.isoformat(), "years": round(yrs, 3),
+            "capital": capital, "final_nav": round(final, 0),
             "total_return_pct": round((final/capital-1)*100, 2),
-            "trades": len(trades), "per_year": years,
+            "cagr_pct": round(cagr, 2), "max_dd_pct": round(mdd, 2),
+            "calmar": round(cagr/max(0.01, mdd), 2),
+            "trades": len(trades), "wins": wins, "losses": losses,
+            "win_rate_pct": round(wins / max(1, wins + losses) * 100, 1),
+            "open_positions": open_positions, "per_year": years,
             "params": {"top_n": S.TOPN, "K": S.K, "retain": S.RETAIN,
                        "lookback": S.LOOKBACK, "mom_floor": S.MOM_FLOOR,
                        "max_price": S.MAX_PRICE, "retest_band": [S.RETEST_LO, S.RETEST_HI]},

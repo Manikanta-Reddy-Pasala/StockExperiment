@@ -22,7 +22,7 @@ Backtest window: **2025-03-01 → 2026-05-12** (recent ~14 months: 2025 chop + 2
 
 True-index version — the trustworthy-clean momentum benchmark.
 
-**Open position at window end:** ? (entry 157.11 on 2026-04-01)
+**Open position at window end:** ADANIPOWER qty 8735 entry ₹157.11 on 2026-04-01 (unrealized +458,762)
 
 ---
 *Auto-generated from summary.json by tools/analysis/refresh_export_docs.py — do not hand-edit.*

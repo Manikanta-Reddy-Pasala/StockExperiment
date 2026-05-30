@@ -46,13 +46,16 @@ def load_holdings(model_dir: Path, model: str, end: date):
             holds.append((t["sym"],
                           date.fromisoformat(t["entry_date"]),
                           date.fromisoformat(t["exit_date"])))
-    # Open position (held through window end)
+    # Open position(s) held through window end — single open_position OR multi
+    # open_positions (multi-holding models like momentum_retest_n500).
     summ = model_dir / model / "summary.json"
-    op = None
     if summ.exists():
-        op = json.loads(summ.read_text()).get("open_position")
-    if op and op.get("sym") and op.get("entry_date"):
-        holds.append((op["sym"], date.fromisoformat(op["entry_date"]), end))
+        sj = json.loads(summ.read_text())
+        ops = sj.get("open_positions") or (
+            [sj["open_position"]] if sj.get("open_position") else [])
+        for op in ops:
+            if op.get("sym") and op.get("entry_date"):
+                holds.append((op["sym"], date.fromisoformat(op["entry_date"]), end))
     return holds
 
 

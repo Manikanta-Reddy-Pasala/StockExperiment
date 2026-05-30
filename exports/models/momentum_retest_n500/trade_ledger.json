@@ -1,164 +1,326 @@
 [
   {
     "sym": "GLAXO",
-    "in": "2025-03-03",
-    "out": "2025-04-01",
-    "ret_pct": 11.0
+    "entry_date": "2025-03-03",
+    "exit_date": "2025-04-01",
+    "qty": 132,
+    "entry_px": 2520.1,
+    "exit_px": 2797.35,
+    "pnl": 36043.0,
+    "ret_pct": 11.0,
+    "cap_after": 1027832.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "GODREJIND",
-    "in": "2025-03-11",
-    "out": "2025-04-01",
-    "ret_pct": -3.0
+    "entry_date": "2025-03-11",
+    "exit_date": "2025-04-01",
+    "qty": 296,
+    "entry_px": 1124.6,
+    "exit_px": 1090.95,
+    "pnl": -10445.0,
+    "ret_pct": -2.99,
+    "cap_after": 1027347.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "SHRIRAMFIN",
-    "in": "2025-03-05",
-    "out": "2025-05-02",
-    "ret_pct": -4.3
+    "entry_date": "2025-03-05",
+    "exit_date": "2025-05-02",
+    "qty": 528,
+    "entry_px": 631.3,
+    "exit_px": 604.2,
+    "pnl": -14787.0,
+    "ret_pct": -4.29,
+    "cap_after": 1036798.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "TATASTEEL",
-    "in": "2025-04-01",
-    "out": "2025-05-02",
-    "ret_pct": -7.8
+    "entry_date": "2025-04-01",
+    "exit_date": "2025-05-02",
+    "qty": 2268,
+    "entry_px": 153.12,
+    "exit_px": 141.18,
+    "pnl": -27560.0,
+    "ret_pct": -7.8,
+    "cap_after": 1036318.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "MAZDOCK",
-    "in": "2025-04-01",
-    "out": "2025-06-02",
-    "ret_pct": 31.3
+    "entry_date": "2025-04-01",
+    "exit_date": "2025-06-02",
+    "qty": 133,
+    "entry_px": 2578.55,
+    "exit_px": 3384.5,
+    "pnl": 106516.0,
+    "ret_pct": 31.26,
+    "cap_after": 1280415.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "BSE",
-    "in": "2025-05-02",
-    "out": "2025-07-01",
-    "ret_pct": 32.0
+    "entry_date": "2025-05-02",
+    "exit_date": "2025-07-01",
+    "qty": 151,
+    "entry_px": 2102.17,
+    "exit_px": 2775.1,
+    "pnl": 100984.0,
+    "ret_pct": 32.01,
+    "cap_after": 1344556.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "BDL",
-    "in": "2025-05-02",
-    "out": "2025-07-01",
-    "ret_pct": 33.2
+    "entry_date": "2025-05-02",
+    "exit_date": "2025-07-01",
+    "qty": 215,
+    "entry_px": 1486.8,
+    "exit_px": 1980.3,
+    "pnl": 105464.0,
+    "ret_pct": 33.19,
+    "cap_after": 1343917.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "BEL",
-    "in": "2025-06-02",
-    "out": "2025-08-01",
-    "ret_pct": -2.7
+    "entry_date": "2025-06-02",
+    "exit_date": "2025-08-01",
+    "qty": 1159,
+    "entry_px": 387.5,
+    "exit_px": 377.2,
+    "pnl": -12593.0,
+    "ret_pct": -2.66,
+    "cap_after": 1195108.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "AUBANK",
-    "in": "2025-07-01",
-    "out": "2025-08-01",
-    "ret_pct": -11.6
+    "entry_date": "2025-07-01",
+    "exit_date": "2025-08-01",
+    "qty": 502,
+    "entry_px": 838.35,
+    "exit_px": 741.05,
+    "pnl": -49403.0,
+    "ret_pct": -11.61,
+    "cap_after": 1194550.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "ABCAPITAL",
-    "in": "2025-07-02",
-    "out": "2025-08-01",
-    "ret_pct": -8.1
+    "entry_date": "2025-07-02",
+    "exit_date": "2025-08-01",
+    "qty": 1539,
+    "entry_px": 273.7,
+    "exit_px": 251.45,
+    "pnl": -34823.0,
+    "ret_pct": -8.13,
+    "cap_after": 1193969.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "LAURUSLABS",
-    "in": "2025-08-01",
-    "out": "2025-09-01",
-    "ret_pct": 1.3
+    "entry_date": "2025-08-01",
+    "exit_date": "2025-09-01",
+    "qty": 468,
+    "entry_px": 849.35,
+    "exit_px": 860.0,
+    "pnl": 4380.0,
+    "ret_pct": 1.25,
+    "cap_after": 1276732.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "PAYTM",
-    "in": "2025-08-01",
-    "out": "2025-10-01",
-    "ret_pct": 6.7
+    "entry_date": "2025-08-01",
+    "exit_date": "2025-10-01",
+    "qty": 369,
+    "entry_px": 1076.4,
+    "exit_px": 1148.6,
+    "pnl": 26006.0,
+    "ret_pct": 6.71,
+    "cap_after": 1266938.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "ETERNAL",
-    "in": "2025-08-01",
-    "out": "2025-10-01",
-    "ret_pct": 8.0
+    "entry_date": "2025-08-01",
+    "exit_date": "2025-10-01",
+    "qty": 1306,
+    "entry_px": 304.75,
+    "exit_px": 329.0,
+    "pnl": 31026.0,
+    "ret_pct": 7.96,
+    "cap_after": 1266293.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "HYUNDAI",
-    "in": "2025-09-01",
-    "out": "2025-10-01",
-    "ret_pct": 3.3
+    "entry_date": "2025-09-01",
+    "exit_date": "2025-10-01",
+    "qty": 163,
+    "entry_px": 2455.6,
+    "exit_px": 2537.2,
+    "pnl": 12680.0,
+    "ret_pct": 3.32,
+    "cap_after": 1265673.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "ADANIPOWER",
-    "in": "2025-10-03",
-    "out": "2025-11-03",
-    "ret_pct": 6.3
+    "entry_date": "2025-10-03",
+    "exit_date": "2025-11-03",
+    "qty": 2860,
+    "entry_px": 147.38,
+    "exit_px": 156.73,
+    "pnl": 26069.0,
+    "ret_pct": 6.34,
+    "cap_after": 1284690.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "TATAINVEST",
-    "in": "2025-10-07",
-    "out": "2025-11-03",
-    "ret_pct": -13.2
+    "entry_date": "2025-10-07",
+    "exit_date": "2025-11-03",
+    "qty": 457,
+    "entry_px": 920.5,
+    "exit_px": 798.7,
+    "pnl": -56210.0,
+    "ret_pct": -13.23,
+    "cap_after": 1284143.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "IDEA",
-    "in": "2025-10-01",
-    "out": "2025-12-01",
-    "ret_pct": 16.5
+    "entry_date": "2025-10-01",
+    "exit_date": "2025-12-01",
+    "qty": 49517,
+    "entry_px": 8.52,
+    "exit_px": 9.93,
+    "pnl": 69081.0,
+    "ret_pct": 16.55,
+    "cap_after": 1327152.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "INDIANB",
-    "in": "2025-11-04",
-    "out": "2025-12-01",
-    "ret_pct": 1.7
+    "entry_date": "2025-11-04",
+    "exit_date": "2025-12-01",
+    "qty": 465,
+    "entry_px": 872.4,
+    "exit_px": 887.35,
+    "pnl": 6333.0,
+    "ret_pct": 1.71,
+    "cap_after": 1326533.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "BHEL",
-    "in": "2025-12-01",
-    "out": "2026-01-01",
-    "ret_pct": 0.2
+    "entry_date": "2025-12-01",
+    "exit_date": "2026-01-01",
+    "qty": 1550,
+    "entry_px": 291.0,
+    "exit_px": 291.45,
+    "pnl": 20.0,
+    "ret_pct": 0.15,
+    "cap_after": 1425884.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "FEDERALBNK",
-    "in": "2025-12-01",
-    "out": "2026-01-01",
-    "ret_pct": 3.8
+    "entry_date": "2025-12-01",
+    "exit_date": "2026-01-01",
+    "qty": 1756,
+    "entry_px": 256.6,
+    "exit_px": 266.25,
+    "pnl": 16244.0,
+    "ret_pct": 3.76,
+    "cap_after": 1425183.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "HINDZINC",
-    "in": "2026-01-01",
-    "out": "2026-02-01",
-    "ret_pct": -6.8
+    "entry_date": "2026-01-01",
+    "exit_date": "2026-02-01",
+    "qty": 749,
+    "entry_px": 611.95,
+    "exit_px": 570.1,
+    "pnl": -31986.0,
+    "ret_pct": -6.84,
+    "cap_after": 1387981.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "SHRIRAMFIN",
-    "in": "2025-11-13",
-    "out": "2026-03-02",
-    "ret_pct": 29.3
+    "entry_date": "2025-11-13",
+    "exit_date": "2026-03-02",
+    "qty": 498,
+    "entry_px": 814.0,
+    "exit_px": 1052.5,
+    "pnl": 117987.0,
+    "ret_pct": 29.3,
+    "cap_after": 1467194.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "ASHOKLEY",
-    "in": "2026-01-06",
-    "out": "2026-03-02",
-    "ret_pct": 12.3
+    "entry_date": "2026-01-06",
+    "exit_date": "2026-03-02",
+    "qty": 2462,
+    "entry_px": 186.15,
+    "exit_px": 209.01,
+    "pnl": 55509.0,
+    "ret_pct": 12.28,
+    "cap_after": 1466422.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "OIL",
-    "in": "2026-02-02",
-    "out": "2026-04-01",
-    "ret_pct": -2.0
+    "entry_date": "2026-02-02",
+    "exit_date": "2026-04-01",
+    "qty": 880,
+    "entry_px": 483.3,
+    "exit_px": 473.4,
+    "pnl": -9337.0,
+    "ret_pct": -2.05,
+    "cap_after": 1404117.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "BHARATFORG",
-    "in": "2026-03-02",
-    "out": "2026-04-01",
-    "ret_pct": -11.2
+    "entry_date": "2026-03-02",
+    "exit_date": "2026-04-01",
+    "qty": 275,
+    "entry_px": 1879.3,
+    "exit_px": 1668.4,
+    "pnl": -58686.0,
+    "ret_pct": -11.22,
+    "cap_after": 1403429.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "ONGC",
-    "in": "2026-03-02",
-    "out": "2026-04-01",
-    "ret_pct": 2.1
+    "entry_date": "2026-03-02",
+    "exit_date": "2026-04-01",
+    "qty": 1840,
+    "entry_px": 282.2,
+    "exit_px": 288.05,
+    "pnl": 9969.0,
+    "ret_pct": 2.07,
+    "cap_after": 1402634.0,
+    "exit_reason": "ROTATE"
   },
   {
     "sym": "NATIONALUM",
-    "in": "2026-04-01",
-    "out": "2026-05-04",
-    "ret_pct": 2.1
+    "entry_date": "2026-04-01",
+    "exit_date": "2026-05-04",
+    "qty": 1170,
+    "entry_px": 399.45,
+    "exit_px": 407.8,
+    "pnl": 9054.0,
+    "ret_pct": 2.09,
+    "cap_after": 1619031.0,
+    "exit_reason": "ROTATE"
   }
 ]

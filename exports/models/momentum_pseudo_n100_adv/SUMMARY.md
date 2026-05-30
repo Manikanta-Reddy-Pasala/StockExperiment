@@ -22,7 +22,7 @@ Backtest window: **2025-03-01 → 2026-05-12** (recent ~14 months: 2025 chop + 2
 
 ⚠️ ADV-ranked pseudo-N100 (not the real index) — selects already-liquid/hot names, so returns are an OPTIMISTIC upper bound vs the real-index sibling momentum_n100_top5_max1.
 
-**Open position at window end:** ? (entry 377.05 on 2026-05-04)
+**Open position at window end:** BHEL qty 6488 entry ₹377.05 on 2026-05-04 (unrealized +95,374)
 
 ---
 *Auto-generated from summary.json by tools/analysis/refresh_export_docs.py — do not hand-edit.*

@@ -88,10 +88,14 @@ def write_summary(model: str, d: dict):
             lines += ["", f"**Per calendar year:** {py}"]
     if info.get("note"):
         lines += ["", "## Note", "", info["note"]]
-    op = d.get("open_position")
-    if op:
-        lines += ["", f"**Open position at window end:** {op.get('symbol','?')} "
-                  f"(entry {op.get('entry_px','?')} on {op.get('entry_date','?')})"]
+    # Single open_position OR multi open_positions (e.g. retest K=3). Note the
+    # json key is 'sym' (not 'symbol') — fall back to both.
+    ops = d.get("open_positions") or ([d["open_position"]] if d.get("open_position") else [])
+    for op in ops:
+        sym = op.get("sym") or op.get("symbol") or "?"
+        lines += ["", f"**Open position at window end:** {sym} "
+                  f"qty {op.get('qty','?')} entry ₹{op.get('entry_px','?')} "
+                  f"on {op.get('entry_date','?')} (unrealized {op.get('unrealized_pnl',0):+,.0f})"]
     lines += ["", "---", "*Auto-generated from summary.json by tools/analysis/refresh_export_docs.py — do not hand-edit.*", ""]
     (EXPORTS / model / "SUMMARY.md").write_text("\n".join(lines))
 
@@ -110,11 +114,18 @@ def write_ledger(model: str):
             if k in t and t[k] is not None:
                 return t[k]
         return ""
+    def money(v):    # ₹ with 2dp, blank if absent
+        return f"{v:,.2f}" if isinstance(v, (int, float)) else (v or "")
+    def intg(v):     # integer with thousands, blank if absent
+        return f"{v:,.0f}" if isinstance(v, (int, float)) else (v or "")
     rows = ["# " + model + " — trade ledger (2025-03-01 → 2026-05-12)", "",
-            "| # | Symbol | Entry | Exit | Return % | Reason |", "|---|---|---|---|---|---|"]
+            "| # | Symbol | Entry date | Exit date | Entry ₹ | Exit ₹ | Qty | PnL ₹ | Return % | Reason |",
+            "|---|---|---|---|---:|---:|---:|---:|---:|---|"]
     for i, t in enumerate(trades, 1):
         rows.append(f"| {i} | {g(t,'sym','symbol')} | {g(t,'entry_date')} | "
-                    f"{g(t,'exit_date')} | {g(t,'ret_pct','ret')} | {g(t,'reason','exit_reason')} |")
+                    f"{g(t,'exit_date')} | {money(g(t,'entry_px'))} | {money(g(t,'exit_px'))} | "
+                    f"{intg(g(t,'qty'))} | {intg(g(t,'pnl'))} | {g(t,'ret_pct','ret')} | "
+                    f"{g(t,'reason','exit_reason')} |")
     rows += ["", f"*{len(trades)} trades. Auto-generated from trade_ledger.json.*", ""]
     (EXPORTS / model / "TRADE_LEDGER.md").write_text("\n".join(rows))
 

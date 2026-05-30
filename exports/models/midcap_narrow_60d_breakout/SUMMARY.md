@@ -22,7 +22,7 @@ Backtest window: **2025-03-01 → 2026-05-12** (recent ~14 months: 2025 chop + 2
 
 ⚠️ Lumpy single-position event model. On current PIT data the FULL-period 2023-26 is NEGATIVE (−28% CAGR / 70% DD) — concentration risk; it shines only in select windows.
 
-**Open position at window end:** DATAPATTNS (entry 3848.84 on 2026-04-23)
+**Open position at window end:** DATAPATTNS qty 323 entry ₹3848.84 on 2026-04-23 (unrealized +0)
 
 ---
 *Auto-generated from summary.json by tools/analysis/refresh_export_docs.py — do not hand-edit.*
