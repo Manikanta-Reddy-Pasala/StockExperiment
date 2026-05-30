@@ -133,7 +133,9 @@ def main():
                "universe_size": len(rk),
                "top_n": [{"rank": i + 1, "symbol": s.split(":")[1].replace("-EQ", ""),
                           "name": s.split(":")[1].replace("-EQ", ""),
-                          "price": round(float(cl[s].iloc[di]), 2)}
+                          "price": round(float(cl[s].iloc[di]), 2),
+                          "ret_30d_pct": (round((float(cl[s].iloc[di]) / float(cl[s].iloc[di - S.LOOKBACK]) - 1) * 100, 2)
+                                          if di >= S.LOOKBACK and pd.notna(cl[s].iloc[di - S.LOOKBACK]) and float(cl[s].iloc[di - S.LOOKBACK]) > 0 else 0.0)}
                          for i, s in enumerate(rk[:5])]}
     rp = Path(args.ranking_out) if args.ranking_out else (STATE_DIR / "ranking" / f"{today.strftime('%Y-%m-%d')}.json")
     rp.parent.mkdir(parents=True, exist_ok=True); rp.write_text(json.dumps(ranking, indent=2))

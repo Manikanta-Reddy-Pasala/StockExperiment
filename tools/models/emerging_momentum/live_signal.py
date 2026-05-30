@@ -336,6 +336,9 @@ def main():
                 "symbol": s.split(":")[-1].replace("-EQ", ""),
                 "name": s.split(":")[-1].replace("-EQ", ""),
                 "ret_15d_pct": round(ret_by_sym.get(s, 0.0), 2),
+                # UI "Return" column reads ret_30d_pct → emit the actual 30d return.
+                "ret_30d_pct": (round((float(cl[s].iloc[di]) / float(cl[s].iloc[di - 30]) - 1) * 100, 2)
+                                if di >= 30 and pd.notna(cl[s].iloc[di - 30]) and float(cl[s].iloc[di - 30]) > 0 else 0.0),
                 "price": round(float(cl[s].iloc[di]), 2),
             }
             for i, s in enumerate(ranked[:5])
