@@ -56,17 +56,12 @@ sys.path.insert(0, str(ROOT))
 from tools.shared.ohlcv_cache import _get_engine  # noqa: E402
 from tools.shared.universes import nifty100_symbols, nifty500_symbols  # noqa: E402
 from tools.shared.rotation_strategy import decide_rotation  # noqa: E402
+from tools.models.n20_daily_large_only.strategy import (  # noqa: E402  shared w/ backtest
+    UNIV_SIZE, ADV_WIN, SMA_LONG, RETAIN, LOOKBACK as LOOKBACK_RET)
 
 log = logging.getLogger("n20_daily_signal")
 
 MODEL_NAME = "n20_daily_large_only"
-
-# Strategy params (must match backtest)
-UNIV_SIZE = 40  # was 20 (n20->n40): top-40 ADV-pool beats top-20 on BOTH 2026
-                # (+37% vs +20%) and 3yr (+55% vs +22%) — wider net, better rank-1.
-LOOKBACK_RET = 30
-ADV_WIN = 20
-SMA_LONG = 200
 
 
 def is_weekday(today: datetime) -> bool:

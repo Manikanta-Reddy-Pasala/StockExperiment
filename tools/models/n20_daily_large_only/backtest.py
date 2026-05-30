@@ -44,12 +44,8 @@ from tools.shared.backtest_engine import run_rotation_backtest
 from tools.shared.index_membership import eligible_at, universe_union
 
 
-UNIV_SIZE = 40  # was 20 (n20->n40): top-40 ADV∩N100 pool wins BOTH 2026 (+37%
-                # vs +20%) and 3yr (+55% vs +22%) standalone-verified. Live parity
-                # in live_signal.py UNIV_SIZE.
-LOOKBACK  = 30
-ADV_WIN   = 20
-SMA_LONG  = 200
+from tools.models.n20_daily_large_only.strategy import (  # noqa: E402  shared w/ live
+    UNIV_SIZE, LOOKBACK, ADV_WIN, SMA_LONG, RETAIN)
 N100_CSV  = str(ROOT / "src" / "data" / "symbols" / "nifty100.csv")
 DEFAULT_START = date(2023, 5, 15)
 DEFAULT_END   = date(2026, 5, 12)
@@ -150,7 +146,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
     # below rank-1). Same knob the live path passes to decide_rotation.
     res = run_rotation_backtest(
         dates=dates, close=cl, calendar=calendar, rank_at=rank_at,
-        capital=capital, start=start, end=end, retain_top_n=1,
+        capital=capital, start=start, end=end, retain_top_n=RETAIN,
     )
     final, cagr = res.final_nav, res.cagr_pct
     trades, yrs, wins, losses, open_pos = (res.trades, res.years, res.wins,
