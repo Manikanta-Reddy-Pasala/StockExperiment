@@ -214,6 +214,47 @@ All timestamps render in IST via `window.fmtIST` helper in `base.html` (naive IS
 - NSE free-float market cap: quarterly + Sep scrape → `exports/nse_mcap.csv` + `market_cap_history` (see `tools/analysis/MCAP_JOB.md`)
 - Live LTP overlaid on every UI display via Fyers `quotes_multiple` API (`_resolve_live_prices` in `admin_routes.py`)
 
+### Index universe sources (NSE constituents)
+
+**LIVE universes come from niftyindices.com** (NSE's official index site — chosen
+because `nseindia.com` WAF-blocks datacenter IPs, niftyindices is plain HTTPS from
+any IP). `tools/analysis/download_niftyindices.py` fetches `BASE + filename` where
+`BASE = https://niftyindices.com/IndexConstituent/`:
+
+| Full URL | → writes |
+|---|---|
+| `https://niftyindices.com/IndexConstituent/ind_nifty50list.csv` | (n50 membership) |
+| `https://niftyindices.com/IndexConstituent/ind_nifty100list.csv` | `src/data/symbols/nifty100.csv` |
+| `https://niftyindices.com/IndexConstituent/ind_nifty200list.csv` | (n200 membership) |
+| `https://niftyindices.com/IndexConstituent/ind_nifty500list.csv` | `src/data/symbols/nifty500.csv` |
+| `https://niftyindices.com/IndexConstituent/ind_niftymidcap150list.csv` | `src/data/symbols/nifty_midcap150.csv` |
+| `https://niftyindices.com/IndexConstituent/ind_niftysmallcap250list.csv` | `src/data/symbols/nifty_smallcap250.csv` |
+
+CSV format: `Company Name,Industry,Symbol,Series,ISIN Code`. These serve the
+**current** constituent list only (a today-snapshot — no history). Verified live:
+all 6 → HTTP 200, n100 = 104 names, n500 = 504. Refreshed by cron on NSE rebalance
+days (n100/n500 ≈ Mar/Sep; pseudo's yearly pool May 15; midcap monthly).
+
+**LIVE vs BACKTEST universe — deliberately different sources:**
+- **Live** (trading) → today's official list from niftyindices.com (above). Correct
+  for "now"; no survivorship issue in real time.
+- **Backtest** → point-in-time history in `src/data/symbols/n{100,500}_membership.csv`
+  (built by `tools/analysis/build_membership_from_nse_factsheets.py` from the official
+  NSE semi-annual factsheet PDFs + the verified Nifty-500 workbook). Needed because
+  niftyindices only serves today's list, not historical membership.
+
+| model | live universe file (built from the CSVs above) |
+|---|---|
+| n40 | `nifty100.csv` + `nifty500.csv` (top-40 ADV ∩ N100) |
+| n100 | `n100_current.json` (from `nifty100.csv`) |
+| pseudo | `yearly_universes.json` (top-100 ADV snapshot) + `nifty_smallcap250.csv` |
+| retest | `nifty500.csv` + `nifty_smallcap250.csv` |
+| emerging | `universe_union("n500")` (PIT membership) − N100 |
+| midcap | `midcap_narrow.json` |
+
+The `nifty_midcap150.csv` / `nifty_smallcap250.csv` also feed the cap tagging
+(`tools/shared/market_cap.py`).
+
 ---
 
 ## Quick Commands
