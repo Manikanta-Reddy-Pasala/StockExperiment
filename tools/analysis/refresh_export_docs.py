@@ -142,11 +142,15 @@ def write_summary(model: str, d: dict):
             wl = f" ({d['wins']}W / {d['losses']}L)"
         wr = f" · {d['win_rate_pct']:.0f}% win" if "win_rate_pct" in d else ""
         lines.append(f"| Trades | {d['trades']}{wl}{wr} |")
-    if d.get("per_year"):
-        py = " · ".join(f"{y} {v:+.1f}%" for y, v in sorted(d["per_year"].items())
-                        if isinstance(v, (int, float)))
-        if py:
-            lines += ["", f"**Per calendar year:** {py}"]
+    py = d.get("per_year") or {}
+    if py:
+        lines += ["", "## Year-by-year breakdown", "", "| Year | Return % | Intra-yr DD % |", "|---|---:|---:|"]
+        for y in sorted(py, key=lambda x: int(x)):
+            v = py[y]
+            if isinstance(v, dict):
+                lines.append(f"| {y} | {v.get('ret_pct',0):+.1f}% | {v.get('dd_pct',0):.1f}% |")
+            else:
+                lines.append(f"| {y} | {v:+.1f}% | — |")
     if info.get("note"):
         lines += ["", "## Note", "", info["note"]]
     # Single open_position OR multi open_positions (e.g. retest K=3). Note the

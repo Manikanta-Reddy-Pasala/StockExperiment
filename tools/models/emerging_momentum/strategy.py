@@ -36,11 +36,15 @@ from tools.shared.index_membership import eligible_at
 
 ROOT = Path(__file__).resolve().parents[3]
 
-# ---- Strategy parameters (Config 1: max-1, lb15, retain-3, mid-month +5%, sma OFF) ----
+# ---- Strategy parameters (max-1, lb30, retain-2, mid-month +5%, sma OFF) ----
+# 2026-05-31 re-tune on the AUTHORITATIVE PIT membership: LB30/RET2 beats the old
+# lb15/ret3 ("Config 1", tuned on the pre-rebuild buggy universe) — full-cycle
+# 2021-03→2026-05 ≈ +65.6% vs +45.6% CAGR. Longer 30d momentum + tighter retain
+# (hold while in top-2) ride the clean mid/small winners harder.
 POOL = 100           # universe pool = top-100 by 20d ADV from (N500 minus N100)
 TOPN = 100           # alias for POOL (display/compat with n100-style naming)
-RETAIN = 3           # keep the held name while it stays in the top-3 rank
-LOOKBACK = 15        # momentum ranking window (TRADING days). Config 1 winner.
+RETAIN = 2           # keep the held name while it stays in the top-2 rank
+LOOKBACK = 30        # momentum ranking window (TRADING days). 2026-05-31 re-tune.
 MAX_PRICE = 3000.0   # skip names priced above this at entry
 ADV_WIN = 20         # ADV averaging window
 MIDMONTH_LEAD = 5.0  # rotate mid-month only if new rank-1 leads held by >= 5pp

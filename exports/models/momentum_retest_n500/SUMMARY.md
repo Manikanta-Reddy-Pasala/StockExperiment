@@ -28,6 +28,17 @@ Backtest window: **2021-04-01 → 2026-05-29** (full ~5.1-year cycle: 2021 bull,
 | Calmar | 1.12 |
 | Trades | 88 (48W / 40L) · 54% win |
 
+## Year-by-year breakdown
+
+| Year | Return % | Intra-yr DD % |
+|---|---:|---:|
+| 2021 | +4.0% | 34.1% |
+| 2022 | -2.0% | 46.5% |
+| 2023 | +176.0% | 25.3% |
+| 2024 | +253.6% | 16.5% |
+| 2025 | +12.6% | 20.9% |
+| 2026 | +20.9% | 19.4% |
+
 ## Note
 
 Multi-holding K=2 (2026-05-30 sweep). Now PIT N500 (2026-05-31): full-cycle 2021-04→2026-05 ≈ +64.9% CAGR / 57.1% DD / Calmar 1.14. The earlier +77.8%/2.08 was survivorship-inflated (static current N500); switching to PIT eligible_at deflated CAGR and roughly doubled DD — the honest number. K=2 + wide 20% entry band (vs K3/band-8%) stops missing leaders that never pull back to the EMA.

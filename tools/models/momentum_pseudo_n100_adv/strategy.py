@@ -31,6 +31,7 @@ ADV_WIN = 20         # ADV averaging window
 UNIV_SIZE = 100      # top-N by 20d ADV (pseudo-N100)
 MAX_PRICE = 3000.0   # skip names priced above this at entry
 SMA_LONG = 200       # uptrend filter: close > 200d SMA
+SMA_GATE = False     # 2026-05-31: dropping the 200d gate lifted CAGR +71->+77% (raises DD some); kept off.
 RETAIN = 1           # exit band — top-1 rotation (wins on the fixed anchor)
 MIDMONTH_LEAD = 3.0  # only used by the opt-in --mid-month-check path (default OFF)
 

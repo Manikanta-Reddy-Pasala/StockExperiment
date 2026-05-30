@@ -38,7 +38,7 @@ from tools.shared.index_membership import universe_union, eligible_at
 
 
 from tools.models.momentum_pseudo_n100_adv.strategy import (  # noqa: E402  shared w/ live
-    LOOKBACK, ADV_WIN, UNIV_SIZE, MAX_PRICE, RETAIN, MIDMONTH_LEAD,
+    LOOKBACK, ADV_WIN, UNIV_SIZE, MAX_PRICE, RETAIN, MIDMONTH_LEAD, SMA_GATE,
     UNIVERSE_ANCHOR_MONTH, UNIVERSE_ANCHOR_DAY, build_calendar)
 # Drop Small-cap NSE Nifty Smallcap 250 stocks from universe (free +2pp CAGR, DD unchanged).
 import csv as _csv
@@ -171,8 +171,9 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
         if di < max(LOOKBACK, 200):
             return []  # not enough history for both the 30d return and 200d SMA
         univ = pick_universe(dates[di])
-        up = sma200.iloc[di] < cl.iloc[di]  # uptrend gate: close above its 200d SMA
-        univ = [s for s in univ if bool(up.get(s, False))]
+        if SMA_GATE:
+            up = sma200.iloc[di] < cl.iloc[di]  # uptrend gate: close above 200d SMA
+            univ = [s for s in univ if bool(up.get(s, False))]
         # MAX_PRICE gate: skip names trading above ₹3000 (giant-loser guard).
         univ = [s for s in univ
                 if pd.notna(cl[s].iloc[di]) and float(cl[s].iloc[di]) <= MAX_PRICE]
@@ -225,6 +226,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
             "wins": wins, "losses": losses,
             "win_rate_pct": round(wins / max(1, wins + losses) * 100, 1),
             "open_position": open_pos,
+            "per_year": res.per_year,
         }
         (out_dir / "summary.json").write_text(json.dumps(summary, indent=2))
 

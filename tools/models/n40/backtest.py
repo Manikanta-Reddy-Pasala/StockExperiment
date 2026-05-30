@@ -189,6 +189,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
             "wins": wins, "losses": losses,
             "win_rate_pct": round(wins / max(1, wins + losses) * 100, 1),
             "open_position": open_pos,
+            "per_year": res.per_year,
         }
         (out_dir / "summary.json").write_text(json.dumps(summary, indent=2))
 

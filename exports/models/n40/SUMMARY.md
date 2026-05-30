@@ -48,6 +48,17 @@
 | Live deployment | NO |
 | Open position | **ADANIENT** qty 2,075 entry Rs.2,849.70 (2026-05-25) last Rs.2,937.40 unrealized +181,978 |
 
+## Year-by-year breakdown
+
+| Year | Return % | Intra-yr DD % |
+|---|---:|---:|
+| 2021 | +2.0% | 23.9% |
+| 2022 | +29.7% | 26.9% |
+| 2023 | +13.1% | 21.4% |
+| 2024 | +71.9% | 17.8% |
+| 2025 | +64.7% | 14.5% |
+| 2026 | +36.3% | 24.4% |
+
 ## NSE cap segment breakdown
 
 | Cap | Trades | Wins | Losses | WR | Total PnL Rs. |

@@ -47,6 +47,17 @@
 | Live deployment | YES |
 | Open position | **VEDL** qty 29,428 entry Rs.331.05 (2026-05-15) last Rs.352.60 unrealized +634,173 |
 
+## Year-by-year breakdown
+
+| Year | Return % | Intra-yr DD % |
+|---|---:|---:|
+| 2021 | -15.8% | 27.1% |
+| 2022 | +10.6% | 38.7% |
+| 2023 | +182.4% | 11.3% |
+| 2024 | +89.2% | 21.3% |
+| 2025 | +37.2% | 13.1% |
+| 2026 | +48.4% | 8.4% |
+
 ## NSE cap segment breakdown
 
 | Cap | Trades | Wins | Losses | WR | Total PnL Rs. |

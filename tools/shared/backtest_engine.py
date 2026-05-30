@@ -55,6 +55,7 @@ class BacktestResult:
     max_dd_mtm_pct: float = 0.0   # daily mark-to-market drawdown (daily models, e.g. n20)
     nav_dates: List = field(default_factory=list)    # calendar-step timestamps
     nav_values: List = field(default_factory=list)   # MTM NAV at each step
+    per_year: Dict = field(default_factory=dict)     # {year: {"ret_pct":..,"dd_pct":..}}
 
 
 def run_rotation_backtest(
@@ -187,10 +188,24 @@ def run_rotation_backtest(
     mtm_dd = float(((roll - nav_s) / roll).max()) * 100 if len(nav_s) > 1 else 0.0
 
     nav_dates = [pd.Timestamp(start)] + [d for d, _ in calendar]
+    nav_dates = nav_dates[:len(nav_marks)]
+    # Year-wise breakdown: % return + intra-year MTM drawdown per calendar year,
+    # from the MTM NAV marks (one per calendar step). Year ret = last/first - 1.
+    per_year: Dict = {}
+    if nav_dates:
+        nser = pd.Series(nav_marks, index=pd.DatetimeIndex(nav_dates))
+        for yy, g in nser.groupby(nser.index.year):
+            if len(g) < 2:
+                continue
+            rl = g.cummax()
+            per_year[int(yy)] = {
+                "ret_pct": round((g.iloc[-1] / g.iloc[0] - 1) * 100, 1),
+                "dd_pct": round(float(((rl - g) / rl).max()) * 100, 1),
+            }
     return BacktestResult(
         final_nav=final, cagr_pct=cagr, max_dd_pct=mdd, calmar=calmar,
         trades=trades, wins=wins, losses=losses,
         win_rate_pct=wins / max(1, wins + losses) * 100,
         years=yrs, open_position=open_pos, max_dd_mtm_pct=mtm_dd,
-        nav_dates=nav_dates[:len(nav_marks)], nav_values=nav_marks,
+        nav_dates=nav_dates, nav_values=nav_marks, per_year=per_year,
     )

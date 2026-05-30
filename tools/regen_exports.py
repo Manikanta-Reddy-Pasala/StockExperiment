@@ -200,6 +200,12 @@ def write_summary(model_dir, meta, trades, summary=None):
     if op:
         md += (f"| Open position | **{op['sym']}** qty {op['qty']:,} entry Rs.{op['entry_px']:,.2f} "
                f"({op['entry_date']}) last Rs.{op['last_px']:,.2f} unrealized {op['unrealized_pnl']:+,.0f} |\n")
+    py = (summary or {}).get("per_year") or {}
+    if py:
+        md += "\n## Year-by-year breakdown\n\n| Year | Return % | Intra-yr DD % |\n|---|---:|---:|\n"
+        for y in sorted(py, key=lambda x: int(x)):
+            v = py[y]
+            md += f"| {y} | {v.get('ret_pct',0):+.1f}% | {v.get('dd_pct',0):.1f}% |\n"
     md += """
 ## NSE cap segment breakdown
 

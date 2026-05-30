@@ -122,6 +122,7 @@ def run(start, end, capital, out_dir=None):
         "wins": wins, "losses": losses,
         "win_rate_pct": round(wins / max(1, wins + losses) * 100, 1),
         "open_position": open_pos,
+            "per_year": res.per_year,
     }
     if out_dir:
         out_dir = Path(out_dir)
