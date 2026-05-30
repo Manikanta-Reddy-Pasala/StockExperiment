@@ -30,11 +30,12 @@ from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
 from tools.shared.backtest_engine import run_rotation_backtest
 from tools.shared.index_membership import eligible_at, universe_union
+from tools.models.momentum_n100_top5_max1.strategy import (
+    LOOKBACK, RETAIN, MIDMONTH_LEAD, build_calendar)
 
 # 15 TRADING days (~3 weeks). Set 2026-05-27 from a 6-year (2020-2026) sweep:
 # 15td beat 30td on CAGR (+151.7% vs +129.0%) AND max DD (45.7% vs 57.3%).
-# Must match live_signal.rank_universe lookback_days (live/backtest parity).
-LOOKBACK = 15
+# LOOKBACK/RETAIN/MIDMONTH_LEAD now imported from strategy.py (shared with live).
 # Today's published n100 list — kept for live signal compatibility only.
 # THE BACKTEST DOES NOT USE THIS FILE; it pulls PIT membership via
 # tools.shared.index_membership.eligible_at instead.
@@ -63,8 +64,8 @@ def load_n100_union(index_name: str = "n100"):
 
 
 def run(start: date, end: date, capital: float, out_dir: Path | None = None,
-        mid_month_check: bool = False, mid_month_lead_pct: float = 5.0,
-        retain_top_n: int = 3, data_source: str = "fyers",
+        mid_month_check: bool = True, mid_month_lead_pct: float = MIDMONTH_LEAD,
+        retain_top_n: int = RETAIN, data_source: str = "fyers",
         index_name: str = "n100"):
     """Run the full Nifty 100 momentum-rotation backtest and report metrics.
 
@@ -120,37 +121,9 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
     present = [s for s in n100_syms if s in cl.columns]
     print(f"Loaded {len(dates)} days × {len(present)} symbols")
 
-    # ---- Build the rebalance calendar -------------------------------------
-    # Walk month by month from `start`. For each month, the "full" rebalance
-    # day is the first actual trading day on/after the 1st; the optional "mid"
-    # check day is the first trading day on/after the 15th.
-    rebal_set = set()
-    mid_month_set = set()
-    y, m = start.year, start.month
-    while True:
-        target = pd.Timestamp(y, m, 1)
-        # First trading day on/after the 1st of this month.
-        fut = dates[dates >= target]
-        if len(fut) == 0 or fut[0].date() > end:
-            break  # ran past the loaded price history / end date
-        if fut[0].date() >= start:
-            rebal_set.add(fut[0])
-        # Mid-month: first trading day on/after the 15th
-        if mid_month_check:
-            target_mid = pd.Timestamp(y, m, 15)
-            fut_mid = dates[dates >= target_mid]
-            if len(fut_mid) > 0 and fut_mid[0].date() <= end:
-                mid_month_set.add(fut_mid[0])
-        m += 1
-        if m > 12: m = 1; y += 1  # roll over December -> next January
-    sd = pd.Timestamp(start)
-    if sd in dates: rebal_set.add(sd)  # ensure the very first day is a rebalance
-    # Combined rotation calendar with per-day flag: each entry is (date, kind)
-    # where kind is "full" (monthly) or "mid". A "mid" day is dropped if it
-    # coincides with a "full" day so the engine never double-fires.
-    calendar = sorted({(d, "full") for d in rebal_set} |
-                      {(d, "mid") for d in mid_month_set if d not in rebal_set},
-                      key=lambda x: x[0])
+    # ---- Rebalance calendar from the SHARED core (same rule live mirrors) ----
+    # full = month's first trading day; mid = first trading day on/after the 15th.
+    calendar = build_calendar(dates, start, end, mid_check=mid_month_check)
 
     # SELECTION layer: model supplies the per-date ranking; EXECUTION is the
     # shared engine (tools/shared/backtest_engine). Universe at each rebal =

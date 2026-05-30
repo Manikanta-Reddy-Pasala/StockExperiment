@@ -42,6 +42,7 @@ sys.path.insert(0, str(ROOT))
 from tools.shared.ohlcv_cache import read_cached  # noqa: E402
 from tools.shared.rotation_strategy import decide_rotation, midmonth_lead_ok  # noqa: E402
 from tools.shared.nse_calendar import is_first_trading_day_of_month  # noqa: E402
+from tools.models.momentum_n100_top5_max1 import strategy as S  # noqa: E402
 
 log = logging.getLogger("momrot_signal")
 
@@ -64,24 +65,14 @@ def is_rebalance_day(today: datetime, last_rotation: datetime = None) -> bool:
 # the currently-held stock's 30d return by >= MID_MONTH_LEAD_PCT. Backtested
 # on 2023-26 N100 universe: +19.7pp CAGR over plain monthly (+81.4% vs
 # +61.7% baseline, Calmar 1.31 → 1.75) with honest costs included.
-MID_MONTH_LEAD_PCT = 5.0   # rotate mid-month only if new rank-1 leads by 5pp
+MID_MONTH_LEAD_PCT = S.MIDMONTH_LEAD   # shared with backtest (strategy.MIDMONTH_LEAD)
 
 
 def is_mid_month_check_day(today: datetime) -> bool:
-    """True if today is the mid-month check trigger.
-
-    Rule: first weekday on/after day 15 of month, but NOT also a rebalance
-    day (avoids double-firing in odd calendars).
-    """
-    if today.day < 15 or today.day > 21:
-        return False
-    if today.weekday() >= 5:
-        return False
-    # Earliest weekday on/after 15 — anchor by walking back from today
-    anchor = datetime(today.year, today.month, 15)
-    while anchor.weekday() >= 5:
-        anchor += timedelta(days=1)
-    return today.date() == anchor.date()
+    """First NSE trading day on/after the 15th (holiday-aware). Delegates to the
+    SHARED strategy.is_mid_month_check_day — exact rule the backtest calendar
+    uses (build_calendar 'mid'), so live + backtest never disagree."""
+    return S.is_mid_month_check_day(today)
 
 
 def load_universe(path: str) -> List[Dict]:
@@ -167,7 +158,7 @@ def get_close_trading_days_ago(symbol: str, today_ts: int, n: int) -> float:
 
 
 def rank_universe(stocks: List[Dict], today_ts: int,
-                  lookback_days: int = 15) -> List[tuple]:
+                  lookback_days: int = S.LOOKBACK) -> List[tuple]:
     """Rank the universe by trailing 15-trading-day return (the live ranking step).
 
     Mirrors backtest.py's rank_at: for each stock, return = close_now /
@@ -337,7 +328,7 @@ def main():
     ap.add_argument("--universe-file", required=True)
     ap.add_argument("--top-n", type=int, default=5,
                     help="Ranking display size only.")
-    ap.add_argument("--retain-top-n", type=int, default=3,
+    ap.add_argument("--retain-top-n", type=int, default=S.RETAIN,
                     help="Exit retention band: hold while in top-N by 15d ret, "
                          "rotate when out. 3 = current canonical (2026-05-28 "
                          "sweep): 3yr +245% / 10yr +86.8% / 10yr DD 53.07% "
