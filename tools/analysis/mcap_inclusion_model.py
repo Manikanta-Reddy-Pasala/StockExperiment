@@ -41,17 +41,21 @@ FULL = (date(2023, 5, 15), date(2026, 5, 12)); WIN = (date(2025, 3, 1), date(202
 CUTOFF = {"n100": 100, "n500": 500}
 
 
-def load_shares():
-    """current free-float shares per symbol from the scrape."""
-    sh = {}
+def load_ffmcap():
+    """current free-float market cap (₹ Cr) per symbol from the scrape.
+
+    FF-shares are derived later as ff_mcap / latest_close (from the price DB) —
+    the scrape's LTP column is unreliable, and the DB close is the same series
+    the backtest ranks on, so this keeps shares consistent with prices."""
+    out = {}
     for r in csv.DictReader(open(MCAP_CSV)):
         try:
-            ff = float(r["ff_mcap_cr"]); ltp = float(r["ltp"])
-            if ff > 0 and ltp > 0:
-                sh[f"NSE:{r['symbol']}-EQ"] = ff * 1e7 / ltp   # free-float shares
+            ff = float(r["ff_mcap_cr"])
+            if ff > 0:
+                out[f"NSE:{r['symbol']}-EQ"] = ff
         except (ValueError, TypeError):
             continue
-    return sh
+    return out
 
 
 def main():
@@ -62,9 +66,9 @@ def main():
     a = ap.parse_args()
     cutoff = CUTOFF[a.target]; K = a.k; retain = a.retain or int(cutoff * 1.3)
 
-    ff_shares = load_shares()
-    syms = list(ff_shares) + [INDEX]
-    print(f"scraped names with FF-shares: {len(ff_shares)}")
+    ff_mcap = load_ffmcap()
+    syms = list(ff_mcap) + [INDEX]
+    print(f"scraped names with FF-mcap: {len(ff_mcap)}")
     eng = _get_engine()
     with eng.connect() as c:
         df = pd.read_sql(text(
@@ -75,8 +79,16 @@ def main():
     cl = df.pivot(index="date", columns="symbol", values="close").ffill()
     op = df.pivot(index="date", columns="symbol", values="open")
     dates = cl.index
+    # FF-shares = current FF-mcap / latest available close (price DB), applied to
+    # historical close to reconstruct the FF-mcap panel (shares ~stable vs price).
+    ff_shares = {}
+    for s in ff_mcap:
+        if s in cl.columns:
+            last = cl[s].dropna()
+            if len(last) and last.iloc[-1] > 0:
+                ff_shares[s] = ff_mcap[s] * 1e7 / last.iloc[-1]
+    print(f"names with FF-shares (matched to price DB): {len(ff_shares)}")
     eq = [s for s in ff_shares if s in cl.columns]
-    # ff-mcap panel = shares * close
     shares_v = pd.Series({s: ff_shares[s] for s in eq})
     ffmcap = cl[eq].mul(shares_v, axis=1)
     ret = cl[eq] / cl[eq].shift(LOOKBACK) - 1
