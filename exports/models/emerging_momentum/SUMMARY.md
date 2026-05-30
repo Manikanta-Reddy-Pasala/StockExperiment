@@ -7,6 +7,16 @@ Single-position (max-1) momentum rotation: 15d return >0, price ≤₹3000 (no S
 
 Backtest window: **2021-04-01 → 2026-05-29** (full ~5.1-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 bear).
 
+## Trade rules
+
+| When | Rule |
+|---|---|
+| **Rebalance** | 1st trading day of month + a mid-month (day-15) lead check. |
+| **Universe & filters** | Top-100 by 20d ADV from (PIT N500 minus PIT N100); 15d return > 0; price ≤ ₹3000; NO SMA gate; MCAP-CLIMBER overlay (keep only names whose mcap-rank is rising over 60d). |
+| **Entry** | BUY rank-1 by 15-day return (single position, max 1). |
+| **Exit** | Hold while in the top-3 by 15d return (RETAIN=3); rotate out when it drops below rank-3. Mid-month only rotates if the new rank-1 leads the held name by ≥ 5pp. |
+| **Source** | Backtest+live: PIT `n500_membership.csv` MINUS `n100_membership.csv` (factsheet-derived). Mcap-climber: `exports/nse_mcap.csv`. Prices: Fyers daily OHLCV. |
+
 ## Results (net of costs)
 
 | Metric | Value |

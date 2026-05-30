@@ -1,28 +1,76 @@
-# Nifty 100 Momentum (`momentum_n100_top5_max1`)
+# momentum_n100_top5_max1 — SUMMARY
 
-**Status:** LIVE  
-Monthly rotation + mid-month check, single position (max 1), 15-trading-day return rank.
+**Real NSE Nifty 100 monthly momentum rotation (top-1 by 30d ret). No price filter — honest baseline.**
 
-**Universe:** Real NSE Nifty 100 (PIT membership)
-
-Backtest window: **2021-04-01 → 2026-05-29** (full ~5.1-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 bear).
-
-## Results (net of costs)
+## Backtest window & trade frequency
 
 | Metric | Value |
 |---|---|
-| Final NAV (₹10L start) | ₹4,634,238 |
-| Total return | +363.4% |
-| CAGR (annualized) | +34.6% |
-| Max drawdown | 52.2% |
-| Calmar | 0.66 |
-| Trades | 97 (53W / 44L) · 55% win |
+| Backtest window | **2021-04-01 → 2026-05-29** (~5.16 years) |
+| First entry | 2021-04-01 |
+| Last exit | 2026-05-15 |
+| Total trades | 97 |
+| Trades per year | ~18.8 |
+| Rebalance | Monthly (1st trading day) |
+| Data source | **Fyers (split-adjusted cont_flag=1)** |
 
-## Note
+## Stock pick logic
 
-True-index version — the trustworthy-clean momentum benchmark.
+1. Universe: src/data/symbols/nifty100.csv (104 NSE Nifty 100 stocks)
+2. Rank by 30-day return, pick top-1
+3. Rebalance: 1st trading day of month
+4. Exit: rotation only — sell when not rank-1
 
-**Open position at window end:** VEDL [large] qty 13143 entry ₹331.05 on 2026-05-15 (unrealized +283,232)
 
----
-*Auto-generated from summary.json by tools/analysis/refresh_export_docs.py — do not hand-edit.*
+## Trade rules
+
+| When | Rule |
+|---|---|
+| **Rebalance** | 1st trading day of month + a mid-month (day-15) lead check. |
+| **Universe & filters** | Real point-in-time NSE Nifty 100 (eligible_at). No price/SMA filter — pure index membership. |
+| **Entry** | BUY rank-1 by 15-day return (single position, max 1). |
+| **Exit** | Hold while in the top-3 by 15d return (RETAIN=3); rotate out when it drops below rank-3, or leaves the index. Mid-month only rotates if the new rank-1 leads the held name by ≥ 5pp. |
+| **Source** | Live: niftyindices.com `ind_nifty100list.csv` → nifty100.csv → n100_current.json. Backtest: PIT `n100_membership.csv` (factsheet-derived). Prices: Fyers daily OHLCV. |
+
+## Headline result
+
+| Metric | Value |
+|---|---:|
+| Final NAV (cap + open MTM) | **Rs.4,634,238** |
+| Total return | **+363.42%** |
+| 5.16-yr CAGR | **+34.62%** |
+| Max DD | **52.18%** |
+| Calmar (CAGR / Max DD) | **0.66** |
+| Trades closed | 97 |
+| Wins / Losses | 53 / 44 |
+| Win rate | 54.6% |
+| Live deployment | YES |
+| Open position | **VEDL** qty 13,143 entry Rs.331.05 (2026-05-15) last Rs.352.60 unrealized +283,232 |
+
+## NSE cap segment breakdown
+
+| Cap | Trades | Wins | Losses | WR | Total PnL Rs. |
+|---|---:|---:|---:|---:|---:|
+| **Large** | 97 | 53 | 44 | 55% | +3,351,007 |
+
+## Top 5 winners
+
+| Symbol | Entry → Exit | Entry ₹ | Ret % | PnL ₹ |
+|---|---|---:|---:|---:|
+| ADANIGREEN   | 2026-04-15 → 2026-05-15 | 1,096.05 | +25.82% | +892,707 |
+| ADANIPOWER   | 2026-04-01 → 2026-04-15 | 157.11 | +16.75% | +496,211 |
+| PAYTM        | 2024-08-16 → 2024-10-01 | 564.25 | +29.61% | +449,833 |
+| GLAND        | 2023-08-01 → 2023-09-01 | 1,303.60 | +35.63% | +420,837 |
+| HINDZINC     | 2025-12-15 → 2026-01-16 | 568.05 | +12.27% | +333,793 |
+
+## Top 5 losses
+
+| Symbol | Entry → Exit | Entry ₹ | Ret % | PnL ₹ |
+|---|---|---:|---:|---:|
+| ADANIENSOL   | 2024-08-01 → 2024-08-16 | 1,275.20 | -14.89% | -265,670 |
+| ENRIN        | 2026-03-02 → 2026-03-16 | 2,972.70 | -6.22% | -201,280 |
+| ADANIGREEN   | 2022-04-18 → 2022-05-16 | 2,970.50 | -23.19% | -185,976 |
+| INDUSINDBK   | 2025-05-02 → 2025-05-15 | 853.00 | -8.50% | -181,685 |
+| CGPOWER      | 2025-09-15 → 2025-10-01 | 791.35 | -6.51% | -177,590 |
+
+Full trade-by-trade ledger: see [TRADE_LEDGER.md](TRADE_LEDGER.md).

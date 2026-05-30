@@ -2,12 +2,14 @@
 
 Run after backtest produces new ledger. Per-model overrides supplied via MODELS dict.
 """
+import sys
 import json
 import csv
 from pathlib import Path
 from datetime import date
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))   # so `from tools.analysis...` resolves when run as a script
 SYM_N100 = ROOT / "src/data/symbols/nifty100.csv"
 SYM_MID  = ROOT / "src/data/symbols/nifty_midcap150.csv"
 SYM_SML  = ROOT / "src/data/symbols/nifty_smallcap250.csv"
@@ -172,6 +174,13 @@ def write_summary(model_dir, meta, trades, summary=None):
 """
     for i, step in enumerate(meta["logic"], 1):
         md += f"{i}. {step}\n"
+    try:
+        from tools.analysis.refresh_export_docs import rules_block
+        rb = rules_block(model_dir)
+        if rb:
+            md += "\n" + "\n".join(rb) + "\n"
+    except Exception:
+        pass
     md += f"""
 ## Headline result
 

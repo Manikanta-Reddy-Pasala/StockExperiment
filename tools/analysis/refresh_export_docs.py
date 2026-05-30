@@ -55,6 +55,66 @@ DESC = {
 
 WIN = "Backtest window: **2021-04-01 → 2026-05-29** (full ~5.1-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 bear)."
 
+# Per-model trade rules — transcribed from the model code (strategy.py + backtest
+# rank_at / run loop) as the single source of truth. Imported by regen_exports too
+# so every model SUMMARY.md carries the same Rebalance / Filters / Entry / Exit block.
+RULES = {
+    "n40": {
+        "Rebalance": "First trading day of each ISO week (WEEKLY).",
+        "Universe & filters": "Top-40 by 20d ADV from N500, intersect PIT Nifty 100, and close > 200d SMA (uptrend).",
+        "Entry": "On the weekly rebalance, BUY rank-1 by 30-day return among the filtered set (single position, max 1).",
+        "Exit": "Rotate: SELL when the held name is no longer rank-1 (RETAIN=1) at the next weekly rebalance, or when it drops out of Nifty 100 / below its 200d SMA.",
+        "Source": "Live: niftyindices.com `ind_nifty100list.csv` + `ind_nifty500list.csv` → nifty100.csv/nifty500.csv. Backtest: PIT `n100_membership.csv` (factsheet-derived). Prices: Fyers daily OHLCV.",
+    },
+    "momentum_n100_top5_max1": {
+        "Rebalance": "1st trading day of month + a mid-month (day-15) lead check.",
+        "Universe & filters": "Real point-in-time NSE Nifty 100 (eligible_at). No price/SMA filter — pure index membership.",
+        "Entry": "BUY rank-1 by 15-day return (single position, max 1).",
+        "Exit": "Hold while in the top-3 by 15d return (RETAIN=3); rotate out when it drops below rank-3, or leaves the index. Mid-month only rotates if the new rank-1 leads the held name by ≥ 5pp.",
+        "Source": "Live: niftyindices.com `ind_nifty100list.csv` → nifty100.csv → n100_current.json. Backtest: PIT `n100_membership.csv` (factsheet-derived). Prices: Fyers daily OHLCV.",
+    },
+    "momentum_pseudo_n100_adv": {
+        "Rebalance": "1st trading day of month (mid-month available as opt-in, default OFF).",
+        "Universe & filters": "Top-100 by 20d ADV from PIT N500 (yearly fixed mid-May anchor) minus Smallcap-250; close > 200d SMA; price ≤ ₹3000.",
+        "Entry": "BUY rank-1 by 30-day return (single position, max 1).",
+        "Exit": "Rotate: SELL when the held name is no longer rank-1 (RETAIN=1).",
+        "Source": "Live: niftyindices.com `ind_nifty500list.csv` + `ind_niftysmallcap250list.csv` → yearly_universes.json. Backtest: PIT `n500_membership.csv` (xlsx-verified). Prices: Fyers daily OHLCV.",
+    },
+    "emerging_momentum": {
+        "Rebalance": "1st trading day of month + a mid-month (day-15) lead check.",
+        "Universe & filters": "Top-100 by 20d ADV from (PIT N500 minus PIT N100); 15d return > 0; price ≤ ₹3000; NO SMA gate; MCAP-CLIMBER overlay (keep only names whose mcap-rank is rising over 60d).",
+        "Entry": "BUY rank-1 by 15-day return (single position, max 1).",
+        "Exit": "Hold while in the top-3 by 15d return (RETAIN=3); rotate out when it drops below rank-3. Mid-month only rotates if the new rank-1 leads the held name by ≥ 5pp.",
+        "Source": "Backtest+live: PIT `n500_membership.csv` MINUS `n100_membership.csv` (factsheet-derived). Mcap-climber: `exports/nse_mcap.csv`. Prices: Fyers daily OHLCV.",
+    },
+    "momentum_retest_n500": {
+        "Rebalance": "Monthly (1st trading day) re-ranks the leaders; entry is scanned DAILY.",
+        "Universe & filters": "Top-120 by 20d ADV from PIT N500 minus Smallcap-250 (incl large+mid, NOT N100-excluded); close > 200d SMA; price ≤ ₹3000; 30d return > 10% (mom floor); 10d return > 0 (accelerating).",
+        "Entry": "Each month, watch the top-K=2 leaders; BUY one when its price sits within the retest band of the 20-EMA — between 20EMA×(1−1%) and 20EMA×(1+20%) — checked daily. Holds up to 2 equal-weight positions.",
+        "Exit": "Rotate: SELL a holding at the monthly rebalance when it drops out of the top-4 by 30d return (RETAIN=4).",
+        "Source": "Live: niftyindices.com `ind_nifty500list.csv` + `ind_niftysmallcap250list.csv` → nifty500.csv. Backtest: PIT `n500_membership.csv` (xlsx-verified). Prices: Fyers daily OHLCV.",
+    },
+    "midcap_narrow_60d_breakout": {
+        "Rebalance": "Breakouts scanned DAILY; the eligible band is rebuilt each year-start.",
+        "Universe & filters": "Top-100 by 20d ADV from (PIT N500 minus PIT N100, excluded at scan time); close > 200d SMA.",
+        "Entry": "BUY (next day's open) on a breakout: close > prior-40-day high AND volume ≥ 2× the 20d average volume. Single position (max 1); the highest volume-ratio breakout wins.",
+        "Exit": "Event exits (whichever first): target +100%, hard stop −20%, trailing stop −20% off the peak, or 120-day max hold.",
+        "Source": "Backtest+live: PIT `n500_membership.csv` MINUS `n100_membership.csv` (factsheet-derived). Prices: Fyers daily OHLCV.",
+    },
+}
+
+
+def rules_block(model: str) -> list:
+    """Markdown lines for the Rebalance / Filters / Entry / Exit / Source block."""
+    r = RULES.get(model)
+    if not r:
+        return []
+    out = ["", "## Trade rules", "", "| When | Rule |", "|---|---|"]
+    for k in ("Rebalance", "Universe & filters", "Entry", "Exit", "Source"):
+        if r.get(k):
+            out.append(f"| **{k}** | {r[k]} |")
+    return out
+
 
 def f(v, suf="%"):
     return f"{v:+.1f}{suf}" if isinstance(v, (int, float)) else str(v)
@@ -65,9 +125,10 @@ def write_summary(model: str, d: dict):
     title = info.get("title", model)
     lines = [f"# {title} (`{model}`)", "",
              f"**Status:** {info.get('live','—')}  ", info.get("strategy", ""), "",
-             f"**Universe:** {info.get('universe','—')}", "", WIN, "",
-             "## Results (net of costs)", "",
-             "| Metric | Value |", "|---|---|"]
+             f"**Universe:** {info.get('universe','—')}", "", WIN]
+    lines += rules_block(model)
+    lines += ["", "## Results (net of costs)", "",
+              "| Metric | Value |", "|---|---|"]
     if d.get("final_nav"):
         lines.append(f"| Final NAV (₹10L start) | ₹{d['final_nav']:,.0f} |")
     if "total_return_pct" in d:

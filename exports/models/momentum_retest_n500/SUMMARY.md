@@ -7,6 +7,16 @@ Monthly top-2 (K=2), 30d momentum, buy within 20% of 20-EMA, retain top-4 band.
 
 Backtest window: **2021-04-01 → 2026-05-29** (full ~5.1-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 bear).
 
+## Trade rules
+
+| When | Rule |
+|---|---|
+| **Rebalance** | Monthly (1st trading day) re-ranks the leaders; entry is scanned DAILY. |
+| **Universe & filters** | Top-120 by 20d ADV from PIT N500 minus Smallcap-250 (incl large+mid, NOT N100-excluded); close > 200d SMA; price ≤ ₹3000; 30d return > 10% (mom floor); 10d return > 0 (accelerating). |
+| **Entry** | Each month, watch the top-K=2 leaders; BUY one when its price sits within the retest band of the 20-EMA — between 20EMA×(1−1%) and 20EMA×(1+20%) — checked daily. Holds up to 2 equal-weight positions. |
+| **Exit** | Rotate: SELL a holding at the monthly rebalance when it drops out of the top-4 by 30d return (RETAIN=4). |
+| **Source** | Live: niftyindices.com `ind_nifty500list.csv` + `ind_niftysmallcap250list.csv` → nifty500.csv. Backtest: PIT `n500_membership.csv` (xlsx-verified). Prices: Fyers daily OHLCV. |
+
 ## Results (net of costs)
 
 | Metric | Value |

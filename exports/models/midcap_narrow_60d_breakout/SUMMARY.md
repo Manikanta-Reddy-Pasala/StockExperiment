@@ -7,6 +7,16 @@ Event-driven single-position breakout: 40d-high + 2× vol + >200DMA. Target +100
 
 Backtest window: **2021-04-01 → 2026-05-29** (full ~5.1-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 bear).
 
+## Trade rules
+
+| When | Rule |
+|---|---|
+| **Rebalance** | Breakouts scanned DAILY; the eligible band is rebuilt each year-start. |
+| **Universe & filters** | Top-100 by 20d ADV from (PIT N500 minus PIT N100, excluded at scan time); close > 200d SMA. |
+| **Entry** | BUY (next day's open) on a breakout: close > prior-40-day high AND volume ≥ 2× the 20d average volume. Single position (max 1); the highest volume-ratio breakout wins. |
+| **Exit** | Event exits (whichever first): target +100%, hard stop −20%, trailing stop −20% off the peak, or 120-day max hold. |
+| **Source** | Backtest+live: PIT `n500_membership.csv` MINUS `n100_membership.csv` (factsheet-derived). Prices: Fyers daily OHLCV. |
+
 ## Results (net of costs)
 
 | Metric | Value |
