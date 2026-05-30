@@ -110,8 +110,8 @@ def refresh_universe():
     log.info("=" * 80)
     Path(UNIVERSE_OUT).parent.mkdir(parents=True, exist_ok=True)
     _run(
-        ["python3", "tools/refresh_nifty100.py"],
-        "refresh_nifty100_csv", timeout=120,
+        ["python3", "tools/analysis/download_niftyindices.py"],
+        "refresh_nifty_universes", timeout=180,
     )
     _run(
         ["python3", "tools/models/momentum_n100_top5_max1/build_universe.py",

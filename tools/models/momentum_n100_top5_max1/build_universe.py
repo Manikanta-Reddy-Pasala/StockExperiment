@@ -97,7 +97,7 @@ def main():
     if not n100:
         # Empty list => the source CSV is missing/stale. Fail loudly so the
         # caller refreshes it instead of writing an empty universe.
-        log.error("Real Nifty 100 list empty. Run tools/refresh_nifty100.py first.")
+        log.error("Real Nifty 100 list empty. Run tools/analysis/download_niftyindices.py first.")
         return 1
 
     log.info(f"Loaded real NIFTY 100 ({len(n100)} stocks) from NSE CSV")

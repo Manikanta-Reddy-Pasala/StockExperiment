@@ -1,18 +1,21 @@
-"""Download current NSE index constituents from niftyindices.com — the
-REPLACEMENT for the old NSE get-quotes scraper (nse_mcap_scraper.py).
+"""Download current NSE index constituents from niftyindices.com — the single
+REPLACEMENT for the old NSE get-quotes scraper AND the per-index NSE scrapers
+(refresh_nifty100/500/midcap150/smallcap250.py) and the Wayback membership
+fetch+parse.
 
-Why this replaces the scraper:
-  * niftyindices is NOT WAF-blocked (plain HTTPS works from ANY IP incl the VM)
-    — no headless Chromium, no residential-IP / laptop dependency.
-  * The constituent CSVs are the authoritative index membership, refreshed by
-    NSE — exactly what we need for clean PIT universes.
-  * Per-stock free-float mcap (what the scraper fetched) is NOT in these CSVs,
-    but the climber overlay uses a price-derived proxy from the DB anyway, and
-    real historical FF-mcap is loaded from the index factsheets
-    (parse_nse_index_pdfs.py). So no mcap scrape is needed at all.
+Why this replaces all of them:
+  * niftyindices is NOT WAF-blocked (plain HTTPS, any IP incl the VM) — no
+    headless Chromium, no residential-IP/laptop dependency.
+  * Its constituent CSVs are the authoritative index membership in the EXACT
+    `Company Name,Industry,Symbol,Series,ISIN Code` layout the models already
+    parse (tools/shared/universes.py), so they drop straight into
+    src/data/symbols/*.csv.
 
-Pulls ind_nifty{50,100,200,500}list.csv -> exports/index_constituents/current/
-+ marks nifty_index_membership (review_date = run date).
+Writes:
+  * src/data/symbols/{nifty100,nifty500,nifty_midcap150,nifty_smallcap250}.csv
+    (the model universe files — replaces refresh_nifty*.py)
+  * exports/index_constituents/current/<raw>.csv (archive copy)
+  * marks nifty_index_membership (n50/100/200/500) when --load-db
 
 Run: python3 tools/analysis/download_niftyindices.py [--load-db] [--date YYYY-MM-DD]
 """
@@ -23,32 +26,36 @@ from datetime import date
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / "exports" / "index_constituents" / "current"
+SYMBOLS = ROOT / "src" / "data" / "symbols"
+ARCHIVE = ROOT / "exports" / "index_constituents" / "current"
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/120 Safari/537.36")
-INDICES = {"n50": "ind_nifty50list.csv", "n100": "ind_nifty100list.csv",
-           "n200": "ind_nifty200list.csv", "n500": "ind_nifty500list.csv"}
 BASE = "https://niftyindices.com/IndexConstituent/"
 
+# niftyindices file -> (membership index_name | None, model universe filename | None)
+FILES = {
+    "ind_nifty50list.csv":          ("n50",  None),
+    "ind_nifty100list.csv":         ("n100", "nifty100.csv"),
+    "ind_nifty200list.csv":         ("n200", None),
+    "ind_nifty500list.csv":         ("n500", "nifty500.csv"),
+    "ind_niftymidcap150list.csv":   (None,   "nifty_midcap150.csv"),
+    "ind_niftysmallcap250list.csv": (None,   "nifty_smallcap250.csv"),
+}
 
-def fetch_csv(fname: str):
+
+def fetch(fname: str):
     url = BASE + fname
-    # Prefer requests (bundles certifi); fall back to urllib w/ certifi, then to
-    # an unverified context (niftyindices is a public report host).
     try:
         import requests
-        raw = requests.get(url, headers={"User-Agent": UA}, timeout=30).text
+        return requests.get(url, headers={"User-Agent": UA}, timeout=30).text
     except ImportError:
         try:
             import certifi
             ctx = ssl.create_default_context(cafile=certifi.where())
         except ImportError:
             ctx = ssl._create_unverified_context()
-        req = Request(url, headers={"User-Agent": UA})
-        with urlopen(req, timeout=30, context=ctx) as r:
-            raw = r.read().decode("utf-8-sig", errors="replace")
-    rows = list(csv.DictReader(io.StringIO(raw)))
-    return rows, raw
+        with urlopen(Request(url, headers={"User-Agent": UA}), timeout=30, context=ctx) as r:
+            return r.read().decode("utf-8-sig", errors="replace")
 
 
 def main():
@@ -56,25 +63,30 @@ def main():
     ap.add_argument("--load-db", action="store_true")
     ap.add_argument("--date", default=None)
     a = ap.parse_args()
-    rev = date.fromisoformat(a.date) if a.date else date.today()
-    OUT.mkdir(parents=True, exist_ok=True)
+    rev = (date.fromisoformat(a.date) if a.date else date.today()).isoformat()
+    SYMBOLS.mkdir(parents=True, exist_ok=True)
+    ARCHIVE.mkdir(parents=True, exist_ok=True)
 
-    membership = []
-    counts = {}
-    for idx, fname in INDICES.items():
+    membership, counts = [], {}
+    for fname, (idx, target) in FILES.items():
         try:
-            rows, raw = fetch_csv(fname)
+            raw = fetch(fname)
         except Exception as e:
-            print(f"  ERR {idx} ({fname}): {type(e).__name__}: {e}"); continue
-        (OUT / fname).write_text(raw)
-        syms = [r["Symbol"].strip() for r in rows
-                if r.get("Symbol") and r.get("Series", "EQ").strip() in ("EQ", "")]
-        counts[idx] = len(syms)
-        for s in syms:
-            membership.append({"index_name": idx, "symbol": s, "review_date": rev.isoformat()})
-    print(f"downloaded {len(counts)} indices @ {rev}: "
-          + " ".join(f"{k}={v}" for k, v in counts.items()))
-    print(f"  saved -> {OUT}")
+            print(f"  ERR {fname}: {type(e).__name__}: {e}"); continue
+        if "Symbol" not in raw.splitlines()[0]:
+            print(f"  ERR {fname}: unexpected response (no Symbol header)"); continue
+        (ARCHIVE / fname).write_text(raw)
+        if target:
+            (SYMBOLS / target).write_text(raw)        # drop-in model universe file
+        rows = list(csv.DictReader(io.StringIO(raw)))
+        counts[idx or target] = len(rows)
+        if idx:
+            for r in rows:
+                if r.get("Symbol") and r.get("Series", "EQ").strip() in ("EQ", ""):
+                    membership.append({"index_name": idx, "symbol": r["Symbol"].strip(),
+                                       "review_date": rev})
+    print(f"downloaded @ {rev}: " + " ".join(f"{k}={v}" for k, v in counts.items()))
+    print(f"  model universes -> {SYMBOLS} | archive -> {ARCHIVE}")
 
     if a.load_db and membership:
         sys.path.insert(0, str(ROOT))

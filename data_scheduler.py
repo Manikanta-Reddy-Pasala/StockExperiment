@@ -451,35 +451,26 @@ def cleanup_old_csv_files(export_dir: Path, keep_days: int = 30):
 def refresh_universe_csvs():
     """
     Refresh all 4 Nifty universe CSVs (nifty100, nifty500, midcap150, smallcap250)
-    from NSE archives. NSE reconstitutes indices in March + September each year;
-    midcap150/smallcap250 also see periodic reshuffles. Run weekly to catch
-    additions/removals (e.g., FY25 IPOs entering Nifty 500).
+    from niftyindices.com. NSE reconstitutes indices in March + September each
+    year. Single downloader (tools/analysis/download_niftyindices.py) — REPLACED
+    the 4 per-index NSE scrapers (niftyindices is not WAF-blocked, runs anywhere)
+    and also marks nifty_index_membership.
 
     Files written:
-      - src/data/symbols/nifty100.csv
-      - src/data/symbols/nifty500.csv
-      - src/data/symbols/nifty_midcap150.csv
-      - src/data/symbols/nifty_smallcap250.csv
+      - src/data/symbols/{nifty100,nifty500,nifty_midcap150,nifty_smallcap250}.csv
     """
     logger.info("=" * 80)
-    logger.info("Refreshing Nifty universe CSVs from NSE")
+    logger.info("Refreshing Nifty universe CSVs from niftyindices.com")
     logger.info("=" * 80)
-    scripts = [
-        "tools/refresh_nifty100.py",
-        "tools/refresh_nifty500.py",
-        "tools/refresh_nifty_midcap150.py",
-        "tools/refresh_nifty_smallcap250.py",
-    ]
-    for s in scripts:
-        try:
-            r = subprocess.run(["python3", s], capture_output=True,
-                               text=True, timeout=60, cwd="/app")
-            if r.returncode == 0:
-                logger.info(f"  ✅ {s}: {r.stdout.strip().splitlines()[-1] if r.stdout.strip() else 'ok'}")
-            else:
-                logger.error(f"  ❌ {s} failed (rc={r.returncode}): {r.stderr.strip()[-200:]}")
-        except Exception as e:
-            logger.error(f"  ❌ {s} exception: {e}")
+    try:
+        r = subprocess.run(["python3", "tools/analysis/download_niftyindices.py", "--load-db"],
+                           capture_output=True, text=True, timeout=180, cwd="/app")
+        if r.returncode == 0:
+            logger.info(f"  ✅ download_niftyindices: {r.stdout.strip().splitlines()[-1] if r.stdout.strip() else 'ok'}")
+        else:
+            logger.error(f"  ❌ download_niftyindices failed (rc={r.returncode}): {r.stderr.strip()[-200:]}")
+    except Exception as e:
+        logger.error(f"  ❌ download_niftyindices exception: {e}")
 
 
 def update_symbol_master():

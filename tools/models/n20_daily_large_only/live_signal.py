@@ -354,7 +354,7 @@ def main() -> int:
     # Build Nifty 100 set (plain symbol form)
     n100 = {s for s, _ in nifty100_symbols()}
     if not n100:
-        log.error("Nifty 100 CSV missing — run tools/refresh_nifty100.py")
+        log.error("Nifty 100 CSV missing — run tools/analysis/download_niftyindices.py")
         Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
         Path(args.signals_out).write_text(json.dumps([]))
         return 1

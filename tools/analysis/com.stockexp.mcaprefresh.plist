@@ -15,10 +15,13 @@
     <string>/bin/bash</string>
     <string>/Users/manip/Documents/codeRepo/StockExperiment/tools/analysis/refresh_mcap.sh</string>
   </array>
-  <!-- 02:30 on the 1st of EVERY month (monthly mcap track). The membership
-       snapshot inside refresh_mcap.sh stays gated to Apr & Sep (NSE reviews). -->
+  <!-- 02:30 on 1 Mar + 1 Sep — the NSE semi-annual index reviews. Index
+       constituents only change twice a year, so no monthly pull is needed. -->
   <key>StartCalendarInterval</key>
-  <dict><key>Day</key><integer>1</integer><key>Hour</key><integer>2</integer><key>Minute</key><integer>30</integer></dict>
+  <array>
+    <dict><key>Month</key><integer>3</integer><key>Day</key><integer>1</integer><key>Hour</key><integer>2</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Month</key><integer>9</integer><key>Day</key><integer>1</integer><key>Hour</key><integer>2</integer><key>Minute</key><integer>30</integer></dict>
+  </array>
   <key>StandardOutPath</key>
   <string>/tmp/mcaprefresh.out.log</string>
   <key>StandardErrorPath</key>

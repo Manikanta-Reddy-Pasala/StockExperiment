@@ -90,6 +90,6 @@ def refresh_universe():
     log.info("n20_daily_large_only universe refresh (Nifty 100 from NSE)")
     log.info("=" * 80)
     _run(
-        ["python3", "tools/refresh_nifty100.py"],
-        "refresh_nifty100_csv", timeout=120,
+        ["python3", "tools/analysis/download_niftyindices.py"],
+        "refresh_nifty_universes", timeout=180,
     )

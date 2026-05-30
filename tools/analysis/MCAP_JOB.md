@@ -5,8 +5,10 @@ already ranks top-100 / top-500 but which NSE hasn't officially added yet (NSE
 reviews semi-annually → there's a lag). When NSE promotes them, inclusion flows
 + momentum lift; we enter ahead.
 
-All code lives in this repo (`tools/analysis/`). The launchd job runs on a
-residential-IP Mac because NSE's WAF 403s the VM and plain scripts.
+All code lives in this repo (`tools/analysis/`). Data now comes from
+niftyindices.com (NOT WAF-blocked → runs anywhere incl the VM); the old
+get-quotes scraper is retired. The launchd job fires only at the NSE
+semi-annual reviews (1 Mar + 1 Sep) since constituents change twice a year.
 
 ## Files
 
@@ -17,7 +19,7 @@ residential-IP Mac because NSE's WAF 403s the VM and plain scripts.
 | `mcap_inclusion_model.py` | PIT backtest. `ff_shares = ff_mcap/ltp`; `ff_mcap[t] = ff_shares × close[t]`; monthly rank; CANDIDATE = mcap rank ≤ cutoff AND not yet in `eligible_at(target)` AND 30d-ret>0. `--target n100\|n500 --k 5`. |
 | `refresh_mcap.sh` | Rebuild candidate list (**full NSE equity universe**, no ADV cap) → scrape → **persist to Postgres** → rsync CSV to VM + `docker cp` into app. |
 | `mcap_db.py` | Postgres persistence: `market_cap_history` (every run) + `nifty_index_membership` (Apr & Sep reviews). CLI: `init` / `load-mcap` / `snapshot-membership` / `status`. |
-| `com.stockexp.mcaprefresh.plist` | launchd template — 02:30 on the **1st of every month** (monthly mcap track). |
+| `com.stockexp.mcaprefresh.plist` | launchd template — 02:30 on **1 Mar + 1 Sep** (the NSE semi-annual reviews; constituents only change twice a year). |
 
 ## Postgres tables (historical track)
 
