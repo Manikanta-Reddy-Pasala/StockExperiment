@@ -192,10 +192,13 @@ All timestamps render in IST via `window.fmtIST` helper in `base.html` (naive IS
 
 ## Data
 
-- **Postgres** historical_data table — 4 years of daily OHLCV for ~2400 NSE-EQ stocks
+📄 **Full reference: [DATA_PIPELINE.md](DATA_PIPELINE.md)** — every data fetch + populate path (source → fetcher code → table/file → schedule), incl. Fyers OHLCV, token refresh, universe lists, PIT membership, NSE market-cap scrape + `market_cap_history` / `nifty_index_membership` tables, options bhavcopy, holidays, the data-quality gate, signals/audit/ledger tables, and the full scheduler job map.
+
+- **Postgres** historical_data table — daily OHLCV for ~2400 NSE-EQ stocks (n100 universe back to 2019-04)
 - Weekly Sunday 03:00 IST full backfill via `tools/shared/prefetch_ohlcv.py --universe all`
-- Per-model daily incremental pulls at 20:30-45 IST
+- Per-model daily incremental pulls at 20:30 IST
 - Symbol master refresh Mon 06:00 IST
+- NSE free-float market cap: quarterly + Sep scrape → `exports/nse_mcap.csv` + `market_cap_history` (see `tools/analysis/MCAP_JOB.md`)
 - Live LTP overlaid on every UI display via Fyers `quotes_multiple` API (`_resolve_live_prices` in `admin_routes.py`)
 
 ---
