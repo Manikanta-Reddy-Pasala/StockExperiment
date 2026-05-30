@@ -10,7 +10,7 @@
     "ret_pct": 1.08,
     "cap_after": 1010795.0,
     "exit_reason": "ROTATE",
-    "cap": "large"
+    "cap": "mid"
   },
   {
     "sym": "JSWSTEEL",
@@ -205,7 +205,7 @@
     "ret_pct": -1.71,
     "cap_after": 692486.0,
     "exit_reason": "ROTATE",
-    "cap": "mid"
+    "cap": "large"
   },
   {
     "sym": "BAJAJFINSV",
@@ -309,7 +309,7 @@
     "ret_pct": 0.05,
     "cap_after": 668824.0,
     "exit_reason": "ROTATE",
-    "cap": "large"
+    "cap": "mid"
   },
   {
     "sym": "ETERNAL",
@@ -543,7 +543,7 @@
     "ret_pct": 2.6,
     "cap_after": 3438198.0,
     "exit_reason": "ROTATE",
-    "cap": "mid"
+    "cap": "large"
   },
   {
     "sym": "MAZDOCK",
@@ -647,7 +647,7 @@
     "ret_pct": 32.15,
     "cap_after": 7490817.0,
     "exit_reason": "ROTATE",
-    "cap": "mid"
+    "cap": "large"
   },
   {
     "sym": "ONGC",

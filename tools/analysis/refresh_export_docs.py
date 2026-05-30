@@ -31,7 +31,7 @@ DESC = {
         "title": "Weekly Top-40", "live": "LIVE",
         "universe": "Top-40 by ADV ∩ Nifty 100",
         "strategy": "WEEKLY rotation (first trading day of each ISO week), single position, uptrend gate.",
-        "note": "Weekly rebalance cut the daily whipsaw (55% of daily trades held ≤3d). +59% vs +55% CAGR 2023-26, lower DD; +20.6% vs +13.7% on the full 2021-26 cycle.",
+        "note": "Weekly rebalance cut the daily whipsaw (55% of daily trades held ≤3d). Full-cycle 2021-04→2026-05 on the AUTHORITATIVE PIT Nifty-100 (2026-05-31 rebuild) ≈ +40.3% CAGR / 36.9% DD / Calmar 1.09 — the clean membership (no DUMMYREL/BHEL/IDEA garbage) lifted it from +25%/0.45.",
     },
     "momentum_retest_n500": {
         "title": "Retest Momentum", "live": "DISABLED (₹0)",
@@ -43,13 +43,13 @@ DESC = {
         "title": "Emerging Momentum", "live": "LIVE",
         "universe": "Top-100 by 20d ADV from emerging mid/small (PIT N500 minus N100)",
         "strategy": "Single-position (max-1) momentum rotation: 15d return >0, price ≤₹3000 (no SMA gate); retain top-3; monthly (1st trading day) + mid-month check that rotates only on a ≥5pp lead.",
-        "note": "Single-position max-1, emerging mid/small, run_rotation engine + MCAP-CLIMBER filter (keep only rising-mcap-rank names). Full-period 2023-26 ≈ +111% CAGR / 23% DD gross (climber ON; OFF baseline ≈ +98%).",
+        "note": "Single-position max-1, emerging mid/small, run_rotation engine + MCAP-CLIMBER filter (keep only rising-mcap-rank names). Full-cycle 2021-04→2026-05 on AUTHORITATIVE PIT membership (2026-05-31) ≈ +46.1% CAGR / 37.7% DD / Calmar 1.22. ⚠ The old +121% headline was a MIRAGE — the buggy Wayback N100 was missing large-cap winners (ADANIGREEN etc), so this 'mid/small' model wrongly held them. Correct N100 exclusion ⇒ genuinely mid/small ⇒ +46%.",
     },
     "midcap_narrow_60d_breakout": {
         "title": "Midcap Breakout", "live": "LIVE",
         "universe": "PIT midcap — top-100 ADV from N500 minus Nifty 100 (excluded at SCAN time)",
         "strategy": "Event-driven single-position breakout: 40d-high + 2× vol + >200DMA. Target +100% / stop −20% / trail −20% off peak / 120d max-hold.",
-        "note": "⚠️ Lumpy single-position event model (only ~15 trades/5yr). Full-cycle 2021-04→2026-05 ≈ +40% CAGR / 22% DD / Calmar 1.82 after the 2026-05-31 trade-time PIT-Nifty-100 exclusion fix (a name promoted to large mid-year was leaking in and dragging returns; excluding it at scan time lifted CAGR +13pp and halved DD).",
+        "note": "⚠️ Lumpy single-position event model (only ~16 trades/5yr). On AUTHORITATIVE PIT membership (2026-05-31) the full-cycle 2021-04→2026-05 is ≈ +1.65% CAGR / 68% DD / Calmar 0.02 — effectively DEAD. Its earlier +40% was living off large-cap winners that leaked through the buggy Wayback N100 exclusion; with the correct PIT N100 removed it has no edge. Confirms the long-standing 'midcap ignore' call.",
     },
 }
 

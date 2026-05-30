@@ -6,12 +6,12 @@ All figures net of costs, ₹10L start, true point-in-time universes.
 
 | Model | Status | CAGR | maxDD | Calmar | Total |
 |---|---|---|---|---|---|
-| [Emerging Momentum](emerging_momentum/SUMMARY.md) | LIVE | +121.7% | 24.9% | 4.88 | +5970.9% |
 | [Retest Momentum](momentum_retest_n500/SUMMARY.md) | DISABLED (₹0) | +77.8% | 37.5% | 2.08 | +1844.5% |
 | [Liquid 100 Momentum](momentum_pseudo_n100_adv/SUMMARY.md) | LIVE | +63.5% | 37.6% | 1.69 | +1164.5% |
-| [Nifty 100 Momentum](momentum_n100_top5_max1/SUMMARY.md) | LIVE | +42.5% | 43.5% | 0.98 | +521.5% |
-| [Midcap Breakout](midcap_narrow_60d_breakout/SUMMARY.md) | LIVE | +40.0% | 22.0% | 1.82 | +467.4% |
-| [Weekly Top-40](n40/SUMMARY.md) | LIVE | +25.0% | 55.5% | 0.45 | +215.7% |
+| [Emerging Momentum](emerging_momentum/SUMMARY.md) | LIVE | +46.0% | 37.7% | 1.22 | +605.6% |
+| [Weekly Top-40](n40/SUMMARY.md) | LIVE | +40.3% | 36.9% | 1.09 | +473.9% |
+| [Nifty 100 Momentum](momentum_n100_top5_max1/SUMMARY.md) | LIVE | +34.5% | 52.2% | 0.66 | +362.1% |
+| [Midcap Breakout](midcap_narrow_60d_breakout/SUMMARY.md) | LIVE | +1.6% | 68.2% | 0.02 | +8.8% |
 
 **Caveats:**
 - `momentum_pseudo_n100_adv` = optimistic upper bound (ADV-selection bias, not real index).

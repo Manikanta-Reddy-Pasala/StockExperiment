@@ -11,18 +11,18 @@ Backtest window: **2021-04-01 → 2026-05-29** (full ~5.1-year cycle: 2021 bull,
 
 | Metric | Value |
 |---|---|
-| Final NAV (₹10L start) | ₹5,673,731 |
-| Total return | +467.4% |
-| CAGR (annualized) | +40.0% |
-| Max drawdown | 22.0% |
-| Calmar | 1.82 |
-| Trades | 15 (10W / 5L) · 67% win |
+| Final NAV (₹10L start) | ₹1,088,048 |
+| Total return | +8.8% |
+| CAGR (annualized) | +1.6% |
+| Max drawdown | 68.2% |
+| Calmar | 0.02 |
+| Trades | 16 (6W / 10L) · 38% win |
 
 ## Note
 
-⚠️ Lumpy single-position event model (only ~15 trades/5yr). Full-cycle 2021-04→2026-05 ≈ +40% CAGR / 22% DD / Calmar 1.82 after the 2026-05-31 trade-time PIT-Nifty-100 exclusion fix (a name promoted to large mid-year was leaking in and dragging returns; excluding it at scan time lifted CAGR +13pp and halved DD).
+⚠️ Lumpy single-position event model (only ~16 trades/5yr). On AUTHORITATIVE PIT membership (2026-05-31) the full-cycle 2021-04→2026-05 is ≈ +1.65% CAGR / 68% DD / Calmar 0.02 — effectively DEAD. Its earlier +40% was living off large-cap winners that leaked through the buggy Wayback N100 exclusion; with the correct PIT N100 removed it has no edge. Confirms the long-standing 'midcap ignore' call.
 
-**Open position at window end:** TEJASNET qty 10902 entry ₹538.94 on 2026-05-08 (unrealized +0)
+**Open position at window end:** POWERINDIA qty 28 entry ₹27827.8 on 2026-04-13 (unrealized +0)
 
 ---
 *Auto-generated from summary.json by tools/analysis/refresh_export_docs.py — do not hand-edit.*
