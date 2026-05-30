@@ -4,22 +4,22 @@
   "end": "2026-05-12",
   "years": 2.992,
   "capital": 1000000.0,
-  "final_nav": 15361000.0,
-  "total_return_pct": 1436.1,
-  "cagr_pct": 149.15,
+  "final_nav": 15652154.0,
+  "total_return_pct": 1465.22,
+  "cagr_pct": 150.72,
   "max_dd_pct": 16.17,
-  "calmar": 9.22,
+  "calmar": 9.32,
   "trades": 27,
   "wins": 24,
   "losses": 3,
   "win_rate_pct": 88.9,
   "open_position": {
     "sym": "ADANIGREEN",
-    "qty": 11743,
+    "qty": 11966,
     "entry_px": 1290.7,
     "entry_date": "2026-05-04",
     "last_px": 1308.0,
-    "mtm_value": 15359844.0,
-    "unrealized_pnl": 203154.0
+    "mtm_value": 15651528.0,
+    "unrealized_pnl": 207012.0
   }
 }

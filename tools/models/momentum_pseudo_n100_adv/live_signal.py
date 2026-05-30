@@ -49,12 +49,12 @@ sys.path.insert(0, str(ROOT))
 from tools.shared.ohlcv_cache import read_cached  # noqa: E402
 from tools.shared.rotation_strategy import decide_rotation  # noqa: E402
 from tools.shared.nse_calendar import is_first_trading_day_of_month  # noqa: E402
+from tools.models.momentum_pseudo_n100_adv.strategy import (  # noqa: E402  shared w/ backtest
+    LOOKBACK, MAX_PRICE, SMA_LONG, RETAIN)
 
 log = logging.getLogger("momrot_pseudo_signal")
 
 MODEL_NAME = "momentum_pseudo_n100_adv"
-MAX_PRICE = 3000.0  # skip very-large priced names that hurt CAGR in backtest
-SMA_LONG = 200  # uptrend filter — must hold close > 200d SMA (backtest parity)
 SMALLCAP_CSV = "/app/src/data/symbols/nifty_smallcap250.csv"
 
 
@@ -202,7 +202,7 @@ def _close_above_sma200(symbol: str, today_ts: int) -> bool:
 
 
 def rank_universe(symbols: List[str], today_ts: int,
-                  lookback_days: int = 30) -> List[tuple]:
+                  lookback_days: int = LOOKBACK) -> List[tuple]:
     """Return [(symbol, name, 30d_return_pct, current_price)] sorted desc.
 
     Filters applied (backtest parity):
@@ -278,7 +278,7 @@ def is_model_enabled() -> bool:
 
 
 def emit_signals(top_picks: List[tuple], pos: Optional[Dict],
-                 top_n: int, retain_top_n: int = 1) -> List[Dict]:
+                 top_n: int, retain_top_n: int = RETAIN) -> List[Dict]:
     # Decision comes from the SHARED rotation core (tools/shared/rotation_strategy)
     # — the exact same rule backtest.py uses, so live and backtest cannot drift.
     # retain_top_n=1 = top-1 rotation. Was top-5 before 2026-05-26.

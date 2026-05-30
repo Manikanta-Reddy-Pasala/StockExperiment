@@ -35,10 +35,8 @@ from tools.shared.universes import nifty500_symbols
 from tools.shared.backtest_engine import run_rotation_backtest
 
 
-LOOKBACK = 30
-ADV_WIN  = 20
-UNIV_SIZE = 100
-MAX_PRICE = 3000  # skip stocks > ₹3000 at entry (DIXON/MARUTI etc were big losers)
+from tools.models.momentum_pseudo_n100_adv.strategy import (  # noqa: E402  shared w/ live
+    LOOKBACK, ADV_WIN, UNIV_SIZE, MAX_PRICE, RETAIN, build_calendar)
 # Drop Small-cap NSE Nifty Smallcap 250 stocks from universe (free +2pp CAGR, DD unchanged).
 import csv as _csv
 _SML_PATH = str(ROOT / "src" / "data" / "symbols" / "nifty_smallcap250.csv")
@@ -67,7 +65,7 @@ DEFAULT_CAP   = 1_000_000.0
 
 
 def run(start: date, end: date, capital: float, out_dir: Path | None = None,
-        retain_top_n: int = 1, data_source: str = "fyers"):
+        retain_top_n: int = RETAIN, data_source: str = "fyers"):
     """Run the full pseudo-N100 momentum-rotation backtest.
 
     Builds the price/ADV panels from historical_data, rebuilds the
@@ -141,22 +139,8 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
                 chosen = ys
         return year_universes.get(chosen, [])
 
-    # Build the monthly rebalance calendar: the first trading day on/after the
-    # 1st of each month within [start, end], plus `start` itself as day one.
-    rebal_set = set()
-    y, m = start.year, start.month
-    while True:
-        target = pd.Timestamp(y, m, 1)
-        fut = dates[dates >= target]
-        if len(fut) == 0 or fut[0].date() > end: break
-        if fut[0].date() >= start:
-            rebal_set.add(fut[0])  # snap 1st-of-month to next trading day
-        m += 1
-        if m > 12: m = 1; y += 1  # roll month into next year
-    sd = pd.Timestamp(start)
-    if sd in dates: rebal_set.add(sd)
-    rebal = sorted(rebal_set)
-    calendar = [(d, "full") for d in rebal]  # engine expects (date, kind) tuples
+    # Monthly rebalance calendar from the SHARED core (no mid-month for pseudo).
+    calendar = build_calendar(dates, start, end, mid_check=False)
 
     # SELECTION layer: yearly-PIT pseudo-N100, uptrend (>200d SMA) + MAX_PRICE
     # filter, ranked by 30-day return. EXECUTION is the shared engine.
