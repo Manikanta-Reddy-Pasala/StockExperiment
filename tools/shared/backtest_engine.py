@@ -42,6 +42,8 @@ class BacktestResult:
     years: float
     open_position: Optional[Dict] = field(default=None)
     max_dd_mtm_pct: float = 0.0   # daily mark-to-market drawdown (daily models, e.g. n20)
+    nav_dates: List = field(default_factory=list)    # calendar-step timestamps
+    nav_values: List = field(default_factory=list)   # MTM NAV at each step
 
 
 def run_rotation_backtest(
@@ -154,9 +156,11 @@ def run_rotation_backtest(
     roll = nav_s.cummax()
     mtm_dd = float(((roll - nav_s) / roll).max()) * 100 if len(nav_s) > 1 else 0.0
 
+    nav_dates = [pd.Timestamp(start)] + [d for d, _ in calendar]
     return BacktestResult(
         final_nav=final, cagr_pct=cagr, max_dd_pct=mdd, calmar=calmar,
         trades=trades, wins=wins, losses=losses,
         win_rate_pct=wins / max(1, wins + losses) * 100,
         years=yrs, open_position=open_pos, max_dd_mtm_pct=mtm_dd,
+        nav_dates=nav_dates[:len(nav_marks)], nav_values=nav_marks,
     )
