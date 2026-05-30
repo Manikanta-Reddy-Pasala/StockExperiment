@@ -73,44 +73,42 @@ DB. The "populated by" code below is the source of truth for schema.
 | | |
 |---|---|
 | **What** | Current Nifty 100 / 500 / Midcap 150 / Smallcap 250 constituents |
-| **Source** | NSE official `ind_nifty*list.csv` (browser User-Agent fetch) |
-| **Fetchers** | `tools/refresh_nifty100.py`, `…500.py`, `…midcap150.py`, `…smallcap250.py` |
+| **Source** | **niftyindices.com** `IndexConstituent/ind_nifty*list.csv` (NOT WAF-blocked, plain HTTPS, runs anywhere incl the VM) |
+| **Downloader** | `tools/analysis/download_niftyindices.py` — ONE script writes all four universe CSVs + marks membership. **Replaced** the 4 per-index NSE scrapers (`refresh_nifty*.py`, deleted 2026-05-30). |
 | **Files** | `src/data/symbols/nifty{100,500,_midcap150,_smallcap250}.csv` |
-| **Triggers** | **Sat 06:00** `refresh_universe_csvs()` (all four); **daily 06:00** `daily_universe_csv_check()` (re-fetch if stale >7d). Per-model monthly: `tools/models/<m>/cron.py::_monthly_universe()` at **06:30** (1st of month) → `build_universe.py` → `logs/momrot/universes/n100_current.json` |
+| **Triggers** | **Sat 06:00** `refresh_universe_csvs()` (now runs `download_niftyindices.py --load-db`); **daily 06:00** `daily_universe_csv_check()` (re-fetch if stale >7d). Per-model monthly: `tools/models/<m>/data_pull.py` also calls the downloader at the monthly rebalance → `build_universe.py` → `logs/momrot/universes/n100_current.json` |
 
 ## 6. NSE index membership (point-in-time, survivorship-free)
 
 | | |
 |---|---|
 | **What** | Half-open membership intervals `(symbol, start_date, end_date)` so backtests use the index as it WAS on each date |
-| **Source** | Wayback NSE snapshots in `/tmp/n_snapshots/n{100,500}/…csv` (`tools/analysis/fetch_wayback_index_snapshots.py`, setup-only) |
-| **Builder** | `tools/analysis/build_membership_table.py` (LAST-KNOWN-STATE rule; `_TICKER_ALIAS` maps renames e.g. TATAMOTORS→TMPV, ZOMATO→ETERNAL) |
-| **Loader API** | `tools/shared/index_membership.py::eligible_at(index, date)` + `universe_union(index)` |
+| **Source** | NSE index factsheet PDFs (`indices_dataMar2021-2026` dump) parsed by `tools/analysis/parse_nse_index_pdfs.py` → authoritative PIT constituents w/ real FF-mcap. (Old Wayback scrape+parse — `fetch_wayback_index_snapshots.py` + `build_membership_table.py` — **deleted 2026-05-30**.) `_TICKER_ALIAS` in `index_membership.py` maps renames (TATAMOTORS→TMPV, ZOMATO→ETERNAL). |
+| **Loader API** | `tools/shared/index_membership.py::eligible_at(index, date)` + `universe_union(index)` (reads the membership CSVs) |
 | **Files** | `src/data/symbols/n{100,500}_membership.csv` |
 | **DB archive** | `nifty_index_membership` (index_name, symbol, review_date) — see §8 |
 
 ---
 
-## 7. NSE free-float market cap (pre-inclusion model)
+## 7. Free-float market cap + the climber / pre-inclusion model
 
 | | |
 |---|---|
-| **What** | Per-stock total + free-float market cap (₹ Cr) + LTP, for the "joining Nifty 100/500" anticipation model |
-| **Source** | NSE get-quotes pages — headless **full Chromium** (NSE WAF 403s plain scripts, datacenter IPs, and `headless_shell`; only full-Chromium from a residential IP works) |
-| **Downloader** | `tools/analysis/download_niftyindices.py` (current n50/100/200/500 constituent CSVs from niftyindices.com — NOT WAF-blocked, runs anywhere). REPLACED the old `nse_mcap_scraper.py` (NSE get-quotes headless Chromium, deleted 2026-05-30). Real per-stock FF-mcap from `parse_nse_index_pdfs.py` (factsheet PDFs). |
-| **Working file** | `exports/nse_mcap.csv` (symbol, total_mcap_cr, ff_mcap_cr, ltp) — the file the model reads |
-| **Model** | `tools/analysis/mcap_inclusion_model.py` (`--target n100\|n500`) — rank by reconstructed FF-mcap, buy names above the cutoff not yet in the index |
-| **Job** | `tools/analysis/refresh_mcap.sh`: rebuild candidates → scrape → **load to Postgres** → rsync CSV to VM + `docker cp` into app |
-| **Schedule** | launchd `~/Library/LaunchAgents/com.stockexp.mcaprefresh.plist` (tracked template: `tools/analysis/com.stockexp.mcaprefresh.plist`) — 02:30 on **1 Jan / Apr / Jul / Sep / Oct**. Runs LOCALLY (the VM can't reach NSE). See `tools/analysis/MCAP_JOB.md`. |
+| **What** | Per-stock free-float market cap (₹ Cr) — feeds the emerging-momentum CLIMBER filter + the "joining Nifty 100/500" research model |
+| **Source** | **Real FF-mcap**: NSE index factsheet PDFs (`parse_nse_index_pdfs.py`, semi-annual). **Working proxy**: `exports/nse_mcap.csv` (FF-shares = ff_mcap/latest DB close, price-driven) — the file `strategy.py` reads. (The old NSE get-quotes scraper `nse_mcap_scraper.py` is **deleted**.) |
+| **Model/use** | `tools/models/emerging_momentum/strategy.py` climber filter (live); research: `tools/analysis/mcap_inclusion_model.py` / `mcap_overlay.py` (both `--target n100\|n500`) |
+| **Job** | `tools/analysis/refresh_mcap.sh`: `download_niftyindices.py --load-db` → `mcap_db.py snapshot-membership` → rsync constituent CSVs to VM |
+| **Schedule** | launchd `~/Library/LaunchAgents/com.stockexp.mcaprefresh.plist` (tracked: `tools/analysis/com.stockexp.mcaprefresh.plist`) — 02:30 on **1 Mar + 1 Sep** (NSE semi-annual reviews; constituents change twice a year). Runs anywhere (niftyindices not blocked). See `tools/analysis/MCAP_JOB.md`. |
 
-## 8. Market-cap + membership history (permanent track)
+## 8. Index market-cap + membership history (permanent track)
 
 | | |
 |---|---|
 | **What** | Append-only archive so mcap + index membership drift is queryable over time |
-| **Code** | `tools/analysis/mcap_db.py` (`init` / `load-mcap` / `snapshot-membership` / `status`) |
-| **`market_cap_history`** | PK (symbol, snapshot_date): total/FF mcap ₹Cr, LTP, derived `ff_shares`, source. Filled **every** mcap run (`load-mcap`, from `exports/nse_mcap.csv`) |
-| **`nifty_index_membership`** | PK (index_name, symbol, review_date): full n100/n500 list. Snapshotted on **Apr & Sep** runs (`snapshot-membership`, from `eligible_at`). Seeded 2026-04-01: n100=105, n500=519 |
+| **Code** | `tools/analysis/mcap_db.py` (`init` / `load-mcap` / `snapshot-membership` / `status`); `parse_nse_index_pdfs.py --load-db` (factsheets) |
+| **`market_cap_history`** | PK (symbol, snapshot_date): total/FF mcap ₹Cr, derived `ff_shares`, source. Real FF-mcap loaded from factsheets (`nse_index_factsheet`); ~4.4k rows incl semi-annual 2021-2026. |
+| **`nifty_index_membership`** | PK (index_name, symbol, review_date): real PIT membership n50/100/200/500 from factsheets + the Mar/Sep refresh. ~4.8k rows. |
+| **Index OHLC** | `tools/analysis/download_nifty_index_history.py` pulls NIFTY 50/100/500 index levels (niftyindices Backpage API) → `historical_data` (`data_source='niftyindices'`). NOTE: that API is rate-limited/flaky for bulk backfill; regime detection currently uses a large-cap basket proxy instead. |
 
 ## 9. Options bhavcopy (F&O)
 
@@ -192,8 +190,8 @@ DB. The "populated by" code below is the source of truth for schema.
 | Sun 03:00 | `backfill_full_history` | `historical_data*` (full 1500d) |
 | 03:30 | `refresh_fyers_token_job` | `broker_configurations` |
 | 04:00 | `refresh_nse_holidays_monthly` | `logs/nse_holidays.json` |
-| daily 06:00 | `daily_universe_csv_check` | `src/data/symbols/*.csv` |
-| Sat 06:00 | `refresh_universe_csvs` | `src/data/symbols/*.csv` |
+| daily 06:00 | `daily_universe_csv_check` | `src/data/symbols/*.csv` (re-fetch if stale) |
+| Sat 06:00 | `refresh_universe_csvs` → `download_niftyindices.py` | `src/data/symbols/*.csv` + `nifty_index_membership` |
 | Mon 06:00 | `update_symbol_master` | `stocks`, `symbol_master` |
 | per-model 06:30 | `_monthly_universe` (1st) | `logs/momrot/universes/*.json` |
 | 09:00 | `pre_market_data_quality_gate` | `logs/data_quality_gate.json` |
@@ -201,7 +199,7 @@ DB. The "populated by" code below is the source of truth for schema.
 | per-model 20:30 | `pull_daily_ohlcv` | `historical_data` (incremental) |
 | 22:00 | `export_daily_csv`, `validate_data_quality` | `exports/*.csv` |
 | 22:05 | `snapshot_data_quality_audit` | data-quality audit |
-| 02:30 (launchd, quarterly+Sep) | `refresh_mcap.sh` | `exports/nse_mcap.csv`, `market_cap_history`, `nifty_index_membership` |
+| 02:30 (launchd, **1 Mar + 1 Sep**) | `refresh_mcap.sh` → `download_niftyindices.py` | constituent CSVs, `nifty_index_membership` (real mcap from factsheets) |
 
 ## Key env vars
 
