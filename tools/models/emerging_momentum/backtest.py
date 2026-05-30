@@ -39,7 +39,7 @@ from tools.shared.index_membership import universe_union
 from tools.shared.backtest_engine import run_rotation_backtest
 from tools.models.emerging_momentum import strategy as S
 
-DEFAULT_START = date(2021, 4, 1)
+DEFAULT_START = date(2021, 3, 1)
 DEFAULT_END = date(2026, 5, 29)
 DEFAULT_CAP = 1_000_000.0
 

@@ -21,18 +21,18 @@ Backtest window: **2021-04-01 → 2026-05-29** (full ~5.1-year cycle: 2021 bull,
 
 | Metric | Value |
 |---|---|
-| Final NAV (₹10L start) | ₹1,088,048 |
-| Total return | +8.8% |
-| CAGR (annualized) | +1.6% |
-| Max drawdown | 68.2% |
-| Calmar | 0.02 |
-| Trades | 16 (6W / 10L) · 38% win |
+| Final NAV (₹10L start) | ₹1,746,287 |
+| Total return | +74.6% |
+| CAGR (annualized) | +11.2% |
+| Max drawdown | 57.2% |
+| Calmar | 0.2 |
+| Trades | 13 (8W / 5L) · 62% win |
 
 ## Note
 
 ⚠️ Lumpy single-position event model (only ~16 trades/5yr). On AUTHORITATIVE PIT membership (2026-05-31) the full-cycle 2021-04→2026-05 is ≈ +1.65% CAGR / 68% DD / Calmar 0.02 — effectively DEAD. Its earlier +40% was living off large-cap winners that leaked through the buggy Wayback N100 exclusion; with the correct PIT N100 removed it has no edge. Confirms the long-standing 'midcap ignore' call.
 
-**Open position at window end:** POWERINDIA qty 28 entry ₹27827.8 on 2026-04-13 (unrealized +0)
+**Open position at window end:** AMBER qty 229 entry ₹7448.44 on 2026-02-11 (unrealized +0)
 
 ---
 *Auto-generated from summary.json by tools/analysis/refresh_export_docs.py — do not hand-edit.*

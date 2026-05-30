@@ -26,7 +26,7 @@ from tools.shared.index_membership import universe_union, eligible_at
 from tools.models.momentum_retest_n500 import strategy as S
 
 COST = 0.0015
-DEFAULT_START = date(2021, 4, 1)
+DEFAULT_START = date(2021, 3, 1)
 DEFAULT_END = date(2026, 5, 29)
 DEFAULT_CAP = 1_000_000.0
 

@@ -42,7 +42,7 @@ from tools.models.momentum_n100_top5_max1.strategy import (
 # tools.shared.index_membership.eligible_at instead.
 N100_CSV = str(ROOT / "src" / "data" / "symbols" / "nifty100.csv")
 
-DEFAULT_START = date(2021, 4, 1)
+DEFAULT_START = date(2021, 3, 1)
 DEFAULT_END   = date(2026, 5, 29)
 DEFAULT_CAP   = 1_000_000.0
 

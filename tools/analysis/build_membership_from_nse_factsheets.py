@@ -169,15 +169,45 @@ def build_intervals(snaps: dict) -> list[tuple[str, str, str]]:
     return rows
 
 
+def load_wayback_snaps(wb_dir: Path, prefix: str) -> dict:
+    """Read supplementary Wayback captures {prefix}_{YYYYMMDD}.csv -> {date: set}.
+    Used to fill factsheet gaps with real historical snapshots (e.g. an N100
+    capture inside the Sep2022–Mar2024 Next-50 hole)."""
+    out: dict[date, set[str]] = {}
+    if not wb_dir or not wb_dir.exists():
+        return out
+    for p in sorted(wb_dir.glob(f"{prefix}_*.csv")):
+        ts = p.stem.split("_")[-1]
+        if len(ts) != 8 or not ts.isdigit():
+            continue
+        d = date(int(ts[:4]), int(ts[4:6]), int(ts[6:8]))
+        with open(p) as f:
+            members = {r["Symbol"].strip() for r in csv.DictReader(f)
+                       if r.get("Symbol") and r.get("Series", "EQ").strip() in ("EQ", "")}
+        if members:
+            out[d] = members
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--indices-dir", required=True, help="indices_dataMar2021-2026 folder")
     ap.add_argument("--xlsx", required=True, help="Nifty500_Rebalancing_v2.xlsx")
+    ap.add_argument("--wayback-dir", default=str(SYM_DIR / "wayback_snapshots"),
+                    help="supplementary Wayback snapshot CSVs (n100_*/n500_*); fills factsheet gaps")
     ap.add_argument("--dry-run", action="store_true", help="print validation only, don't write CSVs")
     a = ap.parse_args()
 
     n100_snaps, n500_pdf = extract_snapshots(Path(a.indices_dir).expanduser())
     n500_snaps = n500_from_xlsx(Path(a.xlsx).expanduser())
+
+    # Merge supplementary Wayback snapshots (factsheet takes precedence on a shared
+    # date; Wayback only ADDS dates the factsheets don't cover — e.g. the gap).
+    wb = Path(a.wayback_dir).expanduser() if a.wayback_dir else None
+    for d, s in load_wayback_snaps(wb, "n100").items():
+        n100_snaps.setdefault(d, s)
+    for d, s in load_wayback_snaps(wb, "n500").items():
+        n500_snaps.setdefault(d, s)
 
     print("N100 snapshots:", sorted(d.isoformat() for d in n100_snaps),
           "| sizes:", [len(n100_snaps[d]) for d in sorted(n100_snaps)])

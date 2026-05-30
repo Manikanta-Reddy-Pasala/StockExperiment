@@ -6,11 +6,11 @@
 
 | Metric | Value |
 |---|---|
-| Backtest window | **2021-04-01 → 2026-05-29** (~5.16 years) |
+| Backtest window | **2021-03-01 → 2026-05-29** (~5.24 years) |
 | First entry | 2021-06-01 |
 | Last exit | 2026-05-04 |
 | Total trades | 50 |
-| Trades per year | ~9.7 |
+| Trades per year | ~9.5 |
 | Rebalance | Monthly (1st trading day) |
 | Data source | **Fyers (split-adjusted cont_flag=1)** |
 
@@ -40,9 +40,9 @@
 |---|---:|
 | Final NAV (cap + open MTM) | **Rs.16,828,054** |
 | Total return | **+1582.81%** |
-| 5.16-yr CAGR | **+72.86%** |
+| 5.24-yr CAGR | **+71.33%** |
 | Max DD | **28.63%** |
-| Calmar (CAGR / Max DD) | **2.54** |
+| Calmar (CAGR / Max DD) | **2.49** |
 | Trades closed | 50 |
 | Wins / Losses | 38 / 12 |
 | Win rate | 76.0% |
