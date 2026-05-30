@@ -24,7 +24,7 @@
 // 4 equity models to show. `schedule` drives the next-rebalance display.
 const MODELS = [
   {key: "momentum_n100_top5_max1",     title: "Nifty 100 Momentum",   desc: "Monthly rotation + mid-month check • real Nifty 100 • 15-trading-day return",        schedule: "monthly_midcheck"},
-  {key: "n20_daily_large_only",        title: "Daily Top-40",         desc: "Daily rotation • top-40 ADV ∩ N100 • uptrend",                            schedule: "daily"},
+  {key: "n20_daily_large_only",        title: "Weekly Top-40",        desc: "Weekly rotation • top-40 ADV ∩ N100 • uptrend",                           schedule: "weekly"},
   {key: "midcap_narrow_60d_breakout",  title: "Midcap Breakout",      desc: "Event-driven • 40-day high + vol surge + 200d SMA",                       schedule: "event"},
   {key: "momentum_pseudo_n100_adv",    title: "Liquid 100 Momentum",  desc: "Monthly rotation • top-100 ADV from N500 • yearly-PIT rebuild",            schedule: "monthly"},
   {key: "momentum_retest_n500",        title: "Retest Momentum",      desc: "Monthly top-3 momentum (top-120 ADV N500) • buy on 20-EMA pullback • retain top-6", schedule: "monthly"},

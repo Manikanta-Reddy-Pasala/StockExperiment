@@ -1,6 +1,9 @@
 """Cron registration for n20_daily_large_only.
 
-Daily rotation model — signal runs every weekday morning (no monthly gate).
+WEEKLY rotation model (2026-05-30: was daily). The 09:25 emit cron still runs
+every weekday, but live_signal gates on is_week_rebalance_day so it ROTATES only
+on the first trading day of each ISO week (weekly cut whipsaw: +59% vs +55%
+CAGR, lower DD). Non-rebalance weekdays simply no-op.
 
 Role in the model flow (data_pull -> live_signal -> cron -> backtest)
 ---------------------------------------------------------------------

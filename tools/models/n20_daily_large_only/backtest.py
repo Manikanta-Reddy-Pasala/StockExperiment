@@ -42,6 +42,7 @@ from tools.shared.ohlcv_cache import _get_engine
 from tools.shared.universes import nifty500_symbols  # noqa: F401
 from tools.shared.backtest_engine import run_rotation_backtest
 from tools.shared.index_membership import eligible_at, universe_union
+from tools.shared.rebalance_calendar import build_weekly_calendar
 
 
 from tools.models.n20_daily_large_only.strategy import (  # noqa: E402  shared w/ live
@@ -104,9 +105,12 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
     sma200 = cl.rolling(SMA_LONG).mean()        # 200-day SMA (long uptrend ref)
     dates = cl.index
 
-    trading = [d for d in dates if start <= d.date() <= end]
-    # Daily rebalance: every trading day is a "full" rebalance opportunity.
-    calendar = [(d, "full") for d in trading]
+    # WEEKLY rebalance (the fix, 2026-05-30): re-rank only on the first trading
+    # day of each ISO week, hold through the week. Daily rebalancing churned
+    # (55% of trades held <=3 days = whipsaw); weekly cuts DD + lifts CAGR on
+    # both 2023-26 and the full 2021-26 cycle. Shared rule (build_weekly_calendar)
+    # so live mirrors via is_week_rebalance_day.
+    calendar = build_weekly_calendar(dates, start, end)
 
     # SELECTION: daily top-20 ADV ∩ Nifty-100, uptrend (>200d SMA), 30d-ret rank.
     # EXECUTION + daily MTM drawdown come from the shared engine.

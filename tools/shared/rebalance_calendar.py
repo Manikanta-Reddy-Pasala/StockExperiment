@@ -54,3 +54,29 @@ def is_mid_month_check_day(today, mid_from: int = MID_MONTH_FROM_DAY) -> bool:
             return False
         probe += timedelta(days=1)
     return True
+
+
+def build_weekly_calendar(dates, start, end):
+    """[(timestamp,'full')] = the FIRST trading day of each ISO week in [start,end].
+    Weekly rebalance (lower turnover than daily — the n40 fix)."""
+    weeks = {}
+    for d in dates:
+        if start <= d.date() <= end:
+            k = d.isocalendar()[:2]          # (iso_year, iso_week)
+            if k not in weeks:
+                weeks[k] = d
+    return [(d, "full") for d in sorted(weeks.values())]
+
+
+def is_week_rebalance_day(today) -> bool:
+    """Live mirror: True iff `today` is the FIRST NSE trading day of its ISO week."""
+    from tools.shared.nse_calendar import is_trading_day
+    d0 = today.date() if hasattr(today, "date") else today
+    if not is_trading_day(d0):
+        return False
+    probe = d0 - timedelta(days=d0.weekday())   # Monday of this ISO week
+    while probe < d0:
+        if is_trading_day(probe):
+            return False
+        probe += timedelta(days=1)
+    return True

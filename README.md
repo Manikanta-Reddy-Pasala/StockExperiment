@@ -10,6 +10,7 @@ Production: `77.42.45.12` · App: <https://stock.oneshell.in> · Bot: `@stocks_m
 
 ## Recent Changes (2026-05)
 
+- **n40 daily → WEEKLY rebalance** (the fix). Daily rotation churned (55% of trades held ≤3 days = whipsaw). Rebalancing weekly (1st trading day of each ISO week, shared `rebalance_calendar.build_weekly_calendar` / `is_week_rebalance_day`) lifts CAGR + cuts DD on BOTH windows: 2023-05→2026 **+59.3% / 24.4% DD** (was +55.4% / 25.4%), full-cycle 2021→2026 **+20.6% / 55.5%** (was +13.7% / 59%). retain-1 kept (wider bands hurt); stop-loss / min-ADV tested + rejected (n40 already top-ADV). backtest + live share the weekly rule.
 - **All models unified backtest↔live** — each model's `backtest.py` + `live_signal.py` import ONE shared core (per-model `strategy.py` + `tools/shared/rebalance_calendar.py`); params can't drift. Canonical numbers regenerated on VM postgres.
 - **n100 backtest was under-reporting** — the CLI defaulted `--mid-month-check` OFF, so the committed summary showed +43% CAGR. Live actually runs the mid-month job (cron 09:27), and with mid-month ON (the real live config) n100 = **+87.5% CAGR / 34% DD** (2023-05→2026-05). CLI now defaults mid-month ON to match live; summary regenerated.
 - **mcap-climber** shipped to emerging (real free-float-mcap filter, +98%→+111% CAGR same DD). Backtest + live share it via `strategy.py`.
@@ -32,7 +33,7 @@ Production: `77.42.45.12` · App: <https://stock.oneshell.in> · Bot: `@stocks_m
 | `momentum_n100_top5_max1` | Real Nifty 100 | Monthly (1st weekday) + mid-month | CNC delivery | until it drops below rank-1 | rank by **15-trading-day** return, hold rank-1 (top-1 rotation) |
 | `momentum_pseudo_n100_adv` | Top-100 ADV from N500 minus Smallcap-250, yearly PIT rebuild, close > 200d SMA | Monthly | CNC | until it drops below rank-1 | rank by 30d return, hold rank-1 (top-1) + uptrend + ≤₹3K |
 | `midcap_narrow_60d_breakout` | ~100 NSE midcaps (top-100 ADV minus Nifty 100) | Event-driven (daily check) | CNC | up to 120d / target +100% / trail -20% from peak | 40d-high + vol >2× + 200d SMA, ALL must fire |
-| `n20_daily_large_only` | **Top-40** ADV ∩ Nifty 100 (n40; dir keeps legacy n20 name) | Daily | CNC | until it drops below rank-1 | rank by 30d return + 200d SMA uptrend filter (PIT) |
+| `n20_daily_large_only` | **Top-40** ADV ∩ Nifty 100 (n40; dir keeps legacy n20 name) | **Weekly** (1st trading day of ISO week) | CNC | until it drops below rank-1 | rank by 30d return + 200d SMA uptrend filter (PIT) |
 
 **Capital model (per model):**
 - `Allocated / Invested` = user-deposited principal (`ModelSettings.invested_amount`). Default ₹30,000 per active model.

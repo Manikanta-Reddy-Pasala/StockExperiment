@@ -58,6 +58,7 @@ from tools.shared.universes import nifty100_symbols, nifty500_symbols  # noqa: E
 from tools.shared.rotation_strategy import decide_rotation  # noqa: E402
 from tools.models.n20_daily_large_only.strategy import (  # noqa: E402  shared w/ backtest
     UNIV_SIZE, ADV_WIN, SMA_LONG, RETAIN, LOOKBACK as LOOKBACK_RET)
+from tools.shared.rebalance_calendar import is_week_rebalance_day  # noqa: E402  weekly rebal
 
 log = logging.getLogger("n20_daily_signal")
 
@@ -340,8 +341,8 @@ def main() -> int:
             log.debug(f"notify_skip failed: {_ne}")
         return 0
 
-    if not args.force and not is_weekday(today):
-        log.info("Weekend — skipping daily rotation.")
+    if not args.force and not is_week_rebalance_day(today):
+        log.info("Not the first trading day of the ISO week — skipping (weekly rebalance).")
         Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
         Path(args.signals_out).write_text(json.dumps([]))
         return 0
