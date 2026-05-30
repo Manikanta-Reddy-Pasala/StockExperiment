@@ -66,16 +66,11 @@ def is_rebalance_day(today: datetime, last_rotation: datetime = None) -> bool:
 
 
 def is_mid_month_check_day(today: datetime) -> bool:
-    """True on the first weekday on/after day 15 of the month (and not a
-    rebalance day). Mirrors momentum_n100_top5_max1.is_mid_month_check_day."""
-    if today.day < 15 or today.day > 21:
-        return False
-    if today.weekday() >= 5:
-        return False
-    anchor = datetime(today.year, today.month, 15)
-    while anchor.weekday() >= 5:
-        anchor += timedelta(days=1)
-    return today.date() == anchor.date()
+    """First NSE trading day on/after the 15th (holiday-aware). Delegates to the
+    SHARED strategy.is_mid_month_check_day — the EXACT rule the backtest calendar
+    uses (build_calendar 'mid'), so live + backtest can never disagree on when
+    the mid-month check fires."""
+    return S.is_mid_month_check_day(today)
 
 
 def is_model_enabled() -> bool:

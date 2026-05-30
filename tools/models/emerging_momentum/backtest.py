@@ -76,22 +76,9 @@ def run(start, end, capital, out_dir=None):
     dates = cl.index
     anchors, pools = S.build_pools(adv20, dates, end)
 
-    # ---- Build the rebalance calendar (full = month-firsts, mid = day 15-18) ----
-    s = pd.Series(dates, index=dates)
-    firsts = {pd.Timestamp(x) for x in s.groupby([dates.year, dates.month]).first().values}
-    full = [d for d in dates if start <= d.date() <= end and d in firsts]
-    mids = []
-    seen = set()
-    for d in dates:
-        if start <= d.date() <= end and 15 <= d.day <= 18 and (d.year, d.month) not in seen:
-            mids.append(d)
-            seen.add((d.year, d.month))
-    # Per-entry kind flag; "mid" days that coincide with a "full" day are dropped
-    # by the sort/dedup so the engine never double-fires.
-    full_set = set(full)
-    calendar = sorted([(d, "full") for d in full]
-                      + [(d, "mid") for d in mids if d not in full_set],
-                      key=lambda x: x[0])
+    # ---- Rebalance calendar from the SHARED core (same rule live mirrors) ----
+    # full = month's first trading day; mid = first trading day on/after the 15th.
+    calendar = S.build_calendar(dates, start, end)
 
     def rank_at(di):
         """Rank the PIT pool by 15d return at row `di` (ret>0, price<=MAX_PRICE)."""

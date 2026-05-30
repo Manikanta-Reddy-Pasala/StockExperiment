@@ -245,3 +245,48 @@ def midret_pool(cl, pool, di):
             continue
         out.append((s, (px / pxl - 1) * 100))
     return out
+
+
+# ---- SHARED rebalance calendar (used by BOTH backtest + live, no drift) -------
+# Rule (single source of truth):
+#   full = first NSE trading day of each month
+#   mid  = first NSE trading day ON/AFTER the 15th of each month
+# Backtest derives these from its trading-day index; live mirrors the SAME rule
+# via nse_calendar so the two never disagree on WHEN to rebalance/mid-check.
+MID_MONTH_FROM_DAY = 15
+
+
+def build_calendar(dates, start, end):
+    """Shared (date, kind) rebalance calendar for the backtest engine.
+
+    full = month's first trading day; mid = first trading day on/after the 15th.
+    A mid that coincides with a full is dropped (engine never double-fires).
+    """
+    s = pd.Series(dates, index=dates)
+    firsts = {pd.Timestamp(x) for x in s.groupby([dates.year, dates.month]).first().values}
+    full = [d for d in dates if start <= d.date() <= end and d in firsts]
+    mids, seen = [], set()
+    for d in dates:
+        if (start <= d.date() <= end and d.day >= MID_MONTH_FROM_DAY
+                and (d.year, d.month) not in seen):
+            mids.append(d)
+            seen.add((d.year, d.month))
+    full_set = set(full)
+    return sorted([(d, "full") for d in full]
+                  + [(d, "mid") for d in mids if d not in full_set], key=lambda x: x[0])
+
+
+def is_mid_month_check_day(today) -> bool:
+    """Live mirror of the backtest 'mid' rule: True iff `today` is the FIRST NSE
+    trading day on/after the 15th of its month (holiday-aware)."""
+    from tools.shared.nse_calendar import is_trading_day
+    from datetime import timedelta
+    d0 = today.date() if hasattr(today, "date") else today
+    if d0.day < MID_MONTH_FROM_DAY or not is_trading_day(d0):
+        return False
+    probe = d0.replace(day=MID_MONTH_FROM_DAY)
+    while probe < d0:                      # an earlier trading day on/after the 15th?
+        if is_trading_day(probe):
+            return False
+        probe += timedelta(days=1)
+    return True
