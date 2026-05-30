@@ -119,11 +119,37 @@ def load_db(combined):
           f"(n100 reconstructed where needed)")
 
 
+def load_from_committed_csv():
+    """Rebuild the `combined` list from the committed exports/index_constituents/
+    ALL_constituents.csv (so we can load the DB without the source PDFs)."""
+    p = OUT / "ALL_constituents.csv"
+    if not p.exists():
+        print(f"ERROR: {p} not found"); return []
+    out = []
+    for r in csv.DictReader(open(p)):
+        try:
+            out.append({"index_name": r["index_name"], "review_date": r["review_date"],
+                        "period": r.get("period", ""), "symbol": r["symbol"],
+                        "close": float(r.get("close") or 0), "mcap_cr": float(r["mcap_cr"]),
+                        "weight": float(r.get("weight") or 0)})
+        except (ValueError, KeyError):
+            continue
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", default=str(DEFAULT_SRC))
     ap.add_argument("--load-db", action="store_true")
+    ap.add_argument("--from-csv", action="store_true",
+                    help="load DB from committed ALL_constituents.csv (no PDFs needed)")
     a = ap.parse_args()
+    if a.from_csv:
+        combined = load_from_committed_csv()
+        print(f"loaded {len(combined)} rows from committed CSV")
+        if combined:
+            load_db(combined)
+        return
     src = Path(a.src)
     OUT.mkdir(parents=True, exist_ok=True)
     combined = []
