@@ -12,7 +12,8 @@ residential-IP Mac because NSE's WAF 403s the VM and plain scripts.
 
 | File | Role |
 |------|------|
-| `nse_mcap_scraper.py` | Scrapes Total + Free-Float mcap + LTP per stock via headless **full Chromium** (NSE blocks `headless_shell` + datacenter IPs). Resumable → `exports/nse_mcap.csv`. |
+| `download_niftyindices.py` | **REPLACES the old get-quotes scraper.** Downloads current index constituents (n50/100/200/500) from niftyindices.com (NOT WAF-blocked → runs anywhere, incl the VM) → `exports/index_constituents/current/` + marks `nifty_index_membership`. |
+| `parse_nse_index_pdfs.py` | Parses NSE factsheet PDFs (the `indices_dataMar2021-2026` dump) → full constituent tables w/ **real free-float mcap** → CSVs + `nifty_index_membership` + `market_cap_history`. |
 | `mcap_inclusion_model.py` | PIT backtest. `ff_shares = ff_mcap/ltp`; `ff_mcap[t] = ff_shares × close[t]`; monthly rank; CANDIDATE = mcap rank ≤ cutoff AND not yet in `eligible_at(target)` AND 30d-ret>0. `--target n100\|n500 --k 5`. |
 | `refresh_mcap.sh` | Rebuild candidate list (**full NSE equity universe**, no ADV cap) → scrape → **persist to Postgres** → rsync CSV to VM + `docker cp` into app. |
 | `mcap_db.py` | Postgres persistence: `market_cap_history` (every run) + `nifty_index_membership` (Apr & Sep reviews). CLI: `init` / `load-mcap` / `snapshot-membership` / `status`. |
@@ -45,31 +46,20 @@ vs the whole market**, not fundamental mcap growth — true mcap-drift needs the
 accumulating monthly `market_cap_history`. Index membership (`eligible_at`) is
 fully point-in-time historical.
 
-## Why it runs on the laptop, NOT the VM (load-bearing)
+## Source: niftyindices.com (NOT the old NSE get-quotes scraper)
 
-NSE's WAF blocks **datacenter IPs**. The Hetzner VM (77.42.45.12) cannot pull
-the quote pages — verified 2026-05-30:
+The old approach scraped NSE `get-quotes` pages with headless full Chromium —
+NSE's WAF blocks datacenter IPs (VM got HTTP 302) so it was laptop-only + slow.
+**Retired 2026-05-30.** niftyindices.com is NOT WAF-blocked (plain HTTPS works
+from any IP, verified incl the VM), so `download_niftyindices.py` pulls the
+constituent CSVs directly — can run on the laptop OR the VM, no Chromium.
 
-| From | Result |
-|------|--------|
-| VM (`2a01:4f9:…` Hetzner IPv6) → NSE get-quotes | **HTTP 302** (WAF bounce, no data) — even with a browser User-Agent |
-| Laptop (residential IP) + **full Chromium** headless | **200**, real data ✅ |
+Mcap nuance: the niftyindices constituent CSVs give MEMBERSHIP only (no per-stock
+mcap). Real free-float mcap comes from the NSE index factsheets
+(`parse_nse_index_pdfs.py`, loaded to `market_cap_history`); the climber overlay
+otherwise uses a price-derived proxy off `exports/nse_mcap.csv` + DB closes.
 
-Also dead: plain `requests`/`curl` from anywhere (403, TLS fingerprint), and
-`headless_shell` Chromium (HTTP2 error / timeout). The scraper must use the
-**full Chromium binary** via `executable_path` (see `nse_mcap_scraper.py`).
-
-So the flow is: **scrape on the laptop → load local Postgres → rsync CSV →
-`docker cp` into the VM app container.** The VM never scrapes; it only receives
-the finished CSV.
-
-⚠️ **Laptop-wake caveat:** the launchd job fires 02:30 on the 1st only if the
-Mac is awake. launchd runs a *missed* job at next wake, so a short sleep is
-fine, but if the Mac is off for days the monthly snapshot lands late. For
-bulletproof timing: keep the Mac awake overnight on the 1st, or route the
-scrape through a residential proxy (more setup). Monthly cadence tolerates slack.
-
-## Install the cron (one-time, on the residential Mac)
+## Install the cron (one-time)
 
 ```bash
 cp tools/analysis/com.stockexp.mcaprefresh.plist ~/Library/LaunchAgents/
@@ -81,8 +71,7 @@ launchctl list | grep mcaprefresh   # verify
 ## Manual run
 
 ```bash
-python3 tools/analysis/nse_mcap_scraper.py            # scrape (background)
-python3 tools/analysis/mcap_inclusion_model.py --target n100
-python3 tools/analysis/mcap_inclusion_model.py --target n500
-bash    tools/analysis/refresh_mcap.sh                 # full quarterly cycle
+python3 tools/analysis/download_niftyindices.py --load-db   # current constituents -> membership
+python3 tools/analysis/parse_nse_index_pdfs.py --load-db    # factsheet PDFs -> real mcap (when you drop a new dump)
+bash    tools/analysis/refresh_mcap.sh                       # full monthly cycle (download + mark + push)
 ```

@@ -97,7 +97,7 @@ DB. The "populated by" code below is the source of truth for schema.
 |---|---|
 | **What** | Per-stock total + free-float market cap (₹ Cr) + LTP, for the "joining Nifty 100/500" anticipation model |
 | **Source** | NSE get-quotes pages — headless **full Chromium** (NSE WAF 403s plain scripts, datacenter IPs, and `headless_shell`; only full-Chromium from a residential IP works) |
-| **Scraper** | `tools/analysis/nse_mcap_scraper.py` (reads `/tmp/mcap_candidates.json` = full NSE equity universe ~2.3k; resumable; regex FF/Total/LTP from DOM) |
+| **Downloader** | `tools/analysis/download_niftyindices.py` (current n50/100/200/500 constituent CSVs from niftyindices.com — NOT WAF-blocked, runs anywhere). REPLACED the old `nse_mcap_scraper.py` (NSE get-quotes headless Chromium, deleted 2026-05-30). Real per-stock FF-mcap from `parse_nse_index_pdfs.py` (factsheet PDFs). |
 | **Working file** | `exports/nse_mcap.csv` (symbol, total_mcap_cr, ff_mcap_cr, ltp) — the file the model reads |
 | **Model** | `tools/analysis/mcap_inclusion_model.py` (`--target n100\|n500`) — rank by reconstructed FF-mcap, buy names above the cutoff not yet in the index |
 | **Job** | `tools/analysis/refresh_mcap.sh`: rebuild candidates → scrape → **load to Postgres** → rsync CSV to VM + `docker cp` into app |
