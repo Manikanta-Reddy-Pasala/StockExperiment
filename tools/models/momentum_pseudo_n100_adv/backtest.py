@@ -31,8 +31,8 @@ sys.path.insert(0, str(ROOT))
 import pandas as pd
 from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
-from tools.shared.universes import nifty500_symbols
 from tools.shared.backtest_engine import run_rotation_backtest
+from tools.shared.index_membership import universe_union, eligible_at
 
 
 from tools.models.momentum_pseudo_n100_adv.strategy import (  # noqa: E402  shared w/ live
@@ -92,9 +92,12 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
         tuple[float, float, list]: (final_nav, cagr_pct, trades).
     """
     eng = _get_engine()
-    # Map plain N500 symbols to Fyers form used as the historical_data key.
-    n500 = [f"NSE:{s}-EQ" for s, _ in nifty500_symbols()]
-    print(f"N500 pool: {len(n500)}")
+    # PIT N500 superset (2026-05-31): preload every symbol that was EVER in NSE
+    # Nifty 500 across the authoritative snapshots, then restrict each yearly
+    # universe to the members eligible AT that anchor date (eligible_at). Removes
+    # the survivorship bias of the old static nifty500_symbols() current list.
+    n500 = [f"NSE:{s}-EQ" for s in sorted(universe_union("n500"))]
+    print(f"N500 PIT union pool: {len(n500)}")
 
     # Pull 400 extra calendar days before `start` so the 200d SMA + 20d ADV
     # rolling windows are already warm on day one of the backtest.
@@ -129,8 +132,12 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
         fut = dates[dates >= ys]
         if len(fut) == 0: continue
         di = dates.get_loc(fut[0])  # first trading-day index on/after the anchor
-        # Rank that day's 20d-ADV descending and take the top UNIV_SIZE names.
+        # PIT N500 membership at the anchor date — only rank names actually in
+        # Nifty 500 then (no survivorship bias).
+        elig500 = eligible_at("n500", ys.date())
         pit_adv = adv20.iloc[di].dropna().sort_values(ascending=False)
+        pit_adv = pit_adv[[s for s in pit_adv.index
+                           if s.replace("NSE:", "").replace("-EQ", "") in elig500]]
         top = pit_adv.head(UNIV_SIZE).index.tolist()
         # Drop Small-cap names from top-100 (sweep showed +2pp CAGR, DD unchanged)
         year_universes[ys] = [s for s in top if s.replace("NSE:","").replace("-EQ","") not in _SMALLCAP]

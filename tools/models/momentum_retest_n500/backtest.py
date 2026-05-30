@@ -19,8 +19,8 @@ sys.path.insert(0, str(ROOT))
 import pandas as pd
 from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
-from tools.shared.universes import nifty500_symbols
 from tools.shared.market_cap import classify_pit
+from tools.shared.index_membership import universe_union, eligible_at
 from tools.models.momentum_retest_n500 import strategy as S
 
 COST = 0.0015
@@ -30,7 +30,10 @@ DEFAULT_CAP = 1_000_000.0
 
 
 def load_panels(eng, start, end):
-    n500 = [f"NSE:{s}-EQ" for s, _ in nifty500_symbols()]
+    # PIT N500 superset (2026-05-31): preload every symbol ever in NSE Nifty 500;
+    # rank_targets output is restricted to eligible_at("n500", date) per rebalance
+    # in run(), removing the survivorship bias of the old static current list.
+    n500 = [f"NSE:{s}-EQ" for s in sorted(universe_union("n500"))]
     with eng.connect() as c:
         df = pd.read_sql(text(
             "SELECT symbol,date,close,volume FROM historical_data "
@@ -67,6 +70,9 @@ def run(start, end, capital, out_dir=None):
         d = dates[di]; crow = cl.iloc[di]
         if d in rebals and di >= warm:
             rk = S.rank_targets(cl, adv20, sma200, smallcap, di)
+            # PIT N500 filter: keep only names actually in Nifty 500 on this date.
+            elig500 = eligible_at("n500", d.date())
+            rk = [s for s in rk if s.replace("NSE:", "").replace("-EQ", "") in elig500]
             retset = set(rk[:S.RETAIN])
             for s in list(pos.keys()):                       # exit: out of retain band
                 if s not in retset:

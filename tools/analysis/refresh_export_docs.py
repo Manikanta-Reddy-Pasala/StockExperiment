@@ -19,7 +19,7 @@ DESC = {
         "title": "Liquid 100 Momentum", "live": "LIVE",
         "universe": "Top-100 by 20d ADV from N500 (yearly-PIT rebuild)",
         "strategy": "Monthly (1st trading day) rotation, single position (rank-1, RET1), 30-trading-day return rank, uptrend (>200d SMA) + ≤₹3K filter. Universe rebuilt yearly at a FIXED mid-May anchor.",
-        "note": "⚠️ ADV-ranked pseudo-N100 (not the real index) — selects already-liquid/hot names, so returns are an OPTIMISTIC upper bound vs the real-index sibling momentum_n100_top5_max1. Full-cycle 2021-04→2026-05 (fixed May anchor) ≈ +63.5% CAGR / 37.6% DD / Calmar 1.69 / 71% win. (A 2026-05-30 'mid-month + RET5' tweak was reverted 2026-05-31 — it was an artifact of the old start-anchored universe and lost on the fixed anchor.)",
+        "note": "⚠️ ADV-ranked pseudo-N100 (not the real index) — selects already-liquid/hot names, so returns are an OPTIMISTIC upper bound vs the real-index sibling momentum_n100_top5_max1. Full-cycle 2021-04→2026-05 (fixed May anchor, PIT N500) ≈ +72.9% CAGR / 28.6% DD / Calmar 2.54 / 76% win. Now PIT (2026-05-31, no survivorship bias) but the ADV-selection bias remains by design.",
     },
     "momentum_n100_top5_max1": {
         "title": "Nifty 100 Momentum", "live": "LIVE",
@@ -37,7 +37,7 @@ DESC = {
         "title": "Retest Momentum", "live": "DISABLED (₹0)",
         "universe": "Top-120 by 20d ADV from N500 (minus Smallcap-250)",
         "strategy": "Monthly top-2 (K=2), 30d momentum, buy within 20% of 20-EMA, retain top-4 band.",
-        "note": "Multi-holding K=2 (2026-05-30 sweep). Both-window dominant config: 2023-26 ≈ +146% CAGR / 21% DD / Calmar 7.0 (every year positive), full 2021-26 ≈ +66% / 39% DD / 1.7. Upgraded from K3/band-8% — K=2 concentrates and the wide 20% entry band stops missing leaders that never pull back to the EMA.",
+        "note": "Multi-holding K=2 (2026-05-30 sweep). Now PIT N500 (2026-05-31): full-cycle 2021-04→2026-05 ≈ +64.9% CAGR / 57.1% DD / Calmar 1.14. The earlier +77.8%/2.08 was survivorship-inflated (static current N500); switching to PIT eligible_at deflated CAGR and roughly doubled DD — the honest number. K=2 + wide 20% entry band (vs K3/band-8%) stops missing leaders that never pull back to the EMA.",
     },
     "emerging_momentum": {
         "title": "Emerging Momentum", "live": "LIVE",

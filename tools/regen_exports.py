@@ -68,7 +68,7 @@ MODELS = {
         "title": "Pseudo-N100 (top-100 ADV from N500 − Smallcap) + uptrend + MAX_PRICE≤₹3,000. Monthly rotation top-1 by 30d ret.",
         "rebalance": "Monthly (1st trading day)",
         "logic": [
-            "Universe: top-100 by 20-day ADV from N500 (yearly-PIT, rebuilt at a FIXED mid-May anchor)",
+            "Universe: top-100 by 20-day ADV from PIT N500 (eligible_at; yearly-PIT, rebuilt at a FIXED mid-May anchor)",
             "Drop NSE Smallcap 250 members",
             "Uptrend filter: close > 200-day SMA",
             "Max-price filter: close ≤ ₹3,000 at entry",
@@ -148,6 +148,9 @@ def write_summary(model_dir, meta, trades, summary=None):
     out_path.parent.mkdir(parents=True, exist_ok=True)
     first_entry = trades[0].get("entry_date") or trades[0].get("entry", "?")
     last_exit  = trades[-1].get("exit_date") or trades[-1].get("exit", "?")
+    win_start = (summary or {}).get("start", "?")
+    win_end = (summary or {}).get("end", "?")
+    yrs = s['years'] or 1.0
     md = f"""# {model_dir} — SUMMARY
 
 **{meta['title']}**
@@ -156,11 +159,11 @@ def write_summary(model_dir, meta, trades, summary=None):
 
 | Metric | Value |
 |---|---|
-| Backtest window | **2023-05-15 → 2026-05-12** (~3.00 years) |
+| Backtest window | **{win_start} → {win_end}** (~{yrs:.2f} years) |
 | First entry | {first_entry} |
 | Last exit | {last_exit} |
 | Total trades | {s['n']} |
-| Trades per year | ~{s['n']/3.0:.1f} |
+| Trades per year | ~{s['n']/yrs:.1f} |
 | Rebalance | {meta['rebalance']} |
 | Data source | **{meta['data']}** |
 

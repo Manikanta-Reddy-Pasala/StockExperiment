@@ -10,11 +10,12 @@ Production: `77.42.45.12` · App: <https://stock.oneshell.in> · Bot: `@stocks_m
 
 ## Recent Changes (2026-05)
 
+- **pseudo + retest switched to PIT N500 (2026-05-31).** They had ranked the *static current* Nifty-500 list (`nifty500_symbols()`) over all history = survivorship bias (only ever saw today's survivors). Now both preload `universe_union("n500")` and restrict selection to `eligible_at("n500", date)`. Result: pseudo **+63.5%→+72.9%** (DD 37.6→28.6, Calmar 1.69→2.54 — the static list had survivorship-dropped some high-ADV names), retest **+77.8%→+64.9%** (DD 37→57, Calmar 2.08→1.14 — it had been riding survivors). **All six models are now fully PIT** — no survivorship bias remains anywhere.
 - **AUTHORITATIVE PIT index membership rebuild (2026-05-31) — big correctness fix.** The old `n{100,500}_membership.csv` came from Wayback snapshots and was **~18% wrong on Nifty 100** (missing real members ADANIGREEN/ADANIENSOL/BANKBARODA/CHOLAFIN/LODHA/PNB/TRENT…, carrying non-members ABB/BHEL/IDEA/ACC/JUBLFOOD + a garbage "DUMMYREL"). Rebuilt from official NSE semi-annual factsheet PDFs (N100 = N50 ∪ Next-50, the exact NSE construction; 11 snapshots Mar2021–Mar2026) + the verified Nifty-500 workbook. Now matches the official lists ~100%. Builder: `tools/analysis/build_membership_from_nse_factsheets.py`. **Impact on the PIT models:** emerging +121.7%→**+46.1%** (the +121% was a mirage — the buggy N100 let large-cap winners leak into the mid/small universe), midcap +40.0%→**+1.65%** (same leak), n40 +25.0%→**+40.3%** (cleaner N100 ⇒ better names, Calmar 0.45→1.09), n100 +42.5%→**+34.6%**. pseudo/retest unchanged (they use the static current N500 — survivorship-biased, conversion to PIT is a TODO). Backtest-only; live signals key off today's CSV, not `eligible_at`.
 - **pseudo universe anchored at a FIXED date + config reverted (2026-05-31).** Its yearly-PIT universe now rebuilds at a fixed mid-May anchor (`UNIVERSE_ANCHOR_*`, matching live's annual rebuild) instead of the backtest-start month, so absolute CAGR no longer drifts with the window. On the correct fixed anchor the earlier "mid-month + RET5" win evaporated (it was a start-anchor artifact) and LOST to plain RET1/monthly — so pseudo is back to **RET1/monthly: +63.5% / 37.6% DD / Calmar 1.69** (was advertised +53.9-100% on shifting anchors). Mid-month code kept as opt-in, default OFF; cron mid-month jobs unregistered.
 - **midcap trade-time PIT-Nifty-100 exclusion (2026-05-31).** Its N100 exclusion only ran at year-start, so a name promoted into Nifty 100 mid-year could leak in. Now re-excluded at scan time. Removed one promoted-to-large disaster trade → midcap **+27.3%/50.5%DD → +40.0%/22.0%DD/Calmar 1.82** (now lowest DD of all models).
 - **n40 / n100 "picking small/mid" — verified NOT a bug.** All 130 n40 + 96 n100 trades were in NSE Nifty 100 *at trade date* (PIT-large, via `eligible_at`); they only read mid/small under today's snapshot because they were demoted afterward. `classify_pit` hardened so a non-N100-at-date name never emits a false PIT "large". Cap labels now honest: n40/n100 100% large, midcap pure mid/small.
-- **Canonical backtest window standardized → 2021-04-01 → 2026-05-29** (full ~5.16yr cycle) for ALL models. `DEFAULT_START`/`DEFAULT_END` unified across every `backtest.py`; summaries + exports regenerated. Full-cycle leaderboard (AFTER the 2026-05-31 membership rebuild): retest +77.8%/37.5% (static-N500 ⚠), pseudo +63.5%/37.6% (static-N500 ⚠), emerging +46.1%/37.7%, n40 +40.3%/36.9%, n100 +34.6%/52.2%, midcap +1.65%/68.2%.
+- **Canonical backtest window standardized → 2021-04-01 → 2026-05-29** (full ~5.16yr cycle) for ALL models. `DEFAULT_START`/`DEFAULT_END` unified across every `backtest.py`; summaries + exports regenerated. Full-cycle leaderboard (all PIT, after the 2026-05-31 rebuild + pseudo/retest PIT switch): pseudo +72.9%/28.6% (ADV-biased), retest +64.9%/57.1%, emerging +46.1%/37.7%, n40 +40.3%/36.9%, n100 +34.6%/52.2%, midcap +1.65%/68.2%.
 - **Per-trade cap tagging (large/mid/small, PIT at entry).** New `tools/shared/market_cap.py` classifies from the NSE Nifty 100 / Midcap-150 / Smallcap-250 constituent CSVs; the shared engine + retest stamp `cap` on every trade. Surfaced as a **Cap** column in each `exports/models/<m>/TRADE_LEDGER.md`. PIT (`classify_pit`) so a name that was large-cap when traded reads "large" even if demoted today.
 - **n40 "smallcap" investigated → not a bug.** ZEEL (and ATGL/IRCTC/INDUSTOWER/HEROMOTOCO) were all in NSE Nifty 100 *at trade date* (PIT-large); they only looked small because the constituent CSVs are current snapshots. All 130 n40 trades are PIT-large — the universe filter (top-40 ADV ∩ Nifty 100) is working correctly. Cap labels now use PIT so the ledgers read "Large".
 - **n40 daily → WEEKLY rebalance** (the fix). Daily rotation churned (55% of trades held ≤3 days = whipsaw). Rebalancing weekly (1st trading day of each ISO week, shared `rebalance_calendar.build_weekly_calendar` / `is_week_rebalance_day`) lifts CAGR + cuts DD on BOTH windows: 2023-05→2026 **+59.3% / 24.4% DD** (was +55.4% / 25.4%), full-cycle 2021→2026 **+20.6% / 55.5%** (was +13.7% / 59%). retain-1 kept (wider bands hurt); stop-loss / min-ADV tested + rejected (n40 already top-ADV). backtest + live share the weekly rule.
@@ -296,13 +297,13 @@ All models share this canonical window (2021 bull, 2022 correction, 2023-24 bull
 retest. ₹10L start. Current PIT engine + current configs. Sorted by CAGR.
 
 Universe = AUTHORITATIVE NSE PIT membership (official semi-annual factsheets,
-2026-05-31 rebuild — see Recent Changes). PIT models (n40/n100/emerging/midcap)
-use `eligible_at`; pseudo/retest still use the static current N500 list (⚠ see note).
+2026-05-31 rebuild — see Recent Changes). **ALL six models now use true
+point-in-time membership** (`eligible_at`) — no survivorship bias remains.
 
 | Model | CAGR | Max DD | Calmar | Trades | WR | universe |
 |---|---:|---:|---:|---:|---:|---|
-| `momentum_retest_n500` (K=2, 20% band) | +77.77% | 37.45% | 2.08 | 86 | 58.1% | static N500 ⚠ |
-| `momentum_pseudo_n100_adv` (RET1, monthly, fixed May anchor) | +63.54% | 37.64% | 1.69 | 52 | 71.2% | static N500 ⚠ |
+| `momentum_pseudo_n100_adv` (RET1, monthly, fixed May anchor) | **+72.86%** | 28.63% | **2.54** | 50 | 76.0% | PIT N500 (ADV-biased) |
+| `momentum_retest_n500` (K=2, 20% band) | +64.90% | 57.13% | 1.14 | 88 | 53.4% | PIT N500 |
 | `emerging_momentum` (single-pos mid/small + climber) | +46.05% | 37.69% | 1.22 | 62 | 59.7% | PIT N500−N100 |
 | `n40` (weekly, top-40 ADV ∩ N100) | +40.32% | 36.85%¹ | 1.09 | 127 | 58.3% | PIT N100 |
 | `momentum_n100_top5_max1` (LB15 + mid-month + RET3) | +34.55% | 52.18% | 0.66 | 98 | 54.1% | PIT N100 |
@@ -310,21 +311,20 @@ use `eligible_at`; pseudo/retest still use the static current N500 list (⚠ see
 
 ¹ n40 / midcap Max DD is daily mark-to-market; the others report realized rebal-day DD.
 
-⚠ **The two top rows are survivorship-biased** — pseudo/retest rank the *static
-current* Nifty-500 list (`nifty500_symbols()`) over all history, so they only ever
-see names that SURVIVED into today's index (look-ahead). The four PIT models below
-them use true point-in-time membership and are the honest comparison. Converting
-pseudo/retest to PIT is a known TODO.
+`pseudo` tops the table (+72.9% / Calmar 2.54 / 76% win) but it is still the
+deliberately-OPTIMISTIC sibling: it ranks the top-100 by ADV (already-liquid/hot
+names), an upper bound vs the real-index `n100`. It is no longer survivorship-biased
+(PIT N500 since 2026-05-31), but the ADV-selection bias remains by design.
 
-**After the 2026-05-31 authoritative-membership rebuild, the PIT picture changed a
-lot.** emerging's old +121% was a MIRAGE: the buggy Wayback N100 was *missing* the
-big large-cap winners (ADANIGREEN/ADANIENSOL…), so emerging (= N500 minus N100)
-wrongly *held* them and rode them. With correct N100 exclusion emerging is genuinely
-mid/small = **+46%**. midcap collapsed the same way (+40%→**+1.65%**, basically dead —
-it was living off leaked large-caps). n40 *improved* (+25%→**+40%**, Calmar 0.45→1.09)
-on the clean N100 (no DUMMYREL/BHEL/IDEA garbage); n100 came down to an honest +34.6%.
-Among genuinely-PIT models, **emerging still leads** (+46% / 1.22 Calmar). Every trade
-is cap-tagged (large/mid/small, PIT at entry) in each `exports/models/<m>/TRADE_LEDGER.md`.
+**Two big corrections landed on 2026-05-31:** (a) the authoritative-membership rebuild
+exposed emerging's old +121% as a MIRAGE — the buggy Wayback N100 was *missing* the
+large-cap winners (ADANIGREEN/ADANIENSOL…), so emerging (= N500 minus N100) wrongly
+*held* them; correct exclusion ⇒ genuinely mid/small ⇒ **+46%**. midcap collapsed the
+same way (+40%→**+1.65%**, basically dead). n40 *improved* (+25%→**+40%**) on the clean
+N100. (b) pseudo + retest were switched from the static current N500 to PIT N500:
+pseudo improved (+63.5%→+72.9%, the static list had survivorship-DROPPED some high-ADV
+names), retest deflated (+77.8%→+64.9%, DD 37→57 — it had been riding survivors). Every
+trade is cap-tagged (large/mid/small, PIT at entry) in each `exports/models/<m>/TRADE_LEDGER.md`.
 
 > NOTE: pseudo's yearly-PIT universe is now anchored at a FIXED date (mid-May, matching
 > live's annual rebuild) — not the backtest start month. The earlier "mid-month + RET5"

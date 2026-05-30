@@ -6,8 +6,8 @@ All figures net of costs, ₹10L start, true point-in-time universes.
 
 | Model | Status | CAGR | maxDD | Calmar | Total |
 |---|---|---|---|---|---|
-| [Retest Momentum](momentum_retest_n500/SUMMARY.md) | DISABLED (₹0) | +77.8% | 37.5% | 2.08 | +1844.5% |
-| [Liquid 100 Momentum](momentum_pseudo_n100_adv/SUMMARY.md) | LIVE | +63.5% | 37.6% | 1.69 | +1164.5% |
+| [Liquid 100 Momentum](momentum_pseudo_n100_adv/SUMMARY.md) | LIVE | +72.9% | 28.6% | 2.54 | +1582.8% |
+| [Retest Momentum](momentum_retest_n500/SUMMARY.md) | DISABLED (₹0) | +64.9% | 57.1% | 1.14 | +1219.6% |
 | [Emerging Momentum](emerging_momentum/SUMMARY.md) | LIVE | +46.0% | 37.7% | 1.22 | +605.6% |
 | [Weekly Top-40](n40/SUMMARY.md) | LIVE | +40.3% | 36.9% | 1.09 | +473.9% |
 | [Nifty 100 Momentum](momentum_n100_top5_max1/SUMMARY.md) | LIVE | +34.5% | 52.2% | 0.66 | +362.1% |

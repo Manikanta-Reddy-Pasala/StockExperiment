@@ -6,11 +6,11 @@
 
 | Metric | Value |
 |---|---|
-| Backtest window | **2023-05-15 → 2026-05-12** (~3.00 years) |
+| Backtest window | **2021-04-01 → 2026-05-29** (~5.16 years) |
 | First entry | 2021-04-01 |
 | Last exit | 2026-05-25 |
 | Total trades | 127 |
-| Trades per year | ~42.3 |
+| Trades per year | ~24.6 |
 | Rebalance | Weekly |
 | Data source | **Fyers (split-adjusted cont_flag=1)** |
 
