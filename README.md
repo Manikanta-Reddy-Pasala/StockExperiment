@@ -10,6 +10,9 @@ Production: `77.42.45.12` · App: <https://stock.oneshell.in> · Bot: `@stocks_m
 
 ## Recent Changes (2026-05)
 
+- **Canonical backtest window standardized → 2021-04-01 → 2026-05-29** (full ~5.16yr cycle) for ALL models. `DEFAULT_START`/`DEFAULT_END` unified across every `backtest.py`; summaries + exports regenerated. Full-cycle leaderboard: emerging +121.7%/24.9%DD, retest +77.8%/37.5%, pseudo +53.9%/42.2%, n100 +42.5%/43.5%, midcap +27.3%/50.5%, n40 +25.0%/55.5%.
+- **Per-trade cap tagging (large/mid/small, PIT at entry).** New `tools/shared/market_cap.py` classifies from the NSE Nifty 100 / Midcap-150 / Smallcap-250 constituent CSVs; the shared engine + retest stamp `cap` on every trade. Surfaced as a **Cap** column in each `exports/models/<m>/TRADE_LEDGER.md`. PIT (`classify_pit`) so a name that was large-cap when traded reads "large" even if demoted today.
+- **n40 "smallcap" investigated → not a bug.** ZEEL (and ATGL/IRCTC/INDUSTOWER/HEROMOTOCO) were all in NSE Nifty 100 *at trade date* (PIT-large); they only looked small because the constituent CSVs are current snapshots. All 130 n40 trades are PIT-large — the universe filter (top-40 ADV ∩ Nifty 100) is working correctly. Cap labels now use PIT so the ledgers read "Large".
 - **n40 daily → WEEKLY rebalance** (the fix). Daily rotation churned (55% of trades held ≤3 days = whipsaw). Rebalancing weekly (1st trading day of each ISO week, shared `rebalance_calendar.build_weekly_calendar` / `is_week_rebalance_day`) lifts CAGR + cuts DD on BOTH windows: 2023-05→2026 **+59.3% / 24.4% DD** (was +55.4% / 25.4%), full-cycle 2021→2026 **+20.6% / 55.5%** (was +13.7% / 59%). retain-1 kept (wider bands hurt); stop-loss / min-ADV tested + rejected (n40 already top-ADV). backtest + live share the weekly rule.
 - **All models unified backtest↔live** — each model's `backtest.py` + `live_signal.py` import ONE shared core (per-model `strategy.py` + `tools/shared/rebalance_calendar.py`); params can't drift. Canonical numbers regenerated on VM postgres.
 - **n100 backtest was under-reporting** — the CLI defaulted `--mid-month-check` OFF, so the committed summary showed +43% CAGR. Live actually runs the mid-month job (cron 09:27), and with mid-month ON (the real live config) n100 = **+87.5% CAGR / 34% DD** (2023-05→2026-05). CLI now defaults mid-month ON to match live; summary regenerated.
@@ -156,7 +159,7 @@ Retention:
 
 ## Cross-Model Overlap
 
-The 3 large-cap equity models (`n100`, `pseudo`, `n20`) share a single Fyers account and frequently agree on the biggest momentum winners (ADANIPOWER, IRFC, PFC, SHRIRAMFIN, ADANIGREEN). Over 2023-05 → 2026-05 they collided on the same name for 58 distinct events / 775 overlap-days. `midcap` is structurally safe — its universe (Nifty-100 excluded) cannot collide with the other three.
+The 3 large-cap equity models (`n100`, `pseudo`, `n40`) share a single Fyers account and frequently agree on the biggest momentum winners (ADANIPOWER, IRFC, PFC, SHRIRAMFIN, ADANIGREEN). Over 2023-05 → 2026-05 they collided on the same name for 58 distinct events / 775 overlap-days. `midcap` is structurally safe — its universe (Nifty-100 excluded) cannot collide with the other three.
 
 **Why the broker can't attribute slices.** Fyers reports one `positions[symbol]` and one `holdings[symbol]` per account, both with merged qty and a blended avg price. No model tag. So the same ADANIPOWER 49 806 (n100) + 65 141 (n20) shows up at the broker as a single row with qty 114 947.
 
@@ -282,18 +285,45 @@ Run after the 2026-05-28 Fyers backfill that extended `historical_data` back to 
 - **Pseudo / n20 / midcap need 200d SMA warmup**, so they're effectively flat until ~Feb 2017.
 - **Capital ₹10L per model** (research scale); combined sim re-run at live ₹30k confirmed direction (see [Cross-Model Overlap](#cross-model-overlap)).
 
-### Per-model 10yr headline
+### Per-model headline — full cycle (2021-04-01 → 2026-05-29, ~5.16yr)
+
+All models share this canonical window (2021 bull, 2022 correction, 2023-24 bull,
+2025 chop, 2026 bear). Net of nothing for the rotation models / 0.15%/side for
+retest. ₹10L start. Current PIT engine + current configs. Sorted by CAGR.
 
 | Model | CAGR | Max DD | Calmar | Trades | WR |
 |---|---:|---:|---:|---:|---:|
-| `momentum_n100_top5_max1` (15td lookback) | **+43.31%** | 59.98% | 0.72 | 113 | 57.5% |
-| `momentum_pseudo_n100_adv` (30d + SMA200 + ≤₹3k, mid-month + RET5) | +16.88% | **81.30%** | 0.21 | 125 | 49.6% |
-| `n40` (weekly, top-40 ADV ∩ N100) | +6.51% | 67.91% | 0.10 | 251 | 49.4% |
-| `midcap_narrow_60d_breakout` (40d-high + 2× vol) | +21.00% | 53.14% | 0.40 | 29 | 65.5% |
+| `emerging_momentum` (single-pos mid/small + climber) | **+121.68%** | **24.93%** | **4.88** | 59 | 66.1% |
+| `momentum_retest_n500` (K=2, 20% band) | +77.77% | 37.45% | 2.08 | 86 | 58.0% |
+| `momentum_pseudo_n100_adv` (mid-month + RET5) | +53.88% | 42.23% | 1.28 | 62 | 59.7% |
+| `momentum_n100_top5_max1` (LB15 + mid-month + RET3) | +42.50% | 43.53% | 0.98 | 96 | 58.3% |
+| `midcap_narrow_60d_breakout` (40d-high + 2× vol) | +27.29% | 50.48% | 0.54 | 16 | 56.2% |
+| `n40` (weekly, top-40 ADV ∩ N100) | +24.96% | 55.45%¹ | 0.45 | 130 | 52.3% |
 
-Calmar < 1 across the board — no model is "amazing" risk-adjusted over a full decade. n100's 0.72 is the strongest. Pseudo's 81% DD is the catastrophic outlier — the 200d SMA + MAX_PRICE filters were tuned on recent data and whipsawed badly in 2017-2020 (see below). The `n40` row is the current PIT weekly engine (apples-to-apples daily would be +0.7%/76%DD — weekly beats daily on every window 2016-26); the other rows predate the PIT rewrite, so don't over-compare across rows.
+¹ n40 / midcap Max DD is daily mark-to-market; n100 / pseudo / emerging / retest
+report realized rebal-day DD (lower by construction — they only mark on rebalance).
 
-### Year-by-year breakdown (return %, true MTM)
+**Emerging is the clear full-cycle winner** (+121.7% CAGR / 24.9% DD / Calmar 4.88) —
+its mid/small universe + climber overlay + single-position concentration ride the
+2023-24 momentum hardest while the 200d-SMA gate keeps it out of the worst of 2022.
+retest (K=2) is the diversified runner-up (Calmar 2.08). The single-position
+large-cap models (n100, pseudo) compound well but carry 42-44% full-cycle DD; n40
+is the highest-churn / lowest Calmar. Every trade is cap-tagged (large/mid/small,
+PIT at entry) in each model's `exports/models/<m>/TRADE_LEDGER.md`.
+
+> NOTE: pseudo's yearly-PIT universe re-anchors to the backtest start month, so its
+> absolute CAGR is start-date-sensitive (a Jan-2021 anchor reads ~+100%, this
+> Apr-2021 canonical reads +53.9%). The mid-month+RET5 config still beats the old
+> RET1/monthly-only config on the same anchor — the *delta* is robust, the *level* drifts.
+
+### Legacy 10-year stress analysis (2016-2026, pre-2026-05-30 configs)
+
+> ⚠️ The tables below are a HISTORICAL 10yr stress test from BEFORE the 2026-05-30
+> config changes (and partly pre-PIT). Kept for the 2017-2019 fragility insight;
+> NOT the canonical numbers — use the full-cycle table above. "n20" = the old name
+> for `n40` (daily config).
+
+#### Year-by-year breakdown (return %, true MTM)
 
 NAV at each year-end = cash + held_qty × close_price_on_Dec_31 (queried from `historical_data`). This corrects the cash-only proxy — positions held across Dec 31 contribute their unrealized P&L to the year they span, not deferred until the close trade. Especially material for midcap (60-120d holds straddle year-ends frequently) and any final-year open position. See `tools/analysis/yearly_breakdown_mtm.py`.
 

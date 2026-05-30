@@ -29,6 +29,17 @@ def _label(sym: str) -> str:
     return sym.replace("NSE:", "").replace("-EQ", "")
 
 
+def _cap_at(sym: str, entry_date: Optional[str]) -> str:
+    """Point-in-time cap class (large/mid/small) of `sym` at its entry date.
+    PIT so a name that was large-cap when traded (in Nifty 100) reads 'large'
+    even if it has since been demoted. Fail-soft to 'unknown'."""
+    try:
+        from tools.shared.market_cap import classify_pit
+        return classify_pit(sym, date.fromisoformat(entry_date)) if entry_date else "unknown"
+    except Exception:
+        return "unknown"
+
+
 @dataclass
 class BacktestResult:
     final_nav: float
@@ -88,6 +99,7 @@ def run_rotation_backtest(
                     "pnl": round(qty * sx - qty * entry_px, 0),
                     "ret_pct": round((sx / entry_px - 1) * 100, 2),
                     "cap_after": round(cap, 0), "exit_reason": "STOP",
+                    "cap": _cap_at(hold, entry_date),
                 })
                 hold = None; qty = 0
                 continue
@@ -127,6 +139,7 @@ def run_rotation_backtest(
                     "ret_pct": round((sx / entry_px - 1) * 100, 2),
                     "cap_after": round(cap, 0),
                     "exit_reason": reason,
+                    "cap": _cap_at(hold, entry_date),
                 })
                 hold = None
                 qty = 0
@@ -153,6 +166,7 @@ def run_rotation_backtest(
             "entry_date": entry_date, "last_px": round(last, 2),
             "mtm_value": round(qty * last, 0),
             "unrealized_pnl": round(qty * (last - entry_px), 0),
+            "cap": _cap_at(hold, entry_date),
         }
 
     wins = sum(1 for t in trades if t["pnl"] > 0)

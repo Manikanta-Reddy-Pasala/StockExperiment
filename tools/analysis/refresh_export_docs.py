@@ -53,7 +53,7 @@ DESC = {
     },
 }
 
-WIN = "Backtest window: **2025-03-01 → 2026-05-12** (recent ~14 months: 2025 chop + 2026 bear)."
+WIN = "Backtest window: **2021-04-01 → 2026-05-29** (full ~5.1-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 bear)."
 
 
 def f(v, suf="%"):
@@ -93,7 +93,9 @@ def write_summary(model: str, d: dict):
     ops = d.get("open_positions") or ([d["open_position"]] if d.get("open_position") else [])
     for op in ops:
         sym = op.get("sym") or op.get("symbol") or "?"
-        lines += ["", f"**Open position at window end:** {sym} "
+        cap = op.get("cap")
+        cap_s = f" [{cap}]" if cap else ""
+        lines += ["", f"**Open position at window end:** {sym}{cap_s} "
                   f"qty {op.get('qty','?')} entry ₹{op.get('entry_px','?')} "
                   f"on {op.get('entry_date','?')} (unrealized {op.get('unrealized_pnl',0):+,.0f})"]
     lines += ["", "---", "*Auto-generated from summary.json by tools/analysis/refresh_export_docs.py — do not hand-edit.*", ""]
@@ -118,11 +120,11 @@ def write_ledger(model: str):
         return f"{v:,.2f}" if isinstance(v, (int, float)) else (v or "")
     def intg(v):     # integer with thousands, blank if absent
         return f"{v:,.0f}" if isinstance(v, (int, float)) else (v or "")
-    rows = ["# " + model + " — trade ledger (2025-03-01 → 2026-05-12)", "",
-            "| # | Symbol | Entry date | Exit date | Entry ₹ | Exit ₹ | Qty | PnL ₹ | Return % | Reason |",
-            "|---|---|---|---|---:|---:|---:|---:|---:|---|"]
+    rows = ["# " + model + " — trade ledger (2021-04-01 → 2026-05-29)", "",
+            "| # | Symbol | Cap | Entry date | Exit date | Entry ₹ | Exit ₹ | Qty | PnL ₹ | Return % | Reason |",
+            "|---|---|---|---|---|---:|---:|---:|---:|---:|---|"]
     for i, t in enumerate(trades, 1):
-        rows.append(f"| {i} | {g(t,'sym','symbol')} | {g(t,'entry_date')} | "
+        rows.append(f"| {i} | {g(t,'sym','symbol')} | {g(t,'cap') or '—'} | {g(t,'entry_date')} | "
                     f"{g(t,'exit_date')} | {money(g(t,'entry_px'))} | {money(g(t,'exit_px'))} | "
                     f"{intg(g(t,'qty'))} | {intg(g(t,'pnl'))} | {g(t,'ret_pct','ret')} | "
                     f"{g(t,'reason','exit_reason')} |")

@@ -20,11 +20,12 @@ import pandas as pd
 from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
 from tools.shared.universes import nifty500_symbols
+from tools.shared.market_cap import classify_pit
 from tools.models.momentum_retest_n500 import strategy as S
 
 COST = 0.0015
-DEFAULT_START = date(2023, 5, 15)
-DEFAULT_END = date(2026, 5, 12)
+DEFAULT_START = date(2021, 4, 1)
+DEFAULT_END = date(2026, 5, 29)
 DEFAULT_CAP = 1_000_000.0
 
 
@@ -85,6 +86,7 @@ def run(start, end, capital, out_dir=None):
                         "ret_pct": round((px / p["entry"] - 1) * 100, 2),
                         "cap_after": round(cap_after, 0),
                         "exit_reason": "ROTATE",
+                        "cap": classify_pit(s, date.fromisoformat(p["in"])),
                     })
                     del pos[s]
             watch = [s for s in rk[:S.K] if s not in pos]
@@ -126,6 +128,7 @@ def run(start, end, capital, out_dir=None):
         "entry_date": p["in"], "last_px": round(float(last[s]), 2),
         "mtm_value": round(p["qty"] * float(last[s]), 0),
         "unrealized_pnl": round(p["qty"] * (float(last[s]) - p["entry"]), 0),
+        "cap": classify_pit(s, date.fromisoformat(p["in"])),
     } for s, p in pos.items() if pd.notna(last.get(s))]
     print("\n## RESULTS (RETEST MOMENTUM, true-PIT, net of cost)")
     print(f"  Final NAV:    Rs.{final:,.0f}")

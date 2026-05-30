@@ -1,17 +1,17 @@
 # Model Backtests — Index
 
-Backtest window: **2025-03-01 → 2026-05-12** (recent ~14 months: 2025 chop + 2026 bear).
+Backtest window: **2021-04-01 → 2026-05-29** (full ~5.1-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 bear).
 
 All figures net of costs, ₹10L start, true point-in-time universes.
 
 | Model | Status | CAGR | maxDD | Calmar | Total |
 |---|---|---|---|---|---|
-| [Nifty 100 Momentum](momentum_n100_top5_max1/SUMMARY.md) | LIVE | +110.5% | 9.6% | 11.55 | +143.7% |
-| [Liquid 100 Momentum](momentum_pseudo_n100_adv/SUMMARY.md) | LIVE | +84.8% | 21.4% | 3.97 | +108.5% |
-| [Weekly Top-40](n40/SUMMARY.md) | LIVE | +70.0% | 24.4% | 2.86 | +88.7% |
-| [Emerging Momentum](emerging_momentum/SUMMARY.md) | LIVE | +64.8% | 13.7% | 4.71 | +81.8% |
-| [Midcap Breakout](midcap_narrow_60d_breakout/SUMMARY.md) | LIVE | +25.6% | 21.2% | 1.21 | +31.4% |
-| [Retest Momentum](momentum_retest_n500/SUMMARY.md) | DISABLED (₹0) | +25.0% | 20.9% | 1.2 | +30.6% |
+| [Emerging Momentum](emerging_momentum/SUMMARY.md) | LIVE | +121.7% | 24.9% | 4.88 | +5970.9% |
+| [Retest Momentum](momentum_retest_n500/SUMMARY.md) | DISABLED (₹0) | +77.8% | 37.5% | 2.08 | +1844.5% |
+| [Liquid 100 Momentum](momentum_pseudo_n100_adv/SUMMARY.md) | LIVE | +53.9% | 42.2% | 1.28 | +823.8% |
+| [Nifty 100 Momentum](momentum_n100_top5_max1/SUMMARY.md) | LIVE | +42.5% | 43.5% | 0.98 | +521.5% |
+| [Midcap Breakout](midcap_narrow_60d_breakout/SUMMARY.md) | LIVE | +27.3% | 50.5% | 0.54 | +247.2% |
+| [Weekly Top-40](n40/SUMMARY.md) | LIVE | +25.0% | 55.5% | 0.45 | +215.7% |
 
 **Caveats:**
 - `momentum_pseudo_n100_adv` = optimistic upper bound (ADV-selection bias, not real index).

@@ -37,6 +37,20 @@ def cap_segment(sym):
     return ("Other", "outside top-500")
 
 
+# PIT cap stamped on each trade at entry-date (engine/retest write trade["cap"]
+# via market_cap.classify_pit). Prefer it so a name that was large-cap when
+# traded (e.g. ZEEL in Nifty 100 in 2023) reads "Large", not its demoted cap
+# today. Falls back to the current-CSV cap_segment for legacy ledgers.
+_PIT = {"large": ("Large", "Nifty 100 (PIT)"),
+        "mid": ("Mid", "Nifty Midcap 150"),
+        "small": ("Small", "Nifty Smallcap 250")}
+
+
+def trade_seg(t):
+    c = (t.get("cap") or "").lower()
+    return _PIT.get(c) or cap_segment(t.get("sym", "?"))
+
+
 MODELS = {
     "momentum_n100_top5_max1": {
         "title": "Real NSE Nifty 100 monthly momentum rotation (top-1 by 30d ret). No price filter — honest baseline.",
@@ -119,7 +133,7 @@ def stats(trades, summary=None):
 def cap_breakdown(trades):
     buckets = {}
     for t in trades:
-        seg, _ = cap_segment(t.get("sym", "?"))
+        seg, _ = trade_seg(t)
         b = buckets.setdefault(seg, {"n": 0, "w": 0, "l": 0, "pnl": 0})
         b["n"] += 1
         if t["pnl"] > 0: b["w"] += 1
@@ -230,7 +244,7 @@ Data: {meta['data']}. {meta['title']}
         ent = t.get("entry_date") or t.get("entry", "")
         ext = t.get("exit_date") or t.get("exit", "")
         sym = t.get("sym", "?")
-        seg, idx = cap_segment(sym)
+        seg, idx = trade_seg(t)
         epx = t.get("entry_px", 0)
         xpx = t.get("exit_px", 0)
         qty = t.get("qty", 0)

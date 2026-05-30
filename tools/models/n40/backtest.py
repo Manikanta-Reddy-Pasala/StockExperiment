@@ -48,8 +48,8 @@ from tools.shared.rebalance_calendar import build_weekly_calendar
 from tools.models.n40.strategy import (  # noqa: E402  shared w/ live
     UNIV_SIZE, LOOKBACK, ADV_WIN, SMA_LONG, RETAIN)
 N100_CSV  = str(ROOT / "src" / "data" / "symbols" / "nifty100.csv")
-DEFAULT_START = date(2023, 5, 15)
-DEFAULT_END   = date(2026, 5, 12)
+DEFAULT_START = date(2021, 4, 1)
+DEFAULT_END   = date(2026, 5, 29)
 DEFAULT_CAP   = 1_000_000.0
 
 

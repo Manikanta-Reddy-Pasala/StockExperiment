@@ -76,8 +76,8 @@ KEEP_NEXT  = 100   # Take top 100. Large filter applied below via NSE Nifty 100 
 
 N100_CSV = str(ROOT / "src" / "data" / "symbols" / "nifty100.csv")
 
-DEFAULT_START = date(2023, 5, 15)
-DEFAULT_END   = date(2026, 5, 15)
+DEFAULT_START = date(2021, 4, 1)
+DEFAULT_END   = date(2026, 5, 29)
 DEFAULT_CAP   = 1_000_000.0
 
 
