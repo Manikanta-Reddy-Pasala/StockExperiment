@@ -37,9 +37,37 @@ No top-N-ADV cap — a stock climbing toward N500 can sit below top liquidity.
 ## Data note
 
 `exports/nse_mcap.csv` is **gitignored** (data, not code). Free-float *shares*
-are reconstructed from current `ff_mcap/ltp` and applied to historical close —
-the only lookahead approximation (shares drift slowly vs price). Index
-membership (`eligible_at`) is fully point-in-time historical.
+are reconstructed as `ff_mcap / latest DB close` (the scrape's LTP column is
+unreliable) and applied to historical close — the only lookahead approximation
+(shares drift slowly vs price). Because shares are frozen at one snapshot, the
+reconstructed "mcap climb" is really **cross-sectional price relative-strength
+vs the whole market**, not fundamental mcap growth — true mcap-drift needs the
+accumulating monthly `market_cap_history`. Index membership (`eligible_at`) is
+fully point-in-time historical.
+
+## Why it runs on the laptop, NOT the VM (load-bearing)
+
+NSE's WAF blocks **datacenter IPs**. The Hetzner VM (77.42.45.12) cannot pull
+the quote pages — verified 2026-05-30:
+
+| From | Result |
+|------|--------|
+| VM (`2a01:4f9:…` Hetzner IPv6) → NSE get-quotes | **HTTP 302** (WAF bounce, no data) — even with a browser User-Agent |
+| Laptop (residential IP) + **full Chromium** headless | **200**, real data ✅ |
+
+Also dead: plain `requests`/`curl` from anywhere (403, TLS fingerprint), and
+`headless_shell` Chromium (HTTP2 error / timeout). The scraper must use the
+**full Chromium binary** via `executable_path` (see `nse_mcap_scraper.py`).
+
+So the flow is: **scrape on the laptop → load local Postgres → rsync CSV →
+`docker cp` into the VM app container.** The VM never scrapes; it only receives
+the finished CSV.
+
+⚠️ **Laptop-wake caveat:** the launchd job fires 02:30 on the 1st only if the
+Mac is awake. launchd runs a *missed* job at next wake, so a short sleep is
+fine, but if the Mac is off for days the monthly snapshot lands late. For
+bulletproof timing: keep the Mac awake overnight on the 1st, or route the
+scrape through a residential proxy (more setup). Monthly cadence tolerates slack.
 
 ## Install the cron (one-time, on the residential Mac)
 
