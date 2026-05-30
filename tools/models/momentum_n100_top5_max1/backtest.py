@@ -229,8 +229,11 @@ if __name__ == "__main__":
     ap.add_argument("--to",   dest="end",   default=DEFAULT_END.isoformat())
     ap.add_argument("--capital", type=float, default=DEFAULT_CAP)
     ap.add_argument("--out", default=None)
-    ap.add_argument("--mid-month-check", action="store_true",
-                    help="Enable day-15 weekday rank check with lead gate")
+    ap.add_argument("--mid-month-check", dest="mid_month_check",
+                    action=argparse.BooleanOptionalAction, default=True,
+                    help="Day-15 rank check + lead gate. Default ON = the LIVE "
+                         "config (cron runs the mid-month job). --no-mid-month-check "
+                         "to disable. Mid ON is a big win: +87.5% vs +43.2% CAGR.")
     ap.add_argument("--mid-month-lead-pct", type=float, default=5.0,
                     help="Minimum lead (pp) for mid-month rotation. Default 5.0")
     ap.add_argument("--retain-top-n", type=int, default=3,

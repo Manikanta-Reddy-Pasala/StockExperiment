@@ -10,6 +10,10 @@ Production: `77.42.45.12` · App: <https://stock.oneshell.in> · Bot: `@stocks_m
 
 ## Recent Changes (2026-05)
 
+- **All models unified backtest↔live** — each model's `backtest.py` + `live_signal.py` import ONE shared core (per-model `strategy.py` + `tools/shared/rebalance_calendar.py`); params can't drift. Canonical numbers regenerated on VM postgres.
+- **n100 backtest was under-reporting** — the CLI defaulted `--mid-month-check` OFF, so the committed summary showed +43% CAGR. Live actually runs the mid-month job (cron 09:27), and with mid-month ON (the real live config) n100 = **+87.5% CAGR / 34% DD** (2023-05→2026-05). CLI now defaults mid-month ON to match live; summary regenerated.
+- **mcap-climber** shipped to emerging (real free-float-mcap filter, +98%→+111% CAGR same DD). Backtest + live share it via `strategy.py`.
+
 - **Model-aware position reconciler** (`tools/live/position_reconciler.py`). The shared Fyers account merges per-symbol holdings across models, so when two equity models (e.g. n100 + n20 in ADANIPOWER) both hold the same name, the broker reports ONE merged qty with no per-model tag. The previous reconciler AUTO_MIRRORed that merged qty into BOTH `model_ledger` rows on every pass → each model thought it owned 2× the position → cash math drifted. New behaviour: ration the broker net by subtracting sibling ledger claims before compare, and refuse to overwrite `entry_px` under overlap (broker avg is a blend, not any one model's truth). See [Cross-Model Overlap](#cross-model-overlap) below. 14-test pure-unit coverage in `tests/test_position_reconciler.py`.
 - **Combined-portfolio sim** (`tools/backtests/combined_portfolio_sim.py`) runs the 3 large-cap models as one portfolio under `{allow, block, rank2}` overlap policies. Verdict (2023-05→2026-05, ₹10L per bucket): `allow` 136.56% CAGR / 26.18% DD / 5.22 Calmar BEATS `block` (77.20% / 17.02% / 4.54) and `rank2` (79.76% / 22.85% / 3.49). Models converge on consensus winners — concentrating into agreement is the alpha, the reconciler change above is the corresponding safety fix. Pair tool: `tools/backtests/analyze_model_overlap.py` — quantifies historical (symbol, date-range) collisions across model trade ledgers.
 - **Market-status banner on `/dashboard`** — visible on weekends and NSE holidays (e.g. Bakri Id 2026-05-28). Shows the next trading day; auto-hides on trading days. Source = existing `/api/nse-holidays` (no new backend), fail-safe (weekend check works even if the API fetch fails).
@@ -28,7 +32,7 @@ Production: `77.42.45.12` · App: <https://stock.oneshell.in> · Bot: `@stocks_m
 | `momentum_n100_top5_max1` | Real Nifty 100 | Monthly (1st weekday) + mid-month | CNC delivery | until it drops below rank-1 | rank by **15-trading-day** return, hold rank-1 (top-1 rotation) |
 | `momentum_pseudo_n100_adv` | Top-100 ADV from N500 minus Smallcap-250, yearly PIT rebuild, close > 200d SMA | Monthly | CNC | until it drops below rank-1 | rank by 30d return, hold rank-1 (top-1) + uptrend + ≤₹3K |
 | `midcap_narrow_60d_breakout` | ~100 NSE midcaps (top-100 ADV minus Nifty 100) | Event-driven (daily check) | CNC | up to 120d / target +100% / trail -20% from peak | 40d-high + vol >2× + 200d SMA, ALL must fire |
-| `n20_daily_large_only` | Top-20 ADV ∩ Nifty 100 | Daily | CNC | until it drops below rank-1 | rank by 30d return + 200d SMA uptrend filter (PIT) |
+| `n20_daily_large_only` | **Top-40** ADV ∩ Nifty 100 (n40; dir keeps legacy n20 name) | Daily | CNC | until it drops below rank-1 | rank by 30d return + 200d SMA uptrend filter (PIT) |
 
 **Capital model (per model):**
 - `Allocated / Invested` = user-deposited principal (`ModelSettings.invested_amount`). Default ₹30,000 per active model.
