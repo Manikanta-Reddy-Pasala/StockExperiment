@@ -18,8 +18,8 @@ DESC = {
     "momentum_pseudo_n100_adv": {
         "title": "Liquid 100 Momentum", "live": "LIVE",
         "universe": "Top-100 by 20d ADV from N500 (yearly-PIT rebuild)",
-        "strategy": "Monthly (1st trading day) + mid-month lead check, single position held while in top-5, 30-trading-day return rank, uptrend (>200d SMA) + ≤₹3K filter.",
-        "note": "⚠️ ADV-ranked pseudo-N100 (not the real index) — selects already-liquid/hot names, so returns are an OPTIMISTIC upper bound vs the real-index sibling momentum_n100_top5_max1. 2026-05-30 sweep upgraded it to mid-month + RET5 + 3pp lead: full-period 2023-26 ≈ +160% CAGR / 22% DD / Calmar 7.4 (every year positive), full 2021-26 ≈ +100% / 31% DD / 3.2.",
+        "strategy": "Monthly (1st trading day) rotation, single position (rank-1, RET1), 30-trading-day return rank, uptrend (>200d SMA) + ≤₹3K filter. Universe rebuilt yearly at a FIXED mid-May anchor.",
+        "note": "⚠️ ADV-ranked pseudo-N100 (not the real index) — selects already-liquid/hot names, so returns are an OPTIMISTIC upper bound vs the real-index sibling momentum_n100_top5_max1. Full-cycle 2021-04→2026-05 (fixed May anchor) ≈ +63.5% CAGR / 37.6% DD / Calmar 1.69 / 71% win. (A 2026-05-30 'mid-month + RET5' tweak was reverted 2026-05-31 — it was an artifact of the old start-anchored universe and lost on the fixed anchor.)",
     },
     "momentum_n100_top5_max1": {
         "title": "Nifty 100 Momentum", "live": "LIVE",
@@ -47,9 +47,9 @@ DESC = {
     },
     "midcap_narrow_60d_breakout": {
         "title": "Midcap Breakout", "live": "LIVE",
-        "universe": "PIT midcap — top-100 ADV from N500 minus N100",
+        "universe": "PIT midcap — top-100 ADV from N500 minus Nifty 100 (excluded at SCAN time)",
         "strategy": "Event-driven single-position breakout: 40d-high + 2× vol + >200DMA. Target +100% / stop −20% / trail −20% off peak / 120d max-hold.",
-        "note": "⚠️ Lumpy single-position event model. On current PIT data the FULL-period 2023-26 is NEGATIVE (−28% CAGR / 70% DD) — concentration risk; it shines only in select windows.",
+        "note": "⚠️ Lumpy single-position event model (only ~15 trades/5yr). Full-cycle 2021-04→2026-05 ≈ +40% CAGR / 22% DD / Calmar 1.82 after the 2026-05-31 trade-time PIT-Nifty-100 exclusion fix (a name promoted to large mid-year was leaking in and dragging returns; excluding it at scan time lifted CAGR +13pp and halved DD).",
     },
 }
 

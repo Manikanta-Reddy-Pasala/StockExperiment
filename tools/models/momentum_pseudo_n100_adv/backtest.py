@@ -36,7 +36,8 @@ from tools.shared.backtest_engine import run_rotation_backtest
 
 
 from tools.models.momentum_pseudo_n100_adv.strategy import (  # noqa: E402  shared w/ live
-    LOOKBACK, ADV_WIN, UNIV_SIZE, MAX_PRICE, RETAIN, MIDMONTH_LEAD, build_calendar)
+    LOOKBACK, ADV_WIN, UNIV_SIZE, MAX_PRICE, RETAIN, MIDMONTH_LEAD,
+    UNIVERSE_ANCHOR_MONTH, UNIVERSE_ANCHOR_DAY, build_calendar)
 # Drop Small-cap NSE Nifty Smallcap 250 stocks from universe (free +2pp CAGR, DD unchanged).
 import csv as _csv
 _SML_PATH = str(ROOT / "src" / "data" / "symbols" / "nifty_smallcap250.csv")
@@ -66,7 +67,7 @@ DEFAULT_CAP   = 1_000_000.0
 
 def run(start: date, end: date, capital: float, out_dir: Path | None = None,
         retain_top_n: int = RETAIN, data_source: str = "fyers",
-        mid_month_check: bool = True, mid_month_lead_pct: float = MIDMONTH_LEAD):
+        mid_month_check: bool = False, mid_month_lead_pct: float = MIDMONTH_LEAD):
     """Run the full pseudo-N100 momentum-rotation backtest.
 
     Builds the price/ADV panels from historical_data, rebuilds the
@@ -113,19 +114,21 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
     sma200 = cl.rolling(200).mean()  # 200d SMA — uptrend filter baseline
     dates = cl.index
 
-    # Yearly-PIT universe rebuild: snapshot the top-100-by-ADV list at each
-    # year-start using only data observable on that date (no lookahead).
-    year_starts = []
-    cur = start
-    while cur <= end:
-        year_starts.append(pd.Timestamp(cur))
-        cur = cur.replace(year=cur.year + 1)
+    # Yearly-PIT universe rebuild: snapshot the top-100-by-ADV list at a FIXED
+    # calendar anchor (mid-May, matching live's annual rebuild) each year — NOT
+    # the backtest start month. Fixed anchors make the yearly ADV snapshots
+    # identical regardless of the backtest window, so absolute CAGR no longer
+    # drifts with the start date and the backtest matches the live universe.
+    # Range starts a year before `start` so a pre-May start still has the prior
+    # year's anchor in force on day one.
+    year_starts = [pd.Timestamp(yr, UNIVERSE_ANCHOR_MONTH, UNIVERSE_ANCHOR_DAY)
+                   for yr in range(start.year - 1, end.year + 1)]
 
     year_universes = {}
     for ys in year_starts:
         fut = dates[dates >= ys]
         if len(fut) == 0: continue
-        di = dates.get_loc(fut[0])  # first trading-day index on/after the year-start
+        di = dates.get_loc(fut[0])  # first trading-day index on/after the anchor
         # Rank that day's 20d-ADV descending and take the top UNIV_SIZE names.
         pit_adv = adv20.iloc[di].dropna().sort_values(ascending=False)
         top = pit_adv.head(UNIV_SIZE).index.tolist()
@@ -133,10 +136,10 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
         year_universes[ys] = [s for s in top if s.replace("NSE:","").replace("-EQ","") not in _SMALLCAP]
 
     def pick_universe(d):
-        """Return the PIT universe in force on date `d` (latest year-start <= d)."""
+        """Return the PIT universe in force on date `d` (latest anchor <= d)."""
         chosen = year_starts[0]
         for ys in year_starts:
-            if d >= ys:  # walk forward, keep the most recent year-start not after d
+            if d >= ys:  # walk forward, keep the most recent anchor not after d
                 chosen = ys
         return year_universes.get(chosen, [])
 
@@ -226,13 +229,13 @@ if __name__ == "__main__":
     ap.add_argument("--capital", type=float, default=DEFAULT_CAP)
     ap.add_argument("--out", default=None)
     ap.add_argument("--retain-top-n", type=int, default=RETAIN,
-                    help="Hold while in top-N by 30d ret; rotate when out. "
-                         f"Default {RETAIN} (2026-05-30 sweep). 1=legacy.")
+                    help=f"Hold while in top-N by 30d ret; rotate when out. "
+                         f"Default {RETAIN} (top-1 rotation — wins on the fixed anchor).")
     ap.add_argument("--mid-month-check", dest="mid_month_check",
-                    action=argparse.BooleanOptionalAction, default=True,
-                    help="Day-15 rank check + lead gate. Default ON = the LIVE "
-                         "config (2026-05-30). --no-mid-month-check to disable. "
-                         "Mid ON is the win: lifts full-cycle CAGR +30pp, DD -13pp.")
+                    action=argparse.BooleanOptionalAction, default=False,
+                    help="Day-15 rank check + lead gate. Default OFF (2026-05-31: "
+                         "the mid-month 'win' was an artifact of the old start-anchored "
+                         "universe; it loses on the fixed May anchor). Opt-in only.")
     ap.add_argument("--mid-month-lead-pct", type=float, default=MIDMONTH_LEAD,
                     help=f"Minimum lead (pp) for mid-month rotation. Default {MIDMONTH_LEAD}")
     ap.add_argument("--data-source", default="fyers",

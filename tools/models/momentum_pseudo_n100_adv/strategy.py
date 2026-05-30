@@ -3,19 +3,23 @@ imported by BOTH backtest.py and live_signal.py so they can't drift.
 
 Strategy: yearly-PIT pseudo-N100 = top-UNIV_SIZE by 20d ADV from N500 minus
 Smallcap-250; uptrend (close > SMA_LONG); price <= MAX_PRICE; rank by LOOKBACK
-return; hold while in top-RETAIN; monthly (1st trading day) + mid-month lead check.
+return; hold rank-1 (retain band RETAIN); monthly (1st trading day) rebalance.
 The universe snapshot itself is shared via yearly_universes.json
 (build_universe.py); these params + the calendar are shared from here.
 
-2026-05-30 optimize sweep (both windows, real PIT engine): added mid-month +
-RET5 + 3pp lead, upgrading from the old RET1/monthly-only config. New config
-beats old on CAGR BOTH windows and on full-cycle DD:
-  2023-26: +160.3% vs +150.7% CAGR | 22% vs 16% DD | Calmar 7.4 vs 9.3
-  2021-26: +100.0% vs  +70.5% CAGR | 31% vs 44% DD | Calmar 3.2 vs 1.6
-Top configs cluster (lead 0/3 x RET 3/5 all strong) = stable region, not a spike.
-Only recent-window DD rises (16->22); full-cycle DD (the true worst case) drops
-13pp while CAGR rises on both windows. Extra filters (momentum-floor, accel) were
-swept and rejected — floor never binds under the SMA200 gate, accel hurts.
+Config history:
+  - 2026-05-30: a sweep on the (then) backtest-start-anchored universe seemed to
+    show mid-month + RET5 + 3pp lead beating RET1/monthly. SHIPPED, then REVERTED
+    2026-05-31 — see below.
+  - 2026-05-31: the universe anchor was made a FIXED calendar date (mid-May, to
+    match live; see UNIVERSE_ANCHOR_*). On the CORRECT fixed anchor the mid-month
+    + RET5 'win' disappeared — it was an artifact of the unstable start-anchor.
+    Old RET1/monthly is clearly better on the fixed full-cycle anchor:
+      RET1/monthly : +63.5% CAGR / 37.6% DD / Calmar 1.69
+      mid-month/RET5: +57.5% CAGR / 66.1% DD / Calmar 0.87
+    So pseudo is back to RET1 + monthly-only. The mid-month machinery stays in
+    the code (backtest --mid-month-check, live --mid-month-check) but defaults
+    OFF; MIDMONTH_LEAD is kept only for those opt-in paths.
 """
 from __future__ import annotations
 
@@ -27,5 +31,14 @@ ADV_WIN = 20         # ADV averaging window
 UNIV_SIZE = 100      # top-N by 20d ADV (pseudo-N100)
 MAX_PRICE = 3000.0   # skip names priced above this at entry
 SMA_LONG = 200       # uptrend filter: close > 200d SMA
-RETAIN = 5           # exit band — hold while in top-5 (2026-05-30 sweep)
-MIDMONTH_LEAD = 3.0  # mid-month rotates only if new rank-1 leads held by >= 3pp
+RETAIN = 1           # exit band — top-1 rotation (wins on the fixed anchor)
+MIDMONTH_LEAD = 3.0  # only used by the opt-in --mid-month-check path (default OFF)
+
+# Universe re-anchor date — FIXED calendar (month, day), NOT the backtest start.
+# Live rebuilds yearly_universes.json once a year at the mid-May NSE rebalance
+# (cron _yearly_universe fires May 15 -> build_universe --end-date ~May-13). The
+# backtest must anchor at the SAME fixed date so its yearly ADV snapshots match
+# live and its CAGR is not start-date-sensitive (2026-05-31 fix: was anchored to
+# the backtest start month, which made absolute returns drift with the window).
+UNIVERSE_ANCHOR_MONTH = 5
+UNIVERSE_ANCHOR_DAY = 15

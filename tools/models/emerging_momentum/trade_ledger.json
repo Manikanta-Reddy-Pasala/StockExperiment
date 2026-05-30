@@ -114,7 +114,7 @@
     "ret_pct": 1.24,
     "cap_after": 990231.0,
     "exit_reason": "ROTATE",
-    "cap": "large"
+    "cap": "mid"
   },
   {
     "sym": "KPITTECH",
@@ -140,7 +140,7 @@
     "ret_pct": -1.13,
     "cap_after": 1203774.0,
     "exit_reason": "ROTATE",
-    "cap": "large"
+    "cap": "mid"
   },
   {
     "sym": "ADANIENSOL",
@@ -153,7 +153,7 @@
     "ret_pct": 8.05,
     "cap_after": 1300649.0,
     "exit_reason": "ROTATE",
-    "cap": "large"
+    "cap": "mid"
   },
   {
     "sym": "ADANIPOWER",
@@ -166,7 +166,7 @@
     "ret_pct": 33.72,
     "cap_after": 1739195.0,
     "exit_reason": "MIDCHECK",
-    "cap": "large"
+    "cap": "mid"
   },
   {
     "sym": "APARINDS",
@@ -192,7 +192,7 @@
     "ret_pct": 58.53,
     "cap_after": 4058432.0,
     "exit_reason": "ROTATE",
-    "cap": "large"
+    "cap": "mid"
   },
   {
     "sym": "BANKINDIA",
@@ -335,7 +335,7 @@
     "ret_pct": 44.27,
     "cap_after": 8924135.0,
     "exit_reason": "ROTATE",
-    "cap": "large"
+    "cap": "mid"
   },
   {
     "sym": "ENGINERSIN",
@@ -374,7 +374,7 @@
     "ret_pct": -7.89,
     "cap_after": 9610003.0,
     "exit_reason": "ROTATE",
-    "cap": "large"
+    "cap": "mid"
   },
   {
     "sym": "BSE",
@@ -400,7 +400,7 @@
     "ret_pct": 46.81,
     "cap_after": 17319664.0,
     "exit_reason": "ROTATE",
-    "cap": "large"
+    "cap": "mid"
   },
   {
     "sym": "NCC",
@@ -452,7 +452,7 @@
     "ret_pct": 24.17,
     "cap_after": 20798986.0,
     "exit_reason": "ROTATE",
-    "cap": "large"
+    "cap": "mid"
   },
   {
     "sym": "BDL",
@@ -478,7 +478,7 @@
     "ret_pct": 22.24,
     "cap_after": 25915427.0,
     "exit_reason": "ROTATE",
-    "cap": "large"
+    "cap": "mid"
   },
   {
     "sym": "OIL",
@@ -543,7 +543,7 @@
     "ret_pct": 8.31,
     "cap_after": 40007741.0,
     "exit_reason": "MIDCHECK",
-    "cap": "large"
+    "cap": "mid"
   },
   {
     "sym": "ITI",
@@ -595,7 +595,7 @@
     "ret_pct": 2.6,
     "cap_after": 32202957.0,
     "exit_reason": "ROTATE",
-    "cap": "large"
+    "cap": "mid"
   },
   {
     "sym": "BSE",
@@ -699,7 +699,7 @@
     "ret_pct": 6.92,
     "cap_after": 56830404.0,
     "exit_reason": "ROTATE",
-    "cap": "large"
+    "cap": "mid"
   },
   {
     "sym": "NATCOPHARM",
@@ -725,7 +725,7 @@
     "ret_pct": -2.17,
     "cap_after": 54675376.0,
     "exit_reason": "ROTATE",
-    "cap": "large"
+    "cap": "mid"
   },
   {
     "sym": "FEDERALBNK",

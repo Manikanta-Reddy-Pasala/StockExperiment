@@ -279,7 +279,7 @@ def register_trading_jobs(schedule):
     # 09:31 (staggered off n100's 09:30) — all 4 models share one scheduler
     # thread + one Fyers account; distinct minutes stop later models filling late.
     schedule.every().day.at("09:31").do(execute_orders)
-    # Mid-month (day-15) check + execute (2026-05-30). live_signal self-skips on
-    # non-day-15 days; staggered off n100's 09:27/09:35 to avoid thread overlap.
-    schedule.every().day.at("09:28").do(emit_mid_month_signal)
-    schedule.every().day.at("09:37").do(execute_mid_month_orders)
+    # Mid-month jobs are NOT registered (2026-05-31): the mid-month config lost to
+    # RET1/monthly on the fixed-anchor re-check, so pseudo runs monthly-only. The
+    # emit_mid_month_signal / execute_mid_month_orders funcs remain as an opt-in
+    # path if a future fixed-anchor sweep revives mid-month.

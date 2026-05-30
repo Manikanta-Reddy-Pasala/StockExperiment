@@ -6,9 +6,10 @@ by 30-day return, picks top-5, emits ENTRY1 / TARGET_HIT / STOP_HIT.
 Strategy:
   - Universe: yearly-PIT pseudo-N100 (read from yearly_universes.json) —
     rebuilt at year-start using current data at that time (PIT-safe)
-  - top_n = 5 (display); single position, held while in top-RETAIN (5)
-  - rebalance: 1st trading day of month + mid-month (day-15) lead check
-    (2026-05-30: was monthly-only / RET1)
+  - top_n = 5 (display); single position, rank-1 rotation (top-RETAIN=1)
+  - rebalance: 1st trading day of month (monthly). Mid-month day-15 check exists
+    as an opt-in --mid-month-check path but defaults OFF (2026-05-31: the
+    mid-month config lost to RET1/monthly on the fixed-anchor re-check).
   - Filter: skip stocks with price > MAX_PRICE (₹3000) — share-count floor
     heuristic so 1 share ≤ 10% of ₹30K live capital
 
@@ -290,7 +291,7 @@ def emit_signals(top_picks: List[tuple], pos: Optional[Dict],
                  top_n: int, retain_top_n: int = RETAIN) -> List[Dict]:
     # Decision comes from the SHARED rotation core (tools/shared/rotation_strategy)
     # — the exact same rule backtest.py uses, so live and backtest cannot drift.
-    # retain_top_n default = RETAIN (5 since 2026-05-30 sweep; was 1).
+    # retain_top_n default = RETAIN (1 = top-1 rotation; wins on the fixed anchor).
     ranked = [p[0] for p in top_picks]
     by_sym = {p[0]: p for p in top_picks}
     held_sym = pos.get("open_symbol") if pos else None

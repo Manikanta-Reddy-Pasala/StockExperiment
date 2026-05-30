@@ -62,10 +62,15 @@ def classify(symbol: str) -> str:
 
 
 def classify_pit(symbol: str, on_date) -> str:
-    """Point-in-time cap: 'large' if the symbol was in NSE Nifty 100 on
-    `on_date` (via index_membership.eligible_at), else fall back to the current
-    CSV classification. Lets a backtest label a name large-cap for the period it
-    was actually in the index, even if it has since been demoted.
+    """Point-in-time cap of `symbol` on `on_date`.
+
+    'large' IFF the symbol was in NSE Nifty 100 on `on_date` (the only index we
+    have true PIT membership for, via index_membership.eligible_at). Otherwise it
+    was NOT large that day, so we fall back to the current Midcap-150 /
+    Smallcap-250 CSVs — and if the current CSV says 'large' (i.e. the name was
+    PROMOTED into Nifty 100 since the trade), we DOWNGRADE it to 'mid' rather than
+    emit a false PIT-large. (We lack PIT mid-vs-small history, so a non-N100 name
+    is best-effort mid/small from today's snapshot.)
     """
     try:
         from tools.shared.index_membership import eligible_at
@@ -73,4 +78,5 @@ def classify_pit(symbol: str, on_date) -> str:
             return "large"
     except Exception:
         pass
-    return classify(symbol)
+    cur = classify(symbol)
+    return "mid" if cur == "large" else cur   # not in N100 then -> can't be PIT-large

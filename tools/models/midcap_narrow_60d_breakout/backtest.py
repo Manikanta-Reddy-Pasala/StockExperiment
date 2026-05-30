@@ -56,6 +56,7 @@ from tools.shared.ohlcv_cache import _get_engine
 from tools.shared.universes import nifty500_symbols  # noqa: F401
 from tools.shared.breakout_strategy import is_breakout, breakout_exit_reason
 from tools.shared.index_membership import eligible_at, universe_union
+from tools.shared.market_cap import classify_pit
 
 # Strategy params (V2 winner)
 HH_WIN     = 40
@@ -243,6 +244,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
                     "ret_pct":    round(ret_e * 100, 2),
                     "reason":     reason,
                     "cap_after":  round(cap, 0),
+                    "cap":        classify_pit(pos["sym"], pos["entry_date"]),
                 })
                 pos = None
 
@@ -250,10 +252,17 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
             # Flat: scan every universe name for a qualifying breakout TODAY.
             # The PIT midcap_band rolls forward at each year-start.
             midcap_band = pick_band(d)
+            # TRADE-TIME large-cap exclusion (2026-05-31 fix): the band freezes the
+            # N100 exclusion at year-start, so a name PROMOTED to Nifty 100 mid-year
+            # (JINDALSTEL, CHOLAFIN, BANKBARODA, ...) used to leak into this mid/small
+            # model. Re-exclude PIT n100 as of the scan day so midcap stays mid/small.
+            n100_today = load_n100_pit(dates[di].date())
             cands = []
             for sym in midcap_band:
                 if sym not in cl.columns:
                     continue
+                if sym.replace("NSE:", "").replace("-EQ", "") in n100_today:
+                    continue  # currently large-cap (in Nifty 100) — not a midcap trade
                 # Pull today's close, 200d SMA, prior-40d high, 20d avg vol, vol.
                 c_v = cl[sym].iloc[di]
                 sma_v = sma_long[sym].iloc[di] if sym in sma_long.columns else None

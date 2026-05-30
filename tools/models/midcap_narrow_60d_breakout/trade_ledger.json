@@ -9,7 +9,8 @@
     "pnl": 2136.0,
     "ret_pct": 0.42,
     "reason": "MAX_HOLD",
-    "cap_after": 1002116.0
+    "cap_after": 1002116.0,
+    "cap": "mid"
   },
   {
     "entry_date": "2021-08-10",
@@ -21,7 +22,8 @@
     "pnl": 86421.0,
     "ret_pct": 8.85,
     "reason": "MAX_HOLD",
-    "cap_after": 1088517.0
+    "cap_after": 1088517.0,
+    "cap": "small"
   },
   {
     "entry_date": "2021-12-13",
@@ -33,7 +35,8 @@
     "pnl": 114515.0,
     "ret_pct": 10.75,
     "reason": "MAX_HOLD",
-    "cap_after": 1203012.0
+    "cap_after": 1203012.0,
+    "cap": "mid"
   },
   {
     "entry_date": "2022-04-27",
@@ -45,7 +48,8 @@
     "pnl": 39112.0,
     "ret_pct": 3.46,
     "reason": "MAX_HOLD",
-    "cap_after": 1242105.0
+    "cap_after": 1242105.0,
+    "cap": "mid"
   },
   {
     "entry_date": "2022-10-17",
@@ -57,7 +61,8 @@
     "pnl": -24849.0,
     "ret_pct": -1.8,
     "reason": "MAX_HOLD",
-    "cap_after": 1217236.0
+    "cap_after": 1217236.0,
+    "cap": "mid"
   },
   {
     "entry_date": "2023-02-17",
@@ -69,7 +74,8 @@
     "pnl": -248084.0,
     "ret_pct": -20.24,
     "reason": "STOP",
-    "cap_after": 969132.0
+    "cap_after": 969132.0,
+    "cap": "mid"
   },
   {
     "entry_date": "2023-03-27",
@@ -81,7 +87,8 @@
     "pnl": 551411.0,
     "ret_pct": 57.22,
     "reason": "MAX_HOLD",
-    "cap_after": 1520523.0
+    "cap_after": 1520523.0,
+    "cap": "mid"
   },
   {
     "entry_date": "2023-07-27",
@@ -93,102 +100,98 @@
     "pnl": -39315.0,
     "ret_pct": -2.39,
     "reason": "MAX_HOLD",
-    "cap_after": 1481188.0
+    "cap_after": 1481188.0,
+    "cap": "small"
   },
   {
-    "entry_date": "2023-11-29",
-    "exit_date": "2024-03-28",
-    "sym": "ADANIENSOL",
-    "qty": 1645,
-    "entry_px": 899.9,
-    "exit_px": 1025.67,
-    "pnl": 205191.0,
-    "ret_pct": 14.09,
+    "entry_date": "2023-12-01",
+    "exit_date": "2024-04-01",
+    "sym": "MAXHEALTH",
+    "qty": 2353,
+    "entry_px": 629.38,
+    "exit_px": 816.43,
+    "pnl": 438197.0,
+    "ret_pct": 29.85,
     "reason": "MAX_HOLD",
-    "cap_after": 1686360.0
+    "cap_after": 1919365.0,
+    "cap": "mid"
   },
   {
     "entry_date": "2024-04-02",
     "exit_date": "2024-05-27",
     "sym": "COCHINSHIP",
-    "qty": 1738,
+    "qty": 1978,
     "entry_px": 970.17,
     "exit_px": 1969.03,
-    "pnl": 1732576.0,
+    "pnl": 1971830.0,
     "ret_pct": 103.16,
     "reason": "TARGET",
-    "cap_after": 3418916.0
+    "cap_after": 3891175.0,
+    "cap": "mid"
   },
   {
     "entry_date": "2024-06-04",
     "exit_date": "2024-09-11",
     "sym": "BANKBARODA",
-    "qty": 11696,
+    "qty": 13312,
     "entry_px": 292.29,
     "exit_px": 232.57,
-    "pnl": -701281.0,
+    "pnl": -798172.0,
     "ret_pct": -20.35,
     "reason": "STOP",
-    "cap_after": 2717614.0
+    "cap_after": 3092983.0,
+    "cap": "mid"
   },
   {
     "entry_date": "2024-09-17",
     "exit_date": "2025-01-15",
     "sym": "BSE",
-    "qty": 2381,
+    "qty": 2710,
     "entry_px": 1141.14,
     "exit_px": 1926.74,
-    "pnl": 1865909.0,
+    "pnl": 2123738.0,
     "ret_pct": 69.01,
     "reason": "MAX_HOLD",
-    "cap_after": 4583504.0
+    "cap_after": 5216701.0,
+    "cap": "mid"
   },
   {
     "entry_date": "2025-04-16",
     "exit_date": "2025-08-14",
     "sym": "KAYNES",
-    "qty": 832,
+    "qty": 947,
     "entry_px": 5504.5,
     "exit_px": 6110.38,
-    "pnl": 498992.0,
+    "pnl": 567966.0,
     "ret_pct": 11.12,
     "reason": "MAX_HOLD",
-    "cap_after": 5082476.0
+    "cap_after": 5784647.0,
+    "cap": "small"
   },
   {
-    "entry_date": "2025-09-02",
-    "exit_date": "2025-12-03",
-    "sym": "KAYNES",
-    "qty": 763,
-    "entry_px": 6656.65,
-    "exit_px": 5301.69,
-    "pnl": -1037897.0,
-    "ret_pct": -20.28,
-    "reason": "STOP",
-    "cap_after": 4044558.0
+    "entry_date": "2025-09-05",
+    "exit_date": "2026-01-05",
+    "sym": "KEI",
+    "qty": 1395,
+    "entry_px": 4144.14,
+    "exit_px": 4524.37,
+    "pnl": 524091.0,
+    "ret_pct": 9.28,
+    "reason": "MAX_HOLD",
+    "cap_after": 6308718.0,
+    "cap": "mid"
   },
   {
-    "entry_date": "2025-12-05",
-    "exit_date": "2026-02-06",
-    "sym": "COFORGE",
-    "qty": 2051,
-    "entry_px": 1971.97,
-    "exit_px": 1544.45,
-    "pnl": -880023.0,
-    "ret_pct": -21.6,
-    "reason": "STOP",
-    "cap_after": 3164515.0
-  },
-  {
-    "entry_date": "2026-02-10",
-    "exit_date": "2026-04-01",
-    "sym": "BLUESTARCO",
-    "qty": 1620,
-    "entry_px": 1952.95,
-    "exit_px": 1554.74,
-    "pnl": -647635.0,
-    "ret_pct": -20.31,
-    "reason": "STOP",
-    "cap_after": 2516861.0
+    "entry_date": "2026-01-06",
+    "exit_date": "2026-05-06",
+    "sym": "VOLTAS",
+    "qty": 4267,
+    "entry_px": 1478.28,
+    "exit_px": 1378.22,
+    "pnl": -432842.0,
+    "ret_pct": -6.68,
+    "reason": "MAX_HOLD",
+    "cap_after": 5875856.0,
+    "cap": "mid"
   }
 ]

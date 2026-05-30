@@ -10,7 +10,10 @@ Production: `77.42.45.12` · App: <https://stock.oneshell.in> · Bot: `@stocks_m
 
 ## Recent Changes (2026-05)
 
-- **Canonical backtest window standardized → 2021-04-01 → 2026-05-29** (full ~5.16yr cycle) for ALL models. `DEFAULT_START`/`DEFAULT_END` unified across every `backtest.py`; summaries + exports regenerated. Full-cycle leaderboard: emerging +121.7%/24.9%DD, retest +77.8%/37.5%, pseudo +53.9%/42.2%, n100 +42.5%/43.5%, midcap +27.3%/50.5%, n40 +25.0%/55.5%.
+- **pseudo universe anchored at a FIXED date + config reverted (2026-05-31).** Its yearly-PIT universe now rebuilds at a fixed mid-May anchor (`UNIVERSE_ANCHOR_*`, matching live's annual rebuild) instead of the backtest-start month, so absolute CAGR no longer drifts with the window. On the correct fixed anchor the earlier "mid-month + RET5" win evaporated (it was a start-anchor artifact) and LOST to plain RET1/monthly — so pseudo is back to **RET1/monthly: +63.5% / 37.6% DD / Calmar 1.69** (was advertised +53.9-100% on shifting anchors). Mid-month code kept as opt-in, default OFF; cron mid-month jobs unregistered.
+- **midcap trade-time PIT-Nifty-100 exclusion (2026-05-31).** Its N100 exclusion only ran at year-start, so a name promoted into Nifty 100 mid-year could leak in. Now re-excluded at scan time. Removed one promoted-to-large disaster trade → midcap **+27.3%/50.5%DD → +40.0%/22.0%DD/Calmar 1.82** (now lowest DD of all models).
+- **n40 / n100 "picking small/mid" — verified NOT a bug.** All 130 n40 + 96 n100 trades were in NSE Nifty 100 *at trade date* (PIT-large, via `eligible_at`); they only read mid/small under today's snapshot because they were demoted afterward. `classify_pit` hardened so a non-N100-at-date name never emits a false PIT "large". Cap labels now honest: n40/n100 100% large, midcap pure mid/small.
+- **Canonical backtest window standardized → 2021-04-01 → 2026-05-29** (full ~5.16yr cycle) for ALL models. `DEFAULT_START`/`DEFAULT_END` unified across every `backtest.py`; summaries + exports regenerated. Full-cycle leaderboard: emerging +121.7%/24.9%DD, retest +77.8%/37.5%, pseudo +63.5%/37.6%, n100 +42.5%/43.5%, midcap +40.0%/22.0%, n40 +25.0%/55.5%.
 - **Per-trade cap tagging (large/mid/small, PIT at entry).** New `tools/shared/market_cap.py` classifies from the NSE Nifty 100 / Midcap-150 / Smallcap-250 constituent CSVs; the shared engine + retest stamp `cap` on every trade. Surfaced as a **Cap** column in each `exports/models/<m>/TRADE_LEDGER.md`. PIT (`classify_pit`) so a name that was large-cap when traded reads "large" even if demoted today.
 - **n40 "smallcap" investigated → not a bug.** ZEEL (and ATGL/IRCTC/INDUSTOWER/HEROMOTOCO) were all in NSE Nifty 100 *at trade date* (PIT-large); they only looked small because the constituent CSVs are current snapshots. All 130 n40 trades are PIT-large — the universe filter (top-40 ADV ∩ Nifty 100) is working correctly. Cap labels now use PIT so the ledgers read "Large".
 - **n40 daily → WEEKLY rebalance** (the fix). Daily rotation churned (55% of trades held ≤3 days = whipsaw). Rebalancing weekly (1st trading day of each ISO week, shared `rebalance_calendar.build_weekly_calendar` / `is_week_rebalance_day`) lifts CAGR + cuts DD on BOTH windows: 2023-05→2026 **+59.3% / 24.4% DD** (was +55.4% / 25.4%), full-cycle 2021→2026 **+20.6% / 55.5%** (was +13.7% / 59%). retain-1 kept (wider bands hurt); stop-loss / min-ADV tested + rejected (n40 already top-ADV). backtest + live share the weekly rule.
@@ -34,7 +37,7 @@ Production: `77.42.45.12` · App: <https://stock.oneshell.in> · Bot: `@stocks_m
 | Model | Universe | Cadence | Product | Hold | Signal |
 |-------|----------|---------|---------|------|--------|
 | `momentum_n100_top5_max1` | Real Nifty 100 | Monthly (1st weekday) + mid-month | CNC delivery | until it drops below rank-1 | rank by **15-trading-day** return, hold rank-1 (top-1 rotation) |
-| `momentum_pseudo_n100_adv` | Top-100 ADV from N500 minus Smallcap-250, yearly PIT rebuild, close > 200d SMA | **Monthly + mid-month** (day-15 lead check) | CNC | while in top-5 | rank by 30d return, hold while in top-5 + uptrend + ≤₹3K + 3pp mid-month lead gate |
+| `momentum_pseudo_n100_adv` | Top-100 ADV from N500 minus Smallcap-250, yearly PIT rebuild (FIXED mid-May anchor), close > 200d SMA | Monthly | CNC | until it drops below rank-1 | rank by 30d return, hold rank-1 (top-1) + uptrend + ≤₹3K |
 | `midcap_narrow_60d_breakout` | ~100 NSE midcaps (top-100 ADV minus Nifty 100) | Event-driven (daily check) | CNC | up to 120d / target +100% / trail -20% from peak | 40d-high + vol >2× + 200d SMA, ALL must fire |
 | `n20_daily_large_only` | **Top-40** ADV ∩ Nifty 100 (n40; dir keeps legacy n20 name) | **Weekly** (1st trading day of ISO week) | CNC | until it drops below rank-1 | rank by 30d return + 200d SMA uptrend filter (PIT) |
 
@@ -293,11 +296,11 @@ retest. ₹10L start. Current PIT engine + current configs. Sorted by CAGR.
 
 | Model | CAGR | Max DD | Calmar | Trades | WR |
 |---|---:|---:|---:|---:|---:|
-| `emerging_momentum` (single-pos mid/small + climber) | **+121.68%** | **24.93%** | **4.88** | 59 | 66.1% |
-| `momentum_retest_n500` (K=2, 20% band) | +77.77% | 37.45% | 2.08 | 86 | 58.0% |
-| `momentum_pseudo_n100_adv` (mid-month + RET5) | +53.88% | 42.23% | 1.28 | 62 | 59.7% |
+| `emerging_momentum` (single-pos mid/small + climber) | **+121.68%** | 24.93% | **4.88** | 59 | 66.1% |
+| `momentum_retest_n500` (K=2, 20% band) | +77.77% | 37.45% | 2.08 | 86 | 58.1% |
+| `momentum_pseudo_n100_adv` (RET1, monthly, fixed May anchor) | +63.54% | 37.64% | 1.69 | 52 | 71.2% |
 | `momentum_n100_top5_max1` (LB15 + mid-month + RET3) | +42.50% | 43.53% | 0.98 | 96 | 58.3% |
-| `midcap_narrow_60d_breakout` (40d-high + 2× vol) | +27.29% | 50.48% | 0.54 | 16 | 56.2% |
+| `midcap_narrow_60d_breakout` (40d-high + 2× vol, PIT-N100 excl) | +40.01% | **21.98%** | 1.82 | 15 | 66.7% |
 | `n40` (weekly, top-40 ADV ∩ N100) | +24.96% | 55.45%¹ | 0.45 | 130 | 52.3% |
 
 ¹ n40 / midcap Max DD is daily mark-to-market; n100 / pseudo / emerging / retest
@@ -306,15 +309,19 @@ report realized rebal-day DD (lower by construction — they only mark on rebala
 **Emerging is the clear full-cycle winner** (+121.7% CAGR / 24.9% DD / Calmar 4.88) —
 its mid/small universe + climber overlay + single-position concentration ride the
 2023-24 momentum hardest while the 200d-SMA gate keeps it out of the worst of 2022.
-retest (K=2) is the diversified runner-up (Calmar 2.08). The single-position
-large-cap models (n100, pseudo) compound well but carry 42-44% full-cycle DD; n40
-is the highest-churn / lowest Calmar. Every trade is cap-tagged (large/mid/small,
-PIT at entry) in each model's `exports/models/<m>/TRADE_LEDGER.md`.
+retest (K=2) is the diversified runner-up (Calmar 2.08); pseudo (RET1/monthly on the
+fixed May anchor) is third with the best win-rate (71%). midcap, after the trade-time
+PIT-Nifty-100 exclusion fix (2026-05-31), has the **lowest DD of all** (22%) and a
+1.82 Calmar — one promoted-to-large disaster trade had been dragging it. n100 / n40
+carry the heaviest full-cycle DD. Every trade is cap-tagged (large/mid/small, PIT at
+entry — "large" = was in Nifty 100 that day) in each `exports/models/<m>/TRADE_LEDGER.md`.
 
-> NOTE: pseudo's yearly-PIT universe re-anchors to the backtest start month, so its
-> absolute CAGR is start-date-sensitive (a Jan-2021 anchor reads ~+100%, this
-> Apr-2021 canonical reads +53.9%). The mid-month+RET5 config still beats the old
-> RET1/monthly-only config on the same anchor — the *delta* is robust, the *level* drifts.
+> NOTE: pseudo's yearly-PIT universe is now anchored at a FIXED date (mid-May, matching
+> live's annual rebuild) — not the backtest start month. The earlier "mid-month + RET5"
+> pseudo win was an artifact of the old start-anchored universe; on the correct fixed
+> anchor it LOSES to plain RET1/monthly (+57.5%/66%DD vs +63.5%/37.6%DD), so pseudo was
+> reverted to RET1/monthly (2026-05-31). Lesson logged: never optimize on a config whose
+> universe re-anchors with the backtest window.
 
 ### Legacy 10-year stress analysis (2016-2026, pre-2026-05-30 configs)
 

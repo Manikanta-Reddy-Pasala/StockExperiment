@@ -8,9 +8,9 @@ All figures net of costs, ₹10L start, true point-in-time universes.
 |---|---|---|---|---|---|
 | [Emerging Momentum](emerging_momentum/SUMMARY.md) | LIVE | +121.7% | 24.9% | 4.88 | +5970.9% |
 | [Retest Momentum](momentum_retest_n500/SUMMARY.md) | DISABLED (₹0) | +77.8% | 37.5% | 2.08 | +1844.5% |
-| [Liquid 100 Momentum](momentum_pseudo_n100_adv/SUMMARY.md) | LIVE | +53.9% | 42.2% | 1.28 | +823.8% |
+| [Liquid 100 Momentum](momentum_pseudo_n100_adv/SUMMARY.md) | LIVE | +63.5% | 37.6% | 1.69 | +1164.5% |
 | [Nifty 100 Momentum](momentum_n100_top5_max1/SUMMARY.md) | LIVE | +42.5% | 43.5% | 0.98 | +521.5% |
-| [Midcap Breakout](midcap_narrow_60d_breakout/SUMMARY.md) | LIVE | +27.3% | 50.5% | 0.54 | +247.2% |
+| [Midcap Breakout](midcap_narrow_60d_breakout/SUMMARY.md) | LIVE | +40.0% | 22.0% | 1.82 | +467.4% |
 | [Weekly Top-40](n40/SUMMARY.md) | LIVE | +25.0% | 55.5% | 0.45 | +215.7% |
 
 **Caveats:**
