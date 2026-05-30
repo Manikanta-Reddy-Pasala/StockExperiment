@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Tracked template for the quarterly NSE market-cap refresh launchd job.
+     Install: cp this to ~/Library/LaunchAgents/com.stockexp.mcaprefresh.plist
+              launchctl unload ~/Library/LaunchAgents/com.stockexp.mcaprefresh.plist 2>/dev/null
+              launchctl load   ~/Library/LaunchAgents/com.stockexp.mcaprefresh.plist
+     Must live on a residential-IP Mac with full Chromium (NSE WAF 403s the VM
+     and plain scripts). See refresh_mcap.sh / MCAP_JOB.md. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.stockexp.mcaprefresh</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/manip/Documents/codeRepo/StockExperiment/tools/analysis/refresh_mcap.sh</string>
+  </array>
+  <!-- Quarterly: 02:30 on the 1st of Jan, Apr, Jul, Oct (ahead of NSE Mar/Sep reviews). -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Month</key><integer>1</integer><key>Day</key><integer>1</integer><key>Hour</key><integer>2</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Month</key><integer>4</integer><key>Day</key><integer>1</integer><key>Hour</key><integer>2</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Month</key><integer>7</integer><key>Day</key><integer>1</integer><key>Hour</key><integer>2</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Month</key><integer>10</integer><key>Day</key><integer>1</integer><key>Hour</key><integer>2</integer><key>Minute</key><integer>30</integer></dict>
+  </array>
+  <key>StandardOutPath</key>
+  <string>/tmp/mcaprefresh.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/mcaprefresh.err.log</string>
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>
