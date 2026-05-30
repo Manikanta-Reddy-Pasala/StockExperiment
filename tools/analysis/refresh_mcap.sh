@@ -32,8 +32,8 @@ PY
 python3 tools/analysis/nse_mcap_scraper.py >> "$LOG" 2>&1
 
 # 2.5. persist this snapshot to Postgres for a permanent historical track:
-#       market_cap_history (every run) + nifty_index_membership (Apr & Sep
-#       NSE-review months — the plist fires 1 Jan/Apr/Jul/Oct + 1 Sep).
+#       market_cap_history (every run — plist fires the 1st of every month) +
+#       nifty_index_membership (gated to Apr & Sep, the NSE semi-annual reviews).
 python3 tools/analysis/mcap_db.py load-mcap >> "$LOG" 2>&1
 MONTH=$(date +%m)
 if [ "$MONTH" = "04" ] || [ "$MONTH" = "09" ]; then

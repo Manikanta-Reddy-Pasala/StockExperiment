@@ -15,16 +15,10 @@
     <string>/bin/bash</string>
     <string>/Users/manip/Documents/codeRepo/StockExperiment/tools/analysis/refresh_mcap.sh</string>
   </array>
-  <!-- 02:30 on the 1st of Jan, Apr, Jul, Sep, Oct. Quarterly mcap track +
-       index-membership snapshot on Apr & Sep (the NSE semi-annual reviews). -->
+  <!-- 02:30 on the 1st of EVERY month (monthly mcap track). The membership
+       snapshot inside refresh_mcap.sh stays gated to Apr & Sep (NSE reviews). -->
   <key>StartCalendarInterval</key>
-  <array>
-    <dict><key>Month</key><integer>1</integer><key>Day</key><integer>1</integer><key>Hour</key><integer>2</integer><key>Minute</key><integer>30</integer></dict>
-    <dict><key>Month</key><integer>4</integer><key>Day</key><integer>1</integer><key>Hour</key><integer>2</integer><key>Minute</key><integer>30</integer></dict>
-    <dict><key>Month</key><integer>7</integer><key>Day</key><integer>1</integer><key>Hour</key><integer>2</integer><key>Minute</key><integer>30</integer></dict>
-    <dict><key>Month</key><integer>9</integer><key>Day</key><integer>1</integer><key>Hour</key><integer>2</integer><key>Minute</key><integer>30</integer></dict>
-    <dict><key>Month</key><integer>10</integer><key>Day</key><integer>1</integer><key>Hour</key><integer>2</integer><key>Minute</key><integer>30</integer></dict>
-  </array>
+  <dict><key>Day</key><integer>1</integer><key>Hour</key><integer>2</integer><key>Minute</key><integer>30</integer></dict>
   <key>StandardOutPath</key>
   <string>/tmp/mcaprefresh.out.log</string>
   <key>StandardErrorPath</key>
