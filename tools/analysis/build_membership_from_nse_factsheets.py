@@ -77,15 +77,20 @@ def _pdf_symbols(pdf_path: str) -> set[str]:
 def extract_snapshots(indices_dir: Path) -> tuple[dict, dict]:
     """Unzip every rebalance ZIP and pull N50 / Next50 / N100 / N500 constituents.
 
-    Returns (n100_snaps, n500_pdf_snaps): {date: set(symbols)}. n100 prefers the
-    direct NIFTY_100 PDF, else NIFTY_50 ∪ NIFTY_Next_50 (skip periods with only
-    N50). n500_pdf_snaps is only the 3 periods that ship a NIFTY_500 PDF (used to
-    cross-check the xlsx, not to build the CSV).
+    Returns (n100_snaps, n500_pdf_snaps): {date: set(symbols)}.
+
+    N100 per period (NSE construction = N50 ∪ Next-50):
+      - direct NIFTY_100 PDF if present; else NIFTY_50 ∪ NIFTY_Next_50.
+      - GAP periods that ship only NIFTY_50 (Sep2022..Mar2024 — the partial zips
+        with no Next-50 PDF): N100 = that period's ACTUAL N50 ∪ the most recent
+        prior Next-50 (carried forward). Keeps the N50 half period-correct and
+        only freezes the Next-50 half across the gap (option 1, 2026-05-31).
+    n500_pdf_snaps = only the periods shipping a NIFTY_500 PDF (xlsx cross-check).
     """
-    n100: dict[date, set[str]] = {}
+    raw: dict[date, dict] = {}
     n500_pdf: dict[date, set[str]] = {}
     with tempfile.TemporaryDirectory() as tmp:
-        for z in sorted(glob.glob(str(indices_dir / "*.zip"))):
+        for z in glob.glob(str(indices_dir / "*.zip")):
             period = os.path.basename(z)[len("indices_data"):-len(".zip")]
             dst = os.path.join(tmp, period)
             with zipfile.ZipFile(z) as zf:
@@ -96,16 +101,25 @@ def extract_snapshots(indices_dir: Path) -> tuple[dict, dict]:
                 return _pdf_symbols(fs[0]) if fs else None
 
             d = _period_to_date(period)
-            n100_pdf = find("NIFTY_100_")
-            if n100_pdf:
-                n100[d] = n100_pdf
-            else:
-                n50, next50 = find("NIFTY_50_"), find("NIFTY_Next_50_")
-                if n50 and next50:
-                    n100[d] = n50 | next50
+            raw[d] = {"n50": find("NIFTY_50_"), "next50": find("NIFTY_Next_50_"),
+                      "n100_pdf": find("NIFTY_100_")}
             n5 = find("NIFTY_500_")
             if n5:
                 n500_pdf[d] = n5
+
+    # Assemble N100 CHRONOLOGICALLY so a gap period can borrow the last Next-50.
+    n100: dict[date, set[str]] = {}
+    last_next50: set[str] | None = None
+    for d in sorted(raw):
+        r = raw[d]
+        if r["next50"]:
+            last_next50 = r["next50"]
+        if r["n100_pdf"]:
+            n100[d] = r["n100_pdf"]
+        elif r["n50"] and r["next50"]:
+            n100[d] = r["n50"] | r["next50"]
+        elif r["n50"] and last_next50:           # gap: actual N50 + carried Next-50
+            n100[d] = r["n50"] | last_next50
     return n100, n500_pdf
 
 

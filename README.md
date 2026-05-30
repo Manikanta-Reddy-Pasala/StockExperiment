@@ -304,7 +304,7 @@ point-in-time membership** (`eligible_at`) — no survivorship bias remains.
 |---|---:|---:|---:|---:|---:|---|
 | `momentum_pseudo_n100_adv` (RET1, monthly, fixed May anchor) | **+72.86%** | 28.63% | **2.54** | 50 | 76.0% | PIT N500 (ADV-biased) |
 | `momentum_retest_n500` (K=2, 20% band) | +64.90% | 57.13% | 1.14 | 88 | 53.4% | PIT N500 |
-| `emerging_momentum` (single-pos mid/small + climber) | +46.05% | 37.69% | 1.22 | 62 | 59.7% | PIT N500−N100 |
+| `emerging_momentum` (single-pos mid/small + climber) | +46.85% | 37.69% | 1.24 | 62 | 59.7% | PIT N500−N100 |
 | `n40` (weekly, top-40 ADV ∩ N100) | +40.32% | 36.85%¹ | 1.09 | 127 | 58.3% | PIT N100 |
 | `momentum_n100_top5_max1` (LB15 + mid-month + RET3) | +34.55% | 52.18% | 0.66 | 98 | 54.1% | PIT N100 |
 | `midcap_narrow_60d_breakout` (40d-high + 2× vol) | +1.65% | 68.17%¹ | 0.02 | 16 | 37.5% | PIT N500−N100 |
