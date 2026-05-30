@@ -14,8 +14,20 @@ residential-IP Mac because NSE's WAF 403s the VM and plain scripts.
 |------|------|
 | `nse_mcap_scraper.py` | Scrapes Total + Free-Float mcap + LTP per stock via headless **full Chromium** (NSE blocks `headless_shell` + datacenter IPs). Resumable → `exports/nse_mcap.csv`. |
 | `mcap_inclusion_model.py` | PIT backtest. `ff_shares = ff_mcap/ltp`; `ff_mcap[t] = ff_shares × close[t]`; monthly rank; CANDIDATE = mcap rank ≤ cutoff AND not yet in `eligible_at(target)` AND 30d-ret>0. `--target n100\|n500 --k 5`. |
-| `refresh_mcap.sh` | Quarterly: rebuild candidate list (**full NSE equity universe**, no ADV cap) → scrape → rsync CSV to VM + `docker cp` into app. |
-| `com.stockexp.mcaprefresh.plist` | launchd template — quarterly 02:30 on 1 Jan/Apr/Jul/Oct (ahead of NSE Mar/Sep reviews). |
+| `refresh_mcap.sh` | Rebuild candidate list (**full NSE equity universe**, no ADV cap) → scrape → **persist to Postgres** → rsync CSV to VM + `docker cp` into app. |
+| `mcap_db.py` | Postgres persistence: `market_cap_history` (every run) + `nifty_index_membership` (Apr & Sep reviews). CLI: `init` / `load-mcap` / `snapshot-membership` / `status`. |
+| `com.stockexp.mcaprefresh.plist` | launchd template — 02:30 on 1 Jan/Apr/Jul/**Sep**/Oct (Sep added for the NSE Sep review). |
+
+## Postgres tables (historical track)
+
+| Table | Grain | Filled |
+|-------|-------|--------|
+| `market_cap_history` | (symbol, snapshot_date) — total/FF mcap ₹Cr, LTP, derived FF shares | every run (`load-mcap`) |
+| `nifty_index_membership` | (index_name, symbol, review_date) — full n100/n500 constituent list | Apr & Sep runs (`snapshot-membership`) |
+
+The CSV (`exports/nse_mcap.csv`) stays the working file the model reads; the DB
+is the permanent append-only archive so we can see how mcap + membership drift
+over time. Seeded 2026-04-01: n100=105, n500=519.
 
 ## Universe
 

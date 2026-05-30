@@ -31,6 +31,15 @@ PY
 [ -f exports/nse_mcap.csv ] && mv exports/nse_mcap.csv "exports/nse_mcap_$(date +%Y%m%d).csv"
 python3 tools/analysis/nse_mcap_scraper.py >> "$LOG" 2>&1
 
+# 2.5. persist this snapshot to Postgres for a permanent historical track:
+#       market_cap_history (every run) + nifty_index_membership (Apr & Sep
+#       NSE-review months — the plist fires 1 Jan/Apr/Jul/Oct + 1 Sep).
+python3 tools/analysis/mcap_db.py load-mcap >> "$LOG" 2>&1
+MONTH=$(date +%m)
+if [ "$MONTH" = "04" ] || [ "$MONTH" = "09" ]; then
+  python3 tools/analysis/mcap_db.py snapshot-membership >> "$LOG" 2>&1
+fi
+
 # 3. push fresh CSV to the VM (exports/ is rsync-excluded on deploy, so push direct)
 rsync -z exports/nse_mcap.csv root@77.42.45.12:/opt/trading_system/exports/nse_mcap.csv >> "$LOG" 2>&1 \
   && ssh root@77.42.45.12 'docker cp /opt/trading_system/exports/nse_mcap.csv trading_system_app:/app/exports/nse_mcap.csv' >> "$LOG" 2>&1

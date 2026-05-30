@@ -15,12 +15,14 @@
     <string>/bin/bash</string>
     <string>/Users/manip/Documents/codeRepo/StockExperiment/tools/analysis/refresh_mcap.sh</string>
   </array>
-  <!-- Quarterly: 02:30 on the 1st of Jan, Apr, Jul, Oct (ahead of NSE Mar/Sep reviews). -->
+  <!-- 02:30 on the 1st of Jan, Apr, Jul, Sep, Oct. Quarterly mcap track +
+       index-membership snapshot on Apr & Sep (the NSE semi-annual reviews). -->
   <key>StartCalendarInterval</key>
   <array>
     <dict><key>Month</key><integer>1</integer><key>Day</key><integer>1</integer><key>Hour</key><integer>2</integer><key>Minute</key><integer>30</integer></dict>
     <dict><key>Month</key><integer>4</integer><key>Day</key><integer>1</integer><key>Hour</key><integer>2</integer><key>Minute</key><integer>30</integer></dict>
     <dict><key>Month</key><integer>7</integer><key>Day</key><integer>1</integer><key>Hour</key><integer>2</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Month</key><integer>9</integer><key>Day</key><integer>1</integer><key>Hour</key><integer>2</integer><key>Minute</key><integer>30</integer></dict>
     <dict><key>Month</key><integer>10</integer><key>Day</key><integer>1</integer><key>Hour</key><integer>2</integer><key>Minute</key><integer>30</integer></dict>
   </array>
   <key>StandardOutPath</key>
