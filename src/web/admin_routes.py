@@ -810,7 +810,7 @@ def models_status():
             })
 
             # ============================================================
-            # Model 5: momentum_pseudo_n100_adv (equity monthly rotation)
+            # Model 5: momentum_pseudo_n100_adv (equity monthly + mid-month rotation)
             # Uses yearly_universes.json — top-100 ADV from N500, rebuilt
             # yearly via PIT. Validates current year's slice.
             # ============================================================

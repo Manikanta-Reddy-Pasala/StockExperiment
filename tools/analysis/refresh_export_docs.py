@@ -18,8 +18,8 @@ DESC = {
     "momentum_pseudo_n100_adv": {
         "title": "Liquid 100 Momentum", "live": "LIVE",
         "universe": "Top-100 by 20d ADV from N500 (yearly-PIT rebuild)",
-        "strategy": "Monthly rotation, single position (max 1), 15-trading-day return rank, uptrend filter.",
-        "note": "⚠️ ADV-ranked pseudo-N100 (not the real index) — selects already-liquid/hot names, so returns are an OPTIMISTIC upper bound vs the real-index sibling momentum_n100_top5_max1.",
+        "strategy": "Monthly (1st trading day) + mid-month lead check, single position held while in top-5, 30-trading-day return rank, uptrend (>200d SMA) + ≤₹3K filter.",
+        "note": "⚠️ ADV-ranked pseudo-N100 (not the real index) — selects already-liquid/hot names, so returns are an OPTIMISTIC upper bound vs the real-index sibling momentum_n100_top5_max1. 2026-05-30 sweep upgraded it to mid-month + RET5 + 3pp lead: full-period 2023-26 ≈ +160% CAGR / 22% DD / Calmar 7.4 (every year positive), full 2021-26 ≈ +100% / 31% DD / 3.2.",
     },
     "momentum_n100_top5_max1": {
         "title": "Nifty 100 Momentum", "live": "LIVE",

@@ -145,6 +145,75 @@ def execute_orders():
         _alert(f"❌ {MODEL_NAME} execute error: {e}")
 
 
+def emit_mid_month_signal():
+    """Day-15 weekday mid-month check (2026-05-30 config). live_signal applies
+    the 3pp lead gate and self-skips on non-day-15 days, so this is safe to fire
+    daily. Writes a SEPARATE *_midmonth.json so it never collides with the
+    monthly signal file. SIGNAL half of the mid-cycle rebalance opportunity."""
+    log.info("RUNNING pseudo-N100 mid-month check")
+    SIGNALS_DIR.mkdir(parents=True, exist_ok=True)
+    today = datetime.now().strftime("%Y-%m-%d")
+    signals_out = SIGNALS_DIR / f"{today}_pseudo_n100_midmonth.json"
+    cmd = [
+        "python3", "tools/models/momentum_pseudo_n100_adv/live_signal.py",
+        "--universes-file", UNIVERSES_FILE, "--top-n", "5",
+        "--signals-out", str(signals_out), "--mid-month-check",
+    ]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600,
+                           env={**os.environ, "MOMROT_TG_NOTIFY": "1"})
+        if r.returncode == 0:
+            log.info(f"✅ {MODEL_NAME} mid-month check -> {signals_out}")
+            if r.stdout:
+                log.info(r.stdout[-500:])
+        else:
+            log.error(f"❌ {MODEL_NAME} mid-month check failed ({r.returncode})")
+            if r.stderr:
+                log.error(r.stderr[-500:])
+            _alert(f"❌ {MODEL_NAME} mid-month emit failed (rc={r.returncode})")
+    except Exception as e:
+        log.error(f"❌ {MODEL_NAME} mid-month error: {e}")
+        _alert(f"❌ {MODEL_NAME} mid-month emit error: {e}")
+
+
+def execute_mid_month_orders():
+    """Execute the mid-month signal file (separate from the monthly file to
+    avoid a double-execution race). Usually a no-op — the lead gate suppresses
+    most mid-cycle rotations, leaving an empty list."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    signals_file = SIGNALS_DIR / f"{today}_pseudo_n100_midmonth.json"
+    if not signals_file.exists():
+        log.info(f"{MODEL_NAME} mid-month execute: no signal at {signals_file}, skipping.")
+        return
+    try:
+        import json as _j
+        if not _j.loads(signals_file.read_text()):
+            log.info(f"{MODEL_NAME} mid-month: no signals to execute.")
+            return
+    except Exception:
+        pass
+    log.info(f"PLACING {MODEL_NAME} MID-MONTH FYERS ORDERS")
+    user_id = os.environ.get("USER_ID", "1")
+    cmd = ["python3", "tools/live/fyers_executor.py",
+           "--signals", str(signals_file), "--user-id", user_id,
+           "--model-name", MODEL_NAME]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if r.returncode == 0:
+            log.info(f"✅ {MODEL_NAME} mid-month execute complete")
+            if r.stdout:
+                log.info(r.stdout[-500:])
+        else:
+            log.error(f"❌ {MODEL_NAME} mid-month execute failed ({r.returncode})")
+            if r.stderr:
+                log.error(r.stderr[-500:])
+            _alert(f"❌ {MODEL_NAME} mid-month execute failed (rc={r.returncode}) — "
+                   f"orders may not be placed")
+    except Exception as e:
+        log.error(f"❌ {MODEL_NAME} mid-month execute error: {e}")
+        _alert(f"❌ {MODEL_NAME} mid-month execute error: {e}")
+
+
 # ---- Data-side helpers ----
 
 def _yearly_universe():
@@ -210,3 +279,7 @@ def register_trading_jobs(schedule):
     # 09:31 (staggered off n100's 09:30) — all 4 models share one scheduler
     # thread + one Fyers account; distinct minutes stop later models filling late.
     schedule.every().day.at("09:31").do(execute_orders)
+    # Mid-month (day-15) check + execute (2026-05-30). live_signal self-skips on
+    # non-day-15 days; staggered off n100's 09:27/09:35 to avoid thread overlap.
+    schedule.every().day.at("09:28").do(emit_mid_month_signal)
+    schedule.every().day.at("09:37").do(execute_mid_month_orders)

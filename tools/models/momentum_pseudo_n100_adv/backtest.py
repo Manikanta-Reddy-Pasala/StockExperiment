@@ -36,7 +36,7 @@ from tools.shared.backtest_engine import run_rotation_backtest
 
 
 from tools.models.momentum_pseudo_n100_adv.strategy import (  # noqa: E402  shared w/ live
-    LOOKBACK, ADV_WIN, UNIV_SIZE, MAX_PRICE, RETAIN, build_calendar)
+    LOOKBACK, ADV_WIN, UNIV_SIZE, MAX_PRICE, RETAIN, MIDMONTH_LEAD, build_calendar)
 # Drop Small-cap NSE Nifty Smallcap 250 stocks from universe (free +2pp CAGR, DD unchanged).
 import csv as _csv
 _SML_PATH = str(ROOT / "src" / "data" / "symbols" / "nifty_smallcap250.csv")
@@ -65,7 +65,8 @@ DEFAULT_CAP   = 1_000_000.0
 
 
 def run(start: date, end: date, capital: float, out_dir: Path | None = None,
-        retain_top_n: int = RETAIN, data_source: str = "fyers"):
+        retain_top_n: int = RETAIN, data_source: str = "fyers",
+        mid_month_check: bool = True, mid_month_lead_pct: float = MIDMONTH_LEAD):
     """Run the full pseudo-N100 momentum-rotation backtest.
 
     Builds the price/ADV panels from historical_data, rebuilds the
@@ -139,8 +140,9 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
                 chosen = ys
         return year_universes.get(chosen, [])
 
-    # Monthly rebalance calendar from the SHARED core (no mid-month for pseudo).
-    calendar = build_calendar(dates, start, end, mid_check=False)
+    # Monthly (+ optional mid-month) rebalance calendar from the SHARED core.
+    # Mid-month ON is the 2026-05-30 config (matches n100): a day-15 lead check.
+    calendar = build_calendar(dates, start, end, mid_check=mid_month_check)
 
     # SELECTION layer: yearly-PIT pseudo-N100, uptrend (>200d SMA) + MAX_PRICE
     # filter, ranked by 30-day return. EXECUTION is the shared engine.
@@ -168,9 +170,22 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
         rets = cl.iloc[di].reindex(univ) / cl.iloc[di - LOOKBACK].reindex(univ) - 1
         return list(rets.dropna().sort_values(ascending=False).index)
 
+    def midret_at(di):
+        """(symbol, LOOKBACK-return-pct) pairs sorted desc for the mid-month
+        lead gate — same eligible set (uptrend + MAX_PRICE) as rank_at."""
+        univ = pick_universe(dates[di])
+        up = sma200.iloc[di] < cl.iloc[di]
+        univ = [s for s in univ if bool(up.get(s, False))
+                and pd.notna(cl[s].iloc[di]) and float(cl[s].iloc[di]) <= MAX_PRICE]
+        rets = cl.iloc[di].reindex(univ) / cl.iloc[di - LOOKBACK].reindex(univ) - 1
+        rk = rets.dropna().sort_values(ascending=False)
+        return [(s, float(rk[s]) * 100) for s in rk.index]
+
     res = run_rotation_backtest(
         dates=dates, close=cl, calendar=calendar, rank_at=rank_at,
         capital=capital, start=start, end=end, retain_top_n=retain_top_n,
+        midmonth_ret_at=midret_at if mid_month_check else None,
+        midmonth_lead_pct=mid_month_lead_pct,
     )
     final, cagr, mdd, calmar = res.final_nav, res.cagr_pct, res.max_dd_pct, res.calmar
     trades, yrs, wins, losses, open_pos = (res.trades, res.years, res.wins,
@@ -210,9 +225,16 @@ if __name__ == "__main__":
     ap.add_argument("--to",   dest="end",   default=DEFAULT_END.isoformat())
     ap.add_argument("--capital", type=float, default=DEFAULT_CAP)
     ap.add_argument("--out", default=None)
-    ap.add_argument("--retain-top-n", type=int, default=1,
+    ap.add_argument("--retain-top-n", type=int, default=RETAIN,
                     help="Hold while in top-N by 30d ret; rotate when out. "
-                         "1=legacy (rotate off rank-1), 5=LIVE exit. Default 1.")
+                         f"Default {RETAIN} (2026-05-30 sweep). 1=legacy.")
+    ap.add_argument("--mid-month-check", dest="mid_month_check",
+                    action=argparse.BooleanOptionalAction, default=True,
+                    help="Day-15 rank check + lead gate. Default ON = the LIVE "
+                         "config (2026-05-30). --no-mid-month-check to disable. "
+                         "Mid ON is the win: lifts full-cycle CAGR +30pp, DD -13pp.")
+    ap.add_argument("--mid-month-lead-pct", type=float, default=MIDMONTH_LEAD,
+                    help=f"Minimum lead (pp) for mid-month rotation. Default {MIDMONTH_LEAD}")
     ap.add_argument("--data-source", default="fyers",
                     help="historical_data.data_source filter. Default fyers "
                          "(canonical). Use yfinance only for local dev DBs.")
@@ -220,4 +242,6 @@ if __name__ == "__main__":
     run(date.fromisoformat(a.start), date.fromisoformat(a.end), a.capital,
         Path(a.out) if a.out else None,
         retain_top_n=a.retain_top_n,
-        data_source=a.data_source)
+        data_source=a.data_source,
+        mid_month_check=a.mid_month_check,
+        mid_month_lead_pct=a.mid_month_lead_pct)

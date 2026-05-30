@@ -31,7 +31,7 @@ Production: `77.42.45.12` · App: <https://stock.oneshell.in> · Bot: `@stocks_m
 | Model | Universe | Cadence | Product | Hold | Signal |
 |-------|----------|---------|---------|------|--------|
 | `momentum_n100_top5_max1` | Real Nifty 100 | Monthly (1st weekday) + mid-month | CNC delivery | until it drops below rank-1 | rank by **15-trading-day** return, hold rank-1 (top-1 rotation) |
-| `momentum_pseudo_n100_adv` | Top-100 ADV from N500 minus Smallcap-250, yearly PIT rebuild, close > 200d SMA | Monthly | CNC | until it drops below rank-1 | rank by 30d return, hold rank-1 (top-1) + uptrend + ≤₹3K |
+| `momentum_pseudo_n100_adv` | Top-100 ADV from N500 minus Smallcap-250, yearly PIT rebuild, close > 200d SMA | **Monthly + mid-month** (day-15 lead check) | CNC | while in top-5 | rank by 30d return, hold while in top-5 + uptrend + ≤₹3K + 3pp mid-month lead gate |
 | `midcap_narrow_60d_breakout` | ~100 NSE midcaps (top-100 ADV minus Nifty 100) | Event-driven (daily check) | CNC | up to 120d / target +100% / trail -20% from peak | 40d-high + vol >2× + 200d SMA, ALL must fire |
 | `n20_daily_large_only` | **Top-40** ADV ∩ Nifty 100 (n40; dir keeps legacy n20 name) | **Weekly** (1st trading day of ISO week) | CNC | until it drops below rank-1 | rank by 30d return + 200d SMA uptrend filter (PIT) |
 
@@ -287,11 +287,11 @@ Run after the 2026-05-28 Fyers backfill that extended `historical_data` back to 
 | Model | CAGR | Max DD | Calmar | Trades | WR |
 |---|---:|---:|---:|---:|---:|
 | `momentum_n100_top5_max1` (15td lookback) | **+43.31%** | 59.98% | 0.72 | 113 | 57.5% |
-| `momentum_pseudo_n100_adv` (30d + SMA200 + ≤₹3k) | +10.87% | **88.04%** | 0.12 | 97 | 59.8% |
+| `momentum_pseudo_n100_adv` (30d + SMA200 + ≤₹3k, mid-month + RET5) | +16.88% | **81.30%** | 0.21 | 125 | 49.6% |
 | `n40` (weekly, top-40 ADV ∩ N100) | +6.51% | 67.91% | 0.10 | 251 | 49.4% |
 | `midcap_narrow_60d_breakout` (40d-high + 2× vol) | +21.00% | 53.14% | 0.40 | 29 | 65.5% |
 
-Calmar < 1 across the board — no model is "amazing" risk-adjusted over a full decade. n100's 0.72 is the strongest. Pseudo's 88% DD is the catastrophic outlier — the 200d SMA + MAX_PRICE filters were tuned on recent data and whipsawed badly in 2017-2020 (see below). The `n40` row is the current PIT weekly engine (apples-to-apples daily would be +0.7%/76%DD — weekly beats daily on every window 2016-26); the other rows predate the PIT rewrite, so don't over-compare across rows.
+Calmar < 1 across the board — no model is "amazing" risk-adjusted over a full decade. n100's 0.72 is the strongest. Pseudo's 81% DD is the catastrophic outlier — the 200d SMA + MAX_PRICE filters were tuned on recent data and whipsawed badly in 2017-2020 (see below). The `n40` row is the current PIT weekly engine (apples-to-apples daily would be +0.7%/76%DD — weekly beats daily on every window 2016-26); the other rows predate the PIT rewrite, so don't over-compare across rows.
 
 ### Year-by-year breakdown (return %, true MTM)
 

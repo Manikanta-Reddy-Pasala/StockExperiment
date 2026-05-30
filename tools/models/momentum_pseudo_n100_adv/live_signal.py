@@ -6,9 +6,9 @@ by 30-day return, picks top-5, emits ENTRY1 / TARGET_HIT / STOP_HIT.
 Strategy:
   - Universe: yearly-PIT pseudo-N100 (read from yearly_universes.json) —
     rebuilt at year-start using current data at that time (PIT-safe)
-  - top_n = 5
-  - max_concurrent = 1 (rank-1 of top-5)
-  - rebalance: 1st of month (or first trading day on/after)
+  - top_n = 5 (display); single position, held while in top-RETAIN (5)
+  - rebalance: 1st trading day of month + mid-month (day-15) lead check
+    (2026-05-30: was monthly-only / RET1)
   - Filter: skip stocks with price > MAX_PRICE (₹3000) — share-count floor
     heuristic so 1 share ≤ 10% of ₹30K live capital
 
@@ -47,15 +47,24 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
 from tools.shared.ohlcv_cache import read_cached  # noqa: E402
-from tools.shared.rotation_strategy import decide_rotation  # noqa: E402
+from tools.shared.rotation_strategy import decide_rotation, midmonth_lead_ok  # noqa: E402
 from tools.shared.nse_calendar import is_first_trading_day_of_month  # noqa: E402
+from tools.models.momentum_pseudo_n100_adv import strategy as S  # noqa: E402
 from tools.models.momentum_pseudo_n100_adv.strategy import (  # noqa: E402  shared w/ backtest
-    LOOKBACK, MAX_PRICE, SMA_LONG, RETAIN)
+    LOOKBACK, MAX_PRICE, SMA_LONG, RETAIN, MIDMONTH_LEAD)
 
 log = logging.getLogger("momrot_pseudo_signal")
 
 MODEL_NAME = "momentum_pseudo_n100_adv"
 SMALLCAP_CSV = "/app/src/data/symbols/nifty_smallcap250.csv"
+MID_MONTH_LEAD_PCT = MIDMONTH_LEAD  # shared with backtest (strategy.MIDMONTH_LEAD)
+
+
+def is_mid_month_check_day(today: datetime) -> bool:
+    """Live mirror of the backtest 'mid' calendar rule (SHARED
+    strategy.is_mid_month_check_day) — first NSE trading day on/after the 15th,
+    holiday-aware. Keeps live + backtest mid-month timing identical."""
+    return S.is_mid_month_check_day(today)
 
 
 def _load_smallcap_set() -> set:
@@ -281,7 +290,7 @@ def emit_signals(top_picks: List[tuple], pos: Optional[Dict],
                  top_n: int, retain_top_n: int = RETAIN) -> List[Dict]:
     # Decision comes from the SHARED rotation core (tools/shared/rotation_strategy)
     # — the exact same rule backtest.py uses, so live and backtest cannot drift.
-    # retain_top_n=1 = top-1 rotation. Was top-5 before 2026-05-26.
+    # retain_top_n default = RETAIN (5 since 2026-05-30 sweep; was 1).
     ranked = [p[0] for p in top_picks]
     by_sym = {p[0]: p for p in top_picks}
     held_sym = pos.get("open_symbol") if pos else None
@@ -331,10 +340,15 @@ def main() -> int:
                     help="Path to yearly_universes.json (PIT universe map)")
     ap.add_argument("--top-n", type=int, default=5,
                     help="Ranking display size only.")
-    ap.add_argument("--retain-top-n", type=int, default=1,
+    ap.add_argument("--retain-top-n", type=int, default=RETAIN,
                     help="Exit retention band: hold while in top-N by 30d ret, "
-                         "rotate when out. 1=top-1 rotation (matches backtest). "
-                         "Default 1.")
+                         f"rotate when out. Default {RETAIN} (2026-05-30 sweep). "
+                         "1=legacy top-1 rotation.")
+    ap.add_argument("--mid-month-check", action="store_true",
+                    help="Day-15 check: emit ROTATE only if rank-1 leads the "
+                         f"held stock's 30d return by >= {MIDMONTH_LEAD}pp "
+                         "(holiday-aware day-15 gate). Mirrors the backtest 'mid' "
+                         "calendar; cron runs this as a second monthly job.")
     ap.add_argument("--signals-out", required=True)
     ap.add_argument("--ranking-out", default=None,
                     help="Where to write the Today's Picks ranking JSON. "
@@ -403,8 +417,19 @@ def main() -> int:
             log.debug(f"notify_skip failed: {_ne}")
         return 0
 
+    # Mid-month gate (mutually exclusive with rebalance-only; --force overrides).
+    # Only proceed on the day-15 weekday; the lead-threshold filter below then
+    # suppresses the rotation unless rank-1 leads the held stock by >= the gate.
+    if args.mid_month_check and not args.force:
+        if not is_mid_month_check_day(today):
+            log.info("Not mid-month check day (need first trading day on/after "
+                     "the 15th). Skipping.")
+            Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.signals_out).write_text(json.dumps([]))
+            return 0
+
     # Monthly rebalance gate
-    if args.rebalance_only and not args.force:
+    if args.rebalance_only and not args.force and not args.mid_month_check:
         if not is_rebalance_day(today, _last_rotation_date()):
             log.info("Not rebalance day (need day<=7 weekday + not already "
                      "rotated this month). Skipping.")
@@ -425,6 +450,22 @@ def main() -> int:
         log.info(f"  {i}. {sym:<20} {ret:+7.2f}%  @ ₹{price:.2f}")
 
     signals = emit_signals(ranks, pos, args.top_n, retain_top_n=args.retain_top_n)
+
+    # Mid-month lead-threshold filter (mirror of n100): on the day-15 check,
+    # suppress rotation unless the new rank-1 leads the held stock's 30d return
+    # by >= MID_MONTH_LEAD_PCT (or the held stock dropped out of the ranking).
+    # Keeps mid-cycle trade count low while still catching genuine breakouts.
+    if args.mid_month_check and pos and pos.get("open_symbol") and signals:
+        held_sym = pos["open_symbol"]
+        ranked_ret = [(r[0], r[2]) for r in ranks]
+        if midmonth_lead_ok(held_sym, ranked_ret, MID_MONTH_LEAD_PCT):
+            log.info(f"mid-month: ROTATE — rank-1 leads held {held_sym} "
+                     f"by >= {MID_MONTH_LEAD_PCT}pp (or held dropped from ranking).")
+        else:
+            log.info(f"mid-month: no rotation for held {held_sym} "
+                     f"(already rank-1, or lead < {MID_MONTH_LEAD_PCT}pp). Suppressing.")
+            signals = []
+
     log.info(f"Emitting {len(signals)} signals")
 
     Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
