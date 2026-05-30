@@ -64,15 +64,15 @@ MODELS = {
         "data": "Fyers (split-adjusted cont_flag=1)",
         "live": False,
     },
-    "n20_daily_large_only": {
-        "title": "Top-20 ADV + uptrend + Nifty 100. Daily rotation top-1 by 30d ret. No price filter — honest baseline.",
-        "rebalance": "Daily",
+    "n40": {
+        "title": "Top-40 ADV + uptrend + Nifty 100. Weekly rotation top-1 by 30d ret. No price filter — honest baseline.",
+        "rebalance": "Weekly",
         "logic": [
-            "Universe: top-20 by 20-day ADV from N500 (rebuilt daily)",
+            "Universe: top-40 by 20-day ADV from N500 (rebuilt each rebalance)",
             "Uptrend filter: close > 200-day SMA",
             "Large-cap filter: stock must be in NSE Nifty 100",
             "Rank by 30-day return, pick top-1",
-            "Rebalance: every trading day",
+            "Rebalance: first trading day of each ISO week (weekly cut whipsaw vs daily)",
         ],
         "data": "Fyers (split-adjusted cont_flag=1)",
         "live": False,

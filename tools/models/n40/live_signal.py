@@ -34,7 +34,7 @@ Today's Picks UI, audit rows (rankings + signals) to the DB, and a
 Telegram/PWA notification of the verdict (scheduled runs only, not --force).
 
 Usage:
-  python tools/models/n20_daily_large_only/live_signal.py \
+  python tools/models/n40/live_signal.py \
     --signals-out /app/logs/n20_daily/signals/$(date +%F)_n20.json
 """
 from __future__ import annotations
@@ -56,12 +56,18 @@ sys.path.insert(0, str(ROOT))
 from tools.shared.ohlcv_cache import _get_engine  # noqa: E402
 from tools.shared.universes import nifty100_symbols, nifty500_symbols  # noqa: E402
 from tools.shared.rotation_strategy import decide_rotation  # noqa: E402
-from tools.models.n20_daily_large_only.strategy import (  # noqa: E402  shared w/ backtest
+from tools.models.n40.strategy import (  # noqa: E402  shared w/ backtest
     UNIV_SIZE, ADV_WIN, SMA_LONG, RETAIN, LOOKBACK as LOOKBACK_RET)
 from tools.shared.rebalance_calendar import is_week_rebalance_day  # noqa: E402  weekly rebal
 
 log = logging.getLogger("n20_daily_signal")
 
+# DB-identity key — kept as the original "n20_daily_large_only" even though the
+# folder/module was renamed to n40 (2026-05-30). This string is the model's
+# primary key across live state: positions, audit_orders, model_ledger and the
+# /app/logs/n20_daily/ signals dir. Renaming it would orphan all live history,
+# so it stays frozen; only the code/folder name changed to reflect the Top-40
+# weekly strategy.
 MODEL_NAME = "n20_daily_large_only"
 
 

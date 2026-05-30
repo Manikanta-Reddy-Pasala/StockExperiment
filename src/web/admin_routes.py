@@ -499,9 +499,9 @@ def trigger_model_data_pull(model_name):
         ],
         "n20_daily_large_only": [
             ("Equity OHLCV (N500 — covers N20 top-ADV)",
-             "tools.models.n20_daily_large_only.data_pull", "pull_daily_ohlcv"),
+             "tools.models.n40.data_pull", "pull_daily_ohlcv"),
             ("N100 universe refresh (source for top-20 ADV ∩ N100)",
-             "tools.models.n20_daily_large_only.data_pull", "refresh_universe"),
+             "tools.models.n40.data_pull", "refresh_universe"),
         ],
         "momentum_pseudo_n100_adv": [
             ("Equity OHLCV (N500 — covers Pseudo-N100 ADV)",
@@ -771,8 +771,8 @@ def models_status():
             })
 
             # ============================================================
-            # Model 4: n20_daily_large_only (equity intraday/daily)
-            # Same N100 universe as model 1 but ranks top-20 by ADV.
+            # Model 4: n20_daily_large_only (DB key; folder=n40) — equity weekly rotation
+            # Same N100 universe as model 1 but ranks top-40 by ADV, weekly rebalance.
             # Sufficiency = N100 coverage + 70d window per symbol.
             # ============================================================
             n20_min_days = 70
@@ -1763,7 +1763,7 @@ MODEL_PATHS = {
     "n20_daily_large_only": {
         "signals_dir": "/app/logs/n20_daily/signals",
         "ranking_dir": "/app/logs/n20_daily/ranking",
-        "live_signal": "tools/models/n20_daily_large_only/live_signal.py",
+        "live_signal": "tools/models/n40/live_signal.py",
         "extra_args": ["--top-n", "1"],
         "label": "Top-40 ADV ∩ N100 weekly rotation (mc=1)",
         "universe_path": None,  # PIT built each run from N500 OHLCV

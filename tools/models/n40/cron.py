@@ -32,7 +32,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from tools.models.n20_daily_large_only.data_pull import (  # noqa: E402
+from tools.models.n40.data_pull import (  # noqa: E402
     pull_daily_ohlcv, refresh_universe,
 )
 
@@ -49,6 +49,9 @@ def _alert(msg: str):
         log.debug(f"tg alert skipped: {e}")
 
 
+# DB-identity key + signals dir kept as the original "n20_daily" naming (folder
+# renamed to n40 on 2026-05-30, but live positions/audit/ledger/signals key it
+# by this string — renaming would orphan live history).
 MODEL_NAME = "n20_daily_large_only"
 SIGNALS_DIR = Path("/app/logs/n20_daily/signals")
 
@@ -70,7 +73,7 @@ def emit_signal():
     today = datetime.now().strftime("%Y-%m-%d")
     signals_out = SIGNALS_DIR / f"{today}_n20.json"
     cmd = [
-        "python3", "tools/models/n20_daily_large_only/live_signal.py",
+        "python3", "tools/models/n40/live_signal.py",
         "--signals-out", str(signals_out), "--top-n", "1",
     ]
     try:

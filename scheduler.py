@@ -487,7 +487,7 @@ def run_scheduler():
     logger.info("  - momentum_n100_top5_max1:    signal 09:25 + execute 09:30 (always live)")
     logger.info("  - momentum_pseudo_n100_adv:   signal 09:25 + execute 09:30 (monthly rebal)")
     logger.info("  - midcap_narrow_60d_breakout: signal 09:25 + execute 09:32 + EOD signal 15:25")
-    logger.info("  - n20_daily_large_only:       signal 09:25 + execute 09:30 (daily rotation)")
+    logger.info("  - n20_daily_large_only:       signal 09:25 + execute 09:30 (weekly rotation; key=n20 legacy, folder=n40)")
     logger.info("  - momentum_retest_n500:       signal 09:26 + execute 09:34 (K=3 multi, gated by enabled flag)")
     logger.info("  - emerging_momentum:          signal 09:29 + execute 09:37 (single, mid-month; emerging mid/small max-1, gated by enabled flag)")
     logger.info("")
@@ -516,7 +516,7 @@ def run_scheduler():
     from tools.models.midcap_narrow_60d_breakout.cron import (
         register_trading_jobs as register_midcap_narrow_jobs,
     )
-    from tools.models.n20_daily_large_only.cron import (
+    from tools.models.n40.cron import (
         register_trading_jobs as register_n20_daily_jobs,
     )
     # Multi-holding model (K=3). Trading jobs run daily but live_signal.py no-ops

@@ -1,28 +1,66 @@
-# Liquid 100 Momentum (`momentum_pseudo_n100_adv`)
+# momentum_pseudo_n100_adv — SUMMARY
 
-**Status:** LIVE  
-Monthly rotation, single position (max 1), 15-trading-day return rank, uptrend filter.
+**Pseudo-N100 (top-100 ADV from N500 − Smallcap) + uptrend + MAX_PRICE≤₹3,000. Monthly rotation top-1 by 30d ret.**
 
-**Universe:** Top-100 by 20d ADV from N500 (yearly-PIT rebuild)
-
-Backtest window: **2025-03-01 → 2026-05-12** (recent ~14 months: 2025 chop + 2026 bear).
-
-## Results (net of costs)
+## Backtest window & trade frequency
 
 | Metric | Value |
 |---|---|
-| Final NAV (₹10L start) | ₹2,541,746 |
-| Total return | +154.2% |
-| CAGR (annualized) | +118.1% |
-| Max drawdown | 11.2% |
-| Calmar | 10.52 |
-| Trades | 11 (9W / 2L) · 82% win |
+| Backtest window | **2023-05-15 → 2026-05-12** (~3.00 years) |
+| First entry | 2023-06-01 |
+| Last exit | 2026-05-04 |
+| Total trades | 27 |
+| Trades per year | ~9.0 |
+| Rebalance | Monthly (1st trading day) |
+| Data source | **Fyers (split-adjusted cont_flag=1)** |
 
-## Note
+## Stock pick logic
 
-⚠️ ADV-ranked pseudo-N100 (not the real index) — selects already-liquid/hot names, so returns are an OPTIMISTIC upper bound vs the real-index sibling momentum_n100_top5_max1.
+1. Universe: top-100 by 20-day ADV from N500 (yearly-PIT, rebuilt at year start)
+2. Drop NSE Smallcap 250 members
+3. Uptrend filter: close > 200-day SMA
+4. Max-price filter: close ≤ ₹3,000 at entry
+5. Rank by 30-day return, pick top-1
+6. Rebalance: 1st trading day of month
 
-**Open position at window end:** BHEL qty 6488 entry ₹377.05 on 2026-05-04 (unrealized +95,374)
+## Headline result
 
----
-*Auto-generated from summary.json by tools/analysis/refresh_export_docs.py — do not hand-edit.*
+| Metric | Value |
+|---|---:|
+| Final NAV (cap + open MTM) | **Rs.15,652,154** |
+| Total return | **+1465.22%** |
+| 2.99-yr CAGR | **+150.72%** |
+| Max DD | **16.17%** |
+| Calmar (CAGR / Max DD) | **9.32** |
+| Trades closed | 27 |
+| Wins / Losses | 24 / 3 |
+| Win rate | 88.9% |
+| Live deployment | NO |
+| Open position | **ADANIGREEN** qty 11,966 entry Rs.1,290.70 (2026-05-04) last Rs.1,308.00 unrealized +207,012 |
+
+## NSE cap segment breakdown
+
+| Cap | Trades | Wins | Losses | WR | Total PnL Rs. |
+|---|---:|---:|---:|---:|---:|
+| **Large** | 14 | 13 | 1 | 93% | +10,171,601 |
+| **Mid** | 13 | 11 | 2 | 85% | +4,273,542 |
+
+## Top 5 winners
+
+| Symbol | Entry → Exit | Entry ₹ | Ret % | PnL ₹ |
+|---|---|---:|---:|---:|
+| ADANIPOWER   | 2026-04-01 → 2026-05-04 | 157.11 | +44.68% | +4,769,410 |
+| SHRIRAMFIN   | 2025-11-03 → 2026-03-02 | 796.45 | +32.15% | +2,544,369 |
+| BSE          | 2025-05-02 → 2025-06-02 | 2,102.17 | +28.12% | +1,568,268 |
+| PAYTM        | 2025-08-01 → 2025-09-01 | 1,076.40 | +14.81% | +889,771 |
+| IDEA         | 2025-10-01 → 2025-11-03 | 8.52 | +11.97% | +846,209 |
+
+## Top 5 losses
+
+| Symbol | Entry → Exit | Entry ₹ | Ret % | PnL ₹ |
+|---|---|---:|---:|---:|
+| MCX          | 2025-07-01 → 2025-08-01 | 1,812.10 | -16.17% | -1,158,815 |
+| COFORGE      | 2024-12-02 → 2025-02-01 | 1,742.14 | -7.28% | -340,773 |
+| IRFC         | 2024-02-01 → 2024-03-01 | 169.90 | -13.24% | -311,310 |
+
+Full trade-by-trade ledger: see [TRADE_LEDGER.md](TRADE_LEDGER.md).

@@ -45,7 +45,7 @@ from tools.shared.index_membership import eligible_at, universe_union
 from tools.shared.rebalance_calendar import build_weekly_calendar
 
 
-from tools.models.n20_daily_large_only.strategy import (  # noqa: E402  shared w/ live
+from tools.models.n40.strategy import (  # noqa: E402  shared w/ live
     UNIV_SIZE, LOOKBACK, ADV_WIN, SMA_LONG, RETAIN)
 N100_CSV  = str(ROOT / "src" / "data" / "symbols" / "nifty100.csv")
 DEFAULT_START = date(2023, 5, 15)

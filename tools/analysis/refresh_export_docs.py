@@ -27,11 +27,11 @@ DESC = {
         "strategy": "Monthly rotation + mid-month check, single position (max 1), 15-trading-day return rank.",
         "note": "True-index version — the trustworthy-clean momentum benchmark.",
     },
-    "n20_daily_large_only": {
-        "title": "Daily Top-40", "live": "LIVE",
+    "n40": {
+        "title": "Weekly Top-40", "live": "LIVE",
         "universe": "Top-40 by ADV ∩ Nifty 100",
-        "strategy": "DAILY rotation, single position, uptrend gate. High turnover.",
-        "note": "Daily rebalance → many trades, lower win-rate, momentum tail carries it.",
+        "strategy": "WEEKLY rotation (first trading day of each ISO week), single position, uptrend gate.",
+        "note": "Weekly rebalance cut the daily whipsaw (55% of daily trades held ≤3d). +59% vs +55% CAGR 2023-26, lower DD; +20.6% vs +13.7% on the full 2021-26 cycle.",
     },
     "momentum_retest_n500": {
         "title": "Retest Momentum", "live": "DISABLED (₹0)",

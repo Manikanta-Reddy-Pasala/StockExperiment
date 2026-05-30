@@ -58,6 +58,7 @@ def run_rotation_backtest(
     retain_top_n: int = 1,
     midmonth_ret_at: Optional[Callable[[int], List[Tuple[str, float]]]] = None,
     midmonth_lead_pct: float = 5.0,
+    stop_loss_pct: Optional[float] = None,
 ) -> BacktestResult:
     """Single-position rotation backtest. Entry/exit at same-day close, no fees
     (matches the existing rotation backtests). `calendar` kind "mid" applies the
@@ -75,6 +76,21 @@ def run_rotation_backtest(
         di = dates.get_loc(d)
         px_h = close[hold].iloc[di] if hold else None
         nav_marks.append(cap + (qty * float(px_h) if hold and pd.notna(px_h) else 0.0))
+        # Per-position STOP-LOSS: if the held name has fallen >= stop_loss_pct
+        # from entry, sell to cash and step aside this bar (caps tail losses).
+        if stop_loss_pct and hold and qty > 0 and pd.notna(px_h):
+            if float(px_h) <= entry_px * (1 - stop_loss_pct):
+                sx = float(px_h); cap += qty * sx
+                trades.append({
+                    "sym": _label(hold), "entry_date": entry_date,
+                    "exit_date": d.date().isoformat(), "qty": qty,
+                    "entry_px": round(entry_px, 2), "exit_px": round(sx, 2),
+                    "pnl": round(qty * sx - qty * entry_px, 0),
+                    "ret_pct": round((sx / entry_px - 1) * 100, 2),
+                    "cap_after": round(cap, 0), "exit_reason": "STOP",
+                })
+                hold = None; qty = 0
+                continue
         ranked = rank_at(di)
         if not ranked:
             continue

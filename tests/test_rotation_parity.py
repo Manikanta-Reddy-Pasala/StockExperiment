@@ -87,7 +87,7 @@ def _picks(*syms):
 
 @pytest.mark.parametrize("module_path,top_n", [
     ("tools.models.momentum_pseudo_n100_adv.live_signal", 1),
-    ("tools.models.n20_daily_large_only.live_signal", 1),
+    ("tools.models.n40.live_signal", 1),
 ])
 def test_pseudo_n20_emit_matches_core(module_path, top_n, monkeypatch):
     import importlib
@@ -98,7 +98,7 @@ def test_pseudo_n20_emit_matches_core(module_path, top_n, monkeypatch):
     picks = _picks("A", "B", "C", "D")
     # Held = rank-3 "C" -> top-1 rotation must SELL C, BUY A.
     pos = {"open_symbol": "C", "open_entry_px": 100.0}
-    if "n20" in module_path:
+    if "n40" in module_path:        # n40 (legacy n20) emit_signals has no retain_top_n kwarg
         sigs = mod.emit_signals(picks, pos, top_n)
     else:
         sigs = mod.emit_signals(picks, pos, top_n, retain_top_n=top_n)

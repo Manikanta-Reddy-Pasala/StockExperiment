@@ -45,7 +45,7 @@ MODELS = {
     "emerging_momentum":        ("tools.models.emerging_momentum.backtest",        {}, (80, 600)),
     "momentum_n100_top5_max1":  ("tools.models.momentum_n100_top5_max1.backtest",  {}, (20, 160)),
     "momentum_pseudo_n100_adv": ("tools.models.momentum_pseudo_n100_adv.backtest", {}, (20, 300)),
-    "n20_daily_large_only":     ("tools.models.n20_daily_large_only.backtest",     {}, (10, 120)),
+    "n40":                      ("tools.models.n40.backtest",     {}, (10, 120)),
 }
 
 

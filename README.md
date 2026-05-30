@@ -288,10 +288,10 @@ Run after the 2026-05-28 Fyers backfill that extended `historical_data` back to 
 |---|---:|---:|---:|---:|---:|
 | `momentum_n100_top5_max1` (15td lookback) | **+43.31%** | 59.98% | 0.72 | 113 | 57.5% |
 | `momentum_pseudo_n100_adv` (30d + SMA200 + ≤₹3k) | +10.87% | **88.04%** | 0.12 | 97 | 59.8% |
-| `n20_daily_large_only` (daily, top-20 ADV ∩ N100) | **+45.28%** | 53.54% | 0.85 | 519 | 47.1% |
+| `n40` (weekly, top-40 ADV ∩ N100) | +6.51% | 67.91% | 0.10 | 251 | 49.4% |
 | `midcap_narrow_60d_breakout` (40d-high + 2× vol) | +21.00% | 53.14% | 0.40 | 29 | 65.5% |
 
-Calmar < 1 across the board — no model is "amazing" risk-adjusted over a full decade. n20's 0.85 is the strongest. Pseudo's 88% DD is the catastrophic outlier — the 200d SMA + MAX_PRICE filters were tuned on recent data and whipsawed badly in 2017-2020 (see below).
+Calmar < 1 across the board — no model is "amazing" risk-adjusted over a full decade. n100's 0.72 is the strongest. Pseudo's 88% DD is the catastrophic outlier — the 200d SMA + MAX_PRICE filters were tuned on recent data and whipsawed badly in 2017-2020 (see below). The `n40` row is the current PIT weekly engine (apples-to-apples daily would be +0.7%/76%DD — weekly beats daily on every window 2016-26); the other rows predate the PIT rewrite, so don't over-compare across rows.
 
 ### Year-by-year breakdown (return %, true MTM)
 
