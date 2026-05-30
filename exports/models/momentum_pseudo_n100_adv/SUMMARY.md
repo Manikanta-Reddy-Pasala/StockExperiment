@@ -1,69 +1,28 @@
-# momentum_pseudo_n100_adv — SUMMARY
+# Liquid 100 Momentum (`momentum_pseudo_n100_adv`)
 
-**Pseudo-N100 (top-100 ADV from N500 − Smallcap) + uptrend + MAX_PRICE≤₹3,000. Monthly rotation top-1 by 30d ret.**
+**Status:** LIVE  
+Monthly (1st trading day) rotation, single position (rank-1, RET1), 30-trading-day return rank, uptrend (>200d SMA) + ≤₹3K filter. Universe rebuilt yearly at a FIXED mid-May anchor.
 
-## Backtest window & trade frequency
+**Universe:** Top-100 by 20d ADV from N500 (yearly-PIT rebuild)
+
+Backtest window: **2021-04-01 → 2026-05-29** (full ~5.1-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 bear).
+
+## Results (net of costs)
 
 | Metric | Value |
 |---|---|
-| Backtest window | **2021-04-01 → 2026-05-29** (~5.16 years) |
-| First entry | 2021-06-01 |
-| Last exit | 2026-05-04 |
-| Total trades | 50 |
-| Trades per year | ~9.7 |
-| Rebalance | Monthly (1st trading day) |
-| Data source | **Fyers (split-adjusted cont_flag=1)** |
+| Final NAV (₹10L start) | ₹16,828,054 |
+| Total return | +1582.8% |
+| CAGR (annualized) | +72.9% |
+| Max drawdown | 28.6% |
+| Calmar | 2.54 |
+| Trades | 50 (38W / 12L) · 76% win |
 
-## Stock pick logic
+## Note
 
-1. Universe: top-100 by 20-day ADV from PIT N500 (eligible_at; yearly-PIT, rebuilt at a FIXED mid-May anchor)
-2. Drop NSE Smallcap 250 members
-3. Uptrend filter: close > 200-day SMA
-4. Max-price filter: close ≤ ₹3,000 at entry
-5. Rank by 30-day return, pick top-1 (RET1 rotation)
-6. Rebalance: 1st trading day of month (mid-month available as opt-in, default off)
+⚠️ ADV-ranked pseudo-N100 (not the real index) — selects already-liquid/hot names, so returns are an OPTIMISTIC upper bound vs the real-index sibling momentum_n100_top5_max1. Full-cycle 2021-04→2026-05 (fixed May anchor, PIT N500) ≈ +72.9% CAGR / 28.6% DD / Calmar 2.54 / 76% win. Now PIT (2026-05-31, no survivorship bias) but the ADV-selection bias remains by design.
 
-## Headline result
+**Open position at window end:** ADANIGREEN [large] qty 11405 entry ₹1290.7 on 2026-05-04 (unrealized +2,106,504)
 
-| Metric | Value |
-|---|---:|
-| Final NAV (cap + open MTM) | **Rs.16,828,054** |
-| Total return | **+1582.81%** |
-| 5.16-yr CAGR | **+72.86%** |
-| Max DD | **28.63%** |
-| Calmar (CAGR / Max DD) | **2.54** |
-| Trades closed | 50 |
-| Wins / Losses | 38 / 12 |
-| Win rate | 76.0% |
-| Live deployment | NO |
-| Open position | **ADANIGREEN** qty 11,405 entry Rs.1,290.70 (2026-05-04) last Rs.1,475.40 unrealized +2,106,504 |
-
-## NSE cap segment breakdown
-
-| Cap | Trades | Wins | Losses | WR | Total PnL Rs. |
-|---|---:|---:|---:|---:|---:|
-| **Large** | 15 | 12 | 3 | 80% | +8,133,238 |
-| **Mid** | 32 | 23 | 9 | 72% | +5,402,255 |
-| **Other** | 3 | 3 | 0 | 100% | +186,061 |
-
-## Top 5 winners
-
-| Symbol | Entry → Exit | Entry ₹ | Ret % | PnL ₹ |
-|---|---|---:|---:|---:|
-| ADANIPOWER   | 2026-04-01 → 2026-05-04 | 157.11 | +44.68% | +4,545,996 |
-| SHRIRAMFIN   | 2025-11-03 → 2026-03-02 | 796.45 | +32.15% | +2,425,050 |
-| BSE          | 2025-05-02 → 2025-06-02 | 2,102.17 | +28.12% | +1,494,968 |
-| PAYTM        | 2025-08-01 → 2025-09-01 | 1,076.40 | +14.81% | +848,008 |
-| IDEA         | 2025-10-01 → 2025-11-03 | 8.52 | +11.97% | +806,575 |
-
-## Top 5 losses
-
-| Symbol | Entry → Exit | Entry ₹ | Ret % | PnL ₹ |
-|---|---|---:|---:|---:|
-| MCX          | 2025-07-01 → 2025-08-01 | 1,812.10 | -16.17% | -1,104,610 |
-| IRFC         | 2024-02-01 → 2024-03-01 | 169.90 | -13.24% | -340,875 |
-| COFORGE      | 2024-12-02 → 2025-02-01 | 1,742.14 | -7.28% | -324,787 |
-| HCLTECH      | 2022-01-03 → 2022-02-01 | 1,326.15 | -14.58% | -183,682 |
-| CANBK        | 2022-02-01 → 2022-03-02 | 51.75 | -16.46% | -177,318 |
-
-Full trade-by-trade ledger: see [TRADE_LEDGER.md](TRADE_LEDGER.md).
+---
+*Auto-generated from summary.json by tools/analysis/refresh_export_docs.py — do not hand-edit.*
