@@ -13,7 +13,7 @@ Output:
   exports/index_constituents/<INDEX>_<PERIOD>.csv  (symbol, close, mcap_cr, weight)
   + a combined exports/index_constituents/ALL_constituents.csv with review_date.
 
-Run: python3 tools/analysis/parse_nse_index_pdfs.py [--src <dir>]
+Run: python3 tools/analysis/parse_nse_index_data.py [--src <dir>]
 """
 from __future__ import annotations
 import sys, re, csv, argparse

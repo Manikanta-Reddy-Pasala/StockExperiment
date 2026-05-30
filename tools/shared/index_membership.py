@@ -84,7 +84,7 @@ def _load_intervals(index_name: str) -> list[tuple[str, date, date]]:
     if not path.exists():
         raise FileNotFoundError(
             f"Index membership file not found: {path}. "
-            f"Run tools/analysis/download_niftyindices.py / parse_nse_index_pdfs.py first."
+            f"Run tools/analysis/download_niftyindices.py / parse_nse_index_data.py first."
         )
     out: list[tuple[str, date, date]] = []
     with open(path, encoding="utf-8") as f:

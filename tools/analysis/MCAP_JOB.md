@@ -15,7 +15,7 @@ semi-annual reviews (1 Mar + 1 Sep) since constituents change twice a year.
 | File | Role |
 |------|------|
 | `download_niftyindices.py` | **REPLACES the old get-quotes scraper.** Downloads current index constituents (n50/100/200/500) from niftyindices.com (NOT WAF-blocked → runs anywhere, incl the VM) → `exports/index_constituents/current/` + marks `nifty_index_membership`. |
-| `parse_nse_index_pdfs.py` | Parses NSE factsheet PDFs (the `indices_dataMar2021-2026` dump) → full constituent tables w/ **real free-float mcap** → CSVs + `nifty_index_membership` + `market_cap_history`. |
+| `parse_nse_index_data.py` | Parses NSE factsheet PDFs (the `indices_dataMar2021-2026` dump) → full constituent tables w/ **real free-float mcap** → CSVs + `nifty_index_membership` + `market_cap_history`. |
 | `mcap_inclusion_model.py` | PIT backtest. `ff_shares = ff_mcap/ltp`; `ff_mcap[t] = ff_shares × close[t]`; monthly rank; CANDIDATE = mcap rank ≤ cutoff AND not yet in `eligible_at(target)` AND 30d-ret>0. `--target n100\|n500 --k 5`. |
 | `refresh_mcap.sh` | Rebuild candidate list (**full NSE equity universe**, no ADV cap) → scrape → **persist to Postgres** → rsync CSV to VM + `docker cp` into app. |
 | `mcap_db.py` | Postgres persistence: `market_cap_history` (every run) + `nifty_index_membership` (Apr & Sep reviews). CLI: `init` / `load-mcap` / `snapshot-membership` / `status`. |
@@ -58,7 +58,7 @@ constituent CSVs directly — can run on the laptop OR the VM, no Chromium.
 
 Mcap nuance: the niftyindices constituent CSVs give MEMBERSHIP only (no per-stock
 mcap). Real free-float mcap comes from the NSE index factsheets
-(`parse_nse_index_pdfs.py`, loaded to `market_cap_history`); the climber overlay
+(`parse_nse_index_data.py`, loaded to `market_cap_history`); the climber overlay
 otherwise uses a price-derived proxy off `exports/nse_mcap.csv` + DB closes.
 
 ## Install the cron (one-time)
@@ -74,6 +74,6 @@ launchctl list | grep mcaprefresh   # verify
 
 ```bash
 python3 tools/analysis/download_niftyindices.py --load-db   # current constituents -> membership
-python3 tools/analysis/parse_nse_index_pdfs.py --load-db    # factsheet PDFs -> real mcap (when you drop a new dump)
+python3 tools/analysis/parse_nse_index_data.py --load-db    # factsheet PDFs -> real mcap (when you drop a new dump)
 bash    tools/analysis/refresh_mcap.sh                       # full monthly cycle (download + mark + push)
 ```

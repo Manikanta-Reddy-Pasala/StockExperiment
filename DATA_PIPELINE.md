@@ -83,7 +83,7 @@ DB. The "populated by" code below is the source of truth for schema.
 | | |
 |---|---|
 | **What** | Half-open membership intervals `(symbol, start_date, end_date)` so backtests use the index as it WAS on each date |
-| **Source** | NSE index factsheet PDFs (`indices_dataMar2021-2026` dump) parsed by `tools/analysis/parse_nse_index_pdfs.py` → authoritative PIT constituents w/ real FF-mcap. (Old Wayback scrape+parse — `fetch_wayback_index_snapshots.py` + `build_membership_table.py` — **deleted 2026-05-30**.) `_TICKER_ALIAS` in `index_membership.py` maps renames (TATAMOTORS→TMPV, ZOMATO→ETERNAL). |
+| **Source** | NSE index factsheet PDFs (`indices_dataMar2021-2026` dump) parsed by `tools/analysis/parse_nse_index_data.py` → authoritative PIT constituents w/ real FF-mcap. (Old Wayback scrape+parse — `fetch_wayback_index_snapshots.py` + `build_membership_table.py` — **deleted 2026-05-30**.) `_TICKER_ALIAS` in `index_membership.py` maps renames (TATAMOTORS→TMPV, ZOMATO→ETERNAL). |
 | **Loader API** | `tools/shared/index_membership.py::eligible_at(index, date)` + `universe_union(index)` (reads the membership CSVs) |
 | **Files** | `src/data/symbols/n{100,500}_membership.csv` |
 | **DB archive** | `nifty_index_membership` (index_name, symbol, review_date) — see §8 |
@@ -95,7 +95,7 @@ DB. The "populated by" code below is the source of truth for schema.
 | | |
 |---|---|
 | **What** | Per-stock free-float market cap (₹ Cr) — feeds the emerging-momentum CLIMBER filter + the "joining Nifty 100/500" research model |
-| **Source** | **Real FF-mcap**: NSE index factsheet PDFs (`parse_nse_index_pdfs.py`, semi-annual). **Working proxy**: `exports/nse_mcap.csv` (FF-shares = ff_mcap/latest DB close, price-driven) — the file `strategy.py` reads. (The old NSE get-quotes scraper `nse_mcap_scraper.py` is **deleted**.) |
+| **Source** | **Real FF-mcap**: NSE index factsheet PDFs (`parse_nse_index_data.py`, semi-annual). **Working proxy**: `exports/nse_mcap.csv` (FF-shares = ff_mcap/latest DB close, price-driven) — the file `strategy.py` reads. (The old NSE get-quotes scraper `nse_mcap_scraper.py` is **deleted**.) |
 | **Model/use** | `tools/models/emerging_momentum/strategy.py` climber filter (live); research: `tools/analysis/mcap_inclusion_model.py` / `mcap_overlay.py` (both `--target n100\|n500`) |
 | **Job** | `tools/analysis/refresh_mcap.sh`: `download_niftyindices.py --load-db` → `mcap_db.py snapshot-membership` → rsync constituent CSVs to VM |
 | **Schedule** | launchd `~/Library/LaunchAgents/com.stockexp.mcaprefresh.plist` (tracked: `tools/analysis/com.stockexp.mcaprefresh.plist`) — 02:30 on **1 Mar + 1 Sep** (NSE semi-annual reviews; constituents change twice a year). Runs anywhere (niftyindices not blocked). See `tools/analysis/MCAP_JOB.md`. |
@@ -105,7 +105,7 @@ DB. The "populated by" code below is the source of truth for schema.
 | | |
 |---|---|
 | **What** | Append-only archive so mcap + index membership drift is queryable over time |
-| **Code** | `tools/analysis/mcap_db.py` (`init` / `load-mcap` / `snapshot-membership` / `status`); `parse_nse_index_pdfs.py --load-db` (factsheets) |
+| **Code** | `tools/analysis/mcap_db.py` (`init` / `load-mcap` / `snapshot-membership` / `status`); `parse_nse_index_data.py --load-db` (factsheets) |
 | **`market_cap_history`** | PK (symbol, snapshot_date): total/FF mcap ₹Cr, derived `ff_shares`, source. Real FF-mcap loaded from factsheets (`nse_index_factsheet`); ~4.4k rows incl semi-annual 2021-2026. |
 | **`nifty_index_membership`** | PK (index_name, symbol, review_date): real PIT membership n50/100/200/500 from factsheets + the Mar/Sep refresh. ~4.8k rows. |
 | **Index OHLC** | `tools/analysis/download_nifty_index_history.py` pulls NIFTY 50/100/500 index levels (niftyindices Backpage API) → `historical_data` (`data_source='niftyindices'`). NOTE: that API is rate-limited/flaky for bulk backfill; regime detection currently uses a large-cap basket proxy instead. |
