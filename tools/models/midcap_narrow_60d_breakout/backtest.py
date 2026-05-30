@@ -24,16 +24,22 @@ Universe:
 
 Costs: 10 bps slippage, 0.10% STT on sells, ₹20/order brokerage.
 
-Result (current, ₹10L start, 2023-05-15 → 2026-05-15)
-=====================================================
+Result (full-cycle 2021-04-01 → 2026-05-29, ₹10L, authoritative PIT universe)
+=============================================================================
+See exports/models/midcap_narrow_60d_breakout/SUMMARY.md for live numbers.
 
 | Metric    | Value           |
 |-----------|----------------:|
-| CAGR      | **+141.73%**    |
-| Max DD    | **8.12%**       |
-| Calmar    | **17.46**       |
-| Trades    | 8               |
-| WR        | 75% (6W / 2L)   |
+| CAGR      | **+1.65%**      |
+| Max DD    | **68.17%**      |
+| Calmar    | **0.02**        |
+| Trades    | 16              |
+| WR        | 37.5%           |
+
+⚠ Effectively DEAD on authoritative PIT data. Earlier sweep showed +141%/Calmar
+17 on the old 2023-26 window with the broken N100 exclusion — that was riding
+large-cap winners leaked through the buggy Wayback membership. Correct PIT N100
+exclusion (2026-05-31) ⇒ no edge. Kept for research only.
 
 CLI usage
 ---------
@@ -67,7 +73,8 @@ PROFIT_TRIG = 0.10
 TARGET_PCT = 1.00
 STOP_PCT   = 0.20  # Catastrophe stop (sweep-chosen). Fires rarely — clear of the -15.7%
                    # deepest winner dip — so 0 CAGR cost on 3yr while capping the tail.
-MAX_HOLD   = 120  # Was 90. 120d max-hold sweep-tested as winner: +141% CAGR / 8% DD / Calmar 17.46.
+MAX_HOLD   = 120  # Was 90. 120d max-hold won an OLD sweep (pre-PIT-rebuild); on
+                  # authoritative PIT data midcap is now ~flat (+1.65% full-cycle).
 # SMA20 exit was tried and DISABLED (leaked winners on dips); exit lives in the shared core.
 
 # Universe params (V3 winner: top-100 ADV minus Large, was skip-30+take-100)

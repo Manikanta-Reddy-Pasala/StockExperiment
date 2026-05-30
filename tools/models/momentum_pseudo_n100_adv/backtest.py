@@ -1,9 +1,11 @@
 """Standalone backtest: pseudo-N100 (ADV-rank from N500, yearly PIT rebuild, MINUS Small).
 
-Reproduces +136.39% CAGR (10L -> 1.32 Cr) over 2023-05-15 to 2026-05-12.
+Full-cycle 2021-04→2026-05 on PIT N500 (fixed May anchor) ≈ +72.9% CAGR / 28.6%
+DD / Calmar 2.54 — see exports/models/momentum_pseudo_n100_adv/SUMMARY.md.
 
-Same strategy as momentum_n100_top5_max1 (lb=30, mc=1, monthly, top-1) but
-universe = top-100 by 20-day ADV at each year-start instead of NSE Nifty 100.
+Single-position monthly rotation (lb=30, max-1, top-1 / RET1), but universe =
+top-100 by 20-day ADV at each yearly anchor from PIT N500 instead of the real
+NSE Nifty 100 — the deliberately-optimistic (ADV-biased) sibling of n100.
 
 Model flow / where this file sits:
   data_pull.py    -> pulls N500 daily OHLCV + rebuilds yearly_universes.json

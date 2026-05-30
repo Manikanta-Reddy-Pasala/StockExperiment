@@ -33,8 +33,9 @@ from tools.shared.index_membership import eligible_at, universe_union
 from tools.models.momentum_n100_top5_max1.strategy import (
     LOOKBACK, RETAIN, MIDMONTH_LEAD, build_calendar)
 
-# 15 TRADING days (~3 weeks). Set 2026-05-27 from a 6-year (2020-2026) sweep:
-# 15td beat 30td on CAGR (+151.7% vs +129.0%) AND max DD (45.7% vs 57.3%).
+# 15 TRADING days (~3 weeks). Set 2026-05-27 from a 6-year sweep: 15td beat 30td
+# on BOTH CAGR and max DD (the relative result; absolute numbers predate the
+# 2026-05-31 PIT-membership rebuild). Current metrics: exports/models/.../SUMMARY.md.
 # LOOKBACK/RETAIN/MIDMONTH_LEAD now imported from strategy.py (shared with live).
 # Today's published n100 list — kept for live signal compatibility only.
 # THE BACKTEST DOES NOT USE THIS FILE; it pulls PIT membership via

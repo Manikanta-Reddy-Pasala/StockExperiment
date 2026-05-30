@@ -17,9 +17,11 @@ Strategy:
              rotation fires only when a new leader beats the held name's 15d
              return by >= 5pp (MIDMONTH_LEAD).
 
-Reproduces tools/analysis/emerging_variants.py CONFIG 1 (lb15, sma off):
-  FULL 2023-05-15..2026-05-12 : ~+98% CAGR / ~23% DD / Calmar ~4.2
-  WINDOW Mar-2025..May-2026    : ~+56% CAGR
+CONFIG 1 (lb15, sma off) + MCAP-CLIMBER. Full-cycle 2021-04→2026-05 on
+authoritative PIT membership ≈ +46.9% CAGR / 37.7% DD / Calmar 1.24 — see
+exports/models/emerging_momentum/SUMMARY.md. (An earlier ~+98-121% figure was on
+the buggy Wayback N100, which leaked large-cap winners into this mid/small model;
+the correct PIT N100 exclusion since 2026-05-31 gives the honest +46.9%.)
 
 Run: python3 tools/models/emerging_momentum/backtest.py \
        --from 2023-05-15 --to 2026-05-12 --out exports/models/emerging_momentum

@@ -2,9 +2,9 @@
 params + rebalance calendar, imported by BOTH backtest.py and live_signal.py so
 they can never drift.
 
-Strategy: real NSE Nifty 100, rank by LOOKBACK-trading-day return, hold rank-1
-(retain band RETAIN), monthly (1st trading day) + mid-month lead check. Universe
-is the live config: retain_top_n=1 + mid-month ON.
+Strategy: real NSE Nifty 100, rank by LOOKBACK-trading-day return, hold while in
+top-RETAIN, monthly (1st trading day) + mid-month lead check. Live config:
+LOOKBACK=15, retain_top_n=3, MIDMONTH_LEAD=5pp, mid-month ON.
 
 Universe SOURCE differs by context (necessarily): backtest uses PIT
 eligible_at("n100", d) over its price panel; live uses today's official

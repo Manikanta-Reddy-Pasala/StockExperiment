@@ -1,10 +1,11 @@
-"""n20_daily_large_only: v1 strategy + NSE Nifty 100 filter.
+"""n40 (dir: n20_daily_large_only): WEEKLY rotation + NSE Nifty 100 filter.
 
-Halves Max DD vs v1 baseline by constraining universe to large-cap.
-₹10L → ₹1.40 Cr (+140.78% CAGR, 26.92% NAV-DD, Calmar 5.23).
+Universe constrained to large-cap (top-40 ADV ∩ PIT Nifty 100) to cut Max DD vs
+the unconstrained v1. Current metrics: see exports/models/n40/SUMMARY.md
+(full-cycle 2021-04→2026-05 ≈ +40% CAGR on authoritative PIT N100).
 
-Same machinery as v1 (n20_daily_30d_mc1_uptrend) plus one filter:
-must be in NSE Nifty 100 (src/data/symbols/nifty100.csv).
+Same machinery as v1 plus one filter: must be in NSE Nifty 100 (PIT via
+eligible_at). 2026-05-30: rebalance switched DAILY → WEEKLY (cut the whipsaw).
 
 Role in the model flow (data_pull -> live_signal -> cron -> backtest)
 ---------------------------------------------------------------------
@@ -26,9 +27,9 @@ n20 reports are delegated to the SHARED engine
 the SHARED rotation core decide_rotation — the same core live_signal.py uses.
 This guarantees backtest and live cannot drift.
 
-This is the highest-churn model in the suite: it rotates DAILY holding only
-rank-1, so its primary risk metric is the daily NAV mark-to-market drawdown
-(max_dd_mtm_pct) rather than the rebalance-day realized drawdown.
+It rotates WEEKLY holding only rank-1 (still the highest-churn rotation model).
+Its primary risk metric is the daily NAV mark-to-market drawdown (max_dd_mtm_pct,
+marked every trading day) rather than the rebalance-day realized drawdown.
 """
 import sys, json, csv, argparse
 from pathlib import Path
@@ -63,7 +64,7 @@ def load_n100_pit(d: date) -> set[str]:
 
 
 def run(start: date, end: date, capital: float, out_dir: Path | None = None):
-    """Replay the n20 daily-rotation strategy over [start, end] and report.
+    """Replay the n40 weekly-rotation strategy over [start, end] and report.
 
     Loads the N500 daily price/volume panel, builds the rolling 20d-ADV and
     200d-SMA matrices, defines a point-in-time selection closure (`rank_at`),
@@ -112,7 +113,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
     # so live mirrors via is_week_rebalance_day.
     calendar = build_weekly_calendar(dates, start, end)
 
-    # SELECTION: daily top-20 ADV ∩ Nifty-100, uptrend (>200d SMA), 30d-ret rank.
+    # SELECTION: weekly top-40 ADV ∩ Nifty-100, uptrend (>200d SMA), 30d-ret rank.
     # EXECUTION + daily MTM drawdown come from the shared engine.
     def rank_at(di):
         """Point-in-time selection for day index `di` (no look-ahead).
