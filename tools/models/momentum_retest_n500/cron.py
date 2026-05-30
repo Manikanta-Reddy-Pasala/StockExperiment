@@ -1,4 +1,4 @@
-"""Cron registration for momentum_retest_n500 (multi-holding, K=3).
+"""Cron registration for momentum_retest_n500 (multi-holding, K=2).
 
 Scheduler glue — owns no strategy logic; shells out to the model's files:
   Data:    20:42 daily  pull_daily_ohlcv (data_pull.py) refresh N500 panel.

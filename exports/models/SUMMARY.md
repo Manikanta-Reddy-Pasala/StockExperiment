@@ -10,8 +10,8 @@ All figures net of costs, ₹10L start, true point-in-time universes.
 | [Nifty 100 Momentum](momentum_n100_top5_max1/SUMMARY.md) | LIVE | +110.5% | 9.6% | 11.55 | +143.7% |
 | [Weekly Top-40](n40/SUMMARY.md) | LIVE | +70.0% | 24.4% | 2.86 | +88.7% |
 | [Emerging Momentum](emerging_momentum/SUMMARY.md) | LIVE | +64.8% | 13.7% | 4.71 | +81.8% |
-| [Retest Momentum](momentum_retest_n500/SUMMARY.md) | DISABLED (₹0) | +45.5% | 16.4% | 2.78 | +56.6% |
 | [Midcap Breakout](midcap_narrow_60d_breakout/SUMMARY.md) | LIVE | +25.6% | 21.2% | 1.21 | +31.4% |
+| [Retest Momentum](momentum_retest_n500/SUMMARY.md) | DISABLED (₹0) | +25.0% | 20.9% | 1.2 | +30.6% |
 
 **Caveats:**
 - `momentum_pseudo_n100_adv` = optimistic upper bound (ADV-selection bias, not real index).

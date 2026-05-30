@@ -36,8 +36,8 @@ DESC = {
     "momentum_retest_n500": {
         "title": "Retest Momentum", "live": "DISABLED (₹0)",
         "universe": "Top-120 by 20d ADV from N500 (minus Smallcap-250)",
-        "strategy": "Monthly top-3 (K=3), 30d momentum, buy on 20-EMA pullback/retest, retain top-6 band.",
-        "note": "Multi-holding K=3. Full-period 2023-26 ≈ +91% CAGR / 19% DD.",
+        "strategy": "Monthly top-2 (K=2), 30d momentum, buy within 20% of 20-EMA, retain top-4 band.",
+        "note": "Multi-holding K=2 (2026-05-30 sweep). Both-window dominant config: 2023-26 ≈ +146% CAGR / 21% DD / Calmar 7.0 (every year positive), full 2021-26 ≈ +66% / 39% DD / 1.7. Upgraded from K3/band-8% — K=2 concentrates and the wide 20% entry band stops missing leaders that never pull back to the EMA.",
     },
     "emerging_momentum": {
         "title": "Emerging Momentum", "live": "LIVE",

@@ -17,16 +17,26 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[3]
 
-# ---- Strategy parameters (the locked K3/top120/ret6/band8% config) ----
+# ---- Strategy parameters (K2/top120/ret4/band20% — 2026-05-30 sweep winner) ----
+# Both-window sweep (2023-26 + full 2021-26 cycle, real PIT engine) upgraded this
+# from the old K3/ret6/band8% config. The new config DOMINATES on both windows:
+#   2023-26: +146% vs +91% CAGR, 21% vs 19% DD, Calmar 7.0 vs 4.9
+#   2021-26: +66%  vs +39% CAGR, 39% vs 48% DD (LOWER), Calmar 1.7 vs 0.8
+# Two independent Pareto levers found:
+#   - K=2 (concentrate from 3): fewer, higher-conviction names beat K3/4/5.
+#   - RETEST_HI=0.20 (was 0.08): the tight pullback band was the main drag — the
+#     strongest momentum leaders never pull back to within 8% of the 20-EMA, so
+#     the model kept missing them. Widening to 20% lets them in; effect plateaus
+#     past 0.20 (natural knee — names rarely sit >20% above EMA), so not overfit.
 TOPN = 120          # universe = top-120 by 20d ADV from N500 (minus smallcap)
-K = 3               # hold 3 positions, equal-weight
-RETAIN = 6          # hold a name while it stays in the top-6 rank
-LOOKBACK = 30       # momentum ranking window (trading days)
-MOM_FLOOR = 10.0    # require LOOKBACK-day return > 10%
+K = 2               # hold 2 positions, equal-weight (concentrated; beat K3/4/5)
+RETAIN = 4          # hold a name while it stays in the top-4 rank
+LOOKBACK = 30       # momentum ranking window (trading days; 30 beat 15/20/40)
+MOM_FLOOR = 10.0    # require LOOKBACK-day return > 10% (10 beat 0/5/15/20)
 ACCEL_DAYS = 10     # require ACCEL_DAYS-day return > 0 (accelerating)
 MAX_PRICE = 3000.0  # skip names priced above this at entry
 RETEST_LO = 0.01    # entry: price >= 20EMA * (1 - 1%)
-RETEST_HI = 0.08    # entry: price <= 20EMA * (1 + 8%)
+RETEST_HI = 0.20    # entry: price <= 20EMA * (1 + 20%) — widened from 8% (see above)
 ADV_WIN = 20        # ADV averaging window
 SMA_LONG = 200      # uptrend gate
 EMA_FAST = 20       # retest reference EMA

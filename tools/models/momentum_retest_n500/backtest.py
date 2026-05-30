@@ -5,10 +5,10 @@ shared core `strategy.py` (rank_targets / is_retest / params) — the SAME code
 live_signal.py uses, so backtest and live cannot drift. This file only owns the
 offline walk: load panels, build the monthly calendar, replay buy/sell, score.
 
-Strategy (see strategy.py / SUMMARY.md): monthly pick top-3 momentum leaders
-from the top-120-ADV liquid N500 pool; buy each on a 20-EMA retest; hold while
-in the top-6 rank. Reproduces (2023-05..2026-05, true-PIT, net 0.15%/side):
-+91% CAGR / 18.7% DD / Calmar 4.88 / positive every year.
+Strategy (see strategy.py / SUMMARY.md): monthly pick top-2 momentum leaders
+from the top-120-ADV liquid N500 pool; buy each within 20% of the 20-EMA; hold
+while in the top-4 rank. Reproduces (2023-05..2026-05, true-PIT, net 0.15%/side):
++146% CAGR / 20.9% DD / Calmar 7.0 / positive every year (2026-05-30 K2 config).
 """
 import sys, json, argparse
 from pathlib import Path

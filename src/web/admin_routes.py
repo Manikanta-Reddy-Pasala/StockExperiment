@@ -1781,7 +1781,7 @@ MODEL_PATHS = {
         "ranking_dir": "/app/logs/momentum_retest_n500/ranking",
         "live_signal": "tools/models/momentum_retest_n500/live_signal.py",
         "extra_args": [],  # builds its own N500 panel each run (K=3 multi)
-        "label": "Retest momentum K=3 multi (N500, retest entry)",
+        "label": "Retest momentum K=2 multi (N500, retest entry)",
         "universe_path": None,
     },
 }

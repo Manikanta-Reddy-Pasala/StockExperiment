@@ -4,63 +4,63 @@
   "end": "2026-05-12",
   "years": 2.992,
   "capital": 1000000.0,
-  "final_nav": 6925588.0,
-  "total_return_pct": 592.56,
-  "cagr_pct": 90.92,
-  "max_dd_pct": 18.68,
-  "calmar": 4.87,
-  "trades": 69,
-  "wins": 46,
-  "losses": 23,
-  "win_rate_pct": 66.7,
+  "final_nav": 14853444.0,
+  "total_return_pct": 1385.34,
+  "cagr_pct": 146.37,
+  "max_dd_pct": 20.91,
+  "calmar": 7.0,
+  "trades": 44,
+  "wins": 31,
+  "losses": 13,
+  "win_rate_pct": 70.5,
   "open_positions": [
     {
       "sym": "ADANIPOWER",
-      "qty": 13153,
+      "qty": 39963,
       "entry_px": 157.11,
       "entry_date": "2026-04-01",
       "last_px": 209.63,
-      "mtm_value": 2757263.0,
-      "unrealized_pnl": 690796.0
+      "mtm_value": 8377444.0,
+      "unrealized_pnl": 2098857.0
     },
     {
       "sym": "ADANIGREEN",
-      "qty": 1594,
-      "entry_px": 1308.0,
-      "entry_date": "2026-05-12",
+      "qty": 4958,
+      "entry_px": 1290.7,
+      "entry_date": "2026-05-04",
       "last_px": 1308.0,
-      "mtm_value": 2084952.0,
-      "unrealized_pnl": 0.0
+      "mtm_value": 6485064.0,
+      "unrealized_pnl": 85773.0
     }
   ],
   "per_year": {
     "2023": {
-      "ret_pct": 106.6,
-      "dd_pct": 9.3
+      "ret_pct": 266.4,
+      "dd_pct": 13.3
     },
     "2024": {
-      "ret_pct": 140.6,
-      "dd_pct": 15.9
+      "ret_pct": 253.6,
+      "dd_pct": 16.5
     },
     "2025": {
-      "ret_pct": 27.5,
-      "dd_pct": 17.7
+      "ret_pct": 10.3,
+      "dd_pct": 20.9
     },
     "2026": {
-      "ret_pct": 9.9,
-      "dd_pct": 11.3
+      "ret_pct": 5.4,
+      "dd_pct": 19.4
     }
   },
   "params": {
     "top_n": 120,
-    "K": 3,
-    "retain": 6,
+    "K": 2,
+    "retain": 4,
     "lookback": 30,
     "mom_floor": 10.0,
     "max_price": 3000.0,
     "retest_band": [
       0.01,
-      0.08
+      0.2
     ]
   }
 }
