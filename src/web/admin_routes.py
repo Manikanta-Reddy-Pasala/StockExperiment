@@ -21,88 +21,16 @@ logger = logging.getLogger(__name__)
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
-# ---- UI read-cache (Dragonfly) ------------------------------------------
-# Short-TTL cache for heavy read endpoints (e.g. /models/portfolio). Fail-OPEN:
-# any cache error falls through to a live compute, so existing flows are never
-# blocked if Dragonfly is down. Manual mutations call _invalidate_ui_cache().
-_PORTFOLIO_CACHE_KEY = "ui:models_portfolio:v1"
-_PORTFOLIO_CACHE_TTL = 30  # seconds — dashboard data may be up to 30s stale
+# ---- UI read-cache (Dragonfly) — shared helpers in src/web/ui_cache.py ----
+# FAIL-OPEN: any cache error falls through to a live compute; existing flows are
+# never blocked if Dragonfly is down. Keys live under ui:* (prefix-invalidated).
+from src.web.ui_cache import (  # noqa: E402
+    ui_cache as _ui_cache, ui_cached, invalidate_ui_cache as _invalidate_ui_cache,
+    invalidate_on_mutation, PORTFOLIO_CACHE_KEY as _PORTFOLIO_CACHE_KEY,
+    PORTFOLIO_CACHE_TTL as _PORTFOLIO_CACHE_TTL,
+)
 
-
-def _ui_cache():
-    """Return the cache service, or None if unavailable (fail-open)."""
-    try:
-        from src.services.utils.cache_service import get_cache_service
-        cs = get_cache_service()
-        return cs if cs and cs.is_available() else None
-    except Exception:
-        return None
-
-
-def _invalidate_ui_cache():
-    """Drop ALL cached UI payloads (ui:* keys) so a manual action reflects
-    immediately across every cached read endpoint. Fail-open."""
-    try:
-        cs = _ui_cache()
-        if cs and cs.redis_client:
-            keys = list(cs.redis_client.scan_iter(match="ui:*", count=500))
-            if keys:
-                cs.redis_client.delete(*keys)
-    except Exception:
-        pass
-
-
-def ui_cached(name: str, ttl: int = 30):
-    """Decorator: cache a GET endpoint's JSON response in Dragonfly for `ttl`s.
-
-    Keyed by name + full request path (so query-arg variants cache separately).
-    Fail-OPEN: any cache miss/error runs the view live. Only caches GET + 2xx.
-    Invalidated wholesale by _invalidate_ui_cache() on any admin mutation.
-    """
-    from functools import wraps
-
-    def deco(fn):
-        @wraps(fn)
-        def wrapper(*args, **kwargs):
-            if request.method != "GET":
-                return fn(*args, **kwargs)
-            key = f"ui:{name}:{request.full_path}"
-            cs = _ui_cache()
-            if cs:
-                try:
-                    hit = cs.redis_client.get(key)
-                    if hit is not None:
-                        from flask import Response
-                        return Response(hit, mimetype="application/json")
-                except Exception:
-                    pass
-            resp = fn(*args, **kwargs)
-            try:
-                # resp may be (body, status) or a Response
-                body, status = (resp if isinstance(resp, tuple)
-                                else (resp, getattr(resp, "status_code", 200)))
-                if cs and status == 200:
-                    data = body.get_data(as_text=True) if hasattr(body, "get_data") else None
-                    if data:
-                        cs.redis_client.setex(key, ttl, data)
-            except Exception:
-                pass
-            return resp
-        return wrapper
-    return deco
-
-
-@admin_bp.after_request
-def _invalidate_ui_cache_on_mutation(response):
-    """Any successful admin mutation (POST/PUT/DELETE/PATCH) drops the UI cache
-    so the next dashboard load is fresh. Fail-open; never blocks the response."""
-    try:
-        if (request.method in ("POST", "PUT", "DELETE", "PATCH")
-                and 200 <= response.status_code < 300):
-            _invalidate_ui_cache()
-    except Exception:
-        pass
-    return response
+admin_bp.after_request(invalidate_on_mutation)
 
 
 def _tg_safe(text: str):
@@ -2717,6 +2645,7 @@ def admin_model_ranking(model_name):
 # =============================================================================
 
 @admin_bp.route('/audit/orders', methods=['GET'])
+@ui_cached('audit_orders', ttl=30)
 def audit_orders_list():
     """List recent Fyers orders. Query: ?model=&symbol=&limit=&days="""
     try:
@@ -2770,6 +2699,7 @@ def audit_orders_list():
 
 
 @admin_bp.route('/audit/rankings', methods=['GET'])
+@ui_cached('audit_rankings', ttl=30)
 def audit_rankings_list():
     """Daily rankings per model. Query: ?model=&date=&days="""
     try:
@@ -2810,6 +2740,7 @@ def audit_rankings_list():
 
 
 @admin_bp.route('/audit/signals', methods=['GET'])
+@ui_cached('audit_signals', ttl=30)
 def audit_signals_list():
     """Emitted signals. Query: ?model=&days="""
     try:
@@ -2841,6 +2772,7 @@ def audit_signals_list():
 
 
 @admin_bp.route('/audit/decisions', methods=['GET'])
+@ui_cached('audit_decisions', ttl=30)
 def audit_decisions_list():
     """Rebalance reasoning. Query: ?model=&days="""
     try:
@@ -2880,6 +2812,7 @@ def audit_decisions_list():
 
 
 @admin_bp.route('/audit/config-changes', methods=['GET'])
+@ui_cached('audit_config', ttl=30)
 def audit_config_changes_list():
     """Settings/ledger field history. Query: ?model=&days="""
     try:
@@ -2912,6 +2845,7 @@ def audit_config_changes_list():
 
 
 @admin_bp.route('/audit/data-quality', methods=['GET'])
+@ui_cached('audit_dq', ttl=30)
 def audit_data_quality_list():
     """Daily data-coverage snapshots. Query: ?model=&days="""
     try:
@@ -2945,6 +2879,7 @@ def audit_data_quality_list():
 
 
 @admin_bp.route('/audit/system-events', methods=['GET'])
+@ui_cached('audit_events', ttl=30)
 def audit_system_events_list():
     """Boot/cron/token-refresh events. Query: ?event_type=&days="""
     try:
@@ -2974,6 +2909,7 @@ def audit_system_events_list():
 
 
 @admin_bp.route('/audit/charges-summary', methods=['GET'])
+@ui_cached('audit_charges', ttl=30)
 def audit_charges_summary():
     """Per-model broker-charge totals (BUY vs SELL) across all audit_orders.
 

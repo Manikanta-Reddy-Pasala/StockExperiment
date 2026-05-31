@@ -34,6 +34,13 @@ logger = logging.getLogger(__name__)
 
 momrot_bp = Blueprint("momrot", __name__, url_prefix="/admin/momrot")
 
+# Shared Dragonfly UI cache (fail-open). The Fyers-backed read endpoints
+# (/state, /ranking, /fyers/*) make live broker API calls per request — caching
+# them a few seconds slashes latency + Fyers rate-limit pressure. A successful
+# POST (buy/sell/run/rebuild) invalidates ui:* so account state refreshes at once.
+from src.web.ui_cache import ui_cached, invalidate_on_mutation  # noqa: E402
+momrot_bp.after_request(invalidate_on_mutation)
+
 # Host paths (inside container they map to /app/logs/momrot/)
 ROOT = Path("/app/logs/momrot")
 LEDGER_PATH = ROOT / "ledger" / "momrot_ledger.json"
@@ -357,6 +364,7 @@ def momrot_dashboard():
 
 
 @momrot_bp.route("/state")
+@ui_cached('momrot_state', ttl=15)
 def api_state():
     try:
         return jsonify({"success": True, "data": _portfolio_state()})
@@ -366,6 +374,7 @@ def api_state():
 
 
 @momrot_bp.route("/ranking")
+@ui_cached('momrot_ranking', ttl=20)
 def api_ranking():
     try:
         top = int(request.args.get("top", 10))
@@ -395,6 +404,7 @@ def api_next_rebalance():
 
 
 @momrot_bp.route("/history")
+@ui_cached('momrot_history', ttl=30)
 def api_history():
     """Trade history: Fyers tradebook (real trades) + local override file."""
     trades = []
@@ -733,6 +743,7 @@ def api_buy_now():
 
 
 @momrot_bp.route("/rebalance-preview")
+@ui_cached('momrot_rebpreview', ttl=20)
 def api_rebalance_preview():
     """Show what /run-now would do WITHOUT executing. Read-only."""
     try:
@@ -837,6 +848,7 @@ def api_rebuild_universe():
 
 
 @momrot_bp.route("/summary")
+@ui_cached('momrot_summary', ttl=30)
 def api_summary():
     """One-shot dashboard payload — state + ranking + next rebalance."""
     try:
@@ -855,6 +867,7 @@ def api_summary():
 # ---- Fyers live account ---------------------------------------------------
 
 @momrot_bp.route("/fyers/account")
+@ui_cached('momrot_fyacct', ttl=20)
 def api_fyers_account():
     """Pull live data from real Fyers account: funds + holdings + positions."""
     try:
@@ -892,6 +905,7 @@ def api_fyers_account():
 
 
 @momrot_bp.route("/fyers/orderbook")
+@ui_cached('momrot_fyob', ttl=15)
 def api_fyers_orderbook():
     """Live order history from Fyers."""
     try:
