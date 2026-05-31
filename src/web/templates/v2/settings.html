@@ -533,6 +533,23 @@ const MODEL_META = {
       ['Recent 2025-03→2026-05', '+48% CAGR / 16% DD'],
     ],
   },
+  'orb_momentum_intraday': {
+    universe: 'Nifty 500 (PIT) • intraday', kind: 'equity',
+    title: 'Morning ORB (Intraday)',
+    rules: { top_n: 3, max_concurrent: 3, lookback: '20d mom + 15m OR',
+             rebalance: 'Intraday daily (entries 09:30–10:00)', stop: 'OR-low', target: '2× OR width',
+             exit: 'Stop / target / flat 15:25 (0 overnight)' },
+    strategy: [
+      ['Type', 'DAY-TRADE — only intraday model; flat every night (0 overnight risk)'],
+      ['Select', 'Top-3 Nifty-500 by 20-day momentum (momentum filter = the edge)'],
+      ['Opening range', 'First 15 min (3× 5-min bars, 09:15–09:30): ORH/ORL'],
+      ['Entry', 'LONG on break above ORH — ONLY if before 10:00 (long-only)'],
+      ['Exit', 'Stop=ORL · target=ORH+2×width · else force-flat 15:25 (~3.5h hold)'],
+      ['Backtest 2025-03→2026-05 (PIT, slip 0.15%)', '+216% total / +251% CAGR / 17% DD / Sharpe 3.44'],
+      ['Trades', '377 (~1.6/day) · WR 53% · 13/15 months green'],
+      ['Note', '⚠ BACKTEST-ONLY (not wired live). Slippage-sensitive (+251%→~+46% at 0.25% slip); one bull regime; paper-trade first'],
+    ],
+  },
 };
 
 async function loadAllocations() {

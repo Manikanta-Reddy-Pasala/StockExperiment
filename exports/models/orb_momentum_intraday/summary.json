@@ -1,0 +1,120 @@
+{
+  "model": "orb_momentum_intraday",
+  "start": "2025-03-01",
+  "end": "2026-05-29",
+  "years": 1.243,
+  "capital": 1000000.0,
+  "final_nav": 3163237.0,
+  "total_return_pct": 216.32,
+  "cagr_pct": 251.24,
+  "max_dd_pct": 17.22,
+  "calmar": 14.59,
+  "sharpe": 3.44,
+  "trades": 377,
+  "wins": 199,
+  "losses": 178,
+  "win_rate_pct": 52.8,
+  "exits": {
+    "stop": 81,
+    "target": 77,
+    "eod": 219
+  },
+  "per_year": {
+    "2025": {
+      "ret_pct": 200.0,
+      "dd_pct": 8.9
+    },
+    "2026": {
+      "ret_pct": 5.5,
+      "dd_pct": 17.2
+    }
+  },
+  "per_month": {
+    "2025-03": {
+      "ret_pct": 8.5,
+      "days": 16,
+      "win_rate_pct": 69.0
+    },
+    "2025-04": {
+      "ret_pct": 18.7,
+      "days": 14,
+      "win_rate_pct": 64.0
+    },
+    "2025-05": {
+      "ret_pct": 16.7,
+      "days": 18,
+      "win_rate_pct": 61.0
+    },
+    "2025-06": {
+      "ret_pct": 12.3,
+      "days": 13,
+      "win_rate_pct": 69.0
+    },
+    "2025-07": {
+      "ret_pct": 6.4,
+      "days": 15,
+      "win_rate_pct": 53.0
+    },
+    "2025-08": {
+      "ret_pct": 15.1,
+      "days": 15,
+      "win_rate_pct": 60.0
+    },
+    "2025-09": {
+      "ret_pct": 8.6,
+      "days": 20,
+      "win_rate_pct": 50.0
+    },
+    "2025-10": {
+      "ret_pct": 12.3,
+      "days": 13,
+      "win_rate_pct": 54.0
+    },
+    "2025-11": {
+      "ret_pct": 3.4,
+      "days": 16,
+      "win_rate_pct": 44.0
+    },
+    "2025-12": {
+      "ret_pct": 15.2,
+      "days": 18,
+      "win_rate_pct": 50.0
+    },
+    "2026-01": {
+      "ret_pct": -1.6,
+      "days": 13,
+      "win_rate_pct": 38.0
+    },
+    "2026-02": {
+      "ret_pct": -11.9,
+      "days": 14,
+      "win_rate_pct": 29.0
+    },
+    "2026-03": {
+      "ret_pct": 6.2,
+      "days": 16,
+      "win_rate_pct": 62.0
+    },
+    "2026-04": {
+      "ret_pct": 13.9,
+      "days": 16,
+      "win_rate_pct": 62.0
+    },
+    "2026-05": {
+      "ret_pct": 0.5,
+      "days": 14,
+      "win_rate_pct": 36.0
+    }
+  },
+  "params": {
+    "index": "n500",
+    "lookback": 20,
+    "select_top": 3,
+    "or_bars": 3,
+    "entry_cutoff_min": 600,
+    "target_mult": 2.0,
+    "slippage": 0.0015,
+    "round_trip_cost": 0.0015
+  },
+  "open_position": null
+}

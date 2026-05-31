@@ -33,3 +33,4 @@ deploy_to_germany.sh
 deploy_test.sh
 exports/overlap/
 exports/index_constituents/source/
+tools/models/orb_momentum_intraday/cache5min/
