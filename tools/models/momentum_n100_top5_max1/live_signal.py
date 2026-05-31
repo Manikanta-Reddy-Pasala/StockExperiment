@@ -40,7 +40,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from tools.shared.ohlcv_cache import read_cached, bar_is_stale  # noqa: E402
-from tools.shared.rotation_strategy import decide_rotation, midmonth_lead_ok  # noqa: E402
+from tools.shared.rotation_strategy import decide_rotation, midmonth_lead_ok, mid_month_retain  # noqa: E402
 from tools.shared.nse_calendar import is_first_trading_day_of_month  # noqa: E402
 from tools.models.momentum_n100_top5_max1 import strategy as S  # noqa: E402
 
@@ -410,7 +410,12 @@ def main():
     for i, (sym, name, ret, price) in enumerate(ranks[:args.top_n], 1):
         log.info(f"  {i}. {sym:<14} {ret:+7.2f}%  @ ₹{price:.2f}")
 
-    signals = emit_signals(ranks, held, args.top_n, retain_top_n=args.retain_top_n)
+    # Backtest parity (single source: rotation_strategy.mid_month_retain): the
+    # MID-month leg rotates on top-1 (retain=1), the full-month leg uses the
+    # configured band. Aligns live to the backtest engine's mid-month decision
+    # (user call 2026-05-31).
+    _retain = mid_month_retain(args.mid_month_check, args.retain_top_n)
+    signals = emit_signals(ranks, held, args.top_n, retain_top_n=_retain)
 
     # Mid-month lead-threshold filter:
     # If today is the mid-month check day, suppress rotation unless the

@@ -210,3 +210,18 @@ def test_partial_sell_nonpositive_qty_falls_back_to_full():
     # defensive: 0/negative requested -> treat as full close (never strand).
     assert partial_sell_outcome(100, 0) == (100, 0, True)
     assert partial_sell_outcome(100, -5) == (100, 0, True)
+
+
+# --- 8. mid-month retain parity (live == backtest) ---------------------------
+
+def test_mid_month_retain_is_top1_on_mid_month():
+    # Mid-month leg always rotates on top-1, regardless of the model's band.
+    from tools.shared.rotation_strategy import mid_month_retain
+    assert mid_month_retain(True, 3) == 1
+    assert mid_month_retain(True, 1) == 1
+
+
+def test_mid_month_retain_uses_full_band_on_regular():
+    from tools.shared.rotation_strategy import mid_month_retain
+    assert mid_month_retain(False, 3) == 3
+    assert mid_month_retain(False, 1) == 1

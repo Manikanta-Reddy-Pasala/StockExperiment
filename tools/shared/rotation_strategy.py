@@ -33,6 +33,17 @@ class RotationDecision:
         return self.sell is None and self.buy is None
 
 
+def mid_month_retain(is_mid_month: bool, full_retain: int) -> int:
+    """Retention band to use for a rotation decision.
+
+    SINGLE source of truth so live and the backtest engine can't drift: the
+    mid-month leg always rotates on a top-1 band (retain=1), the full-month
+    (1st-trading-day) leg uses the model's configured band. Used by both
+    backtest_engine.run_rotation_backtest and each model's live_signal.
+    """
+    return 1 if is_mid_month else int(full_retain)
+
+
 def decide_rotation(held: Optional[str], ranked: Sequence[str],
                     retain_top_n: int = 1) -> RotationDecision:
     """Single-position top-N retention rotation (max_concurrent=1).

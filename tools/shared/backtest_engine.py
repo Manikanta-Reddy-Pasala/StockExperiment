@@ -22,7 +22,7 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import pandas as pd
 
-from tools.shared.rotation_strategy import decide_rotation, midmonth_lead_ok
+from tools.shared.rotation_strategy import decide_rotation, midmonth_lead_ok, mid_month_retain
 
 
 def _label(sym: str) -> str:
@@ -113,7 +113,8 @@ def run_rotation_backtest(
             ret_list = midmonth_ret_at(di) if midmonth_ret_at else []
             if not midmonth_lead_ok(hold, ret_list, midmonth_lead_pct):
                 continue
-            if decide_rotation(hold, ranked, retain_top_n=1).is_noop:
+            if decide_rotation(hold, ranked,
+                               retain_top_n=mid_month_retain(True, retain_top_n)).is_noop:
                 continue
             reason = "MIDCHECK"
         else:
