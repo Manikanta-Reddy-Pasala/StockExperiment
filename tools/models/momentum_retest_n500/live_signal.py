@@ -1,4 +1,4 @@
-"""Live signal generator for momentum_retest_n500 (multi-holding, K=2).
+"""Live signal generator for momentum_retest_n500 (multi-holding, K=4).
 
 Uses the SHARED core `strategy.py` (rank_targets / is_retest / params) — the same
 logic the backtest uses — and the multi-holding ledger (multi_holding_service).

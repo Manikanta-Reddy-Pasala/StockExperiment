@@ -7,10 +7,11 @@ offline walk: load panels, build the monthly calendar, replay buy/sell, score.
 
 Strategy (see strategy.py / SUMMARY.md): monthly pick top-2 momentum leaders
 from the top-120-ADV liquid N500 pool; buy each within 20% of the 20-EMA; hold
-while in the top-4 rank. Full-cycle 2021-04→2026-05 on PIT N500 (net 0.15%/side):
-≈ +64.9% CAGR / 57.1% DD / Calmar 1.14 — see exports/models/momentum_retest_n500/
-SUMMARY.md. (An earlier +146%/2023-26 figure was the static-current-N500,
-survivorship-biased run; PIT N500 since 2026-05-31 is the honest number.)
+while in the top-4 rank. K=4 (2026-05-31 re-tune, was K2). Full-cycle
+2021-03→2026-05 on PIT N500 (net 0.15%/side): ≈ +57.3% CAGR / 38.8% DD /
+Calmar 1.48; recent 2025-03→2026-05 ≈ +53% CAGR / 15% DD — see
+exports/models/momentum_retest_n500/SUMMARY.md. K2→K4 diversified the basket:
+recent CAGR +38→+53, DD cut both windows (full 57→39, per-year ≤32 every year).
 """
 import sys, json, argparse
 from pathlib import Path

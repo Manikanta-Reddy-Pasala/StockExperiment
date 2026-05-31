@@ -17,13 +17,15 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[3]
 
-# ---- Strategy parameters (K2/top120/ret4/band20% — 2026-05-30 sweep winner) ----
-# Both-window sweep (2023-26 + full 2021-26 cycle, real PIT engine) upgraded this
-# from the old K3/ret6/band8% config. The new config DOMINATES on both windows:
-#   2023-26: +146% vs +91% CAGR, 21% vs 19% DD, Calmar 7.0 vs 4.9
-#   2021-26: +66%  vs +39% CAGR, 39% vs 48% DD (LOWER), Calmar 1.7 vs 0.8
-# Two independent Pareto levers found:
-#   - K=2 (concentrate from 3): fewer, higher-conviction names beat K3/4/5.
+# ---- Strategy parameters (K4/top120/ret4/band20% — 2026-05-31 re-tune) ----
+# 2026-05-31: K2→K4. On both windows K4 dominates K2 on risk-adjusted return:
+#   full 2021-03→2026-05: +57% CAGR / 39% DD / Calmar 1.48 (was K2 +64/57/1.12)
+#   recent 2025-03→2026-05: +53% CAGR / 15% DD (was K2 +38/21)
+# K2→K4 diversifies the basket: recent CAGR +38→+53, DD cut both windows
+# (full 57→39, per-year DD ≤32 EVERY year). −7pt full CAGR for far better DD.
+# K-knee verified: K5/K6 decay. (The old K2 "beat K3/4/5" was the pre-PIT
+# survivorship-era sweep; on the corrected PIT N500 engine K4 is the winner.)
+# Other lever (unchanged):
 #   - RETEST_HI=0.20 (was 0.08): the tight pullback band was the main drag — the
 #     strongest momentum leaders never pull back to within 8% of the 20-EMA, so
 #     the model kept missing them. Widening to 20% lets them in; effect plateaus
