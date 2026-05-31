@@ -64,6 +64,16 @@ KNOWN_MODELS = [
         "enabled": True,
         "description": "Equity daily rotation top-20-ADV ∩ Nifty 100 by 30d return",
     },
+    {
+        # BACKTEST-ONLY intraday day-trade model. Seeded DISABLED + ₹0 so it is
+        # VISIBLE in the dashboard / settings UI (with its MODEL_META strategy
+        # card) but never allocated capital or auto-traded. No scheduler/executor
+        # wiring exists for it yet — enabling alone would not place orders.
+        "name": "orb_momentum_intraday",
+        "default_capital": 0,
+        "enabled": False,
+        "description": "Intraday morning opening-range breakout on top-3 Nifty-500 momentum leaders (day-trade, flat EOD). BACKTEST-ONLY.",
+    },
 ]
 
 # Models intentionally removed from the system. ensure_models_seeded() purges
