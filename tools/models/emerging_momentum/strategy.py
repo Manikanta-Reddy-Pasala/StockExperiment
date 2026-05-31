@@ -43,11 +43,18 @@ ROOT = Path(__file__).resolve().parents[3]
 # (hold while in top-2) ride the clean mid/small winners harder.
 POOL = 100           # universe pool = top-100 by 20d ADV from (N500 minus N100)
 TOPN = 100           # alias for POOL (display/compat with n100-style naming)
-RETAIN = 2           # keep the held name while it stays in the top-2 rank
+RETAIN = 1           # top-1 rotation (2026-05-31: RET1 + vol-adj beats RET2, +111% vs +95%)
 LOOKBACK = 30        # momentum ranking window (TRADING days). 2026-05-31 re-tune.
 MAX_PRICE = 3000.0   # skip names priced above this at entry
 ADV_WIN = 20         # ADV averaging window
 MIDMONTH_LEAD = 5.0  # rotate mid-month only if new rank-1 leads held by >= 5pp
+# Vol-adjusted momentum: rank by LOOKBACK-return / VOL_WIN-day return-vol instead
+# of raw return. On the high-vol mid/small universe this picks SMOOTH strong
+# trends over jumpy ones and compounds much better (2026-05-31 sweep). Set
+# RANK_MODE="ret" for the old raw-return ranking.
+RANK_MODE = "vol_adj"
+VOL_WIN = 60
+_VOL_CACHE: dict = {}
 
 # ---- MCAP CLIMBER overlay (validated +13pp CAGR at same DD, 2026-05-30) ------
 # Keep only entry candidates whose free-float MARKET-CAP RANK has RISEN over the
@@ -57,7 +64,8 @@ MIDMONTH_LEAD = 5.0  # rotate mid-month only if new rank-1 leads held by >= 5pp
 # to ~+111% CAGR at the SAME ~23% DD. A/B across all models showed this edge
 # lives ONLY in this liquid-mid tier. If the scrape CSV is absent the filter
 # no-ops (falls back to pure-momentum baseline) so live never hard-fails.
-CLIMBER_ENABLED = True
+CLIMBER_ENABLED = False   # 2026-05-31: climber was a pre-rebuild artifact; OFF + vol-adj
+                          # ranking gives +111% vs +101% (climber-on) — and lower DD.
 CLIMB_LOOKBACK = 60
 MCAP_CSV = ROOT / "exports" / "nse_mcap.csv"
 _MCAP_RANK_CACHE: dict = {}
@@ -188,6 +196,15 @@ def _is_climber(rank, s, di) -> bool:
     return pd.notna(a) and pd.notna(b) and a < b
 
 
+def _vol_panel(cl):
+    """Cached VOL_WIN-day rolling std of daily returns (for vol-adjusted ranking)."""
+    key = id(cl)
+    if key not in _VOL_CACHE:
+        _VOL_CACHE.clear()
+        _VOL_CACHE[key] = cl.pct_change().rolling(VOL_WIN).std()
+    return _VOL_CACHE[key]
+
+
 def rank_pool(cl, pool, di):
     """Ranked momentum leaders passing the filters, at row index `di`.
 
@@ -215,7 +232,14 @@ def rank_pool(cl, pool, di):
             continue
         if not (0 < float(px) <= MAX_PRICE):
             continue
-        out.append((s, ret))
+        score = ret
+        if RANK_MODE == "vol_adj":
+            vp = _vol_panel(cl)
+            v = vp[s].iloc[di] if s in vp.columns else None
+            if v is None or pd.isna(v) or v <= 0:
+                continue
+            score = ret / v        # return per unit of volatility
+        out.append((s, score))
     out.sort(key=lambda x: x[1], reverse=True)
     ranked = [s for s, _ in out]
     if CLIMBER_ENABLED:

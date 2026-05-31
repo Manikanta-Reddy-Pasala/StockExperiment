@@ -4,49 +4,49 @@
   "end": "2026-05-29",
   "years": 5.243,
   "capital": 1000000.0,
-  "final_nav": 14089017.0,
-  "total_return_pct": 1308.9,
-  "cagr_pct": 65.63,
-  "max_dd_pct": 42.53,
-  "calmar": 1.54,
-  "trades": 46,
-  "wins": 28,
-  "losses": 18,
-  "win_rate_pct": 60.9,
+  "final_nav": 50667400.0,
+  "total_return_pct": 4966.74,
+  "cagr_pct": 111.42,
+  "max_dd_pct": 31.17,
+  "calmar": 3.57,
+  "trades": 61,
+  "wins": 41,
+  "losses": 20,
+  "win_rate_pct": 67.2,
   "open_position": {
     "sym": "BHEL",
-    "qty": 33806,
+    "qty": 121577,
     "entry_px": 377.05,
     "entry_date": "2026-05-04",
     "last_px": 416.75,
-    "mtm_value": 14088650.0,
-    "unrealized_pnl": 1342098.0,
+    "mtm_value": 50667215.0,
+    "unrealized_pnl": 4826607.0,
     "cap": "mid"
   },
   "per_year": {
     "2021": {
-      "ret_pct": 14.5,
-      "dd_pct": 27.7
+      "ret_pct": -4.6,
+      "dd_pct": 32.6
     },
     "2022": {
-      "ret_pct": 284.5,
-      "dd_pct": 22.6
+      "ret_pct": 204.4,
+      "dd_pct": 14.8
     },
     "2023": {
-      "ret_pct": 127.9,
+      "ret_pct": 301.0,
       "dd_pct": 22.0
     },
     "2024": {
-      "ret_pct": 34.6,
-      "dd_pct": 33.9
+      "ret_pct": 136.1,
+      "dd_pct": 12.0
     },
     "2025": {
-      "ret_pct": -6.5,
-      "dd_pct": 34.8
+      "ret_pct": 38.0,
+      "dd_pct": 16.2
     },
     "2026": {
-      "ret_pct": 5.6,
-      "dd_pct": 13.3
+      "ret_pct": 14.8,
+      "dd_pct": 11.2
     }
   }
 }

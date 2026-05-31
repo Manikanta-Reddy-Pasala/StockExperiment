@@ -21,29 +21,29 @@ Backtest window: **2021-04-01 → 2026-05-29** (full ~5.1-year cycle: 2021 bull,
 
 | Metric | Value |
 |---|---|
-| Final NAV (₹10L start) | ₹14,089,017 |
-| Total return | +1308.9% |
-| CAGR (annualized) | +65.6% |
-| Max drawdown | 42.5% |
-| Calmar | 1.54 |
-| Trades | 46 (28W / 18L) · 61% win |
+| Final NAV (₹10L start) | ₹50,667,400 |
+| Total return | +4966.7% |
+| CAGR (annualized) | +111.4% |
+| Max drawdown | 31.2% |
+| Calmar | 3.57 |
+| Trades | 61 (41W / 20L) · 67% win |
 
 ## Year-by-year breakdown
 
 | Year | Return % | Intra-yr DD % |
 |---|---:|---:|
-| 2021 | +14.5% | 27.7% |
-| 2022 | +284.5% | 22.6% |
-| 2023 | +127.9% | 22.0% |
-| 2024 | +34.6% | 33.9% |
-| 2025 | -6.5% | 34.8% |
-| 2026 | +5.6% | 13.3% |
+| 2021 | -4.6% | 32.6% |
+| 2022 | +204.4% | 14.8% |
+| 2023 | +301.0% | 22.0% |
+| 2024 | +136.1% | 12.0% |
+| 2025 | +38.0% | 16.2% |
+| 2026 | +14.8% | 11.2% |
 
 ## Note
 
 Single-position max-1, emerging mid/small, run_rotation engine + MCAP-CLIMBER filter (keep only rising-mcap-rank names). Full-cycle 2021-04→2026-05 on AUTHORITATIVE PIT membership (2026-05-31) ≈ +46.1% CAGR / 37.7% DD / Calmar 1.22. ⚠ The old +121% headline was a MIRAGE — the buggy Wayback N100 was missing large-cap winners (ADANIGREEN etc), so this 'mid/small' model wrongly held them. Correct N100 exclusion ⇒ genuinely mid/small ⇒ +46%.
 
-**Open position at window end:** BHEL [mid] qty 33806 entry ₹377.05 on 2026-05-04 (unrealized +1,342,098)
+**Open position at window end:** BHEL [mid] qty 121577 entry ₹377.05 on 2026-05-04 (unrealized +4,826,607)
 
 ---
 *Auto-generated from summary.json by tools/analysis/refresh_export_docs.py — do not hand-edit.*
