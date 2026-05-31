@@ -116,7 +116,7 @@ def execute_orders():
            "--signals", str(signals_file), "--user-id", user_id,
            "--model-name", "momentum_n100_top5_max1"]
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=1200)
         if r.returncode == 0:
             log.info("✅ Model 3 Fyers execute complete")
             if r.stdout:
@@ -243,7 +243,7 @@ def execute_mid_month_orders():
            "--signals", str(signals_file), "--user-id", user_id,
            "--model-name", "momentum_n100_top5_max1"]
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=1200)
         if r.returncode == 0:
             log.info("✅ Model 3 mid-month execute complete")
             if r.stdout:

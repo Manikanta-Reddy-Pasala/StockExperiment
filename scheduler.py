@@ -645,11 +645,14 @@ def run_scheduler():
                     _active_jobs.discard(threading.current_thread())
 
         def _launch():
-            if _draining.is_set():
-                logger.warning("draining — skipping new job launch")
-                return
+            # Check _draining INSIDE the lock so a job can't slip in after the
+            # shutdown handler has snapshotted _active_jobs (TOCTOU) and then
+            # escape the drain join.
             t = threading.Thread(target=_runner, daemon=True)
             with _active_lock:
+                if _draining.is_set():
+                    logger.warning("draining — skipping new job launch")
+                    return
                 _active_jobs.add(t)
             t.start()
         return _launch
@@ -663,8 +666,8 @@ def run_scheduler():
     def _graceful_shutdown(signum, frame):
         logger.info(f"signal {signum} — draining in-flight jobs "
                     f"(up to {DRAIN_TIMEOUT_S}s) before exit.")
-        _draining.set()
         with _active_lock:
+            _draining.set()   # set + snapshot atomically vs _launch's check
             threads = list(_active_jobs)
         deadline = time.monotonic() + DRAIN_TIMEOUT_S
         for t in threads:

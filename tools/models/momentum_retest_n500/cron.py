@@ -25,7 +25,7 @@ STATE_DIR = Path("/app/logs/momentum_retest_n500")
 SIGNALS = STATE_DIR / "signals" / "latest.json"
 
 
-def _run(cmd, label, timeout=900):
+def _run(cmd, label, timeout=1200):
     try:
         r = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, timeout=timeout)
         (log.info if r.returncode == 0 else log.error)(

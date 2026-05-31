@@ -7,7 +7,7 @@ Pass-ordering (Phase 2 Task 5):
   Pass 1  — All EXIT signals (STOP_HIT/TARGET_HIT/EXIT) first.
             Each sell is polled to FILLED before any buy proceeds.
             Any unfilled sell ABORTS the run (no phantom buys on phantom cash).
-  Pass 2  — Reload `current_amount` from DB (post-sells), rebuild RiskManager,
+  Pass 2  — Rebuild RiskManager from refreshed DB ledger.cash (post-sells),
             then process ENTRY1/ENTRY2 signals with refreshed sizing.
 
 Order-placement (Phase 2 Task 6):

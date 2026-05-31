@@ -23,6 +23,7 @@ Semantics (see `lock_proceed_decision`):
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from contextlib import contextmanager
 
@@ -42,17 +43,24 @@ TRADING_LOCK_KEY = 730_051_001
 # opens a throwaway connection per lock and closes it on release, isolating the
 # lock from the app pool entirely.
 _lock_engine = None
+_lock_engine_init = threading.Lock()
 
 
 def _get_lock_engine():
     global _lock_engine
     if _lock_engine is not None:
         return _lock_engine
-    from sqlalchemy.pool import NullPool
-    from sqlalchemy import create_engine
-    from src.models.database import get_database_manager
-    url = get_database_manager().engine.url
-    _lock_engine = create_engine(url, poolclass=NullPool, pool_pre_ping=True)
+    # Thread-safe lazy init (double-checked): the threaded scheduler can call
+    # this from two job threads at the same minute; without the lock both build
+    # an Engine and one leaks.
+    with _lock_engine_init:
+        if _lock_engine is not None:
+            return _lock_engine
+        from sqlalchemy.pool import NullPool
+        from sqlalchemy import create_engine
+        from src.models.database import get_database_manager
+        url = get_database_manager().engine.url
+        _lock_engine = create_engine(url, poolclass=NullPool, pool_pre_ping=True)
     return _lock_engine
 
 

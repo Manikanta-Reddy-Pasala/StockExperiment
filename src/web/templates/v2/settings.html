@@ -534,7 +534,7 @@ const MODEL_META = {
     ],
   },
   'orb_momentum_intraday': {
-    universe: 'Nifty 500 (PIT) • intraday', kind: 'equity',
+    universe: 'Nifty 500 (PIT) • intraday', kind: 'intraday',
     title: 'Morning ORB (Intraday)',
     rules: { top_n: 3, max_concurrent: 3, lookback: '20d mom + 15m OR',
              rebalance: 'Intraday daily (entries 09:30–10:00)', stop: 'OR-low', target: '2× OR width',
