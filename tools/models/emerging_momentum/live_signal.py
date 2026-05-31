@@ -57,6 +57,24 @@ MODEL_NAME = "emerging_momentum"
 STATE_DIR = Path("/app/logs/emerging_momentum")
 
 
+def panel_is_stale(last_date, today, max_gap_days: int = 7) -> bool:
+    """True if the panel's most recent equity day is too old to trade on.
+
+    Parity with the per-symbol bar_is_stale gate n100/pseudo use — emerging
+    ranks off a pivoted panel, so the freshness check is at the panel level:
+    if the last equity day is more than ``max_gap_days`` calendar days before
+    today (failed nightly OHLCV pull / dead feed), abort rather than emit real
+    ENTRY/STOP/TARGET signals priced off a stale close. Accepts date,
+    datetime, or pandas Timestamp on either side.
+    """
+    try:
+        ld = pd.Timestamp(last_date).date()
+        td = pd.Timestamp(today).date()
+        return (td - ld).days > max_gap_days
+    except Exception:
+        return False
+
+
 def is_rebalance_day(today: datetime, last_rotation: datetime = None) -> bool:
     """True if today is the monthly rebalance trigger (1st NSE trading day of
     month, holiday-aware). Skips if we already rotated this calendar month."""
@@ -279,6 +297,15 @@ def main():
     adv20 = S.indicators(cl, adv_rs)
     dates = cl.index
     di = len(dates) - 1  # today = last equity day
+
+    # Freshness gate (parity with n100/pseudo bar_is_stale): if the last equity
+    # day in the panel is stale (failed nightly pull / dead feed), abort rather
+    # than emit real ENTRY/STOP/TARGET signals off an old close.
+    if len(dates) and panel_is_stale(dates[di], today):
+        log.error(f"Panel stale — last equity day {pd.Timestamp(dates[di]).date()} "
+                  f"vs today {today.date()}; aborting (no signals).")
+        _write_empty()
+        return 1
 
     anchors, pools = S.build_pools(adv20, dates, today.date())
     pool = S.pool_for_date(anchors, pools, dates[di])

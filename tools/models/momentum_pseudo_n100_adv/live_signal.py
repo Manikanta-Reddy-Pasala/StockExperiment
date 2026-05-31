@@ -47,7 +47,7 @@ from typing import Dict, List, Optional, Tuple
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
-from tools.shared.ohlcv_cache import read_cached  # noqa: E402
+from tools.shared.ohlcv_cache import read_cached, bar_is_stale  # noqa: E402
 from tools.shared.rotation_strategy import decide_rotation, midmonth_lead_ok  # noqa: E402
 from tools.shared.nse_calendar import is_first_trading_day_of_month  # noqa: E402
 from tools.models.momentum_pseudo_n100_adv import strategy as S  # noqa: E402
@@ -169,6 +169,10 @@ def get_close_at(symbol: str, target_ts: int) -> float:
     # 90-day window back from target_ts is enough to find the most recent bar.
     df = read_cached(symbol, "D", target_ts - 90 * 86400, target_ts)
     if df.empty:
+        return 0.0
+    # Freshness gate: drop a name whose latest cached bar is stale (failed
+    # nightly pull / delisted / halted) instead of ranking on an old close.
+    if bar_is_stale(int(df.iloc[-1]["timestamp"]), target_ts):
         return 0.0
     return float(df.iloc[-1]["close"])
 

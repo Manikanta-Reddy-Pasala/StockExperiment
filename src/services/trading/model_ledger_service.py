@@ -34,6 +34,31 @@ def _normalize_symbol(sym: str) -> str:
     return f"NSE:{sym}-EQ"
 
 
+# Order ids that never identify a unique broker fill, so are never deduped.
+_NON_DEDUPABLE_ORDER_IDS = ("", "DRY")
+
+
+def _order_already_recorded(order_id, existing_ids) -> bool:
+    """True if this Fyers order id was already recorded (idempotency guard).
+
+    Prevents a retried / re-invoked executor from double-recording the same
+    fill (cash debited twice, qty doubled). Blank / "DRY" / None ids never
+    identify a real fill, so are treated as non-dedupable (always False).
+    """
+    if not order_id or order_id in _NON_DEDUPABLE_ORDER_IDS:
+        return False
+    return order_id in set(existing_ids)
+
+
+def _order_seen(session, model_name: str, order_id) -> bool:
+    """DB-backed idempotency check: has model_name already logged this order id?"""
+    if not order_id or order_id in _NON_DEDUPABLE_ORDER_IDS:
+        return False
+    rows = session.query(ModelTrade.fyers_order_id).filter_by(
+        model_name=model_name, fyers_order_id=order_id).all()
+    return _order_already_recorded(order_id, [r[0] for r in rows])
+
+
 # Models the system knows about. Adding a new model = append here.
 # `enabled` controls auto-seeding default (per-row UI toggle still wins later).
 # `default_capital` ₹30K = small live test slug; user can deposit more via UI.
@@ -545,6 +570,11 @@ def record_buy(model_name: str, symbol: str, qty: int, price: float,
         l = s.query(ModelLedger).filter_by(model_name=model_name).first()
         if not l or not settings:
             raise ValueError(f"Unknown model: {model_name}")
+        # Idempotency: a retried/re-invoked executor must not re-apply a fill.
+        if _order_seen(s, model_name, fyers_order_id):
+            log.warning(f"{model_name}: BUY order {fyers_order_id} already "
+                        f"recorded — skipping duplicate (idempotent).")
+            return _ledger_dict(l)
         norm = _normalize_symbol(symbol)
         # Different-symbol guard remains — model logic owns single-symbol per
         # position; rotating to a different symbol must SELL first.
@@ -655,6 +685,11 @@ def record_sell(model_name: str, exit_price: float, reason: str,
         l = s.query(ModelLedger).filter_by(model_name=model_name).first()
         if not l or not l.open_symbol or not settings:
             raise ValueError(f"{model_name}: no open position")
+        # Idempotency: don't re-apply a sell that was already recorded.
+        if _order_seen(s, model_name, fyers_order_id):
+            log.warning(f"{model_name}: SELL order {fyers_order_id} already "
+                        f"recorded — skipping duplicate (idempotent).")
+            return _ledger_dict(l)
         qty = l.open_qty
         entry_px = l.open_entry_px
         proc = Decimal(str(qty)) * Decimal(str(exit_price))

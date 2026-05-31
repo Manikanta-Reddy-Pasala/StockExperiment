@@ -24,7 +24,7 @@ from src.models.model_ledger_models import (
     ModelSettings, ModelLedger, ModelTrade, ModelHolding,
 )
 from src.services.trading.model_ledger_service import (
-    _normalize_symbol, _compute_real_charges, _ledger_dict,
+    _normalize_symbol, _compute_real_charges, _ledger_dict, _order_seen,
 )
 
 log = logging.getLogger(__name__)
@@ -61,6 +61,10 @@ def record_buy_multi(model_name: str, symbol: str, qty: int, price: float,
         l = s.query(ModelLedger).filter_by(model_name=model_name).first()
         if not l or not settings:
             raise ValueError(f"Unknown model: {model_name}")
+        if _order_seen(s, model_name, fyers_order_id):
+            log.warning(f"{model_name}: multi-BUY order {fyers_order_id} already "
+                        f"recorded — skipping duplicate (idempotent).")
+            return _ledger_dict(l)
         norm = _normalize_symbol(symbol)
         qty_d, price_d = Decimal(str(qty)), Decimal(str(price))
         charges = _compute_real_charges("BUY", qty, price, product)
@@ -97,6 +101,10 @@ def record_sell_multi(model_name: str, symbol: str, exit_price: float,
     with db.get_session() as s:
         settings = s.query(ModelSettings).filter_by(model_name=model_name).first()
         l = s.query(ModelLedger).filter_by(model_name=model_name).first()
+        if _order_seen(s, model_name, fyers_order_id):
+            log.warning(f"{model_name}: multi-SELL order {fyers_order_id} already "
+                        f"recorded — skipping duplicate (idempotent).")
+            return _ledger_dict(l)
         norm = _normalize_symbol(symbol)
         h = s.query(ModelHolding).filter_by(model_name=model_name, symbol=norm).first()
         if not h:

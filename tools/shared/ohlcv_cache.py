@@ -39,6 +39,22 @@ _TABLE_MAP = {
 _engine = None
 
 
+def bar_is_stale(last_ts: int, target_ts: int, max_gap_days: int = 7) -> bool:
+    """True if the most recent cached bar is too old to price `target_ts`.
+
+    Used by the live signal path: a name whose last cached daily bar is more
+    than ``max_gap_days`` calendar days before the as-of date is treated as
+    stale (failed nightly OHLCV pull / delisted / halted) and dropped from
+    ranking rather than ranked on a days-old close. Default 7 days comfortably
+    spans a long weekend + a contiguous exchange-holiday cluster, so it only
+    fires on genuinely broken/missing data, never on normal operation.
+    """
+    try:
+        return (int(target_ts) - int(last_ts)) > max_gap_days * 86400
+    except (TypeError, ValueError):
+        return False
+
+
 def _get_engine():
     """Return the shared SQLAlchemy engine for the prod ``historical_data`` DB.
 

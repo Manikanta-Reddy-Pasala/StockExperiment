@@ -2317,6 +2317,22 @@ def admin_model_exit(model_name):
             "error": f"Another operation (rebalance/exit) is in progress for {model_name}.",
         }), 409
 
+    # (N1) Cross-process trading lock — this endpoint places via
+    # _fyers_place_market DIRECTLY (not the executor), so it must also serialise
+    # against the cron executor + other gunicorn workers on the shared account.
+    from src.services.trading.trade_lock import trading_lock
+    _tlk = trading_lock()
+    if not _tlk.__enter__():
+        try:
+            lk.release()
+        except Exception:
+            pass
+        _tlk.__exit__(None, None, None)
+        return jsonify({
+            "success": False,
+            "error": "another trade/rebalance is in progress — retry shortly.",
+        }), 409
+
     sold = []
     errors = []
     try:
@@ -2366,6 +2382,10 @@ def admin_model_exit(model_name):
             sold.append({"symbol": symbol, "qty": qty,
                          "order_id": order_id, "exit_price": ltp})
     finally:
+        try:
+            _tlk.__exit__(None, None, None)
+        except Exception:
+            pass
         try:
             lk.release()
         except Exception:

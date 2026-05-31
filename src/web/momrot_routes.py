@@ -605,7 +605,15 @@ def api_run_now():
 
     Always live — places real Fyers orders.
     """
+    _lk = None
     try:
+        # (N1) serialise live placement against the cron executor + other
+        # gunicorn workers on the shared Fyers account.
+        from src.services.trading.trade_lock import trading_lock
+        _lk = trading_lock()
+        if not _lk.__enter__():
+            return jsonify({"success": False,
+                            "error": "another trade/rebalance is in progress — retry shortly"}), 409
         user_id = int(request.args.get("user_id", 1))
         actions = []
 
@@ -690,13 +698,26 @@ def api_run_now():
         logger.exception("run-now fail")
         _notify_tg(f"❌ Rebalance error: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if _lk is not None:
+            try:
+                _lk.__exit__(None, None, None)
+            except Exception:
+                pass
 
 
 @momrot_bp.route("/buy-now", methods=["POST"])
 def api_buy_now():
     """Manual buy: place market order for rank-1 (or specified symbol) using available cash."""
 
+    _lk = None
     try:
+        # (N1) serialise placement against cron + other gunicorn workers.
+        from src.services.trading.trade_lock import trading_lock
+        _lk = trading_lock()
+        if not _lk.__enter__():
+            return jsonify({"success": False,
+                            "error": "another trade/rebalance is in progress — retry shortly"}), 409
         user_id = int(request.args.get("user_id", 1))
         body = request.get_json(silent=True) or {}
         symbol = body.get("symbol")
@@ -708,6 +729,16 @@ def api_buy_now():
             price = ranks[0]["price"]
         else:
             price = _live_price(symbol)
+
+        # (N1 TOCTOU) re-check live Fyers holdings INSIDE the lock — refuse to
+        # double-buy a symbol the account already holds (the manual path had no
+        # equivalent of the executor's duplicate-buy guard).
+        _sym_bare = (symbol or "").replace("NSE:", "").replace("-EQ", "")
+        for _p in _fyers_holdings(user_id):
+            _ph = (_p.get("symbol") or "").replace("NSE:", "").replace("-EQ", "")
+            if _ph == _sym_bare and int(float(_p.get("quantity") or 0)) > 0:
+                return jsonify({"success": False, "symbol": symbol,
+                                "error": f"already holding {_sym_bare} at broker — skipping duplicate buy"}), 409
 
         # Override `price` with live Fyers LTP for accurate qty
         live_ltp = _fyers_live_ltp(symbol, user_id)
@@ -740,6 +771,12 @@ def api_buy_now():
         logger.exception("buy-now fail")
         _notify_tg(f"❌ Buy error: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if _lk is not None:
+            try:
+                _lk.__exit__(None, None, None)
+            except Exception:
+                pass
 
 
 @momrot_bp.route("/rebalance-preview")
@@ -797,7 +834,13 @@ def api_rebalance_preview():
 @momrot_bp.route("/sell-now", methods=["POST"])
 def api_sell_now():
     """Manual sell: place SELL market order for symbol + qty."""
+    _lk = None
     try:
+        from src.services.trading.trade_lock import trading_lock
+        _lk = trading_lock()
+        if not _lk.__enter__():
+            return jsonify({"success": False,
+                            "error": "another trade/rebalance is in progress — retry shortly"}), 409
         user_id = int(request.args.get("user_id", 1))
         body = request.get_json(silent=True) or {}
         symbol = body.get("symbol")
@@ -819,6 +862,12 @@ def api_sell_now():
     except Exception as e:
         logger.exception("sell-now fail")
         return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if _lk is not None:
+            try:
+                _lk.__exit__(None, None, None)
+            except Exception:
+                pass
 
 
 @momrot_bp.route("/rebuild-universe", methods=["POST"])

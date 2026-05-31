@@ -209,6 +209,31 @@ def _extract_traded_price(row: Dict) -> Optional[float]:
     return None
 
 
+def _resolve_fill_price(res: Dict, fallback: float) -> float:
+    """Pick the real executed price from a place_limit_with_fallback result.
+
+    `place_limit_with_fallback` returns the executed price under the key
+    ``fill_price`` (the Fyers-reported tradedPrice when available, else the
+    LIMIT/last price it priced at). Returns that when present and > 0, else the
+    caller's ``fallback`` (the pre-trade LTP / entry price).
+
+    Centralised because the multi-holding executor previously read a key
+    (``traded_px``) that this function never emits, so every multi fill was
+    silently booked at the quote instead of the fill. Always read fills through
+    this helper.
+    """
+    if isinstance(res, dict):
+        val = res.get("fill_price")
+        if val is not None:
+            try:
+                f = float(val)
+                if f > 0:
+                    return f
+            except (TypeError, ValueError):
+                pass
+    return float(fallback)
+
+
 def _resolve_recent_order_id(svc, user_id: int, symbol: str, qty: int,
                              side: str) -> str:
     """Find the most recent order in the order book matching (symbol, qty, side).
@@ -869,6 +894,28 @@ def main() -> int:
     else:
         svc = None
 
+    # (N1) Cross-process trading lock — serialise live placement against the
+    # manual /run-now,/buy-now,rebalance,exit endpoints (multi-worker gunicorn)
+    # and any concurrent run on the one shared Fyers account. Skipped in
+    # dry-run (places nothing). Held for the rest of main(); released at every
+    # return below (and auto-freed on process exit as a backstop).
+    _trade_lock = None
+    if not args.dry_run:
+        from src.services.trading.trade_lock import trading_lock
+        _trade_lock = trading_lock()
+        if not _trade_lock.__enter__():
+            log.error("Trading lock held by another process — skipping this "
+                      "execute cycle to avoid double-placement.")
+            _trade_lock.__exit__(None, None, None)
+            return 4
+
+    def _release_lock():
+        if _trade_lock is not None:
+            try:
+                _trade_lock.__exit__(None, None, None)
+            except Exception:
+                pass
+
     # Load open positions from DB model_ledger (single source of truth).
     # Per-model row keyed by model_name. record_buy / record_sell maintain
     # open_symbol / open_qty / open_entry_px. File ledger removed 2026-05-22.
@@ -960,6 +1007,7 @@ def main() -> int:
                     f"Held position retained; no new entries this cycle."
                 )
                 # Best-effort save of what we did so far, then bail.
+                _release_lock()
                 return 3
             fill_price = res.get("fill_price") or price
             # FIX 2 — actual filled qty (fall back to intended when Fyers omits
@@ -1287,6 +1335,7 @@ def main() -> int:
             )
         except Exception as e:
             log.debug(f"HOLD audit write failed: {e}")
+    _release_lock()
     return 0
 
 

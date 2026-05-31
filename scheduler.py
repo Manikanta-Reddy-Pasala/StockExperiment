@@ -8,6 +8,7 @@ NO ML TRAINING - Pure technical analysis approach.
 import sys
 import logging
 import schedule
+import threading
 import time
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -361,6 +362,9 @@ _MODEL_SIGNAL_FILES = {
     "momentum_pseudo_n100_adv":  "/app/logs/momrot_pseudo/signals/{today}_pseudo_n100.json",
     "midcap_narrow_60d_breakout": "/app/logs/midcap_narrow/signals/{today}_midcap_narrow.json",
     "n20_daily_large_only":      "/app/logs/n20_daily/signals/{today}_n20.json",
+    "emerging_momentum":         "/app/logs/emerging_momentum/signals/{today}_emerging.json",
+    # momentum_retest_n500 writes signals/latest.json (not date-stamped) — its
+    # miss-detection needs a different shape, omitted until that path is dated.
 }
 
 
@@ -614,8 +618,26 @@ def run_scheduler():
     # Schedule API-based token refresh every 5 hours
     schedule.every(5).hours.do(refresh_all_fyers_tokens)
 
+    # (N2) Run every registered job in its OWN daemon thread so a slow job
+    # (e.g. an emit subprocess near its 600s timeout) cannot serialise behind
+    # the single scheduler thread and delay the 09:30 execute window. Order
+    # placement is now safe to run concurrently because every execute path
+    # acquires the cross-process trading lock (trade_lock.trading_lock). The
+    # emits are isolated subprocesses; the reconciler is read/alert-only.
+    def _threaded(orig_func):
+        def _runner():
+            try:
+                orig_func()
+            except Exception as _je:
+                logger.error(f"threaded job failed: {_je}", exc_info=True)
+        return lambda: threading.Thread(target=_runner, daemon=True).start()
+
+    for _job in schedule.jobs:
+        if _job.job_func is not None:
+            _job.job_func = _threaded(_job.job_func)
+
     # Keep scheduler running
-    logger.info("✅ Scheduler is now running. Press Ctrl+C to stop.\n")
+    logger.info("✅ Scheduler is now running (threaded jobs). Press Ctrl+C to stop.\n")
     while True:
         try:
             schedule.run_pending()
