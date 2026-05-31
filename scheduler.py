@@ -538,6 +538,10 @@ def run_scheduler():
         register_trading_jobs as register_emerging_jobs,
         register_data_jobs as register_emerging_data_jobs,
     )
+    from tools.models.orb_momentum_intraday.cron import (
+        register_trading_jobs as register_orb_jobs,
+        register_data_jobs as register_orb_data_jobs,
+    )
     register_momentum_n100_jobs(schedule)
     register_pseudo_n100_jobs(schedule)
     register_midcap_narrow_jobs(schedule)
@@ -546,6 +550,9 @@ def run_scheduler():
     register_mr500_data_jobs(schedule)
     register_emerging_jobs(schedule)
     register_emerging_data_jobs(schedule)
+    # ORB (intraday): morning breakout scans 09:30-09:55 + 15:10 square-off.
+    register_orb_jobs(schedule)
+    register_orb_data_jobs(schedule)
 
     # M3 — SAFE catch-up: if we restarted after the morning trade window on a
     # trading day, ALERT (never auto-execute) so a human can check for misses.

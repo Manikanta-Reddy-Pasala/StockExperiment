@@ -21,11 +21,14 @@ Each trading day:
   4. STOP / TARGET — stop at ORL (one range-width below entry); target at
      entry-side ORH + TARGET_MULT (2.0) × width.
   5. EXIT — whichever comes first: stop, target, or a forced square-off at
-     EOD_FLAT (15:25). ~58% of trades exit flat at EOD (riding the intraday
-     trend to the close); ~21% stop, ~20% target. ZERO overnight risk.
+     EOD_FLAT (15:10). Most trades exit flat at EOD (riding the intraday
+     trend); the rest stop/target. ZERO overnight risk.
 
-Position sizing: equal-weight across the leaders that actually fire a breakout
-(not every leader breaks out — ~32% never cross ORH before the cutoff).
+Position sizing (live): per-slot reserve = invested_amount / SELECT_TOP (e.g.
+₹30k/3 = ₹10k per leader). Each breakout takes ONE slot, so a single morning
+breakout deploys only its ₹10k and leaves the other slots' cash free for later
+breakouts (the incremental nature of ORB entries). Already-held names are not
+re-bought.
 
 ================================ WHY THESE PARAMS ============================
 6-yr daily momentum work established that momentum is the only ≥60% edge on NSE.
@@ -60,7 +63,7 @@ SELECT_TOP = 3          # trade the top-3 momentum leaders each day
 OR_BARS = 3             # opening-range = first 3 × 5-min bars (09:15-09:30 = 15 min)
 ENTRY_CUTOFF_MIN = 600  # only enter if the breakout fires before 10:00 (=10*60 min)
 TARGET_MULT = 2.0       # target = entry + TARGET_MULT × opening-range width
-EOD_FLAT_MIN = 925      # force square-off at/after 15:25 (=15*60+25); intraday only
+EOD_FLAT_MIN = 910      # force square-off at/after 15:10 (=15*60+10); intraday only
 MAX_PRICE = 1e9         # no price cap (liquid N500 names)
 
 # Cost model (per side baked into round-trip). Realistic default; raise for a
@@ -79,6 +82,21 @@ class OrbTrade:
     exit_px: float
     ret_pct: float          # net of slippage + round-trip cost
     reason: str             # "stop" | "target" | "eod"
+
+
+def slot_qty(invested: float, select_top: int, entry_px: float) -> int:
+    """Shares for ONE breakout slot = floor((invested / select_top) / entry_px).
+
+    Per-slot reserve so each of the up-to-SELECT_TOP leaders gets its own equal
+    cash slice (invested/SELECT_TOP) regardless of how many fire that cycle — a
+    later breakout still has its slot's cash. Returns 0 on bad inputs.
+    """
+    try:
+        if invested > 0 and select_top > 0 and entry_px > 0:
+            return int((float(invested) / int(select_top)) / float(entry_px))
+    except (TypeError, ValueError, ZeroDivisionError):
+        pass
+    return 0
 
 
 def rank_momentum(daily_close: pd.DataFrame, di: int, eligible: set) -> List[str]:

@@ -192,9 +192,11 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
                 ltp = _fetch_live_ltp(svc, a.user_id, sym) or ltp
             if not ltp:
                 log.warning(f"  BUY {sym}: no price, skip"); continue
-            qty = int(alloc / float(ltp))
+            # Honor an explicit per-buy qty (e.g. ORB's per-slot invested/SELECT_TOP
+            # sizing); else fall back to equal-weight cash/N.
+            qty = int(b["qty"]) if b.get("qty") else int(alloc / float(ltp))
             if qty < 1:
-                log.warning(f"  BUY {sym}: alloc {alloc:.0f} < 1 share @ {ltp}"); continue
+                log.warning(f"  BUY {sym}: qty<1 (alloc {alloc:.0f} @ {ltp})"); continue
             _cost = qty * float(ltp)
             if _acct is not None and _cost > _acct:
                 log.error(f"  BUY {sym}: cost ₹{_cost:,.0f} > account cash "

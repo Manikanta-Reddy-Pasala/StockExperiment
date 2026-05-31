@@ -1,0 +1,106 @@
+"""Cron wiring for orb_momentum_intraday (the only INTRADAY model).
+
+Schedule (IST):
+  09:30, 09:35, 09:40, 09:45, 09:50, 09:55  breakout scan + execute
+      -> live_signal.emit_signals writes today's BUY set (leaders that broke
+         above ORH, not already held, sized to one invested/SELECT_TOP slot);
+         fyers_executor_multi places them (INTRADAY/MIS via product_for_model).
+         Each scan re-checks holdings so a name is never double-bought, and
+         entries stop after ENTRY_CUTOFF (10:00).
+  15:10  SQUARE-OFF: emit SELLS for every held name -> executor flattens.
+         (MIS broker auto-square-off is the backstop; this is the explicit exit.)
+
+INTRADAY → flat by 15:10, ZERO overnight risk. Multi-holding (up to SELECT_TOP).
+live_signal self-gates on time, so firing the same job daily is safe.
+"""
+from __future__ import annotations
+
+import json as _json
+import logging
+import os
+import subprocess
+from datetime import datetime
+from pathlib import Path
+
+log = logging.getLogger(__name__)
+ROOT = Path(__file__).resolve().parents[3]
+MODEL_NAME = "orb_momentum_intraday"
+STATE_DIR = Path("/app/logs/orb_momentum_intraday")
+
+
+def _alert(msg: str):
+    try:
+        from tools.live.telegram_notify import send
+        send(msg)
+    except Exception:
+        pass
+
+
+def _signals_path(today: str) -> Path:
+    return STATE_DIR / "signals" / f"{today}_orb.json"
+
+
+def scan_and_execute():
+    """Emit the current intraday signal set then place it (single combined step
+    so the executor always acts on THIS scan's fresh buys/sells)."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    out = _signals_path(today)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    emit = ["python3", "tools/models/orb_momentum_intraday/live_signal.py",
+            "--signals-out", str(out)]
+    try:
+        r = subprocess.run(emit, cwd=str(ROOT), capture_output=True, text=True, timeout=300)
+        if r.returncode != 0:
+            log.error(f"❌ orb emit failed: {r.stderr[-300:]}")
+            _alert(f"❌ orb emit failed (rc={r.returncode})"); return
+        log.info(f"orb emit: {r.stdout.strip()[-200:]}")
+    except Exception as e:
+        log.error(f"❌ orb emit error: {e}"); _alert(f"❌ orb emit error: {e}"); return
+
+    # Skip the executor entirely if there's nothing to do this scan.
+    try:
+        sig = _json.loads(out.read_text())
+        if not sig.get("buys") and not sig.get("sells"):
+            return
+    except Exception:
+        return
+
+    user_id = os.environ.get("USER_ID", "1")
+    cmd = ["python3", "tools/live/fyers_executor_multi.py",
+           "--signals", str(out), "--user-id", user_id]
+    try:
+        r = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, timeout=900)
+        (log.info if r.returncode == 0 else log.error)(
+            f"{'✅' if r.returncode==0 else '❌'} orb execute"
+            + ("" if r.returncode == 0 else f" rc={r.returncode}: {r.stderr[-300:]}"))
+        if r.stdout:
+            log.info(r.stdout[-500:])
+        if r.returncode != 0:
+            _alert(f"❌ orb execute failed (rc={r.returncode})")
+    except Exception as e:
+        log.error(f"❌ orb execute error: {e}"); _alert(f"❌ orb execute error: {e}")
+
+
+def square_off():
+    """15:10 forced flatten — same path; live_signal emits SELLS for all held."""
+    log.info("orb: 15:10 SQUARE-OFF")
+    scan_and_execute()
+
+
+# ---- Registration entrypoints ----
+
+def register_data_jobs(schedule):
+    """ORB selection uses the daily N500 close already pulled by the other
+    models' 20:xx jobs; intraday 5-min bars are fetched live per scan. No
+    dedicated data job needed."""
+    return
+
+
+def register_trading_jobs(schedule):
+    """Morning breakout scans + 15:10 square-off. live_signal self-gates on time
+    (no entries after 10:00; sells only at/after 15:10)."""
+    for t in ("09:30", "09:35", "09:40", "09:45", "09:50", "09:55"):
+        schedule.every().day.at(t).do(scan_and_execute)
+    schedule.every().day.at("15:10").do(square_off)
+    # Safety re-attempt in case the 15:10 flatten partially filled.
+    schedule.every().day.at("15:13").do(square_off)

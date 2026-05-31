@@ -55,23 +55,60 @@ def _today_leaders():
     return S.rank_momentum(cl, len(cl) - 1, elig)
 
 
+def _held_symbols() -> set:
+    """Symbols ORB currently holds (multi-holding ledger), Fyers form."""
+    try:
+        from src.services.trading.multi_holding_service import get_holdings
+        return {h["symbol"] for h in get_holdings(MODEL_NAME) if h.get("symbol")}
+    except Exception:
+        return set()
+
+
+def _invested() -> float:
+    """orb invested_amount (capital cap) from model_settings."""
+    try:
+        from src.services.trading.model_ledger_service import get_all_settings
+        row = next((s for s in get_all_settings() if s["model_name"] == MODEL_NAME), None)
+        return float(row.get("invested_amount") or 0) if row else 0.0
+    except Exception:
+        return 0.0
+
+
 def emit_signals(now: dt.datetime = None) -> dict:
-    """Compute the current intraday signal set (buys + EOD flats)."""
+    """Current intraday signal set in the MULTI-executor schema:
+    {model, ts, sells:[{symbol,reason}], buys:[{symbol,qty,...}]}.
+
+    - At/after EOD_FLAT (15:10): emit SELLS for EVERY currently-held name
+      (force square-off; reason EOD_FLAT). No buys.
+    - Before the entry cutoff: emit a BUY for each top leader that has broken
+      above its opening-range high and is NOT already held, sized to one slot
+      (invested/SELECT_TOP). After the cutoff: no new buys.
+    The executor (fyers_executor_multi) places these; stop/target are carried as
+    hints for a future bracket-order extension (the executor ignores them today).
+    """
     now = now or dt.datetime.now()
-    cutoff_passed = (now.hour * 60 + now.minute) >= S.ENTRY_CUTOFF_MIN
-    eod = (now.hour * 60 + now.minute) >= S.EOD_FLAT_MIN
-    out = {"model": MODEL_NAME, "ts": now.isoformat(), "buys": [], "flats": []}
-    if eod:
-        out["flats"] = ["*"]   # force-flat everything still open
+    mins = now.hour * 60 + now.minute
+    out = {"model": MODEL_NAME, "ts": now.isoformat(), "sells": [], "buys": []}
+
+    # ---- EOD square-off: sell everything still open ----
+    if mins >= S.EOD_FLAT_MIN:
+        for sym in sorted(_held_symbols()):
+            out["sells"].append({"symbol": sym, "reason": "EOD_FLAT"})
         return out
-    if cutoff_passed:
+
+    if mins >= S.ENTRY_CUTOFF_MIN:
         return out             # no new entries after the morning cutoff
+
     leaders = _today_leaders()
     if not leaders:
         return out
+    held = _held_symbols()
+    invested = _invested()
     fy = _fyers()
     today = now.date()
     for sym in leaders:
+        if sym in held:
+            continue           # already in this name — don't re-buy
         df = fetch_5min(sym, today, today, fy=fy)
         if df is None or len(df) < S.OR_BARS + 1:
             continue
@@ -81,11 +118,14 @@ def emit_signals(now: dt.datetime = None) -> dict:
         orh, orl = rng
         width = orh - orl
         last = float(df["c"].iloc[-1])
-        if last >= orh:   # broken out — signal a long with bracket
+        if last >= orh:   # broken out — signal a long, one slot of capital
+            entry_hint = round(orh * (1 + S.SLIPPAGE), 2)
+            qty = S.slot_qty(invested, S.SELECT_TOP, entry_hint)
+            if qty < 1:
+                continue
             out["buys"].append({
-                "symbol": sym, "ref_high": round(orh, 2),
-                "entry_hint": round(orh * (1 + S.SLIPPAGE), 2),
-                "stop": round(orl, 2),
+                "symbol": sym, "qty": qty, "ref_high": round(orh, 2),
+                "entry_hint": entry_hint, "stop": round(orl, 2),
                 "target": round(orh + S.TARGET_MULT * width, 2),
             })
     return out
@@ -100,7 +140,8 @@ def main():
     sig = emit_signals(now)
     Path(a.signals_out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.signals_out).write_text(json.dumps(sig, indent=2))
-    print(f"{MODEL_NAME}: {len(sig['buys'])} buys, flats={sig['flats']} -> {a.signals_out}")
+    print(f"{MODEL_NAME}: {len(sig['buys'])} buys, {len(sig['sells'])} sells "
+          f"-> {a.signals_out}")
     return 0
 
 

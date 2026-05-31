@@ -42,8 +42,8 @@ DESC = {
     "emerging_momentum": {
         "title": "Emerging Momentum", "live": "LIVE",
         "universe": "Top-100 by 20d ADV from emerging mid/small (PIT N500 minus N100)",
-        "strategy": "Single-position (max-1) VOL-ADJUSTED momentum: rank by 30d return ÷ 60d return-volatility; ret>0, price ≤₹3000 (no SMA gate); RET1 top-1 rotation; monthly (1st trading day) + mid-month check (≥5pp lead).",
-        "note": "Best model. Vol-adjusted momentum (return per unit of volatility) on the mid/small universe = +111.4% CAGR / 31% DD / Calmar 3.6 full-cycle 2021-03→2026-05 (2026-05-31). Dividing momentum by volatility picks smooth strong trends over jumpy ones and compounds far better (+65.6%→+111.4%); MCAP-climber turned OFF (pre-rebuild artifact). Per-year: 2021 −5 / 2022 +204 / 2023 +301 / 2024 +136 / 2025 +38 / 2026 +15. Recent 2025-03→2026-05 ≈ +48% CAGR / 16% DD. The one model that crosses 100% organically (no leverage).",
+        "strategy": "Single-position (max-1) VOL-ADJUSTED momentum: rank by 30d return ÷ 60d return-volatility; ret>0, price ≤₹3000 (no SMA gate); RET1 top-1 rotation; monthly (1st trading day) + mid-month check (≥5pp lead). + DAILY ATR-from-entry hard stop (entry − 2.5× ATR(14)).",
+        "note": "Best model. Vol-adjusted momentum (return per unit of volatility) on the mid/small universe, PLUS a 2.5× ATR-from-entry hard stop (2026-06-01, backtest-validated both windows + every year): +119.9% CAGR / 37.9% DD / Calmar 3.16 / 64% win full-cycle 2021-03→2026-05; recent 2023-05→2026-05 +167.7% CAGR / 26.3% DD / 75% win (+27% / +37% net P&L vs the rotation-only baseline). The stop is a FIXED level at entry − 2.5×ATR (NOT trailing) so it cuts genuine breakdowns without whipsawing winners. Per-year: 2021 +20 / 2022 +150 / 2023 +358 / 2024 +171 / 2025 +46 / 2026 +15. Shared helper strategy.atr_stop_hit used by both backtest and the live --stop-check (no drift). The one model that crosses 100% organically (no leverage).",
     },
     "midcap_narrow_60d_breakout": {
         "title": "Midcap Breakout", "live": "LIVE",
@@ -52,10 +52,10 @@ DESC = {
         "note": "⚠️ Lumpy single-position event model (only ~16 trades/5yr). On AUTHORITATIVE PIT membership (2026-05-31) the full-cycle 2021-03→2026-05 is ≈ +11.2% CAGR / 57% DD / Calmar 0.2 (only 13 trades/5yr) — effectively DEAD. Its earlier +40% was living off large-cap winners that leaked through the buggy Wayback N100 exclusion; with the correct PIT N100 removed it has no edge. Confirms the long-standing 'midcap ignore' call.",
     },
     "orb_momentum_intraday": {
-        "title": "Morning ORB (Intraday)", "live": "BACKTEST-ONLY",
+        "title": "Morning ORB (Intraday)", "live": "OBSERVE (paper)",
         "universe": "Nifty 500 (PIT) — top-3 by 20d momentum, traded intraday",
-        "strategy": "DAY-TRADE: each day pick top-3 momentum leaders, LONG the 15-min opening-range breakout if it fires before 10:00, stop=OR-low, target=2×range, flat by 15:25. Zero overnight.",
-        "note": "The only intraday model. Momentum SELECT + long-only opening-range-breakout EXECUTION (momentum filter is the edge — raw ORB on random names is −13%). 2025-03→2026-05 on full PIT N500 (realistic 0.15% slippage + 0.15% round-trip): +216% total / +251% CAGR / 17.2% DD / Sharpe ~3.44 / 377 trades / WR 53% / 13-of-15 months green. ⚠️ SLIPPAGE-SENSITIVE (+251% at 0.15% slip → ~+46-90% at 0.25%) and validated on ONE bull regime only (Feb-26 −11.9% shows chop-risk; no intraday bear tested). Defensible claim = positive-expectancy intraday momentum-breakout edge; exact CAGR pending live fills. PAPER-TRADE before trusting magnitude. Backtest-only — intraday cron + executor not yet wired.",
+        "strategy": "DAY-TRADE: each day pick top-3 momentum leaders, LONG the 15-min opening-range breakout if it fires before 10:00, stop=OR-low, target=2×range, FORCED FLAT by 15:10. Zero overnight. Sizing = invested/SELECT_TOP per slot (₹30k/3 = ₹10k per leader); already-held names not re-bought.",
+        "note": "The only intraday model. Momentum SELECT + long-only opening-range-breakout EXECUTION (momentum filter is the edge — raw ORB on random names is −13%). 2025-03→2026-05 on full PIT N500 (realistic 0.15% slippage + 0.15% round-trip): +216% total / +251% CAGR / 17.2% DD / Sharpe ~3.44 / 377 trades / WR 53% / 13-of-15 months green. ⚠️ SLIPPAGE-SENSITIVE (+251% at 0.15% slip → ~+46-90% at 0.25%) and validated on ONE bull regime only (Feb-26 −11.9% shows chop-risk; no intraday bear tested). WIRED 2026-06-01: cron breakout scans 09:30-09:55 + 15:10 auto-square-off, multi-holding (cash/3 per slot), INTRADAY/MIS product. Running in OBSERVE (signals_only) — flip to live in Settings after paper fills confirm slippage.",
     },
 }
 
