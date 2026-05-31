@@ -201,7 +201,7 @@ def emit_signals(ranked: List[str], midret: List[tuple], held: List[Dict],
             "signal": "ENTRY1",
             "price": float(price),
             "sl": 0.0, "target": 0.0,
-            "note": f"15d momentum rank-1 ({ret:+.2f}%)",
+            "note": f"vol-adj momentum rank-1 ({ret:+.2f}%)",
         })
 
     return signals

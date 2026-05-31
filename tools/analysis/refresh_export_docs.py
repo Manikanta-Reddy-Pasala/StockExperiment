@@ -42,8 +42,8 @@ DESC = {
     "emerging_momentum": {
         "title": "Emerging Momentum", "live": "LIVE",
         "universe": "Top-100 by 20d ADV from emerging mid/small (PIT N500 minus N100)",
-        "strategy": "Single-position (max-1) momentum rotation: 15d return >0, price ≤₹3000 (no SMA gate); retain top-3; monthly (1st trading day) + mid-month check that rotates only on a ≥5pp lead.",
-        "note": "Single-position max-1, emerging mid/small, run_rotation engine + MCAP-CLIMBER filter (keep only rising-mcap-rank names). Full-cycle 2021-04→2026-05 on AUTHORITATIVE PIT membership (2026-05-31) ≈ +46.1% CAGR / 37.7% DD / Calmar 1.22. ⚠ The old +121% headline was a MIRAGE — the buggy Wayback N100 was missing large-cap winners (ADANIGREEN etc), so this 'mid/small' model wrongly held them. Correct N100 exclusion ⇒ genuinely mid/small ⇒ +46%.",
+        "strategy": "Single-position (max-1) VOL-ADJUSTED momentum: rank by 30d return ÷ 60d return-volatility; ret>0, price ≤₹3000 (no SMA gate); RET1 top-1 rotation; monthly (1st trading day) + mid-month check (≥5pp lead).",
+        "note": "Best model. Vol-adjusted momentum (return per unit of volatility) on the mid/small universe = +111.4% CAGR / 31% DD / Calmar 3.6 full-cycle 2021-03→2026-05 (2026-05-31). Dividing momentum by volatility picks smooth strong trends over jumpy ones and compounds far better (+65.6%→+111.4%); MCAP-climber turned OFF (pre-rebuild artifact). Per-year: 2021 −5 / 2022 +204 / 2023 +301 / 2024 +136 / 2025 +38 / 2026 +15. The one model that crosses 100% organically (no leverage).",
     },
     "midcap_narrow_60d_breakout": {
         "title": "Midcap Breakout", "live": "LIVE",
@@ -82,9 +82,9 @@ RULES = {
     },
     "emerging_momentum": {
         "Rebalance": "1st trading day of month + a mid-month (day-15) lead check.",
-        "Universe & filters": "Top-100 by 20d ADV from (PIT N500 minus PIT N100); 15d return > 0; price ≤ ₹3000; NO SMA gate; MCAP-CLIMBER overlay (keep only names whose mcap-rank is rising over 60d).",
-        "Entry": "BUY rank-1 by 15-day return (single position, max 1).",
-        "Exit": "Hold while in the top-3 by 15d return (RETAIN=3); rotate out when it drops below rank-3. Mid-month only rotates if the new rank-1 leads the held name by ≥ 5pp.",
+        "Universe & filters": "Top-100 by 20d ADV from (PIT N500 minus PIT N100); 30d return > 0; price ≤ ₹3000; NO SMA gate. MCAP-climber OFF.",
+        "Entry": "BUY rank-1 by VOL-ADJUSTED momentum (30d return ÷ 60d return-volatility) — single position, max 1.",
+        "Exit": "Rotate when held is no longer rank-1 (RET1). Mid-month only rotates if the new rank-1 leads the held by ≥ 5pp.",
         "Source": "Backtest+live: PIT `n500_membership.csv` MINUS `n100_membership.csv` (factsheet-derived). Mcap-climber: `exports/nse_mcap.csv`. Prices: Fyers daily OHLCV.",
     },
     "momentum_retest_n500": {

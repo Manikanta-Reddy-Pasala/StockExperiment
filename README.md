@@ -10,6 +10,8 @@ Production: `77.42.45.12` · App: <https://stock.oneshell.in> · Bot: `@stocks_m
 
 ## Recent Changes (2026-05)
 
+- **emerging → +111% CAGR via VOL-ADJUSTED momentum (2026-05-31, organic — no leverage).** Rank by 30d return ÷ 60d return-volatility (RANK_MODE=vol_adj) instead of raw return, + RET1 (top-1) + climber OFF. On the high-vol mid/small universe this picks smooth strong trends over jumpy ones and compounds far better: +65.6% → **+111.4% CAGR / 31% DD / Calmar 3.6** full-cycle 2021-03→2026-05 (DD also down). Per-year 2021 −5 / 2022 +204 / 2023 +301 / 2024 +136 / 2025 +38 / 2026 +15 — the first model over 100% organically. Vol-adjustment only helps mid/small (over-penalizes low-vol large-caps), so it is emerging-specific; live mirrors via the shared rank_pool.
+
 - **Full semi-annual index membership (Mar + Sep, 2021-2026) for N50/N100/N500/Next50/Smallcap-250 → files + DB (2026-05-31).** Assembled from ALL available authoritative sources: official NSE factsheet zips, the verified Nifty-500 workbook (incl. its Mar+Sep delta sheet → N500 every review), and exhaustive Wayback-Machine harvest across all NSE/niftyindices mirrors (`tools/analysis/harvest_wayback_snapshots.py`). Saved by-year to `src/data/symbols/index_history/{index}_{YYYYMMDD}.csv` (55 files) + clean-rebuilt `n{100,500}_membership.csv` + loaded to the `nifty_index_membership` DB table (11 review-dates each: n50=550, n100=1098, n500=5462, next50=550, **smallcap250=2742** — smallcap now present). Coverage: N100 + N500 fully real every Mar+Sep; Smallcap-250 real where archived (2021 Mar/Sep, 2022 Mar, 2024 Sep) + carried between (the open web has no Sep-state smallcap for 2022-2024 — exhausted). Backtests rerun 2021-03-01 → 2026-05-29 on the clean membership: pseudo +71.3%/28.6%, retest +64.2%/57.1%, n100 +56.2%/52.2%, emerging +45.6%/37.7%, n40 +41.2%/36.9%, midcap +11.2%/57.2%.
 - **pseudo + retest switched to PIT N500 (2026-05-31).** They had ranked the *static current* Nifty-500 list (`nifty500_symbols()`) over all history = survivorship bias (only ever saw today's survivors). Now both preload `universe_union("n500")` and restrict selection to `eligible_at("n500", date)`. Result: pseudo **+63.5%→+72.9%** (DD 37.6→28.6, Calmar 1.69→2.54 — the static list had survivorship-dropped some high-ADV names), retest **+77.8%→+64.9%** (DD 37→57, Calmar 2.08→1.14 — it had been riding survivors). **All six models are now fully PIT** — no survivorship bias remains anywhere.
 - **AUTHORITATIVE PIT index membership rebuild (2026-05-31) — big correctness fix.** The old `n{100,500}_membership.csv` came from Wayback snapshots and was **~18% wrong on Nifty 100** (missing real members ADANIGREEN/ADANIENSOL/BANKBARODA/CHOLAFIN/LODHA/PNB/TRENT…, carrying non-members ABB/BHEL/IDEA/ACC/JUBLFOOD + a garbage "DUMMYREL"). Rebuilt from official NSE semi-annual factsheet PDFs (N100 = N50 ∪ Next-50, the exact NSE construction; 11 snapshots Mar2021–Mar2026) + the verified Nifty-500 workbook. Now matches the official lists ~100%. Builder: `tools/analysis/build_membership_from_nse_factsheets.py`. **Impact on the PIT models:** emerging +121.7%→**+46.1%** (the +121% was a mirage — the buggy N100 let large-cap winners leak into the mid/small universe), midcap +40.0%→**+1.65%** (same leak), n40 +25.0%→**+40.3%** (cleaner N100 ⇒ better names, Calmar 0.45→1.09), n100 +42.5%→**+34.6%**. pseudo/retest unchanged (they use the static current N500 — survivorship-biased, conversion to PIT is a TODO). Backtest-only; live signals key off today's CSV, not `eligible_at`.
@@ -344,12 +346,18 @@ point-in-time membership** (`eligible_at`) — no survivorship bias remains.
 
 | Model | CAGR | Max DD | Calmar | Trades | WR | universe |
 |---|---:|---:|---:|---:|---:|---|
-| `momentum_pseudo_n100_adv` (RET1, monthly, fixed May anchor) | **+72.86%** | 28.63% | **2.54** | 50 | 76.0% | PIT N500 (ADV-biased) |
-| `momentum_retest_n500` (K=2, 20% band) | +64.90% | 57.13% | 1.14 | 88 | 53.4% | PIT N500 −Smallcap (top-120 ADV; incl large+mid) |
-| `emerging_momentum` (single-pos mid/small + climber) | +46.85% | 37.69% | 1.24 | 62 | 59.7% | PIT N500−N100 |
-| `n40` (weekly, top-40 ADV ∩ N100) | +40.32% | 36.85%¹ | 1.09 | 127 | 58.3% | PIT N100 |
-| `momentum_n100_top5_max1` (LB15 + mid-month + RET3) | +34.55% | 52.18% | 0.66 | 98 | 54.1% | PIT N100 |
-| `midcap_narrow_60d_breakout` (40d-high + 2× vol) | +1.65% | 68.17%¹ | 0.02 | 16 | 37.5% | PIT N500−N100 |
+| `emerging_momentum` (**vol-adj momentum**, RET1, mid/small) | **+111.42%** | 31.17% | **3.57** | 61 | 67.2% | PIT N500−N100 |
+| `momentum_pseudo_n100_adv` (RET1, monthly, fixed May anchor) | +76.6% | 28.6% | 2.7 | 50 | 76.0% | PIT N500 (ADV-biased) |
+| `momentum_retest_n500` (K=2, 20% band) | +64.2% | 57.1% | 1.1 | 88 | 53.4% | PIT N500 −Smallcap (top-120 ADV; incl large+mid) |
+| `n40` (weekly, top-40 ADV ∩ N100) | +41.2% | 36.9%¹ | 1.1 | 133 | 58.3% | PIT N100 |
+| `momentum_n100_top5_max1` (LB15 + mid-month + RET3) | +56.2% | 52.2% | 1.1 | 96 | 54.6% | PIT N100 |
+| `midcap_narrow_60d_breakout` (40d-high + 2× vol) | +1.65% | 68.2%¹ | 0.02 | 16 | 37.5% | PIT N500−N100 |
+
+> Window: full-cycle **2021-03-01 → 2026-05-29**. **emerging is the standout** —
+> vol-adjusted momentum (return ÷ 60d volatility) on mid/small = **+111% organic
+> (no leverage)**, per-year 2021 −5 / 2022 +204 / 2023 +301 / 2024 +136 / 2025 +38 /
+> 2026 +15. Dividing momentum by volatility picks smooth strong trends; only the
+> high-vol mid/small universe benefits (it over-penalizes large-caps).
 
 ¹ n40 / midcap Max DD is daily mark-to-market; the others report realized rebal-day DD.
 
