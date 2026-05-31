@@ -1741,6 +1741,22 @@ def signals_today():
                 "has_file": found_path is not None,
             })
 
+        # orb_momentum_intraday has no signal-file cron (intraday, backtest-only).
+        # Surface its daily WATCHLIST: the top-3 momentum leaders it would watch
+        # for a morning opening-range breakout. Computed live from daily data.
+        try:
+            orb_picks = _orb_today_watchlist()
+            results.append({
+                "model_name": "orb_momentum_intraday",
+                "date": date_str, "path": "(computed watchlist)",
+                "count": len(orb_picks), "signals": orb_picks,
+                "error": None, "has_file": True,
+                "note": "Intraday watchlist — top-3 momentum leaders to watch for a "
+                        "morning opening-range breakout (BACKTEST-ONLY, no live orders).",
+            })
+        except Exception as _e:
+            logger.debug(f"orb watchlist failed: {_e}")
+
         total = sum(r["count"] for r in results)
         return jsonify({
             "success": True,
@@ -1751,6 +1767,46 @@ def signals_today():
     except Exception as e:
         logger.error(f"signals/today error: {e}", exc_info=True)
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+def _orb_today_watchlist():
+    """Top-3 momentum leaders the intraday ORB model would watch today.
+
+    The SELECT step of orb_momentum_intraday (20d momentum rank over PIT N500),
+    computed from daily close — no intraday feed needed. Returns signal dicts.
+    """
+    from datetime import date as _d, timedelta as _td
+    from sqlalchemy import text as _text
+    from tools.shared.ohlcv_cache import _get_engine
+    from tools.shared.index_membership import universe_union, eligible_at
+    from tools.models.orb_momentum_intraday import strategy as _S
+    import pandas as _pd
+
+    eng = _get_engine()
+    syms = [f"NSE:{s}-EQ" for s in sorted(universe_union(_S.INDEX))]
+    with eng.connect() as c:
+        df = _pd.read_sql(_text(
+            "SELECT symbol,date,close FROM historical_data "
+            "WHERE symbol=ANY(:s) AND data_source='fyers' AND date >= :a "
+            "ORDER BY symbol,date"
+        ), c, params={"s": syms, "a": (_d.today() - _td(days=90)).isoformat()})
+    if df.empty:
+        return []
+    df["date"] = _pd.to_datetime(df["date"])
+    cl = df.pivot(index="date", columns="symbol", values="close").ffill()
+    di = len(cl) - 1
+    elig = set(eligible_at(_S.INDEX, cl.index[di].date()))
+    leaders = _S.rank_momentum(cl, di, elig)
+    now, then = cl.iloc[di], cl.iloc[di - _S.LOOKBACK]
+    out = []
+    for s in leaders:
+        fs = f"NSE:{s}-EQ"
+        a, b = now.get(fs), then.get(fs)
+        ret = round((float(a) / float(b) - 1) * 100, 1) if (a is not None and b) else 0.0
+        out.append({"symbol": s, "ret_20d_pct": ret, "action": "WATCH",
+                    "price": round(float(a), 2) if a is not None else 0.0,
+                    "note": "morning ORB breakout candidate"})
+    return out
 
 
 # =============================================================================
