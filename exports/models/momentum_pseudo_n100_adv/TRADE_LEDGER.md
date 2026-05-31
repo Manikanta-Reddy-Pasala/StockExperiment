@@ -1,4 +1,4 @@
-# momentum_pseudo_n100_adv — trade ledger (2021-04-01 → 2026-05-29)
+# momentum_pseudo_n100_adv — trade ledger (2021-03-01 → 2026-05-29)
 
 | # | Symbol | Cap | Entry date | Exit date | Entry ₹ | Exit ₹ | Qty | PnL ₹ | Return % | Reason |
 |---|---|---|---|---|---:|---:|---:|---:|---:|---|

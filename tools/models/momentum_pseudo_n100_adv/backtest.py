@@ -1,7 +1,8 @@
 """Standalone backtest: pseudo-N100 (ADV-rank from N500, yearly PIT rebuild, MINUS Small).
 
-Full-cycle 2021-04→2026-05 on PIT N500 (fixed May anchor) ≈ +72.9% CAGR / 28.6%
-DD / Calmar 2.54 — see exports/models/momentum_pseudo_n100_adv/SUMMARY.md.
+Full-cycle 2021-03→2026-05 on PIT N500 (fixed May anchor) ≈ +76.6% CAGR / 28.6%
+DD / Calmar 2.68; recent 2025-03→2026-05 ≈ +191% CAGR / 16% DD — see
+exports/models/momentum_pseudo_n100_adv/SUMMARY.md.
 
 Single-position monthly rotation (lb=30, max-1, top-1 / RET1), but universe =
 top-100 by 20-day ADV at each yearly anchor from PIT N500 instead of the real
