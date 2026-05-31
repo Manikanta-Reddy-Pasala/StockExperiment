@@ -172,6 +172,10 @@ services:
     volumes:
       - ./logs:/app/logs
     restart: unless-stopped
+    # Allow scheduler.py's graceful drain (joins in-flight execute threads up to
+    # 120s on SIGTERM) to finish before docker SIGKILLs on stop/redeploy — so a
+    # deploy can't kill an execute between placeorder and record_buy/record_sell.
+    stop_grace_period: 130s
     networks:
       - trading_network
     command: python scheduler.py
