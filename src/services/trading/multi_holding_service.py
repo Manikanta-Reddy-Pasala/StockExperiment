@@ -25,6 +25,7 @@ from src.models.model_ledger_models import (
 )
 from src.services.trading.model_ledger_service import (
     _normalize_symbol, _compute_real_charges, _ledger_dict, _order_seen,
+    partial_sell_outcome,
 )
 
 log = logging.getLogger(__name__)
@@ -91,11 +92,13 @@ def record_buy_multi(model_name: str, symbol: str, qty: int, price: float,
 
 def record_sell_multi(model_name: str, symbol: str, exit_price: float,
                       reason: str = "ROTATE", fyers_order_id: str = None,
-                      product: str = "CNC") -> Dict:
+                      product: str = "CNC", qty: int = None) -> Dict:
     """Record a SELL of one held symbol for a multi-holding model.
 
-    cash += proceeds - charges; realized_pnl/wins/losses updated; model_holdings
-    row removed; ModelTrade logged with pnl. Mirrors record_sell's accounting.
+    cash += proceeds - charges; realized_pnl/wins/losses updated; ModelTrade
+    logged with pnl. ``qty`` = ACTUAL filled quantity; None / >= held / <=0
+    means a full close (holding row deleted). A genuine partial fill sells only
+    that many shares and RETAINS the residual holding (no phantom-flat row).
     """
     db = get_database_manager()
     with db.get_session() as s:
@@ -109,9 +112,10 @@ def record_sell_multi(model_name: str, symbol: str, exit_price: float,
         h = s.query(ModelHolding).filter_by(model_name=model_name, symbol=norm).first()
         if not h:
             raise ValueError(f"{model_name}: not holding {norm}, cannot sell")
-        qty = int(h.qty); entry = Decimal(str(h.entry_px))
-        price_d = Decimal(str(exit_price)); qty_d = Decimal(str(qty))
-        charges = _compute_real_charges("SELL", qty, exit_price, product)
+        sell_qty, remaining_qty, is_full = partial_sell_outcome(int(h.qty), qty)
+        entry = Decimal(str(h.entry_px))
+        price_d = Decimal(str(exit_price)); qty_d = Decimal(str(sell_qty))
+        charges = _compute_real_charges("SELL", sell_qty, exit_price, product)
         proceeds = qty_d * price_d - charges
         pnl = proceeds - (qty_d * entry)
         l.cash = l.cash + proceeds
@@ -122,11 +126,16 @@ def record_sell_multi(model_name: str, symbol: str, exit_price: float,
         else:
             l.losses = (l.losses or 0) + 1
         settings.current_amount = (settings.current_amount or Decimal(0)) - charges
-        s.add(ModelTrade(model_name=model_name, side="SELL", symbol=norm, qty=qty,
+        s.add(ModelTrade(model_name=model_name, side="SELL", symbol=norm, qty=sell_qty,
                          price=price_d, value=proceeds, pnl=pnl, reason=reason,
                          fyers_order_id=fyers_order_id))
-        s.delete(h)
-        log.info(f"{model_name}: SELL {qty}x{norm}@{exit_price} pnl={float(pnl):.0f} ({reason})")
+        if is_full:
+            s.delete(h)
+        else:
+            h.qty = remaining_qty   # partial — keep residual holding
+            log.warning(f"{model_name}: PARTIAL SELL {sell_qty}/{sell_qty + remaining_qty} "
+                        f"{norm} — retaining {remaining_qty} shares.")
+        log.info(f"{model_name}: SELL {sell_qty}x{norm}@{exit_price} pnl={float(pnl):.0f} ({reason})")
         return _ledger_dict(l)
 
 

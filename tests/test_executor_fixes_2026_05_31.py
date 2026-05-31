@@ -184,3 +184,29 @@ def test_lock_failopen_on_infra_error():
     # the executor's own duplicate-buy guard remains the backstop.
     from src.services.trading.trade_lock import lock_proceed_decision
     assert lock_proceed_decision(acquired=False, infra_error=True) is True
+
+
+# --- 7. partial-sell outcome (don't book full position on a partial fill) -----
+
+def test_partial_sell_none_qty_is_full_close():
+    from src.services.trading.model_ledger_service import partial_sell_outcome
+    assert partial_sell_outcome(100, None) == (100, 0, True)
+
+
+def test_partial_sell_requested_ge_open_is_full():
+    from src.services.trading.model_ledger_service import partial_sell_outcome
+    assert partial_sell_outcome(100, 100) == (100, 0, True)
+    assert partial_sell_outcome(100, 150) == (100, 0, True)  # never sell more than held
+
+
+def test_partial_sell_partial_keeps_residual():
+    from src.services.trading.model_ledger_service import partial_sell_outcome
+    # filled 40 of 100 -> sell 40, keep 60 open, NOT a full close.
+    assert partial_sell_outcome(100, 40) == (40, 60, False)
+
+
+def test_partial_sell_nonpositive_qty_falls_back_to_full():
+    from src.services.trading.model_ledger_service import partial_sell_outcome
+    # defensive: 0/negative requested -> treat as full close (never strand).
+    assert partial_sell_outcome(100, 0) == (100, 0, True)
+    assert partial_sell_outcome(100, -5) == (100, 0, True)

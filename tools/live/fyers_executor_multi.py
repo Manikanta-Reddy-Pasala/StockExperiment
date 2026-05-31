@@ -122,9 +122,12 @@ def main() -> int:
     _trade_lock = None
     if not a.dry_run:
         from src.services.trading.trade_lock import trading_lock
-        _trade_lock = trading_lock()
+        # Long wait so concurrent same-minute executes QUEUE rather than skip
+        # (see fyers_executor.py). The executor must run its trade.
+        _trade_lock = trading_lock(wait_s=600)
         if not _trade_lock.__enter__():
-            log.error("Trading lock held by another process — skipping this run.")
+            log.error("Trading lock unavailable after 600s — skipping this run "
+                      "(stuck holder?).")
             _trade_lock.__exit__(None, None, None)
             return 4
     try:
@@ -152,9 +155,13 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
                                         tag=f"{model}_sell")
         if res.get("filled"):
             px = _resolve_fill_price(res, ltp)
+            # Forward ACTUAL filled qty so a partial fill keeps the residual
+            # holding instead of deleting the whole row.
+            _fq = int(res.get("fill_qty") or 0)
             record_sell_multi(model, sym, float(px), reason,
-                              fyers_order_id=res.get("order_id"))
-            log.info(f"  SOLD {qty}x{sym}@{px} ({reason})")
+                              fyers_order_id=res.get("order_id"),
+                              qty=(_fq if _fq > 0 else None))
+            log.info(f"  SOLD {_fq or qty}x{sym}@{px} ({reason})")
         else:
             log.error(f"  SELL {sym} not filled: {res.get('status')}")
 

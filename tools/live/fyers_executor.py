@@ -747,8 +747,10 @@ def _record_model_sell(model_name, exit_price, reason, order_id, qty=None,
         return
     try:
         from src.services.trading.model_ledger_service import record_sell
-        record_sell(model_name, exit_price, reason, fyers_order_id=order_id)
-        log.info(f"  ledger: recorded SELL for {model_name}")
+        # Forward the ACTUAL filled qty so a partial exit books only the shares
+        # that sold and retains the residual open position (no phantom-flat).
+        record_sell(model_name, exit_price, reason, fyers_order_id=order_id, qty=qty)
+        log.info(f"  ledger: recorded SELL for {model_name} (qty={qty})")
         _tg_safe(
             f"💰 *SELL {model_name}*\n"
             f"@ ₹{float(exit_price):.2f}  reason=`{reason}`\n"
@@ -902,10 +904,16 @@ def main() -> int:
     _trade_lock = None
     if not args.dry_run:
         from src.services.trading.trade_lock import trading_lock
-        _trade_lock = trading_lock()
+        # Long wait: with the threaded scheduler, models scheduled at the SAME
+        # minute (n100 + n40 both 09:30) start concurrently and contend for this
+        # lock. The executor MUST run its trade, so it QUEUES (waits its turn)
+        # rather than skipping — a short wait would make the loser return 4 and
+        # silently skip the day's trade. 600s covers several queued executes;
+        # only a genuinely stuck holder past that falls through to skip.
+        _trade_lock = trading_lock(wait_s=600)
         if not _trade_lock.__enter__():
-            log.error("Trading lock held by another process — skipping this "
-                      "execute cycle to avoid double-placement.")
+            log.error("Trading lock unavailable after 600s — skipping this "
+                      "execute cycle to avoid double-placement (stuck holder?).")
             _trade_lock.__exit__(None, None, None)
             return 4
 
@@ -1033,8 +1041,16 @@ def main() -> int:
             _record_model_sell(model_for_signal, fill_price,
                                sig.get("reason", sig_type), order_id,
                                qty=actual_qty, svc=svc, user_id=args.user_id)
-        open_positions = [p for p in open_positions if p.symbol != sym]
-        log.info(f"{'DRY-RUN' if args.dry_run else 'CLOSED'} PASS-1 {sym} qty={actual_qty} "
+        # On a PARTIAL exit the residual stays open — keep the slot occupied so
+        # PASS-2 can_enter blocks a new entry (and the model is NOT free to
+        # rotate into a different symbol while shares remain). Only a FULL exit
+        # frees the slot.
+        _partial_exit = (not args.dry_run) and 0 < int(res.get("fill_qty") or 0) < held.qty
+        if _partial_exit:
+            held.qty = held.qty - actual_qty  # reduce in-memory residual
+        else:
+            open_positions = [p for p in open_positions if p.symbol != sym]
+        log.info(f"{'DRY-RUN' if args.dry_run else ('PARTIAL-CLOSE' if _partial_exit else 'CLOSED')} PASS-1 {sym} qty={actual_qty} "
                  f"entry={held.entry_price} exit={fill_price} pnl=₹{pnl:.0f} "
                  f"reason={sig_type}")
         closed += 1

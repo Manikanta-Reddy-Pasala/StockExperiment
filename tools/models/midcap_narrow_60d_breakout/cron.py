@@ -137,7 +137,7 @@ def execute_orders():
         "--model-name", MODEL_NAME,
     ]
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
         if r.returncode == 0:
             log.info(f"✅ {MODEL_NAME} Fyers execute complete")
             if r.stdout:

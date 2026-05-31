@@ -50,6 +50,23 @@ def _order_already_recorded(order_id, existing_ids) -> bool:
     return order_id in set(existing_ids)
 
 
+def partial_sell_outcome(open_qty: int, requested_qty):
+    """Resolve a (possibly partial) sell against the open position.
+
+    Returns (sell_qty, remaining_qty, is_full). A partial broker fill must NOT
+    book the whole position flat — that strands the unfilled shares at the
+    broker while the ledger thinks the model is flat. ``requested_qty`` None or
+    <=0 (or >= open) means a full close (defensive: never strand on a bad qty).
+    """
+    oq = int(open_qty)
+    if requested_qty is None:
+        return oq, 0, True
+    rq = int(requested_qty)
+    if rq <= 0 or rq >= oq:
+        return oq, 0, True
+    return rq, oq - rq, False
+
+
 def _order_seen(session, model_name: str, order_id) -> bool:
     """DB-backed idempotency check: has model_name already logged this order id?"""
     if not order_id or order_id in _NON_DEDUPABLE_ORDER_IDS:
@@ -669,12 +686,18 @@ def record_buy(model_name: str, symbol: str, qty: int, price: float,
 
 def record_sell(model_name: str, exit_price: float, reason: str,
                 brokerage: float = None, stt_pct: float = None,
-                fyers_order_id: str = None, product: str = "CNC") -> Dict:
+                fyers_order_id: str = None, product: str = "CNC",
+                qty: int = None) -> Dict:
     """Record a SELL fill.
 
-    Cash flow: cash += (qty*exit_price - charges)
-    NAV flow:  current_amount = cash (position flat, no open MTM)
-               — recomputed from cash because we just realized the trade.
+    Cash flow: cash += (sell_qty*exit_price - charges)
+    NAV flow:  full close  -> current_amount = cash (position flat)
+               partial sell -> current_amount = cash + remaining_qty*entry_px
+
+    ``qty`` = the ACTUAL filled quantity. None / >= open / <=0 means a full
+    close (back-compat + defensive). A genuine partial fill (0<qty<open) sells
+    only that many shares and RETAINS the residual open position, so the ledger
+    never marks flat while real shares remain at the broker.
 
     charges = full SEBI-rate broker_charges.compute_charges (incl. STT, DP, GST).
     brokerage + stt_pct kwargs are ignored — kept for back-compat.
@@ -690,16 +713,16 @@ def record_sell(model_name: str, exit_price: float, reason: str,
             log.warning(f"{model_name}: SELL order {fyers_order_id} already "
                         f"recorded — skipping duplicate (idempotent).")
             return _ledger_dict(l)
-        qty = l.open_qty
+        sell_qty, remaining_qty, is_full = partial_sell_outcome(l.open_qty, qty)
         entry_px = l.open_entry_px
-        proc = Decimal(str(qty)) * Decimal(str(exit_price))
-        fees = _compute_real_charges("SELL", qty, float(exit_price), product)
+        proc = Decimal(str(sell_qty)) * Decimal(str(exit_price))
+        fees = _compute_real_charges("SELL", sell_qty, float(exit_price), product)
         net = proc - fees
         # P&L = exit proceeds (net of sell-side charges) minus entry cost. Entry
         # cost in the ledger already reflects buy-side charges (cash was
         # decremented by qty*entry_px + buy_charges at record_buy time), so the
         # cumulative realized_pnl across a round-trip captures BOTH legs.
-        pnl = net - (Decimal(str(qty)) * entry_px)
+        pnl = net - (Decimal(str(sell_qty)) * entry_px)
         l.cash = l.cash + net
         l.realized_pnl = (l.realized_pnl or Decimal(0)) + pnl
         l.total_trades = (l.total_trades or 0) + 1
@@ -708,17 +731,25 @@ def record_sell(model_name: str, exit_price: float, reason: str,
         else:
             l.losses = (l.losses or 0) + 1
         symbol = l.open_symbol
-        l.open_symbol = None
-        l.open_qty = None
-        l.open_entry_px = None
-        l.open_entry_date = None
-        # Position flat — current_amount snaps to cash (no open MTM)
-        settings.current_amount = l.cash
+        if is_full:
+            l.open_symbol = None
+            l.open_qty = None
+            l.open_entry_px = None
+            l.open_entry_date = None
+            # Position flat — current_amount snaps to cash (no open MTM)
+            settings.current_amount = l.cash
+        else:
+            # PARTIAL exit — keep the residual position; only the sold shares
+            # leave. NAV = realized cash + remaining shares at entry cost.
+            l.open_qty = remaining_qty
+            settings.current_amount = l.cash + Decimal(str(remaining_qty)) * entry_px
+            log.warning(f"{model_name}: PARTIAL SELL {sell_qty}/{sell_qty + remaining_qty} "
+                        f"{symbol} — retaining {remaining_qty} open shares.")
         s.add(ModelTrade(
             model_name=model_name,
             side="SELL",
             symbol=symbol,
-            qty=qty,
+            qty=sell_qty,
             price=Decimal(str(exit_price)),
             value=net,
             pnl=pnl,
