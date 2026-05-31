@@ -40,13 +40,56 @@ def _ui_cache():
 
 
 def _invalidate_ui_cache():
-    """Drop cached UI payloads so a manual action reflects immediately."""
+    """Drop ALL cached UI payloads (ui:* keys) so a manual action reflects
+    immediately across every cached read endpoint. Fail-open."""
     try:
         cs = _ui_cache()
-        if cs:
-            cs.delete(_PORTFOLIO_CACHE_KEY)
+        if cs and cs.redis_client:
+            keys = list(cs.redis_client.scan_iter(match="ui:*", count=500))
+            if keys:
+                cs.redis_client.delete(*keys)
     except Exception:
         pass
+
+
+def ui_cached(name: str, ttl: int = 30):
+    """Decorator: cache a GET endpoint's JSON response in Dragonfly for `ttl`s.
+
+    Keyed by name + full request path (so query-arg variants cache separately).
+    Fail-OPEN: any cache miss/error runs the view live. Only caches GET + 2xx.
+    Invalidated wholesale by _invalidate_ui_cache() on any admin mutation.
+    """
+    from functools import wraps
+
+    def deco(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            if request.method != "GET":
+                return fn(*args, **kwargs)
+            key = f"ui:{name}:{request.full_path}"
+            cs = _ui_cache()
+            if cs:
+                try:
+                    hit = cs.redis_client.get(key)
+                    if hit is not None:
+                        from flask import Response
+                        return Response(hit, mimetype="application/json")
+                except Exception:
+                    pass
+            resp = fn(*args, **kwargs)
+            try:
+                # resp may be (body, status) or a Response
+                body, status = (resp if isinstance(resp, tuple)
+                                else (resp, getattr(resp, "status_code", 200)))
+                if cs and status == 200:
+                    data = body.get_data(as_text=True) if hasattr(body, "get_data") else None
+                    if data:
+                        cs.redis_client.setex(key, ttl, data)
+            except Exception:
+                pass
+            return resp
+        return wrapper
+    return deco
 
 
 @admin_bp.after_request
@@ -581,6 +624,7 @@ def trigger_model_data_pull(model_name):
 
 
 @admin_bp.route('/system/models-status', methods=['GET'])
+@ui_cached('models_status', ttl=30)
 def models_status():
     """Per-model data sufficiency audit.
 
@@ -963,6 +1007,7 @@ def models_status():
 
 
 @admin_bp.route('/system/status', methods=['GET'])
+@ui_cached('system_status', ttl=15)
 def system_status():
     """Get system status."""
     try:
@@ -1145,6 +1190,7 @@ def get_model_portfolio():
 
 
 @admin_bp.route('/models/settings', methods=['GET'])
+@ui_cached('models_settings', ttl=30)
 def list_model_settings():
     try:
         from src.services.trading.model_ledger_service import (
@@ -1722,6 +1768,7 @@ _SIGNAL_PATHS = {
 
 
 @admin_bp.route('/signals/today', methods=['GET'])
+@ui_cached('signals_today', ttl=30)
 def signals_today():
     """Aggregate today's emitted signals across all wired models.
 
