@@ -2535,6 +2535,7 @@ def admin_model_rebalance(model_name):
 
 
 @admin_bp.route('/<model_name>/ranking', methods=['GET'])
+@ui_cached('model_ranking', ttl=120)
 def admin_model_ranking(model_name):
     """Read the per-model ranking JSON written by live_signal.py.
 
@@ -2548,10 +2549,30 @@ def admin_model_ranking(model_name):
       2. Otherwise run live_signal.py synchronously, then read the file
          it wrote. Subsequent same-day requests hit the cache.
 
+    Cached 120s in Dragonfly (keyed by ?top/?recalc) so Today's Picks — which
+    fetches every model's ranking in parallel — doesn't re-spawn a live_signal
+    subprocess per model on every page load.
+
     Scheduler still runs live_signal nightly/morning; this on-demand
     rerun fills the gap when a user opens Today's Picks before the cron
     has fired.
     """
+    # orb_momentum_intraday has no signal-file pipeline (intraday, backtest-only)
+    # and isn't in MODEL_PATHS. Serve its daily momentum watchlist as the ranking
+    # so Today's Picks can render its card — no subprocess, no live orders.
+    if model_name == "orb_momentum_intraday":
+        try:
+            picks = _orb_today_watchlist()
+        except Exception:
+            picks = []
+        top_n = [{"rank": i + 1, "symbol": p["symbol"],
+                  "ret_30d_pct": p.get("ret_20d_pct", 0.0),
+                  "price": p.get("price", 0.0)} for i, p in enumerate(picks)]
+        return jsonify({"success": True, "model": model_name,
+                        "date": datetime.now().strftime("%Y-%m-%d"),
+                        "top_n": top_n, "held": None,
+                        "note": "Intraday morning-ORB watchlist (BACKTEST-ONLY)."})
+
     paths = MODEL_PATHS.get(model_name)
     if not paths:
         return jsonify({"success": False,
