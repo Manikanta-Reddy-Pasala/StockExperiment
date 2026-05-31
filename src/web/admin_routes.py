@@ -21,6 +21,46 @@ logger = logging.getLogger(__name__)
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
+# ---- UI read-cache (Dragonfly) ------------------------------------------
+# Short-TTL cache for heavy read endpoints (e.g. /models/portfolio). Fail-OPEN:
+# any cache error falls through to a live compute, so existing flows are never
+# blocked if Dragonfly is down. Manual mutations call _invalidate_ui_cache().
+_PORTFOLIO_CACHE_KEY = "ui:models_portfolio:v1"
+_PORTFOLIO_CACHE_TTL = 30  # seconds — dashboard data may be up to 30s stale
+
+
+def _ui_cache():
+    """Return the cache service, or None if unavailable (fail-open)."""
+    try:
+        from src.services.utils.cache_service import get_cache_service
+        cs = get_cache_service()
+        return cs if cs and cs.is_available() else None
+    except Exception:
+        return None
+
+
+def _invalidate_ui_cache():
+    """Drop cached UI payloads so a manual action reflects immediately."""
+    try:
+        cs = _ui_cache()
+        if cs:
+            cs.delete(_PORTFOLIO_CACHE_KEY)
+    except Exception:
+        pass
+
+
+@admin_bp.after_request
+def _invalidate_ui_cache_on_mutation(response):
+    """Any successful admin mutation (POST/PUT/DELETE/PATCH) drops the UI cache
+    so the next dashboard load is fresh. Fail-open; never blocks the response."""
+    try:
+        if (request.method in ("POST", "PUT", "DELETE", "PATCH")
+                and 200 <= response.status_code < 300):
+            _invalidate_ui_cache()
+    except Exception:
+        pass
+    return response
+
 
 def _tg_safe(text: str):
     """Best-effort Telegram alert. Never raises."""
@@ -1009,6 +1049,15 @@ def get_model_portfolio():
 
     Used by dashboard cards. Includes MTM if last close available.
     """
+    # Serve from Dragonfly if a fresh payload is cached (fail-open).
+    _cs = _ui_cache()
+    if _cs:
+        try:
+            cached = _cs.get(_PORTFOLIO_CACHE_KEY)
+            if cached is not None:
+                return jsonify(cached)
+        except Exception:
+            pass
     try:
         from src.services.trading.model_ledger_service import (
             get_portfolio_stats, ensure_models_seeded,
@@ -1054,32 +1103,42 @@ def get_model_portfolio():
         # Per-model BUY charges for the CURRENT open position only (latest
         # filled BUY matching open_symbol). Lets the dashboard reconcile
         # Allocated = Cost Basis + Open-Pos Charges + Idle Cash + Realized.
+        # Single DISTINCT ON query (was an N+1 loop, one DB round-trip/model).
         try:
+            for m in stats.get("models", []):
+                m["entry_charges_open"] = 0.0
             db = get_database_manager()
             with db.get_session() as s:
-                for m in stats.get("models", []):
-                    m["entry_charges_open"] = 0.0
-                    open_sym = m.get("open_symbol")
-                    if not open_sym:
-                        continue
-                    bare = open_sym.upper().replace("NSE:", "").replace("-EQ", "")
-                    r = s.execute(text("""
-                        SELECT COALESCE(charges_inr, 0) AS c
-                        FROM audit_orders
-                        WHERE model_name = :m
-                          AND side = 'BUY'
-                          AND status IN ('placed','filled','partial')
-                          AND (UPPER(symbol) = :bare OR UPPER(symbol) = :fyers)
-                        ORDER BY placed_at DESC NULLS LAST, id DESC
-                        LIMIT 1
-                    """), {"m": m["model_name"], "bare": bare,
-                           "fyers": f"NSE:{bare}-EQ"}).fetchone()
-                    if r and r.c:
-                        m["entry_charges_open"] = round(float(r.c), 2)
+                rows = s.execute(text("""
+                    SELECT DISTINCT ON (model_name, UPPER(symbol))
+                           model_name, UPPER(symbol) AS sym,
+                           COALESCE(charges_inr, 0) AS c
+                    FROM audit_orders
+                    WHERE side = 'BUY'
+                      AND status IN ('placed','filled','partial')
+                    ORDER BY model_name, UPPER(symbol),
+                             placed_at DESC NULLS LAST, id DESC
+                """)).fetchall()
+            charge_map = {(r.model_name, r.sym): float(r.c or 0) for r in rows}
+            for m in stats.get("models", []):
+                open_sym = m.get("open_symbol")
+                if not open_sym:
+                    continue
+                bare = open_sym.upper().replace("NSE:", "").replace("-EQ", "")
+                c = (charge_map.get((m["model_name"], bare))
+                     or charge_map.get((m["model_name"], f"NSE:{bare}-EQ")))
+                if c:
+                    m["entry_charges_open"] = round(float(c), 2)
         except Exception as _e:
             logger.debug(f"open-pos charges enrich failed: {_e}")
 
-        return jsonify({"success": True, **stats})
+        payload = {"success": True, **stats}
+        if _cs:
+            try:
+                _cs.set(_PORTFOLIO_CACHE_KEY, payload, _PORTFOLIO_CACHE_TTL)
+            except Exception:
+                pass
+        return jsonify(payload)
     except Exception as e:
         logger.error(f"models portfolio error: {e}", exc_info=True)
         return jsonify({"success": False, "error": str(e)}), 500
