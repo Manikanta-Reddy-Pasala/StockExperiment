@@ -177,6 +177,14 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
         cash = float(led.get("cash") or 0)
         n = len(buys)
         alloc = cash / n if n else 0
+        # Account-wide margin gate (parity with single executor): the per-model
+        # ledger.cash bounds this model, but the SHARED Fyers account must also
+        # not be over-committed. Fetch once, decrement per placed buy. None =
+        # funds API down -> gate disabled (fail-safe; broker still rejects).
+        from tools.live.fyers_executor import _fetch_account_available_cash
+        _acct = None if a.dry_run else _fetch_account_available_cash(svc, a.user_id)
+        if _acct is not None:
+            log.info(f"  account available cash (Fyers): ₹{_acct:,.2f}")
         for b in buys:
             sym = b["symbol"]
             ltp = (h["entry_px"] if (h := held.get(sym)) else None)
@@ -187,15 +195,23 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
             qty = int(alloc / float(ltp))
             if qty < 1:
                 log.warning(f"  BUY {sym}: alloc {alloc:.0f} < 1 share @ {ltp}"); continue
+            _cost = qty * float(ltp)
+            if _acct is not None and _cost > _acct:
+                log.error(f"  BUY {sym}: cost ₹{_cost:,.0f} > account cash "
+                          f"₹{_acct:,.0f} — skip (margin gate).")
+                continue
             if a.dry_run:
                 log.info(f"  [dry] BUY {qty}x{sym} @~{ltp} (alloc {alloc:.0f})"); continue
             res = place_limit_with_fallback(svc, a.user_id, sym, qty, "BUY", ltp,
                                             rm_cfg, tag=f"{model}_buy")
             if res.get("filled"):
                 px = _resolve_fill_price(res, ltp)
-                record_buy_multi(model, sym, res.get("fill_qty") or qty, float(px),
+                _fqb = int(res.get("fill_qty") or qty)
+                record_buy_multi(model, sym, _fqb, float(px),
                                  fyers_order_id=res.get("order_id"))
-                log.info(f"  BOUGHT {qty}x{sym}@{px}")
+                if _acct is not None:
+                    _acct = max(0.0, _acct - _fqb * float(px))
+                log.info(f"  BOUGHT {_fqb}x{sym}@{px}")
             else:
                 log.error(f"  BUY {sym} not filled: {res.get('status')}")
     return 0

@@ -624,21 +624,64 @@ def run_scheduler():
     # placement is now safe to run concurrently because every execute path
     # acquires the cross-process trading lock (trade_lock.trading_lock). The
     # emits are isolated subprocesses; the reconciler is read/alert-only.
+    # (N2 + graceful drain) Run every job in its own thread, but track active
+    # threads and, on SIGTERM/SIGINT (container stop / redeploy), STOP starting
+    # new jobs and WAIT for in-flight ones (esp. an execute placing orders +
+    # writing the ledger) to finish — so a deploy can't kill a thread between
+    # placeorder and record_buy/record_sell (broker-order-without-ledger-row).
+    _active_jobs = set()
+    _active_lock = threading.Lock()
+    _draining = threading.Event()
+    DRAIN_TIMEOUT_S = 120  # bound the wait; container stop_grace_period must allow it
+
     def _threaded(orig_func):
         def _runner():
             try:
                 orig_func()
             except Exception as _je:
                 logger.error(f"threaded job failed: {_je}", exc_info=True)
-        return lambda: threading.Thread(target=_runner, daemon=True).start()
+            finally:
+                with _active_lock:
+                    _active_jobs.discard(threading.current_thread())
+
+        def _launch():
+            if _draining.is_set():
+                logger.warning("draining — skipping new job launch")
+                return
+            t = threading.Thread(target=_runner, daemon=True)
+            with _active_lock:
+                _active_jobs.add(t)
+            t.start()
+        return _launch
 
     for _job in schedule.jobs:
         if _job.job_func is not None:
             _job.job_func = _threaded(_job.job_func)
 
+    import signal as _signal
+
+    def _graceful_shutdown(signum, frame):
+        logger.info(f"signal {signum} — draining in-flight jobs "
+                    f"(up to {DRAIN_TIMEOUT_S}s) before exit.")
+        _draining.set()
+        with _active_lock:
+            threads = list(_active_jobs)
+        deadline = time.monotonic() + DRAIN_TIMEOUT_S
+        for t in threads:
+            t.join(timeout=max(0.0, deadline - time.monotonic()))
+        still = [t for t in threads if t.is_alive()]
+        if still:
+            logger.warning(f"{len(still)} job(s) still running at drain timeout — exiting anyway.")
+        else:
+            logger.info("all in-flight jobs drained cleanly.")
+        sys.exit(0)
+
+    _signal.signal(_signal.SIGTERM, _graceful_shutdown)
+    _signal.signal(_signal.SIGINT, _graceful_shutdown)
+
     # Keep scheduler running
-    logger.info("✅ Scheduler is now running (threaded jobs). Press Ctrl+C to stop.\n")
-    while True:
+    logger.info("✅ Scheduler is now running (threaded jobs, graceful drain). Ctrl+C to stop.\n")
+    while not _draining.is_set():
         try:
             schedule.run_pending()
             time.sleep(60)  # Check every minute

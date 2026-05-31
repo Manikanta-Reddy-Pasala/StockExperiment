@@ -123,8 +123,8 @@ def record_sell_multi(model_name: str, symbol: str, exit_price: float,
         l.total_trades = (l.total_trades or 0) + 1
         if pnl > 0:
             l.wins = (l.wins or 0) + 1
-        else:
-            l.losses = (l.losses or 0) + 1
+        elif pnl < 0:
+            l.losses = (l.losses or 0) + 1   # exact break-even counts as neither
         settings.current_amount = (settings.current_amount or Decimal(0)) - charges
         s.add(ModelTrade(model_name=model_name, side="SELL", symbol=norm, qty=sell_qty,
                          price=price_d, value=proceeds, pnl=pnl, reason=reason,

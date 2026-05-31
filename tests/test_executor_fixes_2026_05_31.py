@@ -259,3 +259,32 @@ def test_multi_run_orders_passes_rm_cfg(monkeypatch):
                        [{"symbol": "NSE:X-EQ"}], {}, object())
     assert rc == 0
     assert captured.get("rm_cfg") is not None  # rm_cfg was forwarded
+
+
+# --- 10. cross-model BUY drift decision (model-scoped, sibling-aware) ---------
+
+def test_buy_drift_skip_when_this_model_already_holds():
+    from tools.live.fyers_executor import buy_drift_decision
+    skip, _ = buy_drift_decision(fyers_qty=10, mine_qty=10, sibling_qty=0)
+    assert skip is True
+
+
+def test_buy_allow_when_position_belongs_to_sibling_model():
+    # Shared account: another model holds the symbol; THIS model is flat on it
+    # and must be allowed to enter (the old account-wide guard wrongly skipped).
+    from tools.live.fyers_executor import buy_drift_decision
+    skip, _ = buy_drift_decision(fyers_qty=10, mine_qty=0, sibling_qty=10)
+    assert skip is False
+
+
+def test_buy_skip_on_unaccounted_drift():
+    # Fyers holds more than any model's ledger claims -> genuine drift, skip.
+    from tools.live.fyers_executor import buy_drift_decision
+    skip, _ = buy_drift_decision(fyers_qty=15, mine_qty=0, sibling_qty=10)
+    assert skip is True
+
+
+def test_buy_allow_when_flat_everywhere():
+    from tools.live.fyers_executor import buy_drift_decision
+    skip, _ = buy_drift_decision(fyers_qty=0, mine_qty=0, sibling_qty=0)
+    assert skip is False

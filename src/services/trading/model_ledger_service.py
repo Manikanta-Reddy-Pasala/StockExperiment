@@ -715,7 +715,7 @@ def record_sell(model_name: str, exit_price: float, reason: str,
             log.warning(f"{model_name}: SELL order {fyers_order_id} already "
                         f"recorded — skipping duplicate (idempotent).")
             return _ledger_dict(l)
-        if not l.open_symbol:
+        if not l.open_symbol or not l.open_qty:
             raise ValueError(f"{model_name}: no open position")
         sell_qty, remaining_qty, is_full = partial_sell_outcome(l.open_qty, qty)
         entry_px = l.open_entry_px
@@ -732,8 +732,8 @@ def record_sell(model_name: str, exit_price: float, reason: str,
         l.total_trades = (l.total_trades or 0) + 1
         if pnl > 0:
             l.wins = (l.wins or 0) + 1
-        else:
-            l.losses = (l.losses or 0) + 1
+        elif pnl < 0:
+            l.losses = (l.losses or 0) + 1   # exact break-even counts as neither
         symbol = l.open_symbol
         if is_full:
             l.open_symbol = None

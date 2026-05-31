@@ -276,6 +276,72 @@ def _resolve_recent_order_id(svc, user_id: int, symbol: str, qty: int,
     return ""
 
 
+def buy_drift_decision(fyers_qty: int, mine_qty: int, sibling_qty: int):
+    """Decide whether to SKIP a BUY because of an existing position.
+
+    Shared Fyers account holds positions for ALL models. The old guard skipped
+    a BUY whenever the ACCOUNT held the symbol — wrongly blocking a model from
+    entering a name a DIFFERENT model legitimately holds. Model-scoped, sibling-
+    aware rule:
+      * mine_qty > 0                       -> SKIP (this model already holds it;
+                                              the May-18 duplicate-buy case).
+      * fyers_qty > mine_qty + sibling_qty -> SKIP (account holds more than any
+                                              model's ledger claims = real drift).
+      * otherwise                          -> ALLOW (position is attributable to
+                                              sibling models; this model may enter).
+    Returns (skip: bool, reason: str).
+    """
+    if mine_qty > 0:
+        return True, f"this model already holds {mine_qty} (ledger)"
+    if fyers_qty > mine_qty + sibling_qty:
+        return True, (f"Fyers qty {fyers_qty} > claimed {mine_qty + sibling_qty} "
+                      f"across all models (unaccounted drift)")
+    return False, "ok (position attributable to other models / flat)"
+
+
+def _account_claims_for_symbol(model_name, symbol) -> Tuple[int, int]:
+    """(mine_qty, sibling_qty) claimed on `symbol` across model ledgers.
+
+    mine = this model's open qty; sibling = sum of OTHER models' open qty.
+    Reads single-position rows (model_ledger.open_symbol/open_qty) AND
+    multi-holding rows (model_holdings). Best-effort: (0,0) on any error.
+    """
+    norm = (symbol or "").upper()
+    bare = norm.replace("NSE:", "").replace("-EQ", "")
+
+    def _b(s):
+        return (s or "").upper().replace("NSE:", "").replace("-EQ", "")
+    mine = sibling = 0
+    try:
+        from src.models.database import get_database_manager
+        from src.models.model_ledger_models import ModelLedger, ModelHolding
+        db = get_database_manager()
+        with db.get_session() as s:
+            for row in s.query(ModelLedger).filter(
+                    ModelLedger.open_symbol.isnot(None)).all():
+                if _b(row.open_symbol) != bare:
+                    continue
+                q = int(row.open_qty or 0)
+                if row.model_name == model_name:
+                    mine += q
+                else:
+                    sibling += q
+            try:
+                for h in s.query(ModelHolding).all():
+                    if _b(h.symbol) != bare:
+                        continue
+                    q = int(h.qty or 0)
+                    if h.model_name == model_name:
+                        mine += q
+                    else:
+                        sibling += q
+            except Exception:
+                pass  # ModelHolding table may be absent in some deploys
+    except Exception as e:
+        log.debug(f"_account_claims_for_symbol failed: {e}")
+    return mine, sibling
+
+
 def _fyers_holds_symbol(svc, user_id: int, symbol: str) -> Tuple[bool, int, float]:
     """Pre-trade check: does Fyers already have a non-zero position in this
     symbol (holdings T+1+ OR same-day CNC positions)?
@@ -1093,19 +1159,24 @@ def main() -> int:
         # per cycle; another order would compound exposure (May 18 incident).
         if side == "BUY" and not args.dry_run:
             held, fyers_qty, fyers_avg = _fyers_holds_symbol(svc, args.user_id, sym)
-            if held:
+            # Model-scoped + sibling-aware: only skip if THIS model already holds
+            # it, or the account holds more than ALL models' ledgers claim (real
+            # drift). A position owned by a SIBLING model must NOT block this
+            # model's legitimate entry (shared Fyers account).
+            _mine, _sib = _account_claims_for_symbol(args.model_name, sym)
+            _skip, _why = buy_drift_decision(fyers_qty, _mine, _sib)
+            if _skip:
                 log.error(
-                    f"SKIP BUY {sym}: Fyers already holds {fyers_qty}@{fyers_avg:.2f} "
-                    f"(ledger thinks flat or different). Possible prior fill not "
-                    f"recorded — investigate before re-entering."
+                    f"SKIP BUY {sym}: {_why}. Fyers holds {fyers_qty}@{fyers_avg:.2f} "
+                    f"(mine={_mine}, siblings={_sib})."
                 )
                 _tg_safe(
-                    f"🛑 *Ledger/Fyers DRIFT*\n"
+                    f"🛑 *BUY skipped — {('already held' if _mine > 0 else 'Fyers/ledger DRIFT')}*\n"
                     f"Model: `{args.model_name or '(env)'}`\n"
                     f"Symbol: `{sym}`\n"
-                    f"Fyers holds: {fyers_qty} @ ₹{fyers_avg:.2f}\n"
-                    f"Ledger thinks flat or different — BUY skipped.\n"
-                    f"Manual reconciliation needed."
+                    f"Fyers holds: {fyers_qty} @ ₹{fyers_avg:.2f} "
+                    f"(mine={_mine}, siblings={_sib})\n"
+                    f"{_why}."
                 )
                 skipped += 1
                 try:
