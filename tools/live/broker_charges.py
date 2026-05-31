@@ -4,9 +4,8 @@ Computes per-trade charges (brokerage + STT + exchange + SEBI + stamp + GST + DP
 using SEBI-published rates. Charges differ between BUY (no STT, has stamp duty)
 and SELL (has STT + DP charges, no stamp).
 
-Currently models CNC (delivery) only. INTRADAY rates differ (lower STT 0.025%,
-no DP charges, no stamp duty) — if/when an INTRADAY model is wired, branch on
-product.
+Models BOTH CNC (delivery) and INTRADAY/MIS — branches on the `product` arg
+(INTRADAY = STT 0.025% sell-side, 0.03% brokerage, no DP, lower stamp).
 
 Reference rates (Indian equity, mid-2026, calibrated against user's
 actual Fyers ledger 14/18/19 May 2026):

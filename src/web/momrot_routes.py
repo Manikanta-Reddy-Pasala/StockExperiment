@@ -837,7 +837,9 @@ def api_sell_now():
     _lk = None
     try:
         from src.services.trading.trade_lock import trading_lock
-        _lk = trading_lock()
+        # Longer wait than buy: an operator sell should queue behind a cron
+        # execute rather than 409 during the morning window.
+        _lk = trading_lock(wait_s=120)
         if not _lk.__enter__():
             return jsonify({"success": False,
                             "error": "another trade/rebalance is in progress — retry shortly"}), 409

@@ -2321,7 +2321,10 @@ def admin_model_exit(model_name):
     # _fyers_place_market DIRECTLY (not the executor), so it must also serialise
     # against the cron executor + other gunicorn workers on the shared account.
     from src.services.trading.trade_lock import trading_lock
-    _tlk = trading_lock()
+    # Longer wait than the retryable run/buy endpoints: an operator-triggered
+    # exit (liquidate) should queue behind a cron execute, not 409 during the
+    # 09:30-39 window.
+    _tlk = trading_lock(wait_s=120)
     if not _tlk.__enter__():
         try:
             lk.release()

@@ -436,8 +436,8 @@ def main() -> int:
     # Monthly rebalance gate
     if args.rebalance_only and not args.force and not args.mid_month_check:
         if not is_rebalance_day(today, _last_rotation_date()):
-            log.info("Not rebalance day (need day<=7 weekday + not already "
-                     "rotated this month). Skipping.")
+            log.info("Not rebalance day (need first trading day of month + not "
+                     "already rotated this month). Skipping.")
             Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
             Path(args.signals_out).write_text(json.dumps([]))
             try:

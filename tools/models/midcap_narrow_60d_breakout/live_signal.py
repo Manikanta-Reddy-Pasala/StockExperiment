@@ -2,8 +2,8 @@
 
 Reads midcap_narrow universe + historical_data, decides:
   - If model holds a position: check exit conditions (target/trail/SMA/max_hold)
-  - Else: scan for fresh 60-day high + vol>2x + close>200d SMA, pick highest
-    vol_ratio candidate as ENTRY1.
+  - Else: scan for fresh 40-day high (HH_WINDOW=40; model name "60d" is legacy)
+    + vol>2x + close>200d SMA, pick highest vol_ratio candidate as ENTRY1.
 
 Emits signals JSON consumed by tools/live/fyers_executor.py --model-name.
 
@@ -370,7 +370,7 @@ def main() -> int:
     note = None
     if not qualified:
         note = ("No qualifying breakouts today — showing near-miss candidates "
-                "(closest to firing all 3 filters: above 60d high, above 200d "
+                "(closest to firing all 3 filters: above 40d high, above 200d "
                 "SMA, volume > 2x avg). Breakout model trades infrequently.")
     for i, c in enumerate(pool[: 5 - len(top_rows)], len(top_rows) + 1):
         # ret_30d_pct = TRUE 30-day return (now distinct from headroom).
