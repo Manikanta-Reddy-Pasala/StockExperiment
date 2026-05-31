@@ -86,10 +86,11 @@ def atr_panel(cl, hi, lo, win=ATR_WIN):
     return tr.rolling(win).mean()
 
 
-def daily_sim(dates, cl, lo, atr, anchors, pools, calendar, *, capital,
+def daily_sim(dates, cl, lo, atr, anchors, pools, calendar, *, hi=None, capital,
               start, end, retain, midmonth_lead,
               price_floor=0.0, atr_mult=None, fixed_stop_pct=None,
-              entry_stop_pct=None, atr_from_entry=None, use_low_for_stop=True):
+              entry_stop_pct=None, atr_from_entry=None, atr_at_entry=None,
+              take_profit_pct=None, use_low_for_stop=True):
     """Single-position DAILY-MTM emerging simulator.
 
     Rotation on calendar days mirrors run_rotation_backtest EXACTLY (same
@@ -106,7 +107,9 @@ def daily_sim(dates, cl, lo, atr, anchors, pools, calendar, *, capital,
     nav_marks = [capital]
     cash = capital
     hold = None; qty = 0; entry_px = 0.0; entry_date = None; peak = 0.0
+    entry_atr = 0.0
     trades = []
+    nav_by_day = []   # (timestamp, nav) every trading day -> per-year metrics
 
     def rank_at(di):
         r = S.rank_pool(cl, S.pool_for_date(anchors, pools, dates[di]), di)
@@ -123,14 +126,17 @@ def daily_sim(dates, cl, lo, atr, anchors, pools, calendar, *, capital,
         d = dates[di]
         # --- daily MTM mark ---
         px = float(cl[hold].iloc[di]) if hold and pd.notna(cl[hold].iloc[di]) else None
-        nav_marks.append(cash + (qty * px if hold and px else 0.0))
+        nav_today = cash + (qty * px if hold and px else 0.0)
+        nav_marks.append(nav_today)
+        nav_by_day.append((d, nav_today))
 
         # --- daily stop, checked every day. TRAILING (from running peak):
         #     atr_mult / fixed_stop_pct. FROM-ENTRY (fixed level, only cuts
         #     losers, lets winners run to the rotation exit): entry_stop_pct /
-        #     atr_from_entry. ---
-        if (atr_mult or fixed_stop_pct or entry_stop_pct or atr_from_entry) \
-                and hold and qty > 0:
+        #     atr_from_entry (current ATR) / atr_at_entry (ATR frozen at entry).
+        #     take_profit_pct: hard profit target. ---
+        if (atr_mult or fixed_stop_pct or entry_stop_pct or atr_from_entry
+                or atr_at_entry or take_profit_pct) and hold and qty > 0:
             if px:
                 peak = max(peak, px)
             stop_level = None
@@ -146,6 +152,17 @@ def daily_sim(dates, cl, lo, atr, anchors, pools, calendar, *, capital,
                 a = atr[hold].iloc[di] if hold in atr.columns else None
                 if a is not None and pd.notna(a) and a > 0:
                     stop_level = entry_px - atr_from_entry * float(a)
+            elif atr_at_entry and entry_px > 0 and entry_atr > 0:
+                stop_level = entry_px - atr_at_entry * entry_atr   # frozen at entry
+            # take-profit first (intraday high), then stop
+            if take_profit_pct and entry_px > 0:
+                tp = entry_px * (1 + take_profit_pct)
+                day_hi = float(hi[hold].iloc[di]) if hold in hi.columns and pd.notna(hi[hold].iloc[di]) else px
+                if day_hi is not None and day_hi >= tp:
+                    cash += qty * tp
+                    trades.append(_trade(hold, entry_date, d, qty, entry_px, tp, cash, "TP"))
+                    hold = None; qty = 0; entry_px = 0.0; peak = 0.0; entry_atr = 0.0
+                    continue
             if stop_level is not None and stop_level > 0:
                 day_low = float(lo[hold].iloc[di]) if pd.notna(lo[hold].iloc[di]) else px
                 hit = (day_low is not None and day_low <= stop_level) if use_low_for_stop \
@@ -154,7 +171,7 @@ def daily_sim(dates, cl, lo, atr, anchors, pools, calendar, *, capital,
                     sx = stop_level if use_low_for_stop else px
                     cash += qty * sx
                     trades.append(_trade(hold, entry_date, d, qty, entry_px, sx, cash, "STOP"))
-                    hold = None; qty = 0; entry_px = 0.0; peak = 0.0
+                    hold = None; qty = 0; entry_px = 0.0; peak = 0.0; entry_atr = 0.0
                     # stay flat until the next calendar buy
 
         # --- rebalance only on calendar days ---
@@ -188,11 +205,13 @@ def daily_sim(dates, cl, lo, atr, anchors, pools, calendar, *, capital,
             if q >= 1 and q * bx <= cash:
                 cash -= q * bx; qty = q; hold = top; entry_px = bx
                 entry_date = d.date().isoformat(); peak = bx
+                ea = atr[top].iloc[di] if top in atr.columns else None
+                entry_atr = float(ea) if ea is not None and pd.notna(ea) and ea > 0 else 0.0
 
     final = cash
     if hold:
         final = cash + qty * float(cl[hold].iloc[-1])
-    return _metrics(final, capital, trades, nav_marks, start, end)
+    return _metrics(final, capital, trades, nav_marks, start, end, nav_by_day)
 
 
 def _trade(sym, ed, d, qty, ep, xp, cap_after, reason):
@@ -203,7 +222,7 @@ def _trade(sym, ed, d, qty, ep, xp, cap_after, reason):
             "cap_after": round(cap_after, 0), "exit_reason": reason}
 
 
-def _metrics(final, capital, trades, nav_marks, start, end):
+def _metrics(final, capital, trades, nav_marks, start, end, nav_by_day=None):
     wins = sum(1 for t in trades if t["pnl"] > 0)
     losses = sum(1 for t in trades if t["pnl"] < 0)
     yrs = (end - start).days / 365.25
@@ -211,12 +230,20 @@ def _metrics(final, capital, trades, nav_marks, start, end):
     nav = pd.Series(nav_marks)
     roll = nav.cummax()
     mdd = float(((roll - nav) / roll).max()) * 100 if len(nav) > 1 else 0.0
+    per_year = {}
+    if nav_by_day:
+        s = pd.Series([v for _, v in nav_by_day],
+                      index=pd.DatetimeIndex([d for d, _ in nav_by_day]))
+        for yy, g in s.groupby(s.index.year):
+            if len(g) > 1:
+                per_year[int(yy)] = round((g.iloc[-1] / g.iloc[0] - 1) * 100, 0)
     return {
         "final_nav": round(final, 0), "net_pnl": round(final - capital, 0),
         "total_return_pct": round((final / capital - 1) * 100, 1),
         "cagr_pct": round(cagr, 1), "max_dd_pct": round(mdd, 1),
         "trades": len(trades), "wins": wins, "losses": losses,
         "win_rate_pct": round(wins / max(1, wins + losses) * 100, 1),
+        "per_year": per_year,
     }
 
 
@@ -251,42 +278,41 @@ def main():
     print(f"\n[engine baseline] ret {eng_res.cagr_pct:+.1f}% CAGR / DD {eng_res.max_dd_pct:.1f}% "
           f"/ trades {len(eng_res.trades)} W{eng_res.wins} L{eng_res.losses}")
 
+    # Focused sweep around the winner (ATR from-ENTRY). "cur" = level recomputed
+    # daily off current ATR; "frz" = ATR frozen at entry (true from-entry stop).
     scenarios = [
-        ("Baseline (daily-sim)",        dict(price_floor=0,   atr_mult=None)),
-        ("Price floor Rs.100",          dict(price_floor=100, atr_mult=None)),
-        ("Price floor Rs.150",          dict(price_floor=150, atr_mult=None)),
-        ("ATR trail 2x",                dict(price_floor=0,   atr_mult=2.0)),
-        ("ATR trail 3x",                dict(price_floor=0,   atr_mult=3.0)),
-        ("ATR trail 4x",                dict(price_floor=0,   atr_mult=4.0)),
-        ("ATR trail 5x",                dict(price_floor=0,   atr_mult=5.0)),
-        ("Fixed trail 20%",             dict(price_floor=0,   fixed_stop_pct=0.20)),
-        ("ENTRY stop 8% (from-entry)",  dict(price_floor=0,   entry_stop_pct=0.08)),
-        ("ENTRY stop 12%",              dict(price_floor=0,   entry_stop_pct=0.12)),
-        ("ENTRY stop 20%",              dict(price_floor=0,   entry_stop_pct=0.20)),
-        ("ATR-from-entry 2x",           dict(price_floor=0,   atr_from_entry=2.0)),
-        ("ATR-from-entry 3x",           dict(price_floor=0,   atr_from_entry=3.0)),
-        ("ENTRY 8% + ATR-entry 3x best",dict(price_floor=0,   entry_stop_pct=0.08)),
+        ("Baseline (daily-sim)",        dict()),
+        ("ATR-from-entry 2.5x (cur)",   dict(atr_from_entry=2.5)),
+        ("ATR-from-entry 3x (cur)",     dict(atr_from_entry=3.0)),
+        ("ATR-from-entry 3.5x (cur)",   dict(atr_from_entry=3.5)),
+        ("ATR-from-entry 4x (cur)",     dict(atr_from_entry=4.0)),
+        ("ATR-at-entry 2.5x (frozen)",  dict(atr_at_entry=2.5)),
+        ("ATR-at-entry 3x (frozen)",    dict(atr_at_entry=3.0)),
+        ("ATR-at-entry 3.5x (frozen)",  dict(atr_at_entry=3.5)),
+        ("ATR-at-entry 4x (frozen)",    dict(atr_at_entry=4.0)),
+        ("ATR-entry 3x + TP +60%",      dict(atr_from_entry=3.0, take_profit_pct=0.60)),
+        ("ATR-entry 3x + TP +100%",     dict(atr_from_entry=3.0, take_profit_pct=1.00)),
     ]
     rows = []
     base_pnl = None
     for name, kw in scenarios:
-        m = daily_sim(dates, cl, lo, atr, anchors, pools, calendar,
+        m = daily_sim(dates, cl, lo, atr, anchors, pools, calendar, hi=hi,
                       capital=cap, start=start, end=end, retain=S.RETAIN,
-                      midmonth_lead=S.MIDMONTH_LEAD, **kw)
+                      midmonth_lead=S.MIDMONTH_LEAD, price_floor=0, **kw)
         if base_pnl is None:
             base_pnl = m["net_pnl"]
         vs = "—" if m["net_pnl"] == base_pnl else \
             f"{(m['net_pnl'] / base_pnl - 1) * 100:+.0f}%" if base_pnl else "n/a"
         rows.append((name, m, vs))
 
-    print(f"\n{'Scenario':<26}{'Trades':>7}{'Loss':>6}{'Win%':>7}"
-          f"{'NetP&L':>14}{'CAGR':>8}{'MaxDD':>8}{'vsBase':>9}")
+    print(f"\n{'Scenario':<28}{'Trd':>5}{'Win%':>6}{'NetP&L':>13}{'CAGR':>7}{'DD':>6}{'vsBase':>8}  per-year")
     for name, m, vs in rows:
-        print(f"{name:<26}{m['trades']:>7}{m['losses']:>6}{m['win_rate_pct']:>6.0f}%"
-              f"{('Rs.' + format(m['net_pnl'], ',.0f')):>14}{m['cagr_pct']:>7.1f}%"
-              f"{m['max_dd_pct']:>7.1f}%{vs:>9}")
-    print("\n(gross-of-fee, single-position, daily-MTM DD. ATR=14d simple. "
-          "vsBase = net-P&L vs the daily-sim baseline.)")
+        py = " ".join(f"{y}:{v:+.0f}" for y, v in sorted(m["per_year"].items()))
+        print(f"{name:<28}{m['trades']:>5}{m['win_rate_pct']:>5.0f}%"
+              f"{('Rs.'+format(m['net_pnl'],',.0f')):>13}{m['cagr_pct']:>6.0f}%"
+              f"{m['max_dd_pct']:>5.0f}%{vs:>8}  {py}")
+    print("\n(gross-of-fee, single-position, daily-MTM DD. ATR=14d. vsBase=net-P&L "
+          "vs daily-sim baseline. per-year=calendar-year % return.)")
 
 
 if __name__ == "__main__":

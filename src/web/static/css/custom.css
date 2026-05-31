@@ -1033,10 +1033,16 @@ body {
    Portfolio page — narrow table needs more breathing
    ============================================================ */
 @media (max-width: 767.98px) {
-    /* Make Rebalance button full-width inside cell */
-    .table .btn-danger { width: 100%; padding: 0.4rem 0.5rem; }
+    /* Stack Rebalance + Exit vertically, each full-width inside the Actions
+       cell so BOTH are visible (the old single-button width:100% rule pushed
+       Exit off-screen in the horizontal-scroll container). */
+    .table .actions-cell .btn { width: 100%; padding: 0.4rem 0.5rem; }
     /* Numeric columns right-align stays — but reduce min-width to fit */
     .table td.text-end, .table th.text-end { min-width: 60px; }
+}
+/* Desktop: buttons sit inline at natural width, not stretched full-cell. */
+@media (min-width: 768px) {
+    .table .actions-cell .btn { width: auto; }
 }
 
 /* ============================================================
