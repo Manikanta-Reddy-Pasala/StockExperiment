@@ -4,66 +4,86 @@
   "end": "2026-05-29",
   "years": 5.243,
   "capital": 1000000.0,
-  "final_nav": 13473665.0,
-  "total_return_pct": 1247.37,
-  "cagr_pct": 64.22,
-  "max_dd_pct": 57.13,
-  "calmar": 1.12,
-  "trades": 88,
-  "wins": 48,
-  "losses": 40,
-  "win_rate_pct": 54.5,
+  "final_nav": 10736058.0,
+  "total_return_pct": 973.61,
+  "cagr_pct": 57.26,
+  "max_dd_pct": 38.79,
+  "calmar": 1.48,
+  "trades": 182,
+  "wins": 108,
+  "losses": 74,
+  "win_rate_pct": 59.3,
   "open_positions": [
     {
       "sym": "ADANIPOWER",
-      "qty": 31614,
+      "qty": 13959,
       "entry_px": 157.11,
       "entry_date": "2026-04-01",
       "last_px": 243.37,
-      "mtm_value": 7693899.0,
-      "unrealized_pnl": 2727024.0,
+      "mtm_value": 3397202.0,
+      "unrealized_pnl": 1204103.0,
       "cap": "large"
     },
     {
       "sym": "ADANIGREEN",
-      "qty": 3922,
+      "qty": 1709,
       "entry_px": 1290.7,
       "entry_date": "2026-05-04",
       "last_px": 1475.4,
-      "mtm_value": 5786519.0,
-      "unrealized_pnl": 724393.0,
+      "mtm_value": 2521459.0,
+      "unrealized_pnl": 315652.0,
+      "cap": "large"
+    },
+    {
+      "sym": "BHEL",
+      "qty": 5849,
+      "entry_px": 377.05,
+      "entry_date": "2026-05-04",
+      "last_px": 416.75,
+      "mtm_value": 2437571.0,
+      "unrealized_pnl": 232205.0,
+      "cap": "mid"
+    },
+    {
+      "sym": "ADANIENSOL",
+      "qty": 1574,
+      "entry_px": 1398.4,
+      "entry_date": "2026-05-04",
+      "last_px": 1513.3,
+      "mtm_value": 2381934.0,
+      "unrealized_pnl": 180853.0,
       "cap": "large"
     }
   ],
   "per_year": {
     "2021": {
-      "ret_pct": 4.0,
-      "dd_pct": 34.1
+      "ret_pct": 21.0,
+      "dd_pct": 23.6
     },
     "2022": {
-      "ret_pct": -2.0,
-      "dd_pct": 46.5
+      "ret_pct": 7.2,
+      "dd_pct": 32.5
     },
     "2023": {
-      "ret_pct": 176.0,
-      "dd_pct": 25.3
+      "ret_pct": 139.7,
+      "dd_pct": 21.3
     },
     "2024": {
-      "ret_pct": 253.6,
-      "dd_pct": 16.5
+      "ret_pct": 141.3,
+      "dd_pct": 18.4
     },
     "2025": {
-      "ret_pct": 12.6,
-      "dd_pct": 20.9
+      "ret_pct": 14.5,
+      "dd_pct": 22.4
     },
     "2026": {
-      "ret_pct": 20.9,
-      "dd_pct": 19.4
+      "ret_pct": 23.0,
+      "dd_pct": 15.2
     }
   },
   "params": {
     "top_n": 120,
-    "K": 2,
+    "K": 4,
     "retain": 4,
     "lookback": 30,
     "mom_floor": 10.0,

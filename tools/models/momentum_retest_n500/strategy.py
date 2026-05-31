@@ -29,7 +29,11 @@ ROOT = Path(__file__).resolve().parents[3]
 #     the model kept missing them. Widening to 20% lets them in; effect plateaus
 #     past 0.20 (natural knee — names rarely sit >20% above EMA), so not overfit.
 TOPN = 120          # universe = top-120 by 20d ADV from N500 (minus smallcap)
-K = 2               # hold 2 positions, equal-weight (concentrated; beat K3/4/5)
+K = 4               # 2026-05-31 re-tune: K4 (was K2) diversifies the basket —
+                    # recent 2025-03→2026-05 CAGR +38→+53, recent DD 21→15, AND
+                    # full-cycle DD 57→39 (per-year DD now ≤32 every year), for
+                    # only −7pt full CAGR (+64→+57). K-knee: K5/K6 decay. The
+                    # old K2 note ("beat K3/4/5") was the pre-PIT survivorship era.
 RETAIN = 4          # hold a name while it stays in the top-4 rank
 LOOKBACK = 30       # momentum ranking window (trading days; 30 beat 15/20/40)
 MOM_FLOOR = 10.0    # require LOOKBACK-day return > 10% (10 beat 0/5/15/20)
