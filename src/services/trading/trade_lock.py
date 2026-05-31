@@ -34,6 +34,27 @@ log = logging.getLogger("trade_lock")
 # fixed 64-bit int; every process must use the same value.
 TRADING_LOCK_KEY = 730_051_001
 
+# Dedicated lock engine (NullPool) so a lock-waiter NEVER consumes a connection
+# from the app's shared QueuePool. Under the threaded scheduler several executes
+# can wait on the lock for up to 600s each; if those waits parked shared-pool
+# connections, the pool could exhaust and trading_lock's except-branch would
+# fail-OPEN (proceed) -> concurrent double-placement. A separate NullPool engine
+# opens a throwaway connection per lock and closes it on release, isolating the
+# lock from the app pool entirely.
+_lock_engine = None
+
+
+def _get_lock_engine():
+    global _lock_engine
+    if _lock_engine is not None:
+        return _lock_engine
+    from sqlalchemy.pool import NullPool
+    from sqlalchemy import create_engine
+    from src.models.database import get_database_manager
+    url = get_database_manager().engine.url
+    _lock_engine = create_engine(url, poolclass=NullPool, pool_pre_ping=True)
+    return _lock_engine
+
 
 def lock_proceed_decision(acquired: bool, infra_error: bool) -> bool:
     """Whether the caller should proceed to place orders.
@@ -48,17 +69,16 @@ def lock_proceed_decision(acquired: bool, infra_error: bool) -> bool:
 def trading_lock(wait_s: float = 30.0, key: int = TRADING_LOCK_KEY):
     """Context manager yielding True if the caller may place orders.
 
-    Holds a dedicated DB connection for the lock's lifetime (pg advisory locks
-    are connection-scoped) and releases on exit. Polls `pg_try_advisory_lock`
-    up to `wait_s` seconds. On any DB/infra error, yields True (fail-open).
+    Holds a dedicated DB connection (from a NullPool engine, isolated from the
+    app's shared pool) for the lock's lifetime (pg advisory locks are
+    connection-scoped) and releases on exit. Polls `pg_try_advisory_lock` up to
+    `wait_s` seconds. On any DB/infra error, yields True (fail-open).
     """
-    from src.models.database import get_database_manager
-
     conn = None
     acquired = False
     infra_error = False
     try:
-        eng = get_database_manager().engine
+        eng = _get_lock_engine()
         conn = eng.connect()
         deadline = time.monotonic() + max(0.0, wait_s)
         while True:

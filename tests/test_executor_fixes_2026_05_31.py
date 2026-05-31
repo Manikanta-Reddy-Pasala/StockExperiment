@@ -225,3 +225,37 @@ def test_mid_month_retain_uses_full_band_on_regular():
     from tools.shared.rotation_strategy import mid_month_retain
     assert mid_month_retain(False, 3) == 3
     assert mid_month_retain(False, 1) == 1
+
+
+# --- 9. multi executor passes rm_cfg to place_limit_with_fallback ------------
+
+def test_multi_run_orders_passes_rm_cfg(monkeypatch):
+    """Regression: the multi executor must pass rm_cfg (7th positional) to
+    place_limit_with_fallback — omitting it crashes every live multi order."""
+    import tools.live.fyers_executor_multi as m
+    import tools.live.risk_manager as RM
+
+    captured = {}
+
+    def fake_place(svc, user_id, symbol, qty, side, last_price, rm_cfg, tag=""):
+        captured["rm_cfg"] = rm_cfg
+        return {"filled": True, "fill_price": 100.0, "fill_qty": qty, "order_id": "OID"}
+
+    monkeypatch.setattr(m, "place_limit_with_fallback", fake_place)
+    monkeypatch.setattr(m, "_fetch_live_ltp", lambda *a, **k: 100.0)
+    monkeypatch.setattr(m, "record_buy_multi", lambda *a, **k: {})
+    monkeypatch.setattr(m, "record_sell_multi", lambda *a, **k: {})
+    monkeypatch.setattr(m.MLS, "get_ledger", lambda model: {"cash": 1000.0})
+    monkeypatch.setattr(
+        RM.RiskManager, "from_model",
+        classmethod(lambda cls, mn: RM.RiskManager(RM.RiskConfig())),
+    )
+
+    class _A:
+        dry_run = False
+        user_id = 1
+
+    rc = m._run_orders(_A(), "momentum_retest_n500", [],
+                       [{"symbol": "NSE:X-EQ"}], {}, object())
+    assert rc == 0
+    assert captured.get("rm_cfg") is not None  # rm_cfg was forwarded

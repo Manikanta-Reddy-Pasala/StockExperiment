@@ -141,6 +141,12 @@ def main() -> int:
 
 
 def _run_orders(a, model, sells, buys, held, svc) -> int:
+    # place_limit_with_fallback REQUIRES rm_cfg (LIMIT tol / retry / slippage-cap
+    # knobs). Build it per-model so the multi path gets the same per-model bands
+    # as the single executor (omitting it crashed every live multi order).
+    from tools.live.risk_manager import RiskManager
+    rm_cfg = RiskManager.from_model(model).cfg
+
     # ---- SELLS first (free up cash + slots) ----
     for sl in sells:
         sym = sl["symbol"]; reason = sl.get("reason", "ROTATE")
@@ -152,7 +158,7 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
             log.info(f"  [dry] SELL {qty}x{sym} ({reason})"); continue
         ltp = _fetch_live_ltp(svc, a.user_id, sym) or h["entry_px"]
         res = place_limit_with_fallback(svc, a.user_id, sym, qty, "SELL", ltp,
-                                        tag=f"{model}_sell")
+                                        rm_cfg, tag=f"{model}_sell")
         if res.get("filled"):
             px = _resolve_fill_price(res, ltp)
             # Forward ACTUAL filled qty so a partial fill keeps the residual
@@ -184,7 +190,7 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
             if a.dry_run:
                 log.info(f"  [dry] BUY {qty}x{sym} @~{ltp} (alloc {alloc:.0f})"); continue
             res = place_limit_with_fallback(svc, a.user_id, sym, qty, "BUY", ltp,
-                                            tag=f"{model}_buy")
+                                            rm_cfg, tag=f"{model}_buy")
             if res.get("filled"):
                 px = _resolve_fill_price(res, ltp)
                 record_buy_multi(model, sym, res.get("fill_qty") or qty, float(px),

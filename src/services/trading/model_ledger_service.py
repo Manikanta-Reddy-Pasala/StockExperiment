@@ -706,13 +706,17 @@ def record_sell(model_name: str, exit_price: float, reason: str,
     with db.get_session() as s:
         settings = s.query(ModelSettings).filter_by(model_name=model_name).first()
         l = s.query(ModelLedger).filter_by(model_name=model_name).first()
-        if not l or not l.open_symbol or not settings:
-            raise ValueError(f"{model_name}: no open position")
-        # Idempotency: don't re-apply a sell that was already recorded.
+        if not l or not settings:
+            raise ValueError(f"{model_name}: unknown model")
+        # Idempotency FIRST: a replayed SELL (same order_id) must be skipped
+        # silently — even after a full close left the position flat — rather
+        # than raising "no open position" and firing a false ledger-FAIL alert.
         if _order_seen(s, model_name, fyers_order_id):
             log.warning(f"{model_name}: SELL order {fyers_order_id} already "
                         f"recorded — skipping duplicate (idempotent).")
             return _ledger_dict(l)
+        if not l.open_symbol:
+            raise ValueError(f"{model_name}: no open position")
         sell_qty, remaining_qty, is_full = partial_sell_outcome(l.open_qty, qty)
         entry_px = l.open_entry_px
         proc = Decimal(str(sell_qty)) * Decimal(str(exit_price))
