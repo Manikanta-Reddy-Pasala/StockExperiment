@@ -85,6 +85,22 @@ RETIRED_MODELS = [
     "finnifty_ic_otm4_w300_lots5",  # FinNifty options IC — removed 2026-05-25
 ]
 
+# ---- Order product-type policy (single source of truth) -------------------
+# ONLY models listed here trade INTRADAY (MIS, broker auto-square-off + intraday
+# margin/cheaper STT). EVERY other model trades CNC (delivery, multi-day hold).
+# The executor resolves product via product_for_model() so a swing model can
+# never accidentally fire an MIS order, and an intraday model can never hold
+# overnight as CNC. Add a new intraday model's name here to switch it to MIS.
+INTRADAY_MODELS = {
+    "orb_momentum_intraday",
+}
+
+
+def product_for_model(model_name: str) -> str:
+    """Canonical order product for a model: 'INTRADAY' for intraday models,
+    'CNC' (delivery) for everything else (the safe default)."""
+    return "INTRADAY" if model_name in INTRADAY_MODELS else "CNC"
+
 
 def ensure_models_seeded() -> None:
     """Create settings+ledger rows for any KNOWN_MODELS missing from DB.

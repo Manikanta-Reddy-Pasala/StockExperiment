@@ -75,21 +75,29 @@ _CURRENT_MODEL: Optional[str] = None
 
 def _placeorder(svc, user_id: int, symbol: str, qty: int, side: str,
                 pricetype: str = "MARKET", price: float = 0.0,
-                product: str = "CNC", tag: str = "",
+                product: Optional[str] = None, tag: str = "",
                 _audit_model: Optional[str] = None) -> Dict:
     """Thin wrapper around FyersService.placeorder using the standardized API.
 
     Returns the response dict (with `status`, `data.orderid` on success).
     Never raises — exceptions are converted to {"status":"error", ...}.
 
-    Default product = CNC (delivery, multi-day hold) since all four equity
-    models (n100, pseudo-n100, midcap, n20) backtest as delivery — exits
-    only when the signal rotates, not at end-of-day. INTRADAY (MIS) is
-    available if a future strategy needs forced same-day square-off.
+    Product type is RESOLVED PER MODEL (not a blind default): swing models trade
+    CNC (delivery, multi-day hold; exit only on rotation), and ONLY models in
+    model_ledger_service.INTRADAY_MODELS trade INTRADAY (MIS, same-day square-off).
+    product_for_model() is the single source of truth, so a swing model can never
+    fire an MIS order and an intraday model can never hold overnight as CNC. An
+    explicit `product=` arg still overrides (kept for ad-hoc callers).
 
     _audit_model — if set, every placeorder call writes an audit_orders
     row capturing request/response. Optional so older callers still work.
     """
+    if product is None:
+        try:
+            from src.services.trading.model_ledger_service import product_for_model
+            product = product_for_model(_audit_model or _CURRENT_MODEL)
+        except Exception:
+            product = "CNC"   # safe fallback = delivery
     fyers_sym = to_fyers_symbol(symbol)
     safe_tag = _sanitize_tag(tag)
     req = {
@@ -1072,8 +1080,10 @@ def main() -> int:
             cash_avail = rm.cfg.capital_inr - used_inr
             try:
                 from tools.live.broker_charges import compute_charges
+                from src.services.trading.model_ledger_service import product_for_model
+                _prod = product_for_model(_CURRENT_MODEL)
                 approx_chg = float(
-                    compute_charges("BUY", 1, float(price), "CNC").get("total", 0))
+                    compute_charges("BUY", 1, float(price), _prod).get("total", 0))
             except Exception:
                 approx_chg = 20.0
             needed_for_one = float(price) + approx_chg
