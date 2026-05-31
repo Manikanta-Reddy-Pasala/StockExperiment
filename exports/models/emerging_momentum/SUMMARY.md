@@ -5,7 +5,7 @@ Single-position (max-1) VOL-ADJUSTED momentum: rank by 30d return ÷ 60d return-
 
 **Universe:** Top-100 by 20d ADV from emerging mid/small (PIT N500 minus N100)
 
-Backtest window: **2021-04-01 → 2026-05-29** (full ~5.1-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 bear).
+Backtest window: **2021-03-01 → 2026-05-29** (full ~5.2-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 recovery). Recent clean-data window also reported: **2025-03-01 → 2026-05-29**.
 
 ## Trade rules
 
@@ -41,7 +41,7 @@ Backtest window: **2021-04-01 → 2026-05-29** (full ~5.1-year cycle: 2021 bull,
 
 ## Note
 
-Best model. Vol-adjusted momentum (return per unit of volatility) on the mid/small universe = +111.4% CAGR / 31% DD / Calmar 3.6 full-cycle 2021-03→2026-05 (2026-05-31). Dividing momentum by volatility picks smooth strong trends over jumpy ones and compounds far better (+65.6%→+111.4%); MCAP-climber turned OFF (pre-rebuild artifact). Per-year: 2021 −5 / 2022 +204 / 2023 +301 / 2024 +136 / 2025 +38 / 2026 +15. The one model that crosses 100% organically (no leverage).
+Best model. Vol-adjusted momentum (return per unit of volatility) on the mid/small universe = +111.4% CAGR / 31% DD / Calmar 3.6 full-cycle 2021-03→2026-05 (2026-05-31). Dividing momentum by volatility picks smooth strong trends over jumpy ones and compounds far better (+65.6%→+111.4%); MCAP-climber turned OFF (pre-rebuild artifact). Per-year: 2021 −5 / 2022 +204 / 2023 +301 / 2024 +136 / 2025 +38 / 2026 +15. Recent 2025-03→2026-05 ≈ +48% CAGR / 16% DD. The one model that crosses 100% organically (no leverage).
 
 **Open position at window end:** BHEL [mid] qty 121577 entry ₹377.05 on 2026-05-04 (unrealized +4,826,607)
 

@@ -443,6 +443,8 @@ const MODEL_META = {
       ['Entry (mid-month)', 'Day-15 — rotate only if rank-1 leads held by ≥5pp'],
       ['Exit', 'Rotate when held drops below rank-3 or leaves the index'],
       ['Backtest 2021-03→2026-05 (PIT)', '+56.2% CAGR / 52% DD / Calmar 1.08'],
+      ['Recent 2025-03→2026-05', '+112% CAGR / 9.6% DD — 52% full DD is the 2022 bear only'],
+      ['Per-year', '2021 −16 / 2022 +11 / 2023 +182 / 2024 +89 / 2025 +37 / 2026 +48'],
     ],
   },
   'momentum_pseudo_n100_adv': {
@@ -459,7 +461,9 @@ const MODEL_META = {
       ['Filters', '≤₹3000 entry cap. 200d-SMA gate OFF (2026-05-31, +5pp CAGR)'],
       ['Selection', 'Buy rank-1, RET1 top-1 rotation, max 1 concurrent'],
       ['Exit', 'Rotate when held is no longer rank-1'],
-      ['Backtest 2021-03→2026-05 (PIT)', '+76.6% CAGR / 29% DD / Calmar 2.6'],
+      ['Backtest 2021-03→2026-05 (PIT)', '+76.6% CAGR / 29% DD / Calmar 2.7'],
+      ['Recent 2025-03→2026-05', '+191% CAGR / 16% DD / 91% win'],
+      ['Per-year', '2021 +50 / 2022 −12 / 2023 +126 / 2024 +56 / 2025 +55 / 2026 +52'],
       ['Note', '⚠ ADV-selection bias — optimistic upper bound vs real-index Nifty 100'],
     ],
   },
@@ -490,6 +494,8 @@ const MODEL_META = {
       ['Selection', 'Hold rank-1 only (RET1), max 1 concurrent'],
       ['Exit', 'Rotate when held is no longer rank-1, or leaves N100 / below 200d SMA'],
       ['Backtest 2021-03→2026-05 (PIT)', '+41.2% CAGR / 37% DD / Calmar 1.12'],
+      ['Recent 2025-03→2026-05', '+96% CAGR / 24% DD — per-year DD ≤27%, 37% is chaining'],
+      ['Per-year', '2021 +2 / 2022 +30 / 2023 +13 / 2024 +72 / 2025 +65 / 2026 +36'],
     ],
   },
   'momentum_retest_n500': {
@@ -505,6 +511,8 @@ const MODEL_META = {
       ['Exit', 'Sell when name drops out of the top-4 rank (retain band)'],
       ['Style', '2-position momentum with retest entry (true-PIT)'],
       ['Backtest 2021-03→2026-05 (PIT)', '+64.2% CAGR / 57% DD / Calmar 1.12'],
+      ['Recent 2025-03→2026-05', '+38% CAGR / 21% DD — 57% full DD is 2021 chop + 2022 bear'],
+      ['Per-year', '2021 +4 / 2022 −2 / 2023 +176 / 2024 +254 / 2025 +13 / 2026 +21'],
     ],
   },
   'emerging_momentum': {
@@ -522,6 +530,7 @@ const MODEL_META = {
       ['Exit', 'Rotate when held is no longer rank-1 (RET1)'],
       ['Backtest 2021-03→2026-05 (PIT)', '+111.4% CAGR / 31% DD / Calmar 3.6 — best model'],
       ['Per-year', '2021 −5 / 2022 +204 / 2023 +301 / 2024 +136 / 2025 +38 / 2026 +15'],
+      ['Recent 2025-03→2026-05', '+48% CAGR / 16% DD'],
     ],
   },
 };

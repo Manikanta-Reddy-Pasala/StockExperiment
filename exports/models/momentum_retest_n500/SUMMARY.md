@@ -5,7 +5,7 @@ Monthly top-2 (K=2), 30d momentum, buy within 20% of 20-EMA, retain top-4 band.
 
 **Universe:** Top-120 by 20d ADV from N500 (minus Smallcap-250)
 
-Backtest window: **2021-04-01 → 2026-05-29** (full ~5.1-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 bear).
+Backtest window: **2021-03-01 → 2026-05-29** (full ~5.2-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 recovery). Recent clean-data window also reported: **2025-03-01 → 2026-05-29**.
 
 ## Trade rules
 
@@ -41,7 +41,7 @@ Backtest window: **2021-04-01 → 2026-05-29** (full ~5.1-year cycle: 2021 bull,
 
 ## Note
 
-Multi-holding K=2 (2026-05-30 sweep). Now PIT N500 (2026-05-31): full-cycle 2021-04→2026-05 ≈ +64.9% CAGR / 57.1% DD / Calmar 1.14. The earlier +77.8%/2.08 was survivorship-inflated (static current N500); switching to PIT eligible_at deflated CAGR and roughly doubled DD — the honest number. K=2 + wide 20% entry band (vs K3/band-8%) stops missing leaders that never pull back to the EMA.
+Multi-holding K=2 (2026-05-30 sweep). Now PIT N500 (2026-05-31): full-cycle 2021-03→2026-05 ≈ +64.2% CAGR / 57.1% DD / Calmar 1.12. Recent 2025-03→2026-05 ≈ +38% CAGR / 21% DD. The 57% full-cycle DD is 2021 retest-entry chop (D34) + 2022 bear (D46) chained; 2023-26 each ≤25%. The earlier +77.8%/2.08 was survivorship-inflated (static current N500); switching to PIT eligible_at deflated CAGR and roughly doubled DD — the honest number. K=2 + wide 20% entry band (vs K3/band-8%) stops missing leaders that never pull back to the EMA.
 
 **Open position at window end:** ADANIPOWER [large] qty 31614 entry ₹157.11 on 2026-04-01 (unrealized +2,727,024)
 

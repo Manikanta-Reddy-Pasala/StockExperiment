@@ -19,31 +19,31 @@ DESC = {
         "title": "Liquid 100 Momentum", "live": "LIVE",
         "universe": "Top-100 by 20d ADV from N500 (yearly-PIT rebuild)",
         "strategy": "Monthly (1st trading day) rotation, single position (rank-1, RET1), 30-trading-day return rank, uptrend (>200d SMA) + ≤₹3K filter. Universe rebuilt yearly at a FIXED mid-May anchor.",
-        "note": "⚠️ ADV-ranked pseudo-N100 (not the real index) — selects already-liquid/hot names, so returns are an OPTIMISTIC upper bound vs the real-index sibling momentum_n100_top5_max1. Full-cycle 2021-04→2026-05 (fixed May anchor, PIT N500) ≈ +72.9% CAGR / 28.6% DD / Calmar 2.54 / 76% win. Now PIT (2026-05-31, no survivorship bias) but the ADV-selection bias remains by design.",
+        "note": "⚠️ ADV-ranked pseudo-N100 (not the real index) — selects already-liquid/hot names, so returns are an OPTIMISTIC upper bound vs the real-index sibling momentum_n100_top5_max1. Full-cycle 2021-03→2026-05 (fixed May anchor, PIT N500) ≈ +76.6% CAGR / 28.6% DD / Calmar 2.68 / 90% win. Recent 2025-03→2026-05 ≈ +191% CAGR / 16% DD. Now PIT (2026-05-31, no survivorship bias) but the ADV-selection bias remains by design.",
     },
     "momentum_n100_top5_max1": {
         "title": "Nifty 100 Momentum", "live": "LIVE",
         "universe": "Real NSE Nifty 100 (PIT membership)",
         "strategy": "Monthly rotation + mid-month check, single position (max 1), 15-trading-day return rank.",
-        "note": "True-index version — the trustworthy-clean momentum benchmark.",
+        "note": "True-index version — the trustworthy-clean momentum benchmark. Full-cycle 2021-03→2026-05 ≈ +56.2% CAGR / 52.2% DD / Calmar 1.08. Recent 2025-03→2026-05 ≈ +112% CAGR / 9.6% DD. The 52% full-cycle DD is entirely the 2022 bear (D39); 2023-26 each ≤21%.",
     },
     "n40": {
         "title": "Weekly Top-40", "live": "LIVE",
         "universe": "Top-40 by ADV ∩ Nifty 100",
         "strategy": "WEEKLY rotation (first trading day of each ISO week), single position, uptrend gate.",
-        "note": "Weekly rebalance cut the daily whipsaw (55% of daily trades held ≤3d). Full-cycle 2021-04→2026-05 on the AUTHORITATIVE PIT Nifty-100 (2026-05-31 rebuild) ≈ +40.3% CAGR / 36.9% DD / Calmar 1.09 — the clean membership (no DUMMYREL/BHEL/IDEA garbage) lifted it from +25%/0.45.",
+        "note": "Weekly rebalance cut the daily whipsaw (55% of daily trades held ≤3d). Full-cycle 2021-03→2026-05 on the AUTHORITATIVE PIT Nifty-100 (2026-05-31 rebuild) ≈ +41.2% CAGR / 36.9% DD / Calmar 1.12 — the clean membership (no DUMMYREL/BHEL/IDEA garbage) lifted it from +25%/0.45. Recent 2025-03→2026-05 ≈ +96% CAGR / 24% DD. Per-year DD ≤27% every year — the 37% full-cycle is 2021→2022 peak-to-trough chaining.",
     },
     "momentum_retest_n500": {
         "title": "Retest Momentum", "live": "DISABLED (₹0)",
         "universe": "Top-120 by 20d ADV from N500 (minus Smallcap-250)",
         "strategy": "Monthly top-2 (K=2), 30d momentum, buy within 20% of 20-EMA, retain top-4 band.",
-        "note": "Multi-holding K=2 (2026-05-30 sweep). Now PIT N500 (2026-05-31): full-cycle 2021-04→2026-05 ≈ +64.9% CAGR / 57.1% DD / Calmar 1.14. The earlier +77.8%/2.08 was survivorship-inflated (static current N500); switching to PIT eligible_at deflated CAGR and roughly doubled DD — the honest number. K=2 + wide 20% entry band (vs K3/band-8%) stops missing leaders that never pull back to the EMA.",
+        "note": "Multi-holding K=2 (2026-05-30 sweep). Now PIT N500 (2026-05-31): full-cycle 2021-03→2026-05 ≈ +64.2% CAGR / 57.1% DD / Calmar 1.12. Recent 2025-03→2026-05 ≈ +38% CAGR / 21% DD. The 57% full-cycle DD is 2021 retest-entry chop (D34) + 2022 bear (D46) chained; 2023-26 each ≤25%. The earlier +77.8%/2.08 was survivorship-inflated (static current N500); switching to PIT eligible_at deflated CAGR and roughly doubled DD — the honest number. K=2 + wide 20% entry band (vs K3/band-8%) stops missing leaders that never pull back to the EMA.",
     },
     "emerging_momentum": {
         "title": "Emerging Momentum", "live": "LIVE",
         "universe": "Top-100 by 20d ADV from emerging mid/small (PIT N500 minus N100)",
         "strategy": "Single-position (max-1) VOL-ADJUSTED momentum: rank by 30d return ÷ 60d return-volatility; ret>0, price ≤₹3000 (no SMA gate); RET1 top-1 rotation; monthly (1st trading day) + mid-month check (≥5pp lead).",
-        "note": "Best model. Vol-adjusted momentum (return per unit of volatility) on the mid/small universe = +111.4% CAGR / 31% DD / Calmar 3.6 full-cycle 2021-03→2026-05 (2026-05-31). Dividing momentum by volatility picks smooth strong trends over jumpy ones and compounds far better (+65.6%→+111.4%); MCAP-climber turned OFF (pre-rebuild artifact). Per-year: 2021 −5 / 2022 +204 / 2023 +301 / 2024 +136 / 2025 +38 / 2026 +15. The one model that crosses 100% organically (no leverage).",
+        "note": "Best model. Vol-adjusted momentum (return per unit of volatility) on the mid/small universe = +111.4% CAGR / 31% DD / Calmar 3.6 full-cycle 2021-03→2026-05 (2026-05-31). Dividing momentum by volatility picks smooth strong trends over jumpy ones and compounds far better (+65.6%→+111.4%); MCAP-climber turned OFF (pre-rebuild artifact). Per-year: 2021 −5 / 2022 +204 / 2023 +301 / 2024 +136 / 2025 +38 / 2026 +15. Recent 2025-03→2026-05 ≈ +48% CAGR / 16% DD. The one model that crosses 100% organically (no leverage).",
     },
     "midcap_narrow_60d_breakout": {
         "title": "Midcap Breakout", "live": "LIVE",
@@ -53,7 +53,7 @@ DESC = {
     },
 }
 
-WIN = "Backtest window: **2021-04-01 → 2026-05-29** (full ~5.1-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 bear)."
+WIN = "Backtest window: **2021-03-01 → 2026-05-29** (full ~5.2-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 recovery). Recent clean-data window also reported: **2025-03-01 → 2026-05-29**."
 
 # Per-model trade rules — transcribed from the model code (strategy.py + backtest
 # rank_at / run loop) as the single source of truth. Imported by regen_exports too

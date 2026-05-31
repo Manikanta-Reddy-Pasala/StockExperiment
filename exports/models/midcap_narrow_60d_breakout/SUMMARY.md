@@ -5,7 +5,7 @@ Event-driven single-position breakout: 40d-high + 2× vol + >200DMA. Target +100
 
 **Universe:** PIT midcap — top-100 ADV from N500 minus Nifty 100 (excluded at SCAN time)
 
-Backtest window: **2021-04-01 → 2026-05-29** (full ~5.1-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 bear).
+Backtest window: **2021-03-01 → 2026-05-29** (full ~5.2-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 recovery). Recent clean-data window also reported: **2025-03-01 → 2026-05-29**.
 
 ## Trade rules
 
