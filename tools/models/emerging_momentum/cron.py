@@ -49,8 +49,9 @@ def _alert(msg: str):
 
 # ---- Trading-side jobs (technical_scheduler) ----
 
-def _signals_path(today: str, mid: bool = False) -> Path:
-    name = f"{today}_emerging" + ("_midmonth" if mid else "") + ".json"
+def _signals_path(today: str, mid: bool = False, stop: bool = False) -> Path:
+    suffix = "_stop" if stop else ("_midmonth" if mid else "")
+    name = f"{today}_emerging{suffix}.json"
     return STATE_DIR / "signals" / name
 
 
@@ -193,6 +194,58 @@ def execute_mid_month_orders():
         _alert(f"❌ emerging_momentum mid-month execute error: {e}")
 
 
+def emit_stop_check():
+    """DAILY ATR-from-entry hard-stop check. live_signal emits a STOP_HIT exit
+    only if the held name's low pierced entry - ATR_STOP_MULT*ATR; otherwise an
+    empty file. Separate *_stop.json so it never collides with rotation."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    signals_out = _signals_path(today, stop=True)
+    signals_out.parent.mkdir(parents=True, exist_ok=True)
+    cmd = ["python3", "tools/models/emerging_momentum/live_signal.py",
+           "--signals-out", str(signals_out), "--stop-check"]
+    try:
+        r = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True,
+                           timeout=600, env={**os.environ, "MOMROT_TG_NOTIFY": "1"})
+        (log.info if r.returncode == 0 else log.error)(
+            f"{'✅' if r.returncode==0 else '❌'} emerging_momentum stop-check"
+            + ("" if r.returncode == 0 else f" rc={r.returncode}: {r.stderr[-300:]}"))
+        if r.stdout:
+            log.info(r.stdout[-300:])
+    except Exception as e:
+        log.error(f"❌ emerging_momentum stop-check error: {e}")
+        _alert(f"❌ emerging_momentum stop-check error: {e}")
+
+
+def execute_stop_orders():
+    """Execute the daily stop signal file (single executor). No-op when empty."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    signals_file = _signals_path(today, stop=True)
+    if not signals_file.exists():
+        return
+    try:
+        if not _json.loads(signals_file.read_text()):
+            return  # empty -> no stop today
+    except Exception:
+        return
+    log.info("PLACING emerging_momentum STOP exit order")
+    user_id = os.environ.get("USER_ID", "1")
+    cmd = ["python3", "tools/live/fyers_executor.py",
+           "--signals", str(signals_file), "--user-id", user_id,
+           "--model-name", MODEL_NAME]
+    try:
+        r = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, timeout=1200)
+        (log.info if r.returncode == 0 else log.error)(
+            f"{'✅' if r.returncode==0 else '❌'} emerging_momentum stop execute"
+            + ("" if r.returncode == 0 else f" rc={r.returncode}: {r.stderr[-300:]}"))
+        if r.stdout:
+            log.info(r.stdout[-500:])
+        if r.returncode != 0:
+            _alert(f"❌ emerging_momentum STOP execute failed (rc={r.returncode})")
+    except Exception as e:
+        log.error(f"❌ emerging_momentum stop execute error: {e}")
+        _alert(f"❌ emerging_momentum stop execute error: {e}")
+
+
 # ---- Registration entrypoints ----
 
 def register_data_jobs(schedule):
@@ -211,3 +264,7 @@ def register_trading_jobs(schedule):
     # Mid-month rank check (day-15 weekday). live_signal self-skips otherwise.
     schedule.every().day.at("09:31").do(emit_mid_month_signal)
     schedule.every().day.at("09:39").do(execute_mid_month_orders)
+    # DAILY ATR-from-entry hard stop (entry - 2.5x ATR). Emit early, execute
+    # after the rotation window so a stop sells before any same-day rotation buy.
+    schedule.every().day.at("09:20").do(emit_stop_check)
+    schedule.every().day.at("09:41").do(execute_stop_orders)

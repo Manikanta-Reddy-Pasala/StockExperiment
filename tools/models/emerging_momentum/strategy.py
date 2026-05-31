@@ -56,6 +56,62 @@ RANK_MODE = "vol_adj"
 VOL_WIN = 60
 _VOL_CACHE: dict = {}
 
+# ---- ATR-from-ENTRY hard stop (2026-06-01, backtest-validated) --------------
+# A hard stop at entry_px - ATR_STOP_MULT * ATR(ATR_WIN), checked DAILY. It is a
+# FIXED level anchored at the entry day (NOT trailing) so it only cuts genuine
+# breakdowns below entry and never whipsaws a winner out. 2.5x is the sweet spot
+# from tools/analysis/emerging_pricefloor_atr_sweep.py (validated BOTH windows +
+# every calendar year): full 2021-26 +27% net P&L / 120% CAGR / 38% DD; recent
+# 2023-26 +37% / 168% CAGR / 26% DD — vs the rotation-only baseline. The ATR
+# value is the CURRENT ATR at the check (recomputed daily); the LEVEL is anchored
+# to entry. Set ATR_STOP_MULT=0 to disable.
+ATR_STOP_MULT = 2.5
+ATR_WIN = 14
+
+
+def atr_latest(high: pd.Series, low: pd.Series, close: pd.Series,
+               win: int = ATR_WIN):
+    """Latest ATR (simple mean of True Range over `win`) for one symbol's
+    high/low/close series. Returns None if insufficient / invalid data."""
+    try:
+        df = pd.DataFrame({"h": high, "l": low, "c": close}).dropna()
+        if len(df) < win + 1:
+            return None
+        prev_c = df["c"].shift(1)
+        tr = pd.concat([
+            (df["h"] - df["l"]).abs(),
+            (df["h"] - prev_c).abs(),
+            (df["l"] - prev_c).abs(),
+        ], axis=1).max(axis=1)
+        a = float(tr.rolling(win).mean().iloc[-1])
+        return a if a > 0 else None
+    except Exception:
+        return None
+
+
+def atr_stop_level(entry_px: float, atr_val: float,
+                   mult: float = ATR_STOP_MULT):
+    """The hard-stop price = entry_px - mult*ATR. <=0 / bad inputs -> None."""
+    try:
+        if entry_px and atr_val and atr_val > 0 and mult and mult > 0:
+            lvl = float(entry_px) - float(mult) * float(atr_val)
+            return lvl if lvl > 0 else None
+    except (TypeError, ValueError):
+        pass
+    return None
+
+
+def atr_stop_hit(entry_px: float, atr_val: float, day_low: float,
+                 mult: float = ATR_STOP_MULT):
+    """(hit, level): True if the day's LOW pierced entry_px - mult*ATR."""
+    lvl = atr_stop_level(entry_px, atr_val, mult)
+    if lvl is None or day_low is None:
+        return False, lvl
+    try:
+        return float(day_low) <= lvl, lvl
+    except (TypeError, ValueError):
+        return False, lvl
+
 # ---- MCAP CLIMBER overlay (validated +13pp CAGR at same DD, 2026-05-30) ------
 # Keep only entry candidates whose free-float MARKET-CAP RANK has RISEN over the
 # last CLIMB_LOOKBACK trading days (genuinely climbing toward index inclusion).

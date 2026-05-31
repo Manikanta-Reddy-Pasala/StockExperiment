@@ -146,7 +146,7 @@ def load_panel(symbols, days_back=420):
     start = end - timedelta(days=days_back)
     with eng.connect() as c:
         df = pd.read_sql(text(
-            "SELECT symbol,date,close,volume FROM historical_data "
+            "SELECT symbol,date,high,low,close,volume FROM historical_data "
             "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b AND data_source='fyers' "
             "ORDER BY symbol,date"
         ), c, params={"s": symbols, "a": start, "b": end})
@@ -241,6 +241,10 @@ def main():
                          ">= MIDMONTH_LEAD (default 5pp).")
     ap.add_argument("--force", action="store_true",
                     help="Bypass date gate (initial deploy / manual).")
+    ap.add_argument("--stop-check", action="store_true",
+                    help="DAILY ATR-from-entry hard-stop check: emit a STOP_HIT "
+                         "exit if the held name's low pierced entry - "
+                         "ATR_STOP_MULT*ATR. Runs every trading day.")
     args = ap.parse_args()
 
     logging.basicConfig(level=logging.INFO,
@@ -262,6 +266,45 @@ def main():
         log.warning(f"{MODEL_NAME}: model_settings.enabled is False — "
                     f"writing empty signals file and exiting.")
         _write_empty()
+        return 0
+
+    # ---- DAILY ATR-from-entry hard-stop check (separate daily mode) ----
+    if args.stop_check:
+        held = held_from_db()
+        if not held or not held[0].get("symbol"):
+            log.info("stop-check: flat — nothing to check."); _write_empty(); return 0
+        h = held[0]
+        sym = h["symbol"]; entry_px = float(h.get("entry_price") or 0)
+        if entry_px <= 0:
+            log.warning("stop-check: held has no entry_px; skip."); _write_empty(); return 0
+        df = load_panel([sym])
+        if df.empty:
+            log.warning(f"stop-check: no data for {sym}; skip."); _write_empty(); return 0
+        df = df.sort_values("date")
+        if panel_is_stale(df["date"].iloc[-1], today):
+            log.error("stop-check: data stale; skip (fail-safe)."); _write_empty(); return 1
+        atr_val = S.atr_latest(df["high"].astype(float), df["low"].astype(float),
+                               df["close"].astype(float))
+        day_low = float(df["low"].iloc[-1])
+        last_close = float(df["close"].iloc[-1])
+        hit, lvl = S.atr_stop_hit(entry_px, atr_val, day_low)
+        log.info(f"stop-check {sym}: entry={entry_px:.2f} ATR={atr_val} "
+                 f"stop_level={lvl} day_low={day_low:.2f} -> {'HIT' if hit else 'ok'}")
+        if hit:
+            signals = [{
+                "model": MODEL_NAME, "symbol": sym,
+                "company": sym.split(":")[-1].replace("-EQ", ""),
+                "ts": today.strftime("%Y-%m-%d %H:%M:%S"),
+                "side": "SELL", "signal": "STOP_HIT",
+                "price": float(lvl), "sl": 0.0, "target": 0.0,
+                "note": f"ATR-from-entry stop: low {day_low:.2f} <= "
+                        f"entry {entry_px:.2f} - {S.ATR_STOP_MULT}x ATR ({lvl:.2f})",
+            }]
+            with open(sig_path, "w") as f:
+                json.dump(signals, f)
+            log.info(f"stop-check: STOP_HIT emitted for {sym} @ {lvl:.2f}")
+        else:
+            _write_empty()
         return 0
 
     # Mid-month gate (mutually exclusive with rebalance-only; --force overrides).

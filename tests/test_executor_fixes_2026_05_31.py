@@ -288,3 +288,42 @@ def test_buy_allow_when_flat_everywhere():
     from tools.live.fyers_executor import buy_drift_decision
     skip, _ = buy_drift_decision(fyers_qty=0, mine_qty=0, sibling_qty=0)
     assert skip is False
+
+
+# --- 11. emerging ATR-from-entry hard stop (2.5x) ----------------------------
+
+def test_atr_stop_level_from_entry():
+    from tools.models.emerging_momentum.strategy import atr_stop_level
+    # entry 1000, ATR 40, 2.5x -> level 900
+    assert atr_stop_level(1000.0, 40.0, 2.5) == 900.0
+
+
+def test_atr_stop_level_none_on_bad_inputs():
+    from tools.models.emerging_momentum.strategy import atr_stop_level
+    assert atr_stop_level(1000.0, 0, 2.5) is None       # no ATR
+    assert atr_stop_level(0, 40.0, 2.5) is None          # no entry
+    assert atr_stop_level(50.0, 40.0, 2.5) is None       # level would be <=0
+
+
+def test_atr_stop_hit_when_low_pierces_level():
+    from tools.models.emerging_momentum.strategy import atr_stop_hit
+    hit, lvl = atr_stop_hit(1000.0, 40.0, day_low=895.0, mult=2.5)
+    assert hit is True and lvl == 900.0
+
+
+def test_atr_stop_not_hit_above_level():
+    from tools.models.emerging_momentum.strategy import atr_stop_hit
+    hit, lvl = atr_stop_hit(1000.0, 40.0, day_low=905.0, mult=2.5)
+    assert hit is False and lvl == 900.0
+
+
+def test_atr_latest_simple():
+    import pandas as pd
+    from tools.models.emerging_momentum.strategy import atr_latest
+    n = 20
+    high = pd.Series([102.0] * n)
+    low = pd.Series([98.0] * n)
+    close = pd.Series([100.0] * n)
+    a = atr_latest(high, low, close, win=14)
+    # constant 4-wide bars, no gaps -> TR=4 -> ATR=4
+    assert a is not None and abs(a - 4.0) < 1e-6
