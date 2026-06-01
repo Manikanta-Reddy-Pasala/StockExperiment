@@ -265,7 +265,7 @@ function posRow(model, symbol, qty, entry, live) {
   return `
     <tr>
       <td><strong>${symbol}</strong></td>
-      <td><a href="/admin/models/${model}/detail" class="badge bg-primary text-decoration-none">${model}</a></td>
+      <td><a href="/admin/models/${model}/detail" class="badge bg-primary text-decoration-none">${modelLabel(model)}</a></td>
       <td class="text-end">${qty.toLocaleString('en-IN')}</td>
       <td class="text-end">${fmtINR(entry)}</td>
       <td class="text-end">${fmtINR(live)}</td>
