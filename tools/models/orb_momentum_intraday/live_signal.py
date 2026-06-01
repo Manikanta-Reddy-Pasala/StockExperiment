@@ -39,8 +39,14 @@ from tools.models.orb_momentum_intraday.data import fetch_5min, _fyers # noqa: E
 MODEL_NAME = "orb_momentum_intraday"
 
 
-def _today_leaders():
-    """Top-SELECT_TOP momentum leaders for today (daily DB close + live N500)."""
+def _today_leaders(today: date = None):
+    """Top-SELECT_TOP momentum leaders for today (daily DB close + live N500).
+
+    Returns [] if the daily panel is STALE (last close older than
+    DAILY_STALE_MAX_DAYS — failed nightly pull / dead feed) so ORB never ranks
+    leaders off days-old data.
+    """
+    today = today or date.today()
     eng = _get_engine()
     syms = [f"NSE:{s}-EQ" for s in sorted(universe_union(S.INDEX))]
     with eng.connect() as c:
@@ -48,9 +54,17 @@ def _today_leaders():
             "SELECT symbol,date,close FROM historical_data "
             "WHERE symbol=ANY(:s) AND data_source='fyers' "
             "AND date >= :a ORDER BY symbol,date"
-        ), c, params={"s": syms, "a": (date.today() - timedelta(days=90)).isoformat()})
+        ), c, params={"s": syms, "a": (today - timedelta(days=90)).isoformat()})
+    if df.empty:
+        return []
     df["date"] = pd.to_datetime(df["date"])
     cl = df.pivot(index="date", columns="symbol", values="close").ffill()
+    # Daily-panel freshness gate (parity with the other models' stale gates).
+    last_day = cl.index[-1].date()
+    if (today - last_day).days > S.DAILY_STALE_MAX_DAYS:
+        print(f"orb: daily panel STALE — last close {last_day} > "
+              f"{S.DAILY_STALE_MAX_DAYS}d before {today}; no leaders.")
+        return []
     elig = set(universe_union(S.INDEX))   # live: today's official N500 list
     return S.rank_momentum(cl, len(cl) - 1, elig)
 
@@ -99,18 +113,32 @@ def emit_signals(now: dt.datetime = None) -> dict:
     if mins >= S.ENTRY_CUTOFF_MIN:
         return out             # no new entries after the morning cutoff
 
-    leaders = _today_leaders()
+    today = now.date()
+    leaders = _today_leaders(today)
     if not leaders:
         return out
     held = _held_symbols()
     invested = _invested()
     fy = _fyers()
-    today = now.date()
     for sym in leaders:
         if sym in held:
             continue           # already in this name — don't re-buy
         df = fetch_5min(sym, today, today, fy=fy)
         if df is None or len(df) < S.OR_BARS + 1:
+            continue
+        # Intraday FRESHNESS gate — refuse to act on stale/wrong-day bars:
+        #  (1) the latest bar must be TODAY (not a cached/old session), and
+        #  (2) it must be recent (live feed alive), else a halted/dead feed
+        #      could read an old close as a "breakout". A missed entry is safe.
+        if df["day"].iloc[-1] != today:
+            continue
+        try:
+            last_bar_age_min = (now - df["dt"].iloc[-1].to_pydatetime().replace(tzinfo=None)).total_seconds() / 60.0
+        except Exception:
+            last_bar_age_min = 0.0
+        if last_bar_age_min > S.STALE_BAR_MAX_MIN:
+            print(f"orb: {sym} last 5-min bar {last_bar_age_min:.0f}m old "
+                  f"(> {S.STALE_BAR_MAX_MIN}m) — stale feed, skip.")
             continue
         rng = S.opening_range(df)
         if rng is None:

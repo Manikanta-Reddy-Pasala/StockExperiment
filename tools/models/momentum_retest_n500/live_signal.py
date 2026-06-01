@@ -90,6 +90,18 @@ def main():
     dates = cl.index
     di = len(dates) - 1                                   # today = last row
 
+    # Data-freshness gate (parity with n100/pseudo/emerging): if the panel's
+    # most recent equity day is stale (failed nightly OHLCV pull / dead feed),
+    # abort rather than rank + emit buys off a days-old close. 7-day window
+    # spans a long weekend + holiday cluster; fires only on broken data.
+    if not args.force and len(dates):
+        _last_day = pd.Timestamp(dates[di]).date()
+        if (today.date() - _last_day).days > 7:
+            log.error(f"Panel STALE — last equity day {_last_day} > 7d before "
+                      f"{today.date()}; refusing to emit (fail-safe).")
+            sig_path.write_text(json.dumps({"model": MODEL_NAME, "sells": [], "buys": []}))
+            return 1
+
     from src.services.trading.multi_holding_service import get_holdings
     holds = {h["symbol"] for h in get_holdings(MODEL_NAME)}
 

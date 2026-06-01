@@ -301,6 +301,18 @@ def main() -> int:
         Path(args.signals_out).write_text(json.dumps([]))
         return 1
 
+    # Data-freshness gate (parity with the other models): if the latest bar is
+    # stale (failed nightly OHLCV pull / dead feed), abort rather than evaluate
+    # a 40d-high breakout off a days-old close. 7-day window spans long
+    # weekend + holiday clusters; fires only on genuinely broken data.
+    _last_day = pd.Timestamp(df["date"].max()).date()
+    if (datetime.now().date() - _last_day).days > 7:
+        log.error(f"Panel STALE — last bar {_last_day} > 7d before "
+                  f"{datetime.now().date()}; refusing to emit (fail-safe).")
+        Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.signals_out).write_text(json.dumps([]))
+        return 1
+
     signals = []
     pos = get_current_position()
 

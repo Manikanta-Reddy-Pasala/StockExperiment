@@ -65,6 +65,9 @@ ENTRY_CUTOFF_MIN = 600  # only enter if the breakout fires before 10:00 (=10*60 
 TARGET_MULT = 2.0       # target = entry + TARGET_MULT × opening-range width
 EOD_FLAT_MIN = 910      # force square-off at/after 15:10 (=15*60+10); intraday only
 MAX_PRICE = 1e9         # no price cap (liquid N500 names)
+# Data-freshness guards (live): refuse to act on stale data.
+STALE_BAR_MAX_MIN = 15  # latest 5-min bar must be within this many minutes of now
+DAILY_STALE_MAX_DAYS = 7  # daily ranking panel's last close must be within this
 
 # Cost model (per side baked into round-trip). Realistic default; raise for a
 # conservative read. The headline backtest uses SLIPPAGE=0.0015, ROUND_TRIP=0.0015.
