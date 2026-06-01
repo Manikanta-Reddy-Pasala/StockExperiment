@@ -256,6 +256,29 @@ def _portfolio_state() -> Dict:
             "source": "position",   # marker — T+1 pending
         })
 
+    # Account TOTAL value = cash + GROSS market value of every broker lot.
+    # holdings() (settled) and CNC positions() (today, pre-settlement) are
+    # DISJOINT lots — a symbol in BOTH (e.g. HFCL: 203 settled + 502 today) is
+    # 705 real shares, so the value sum must NOT dedup by symbol (the
+    # open_positions list above dedups for display; that under-counted the
+    # account total, e.g. showing 212k for a real ~308k account).
+    holdings_value = 0.0
+    for p in holdings:
+        q = float(p.get("quantity") or 0)
+        if q <= 0:
+            continue
+        bsym = (p.get("symbol") or "").replace("NSE:", "").replace("-EQ", "")
+        holdings_value += _resolve_ltp(bsym, float(p.get("last_price") or 0)) * q
+    for p in positions:
+        if p.get("productType") != "CNC":
+            continue
+        nq = float(p.get("netQty") or 0)
+        if nq <= 0:
+            continue
+        bsym = (p.get("symbol") or "").replace("NSE:", "").replace("BSE:", "").replace("-EQ", "").replace("-B", "")
+        holdings_value += _resolve_ltp(bsym, float(p.get("ltp") or 0)) * nq
+    account_total = cash + holdings_value
+
     total_value = cash + market_value
     # P&L based on ACTUAL invested capital, not hardcoded baseline
     total_pnl = unrealized_total
@@ -273,6 +296,9 @@ def _portfolio_state() -> Dict:
         "position_cost": position_cost,
         "market_value": market_value,
         "total_value": total_value,
+        # Plain-language funds for the portfolio card (gross, no symbol-dedup):
+        "holdings_value": holdings_value,        # live ₹ in all stock lots
+        "account_total": account_total,          # cash + holdings_value (true total)
         "realized_pnl": 0.0,
         "unrealized_pnl": unrealized_total,
         "total_pnl": total_pnl,

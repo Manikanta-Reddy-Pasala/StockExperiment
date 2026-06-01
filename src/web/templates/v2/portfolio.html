@@ -21,16 +21,16 @@
         <div class="fs-5 fw-bold" id="fyers_available_cash">--</div>
       </div>
       <div class="col-md-auto">
-        <span class="text-muted small" title="Money currently locked inside your open stock positions">Money in Stocks</span>
+        <span class="text-muted small" title="Live market value of every stock you currently hold (all lots)">Money in Stocks</span>
         <div class="fs-6" id="fyers_used_margin">--</div>
       </div>
       <div class="col-md-auto">
-        <span class="text-muted small" title="Whole Fyers account = Cash to Trade + Money in Stocks">Total Account</span>
+        <span class="text-muted small" title="Your true account value = Cash to Trade + Money in Stocks">Total Account</span>
         <div class="fs-6 fw-bold" id="fyers_total_account">--</div>
       </div>
       <div class="col-12">
         <span class="text-muted" style="font-size:.72rem">
-          Whole Fyers account (all models share it). “Cash to Trade” is free to buy; “Money in Stocks” is locked in holdings; “Total Account” = the two added. Per-model split is in the table below.
+          Whole Fyers account (all models share it). “Cash to Trade” = free cash to buy; “Money in Stocks” = live market value of all your holdings; “Total Account” = the two added (your real account worth). Per-model split is in the table below.
         </span>
       </div>
       <div class="col-md-auto ms-auto">
@@ -240,14 +240,16 @@ async function loadFyersFunds() {
     const d = await r.json();
     if (!d.success) return;
     const s = d.data;
-    // Plain-language funds. Broker's "total_margin" field is actually the FREE
-    // limit (~= available cash), NOT the grand total — so we IGNORE it and show
-    // a TRUE total = cash to trade + money locked in positions.
+    // Plain-language funds. "Money in Stocks" = LIVE market value of every
+    // stock lot you hold (holdings_value), NOT the broker's "utilized_margin"
+    // field (a margin number that under-states it). "Total Account" = cash +
+    // that = your true account value (matches the ~3L you deposited).
     const cashToTrade = Number(s.cash || 0);
-    const inStocks = Number(s.utilized_margin || 0);
+    const inStocks = Number(s.holdings_value || 0);
+    const totalAcct = Number(s.account_total || (cashToTrade + inStocks));
     document.getElementById('fyers_available_cash').textContent = fmtINR(cashToTrade);
     document.getElementById('fyers_used_margin').textContent = fmtINR(inStocks);
-    document.getElementById('fyers_total_account').textContent = fmtINR(cashToTrade + inStocks);
+    document.getElementById('fyers_total_account').textContent = fmtINR(totalAcct);
     document.getElementById('fyers_funds_ts').textContent =
       window.fmtIST ? window.fmtIST(s.ledger_updated_at) : (s.ledger_updated_at || '');
   } catch(e) { console.error(e); }
