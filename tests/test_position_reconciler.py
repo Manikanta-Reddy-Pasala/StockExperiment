@@ -180,3 +180,42 @@ def test_decide_drift_cap_none_is_legacy():
     # no cap passed -> unchanged behaviour
     kind, q, _ = decide_drift(100, 10.0, 705, 10.0, 0)
     assert kind == "AUTO_MIRROR" and q == 705
+
+
+# ---------------- multi_claimed_symbols (pure) — 2026-06-01 ----------------
+# Bug: the single-position reconciler built `claimed_syms` from model_ledger
+# .open_symbol only, so a MULTI-holding model (momentum_retest_n500, positions
+# live in model_holdings) had its real, recorded holdings (BHEL, IDEA) flagged
+# as FYERS_ORPHAN every pass. multi_claimed_symbols folds the model_holdings
+# symbols into the claimed set so they stop looking like orphans.
+
+class _H:
+    """Minimal stand-in for a ModelHolding row."""
+    def __init__(self, model_name, symbol, qty=0):
+        self.model_name = model_name
+        self.symbol = symbol
+        self.qty = qty
+
+
+def test_multi_claimed_symbols_normalizes_and_dedups():
+    from tools.live.position_reconciler import multi_claimed_symbols
+    holdings = [
+        _H("momentum_retest_n500", "NSE:BHEL-EQ", 36),
+        _H("momentum_retest_n500", "IDEA", 1053),      # plain form -> normalized
+    ]
+    assert multi_claimed_symbols(holdings) == {"NSE:BHEL-EQ", "NSE:IDEA-EQ"}
+
+
+def test_multi_claimed_symbols_skips_zero_and_blank():
+    from tools.live.position_reconciler import multi_claimed_symbols
+    holdings = [
+        _H("m", "NSE:X-EQ", 0),    # zero qty -> not a real claim
+        _H("m", "", 50),           # blank symbol -> skip
+        _H("m", "NSE:Y-EQ", 10),
+    ]
+    assert multi_claimed_symbols(holdings) == {"NSE:Y-EQ"}
+
+
+def test_multi_claimed_symbols_empty():
+    from tools.live.position_reconciler import multi_claimed_symbols
+    assert multi_claimed_symbols([]) == set()

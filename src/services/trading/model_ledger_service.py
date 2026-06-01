@@ -20,7 +20,7 @@ from sqlalchemy import text
 
 from src.models.database import get_database_manager
 from src.models.model_ledger_models import (
-    ModelLedger, ModelSettings, ModelTrade,
+    ModelLedger, ModelSettings, ModelTrade, ModelHolding,
 )
 
 log = logging.getLogger(__name__)
@@ -787,6 +787,13 @@ def get_portfolio_stats(price_lookup=None) -> Dict:
     with db.get_session() as s:
         settings_rows = {x.model_name: x for x in s.query(ModelSettings).all()}
         ledger_rows = s.query(ModelLedger).all()
+        # Multi-holding models (e.g. momentum_retest_n500) keep their positions
+        # in model_holdings, not ledger.open_symbol. Group them once so each
+        # model's NAV / position_value includes ALL its holdings (otherwise a
+        # K>1 model shows only cash and its real shares look "untracked").
+        holdings_by_model: Dict[str, list] = {}
+        for h in s.query(ModelHolding).all():
+            holdings_by_model.setdefault(h.model_name, []).append(h)
 
         models = []
         total_allocated = Decimal(0)
@@ -809,6 +816,32 @@ def get_portfolio_stats(price_lookup=None) -> Dict:
                     mtm_price = float(l.open_entry_px)
                 if mtm_price is not None:
                     pos_value = Decimal(str(mtm_price)) * Decimal(str(l.open_qty))
+
+            # Multi-holding positions: MTM each, add to pos_value, and expose
+            # the list so the dashboard can render a K>1 model's open names.
+            holdings_list = []
+            for h in holdings_by_model.get(l.model_name, []):
+                h_qty = int(h.qty or 0)
+                if h_qty <= 0:
+                    continue
+                h_mtm = None
+                if price_lookup:
+                    try:
+                        h_mtm = price_lookup(h.symbol)
+                    except Exception:
+                        h_mtm = None
+                if h_mtm is None and h.entry_px:
+                    h_mtm = float(h.entry_px)
+                h_val = Decimal(str(h_mtm)) * Decimal(str(h_qty)) if h_mtm is not None else Decimal(0)
+                pos_value += h_val
+                holdings_list.append({
+                    "symbol": h.symbol,
+                    "qty": h_qty,
+                    "entry_px": float(h.entry_px) if h.entry_px else None,
+                    "entry_date": h.entry_date.isoformat() if h.entry_date else None,
+                    "mtm_price": h_mtm,
+                    "value": float(h_val),
+                })
 
             nav = cash + pos_value
             invested = cfg.invested_amount if cfg else Decimal(0)
@@ -837,6 +870,8 @@ def get_portfolio_stats(price_lookup=None) -> Dict:
                 "open_entry_px": float(l.open_entry_px) if l.open_entry_px else None,
                 "open_entry_date": l.open_entry_date.isoformat() if l.open_entry_date else None,
                 "open_mtm_price": mtm_price,
+                "holdings": holdings_list,
+                "is_multi": bool(holdings_list),
                 "total_trades": l.total_trades or 0,
                 "wins": l.wins or 0,
                 "losses": l.losses or 0,

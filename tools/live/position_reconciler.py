@@ -79,6 +79,29 @@ def sibling_qty_for(ledgers, model_name: str, symbol: str) -> int:
     return total
 
 
+def multi_claimed_symbols(holdings) -> set:
+    """Normalized symbols claimed by MULTI-holding models (model_holdings rows).
+
+    The single-position reconciler tracks claims via model_ledger.open_symbol,
+    but multi-holding models (e.g. momentum_retest_n500) store their positions
+    in model_holdings instead — so without this their real, recorded holdings
+    (BHEL, IDEA, …) get flagged as FYERS_ORPHAN every pass. Folding these into
+    `claimed_syms` stops the false orphan alerts. Zero-qty / blank rows are
+    skipped (not a live claim).
+
+    Args:
+        holdings: iterable of ModelHolding-like rows (.symbol, .qty).
+    Returns:
+        Set of normalized symbols with qty > 0.
+    """
+    out = set()
+    for h in holdings or []:
+        sym = _normalize(getattr(h, "symbol", "") or "")
+        if sym and int(getattr(h, "qty", 0) or 0) > 0:
+            out.add(sym)
+    return out
+
+
 def decide_drift(expected_qty: int, expected_px: float,
                  actual_qty: int, actual_px: float,
                  sibling_qty: int = 0, max_affordable_qty: int = None):
@@ -218,7 +241,7 @@ def _fyers_positions_by_symbol(svc, user_id: int = 1):
 def reconcile_once(user_id: int = 1, dry_run: bool = False) -> List[Dict]:
     """One pass. Returns list of correction dicts."""
     from src.models.database import get_database_manager
-    from src.models.model_ledger_models import ModelLedger, ModelSettings
+    from src.models.model_ledger_models import ModelLedger, ModelSettings, ModelHolding
     from src.services.brokers.fyers_service import FyersService
 
     svc = FyersService()
@@ -229,7 +252,11 @@ def reconcile_once(user_id: int = 1, dry_run: bool = False) -> List[Dict]:
     with db.get_session() as s:
         ledgers = s.query(ModelLedger).all()
         settings_map = {x.model_name: x for x in s.query(ModelSettings).all()}
-        claimed_syms = set()
+        # Multi-holding models store positions in model_holdings, not in
+        # ledger.open_symbol. Seed claimed_syms with those so they are not
+        # mistaken for FYERS_ORPHAN by the single-position orphan check below.
+        multi_holdings = s.query(ModelHolding).all()
+        claimed_syms = multi_claimed_symbols(multi_holdings)
 
         for l in ledgers:
             cfg = settings_map.get(l.model_name)

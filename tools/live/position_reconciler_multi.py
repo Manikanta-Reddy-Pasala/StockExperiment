@@ -24,6 +24,28 @@ log = logging.getLogger("reconciler_multi")
 DEFAULT_MODEL = "momentum_retest_n500"
 
 
+def holding_status(expected_qty, fyers_qty, sibling_qty):
+    """Pure: classify ONE model_holdings row against the broker net.
+
+    available = fyers_qty - sibling_qty (sibling = qty OTHER models claim of the
+    same symbol on the shared Fyers account). Returns (status, available):
+
+      ORPHAN — fyers_qty == 0 (ledger holds, Fyers flat)
+      SHORT  — available < expected_qty (external / missed record_sell)
+      OK     — available >= expected_qty
+
+    Kept pure (no Fyers/DB IO) so it is unit-testable. NOTE: `fyers_qty` must be
+    the integer qty — `_fyers_positions_by_symbol` returns symbol -> {qty,...},
+    so the caller has to pull `.qty` out of the dict before calling this.
+    """
+    if fyers_qty == 0:
+        return ("ORPHAN", 0)
+    avail = fyers_qty - sibling_qty
+    if avail < expected_qty:
+        return ("SHORT", avail)
+    return ("OK", avail)
+
+
 def _sibling_claims(sym, this_model, single_ledgers, all_holdings):
     """Qty of `sym` claimed by OTHER models on the shared Fyers account.
 
@@ -60,20 +82,21 @@ def reconcile_multi(model_name=DEFAULT_MODEL, user_id=1, dry_run=False):
         my = [h for h in all_holdings if h.model_name == model_name]
         for h in my:
             sym = _normalize(h.symbol); exp = int(h.qty or 0)
-            fy = fyers.get(sym, 0)
+            # _fyers_positions_by_symbol returns sym -> {qty, avg_price, ...}.
+            # Pull the int qty out of the dict (the dict-minus-int bug crashed
+            # the whole reconcile pass here).
+            fy = int((fyers.get(sym) or {}).get("qty", 0) or 0)
             sib = _sibling_claims(sym, model_name, single_ledgers, all_holdings)
-            avail = fy - sib
-            if avail < exp:                                  # Fyers short of ledger
+            status, avail = holding_status(exp, fy, sib)
+            if status == "ORPHAN":
+                alerts.append({"model": model_name, "symbol": sym,
+                               "ledger_qty": exp, "fyers_qty": 0,
+                               "action": "MANUAL: ORPHAN — ledger holds, Fyers flat"})
+            elif status == "SHORT":
                 alerts.append({"model": model_name, "symbol": sym,
                                "ledger_qty": exp, "fyers_qty": fy, "sibling": sib,
                                "available": avail, "drift": exp - avail,
                                "action": "MANUAL: external sell / missed record_sell — verify Fyers"})
-        # orphan: ledger says we hold N positions but Fyers has none of a symbol
-        for h in my:
-            if fyers.get(_normalize(h.symbol), 0) == 0:
-                alerts.append({"model": model_name, "symbol": _normalize(h.symbol),
-                               "ledger_qty": int(h.qty or 0), "fyers_qty": 0,
-                               "action": "MANUAL: ORPHAN — ledger holds, Fyers flat"})
     for a in alerts:
         log.warning(f"DRIFT {a['model']} {a['symbol']}: {a}")
     if alerts and not dry_run:
