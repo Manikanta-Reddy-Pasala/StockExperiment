@@ -50,24 +50,25 @@ def atr_panel(cl, hi, lo, win=ATR_WIN):
     return tr.rolling(win).mean()
 
 
-def make_rank(dates, cl):
+def make_rank(dates, cl, lb=None):
+    lb = lb or LOOKBACK
     def pit(di):
         elig = eligible_at(INDEX_NAME, dates[di].date())
         return [f"NSE:{s}-EQ" for s in elig
                 if f"NSE:{s}-EQ" in cl.columns and pd.notna(cl[f"NSE:{s}-EQ"].iloc[di])]
 
     def rank_at(di):
-        if di < LOOKBACK:
+        if di < lb:
             return []
         univ = pit(di)
         if not univ:
             return []
-        rets = cl.iloc[di].reindex(univ) / cl.iloc[di - LOOKBACK].reindex(univ) - 1
+        rets = cl.iloc[di].reindex(univ) / cl.iloc[di - lb].reindex(univ) - 1
         return list(rets.dropna().sort_values(ascending=False).index)
 
     def midret_at(di):
         univ = pit(di)
-        rets = cl.iloc[di].reindex(univ) / cl.iloc[di - LOOKBACK].reindex(univ) - 1
+        rets = cl.iloc[di].reindex(univ) / cl.iloc[di - lb].reindex(univ) - 1
         rk = rets.dropna().sort_values(ascending=False)
         return [(s, float(rk[s]) * 100) for s in rk.index]
     return rank_at, midret_at
@@ -190,6 +191,8 @@ def main():
     ap.add_argument("--from", dest="start", default="2021-03-01")
     ap.add_argument("--to", dest="end", default="2026-05-31")
     ap.add_argument("--capital", type=float, default=1_000_000.0)
+    ap.add_argument("--grid", action="store_true",
+                    help="LOOKBACK x RETAIN sweep with fixed -12%% stop ON — chase CAGR.")
     a = ap.parse_args()
     start = datetime.strptime(a.start, "%Y-%m-%d").date()
     end = datetime.strptime(a.end, "%Y-%m-%d").date()
@@ -198,8 +201,23 @@ def main():
     cl, hi, lo, sma20 = load_panels(eng, start, end)
     atr = atr_panel(cl, hi, lo)
     dates = cl.index
-    rank_at, midret_at = make_rank(dates, cl)
     calendar = build_calendar(dates, start, end, mid_check=True)
+
+    if a.grid:
+        print(f"\nLOOKBACK x RETAIN grid (fixed -12% stop ON):")
+        print(f"{'LB/RET':<14}{'CAGR%':>8}{'DD%':>8}{'ret%':>8}{'trades':>8}{'WR%':>6}")
+        print("-" * 52)
+        for lb in (10, 15, 20):
+            r_at, mr_at = make_rank(dates, cl, lb=lb)
+            for ret in (2, 3, 4):
+                m = daily_sim(dates, cl, hi, lo, atr, sma20, calendar, r_at, mr_at,
+                              capital=a.capital, start=start, end=end,
+                              retain=ret, entry_stop_pct=0.12)
+                tag = f"LB{lb}/RET{ret}" + ("*" if (lb == LOOKBACK and ret == RETAIN) else "")
+                print(f"{tag:<14}{m['cagr']:>8}{m['dd']:>8}{m['ret']:>8}{m['trades']:>8}{m['wr']:>6}")
+        return
+
+    rank_at, midret_at = make_rank(dates, cl)
     print(f"\n{'scenario':<22}{'CAGR%':>8}{'DD%':>8}{'ret%':>8}{'trades':>8}{'WR%':>6}")
     print("-" * 60)
     for name, kw in SCENARIOS:

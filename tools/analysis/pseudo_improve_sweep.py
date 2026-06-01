@@ -87,7 +87,8 @@ def build_universes(dates, adv20, start, end):
     return year_starts, yu
 
 
-def make_rank_at(dates, cl, sma200, year_starts, yu):
+def make_rank_at(dates, cl, sma200, year_starts, yu, lb=None):
+    lb = lb or S.LOOKBACK
     def pick_universe(d):
         chosen = year_starts[0]
         for ys in year_starts:
@@ -96,7 +97,7 @@ def make_rank_at(dates, cl, sma200, year_starts, yu):
         return yu.get(chosen, [])
 
     def rank_at(di):
-        if di < max(S.LOOKBACK, 200):
+        if di < max(lb, 200):
             return []
         univ = pick_universe(dates[di])
         if S.SMA_GATE:
@@ -105,7 +106,7 @@ def make_rank_at(dates, cl, sma200, year_starts, yu):
         univ = [s for s in univ if pd.notna(cl[s].iloc[di]) and float(cl[s].iloc[di]) <= S.MAX_PRICE]
         if not univ:
             return []
-        rets = cl.iloc[di].reindex(univ) / cl.iloc[di - S.LOOKBACK].reindex(univ) - 1
+        rets = cl.iloc[di].reindex(univ) / cl.iloc[di - lb].reindex(univ) - 1
         return list(rets.dropna().sort_values(ascending=False).index)
     return rank_at
 
@@ -236,6 +237,8 @@ def main():
     ap.add_argument("--from", dest="start", default="2021-03-01")
     ap.add_argument("--to", dest="end", default="2026-05-31")
     ap.add_argument("--capital", type=float, default=1_000_000.0)
+    ap.add_argument("--grid", action="store_true",
+                    help="LOOKBACK sweep with ATR x3.0 stop ON (RET1) — chase CAGR.")
     a = ap.parse_args()
     start = datetime.strptime(a.start, "%Y-%m-%d").date()
     end = datetime.strptime(a.end, "%Y-%m-%d").date()
@@ -246,9 +249,21 @@ def main():
     atr = atr_panel(cl, hi, lo)
     dates = cl.index
     year_starts, yu = build_universes(dates, adv20, start, end)
-    rank_at = make_rank_at(dates, cl, sma200, year_starts, yu)
     calendar = build_calendar(dates, start, end, mid_check=False)
 
+    if a.grid:
+        print(f"\nLOOKBACK grid (ATR x3.0 stop ON, RET1):")
+        print(f"{'lookback':<12}{'CAGR%':>8}{'DD%':>8}{'ret%':>8}{'trades':>8}{'WR%':>6}")
+        print("-" * 50)
+        for lb in (15, 20, 25, 30, 40):
+            r_at = make_rank_at(dates, cl, sma200, year_starts, yu, lb=lb)
+            m = daily_sim(dates, cl, hi, lo, atr, sma20, calendar, r_at,
+                          capital=a.capital, start=start, end=end, atr_from_entry=3.0)
+            tag = f"LB={lb}" + (" *current" if lb == S.LOOKBACK else "")
+            print(f"{tag:<12}{m['cagr']:>8}{m['dd']:>8}{m['ret']:>8}{m['trades']:>8}{m['wr']:>6}")
+        return
+
+    rank_at = make_rank_at(dates, cl, sma200, year_starts, yu)
     print(f"\n{'scenario':<22}{'CAGR%':>8}{'DD%':>8}{'ret%':>8}{'trades':>8}{'WR%':>6}")
     print("-" * 60)
     for name, kw in SCENARIOS:
