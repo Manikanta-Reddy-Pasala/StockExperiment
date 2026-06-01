@@ -276,6 +276,30 @@ def _resolve_recent_order_id(svc, user_id: int, symbol: str, qty: int,
     return ""
 
 
+def _net_qty(svc, user_id: int, symbol: str) -> int:
+    """Account-wide NET qty for `symbol` = holdings (T+1) + intraday positions
+    netQty. Best-effort (0 on error). Used to DETECT a fill that the order-status
+    poll missed — the definitive guard against a cancel/fill-race double order."""
+    bare = (symbol or "").upper().replace("NSE:", "").replace("-EQ", "")
+    if not bare:
+        return 0
+    net = 0
+    try:
+        for r in (svc.holdings(user_id) or {}).get("data") or []:
+            if isinstance(r, dict) and bare in (r.get("symbol") or "").upper():
+                net += int(float(r.get("quantity") or 0))
+    except Exception:
+        pass
+    try:
+        raw = svc._get_api_instance(user_id)._make_request("GET", "positions") or {}
+        for r in (raw.get("data") or []):
+            if isinstance(r, dict) and bare in (r.get("symbol") or "").upper():
+                net += int(float(r.get("netQty") or 0))
+    except Exception:
+        pass
+    return net
+
+
 def buy_drift_decision(fyers_qty: int, mine_qty: int, sibling_qty: int):
     """Decide whether to SKIP a BUY because of an existing position.
 
@@ -603,6 +627,29 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
     # during the first window), not the stale t=0 last_price.
     retry_px = first_px
 
+    # Baseline account net qty for this symbol BEFORE we place anything. Any
+    # later placement re-checks this: if net has risen by >= qty, a prior leg
+    # filled (even if the order-status poll / cancel-confirm missed it) — we must
+    # NOT place another order (the HFCL 2026-06-01 cancel/fill-race double-buy).
+    _base_net = 0 if (side or "").upper() != "BUY" else _net_qty(svc, user_id, symbol)
+
+    def _filled_via_position(px):
+        """If the account net already rose by qty since baseline, the order
+        filled — return a filled result instead of placing another order."""
+        if (side or "").upper() != "BUY":
+            return None
+        try:
+            if _net_qty(svc, user_id, symbol) - _base_net >= qty:
+                log.warning(f"  {symbol}: account net rose by >= {qty} since "
+                            f"start — a prior leg FILLED; NOT placing another "
+                            f"order (double-fill guard).")
+                return {"filled": True, "status": "limit_filled_position_confirmed",
+                        "order_id": "", "fill_price": float(px),
+                        "fill_qty": qty, "reason": "position_confirmed"}
+        except Exception:
+            pass
+        return None
+
     log.info(f"  LIMIT {side} {symbol} qty={qty} px={first_px} "
              f"(last={last_price}, tol={rm_cfg.limit_tol_pct}%)")
     res = _placeorder(svc, user_id, symbol, qty, side,
@@ -670,6 +717,11 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
                 return {"filled": False, "status": "limit_cancel_unconfirmed",
                         "order_id": order_id, "fill_price": None, "fill_qty": 0,
                         "reason": "prior LIMIT not cancelled; skipped replacement to avoid double-margin"}
+            # Cancel/fill race: 'cancelled' can be reported for an order that
+            # actually filled. Confirm via the ACCOUNT position before replacing.
+            _pf = _filled_via_position(first_px)
+            if _pf:
+                return _pf
             res2 = _placeorder(svc, user_id, symbol, qty, side,
                                pricetype="LIMIT", price=retry_px, tag=tag)
             if _is_ok(res2):
@@ -703,6 +755,11 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
         return {"filled": False, "status": "market_skipped_cancel_unconfirmed",
                 "order_id": order_id, "fill_price": None, "fill_qty": 0,
                 "reason": "prior LIMIT not cancelled; skipped MARKET to avoid double-margin"}
+    # Cancel/fill race guard: if the just-"cancelled" re-quote actually filled
+    # (account net rose by qty), do NOT place the MARKET — that's the double-buy.
+    _pf = _filled_via_position(retry_px)
+    if _pf:
+        return _pf
 
     # FIX 3 — slippage cap before the uncapped MARKET fallback. On thin midcaps
     # the price can run away during the LIMIT windows; a blind MARKET then fills
@@ -1160,6 +1217,29 @@ def main() -> int:
             log.info(f"  live LTP {sym}={live_px} (signal={signal_price}, "
                      f"delta={((live_px/signal_price-1)*100 if signal_price else 0):+.2f}%)")
         side = sig["side"]
+
+        # PRICE VALIDATION (entries): an entry LIMIT must price off a FRESH live
+        # LTP. If the live quote is unavailable, the emit-time signal price can
+        # be stale / off-market (e.g. ENRIN: signal ₹3872 while the 09:30 market
+        # was 3817-3846 → a ~1% mispriced limit that also tick-rejected). Refuse
+        # to place on a stale price — skip + alert (a missed entry is safe; a
+        # blind mispriced order is not). Exits keep the fallback (closing wins).
+        if not args.dry_run and (not live_px or live_px <= 0):
+            log.error(f"SKIP ENTRY {sym}: no live LTP — refusing to place on "
+                      f"stale signal price ₹{signal_price} (price-validation).")
+            _tg_safe(
+                f"⚠️ *ENTRY skipped — no live price*\n"
+                f"Model: `{args.model_name or '(env)'}`\n"
+                f"Symbol: `{sym}` — live LTP unavailable; not placing on the "
+                f"stale signal price ₹{signal_price:,.2f}. Will retry next cycle."
+            )
+            skipped += 1
+            continue
+        # Sanity: if a live LTP IS present but the signal was wildly off (>10%),
+        # we already use live_px for pricing — just log it loudly for review.
+        if live_px and signal_price and abs(live_px / signal_price - 1) > 0.10:
+            log.warning(f"  {sym}: signal ₹{signal_price} vs live ₹{live_px} "
+                        f"({(live_px/signal_price-1)*100:+.1f}%) — pricing off LIVE.")
 
         # Pre-trade Fyers position check (BUY only). Guards against ledger ↔
         # Fyers desync from prior multi-fill races. If Fyers already holds
