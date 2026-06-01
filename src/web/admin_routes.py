@@ -1376,7 +1376,7 @@ def _resolve_live_prices(symbols):
 def _live_mtm_lookup_for_model(model_name):
     """Pre-resolve the given model's open-position MTM and return a closure
     suitable for get_portfolio_stats(price_lookup=...)."""
-    from src.models.model_ledger_models import ModelLedger
+    from src.models.model_ledger_models import ModelLedger, ModelHolding
     from src.models.database import get_database_manager
     db = get_database_manager()
     with db.get_session() as s:
@@ -1384,7 +1384,11 @@ def _live_mtm_lookup_for_model(model_name):
         # Pre-extract open_symbols inside session — values are primitives,
         # safe to use after exit.
         open_syms = [l.open_symbol for l in rows if l.open_symbol]
-    prices = _resolve_live_prices(open_syms)
+        # ALSO resolve multi-holding symbols (model_holdings) — otherwise a K>1
+        # model's holdings (IDEA, BHEL on retest) had no live LTP and showed
+        # entry-price MTM with 0 P&L.
+        open_syms += [h.symbol for h in s.query(ModelHolding).all() if h.symbol]
+    prices = _resolve_live_prices(list(set(open_syms)))
 
     def _lookup(sym):
         return prices.get((sym or "").replace("NSE:", "").replace("-EQ", ""))
