@@ -7,6 +7,32 @@
   .pos { color: #15a36b; } .neg { color: #d4453a; } .neutral { color: #4f5868; }
   .summary-card { border-left: 4px solid #5b8def; }
   .row-disabled td { opacity: 0.55; }
+
+  /* Mobile: the 12-column "All Models Portfolio" table is too wide for a phone.
+     Turn each row into a stacked card with a label per value (data-label). */
+  @media (max-width: 768px) {
+    #agg_table thead { display: none; }
+    #agg_table, #agg_table tbody, #agg_table tr, #agg_table td { display: block; width: 100%; }
+    #agg_table tr {
+      border: 1px solid #e2e6ee; border-radius: 10px;
+      margin-bottom: 12px; padding: 6px 10px; background: #fff;
+    }
+    #agg_table td {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 12px; text-align: right; padding: 5px 0; border: 0;
+      border-bottom: 1px solid #f1f3f7;
+    }
+    #agg_table td:last-child { border-bottom: 0; }
+    #agg_table td::before {
+      content: attr(data-label); text-align: left; font-weight: 600;
+      color: #6b7280; font-size: .8rem; flex: 0 0 auto;
+    }
+    /* Model name + Open Position + Actions read better full-width */
+    #agg_table td.cell-model { font-size: 1.05rem; border-bottom: 2px solid #eef0f5; }
+    #agg_table td.cell-pos, #agg_table td.actions-cell { text-align: left; }
+    #agg_table td.actions-cell::before { align-self: center; }
+    #agg_table td.actions-cell > div { width: 100%; }
+  }
 </style>
 
 <!-- Fyers broker account funds — plain-language. This is the WHOLE broker
@@ -52,7 +78,7 @@
       <div class="col-6 col-lg-2"><div class="text-muted small" title="Approximate lifetime broker charges (formula-based). Info only — already deducted from cash.">Approx Txn Charges</div><div class="fs-5 fw-bold neg" id="agg_charges">--</div></div>
     </div>
     <div class="table-responsive">
-      <table class="table table-sm align-middle mb-0">
+      <table class="table table-sm align-middle mb-0" id="agg_table">
         <thead><tr>
           <th>Model</th>
           <th class="text-end" title="Original capital deposited">Allocated</th>
@@ -213,18 +239,18 @@ async function loadAggregate() {
         ? m.holdings.reduce((a,h) => a + Number(h.qty||0) * Number(h.entry_px||0), 0)
         : (Number(m.open_qty||0) * Number(m.open_entry_px||0)) || 0;
       tr.innerHTML = `
-        <td><strong>${modelLabel(m.model_name)}</strong></td>
-        <td class="text-end">${fmtINR(m.allocated_capital)}</td>
-        <td class="text-end">${fmtINR(posCost)}</td>
-        <td class="text-end">${fmtINR(m.cash)}</td>
-        <td>${posHtml}</td>
-        <td class="text-end">${fmtINR(m.position_value)}</td>
-        <td class="text-end ${cls(m.realized_pnl)}">${fmtINR(m.realized_pnl)}</td>
-        <td class="text-end"><strong>${fmtINR(m.nav)}</strong></td>
-        <td class="text-end ${cls(m.pnl_total)}">${fmtINR(m.pnl_total)} (${fmtPct(m.return_pct)})</td>
-        <td class="text-end neg" title="Buy ${fmtINR(m.buy_txn_charges)} + Sell ${fmtINR(m.sell_txn_charges)}"><strong>${fmtINR(m.total_txn_charges)}</strong></td>
-        <td class="text-end">${m.total_trades} (${m.wins}W/${m.losses}L)</td>
-        <td class="text-center actions-cell"><div class="d-flex flex-column flex-md-row gap-1 justify-content-center align-items-stretch">${rebalBtn}${exitBtn}</div></td>
+        <td class="cell-model"><strong>${modelLabel(m.model_name)}</strong></td>
+        <td class="text-end" data-label="Allocated">${fmtINR(m.allocated_capital)}</td>
+        <td class="text-end" data-label="Cost Basis">${fmtINR(posCost)}</td>
+        <td class="text-end" data-label="Idle Cash">${fmtINR(m.cash)}</td>
+        <td class="cell-pos" data-label="Open">${posHtml}</td>
+        <td class="text-end" data-label="Position Value">${fmtINR(m.position_value)}</td>
+        <td class="text-end ${cls(m.realized_pnl)}" data-label="Realized">${fmtINR(m.realized_pnl)}</td>
+        <td class="text-end" data-label="Available (NAV)"><strong>${fmtINR(m.nav)}</strong></td>
+        <td class="text-end ${cls(m.pnl_total)}" data-label="Total P&L">${fmtINR(m.pnl_total)} (${fmtPct(m.return_pct)})</td>
+        <td class="text-end neg" data-label="Approx Txn Chg" title="Buy ${fmtINR(m.buy_txn_charges)} + Sell ${fmtINR(m.sell_txn_charges)}"><strong>${fmtINR(m.total_txn_charges)}</strong></td>
+        <td class="text-end" data-label="Trades">${m.total_trades} (${m.wins}W/${m.losses}L)</td>
+        <td class="text-center actions-cell" data-label="Actions"><div class="d-flex flex-column flex-md-row gap-1 justify-content-center align-items-stretch">${rebalBtn}${exitBtn}</div></td>
       `;
       tbody.appendChild(tr);
     });
