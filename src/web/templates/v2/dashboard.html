@@ -207,7 +207,11 @@ function renderModelCard(m, sig) {
   // NAV already includes the holdings = confusing).
   const _hold = (m.holdings && m.holdings.length) ? m.holdings : null;
   const posLine = _hold
-    ? _hold.map(h => `<strong>${h.symbol}</strong> <span class="text-muted">x${h.qty}</span> @ ${fmtINR(h.entry_px)}`).join('<br>')
+    ? _hold.map(h => {
+        const lp = Number(h.mtm_price || 0);
+        const lpStr = lp > 0 ? ` · LTP ${fmtINR(lp)}` : '';
+        return `<strong>${h.symbol}</strong> <span class="text-muted">x${h.qty} @ ${fmtINR(h.entry_px)}${lpStr}</span>`;
+      }).join('<br>')
     : (m.open_symbol
         ? `<strong>${m.open_symbol}</strong> <span class="text-muted">x${m.open_qty}</span> @ ${fmtINR(m.open_entry_px)}`
         : '<span class="text-muted">flat</span>');
@@ -267,7 +271,7 @@ function renderModelCard(m, sig) {
                 <div class="col-12">
                   <div class="text-muted text-uppercase" style="font-size:0.7rem; letter-spacing:0.5px; margin-bottom:4px;">Position</div>
                   <div class="kv"><span class="k">Open</span><span class="v">${posLine}</span></div>
-                  <div class="kv"><span class="k">LTP (live)</span><span class="v" title="Last traded price per share (live MTM ÷ qty)">${ltp > 0 ? fmtINR(ltp) : '<span class=\"text-muted\">—</span>'}${ltp > 0 && Number(m.open_entry_px) > 0 ? ` <small class="${cls(ltp - Number(m.open_entry_px))}">(${fmtPct((ltp/Number(m.open_entry_px)-1)*100)})</small>` : ''}</span></div>
+                  <div class="kv"><span class="k">LTP (live)</span><span class="v" title="Last traded price per share (live MTM ÷ qty)">${_hold ? '<span class=\"text-muted\">per stock above</span>' : (ltp > 0 ? fmtINR(ltp) + (Number(m.open_entry_px) > 0 ? ` <small class="${cls(ltp - Number(m.open_entry_px))}">(${fmtPct((ltp/Number(m.open_entry_px)-1)*100)})</small>` : '') : '<span class=\"text-muted\">—</span>')}</span></div>
                   <div class="kv"><span class="k">Idle Cash</span><span class="v" title="Cash not tied up in open position">${fmtINR(idleCash)}</span></div>
                   <div class="kv"><span class="k">Cost Basis</span><span class="v" title="qty × entry price (ex-charges)">${fmtINR(posCost)}</span></div>
                   <div class="kv"><span class="k">Position Value (Live MTM)</span><span class="v" title="qty × live LTP">${fmtINR(posValue)}</span></div>
