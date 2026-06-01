@@ -927,6 +927,34 @@ def models_status():
                 ],
             })
 
+        # Append a "Data synced (IST)" check to EVERY model card — the wall-clock
+        # time the daily Fyers price pull last wrote rows (updated_at). This is
+        # the freshness stamp shown on each data-status card. Container TZ is IST
+        # so the naive timestamp prints as IST clock time.
+        try:
+            from src.models.database import get_database_manager as _gdb
+            from sqlalchemy import text as _txt
+            _db = _gdb()
+            with _db.get_session() as _s:
+                _r = _s.execute(_txt(
+                    "SELECT MAX(updated_at) FROM historical_data "
+                    "WHERE data_source='fyers'"
+                )).fetchone()
+            _synced = _r[0] if _r else None
+            _synced_str = _synced.strftime("%Y-%m-%d %H:%M IST") if _synced else "—"
+            _synced_age = (today - _synced.date()).days if _synced else None
+            for _m in models:
+                _m.setdefault("items", []).append({
+                    "label": "Data synced (IST)",
+                    "value": _synced_str,
+                    "required": "nightly pull",
+                    "ok": _synced is not None and (_synced_age is None or _synced_age <= 3),
+                    "extra": (f"{_synced_age}d ago" if _synced_age is not None
+                              else "last Fyers price sync"),
+                })
+        except Exception as _se:
+            logger.debug(f"data-synced stamp failed: {_se}")
+
         return jsonify({"success": True, "models": models, "as_of": today.isoformat()})
 
     except Exception as e:
