@@ -145,6 +145,7 @@ INTRADAY_MODELS = {
 # wrongly treat momentum_retest_n500 as a single-position model.
 MULTI_HOLDING_MODELS = {
     "momentum_retest_n500": 4,   # K4 (see tools/models/momentum_retest_n500/strategy.py)
+    "orb_momentum_intraday": 3,  # SELECT_TOP=3 intraday basket (slot_qty=invested/3)
 }
 
 
