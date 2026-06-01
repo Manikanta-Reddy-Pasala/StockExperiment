@@ -63,7 +63,8 @@ def load_panels(eng, start, end):
 
 def walk(dates, cl, lo, adv20, sma200, ema20, atr, proxy, proxy200, smallcap, *,
          start, end, capital, atr_trail=None, atr_entry=None,
-         regime_block=False, vol_sizing=False):
+         regime_block=False, vol_sizing=False, k=None, retain=None):
+    k = k or S.K; retain = retain or k
     i0 = dates.searchsorted(pd.Timestamp(start)); i1 = dates.searchsorted(pd.Timestamp(end), side="right")
     rebals = set(); y, m = start.year, start.month
     while True:
@@ -108,18 +109,18 @@ def walk(dates, cl, lo, adv20, sma200, ema20, atr, proxy, proxy200, smallcap, *,
             rk = S.rank_targets(cl, adv20, sma200, smallcap, di)
             elig = eligible_at("n500", d.date())
             rk = [s for s in rk if s.replace("NSE:", "").replace("-EQ", "") in elig]
-            retset = set(rk[:S.RETAIN])
+            retset = set(rk[:retain])
             for s in list(pos.keys()):
                 if s not in retset:
                     _exit(s, di, float(cl[s].iloc[di]), "ROTATE")
-            watch = [s for s in rk[:S.K] if s not in pos]
+            watch = [s for s in rk[:k] if s not in pos]
 
         # --- entries (with optional regime block 5.2 + vol sizing 5.3) ---
         regime_ok = True
         if regime_block and pd.notna(proxy200.iloc[di]):
             regime_ok = float(proxy.iloc[di]) >= float(proxy200.iloc[di])
         if watch and di >= warm and regime_ok:
-            slots = S.K - len(pos)
+            slots = k - len(pos)
             for s in list(watch):
                 if s in pos or slots <= 0:
                     continue
@@ -172,6 +173,8 @@ def main():
     ap.add_argument("--from", dest="start", default="2021-03-01")
     ap.add_argument("--to", dest="end", default="2026-05-31")
     ap.add_argument("--capital", type=float, default=1_000_000.0)
+    ap.add_argument("--grid", action="store_true",
+                    help="K (basket size) x stop/vol-sizing grid — chase CAGR.")
     a = ap.parse_args()
     start = datetime.strptime(a.start, "%Y-%m-%d").date()
     end = datetime.strptime(a.end, "%Y-%m-%d").date()
@@ -179,6 +182,23 @@ def main():
     print(f"Loading panels {start}..{end} (K={S.K} RETAIN={S.RETAIN} LOOKBACK={S.LOOKBACK}) ...")
     cl, hi, lo, adv20, sma200, ema20, atr, proxy, proxy200, smallcap = load_panels(eng, start, end)
     dates = cl.index
+
+    if a.grid:
+        print(f"\nK x stop/vol grid (retain=K):")
+        print(f"{'config':<26}{'CAGR%':>8}{'DD%':>8}{'ret%':>8}{'trades':>8}{'WR%':>6}")
+        print("-" * 64)
+        combos = []
+        for kk in (3, 4, 5):
+            combos.append((f"K{kk}", dict(k=kk)))
+            combos.append((f"K{kk}+atr3.0", dict(k=kk, atr_entry=3.0)))
+            combos.append((f"K{kk}+atr3.0+vol", dict(k=kk, atr_entry=3.0, vol_sizing=True)))
+        for name, kw in combos:
+            m = walk(dates, cl, lo, adv20, sma200, ema20, atr, proxy, proxy200, smallcap,
+                     start=start, end=end, capital=a.capital, **kw)
+            star = " *cur" if name == f"K{S.K}" else ""
+            print(f"{(name+star):<26}{m['cagr']:>8}{m['dd']:>8}{m['ret']:>8}{m['trades']:>8}{m['wr']:>6}")
+        return
+
     print(f"\n{'scenario':<24}{'CAGR%':>8}{'DD%':>8}{'ret%':>8}{'trades':>8}{'WR%':>6}")
     print("-" * 62)
     for name, kw in SCENARIOS:
