@@ -75,13 +75,24 @@ def main():
             print(f"  ERR {fname}: {type(e).__name__}: {e}"); continue
         if "Symbol" not in raw.splitlines()[0]:
             print(f"  ERR {fname}: unexpected response (no Symbol header)"); continue
-        (ARCHIVE / fname).write_text(raw)
-        if target:
-            (SYMBOLS / target).write_text(raw)        # drop-in model universe file
+        (ARCHIVE / fname).write_text(raw)                 # archive = verbatim NSE
         rows = list(csv.DictReader(io.StringIO(raw)))
-        counts[idx or target] = len(rows)
+        # Drop NSE corporate-action PLACEHOLDER scrips (e.g. DUMMYVEDL1-4 from
+        # the Vedanta demerger) from the model universe — not tradable, never
+        # have price data (showed as "symbols completely missing" in the audit).
+        kept = [r for r in rows
+                if not (r.get("Symbol") or "").strip().upper().startswith("DUMMY")]
+        if target:
+            if kept and rows:
+                buf = io.StringIO()
+                w = csv.DictWriter(buf, fieldnames=list(rows[0].keys()))
+                w.writeheader(); w.writerows(kept)
+                (SYMBOLS / target).write_text(buf.getvalue())   # drop-in, DUMMY-free
+            else:
+                (SYMBOLS / target).write_text(raw)
+        counts[idx or target] = len(kept)
         if idx:
-            for r in rows:
+            for r in kept:
                 if r.get("Symbol") and r.get("Series", "EQ").strip() in ("EQ", ""):
                     membership.append({"index_name": idx, "symbol": r["Symbol"].strip(),
                                        "review_date": rev})

@@ -94,6 +94,11 @@ def nifty100_symbols(limit: Optional[int] = None) -> List[Tuple[str, str]]:
             # Keep only cash-market equity rows; skip blanks and non-EQ series.
             if not sym or series.upper() != "EQ":
                 continue
+            # Skip NSE corporate-action PLACEHOLDER scrips (e.g. DUMMYVEDL1-4
+            # from the Vedanta demerger). Not tradable, never have price data —
+            # they only showed up as "symbols completely missing" in the audit.
+            if sym.upper().startswith("DUMMY"):
+                continue
             out.append((sym, (row.get("Company Name") or "").strip()))
     return out[:limit] if limit else out
 
