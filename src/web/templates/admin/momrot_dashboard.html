@@ -159,6 +159,7 @@
             <th>Enabled</th>
             <th>Wired</th>
             <th>Data Pulled</th>
+            <th>Data Synced (IST)</th>
             <th>Last Signal</th>
             <th>Last Execution</th>
             <th class="text-end">Universe</th>
@@ -166,7 +167,7 @@
           </tr>
         </thead>
         <tbody id="datastatus_body">
-          <tr><td colspan="8" class="text-center text-muted py-3">Loading…</td></tr>
+          <tr><td colspan="9" class="text-center text-muted py-3">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -773,6 +774,7 @@ async function _loadModelDataStatus(modelName, enabled, signalsOnly) {
   const wired = statusOk;  // triggers/status succeeds only for wired models
   const lastSig = statusOk ? statusRes.last_signal_at : null;
   const lastExec = statusOk ? statusRes.last_execution_at : null;
+  const lastSynced = statusOk ? statusRes.last_data_synced_at : null;
   let universeSize = null;
   let rankingCount = null;
   let rankingGenAt = null;
@@ -796,6 +798,7 @@ async function _loadModelDataStatus(modelName, enabled, signalsOnly) {
     <td>${enabledBadge}</td>
     <td>${wiredBadge}</td>
     <td>${dataPulledBadge}</td>
+    <td class="small">${_dash(lastSynced ? _ts(lastSynced) : null)}</td>
     <td class="small">${_dash(effectiveLastSig ? _ts(effectiveLastSig) : null)}</td>
     <td class="small">${_dash(lastExec ? _ts(lastExec) : null)}</td>
     <td class="text-end">${_dash(universeSize)}</td>
@@ -806,18 +809,18 @@ async function _loadModelDataStatus(modelName, enabled, signalsOnly) {
 async function loadDataStatus() {
   const body = document.getElementById('datastatus_body');
   const countEl = document.getElementById('datastatus_count');
-  body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Loading…</td></tr>';
+  body.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">Loading…</td></tr>';
   if (countEl) countEl.textContent = '…';
   const pf = await _fetchJson('/admin/models/portfolio');
   if (!pf || !pf.success) {
-    body.innerHTML = '<tr><td colspan="8" class="text-danger small">Failed to load /admin/models/portfolio</td></tr>';
+    body.innerHTML = '<tr><td colspan="9" class="text-danger small">Failed to load /admin/models/portfolio</td></tr>';
     if (countEl) countEl.textContent = 'error';
     return;
   }
   const models = pf.models || [];
   if (countEl) countEl.textContent = `${models.length} models`;
   if (models.length === 0) {
-    body.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No models seeded.</td></tr>';
+    body.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No models seeded.</td></tr>';
     return;
   }
   // Iterate ALL models — enabled AND disabled, wired AND not — so operators see full picture.
@@ -830,7 +833,7 @@ async function loadDataStatus() {
     const m = models[i];
     return `<tr style="background:#fff8f0;">
       <td><strong>${m.model_name}</strong></td>
-      <td colspan="7" class="text-danger small">render failed: ${String(r.reason || 'unknown').slice(0,200)}</td>
+      <td colspan="8" class="text-danger small">render failed: ${String(r.reason || 'unknown').slice(0,200)}</td>
     </tr>`;
   });
   body.innerHTML = rows.join('');

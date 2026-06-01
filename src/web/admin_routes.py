@@ -2065,6 +2065,21 @@ def model_triggers_status(model_name):
                 entry_trade_at = buy_row[0].isoformat() if buy_row[0] else None
                 entry_reason = buy_row[1]
 
+            # Last time the DAILY price data was synced (nightly Fyers pull).
+            # updated_at is the row write time; this is the "data freshness"
+            # the Per-Model Data Status panel shows. Global (one shared pull
+            # feeds every model's universe). ISO → UI renders in IST.
+            last_data_synced_at = None
+            try:
+                drow = s.execute(text(
+                    "SELECT MAX(updated_at) FROM historical_data "
+                    "WHERE data_source='fyers'"
+                )).fetchone()
+                if drow and drow[0]:
+                    last_data_synced_at = drow[0].isoformat()
+            except Exception as _de:
+                logger.debug(f"last_data_synced lookup failed: {_de}")
+
         # Portfolio stats — pre-resolve live MTM outside any open session so
         # get_portfolio_stats's internal session doesn't conflict with the
         # one we used for the trade queries above.
@@ -2095,6 +2110,7 @@ def model_triggers_status(model_name):
             "signals_only": bool(per_model.get("signals_only")),
             "last_signal_at": last_signal_at,
             "last_signal_file": last_signal_file,
+            "last_data_synced_at": last_data_synced_at,
             "last_execution_at": last_execution_at,
             "last_order_id": last_order_id,
             "current_position": current_position,
