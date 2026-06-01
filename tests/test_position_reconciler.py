@@ -219,3 +219,31 @@ def test_multi_claimed_symbols_skips_zero_and_blank():
 def test_multi_claimed_symbols_empty():
     from tools.live.position_reconciler import multi_claimed_symbols
     assert multi_claimed_symbols([]) == set()
+
+
+# ---------------- corrections_signature (pure) — alert de-dup 2026-06-01 ----
+# The reconciler runs every few minutes 09:45-15:30 with --tg-on-fix. A KNOWN
+# drift (e.g. the HFCL double-fill duplicate awaiting a manual sell) re-fired
+# the SAME Telegram alert every cycle = spam. corrections_signature lets main()
+# send only when the drift set CHANGES from the last alerted state.
+
+def test_corrections_signature_empty_is_blank():
+    from tools.live.position_reconciler import corrections_signature
+    assert corrections_signature([]) == ""
+    assert corrections_signature(None) == ""
+
+
+def test_corrections_signature_order_independent():
+    from tools.live.position_reconciler import corrections_signature
+    a = [{"type": "MIRROR_CAP_EXCEEDED", "model": "emerging_momentum", "before": "HFCL x251 @ 179.75"},
+         {"type": "MIRROR_CAP_EXCEEDED", "model": "momentum_pseudo_n100_adv", "before": "HFCL x203 @ 145.46"}]
+    assert corrections_signature(a) == corrections_signature(list(reversed(a)))
+
+
+def test_corrections_signature_changes_on_content():
+    from tools.live.position_reconciler import corrections_signature
+    a = [{"type": "MIRROR_CAP_EXCEEDED", "model": "emerging_momentum", "before": "HFCL x251 @ 179.75"}]
+    b = [{"type": "MIRROR_CAP_EXCEEDED", "model": "emerging_momentum", "before": "HFCL x100 @ 179.75"}]
+    assert corrections_signature(a) != corrections_signature(b)
+    # adding a 2nd drift changes the signature too
+    assert corrections_signature(a) != corrections_signature(a + b)

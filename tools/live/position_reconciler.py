@@ -79,6 +79,47 @@ def sibling_qty_for(ledgers, model_name: str, symbol: str) -> int:
     return total
 
 
+_ALERT_SIG_KEY = "reconciler:last_alert_sig"          # single-position
+_ALERT_SIG_KEY_MULTI = "reconciler:last_alert_sig_multi"
+_ALERT_SIG_TTL = 86400                                 # 24h
+
+
+def _get_last_alert_sig(key: str) -> str:
+    """Last alerted drift signature from Dragonfly (empty on miss/error)."""
+    try:
+        from src.services.utils.cache_service import get_cache_service
+        v = get_cache_service().get(key)
+        return v if isinstance(v, str) else ""
+    except Exception as e:
+        log.debug(f"alert-sig get failed: {e}")
+        return ""
+
+
+def _set_last_alert_sig(key: str, sig: str) -> None:
+    """Persist (or clear) the last alerted drift signature. Best-effort."""
+    try:
+        from src.services.utils.cache_service import get_cache_service
+        get_cache_service().set(key, sig, _ALERT_SIG_TTL)
+    except Exception as e:
+        log.debug(f"alert-sig set failed: {e}")
+
+
+def corrections_signature(items, keys=("type", "model", "before")) -> str:
+    """Stable hash of a corrections/alerts list — used to de-dup repeat alerts.
+
+    The reconciler runs every few minutes; a KNOWN, unchanged drift must alert
+    ONCE, not every cycle. Order-independent (sorted) so the same set in any
+    order yields the same signature. Empty list -> "" (no drift => clear state).
+    """
+    import hashlib
+    parts = sorted(
+        "|".join(str(it.get(k, "")) for k in keys) for it in (items or [])
+    )
+    if not parts:
+        return ""
+    return hashlib.sha1("\n".join(parts).encode()).hexdigest()
+
+
 def multi_claimed_symbols(holdings) -> set:
     """Normalized symbols claimed by MULTI-holding models (model_holdings rows).
 
@@ -449,6 +490,8 @@ def main() -> int:
 
     if not corrections:
         log.info("Reconcile: no drift")
+        # Drift cleared — reset the de-dup state so the NEXT real drift alerts.
+        _set_last_alert_sig(_ALERT_SIG_KEY, "")
         return 0
 
     log.warning(f"Reconcile: {len(corrections)} item(s)"
@@ -456,6 +499,14 @@ def main() -> int:
     for c in corrections:
         log.warning(f"  [{c['type']}] {c['model']}: {c['before']} → {c['after']}"
                     f" ({c['action']})")
+
+    # Alert de-dup: only Telegram when the drift set CHANGED from last run. A
+    # known, unchanged drift (e.g. a duplicate awaiting a manual sell) must not
+    # re-spam every cycle.
+    sig = corrections_signature(corrections)
+    if args.tg_on_fix and sig and sig == _get_last_alert_sig(_ALERT_SIG_KEY):
+        log.info("Reconcile: drift unchanged since last alert — suppressing repeat Telegram.")
+        return 0
 
     if args.tg_on_fix:
         try:
@@ -479,6 +530,9 @@ def main() -> int:
                 lines.append(f"  now: {c['after']}")
                 lines.append(f"  → {c['action']}")
             send("\n".join(lines))
+            # Remember what we just alerted so an identical drift next cycle
+            # is suppressed (until it changes or clears).
+            _set_last_alert_sig(_ALERT_SIG_KEY, sig)
         except Exception as e:
             log.error(f"TG alert failed: {e}")
 

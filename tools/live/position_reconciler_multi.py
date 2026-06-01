@@ -99,15 +99,29 @@ def reconcile_multi(model_name=DEFAULT_MODEL, user_id=1, dry_run=False):
                                "action": "MANUAL: external sell / missed record_sell — verify Fyers"})
     for a in alerts:
         log.warning(f"DRIFT {a['model']} {a['symbol']}: {a}")
-    if alerts and not dry_run:
+    # Alert de-dup (per model): only Telegram when this model's drift CHANGED
+    # since last run — a known unchanged drift must not re-spam every cycle.
+    from tools.live.position_reconciler import (
+        corrections_signature, _get_last_alert_sig, _set_last_alert_sig,
+        _ALERT_SIG_KEY_MULTI,
+    )
+    sig_key = f"{_ALERT_SIG_KEY_MULTI}:{model_name}"
+    sig = corrections_signature(alerts, keys=("model", "symbol", "action", "ledger_qty"))
+    if not alerts:
+        log.info(f"{model_name}: holdings reconciled clean vs Fyers")
+        _set_last_alert_sig(sig_key, "")          # cleared — re-alert next drift
+        return alerts
+    if not dry_run:
+        if sig == _get_last_alert_sig(sig_key):
+            log.info(f"{model_name}: multi-holding drift unchanged — suppressing repeat Telegram.")
+            return alerts
         try:
             from tools.live.telegram_notify import send as _tg
             _tg(f"⚠️ {model_name} multi-holding drift: {len(alerts)} issue(s)\n"
                 + "\n".join(f"• {a['symbol']}: ledger {a['ledger_qty']} vs Fyers {a['fyers_qty']}" for a in alerts[:6]))
+            _set_last_alert_sig(sig_key, sig)
         except Exception as e:
             log.debug(f"tg failed: {e}")
-    if not alerts:
-        log.info(f"{model_name}: holdings reconciled clean vs Fyers")
     return alerts
 
 
