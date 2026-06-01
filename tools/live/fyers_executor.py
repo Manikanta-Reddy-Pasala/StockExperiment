@@ -276,6 +276,19 @@ def _resolve_recent_order_id(svc, user_id: int, symbol: str, qty: int,
     return ""
 
 
+def fill_confirmed_by_position(side: str, base_net: int, cur_net: int, qty: int) -> bool:
+    """True if the account NET moved by >= qty since baseline — a fill the
+    order-status poll may have missed (cancel/fill race). BUY: net ROSE by qty.
+    SELL: net DROPPED by qty. Pure (no IO) so the double-fill / over-sell guard
+    is unit-testable for BOTH sides."""
+    try:
+        moved = (int(cur_net) - int(base_net)) if (side or "").upper() == "BUY" \
+            else (int(base_net) - int(cur_net))
+        return moved >= int(qty)
+    except (TypeError, ValueError):
+        return False
+
+
 def _net_qty(svc, user_id: int, symbol: str) -> int:
     """Account-wide NET qty for `symbol` = holdings (T+1) + intraday positions
     netQty. Best-effort (0 on error). Used to DETECT a fill that the order-status
@@ -684,22 +697,23 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
     # during the first window), not the stale t=0 last_price.
     retry_px = first_px
 
-    # Baseline account net qty for this symbol BEFORE we place anything. Any
-    # later placement re-checks this: if net has risen by >= qty, a prior leg
-    # filled (even if the order-status poll / cancel-confirm missed it) — we must
-    # NOT place another order (the HFCL 2026-06-01 cancel/fill-race double-buy).
-    _base_net = 0 if (side or "").upper() != "BUY" else _net_qty(svc, user_id, symbol)
+    # Baseline account net qty for this symbol BEFORE we place anything — for
+    # BOTH sides. A later placement re-checks this: BUY filled if net ROSE by
+    # qty, SELL filled if net DROPPED by qty (even if the order-status poll /
+    # cancel-confirm missed it). Prevents a cancel/fill-race DOUBLE order — a
+    # double-BUY (HFCL 2026-06-01) OR an over-SELL on the sell side.
+    _base_net = _net_qty(svc, user_id, symbol)
 
     def _filled_via_position(px):
-        """If the account net already rose by qty since baseline, the order
-        filled — return a filled result instead of placing another order."""
-        if (side or "").upper() != "BUY":
-            return None
+        """If the account net already moved by qty since baseline, the prior
+        leg filled — return a filled result instead of placing another order.
+        BUY: net rose by qty. SELL: net dropped by qty (don't over-sell)."""
         try:
-            if _net_qty(svc, user_id, symbol) - _base_net >= qty:
-                log.warning(f"  {symbol}: account net rose by >= {qty} since "
-                            f"start — a prior leg FILLED; NOT placing another "
-                            f"order (double-fill guard).")
+            cur = _net_qty(svc, user_id, symbol)
+            if fill_confirmed_by_position(side, _base_net, cur, qty):
+                log.warning(f"  {symbol}: account net moved by >= {qty} since "
+                            f"start — a prior {side} leg FILLED; NOT placing "
+                            f"another order (double-fill guard).")
                 return {"filled": True, "status": "limit_filled_position_confirmed",
                         "order_id": "", "fill_price": float(px),
                         "fill_qty": qty, "reason": "position_confirmed"}
