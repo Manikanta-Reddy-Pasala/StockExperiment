@@ -74,7 +74,10 @@
 </div>
 
 <div class="card">
-  <div class="card-header"><i class="bi bi-briefcase me-2"></i>Open Position(s) — Live Fyers</div>
+  <div class="card-header">
+    <i class="bi bi-briefcase me-2"></i>Open Positions — by Model
+    <span class="text-muted small ms-2">each model's own qty &amp; cost (live MTM). A stock held by two models shows once per model.</span>
+  </div>
   <div class="table-responsive">
     <table class="table table-sm align-middle mb-0">
       <thead><tr>
@@ -250,33 +253,51 @@ async function loadFyersFunds() {
   } catch(e) { console.error(e); }
 }
 
+// One position row, PER MODEL (so a symbol held by two models shows TWICE with
+// each model's own qty/entry — not one merged broker row). Live MTM price.
+function posRow(model, symbol, qty, entry, live) {
+  qty = Number(qty || 0); entry = Number(entry || 0);
+  live = Number(live || 0) || entry;            // fall back to entry if no MTM
+  const cost = qty * entry, mv = qty * live, pnl = mv - cost;
+  const pct = cost > 0 ? (pnl / cost * 100) : 0;
+  return `
+    <tr>
+      <td><strong>${symbol}</strong></td>
+      <td><a href="/admin/models/${model}/detail" class="badge bg-primary text-decoration-none">${model}</a></td>
+      <td class="text-end">${qty.toLocaleString('en-IN')}</td>
+      <td class="text-end">${fmtINR(entry)}</td>
+      <td class="text-end">${fmtINR(live)}</td>
+      <td class="text-end">${fmtINR(cost)}</td>
+      <td class="text-end">${fmtINR(mv)}</td>
+      <td class="text-end ${cls(pnl)}">${fmtINR(pnl)}</td>
+      <td class="text-end ${cls(pct)}">${fmtPct(pct)}</td>
+      <td class="text-center"><button class="btn btn-sm btn-outline-danger" onclick="sellNow('${symbol}', ${qty})"><i class="bi bi-cash"></i> Sell</button></td>
+    </tr>`;
+}
+
 async function loadState() {
   await Promise.all([loadAggregate(), loadFyersFunds()]);
   try {
-    const r = await fetch('/admin/momrot/state', {cache: 'no-store'});
+    // Per-MODEL positions (not raw merged broker rows): each model's own
+    // qty/entry/MTM. A symbol held by 2 models (e.g. HFCL by pseudo + emerging)
+    // shows as 2 rows with the correct per-model qty.
+    const r = await fetch('/admin/models/portfolio', {cache: 'no-store'});
     const d = await r.json();
     if (!d.success) return;
-    const s = d.data;
-
+    const rows = [];
+    (d.models || []).forEach(m => {
+      if (!m.enabled) return;
+      if (m.open_symbol && m.open_qty) {
+        rows.push(posRow(m.model_name, m.open_symbol, m.open_qty, m.open_entry_px, m.open_mtm_price));
+      }
+      (m.holdings || []).forEach(h => {
+        rows.push(posRow(m.model_name, h.symbol, h.qty, h.entry_px, h.mtm_price));
+      });
+    });
     const tb = document.getElementById('positions');
-    if (!s.open_positions || s.open_positions.length === 0) {
-      tb.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-3">No open Fyers positions</td></tr>';
-    } else {
-      tb.innerHTML = s.open_positions.map(p => `
-        <tr>
-          <td><strong>${p.symbol}</strong></td>
-          <td>${lookupModel(p.symbol)}</td>
-          <td class="text-end">${p.qty.toLocaleString('en-IN')}</td>
-          <td class="text-end">${fmtINR(p.entry_price)}</td>
-          <td class="text-end">${fmtINR(p.live_price)}</td>
-          <td class="text-end">${fmtINR(p.cost)}</td>
-          <td class="text-end">${fmtINR(p.market_value)}</td>
-          <td class="text-end ${cls(p.unrealized_pnl)}">${fmtINR(p.unrealized_pnl)}</td>
-          <td class="text-end ${cls(p.unrealized_pct)}">${fmtPct(p.unrealized_pct)}</td>
-          <td class="text-center"><button class="btn btn-sm btn-outline-danger" onclick="sellNow('${p.symbol}', ${p.qty})"><i class="bi bi-cash"></i> Sell</button></td>
-        </tr>
-      `).join('');
-    }
+    tb.innerHTML = rows.length
+      ? rows.join('')
+      : '<tr><td colspan="10" class="text-center text-muted py-3">No open positions</td></tr>';
   } catch(e) { console.error(e); }
 }
 
