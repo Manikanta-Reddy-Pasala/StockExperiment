@@ -565,10 +565,14 @@ async function loadAllocations() {
     (d.models||[]).forEach(m => {
       const meta = MODEL_META[m.model_name] || { universe: '—', kind: 'unknown' };
       const tr = document.createElement('tr');
-      const posHtml = m.open_symbol
-        ? `<div><strong>${m.open_symbol}</strong> <span class="text-muted small">x${m.open_qty} @ ${fmtINR(m.open_entry_px)}</span></div>
-           <div class="text-muted small">${m.open_entry_date||''}</div>`
-        : '<span class="text-muted">flat</span>';
+      // Multi-holding models (Retest) hold a basket in m.holdings; single
+      // models use m.open_symbol. Show whichever applies (else multi = "flat").
+      const posHtml = (m.holdings && m.holdings.length)
+        ? m.holdings.map(h => `<div><strong>${h.symbol}</strong> <span class="text-muted small">x${h.qty} @ ${fmtINR(h.entry_px)}</span></div>`).join('')
+        : (m.open_symbol
+            ? `<div><strong>${m.open_symbol}</strong> <span class="text-muted small">x${m.open_qty} @ ${fmtINR(m.open_entry_px)}</span></div>
+               <div class="text-muted small">${m.open_entry_date||''}</div>`
+            : '<span class="text-muted">flat</span>');
       const pnlCls = m.pnl_total > 0 ? 'pos' : (m.pnl_total < 0 ? 'neg' : 'neutral');
       const enabledBadge = m.enabled ? '' : ' <span class="disabled-badge">DISABLED</span>';
       const observeBadge = (m.enabled && m.signals_only)
