@@ -33,6 +33,30 @@
     #agg_table td.actions-cell::before { align-self: center; }
     #agg_table td.actions-cell > div { width: 100%; }
   }
+
+  /* Open Positions — card-grid design (replaces the dense table). */
+  #positions_grid {
+    display: grid; gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+  .pos-card {
+    border: 1px solid #e2e6ee; border-radius: 12px; padding: 12px 14px;
+    background: #fff; box-shadow: 0 1px 2px rgba(16,24,40,.04);
+  }
+  .pos-card .pc-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .pos-card .pc-sym { font-size: 1.05rem; font-weight: 700; }
+  .pos-card .pc-pnl { font-size: 1.05rem; font-weight: 700; text-align: right; white-space: nowrap; }
+  .pos-card .pc-meta { color: #6b7280; font-size: .82rem; margin: 6px 0; }
+  .pos-card .pc-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .pos-card .pc-val { color: #4f5868; font-size: .85rem; }
+
+  /* iOS: keep bottom action buttons clear of the home indicator / Safari bar. */
+  body { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 64px); }
+  /* Bigger tap targets on touch screens (avoid mis-taps near the iOS bar). */
+  @media (max-width: 768px) {
+    .btn-sm { padding: .38rem .7rem; min-height: 40px; }
+    .pos-card .btn-sm { min-height: 42px; }
+  }
 </style>
 
 <!-- Fyers broker account funds — plain-language. This is the WHOLE broker
@@ -77,6 +101,14 @@
       <div class="col-6 col-lg-2"><div class="text-muted small">Realized P&amp;L</div><div class="fs-5 fw-bold" id="agg_realized">--</div></div>
       <div class="col-6 col-lg-2"><div class="text-muted small" title="Approximate lifetime broker charges (formula-based). Info only — already deducted from cash.">Approx Txn Charges</div><div class="fs-5 fw-bold neg" id="agg_charges">--</div></div>
     </div>
+    <!-- Per-model breakdown is collapsible — the aggregate strip above is the
+         at-a-glance summary; the full table is opt-in (mobile space). -->
+    <div class="expand-header d-flex justify-content-between align-items-center py-1 border-top pt-2"
+         data-bs-toggle="collapse" data-bs-target="#agg_table_wrap"
+         aria-expanded="false" aria-controls="agg_table_wrap" style="cursor:pointer">
+      <span class="text-muted small"><strong>Per-model breakdown</strong> <span id="agg_model_count" class="badge bg-secondary ms-1"></span> <i class="bi bi-chevron-down ms-1"></i></span>
+    </div>
+    <div class="collapse" id="agg_table_wrap">
     <div class="table-responsive">
       <table class="table table-sm align-middle mb-0" id="agg_table">
         <thead><tr>
@@ -96,24 +128,17 @@
         <tbody id="agg_tbody"><tr><td colspan="12" class="text-center text-muted py-3">Loading…</td></tr></tbody>
       </table>
     </div>
+    </div>
   </div>
 </div>
 
 <div class="card">
   <div class="card-header">
     <i class="bi bi-briefcase me-2"></i>Open Positions — by Model
-    <span class="text-muted small ms-2">each model's own qty &amp; cost (live MTM). A stock held by two models shows once per model.</span>
+    <span class="text-muted small ms-2 d-none d-sm-inline">each model's own qty &amp; cost (live MTM). A stock held by two models shows once per model.</span>
   </div>
-  <div class="table-responsive">
-    <table class="table table-sm align-middle mb-0">
-      <thead><tr>
-        <th>Symbol</th><th>Model</th><th class="text-end">Qty</th><th class="text-end">Entry</th>
-        <th class="text-end">Live</th><th class="text-end">Cost</th>
-        <th class="text-end">Market Value</th><th class="text-end">P&amp;L ₹</th><th class="text-end">P&amp;L %</th>
-        <th class="text-center">Action</th>
-      </tr></thead>
-      <tbody id="positions"><tr><td colspan="10" class="text-center text-muted py-3">Loading…</td></tr></tbody>
-    </table>
+  <div class="card-body">
+    <div id="positions_grid"><div class="text-muted py-2">Loading…</div></div>
   </div>
 </div>
 
@@ -257,6 +282,8 @@ async function loadAggregate() {
     if (!tbody.children.length) {
       tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted py-3">No enabled models. <a href="/settings">Enable one in Settings</a>.</td></tr>';
     }
+    const _cntEl = document.getElementById('agg_model_count');
+    if (_cntEl) _cntEl.textContent = (d.models||[]).filter(m => m.enabled).length + ' models';
   } catch(e) { console.error(e); }
 }
 
@@ -281,26 +308,28 @@ async function loadFyersFunds() {
   } catch(e) { console.error(e); }
 }
 
-// One position row, PER MODEL (so a symbol held by two models shows TWICE with
-// each model's own qty/entry — not one merged broker row). Live MTM price.
-function posRow(model, symbol, qty, entry, live) {
+// One position CARD, PER MODEL (a symbol held by two models shows twice, each
+// with its own qty/entry). Live MTM price. Card design (mobile-friendly).
+function posCard(model, symbol, qty, entry, live) {
   qty = Number(qty || 0); entry = Number(entry || 0);
   live = Number(live || 0) || entry;            // fall back to entry if no MTM
   const cost = qty * entry, mv = qty * live, pnl = mv - cost;
   const pct = cost > 0 ? (pnl / cost * 100) : 0;
   return `
-    <tr>
-      <td><strong>${symbol}</strong></td>
-      <td><a href="/admin/models/${model}/detail" class="badge bg-primary text-decoration-none">${modelLabel(model)}</a></td>
-      <td class="text-end">${qty.toLocaleString('en-IN')}</td>
-      <td class="text-end">${fmtINR(entry)}</td>
-      <td class="text-end">${fmtINR(live)}</td>
-      <td class="text-end">${fmtINR(cost)}</td>
-      <td class="text-end">${fmtINR(mv)}</td>
-      <td class="text-end ${cls(pnl)}">${fmtINR(pnl)}</td>
-      <td class="text-end ${cls(pct)}">${fmtPct(pct)}</td>
-      <td class="text-center"><button class="btn btn-sm btn-outline-danger" onclick="sellNow('${symbol}', ${qty})"><i class="bi bi-cash"></i> Sell</button></td>
-    </tr>`;
+    <div class="pos-card">
+      <div class="pc-top">
+        <div>
+          <div class="pc-sym">${symbol}</div>
+          <a href="/admin/models/${model}/detail" class="badge bg-primary text-decoration-none">${modelLabel(model)}</a>
+        </div>
+        <div class="pc-pnl ${cls(pnl)}">${fmtINR(pnl)}<div class="small">(${fmtPct(pct)})</div></div>
+      </div>
+      <div class="pc-meta">Qty <strong>${qty.toLocaleString('en-IN')}</strong> · Entry ${fmtINR(entry)} · LTP ${fmtINR(live)}</div>
+      <div class="pc-foot">
+        <span class="pc-val">Cost ${fmtINR(cost)} → MV ${fmtINR(mv)}</span>
+        <button class="btn btn-sm btn-outline-danger" onclick="sellNow('${symbol}', ${qty})"><i class="bi bi-cash"></i> Sell</button>
+      </div>
+    </div>`;
 }
 
 async function loadState() {
@@ -308,24 +337,24 @@ async function loadState() {
   try {
     // Per-MODEL positions (not raw merged broker rows): each model's own
     // qty/entry/MTM. A symbol held by 2 models (e.g. HFCL by pseudo + emerging)
-    // shows as 2 rows with the correct per-model qty.
+    // shows as 2 cards with the correct per-model qty.
     const r = await fetch('/admin/models/portfolio', {cache: 'no-store'});
     const d = await r.json();
     if (!d.success) return;
-    const rows = [];
+    const cards = [];
     (d.models || []).forEach(m => {
       if (!m.enabled) return;
       if (m.open_symbol && m.open_qty) {
-        rows.push(posRow(m.model_name, m.open_symbol, m.open_qty, m.open_entry_px, m.open_mtm_price));
+        cards.push(posCard(m.model_name, m.open_symbol, m.open_qty, m.open_entry_px, m.open_mtm_price));
       }
       (m.holdings || []).forEach(h => {
-        rows.push(posRow(m.model_name, h.symbol, h.qty, h.entry_px, h.mtm_price));
+        cards.push(posCard(m.model_name, h.symbol, h.qty, h.entry_px, h.mtm_price));
       });
     });
-    const tb = document.getElementById('positions');
-    tb.innerHTML = rows.length
-      ? rows.join('')
-      : '<tr><td colspan="10" class="text-center text-muted py-3">No open positions</td></tr>';
+    const grid = document.getElementById('positions_grid');
+    grid.innerHTML = cards.length
+      ? cards.join('')
+      : '<div class="text-muted py-2">No open positions</div>';
   } catch(e) { console.error(e); }
 }
 
