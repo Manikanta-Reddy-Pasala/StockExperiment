@@ -92,7 +92,7 @@
        title="Click to expand breakdown + math identity">
     <div>
       <span class="strategy-pill">Multi-Model Portfolio</span>
-      <span class="text-muted small ms-2">4 equity models · per-model cash silos</span>
+      <span class="text-muted small ms-2" id="model_count_label">enabled models · per-model cash silos</span>
       <i class="bi bi-chevron-down ms-2"></i>
     </div>
     <div class="row text-end g-3 flex-grow-1 justify-content-end align-items-center">
@@ -432,6 +432,12 @@ async function loadPortfolio() {
       if (!MODEL_ORDER.includes(name)) cards.push(renderModelCard(byName[name], _signalsByModel[name]));
     });
     grid.innerHTML = cards.length ? cards.join('') : '<div class="col-12 text-center text-muted py-3">No enabled models. Visit <a href="/admin/v2/settings">Settings</a> to enable one.</div>';
+    // Dynamic model count label (was hardcoded "4 equity models").
+    const _lbl = document.getElementById('model_count_label');
+    if (_lbl) {
+      const n = cards.length;
+      _lbl.textContent = `${n} active model${n === 1 ? '' : 's'} · per-model cash silos`;
+    }
     // Re-apply expanded state to cards still present after refresh.
     wasExpanded.forEach(id => {
       const el = document.getElementById(id);
