@@ -562,7 +562,12 @@ def _fetch_live_ltp(svc, user_id: int, symbol: str) -> Optional[float]:
     """Pull current LTP from Fyers. Returns None on failure so caller falls
     back to the stale signal-file price."""
     try:
-        res = svc.quotes(user_id=user_id, symbol=symbol)
+        # Normalize to Fyers form: a PLAIN symbol (e.g. "ENRIN") returns ltp 0
+        # from quotes — it must be "NSE:ENRIN-EQ". n100 emits plain symbols, so
+        # an un-normalized fetch silently returned 0/None and the entry was
+        # skipped (or, pre-guard, priced off the stale signal). to_fyers_symbol
+        # is idempotent on already-Fyers symbols.
+        res = svc.quotes(user_id=user_id, symbol=to_fyers_symbol(symbol))
         data = res.get("data") if isinstance(res, dict) else None
         if not data:
             return None
