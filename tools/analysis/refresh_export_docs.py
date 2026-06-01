@@ -18,14 +18,14 @@ DESC = {
     "momentum_pseudo_n100_adv": {
         "title": "Liquid 100 Momentum", "live": "LIVE",
         "universe": "Top-100 by 20d ADV from N500 (yearly-PIT rebuild)",
-        "strategy": "Monthly (1st trading day) rotation, single position (rank-1, RET1), 30-trading-day return rank, uptrend (>200d SMA) + ≤₹3K filter. Universe rebuilt yearly at a FIXED mid-May anchor.",
-        "note": "⚠️ ADV-ranked pseudo-N100 (not the real index) — selects already-liquid/hot names, so returns are an OPTIMISTIC upper bound vs the real-index sibling momentum_n100_top5_max1. Full-cycle 2021-03→2026-05 (fixed May anchor, PIT N500) ≈ +76.6% CAGR / 28.6% DD / Calmar 2.68 / 90% win. Recent 2025-03→2026-05 ≈ +191% CAGR / 16% DD. Now PIT (2026-05-31, no survivorship bias) but the ADV-selection bias remains by design.",
+        "strategy": "Monthly (1st trading day) rotation, single position (rank-1, RET1), 30-trading-day return rank, uptrend (>200d SMA) + ≤₹3K filter. Universe rebuilt yearly at a FIXED mid-May anchor. + DAILY from-entry ATR×3.0 hard stop (entry − 3×ATR(14)).",
+        "note": "⚠️ ADV-ranked pseudo-N100 (not the real index) — selects already-liquid/hot names, an OPTIMISTIC upper bound vs the real-index sibling. NOW with a from-entry ATR×3.0 hard stop (2026-06-02, backtest-validated both windows): full-cycle 2021-03→2026-05 +77.4% CAGR / 43.8% DD / Calmar 1.77 / 74% win; recent 2025-03→2026-05 +209% CAGR / 16% DD. The stop is a FIXED level at entry−3×ATR (cuts genuine breakdowns, winners run to rotation); shared helper tools.shared.stops used by backtest + live --stop-check (no drift). DD is now on the stricter DAILY-MTM (intraday-low) basis — not comparable to the prior rebal-snapshot DD; the stop's gain is the within-basis delta (50.1→43.8). ADV-selection bias remains by design.",
     },
     "momentum_n100_top5_max1": {
         "title": "Nifty 100 Momentum", "live": "LIVE",
         "universe": "Real NSE Nifty 100 (PIT membership)",
-        "strategy": "Monthly rotation + mid-month check, single position (max 1), 15-trading-day return rank.",
-        "note": "True-index version — the trustworthy-clean momentum benchmark. Full-cycle 2021-03→2026-05 ≈ +56.2% CAGR / 52.2% DD / Calmar 1.08. Recent 2025-03→2026-05 ≈ +112% CAGR / 9.6% DD. The 52% full-cycle DD is entirely the 2022 bear (D39); 2023-26 each ≤21%.",
+        "strategy": "Monthly rotation + mid-month check, single position (max 1), 15-trading-day return rank. + DAILY from-entry FIXED −12% hard stop (entry × 0.88).",
+        "note": "True-index version — the trustworthy-clean momentum benchmark. NOW with a from-entry fixed −12% hard stop (2026-06-02, backtest-validated): full-cycle 2021-03→2026-05 +59.9% CAGR / 46.4% DD / Calmar 1.29; recent 2025-03→2026-05 +111% CAGR / 15% DD; 2022-23 crash +95.7% CAGR / 27.8% DD — the stop's big win (was 68.7/42.9). Stop = entry×(1−0.12), checked daily on the low; shared backtest+live helper tools.shared.stops (no drift). Fixed-% fits these large-caps (uniform vol); ATR was DD-only, a price-floor threshold-fragile. DD now DAILY-MTM (stricter than the old rebal-snapshot; within-basis delta 56.8→46.4).",
     },
     "n40": {
         "title": "Weekly Top-40", "live": "LIVE",

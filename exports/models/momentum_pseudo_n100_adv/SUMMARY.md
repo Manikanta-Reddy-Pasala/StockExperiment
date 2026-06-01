@@ -1,7 +1,7 @@
 # Liquid 100 Momentum (`momentum_pseudo_n100_adv`)
 
 **Status:** LIVE  
-Monthly (1st trading day) rotation, single position (rank-1, RET1), 30-trading-day return rank, uptrend (>200d SMA) + ≤₹3K filter. Universe rebuilt yearly at a FIXED mid-May anchor.
+Monthly (1st trading day) rotation, single position (rank-1, RET1), 30-trading-day return rank, uptrend (>200d SMA) + ≤₹3K filter. Universe rebuilt yearly at a FIXED mid-May anchor. + DAILY from-entry ATR×3.0 hard stop (entry − 3×ATR(14)).
 
 **Universe:** Top-100 by 20d ADV from N500 (yearly-PIT rebuild)
 
@@ -21,29 +21,29 @@ Backtest window: **2021-03-01 → 2026-05-29** (full ~5.2-year cycle: 2021 bull,
 
 | Metric | Value |
 |---|---|
-| Final NAV (₹10L start) | ₹19,741,787 |
-| Total return | +1874.2% |
-| CAGR (annualized) | +76.6% |
-| Max drawdown | 28.6% |
-| Calmar | 2.68 |
-| Trades | 50 (38W / 12L) · 76% win |
+| Final NAV (₹10L start) | ₹20,239,089 |
+| Total return | +1923.9% |
+| CAGR (annualized) | +77.4% |
+| Max drawdown | 43.8% |
+| Calmar | 1.77 |
+| Trades | 50 (37W / 13L) · 74% win |
 
 ## Year-by-year breakdown
 
 | Year | Return % | Intra-yr DD % |
 |---|---:|---:|
-| 2021 | +50.4% | 5.8% |
-| 2022 | -11.5% | 28.6% |
-| 2023 | +125.9% | 13.1% |
-| 2024 | +56.3% | 16.4% |
-| 2025 | +55.4% | 22.3% |
-| 2026 | +52.4% | 2.2% |
+| 2021 | +55.3% | 31.6% |
+| 2022 | -6.2% | 27.1% |
+| 2023 | +137.8% | 19.7% |
+| 2024 | +45.2% | 43.3% |
+| 2025 | +114.7% | 26.5% |
+| 2026 | +74.2% | 12.1% |
 
 ## Note
 
-⚠️ ADV-ranked pseudo-N100 (not the real index) — selects already-liquid/hot names, so returns are an OPTIMISTIC upper bound vs the real-index sibling momentum_n100_top5_max1. Full-cycle 2021-03→2026-05 (fixed May anchor, PIT N500) ≈ +76.6% CAGR / 28.6% DD / Calmar 2.68 / 90% win. Recent 2025-03→2026-05 ≈ +191% CAGR / 16% DD. Now PIT (2026-05-31, no survivorship bias) but the ADV-selection bias remains by design.
+⚠️ ADV-ranked pseudo-N100 (not the real index) — selects already-liquid/hot names, an OPTIMISTIC upper bound vs the real-index sibling. NOW with a from-entry ATR×3.0 hard stop (2026-06-02, backtest-validated both windows): full-cycle 2021-03→2026-05 +77.4% CAGR / 43.8% DD / Calmar 1.77 / 74% win; recent 2025-03→2026-05 +209% CAGR / 16% DD. The stop is a FIXED level at entry−3×ATR (cuts genuine breakdowns, winners run to rotation); shared helper tools.shared.stops used by backtest + live --stop-check (no drift). DD is now on the stricter DAILY-MTM (intraday-low) basis — not comparable to the prior rebal-snapshot DD; the stop's gain is the within-basis delta (50.1→43.8). ADV-selection bias remains by design.
 
-**Open position at window end:** ADANIGREEN [large] qty 13380 entry ₹1290.7 on 2026-05-04 (unrealized +2,471,286)
+**Open position at window end:** NSE:ADANIGREEN-EQ qty 13717 entry ₹1290.7 on ? (unrealized +0)
 
 ---
 *Auto-generated from summary.json by tools/analysis/refresh_export_docs.py — do not hand-edit.*
