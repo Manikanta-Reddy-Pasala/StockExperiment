@@ -23,9 +23,9 @@ Backtest window: **2021-03-01 → 2026-05-29** (full ~5.2-year cycle: 2021 bull,
 |---|---|
 | Final NAV (₹10L start) | ₹10,736,058 |
 | Total return | +973.6% |
-| CAGR (annualized) | +57.3% |
+| CAGR (annualized) | +57.2% |
 | Max drawdown | 38.8% |
-| Calmar | 1.48 |
+| Calmar | 1.47 |
 | Trades | 182 (108W / 74L) · 59% win |
 
 ## Year-by-year breakdown
