@@ -46,7 +46,11 @@ def fetch_5min(symbol: str, start: dt.date, end: dt.date,
     fsym = f"NSE:{symbol}-EQ"
     out: List[list] = []
     cur = start
-    while cur < end:
+    # NOTE: `<=` not `<`. The LIVE intraday path calls fetch_5min(today, today)
+    # (start == end); `cur < end` skipped the loop entirely → None → ORB never
+    # got today's bars → never bought. `<=` fetches the single (today) chunk;
+    # multi-day backtests are unaffected (the last chunk still ends at `end`).
+    while cur <= end:
         ce = min(cur + dt.timedelta(days=chunk_days), end)
         try:
             resp = fy.history({"symbol": fsym, "resolution": "5", "date_format": "1",
