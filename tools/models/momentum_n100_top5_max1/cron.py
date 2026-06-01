@@ -267,3 +267,43 @@ def register_trading_jobs(schedule):
     # non-day-15 so safe to fire daily. 5pp lead threshold.
     schedule.every().day.at("09:27").do(emit_mid_month_signal)
     schedule.every().day.at("09:35").do(execute_mid_month_orders)
+    # DAILY from-entry fixed-% hard-stop check (2026-06-02). Every trading day,
+    # staggered last so a same-day rotation entry isn't falsely stopped.
+    schedule.every().day.at("09:37").do(stop_check)
+
+
+def stop_check():
+    """DAILY from-entry fixed-% hard-stop check (every trading day). live_signal
+    --stop-check emits a STOP_HIT SELL to a *_stop.json file if the held name's
+    last completed bar breached entry*(1-STOP_PCT); we then execute it. Shared
+    stop helper -> matches the backtest exactly."""
+    import json as _json
+    universe = os.environ.get("UNIVERSE_FILE",
+                              "/app/logs/momrot/universes/n100_current.json")
+    today = datetime.now().strftime("%Y-%m-%d")
+    signals_dir = Path("/app/logs/momrot/signals"); signals_dir.mkdir(parents=True, exist_ok=True)
+    stop_out = signals_dir / f"{today}_momrot_n100_stop.json"
+    cmd = ["python3", "tools/models/momentum_n100_top5_max1/live_signal.py",
+           "--universe-file", universe, "--top-n", "5",
+           "--signals-out", str(stop_out), "--stop-check"]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=300,
+                           env={**os.environ, "MOMROT_TG_NOTIFY": "1"})
+        if r.returncode != 0:
+            log.error(f"❌ n100 stop-check failed ({r.returncode}): {r.stderr[-300:]}")
+            _alert(f"❌ n100 stop-check failed (rc={r.returncode})"); return
+        if r.stdout:
+            log.info(r.stdout[-300:])
+        if stop_out.exists() and _json.loads(stop_out.read_text() or "[]"):
+            user_id = os.environ.get("USER_ID", "1")
+            ex = subprocess.run(
+                ["python3", "tools/live/fyers_executor.py", "--signals", str(stop_out),
+                 "--user-id", user_id, "--model-name", "momentum_n100_top5_max1"],
+                capture_output=True, text=True, timeout=1200)
+            (log.info if ex.returncode == 0 else log.error)(
+                f"{'✅' if ex.returncode==0 else '❌'} n100 stop execute"
+                + ("" if ex.returncode == 0 else f" rc={ex.returncode}: {ex.stderr[-300:]}"))
+            if ex.returncode != 0:
+                _alert(f"❌ n100 stop execute failed (rc={ex.returncode})")
+    except Exception as e:
+        log.error(f"❌ n100 stop-check error: {e}"); _alert(f"❌ n100 stop-check error: {e}")

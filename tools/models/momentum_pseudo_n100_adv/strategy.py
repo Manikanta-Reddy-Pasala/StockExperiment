@@ -34,6 +34,14 @@ SMA_LONG = 200       # uptrend filter: close > 200d SMA
 SMA_GATE = False     # 2026-05-31: dropping the 200d gate lifted CAGR +71->+77% (raises DD some); kept off.
 RETAIN = 1           # exit band — top-1 rotation (wins on the fixed anchor)
 MIDMONTH_LEAD = 3.0  # only used by the opt-in --mid-month-check path (default OFF)
+# From-entry ATR hard stop (backtest-validated 2026-06-02 via
+# tools/analysis/pseudo_improve_sweep.py). k=3.0 won BOTH windows — full 2021-26
+# CAGR 76.5->77.4 / DD 50.1->43.8; recent 2025-26 190->209 / DD 18->16. Fixed-%,
+# floor, SMA20, cooldown all LOST. SHARED with backtest + live --stop-check via
+# tools.shared.stops (no drift). Hard level = entry - 3*ATR(14), checked daily;
+# only cuts genuine breakdowns. Set ATR_STOP_MULT=0 to disable.
+ATR_STOP_MULT = 3.0
+ATR_WIN = 14
 
 # Universe re-anchor date — FIXED calendar (month, day), NOT the backtest start.
 # Live rebuilds yearly_universes.json once a year at the mid-May NSE rebalance

@@ -145,6 +145,47 @@ def execute_orders():
         _alert(f"❌ {MODEL_NAME} execute error: {e}")
 
 
+def stop_check():
+    """DAILY from-entry ATR hard-stop check (every trading day, not just the
+    rebalance day). live_signal --stop-check emits a STOP_HIT SELL to a separate
+    *_stop.json file when the held name's last completed bar breached
+    entry - ATR_STOP_MULT*ATR; we then execute it. Uses the SHARED stop helper
+    so it matches the backtest exactly."""
+    SIGNALS_DIR.mkdir(parents=True, exist_ok=True)
+    today = datetime.now().strftime("%Y-%m-%d")
+    stop_out = SIGNALS_DIR / f"{today}_pseudo_n100_stop.json"
+    cmd = ["python3", "tools/models/momentum_pseudo_n100_adv/live_signal.py",
+           "--universes-file", UNIVERSES_FILE, "--top-n", "5",
+           "--signals-out", str(stop_out), "--stop-check"]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=300,
+                           env={**os.environ, "MOMROT_TG_NOTIFY": "1"})
+        if r.returncode != 0:
+            log.error(f"❌ {MODEL_NAME} stop-check failed ({r.returncode}): {r.stderr[-300:]}")
+            _alert(f"❌ {MODEL_NAME} stop-check failed (rc={r.returncode})")
+            return
+        if r.stdout:
+            log.info(r.stdout[-300:])
+        # Execute only if the stop emitted a non-empty SELL.
+        try:
+            import json as _json
+            if stop_out.exists() and _json.loads(stop_out.read_text() or "[]"):
+                user_id = os.environ.get("USER_ID", "1")
+                ex = subprocess.run(
+                    ["python3", "tools/live/fyers_executor.py", "--signals", str(stop_out),
+                     "--user-id", user_id, "--model-name", MODEL_NAME],
+                    capture_output=True, text=True, timeout=1200)
+                (log.info if ex.returncode == 0 else log.error)(
+                    f"{'✅' if ex.returncode==0 else '❌'} {MODEL_NAME} stop execute"
+                    + ("" if ex.returncode == 0 else f" rc={ex.returncode}: {ex.stderr[-300:]}"))
+                if ex.returncode != 0:
+                    _alert(f"❌ {MODEL_NAME} stop execute failed (rc={ex.returncode})")
+        except Exception as _ee:
+            log.error(f"{MODEL_NAME} stop execute error: {_ee}")
+    except Exception as e:
+        log.error(f"❌ {MODEL_NAME} stop-check error: {e}"); _alert(f"❌ {MODEL_NAME} stop-check error: {e}")
+
+
 def emit_mid_month_signal():
     """Day-15 weekday mid-month check (2026-05-30 config). live_signal applies
     the 3pp lead gate and self-skips on non-day-15 days, so this is safe to fire
@@ -279,6 +320,10 @@ def register_trading_jobs(schedule):
     # 09:31 (staggered off n100's 09:30) — all 4 models share one scheduler
     # thread + one Fyers account; distinct minutes stop later models filling late.
     schedule.every().day.at("09:31").do(execute_orders)
+    # DAILY from-entry ATR hard-stop check (2026-06-02) — runs every trading day,
+    # staggered after the rotation execute so a same-day rotation entry isn't
+    # falsely stopped. Sells the held name if it breached entry-3*ATR.
+    schedule.every().day.at("09:34").do(stop_check)
     # Mid-month jobs are NOT registered (2026-05-31): the mid-month config lost to
     # RET1/monthly on the fixed-anchor re-check, so pseudo runs monthly-only. The
     # emit_mid_month_signal / execute_mid_month_orders funcs remain as an opt-in

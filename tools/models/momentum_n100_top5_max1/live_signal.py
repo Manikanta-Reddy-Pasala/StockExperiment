@@ -240,6 +240,49 @@ def held_from_db() -> List[Dict]:
     return []  # no open position (or read failed) -> model runs as flat
 
 
+def run_stop_check(today, sig_path) -> int:
+    """DAILY from-entry FIXED-% hard-stop check. Emits a STOP_HIT SELL when the
+    held name's LOW pierces entry*(1-STOP_PCT). Uses the SHARED
+    tools.shared.stops.fixed_stop_hit (same helper the backtest applies) so live
+    and backtest never drift. Fail-safe (empty + skip) on missing/stale data."""
+    import json as _json
+    from pathlib import Path as _P
+    from tools.shared import stops
+    sig_path = _P(sig_path); sig_path.parent.mkdir(parents=True, exist_ok=True)
+    pct = float(getattr(S, "STOP_PCT", 0.0) or 0.0)
+    if pct <= 0:
+        sig_path.write_text(_json.dumps([])); return 0
+    held = held_from_db()
+    if not held or not held[0].get("symbol"):
+        log.info("stop-check: flat — nothing to check."); sig_path.write_text(_json.dumps([])); return 0
+    sym = held[0]["symbol"]; entry_px = float(held[0].get("entry_price") or 0)
+    if entry_px <= 0:
+        log.warning("stop-check: held has no entry_px; skip."); sig_path.write_text(_json.dumps([])); return 0
+    to_ts = int(today.timestamp())
+    df = read_cached(sym, "D", to_ts - 90 * 86400, to_ts)
+    if df is None or df.empty:
+        log.warning(f"stop-check: no data for {sym}; skip."); sig_path.write_text(_json.dumps([])); return 0
+    if bar_is_stale(int(df.iloc[-1]["timestamp"]), to_ts):
+        log.error("stop-check: data stale; skip (fail-safe)."); sig_path.write_text(_json.dumps([])); return 1
+    day_low = float(df["low"].iloc[-1])
+    hit, lvl = stops.fixed_stop_hit(entry_px, day_low, pct)
+    log.info(f"stop-check {sym}: entry={entry_px:.2f} stop={lvl} day_low={day_low:.2f} "
+             f"-> {'HIT' if hit else 'ok'}")
+    if hit:
+        sig_path.write_text(_json.dumps([{
+            "model": "momentum_n100_top5_max1", "symbol": sym,
+            "company": sym.split(":")[-1].replace("-EQ", ""),
+            "ts": today.strftime("%Y-%m-%d %H:%M:%S"), "side": "SELL",
+            "signal": "STOP_HIT", "price": float(lvl), "sl": 0.0, "target": 0.0,
+            "note": f"fixed -{pct*100:.0f}% from-entry stop: low {day_low:.2f} <= "
+                    f"entry {entry_px:.2f} x (1-{pct}) ({lvl:.2f})",
+        }]))
+        log.info(f"stop-check: STOP_HIT emitted for {sym} @ {lvl:.2f}")
+    else:
+        sig_path.write_text(_json.dumps([]))
+    return 0
+
+
 def emit_signals(top_picks: List[tuple], held: List[Dict],
                   top_n: int, retain_top_n: int = 3) -> List[Dict]:
     """Turn a ranking + current holding into SELL/BUY signal dicts.
@@ -353,6 +396,10 @@ def main():
                          "current held by >= MID_MONTH_LEAD_PCT (default 5pp)")
     ap.add_argument("--force", action="store_true",
                     help="Bypass rebalance-day check (initial deploy / manual)")
+    ap.add_argument("--stop-check", action="store_true",
+                    help="DAILY from-entry fixed-% hard-stop check: emit STOP_HIT "
+                         "SELL when the held name's LOW pierces entry*(1-STOP_PCT). "
+                         "Shared with the backtest via tools.shared.stops.")
     args = ap.parse_args()
 
     logging.basicConfig(level=logging.INFO,
@@ -361,6 +408,9 @@ def main():
     today = datetime.now()
     log.info(f"momentum_rotation_signal run: today={today.date()} "
              f"weekday={today.strftime('%A')} day_of_month={today.day}")
+
+    if args.stop_check:
+        return run_stop_check(today, args.signals_out)
 
     # Enabled gate (fail-closed) — a model toggled OFF must not emit/trade.
     if not args.force and not is_model_enabled():

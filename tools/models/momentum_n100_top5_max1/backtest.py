@@ -29,7 +29,9 @@ import pandas as pd
 from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
 from tools.shared.backtest_engine import run_rotation_backtest
+from tools.shared.rotation_strategy import decide_rotation
 from tools.shared.index_membership import eligible_at, universe_union
+from tools.models.momentum_n100_top5_max1 import strategy as S
 from tools.models.momentum_n100_top5_max1.strategy import (
     LOOKBACK, RETAIN, MIDMONTH_LEAD, build_calendar)
 
@@ -107,7 +109,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
         # Pull 400 extra calendar days before `start` so the 30d lookback has
         # warm-up history available for the earliest rebalance dates.
         df = pd.read_sql(text(
-            "SELECT symbol,date,close,volume FROM historical_data "
+            "SELECT symbol,date,low,close,volume FROM historical_data "
             "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b AND data_source=:ds "
             "ORDER BY symbol,date"
         ), c, params={"s": n100_syms, "a": start - timedelta(days=400), "b": end,
@@ -117,6 +119,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
     # Wide close-price matrix: rows = trading days, cols = symbols. ffill carries
     # the last known close forward over gaps so ranking never sees NaN holes.
     cl = df.pivot(index="date", columns="symbol", values="close").ffill()
+    _lo = df.pivot(index="date", columns="symbol", values="low").ffill()  # for the fixed-% stop
     dates = cl.index
     # Keep only universe symbols that actually have price columns loaded.
     present = [s for s in n100_syms if s in cl.columns]
@@ -182,14 +185,79 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
         # the lead-pct gate compares against).
         return [(s, float(rk[s]) * 100) for s in rk.index]
 
-    res = run_rotation_backtest(
-        dates=dates, close=cl, calendar=calendar, rank_at=rank_at,
-        capital=capital, start=start, end=end, retain_top_n=retain_top_n,
-        midmonth_ret_at=midret_at, midmonth_lead_pct=mid_month_lead_pct,
-    )
-    final, cagr, mdd, calmar = res.final_nav, res.cagr_pct, res.max_dd_pct, res.calmar
-    trades, yrs, wins, losses, open_pos = (res.trades, res.years, res.wins,
-                                           res.losses, res.open_position)
+    # DAILY-MTM single-position walk WITH the from-entry FIXED-% hard stop
+    # (shared tools.shared.stops.fixed_stop_hit — SAME helper live --stop-check
+    # uses, so backtest/live can't drift). Selection/rotation identical to the
+    # production rule (decide_rotation + mid-month gate). STOP_PCT=0 -> the walk
+    # reproduces the rotation-only baseline exactly.
+    from tools.shared.stops import fixed_stop_hit as _fix_hit
+    from tools.shared.rotation_strategy import midmonth_lead_ok as _midok, mid_month_retain as _midret
+    _STOP = float(getattr(S, "STOP_PCT", 0.0) or 0.0)
+    cal = {pd.Timestamp(d): k for d, k in calendar}
+    cash = capital; hold = None; q = 0; entry = 0.0; entry_dt = None
+    trades = []; navdays = []
+    first_di = dates.get_loc(min(cal)) if cal else 0
+    for di in range(first_di, len(dates)):
+        d = dates[di]
+        px = float(cl[hold].iloc[di]) if hold and pd.notna(cl[hold].iloc[di]) else None
+        navdays.append((d, cash + (q * px if hold and px else 0.0)))
+        if hold and q > 0 and _STOP > 0:
+            dlow = float(_lo[hold].iloc[di]) if hold in _lo.columns and pd.notna(_lo[hold].iloc[di]) else px
+            hit, lvl = _fix_hit(entry, dlow, _STOP)
+            if hit and lvl:
+                cash += q * lvl
+                trades.append({"sym": hold.replace("NSE:", "").replace("-EQ", ""),
+                               "entry_date": entry_dt, "exit_date": d.date().isoformat(),
+                               "qty": q, "entry_px": round(entry, 2), "exit_px": round(lvl, 2),
+                               "pnl": round(q * lvl - q * entry, 0),
+                               "ret_pct": round((lvl / entry - 1) * 100, 2) if entry else 0.0,
+                               "cap_after": round(cash, 0), "exit_reason": "FIXED_STOP"})
+                hold = None; q = 0; entry = 0.0
+        kind = cal.get(d)
+        if kind is None:
+            continue
+        ranked = rank_at(di)
+        if not ranked:
+            continue
+        top = ranked[0]
+        if kind == "mid" and mid_month_check:
+            if not _midok(hold, midret_at(di), mid_month_lead_pct):
+                continue
+            if decide_rotation(hold, ranked, retain_top_n=_midret(True, retain_top_n)).is_noop:
+                continue
+        else:
+            if decide_rotation(hold, ranked, retain_top_n=retain_top_n).is_noop:
+                continue
+        if hold and q > 0:
+            sx = float(cl[hold].iloc[di]); cash += q * sx
+            trades.append({"sym": hold.replace("NSE:", "").replace("-EQ", ""),
+                           "entry_date": entry_dt, "exit_date": d.date().isoformat(),
+                           "qty": q, "entry_px": round(entry, 2), "exit_px": round(sx, 2),
+                           "pnl": round(q * sx - q * entry, 0),
+                           "ret_pct": round((sx / entry - 1) * 100, 2) if entry else 0.0,
+                           "cap_after": round(cash, 0), "exit_reason": "ROTATE"})
+            hold = None; q = 0
+        bx = float(cl[top].iloc[di])
+        if bx > 0:
+            n = int(cash / bx)
+            if n >= 1 and n * bx <= cash:
+                cash -= n * bx; q = n; hold = top; entry = bx; entry_dt = d.date().isoformat()
+    final = cash + (q * float(cl[hold].iloc[-1]) if hold else 0.0)
+    yrs = (end - start).days / 365.25
+    cagr = ((final / capital) ** (1 / yrs) - 1) * 100 if final > 0 else -100.0
+    _nav = pd.Series([v for _, v in navdays], index=pd.DatetimeIndex([d for d, _ in navdays]))
+    _roll = _nav.cummax(); mdd = float(((_roll - _nav) / _roll).max()) * 100 if len(_nav) > 1 else 0.0
+    calmar = round(cagr / mdd, 2) if mdd > 0 else 0.0
+    wins = sum(1 for t in trades if t["pnl"] > 0); losses = sum(1 for t in trades if t["pnl"] < 0)
+    per_year = {}
+    for yy, g in _nav.groupby(_nav.index.year):
+        if len(g) > 1:
+            rl = g.cummax()
+            per_year[int(yy)] = {"ret_pct": round((g.iloc[-1] / g.iloc[0] - 1) * 100, 1),
+                                 "dd_pct": round(float(((rl - g) / rl).max()) * 100, 1)}
+    open_pos = ({"symbol": hold, "qty": q, "entry_px": round(entry, 2)} if hold else None)
+    class _R: pass
+    res = _R(); res.per_year = per_year
 
     print(f"\n## RESULTS")
     print(f"  Final NAV:    Rs.{final:,.0f}")

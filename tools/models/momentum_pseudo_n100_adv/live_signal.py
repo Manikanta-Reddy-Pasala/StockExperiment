@@ -291,6 +291,49 @@ def is_model_enabled() -> bool:
         return False
 
 
+def run_stop_check(today: datetime, sig_path: Path) -> int:
+    """DAILY from-entry ATR hard-stop check (separate mode). Emits a STOP_HIT
+    SELL when the held name's LOW pierces entry - ATR_STOP_MULT*ATR. Uses the
+    SHARED tools.shared.stops helpers — the SAME logic the backtest applies, so
+    live and backtest never drift. Fail-safe (writes empty + skips) on missing
+    or stale data."""
+    from tools.shared import stops
+    sig_path.parent.mkdir(parents=True, exist_ok=True)
+    if not S.ATR_STOP_MULT or S.ATR_STOP_MULT <= 0:
+        sig_path.write_text(json.dumps([])); return 0
+    pos = get_current_position()
+    if not pos or not pos.get("open_symbol"):
+        log.info("stop-check: flat — nothing to check."); sig_path.write_text(json.dumps([])); return 0
+    sym = pos["open_symbol"]; entry_px = float(pos.get("open_entry_px") or 0)
+    if entry_px <= 0:
+        log.warning("stop-check: held has no entry_px; skip."); sig_path.write_text(json.dumps([])); return 0
+    to_ts = int(today.timestamp()); from_ts = to_ts - 120 * 86400
+    df = read_cached(sym, "D", from_ts, to_ts)
+    if df is None or df.empty or len(df) < S.ATR_WIN + 1:
+        log.warning(f"stop-check: insufficient data for {sym}; skip."); sig_path.write_text(json.dumps([])); return 0
+    if bar_is_stale(int(df.iloc[-1]["timestamp"]), to_ts):
+        log.error("stop-check: data stale; skip (fail-safe)."); sig_path.write_text(json.dumps([])); return 1
+    atr_val = stops.atr_latest(df["high"].astype(float), df["low"].astype(float),
+                               df["close"].astype(float), S.ATR_WIN)
+    day_low = float(df["low"].iloc[-1])
+    hit, lvl = stops.atr_stop_hit(entry_px, atr_val, day_low, S.ATR_STOP_MULT)
+    log.info(f"stop-check {sym}: entry={entry_px:.2f} ATR={atr_val} stop={lvl} "
+             f"day_low={day_low:.2f} -> {'HIT' if hit else 'ok'}")
+    if hit:
+        sig_path.write_text(json.dumps([{
+            "model": MODEL_NAME, "universe": "pseudo_n100", "symbol": sym,
+            "company": sym.split(":")[-1].replace("-EQ", ""),
+            "ts": today.strftime("%Y-%m-%d %H:%M:%S"), "side": "SELL",
+            "signal": "STOP_HIT", "price": float(lvl), "sl": 0.0, "target": 0.0,
+            "note": f"ATR-from-entry stop: low {day_low:.2f} <= entry {entry_px:.2f} "
+                    f"- {S.ATR_STOP_MULT}x ATR ({lvl:.2f})",
+        }]))
+        log.info(f"stop-check: STOP_HIT emitted for {sym} @ {lvl:.2f}")
+    else:
+        sig_path.write_text(json.dumps([]))
+    return 0
+
+
 def emit_signals(top_picks: List[tuple], pos: Optional[Dict],
                  top_n: int, retain_top_n: int = RETAIN) -> List[Dict]:
     # Decision comes from the SHARED rotation core (tools/shared/rotation_strategy)
@@ -364,6 +407,11 @@ def main() -> int:
                     help="Skip if today is not rebalance trigger day")
     ap.add_argument("--force", action="store_true",
                     help="Bypass rebalance-day + enabled checks")
+    ap.add_argument("--stop-check", action="store_true",
+                    help="DAILY from-entry ATR hard-stop check: emit a STOP_HIT "
+                         "SELL when the held name's LOW pierces entry - "
+                         "ATR_STOP_MULT*ATR. Runs every trading day (shared with "
+                         "the backtest via tools.shared.stops).")
     args = ap.parse_args()
 
     logging.basicConfig(level=logging.INFO,
@@ -372,6 +420,11 @@ def main() -> int:
     today = datetime.now()
     log.info(f"{MODEL_NAME} signal run: today={today.date()} "
              f"weekday={today.strftime('%A')} day_of_month={today.day}")
+
+    # DAILY stop-check is a fast, self-contained mode — run + return before the
+    # ranking/rebalance machinery.
+    if args.stop_check:
+        return run_stop_check(today, Path(args.signals_out))
 
     # Even when disabled / non-rebalance day, we still want the Today's Picks
     # UI to show the ranking. Compute it up front and write to the per-model
