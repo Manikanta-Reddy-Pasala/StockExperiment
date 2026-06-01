@@ -1829,6 +1829,10 @@ def signals_today():
                 "note": "Intraday watchlist — top-3 momentum leaders to watch for a "
                         "morning opening-range breakout (BACKTEST-ONLY, no live orders).",
             })
+            # Persist orb's watchlist to the DB once per day (it has no signal
+            # cron — its picks are computed here). Observe/backtest models still
+            # belong in audit_model_signals. Dedup: write only if today has none.
+            _persist_orb_watchlist(date_str, orb_picks)
         except Exception as _e:
             logger.debug(f"orb watchlist failed: {_e}")
 
@@ -1842,6 +1846,35 @@ def signals_today():
     except Exception as e:
         logger.error(f"signals/today error: {e}", exc_info=True)
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+def _persist_orb_watchlist(date_str, picks):
+    """Save orb's daily watchlist to audit_model_signals ONCE per day.
+
+    orb has no signal cron (its picks are computed on demand), so without this
+    it was the only model missing from the DB. Idempotent: skips if today
+    already has orb rows, and only writes for TODAY (not ?date= history views).
+    """
+    try:
+        from datetime import date as _dd
+        td = _dd.today()
+        if date_str != td.isoformat() or not picks:
+            return
+        from src.models.database import get_database_manager
+        from src.models.audit_models import AuditModelSignal
+        from src.services.audit_service import write_signal
+        db = get_database_manager()
+        with db.get_session() as s:
+            exists = s.query(AuditModelSignal).filter_by(
+                model_name="orb_momentum_intraday", trading_date=td).count()
+        if exists:
+            return
+        for p in picks:
+            write_signal("orb_momentum_intraday", td, "WATCHLIST",
+                         p.get("symbol") or "", "WATCH", price=p.get("price"),
+                         reason="intraday ORB watchlist (backtest-only)")
+    except Exception as e:
+        logger.debug(f"orb watchlist persist failed: {e}")
 
 
 def _orb_today_watchlist():
