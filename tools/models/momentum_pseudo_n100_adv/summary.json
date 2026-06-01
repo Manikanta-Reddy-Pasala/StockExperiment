@@ -1,52 +1,47 @@
 {
   "model": "momentum_pseudo_n100_adv",
   "start": "2021-03-01",
-  "end": "2026-05-29",
-  "years": 5.243,
+  "end": "2026-05-31",
+  "years": 5.248,
   "capital": 1000000.0,
-  "final_nav": 19741787.0,
-  "total_return_pct": 1874.18,
-  "cagr_pct": 76.63,
-  "max_dd_pct": 28.63,
-  "calmar": 2.68,
+  "final_nav": 20239089.0,
+  "total_return_pct": 1923.91,
+  "cagr_pct": 77.37,
+  "max_dd_pct": 43.76,
+  "calmar": 1.77,
   "trades": 50,
-  "wins": 38,
-  "losses": 12,
-  "win_rate_pct": 76.0,
+  "wins": 37,
+  "losses": 13,
+  "win_rate_pct": 74.0,
   "open_position": {
-    "sym": "ADANIGREEN",
-    "qty": 13380,
-    "entry_px": 1290.7,
-    "entry_date": "2026-05-04",
-    "last_px": 1475.4,
-    "mtm_value": 19740852.0,
-    "unrealized_pnl": 2471286.0,
-    "cap": "large"
+    "symbol": "NSE:ADANIGREEN-EQ",
+    "qty": 13717,
+    "entry_px": 1290.7
   },
   "per_year": {
     "2021": {
-      "ret_pct": 50.4,
-      "dd_pct": 5.8
+      "ret_pct": 55.3,
+      "dd_pct": 31.6
     },
     "2022": {
-      "ret_pct": -11.5,
-      "dd_pct": 28.6
+      "ret_pct": -6.2,
+      "dd_pct": 27.1
     },
     "2023": {
-      "ret_pct": 125.9,
-      "dd_pct": 13.1
+      "ret_pct": 137.8,
+      "dd_pct": 19.7
     },
     "2024": {
-      "ret_pct": 56.3,
-      "dd_pct": 16.4
+      "ret_pct": 45.2,
+      "dd_pct": 43.3
     },
     "2025": {
-      "ret_pct": 55.4,
-      "dd_pct": 22.3
+      "ret_pct": 114.7,
+      "dd_pct": 26.5
     },
     "2026": {
-      "ret_pct": 52.4,
-      "dd_pct": 2.2
+      "ret_pct": 74.2,
+      "dd_pct": 12.1
     }
   }
 }
