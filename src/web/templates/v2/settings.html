@@ -580,9 +580,13 @@ async function loadAllocations() {
       if (!m.enabled) tr.classList.add('row-disabled');
       const warnBadge = meta.warn ? ` <span class="lookahead-pill" title="Strategy note">${meta.warn}</span>` : '';
       // Position-state-dependent button: clear/sell-mark if holding, seed if flat.
-      const posBtn = m.open_symbol
-        ? `<button class="btn btn-outline-danger" onclick="resetPos('${m.model_name}')" title="Mark flat (no Fyers order)" aria-label="Clear position"><i class="bi bi-x-circle"></i></button>`
-        : `<button class="btn btn-outline-primary" onclick="openSeed('${m.model_name}')" title="Seed existing position into ledger" aria-label="Seed position"><i class="bi bi-bookmark-plus"></i></button>`;
+      // Multi-holding (basket) models use neither — seed/clear are single-slot
+      // ops; manage a basket via Exit on the Portfolio page.
+      const posBtn = (m.holdings && m.holdings.length)
+        ? `<span class="badge bg-secondary" title="Basket model — exit/manage on the Portfolio page">basket</span>`
+        : (m.open_symbol
+            ? `<button class="btn btn-outline-danger" onclick="resetPos('${m.model_name}')" title="Mark flat (no Fyers order)" aria-label="Clear position"><i class="bi bi-x-circle"></i></button>`
+            : `<button class="btn btn-outline-primary" onclick="openSeed('${m.model_name}')" title="Seed existing position into ledger" aria-label="Seed position"><i class="bi bi-bookmark-plus"></i></button>`);
       const dropdownId = `act_${m.model_name}`;
       // B1 fix v2: build menu HTML separately. Markup is appended to <body>
       // on click (see openKebabMenu) to escape the .table-responsive clip box.

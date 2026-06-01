@@ -139,6 +139,27 @@ def main():
                          for i, s in enumerate(rk[:5])]}
     rp = Path(args.ranking_out) if args.ranking_out else (STATE_DIR / "ranking" / f"{today.strftime('%Y-%m-%d')}.json")
     rp.parent.mkdir(parents=True, exist_ok=True); rp.write_text(json.dumps(ranking, indent=2))
+
+    # Audit hook — persist ranking snapshot + every signal to the DB
+    # (audit_model_signals), parity with the single-position models. retest was
+    # file-only (signals/latest.json) before, so its signals never hit the DB.
+    if not args.force:
+        try:
+            from src.services.audit_service import write_rankings, write_signal
+            write_rankings(MODEL_NAME, today.date(), len(rk), 0, ranking.get("top_n") or [])
+            if sells or buys:
+                for sl in sells:
+                    write_signal(MODEL_NAME, today.date(), "EXIT",
+                                 sl.get("symbol", ""), "SELL",
+                                 reason=sl.get("reason", "RANK_DROP"))
+                for b in buys:
+                    write_signal(MODEL_NAME, today.date(), "RETEST_ENTRY",
+                                 b.get("symbol", ""), "BUY")
+            else:
+                write_signal(MODEL_NAME, today.date(), "HOLD", "", "NONE",
+                             reason="no signal emitted")
+        except Exception as _e:
+            log.debug(f"audit hook failed: {_e}")
     return 0
 
 

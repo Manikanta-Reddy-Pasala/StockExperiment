@@ -232,8 +232,12 @@ async function loadBalanceSheet() {
       `(target ${fmtINR(invNum)}, drift ${drift >= 0 ? '+' : ''}${fmtINR(drift)})</small>`;
 
     const posValueEl = document.getElementById('bs_position_value');
-    if (data.open_position) {
-      posValueEl.textContent = fmtINR(data.open_position.position_value);
+    // Top-level position_value includes a multi-holding basket; fall back to
+    // the single open_position; else flat.
+    const _pv = Number(data.position_value || 0) ||
+                (data.open_position ? Number(data.open_position.position_value || 0) : 0);
+    if (_pv > 0) {
+      posValueEl.textContent = fmtINR(_pv);
     } else {
       posValueEl.innerHTML = '<span class="text-muted">— (flat)</span>';
     }
@@ -262,7 +266,31 @@ async function loadBalanceSheet() {
 
     // Open position card
     const posBody = document.getElementById('pos_body');
-    if (data.open_position) {
+    if (data.is_multi && data.holdings && data.holdings.length) {
+      // Multi-holding model (e.g. Retest Momentum): show the whole basket.
+      const rows = data.holdings.map(h => `
+        <tr>
+          <td><strong>${h.symbol}</strong></td>
+          <td class="text-end">${fmtNum(h.qty)}</td>
+          <td class="text-end">${fmtINR(h.entry_px)}</td>
+          <td class="text-end">${fmtINR(h.current_px)}</td>
+          <td class="text-end">${fmtINR(h.entry_cost)}</td>
+          <td class="text-end">${fmtINR(h.position_value)}</td>
+          <td class="text-end ${cls(h.unrealized_pnl)}">${fmtINR(h.unrealized_pnl)} <small>(${fmtPct(h.unrealized_pct)})</small></td>
+        </tr>`).join('');
+      posBody.innerHTML = `
+        <div class="pos-line mb-2"><strong>${data.holdings.length} holdings</strong> <span class="text-muted">(basket)</span></div>
+        <div class="table-responsive">
+          <table class="table table-sm metric-table mb-0">
+            <thead><tr>
+              <th>Symbol</th><th class="text-end">Qty</th><th class="text-end">Entry</th>
+              <th class="text-end">LTP</th><th class="text-end">Cost</th>
+              <th class="text-end">Value</th><th class="text-end">P&amp;L</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    } else if (data.open_position) {
       const op = data.open_position;
       const pnlCls = cls(op.unrealized_pnl);
       posBody.innerHTML = `

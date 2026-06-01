@@ -1503,6 +1503,35 @@ def model_balance_sheet(model_name):
                 "unrealized_pct": round(unrealized_pct, 2),
             }
 
+        # Multi-holding models (e.g. Retest Momentum): one row per held name.
+        # Parity with the per-model Portfolio table so the Detail page shows the
+        # whole basket, not "flat".
+        holdings_detail = []
+        for h in (per_model.get("holdings") or []):
+            hq = float(h.get("qty") or 0)
+            hpx = float(h.get("entry_px") or 0)
+            hmtm = float(h.get("mtm_price") or hpx or 0)
+            hcost = hq * hpx
+            hval = float(h.get("value") or (hq * hmtm))
+            hpnl = hval - hcost
+            holdings_detail.append({
+                "symbol": h.get("symbol"),
+                "qty": int(hq),
+                "entry_px": hpx,
+                "entry_date": h.get("entry_date"),
+                "current_px": hmtm,
+                "entry_cost": round(hcost, 2),
+                "position_value": round(hval, 2),
+                "unrealized_pnl": round(hpnl, 2),
+                "unrealized_pct": round((hpnl / hcost * 100.0) if hcost > 0 else 0.0, 2),
+            })
+        # For a multi-holding model, the single-position block above never ran,
+        # so derive cost-basis + unrealized from the basket for the headline rows.
+        if holdings_detail:
+            entry_cost_open = sum(h["entry_cost"] for h in holdings_detail)
+            unrealized_pnl = sum(h["unrealized_pnl"] for h in holdings_detail)
+            unrealized_pct = (unrealized_pnl / entry_cost_open * 100.0) if entry_cost_open > 0 else 0.0
+
         return_pct = (total_pnl / invested * 100.0) if invested > 0 else 0.0
 
         # Lookup pretty label if available in MODEL_PATHS
@@ -1546,6 +1575,9 @@ def model_balance_sheet(model_name):
             "invested_amount": round(float(invested), 2),
             "cash": round(float(cash), 2),
             "open_position": open_position,
+            "holdings": holdings_detail,        # multi-holding basket (empty for single)
+            "is_multi": bool(holdings_detail),
+            "position_value": round(float(pos_value), 2),   # incl. holdings (multi)
             # Top-level mirror so UIs can render cost-basis + buy-charges rows
             # without drilling into open_position. Zero when flat.
             "entry_cost_open": round(float(entry_cost_open), 2),

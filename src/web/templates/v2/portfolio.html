@@ -314,6 +314,22 @@ async function rebalanceModel(model) {
     const m = (pfRes.success && (pfRes.models||[]).find(x => x.model_name === model)) || {};
     const rank = (rkRes.success && rkRes.ranking) || [];
     const rank1 = rank[0];
+
+    // Multi-holding (basket) models don't do a rank-1 1-for-1 swap — rebalancing
+    // re-runs the monthly signal (sell rank-droppers, buy new top names at
+    // retest). Show a basket-aware preview instead of the single-rotation view.
+    if (m.holdings && m.holdings.length) {
+      const heldList = m.holdings.map(h => `${h.symbol} <span class="text-muted">x${h.qty}</span>`).join(', ');
+      const topList = rank.slice(0, 4).map(r => r.symbol).join(', ');
+      preview = `
+        <div class="small mb-2">
+          <div><strong>Model:</strong> ${modelLabel(model)} <span class="badge bg-secondary">basket</span></div>
+          <div><strong>Cash:</strong> ${fmtINR(m.cash)} · <strong>NAV:</strong> ${fmtINR(m.nav)}</div>
+          <div><strong>Currently holding:</strong> ${heldList || 'flat'}</div>
+          <div><strong>Top names now:</strong> ${topList || '—'}</div>
+        </div>
+        <div class="text-muted">Multi-stock (basket) model. Rebalancing re-runs its signal — SELLS names that dropped out of the top ranks and BUYS new top names at their retest. Exact orders depend on today's conditions.</div>`;
+    } else {
     const heldNorm = _norm(m.open_symbol);
     const inTop = rank1 && rank.some(r => _norm(r.symbol) === heldNorm);
 
@@ -357,6 +373,7 @@ async function rebalanceModel(model) {
         <div><strong>Rank-1:</strong> ${rank1 ? rank1.symbol + ' @ ' + fmtINR(rank1.price) + (rank1.live ? ' <span class="badge bg-success">LIVE</span>' : '') : '—'}</div>
       </div>
       ${actionRow}`;
+    }
   } catch(e) {
     preview = '<div class="text-warning">Could not load preview: ' + e.message + '</div>';
   }
@@ -525,9 +542,14 @@ async function exitModel(model) {
   try {
     const pf = await fetch('/admin/models/portfolio', {cache: 'no-store'}).then(r => r.json());
     const m = (pf.success && (pf.models||[]).find(x => x.model_name === model)) || {};
-    posLine = m.open_symbol
-      ? `<div class="small mb-2"><strong>Current:</strong> ${m.open_symbol} x${m.open_qty} @ ${fmtINR(m.open_entry_px)} · MTM ${fmtINR(m.position_value)}</div>`
-      : '<div class="small mb-2 text-muted">No open position found (will report nothing to exit).</div>';
+    if (m.holdings && m.holdings.length) {
+      const list = m.holdings.map(h => `${h.symbol} x${h.qty}`).join(', ');
+      posLine = `<div class="small mb-2"><strong>Current (basket):</strong> ${list} · MTM ${fmtINR(m.position_value)}</div>`;
+    } else if (m.open_symbol) {
+      posLine = `<div class="small mb-2"><strong>Current:</strong> ${m.open_symbol} x${m.open_qty} @ ${fmtINR(m.open_entry_px)} · MTM ${fmtINR(m.position_value)}</div>`;
+    } else {
+      posLine = '<div class="small mb-2 text-muted">No open position found (will report nothing to exit).</div>';
+    }
   } catch (e) { /* preview is best-effort */ }
 
   const ok = await appModal.confirm(
