@@ -176,6 +176,8 @@ SCENARIOS = [
     ("atr3.0_fromentry",    dict(atr_from_entry=3.0)),
     ("stop_-10%",           dict(entry_stop_pct=0.10)),
     ("stop_-12%",           dict(entry_stop_pct=0.12)),
+    ("stop_-14%",           dict(entry_stop_pct=0.14)),
+    ("stop_-16%",           dict(entry_stop_pct=0.16)),
     ("sma20_trail",         dict(sma20_trail=True)),
     ("cooldown_2",          dict(cooldown_cycles=2)),
     ("atr2.5+cooldown2",    dict(atr_from_entry=2.5, cooldown_cycles=2)),
