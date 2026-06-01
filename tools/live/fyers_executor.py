@@ -547,10 +547,58 @@ def _snap_tick(px: float, tick: float = 0.10) -> float:
     return round(round(px / tick) * tick, 2)
 
 
-def _modify_order_limit(svc, user_id: int, order_id: str, new_price: float) -> bool:
+def pick_tick(db_tick) -> float:
+    """Validate a per-symbol tick from symbol_master; fall back to 0.10.
+
+    0.10 is the universally-accepted NSE equity tick (a multiple of 0.10 is
+    also a valid 0.05 / 0.01 multiple) — a safe default when the master has no
+    row or a junk value.
+    """
+    try:
+        t = float(db_tick)
+        if t > 0:
+            return t
+    except (TypeError, ValueError):
+        pass
+    return 0.10
+
+
+_TICK_CACHE: Dict[str, float] = {}
+
+
+def _tick_for_symbol(symbol: str) -> float:
+    """Per-symbol LIMIT tick from symbol_master.tick_size (cached).
+
+    Snapping to the symbol's REAL tick (ENRIN 0.10, IDEA 0.01, …) instead of a
+    blanket 0.10 keeps low-priced names precise while still never tick-rejecting
+    high-priced ones. Falls back to 0.10 on any miss/error.
+    """
+    sym = to_fyers_symbol(symbol)
+    if sym in _TICK_CACHE:
+        return _TICK_CACHE[sym]
+    tick = 0.10
+    try:
+        from src.models.database import get_database_manager
+        from sqlalchemy import text
+        db = get_database_manager()
+        with db.get_session() as s:
+            row = s.execute(
+                text("SELECT tick_size FROM symbol_master WHERE symbol=:s LIMIT 1"),
+                {"s": sym},
+            ).fetchone()
+        if row:
+            tick = pick_tick(row[0])
+    except Exception as e:
+        log.debug(f"tick lookup {symbol} failed ({e}); using 0.10")
+    _TICK_CACHE[sym] = tick
+    return tick
+
+
+def _modify_order_limit(svc, user_id: int, order_id: str, new_price: float,
+                        tick: float = 0.10) -> bool:
     """Try modify; if not supported, caller should cancel+replace."""
     try:
-        snapped = _snap_tick(new_price)
+        snapped = _snap_tick(new_price, tick)
         res = svc.modifyorder(user_id=user_id, orderid=order_id, price=str(snapped))
         return _is_ok(res)
     except Exception as e:
@@ -624,10 +672,14 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
     first_window_s = max(5, total_s // 2)
     second_window_s = max(5, total_s - first_window_s)
 
+    # Per-symbol tick (Q2): snap LIMITs to the symbol's REAL tick from
+    # symbol_master (ENRIN 0.10, IDEA 0.01, …), not a blanket 0.10.
+    tick = _tick_for_symbol(symbol)
+
     if side.upper() == "BUY":
-        first_px = _snap_tick(last_price * (1.0 + tol))
+        first_px = _snap_tick(last_price * (1.0 + tol), tick)
     else:
-        first_px = _snap_tick(last_price * (1.0 - tol))
+        first_px = _snap_tick(last_price * (1.0 - tol), tick)
     # retry_px is computed later from a FRESH live LTP (the price can move
     # during the first window), not the stale t=0 last_price.
     retry_px = first_px
@@ -690,9 +742,9 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
     # current market and never fill. Fall back to last_price on quote failure.
     requote_ltp = _fetch_live_ltp(svc, user_id, symbol) or last_price
     if side.upper() == "BUY":
-        retry_px = _snap_tick(requote_ltp * (1.0 + retry))
+        retry_px = _snap_tick(requote_ltp * (1.0 + retry), tick)
     else:
-        retry_px = _snap_tick(requote_ltp * (1.0 - retry))
+        retry_px = _snap_tick(requote_ltp * (1.0 - retry), tick)
     log.info(f"  re-quote price refresh {symbol}: ltp={requote_ltp} "
              f"retry_px={retry_px} (+{rm_cfg.limit_retry_pct}%)")
 
@@ -704,7 +756,7 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
         # extra margin). Only if modify is unsupported do we cancel+replace,
         # and that replacement must wait for the cancel to actually free the
         # margin first (else 2x reservation -> Margin Shortfall).
-        if _modify_order_limit(svc, user_id, order_id, retry_px):
+        if _modify_order_limit(svc, user_id, order_id, retry_px, tick):
             log.info(f"  LIMIT {symbol} modified to {retry_px}")
         else:
             conf = _cancel_and_confirm(svc, user_id, order_id)

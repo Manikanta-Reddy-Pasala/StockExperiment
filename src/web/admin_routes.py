@@ -1692,7 +1692,49 @@ _SIGNAL_PATHS = {
         "/app/logs/n20_daily/signals/{date}_n20.json",
         "/app/logs/n20_daily_large_only/signals/{date}.json",
     ],
+    # emerging writes a date-stamped list file ({date}_emerging.json).
+    "emerging_momentum": [
+        "/app/logs/emerging_momentum/signals/{date}_emerging.json",
+        "/app/logs/emerging_momentum/signals/{date}.json",
+    ],
+    # retest (K=4 multi) writes a NON-dated latest.json with a {buys,sells}
+    # dict shape (its "date" field is checked against today below). A dated
+    # file is tried first in case the launcher ever stamps one.
+    "momentum_retest_n500": [
+        "/app/logs/momentum_retest_n500/signals/{date}.json",
+        "/app/logs/momentum_retest_n500/signals/latest.json",
+    ],
 }
+
+
+def _normalize_signal_payload(data, date_str):
+    """Coerce a signals-file payload into a flat list of signal dicts.
+
+    Handles three on-disk shapes:
+      - list[dict]                      (n100/emerging emit this directly)
+      - {"signals": [...]}              (legacy wrapper)
+      - {"date","buys":[...],"sells":[...]}  (multi-holding: retest)
+    For the multi shape, only return signals when the file's own `date` matches
+    today (latest.json is not date-stamped, so a stale day must not show up as
+    today's signals). buys/sells become {symbol, side} rows.
+    """
+    if isinstance(data, list):
+        return data
+    if not isinstance(data, dict):
+        return []
+    if "signals" in data and isinstance(data["signals"], list):
+        return data["signals"]
+    if "buys" in data or "sells" in data:
+        if data.get("date") and data.get("date") != date_str:
+            return []   # latest.json from a different day — not today's
+        out = []
+        for s in (data.get("sells") or []):
+            out.append({"symbol": s.get("symbol"), "side": "SELL",
+                        "reason": s.get("reason")})
+        for b in (data.get("buys") or []):
+            out.append({"symbol": b.get("symbol"), "side": "BUY"})
+        return out
+    return []
 
 
 @admin_bp.route('/signals/today', methods=['GET'])
@@ -1723,10 +1765,7 @@ def signals_today():
                     found_path = str(p)
                     try:
                         data = json.loads(p.read_text() or "[]")
-                        if isinstance(data, list):
-                            signals = data
-                        elif isinstance(data, dict) and "signals" in data:
-                            signals = data["signals"]
+                        signals = _normalize_signal_payload(data, date_str)
                     except Exception as e:
                         err = f"parse: {e}"
                     break

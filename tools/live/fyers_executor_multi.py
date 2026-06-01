@@ -30,52 +30,30 @@ from src.services.trading import model_ledger_service as MLS
 log = logging.getLogger("fyers_executor_multi")
 
 
-def pick_buy_price(live, signal, last):
-    """First POSITIVE price among (live LTP, signal-file price, last-known).
-
-    A brand-new BUY starts with no price; if the single live-LTP fetch misses
-    (transient quote hiccup), we must NOT silently drop the order — fall back
-    to the signal-file close, then any last-known price. Returns None only when
-    every candidate is missing/<=0 (genuine "no price").
-    """
-    for p in (live, signal, last):
-        try:
-            v = float(p)
-        except (TypeError, ValueError):
-            continue
-        if v > 0:
-            return v
-    return None
-
-
-def _last_close_for(sym):
-    """Final price safety net: last fyers close from historical_data. Returns
-    None on any error (the caller then truly has no price and skips)."""
-    try:
-        from tools.shared.ohlcv_cache import _get_engine
-        from sqlalchemy import text
-        bare = to_fyers_symbol(sym)
-        eng = _get_engine()
-        with eng.connect() as c:
-            row = c.execute(text(
-                "SELECT close FROM historical_data WHERE symbol=:s "
-                "AND data_source='fyers' ORDER BY date DESC LIMIT 1"
-            ), {"s": bare}).fetchone()
-        return float(row[0]) if row and row[0] else None
-    except Exception as e:
-        log.debug(f"last-close lookup {sym} failed: {e}")
-        return None
-
-
 def _fetch_live_ltp_retry(svc, user_id, sym, tries=3):
     """live LTP with a few retries — a single quote hiccup at the market-open
     window dropped a buy (ADANIENT 2026-06-01). Returns the first positive LTP
-    or None after `tries` attempts."""
+    or None after `tries` attempts.
+
+    Entries price off LIVE LTP ONLY — a stale signal price is never used for
+    placement (parity with the single executor). On a persistent miss the buy
+    is skipped + audited + alerted (visible), not silently dropped.
+    """
     for _ in range(max(1, tries)):
         v = _fetch_live_ltp(svc, user_id, sym)
         if v and v > 0:
             return v
     return None
+
+
+def _tg_skip(model, sym, reason):
+    """Best-effort Telegram alert when a multi buy is skipped (so a missed
+    entry is visible, never silent)."""
+    try:
+        from tools.live.telegram_notify import send
+        send(f"⚠️ *BUY skipped* `{model}`\nSymbol: `{sym}`\n{reason}")
+    except Exception as e:
+        log.debug(f"tg skip alert failed: {e}")
 
 
 def multi_trading_blocked(enabled: bool, is_trading_day: bool):
@@ -264,20 +242,17 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
             # re-run signal file must not double-buy). Skip silently — not drift.
             if sym in held:
                 log.info(f"  BUY {sym}: already held, skip"); continue
-            # (a) Price resolution with retry + fallback. A brand-new buy starts
-            # priceless; one missed live fetch must NOT drop it (ADANIENT
-            # 2026-06-01). Order of trust: live LTP (retried) -> signal px ->
-            # any last-known. _last_close_for is the final safety net.
-            live = _fetch_live_ltp_retry(svc, a.user_id, sym) if svc else None
-            signal_px = b.get("px")
-            last = (h["entry_px"] if (h := held.get(sym)) else None)
-            if last is None and not signal_px and live is None:
-                last = _last_close_for(sym)
-            ltp = pick_buy_price(live, signal_px, last)
-            if not ltp:
-                log.warning(f"  BUY {sym}: no price after retry+fallback, skip")
+            # (a) Entries price off LIVE LTP ONLY (3 retries) — never a stale
+            # signal price. A persistent miss must NOT silently drop the order
+            # (ADANIENT 2026-06-01): skip + AUDIT + Telegram alert + retry next
+            # cycle. Mirrors the single executor's stale-price refusal.
+            ltp = _fetch_live_ltp_retry(svc, a.user_id, sym) if svc else None
+            if not ltp or ltp <= 0:
+                log.error(f"  BUY {sym}: no live LTP after retry — skip "
+                          f"(refusing to place on a stale price).")
                 _audit(model, sym, "BUY", b.get("qty") or 0, 0, "skipped",
-                       error="no price (live miss + no signal/last fallback)")
+                       error="no live LTP after retry — refused stale-price entry")
+                _tg_skip(model, sym, "no live LTP after retry — not placing on a stale price. Will retry next cycle.")
                 continue
             # Honor an explicit per-buy qty (e.g. ORB's per-slot invested/SELECT_TOP
             # sizing); else fall back to equal-weight cash/N.
