@@ -81,7 +81,7 @@ def sibling_qty_for(ledgers, model_name: str, symbol: str) -> int:
 
 def decide_drift(expected_qty: int, expected_px: float,
                  actual_qty: int, actual_px: float,
-                 sibling_qty: int = 0):
+                 sibling_qty: int = 0, max_affordable_qty: int = None):
     """Pure: classify drift between ledger (expected) and broker (actual).
 
     When ``sibling_qty == 0`` this is the pre-overlap behaviour: qty + px both
@@ -115,6 +115,15 @@ def decide_drift(expected_qty: int, expected_px: float,
                               ledger lies. Don't auto-fix; surface for manual
                               cross-check.
     """
+    def _cap(qty):
+        """Refuse to AUTO_MIRROR a model UP to a qty it could NOT afford
+        (cost > invested+realized). Such excess is another model's intraday
+        position or unrecorded drift wrongly attributed here (the 2026-06-01
+        HFCL double-buy that got dumped onto pseudo as 705). Alert instead."""
+        if max_affordable_qty is not None and qty > max_affordable_qty:
+            return ("MIRROR_CAP_EXCEEDED", None, None)
+        return None
+
     if sibling_qty > 0:
         # Overlap path: ration broker qty between this model and its siblings.
         if sibling_qty > actual_qty:
@@ -127,13 +136,13 @@ def decide_drift(expected_qty: int, expected_px: float,
         if my_share < expected_qty:
             return ("QTY_REDUCED", None, None)
         # AUTO_MIRROR but keep entry_px — broker avg is the cross-model blend.
-        return ("AUTO_MIRROR", my_share, None)
+        return _cap(my_share) or ("AUTO_MIRROR", my_share, None)
     # No overlap — reconcile qty AND px against the broker (legacy behaviour).
     if actual_qty == expected_qty and abs(actual_px - expected_px) < 0.01:
         return ("NO_DRIFT", None, None)
     if actual_qty < expected_qty:
         return ("QTY_REDUCED", None, None)
-    return ("AUTO_MIRROR", actual_qty, actual_px)
+    return _cap(actual_qty) or ("AUTO_MIRROR", actual_qty, actual_px)
 
 
 def _merge_pos(out: Dict[str, Dict], rows, source: str) -> None:
@@ -272,11 +281,36 @@ def reconcile_once(user_id: int = 1, dry_run: bool = False) -> List[Dict]:
             # claiming 2x what it actually owns) on every reconcile pass.
             sibling_qty = sibling_qty_for(ledgers, l.model_name, expected_sym)
 
+            # Affordability cap: the most shares this model could OWN is
+            # (invested + realized) / its entry price. The reconciler must never
+            # AUTO_MIRROR it above that — excess is another model's intraday
+            # position / unrecorded drift (the HFCL double-buy dumped onto
+            # pseudo as 705 vs its ~413 cap). Use the broker avg as the price
+            # basis (the buy that created the excess), falling back to entry_px.
+            _cap_px = actual_px if actual_px and actual_px > 0 else expected_px
+            _invested = float(cfg.invested_amount or 0) + float(l.realized_pnl or 0)
+            max_affordable = int(_invested / _cap_px) if _cap_px > 0 else None
+
             kind, fix_qty, fix_px = decide_drift(
                 expected_qty, expected_px, actual_qty, actual_px, sibling_qty,
+                max_affordable_qty=max_affordable,
             )
 
             if kind == "NO_DRIFT":
+                continue
+
+            if kind == "MIRROR_CAP_EXCEEDED":
+                corrections.append({
+                    "model": l.model_name,
+                    "type": "MIRROR_CAP_EXCEEDED",
+                    "before": f"{expected_sym} x{expected_qty} @ {expected_px:.2f}",
+                    "after": (f"broker slice x{actual_qty - sibling_qty} > max "
+                              f"affordable x{max_affordable} (cap ₹{_invested:,.0f} "
+                              f"@ ₹{_cap_px:.2f}) — NOT mirrored (likely another "
+                              f"model's position / unrecorded drift)"),
+                    "action": "MANUAL: a buy on this symbol wasn't recorded to the "
+                              "right model; check Fyers tradebook + record_buy/sell",
+                })
                 continue
 
             if kind == "QTY_REDUCED":

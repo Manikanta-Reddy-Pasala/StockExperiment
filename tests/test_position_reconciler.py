@@ -156,3 +156,27 @@ def test_sibling_qty_for_skips_flat_and_different_symbols():
         _L("c", "NSE:TARGET-EQ", 50),
     ]
     assert sibling_qty_for(ledgers, "z", "NSE:TARGET-EQ") == 50
+
+
+# ---------------- decide_drift affordability cap (2026-06-01) ----------------
+
+def test_decide_drift_caps_mirror_above_affordable():
+    from tools.live.position_reconciler import decide_drift
+    # pseudo: owns 203, broker shows 705 (sibling 0), could only afford 413 ->
+    # refuse to mirror (the HFCL double-buy dumped onto it). Alert, no write.
+    assert decide_drift(203, 145.46, 705, 169.53, 0,
+                        max_affordable_qty=413) == ("MIRROR_CAP_EXCEEDED", None, None)
+
+
+def test_decide_drift_mirrors_within_affordable():
+    from tools.live.position_reconciler import decide_drift
+    # genuine missed buy within cap -> still AUTO_MIRROR
+    kind, q, px = decide_drift(100, 145.0, 250, 145.0, 0, max_affordable_qty=413)
+    assert kind == "AUTO_MIRROR" and q == 250
+
+
+def test_decide_drift_cap_none_is_legacy():
+    from tools.live.position_reconciler import decide_drift
+    # no cap passed -> unchanged behaviour
+    kind, q, _ = decide_drift(100, 10.0, 705, 10.0, 0)
+    assert kind == "AUTO_MIRROR" and q == 705
