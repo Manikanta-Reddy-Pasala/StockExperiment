@@ -120,7 +120,10 @@ def main():
         px = cl[s].iloc[di] if s in cl.columns else None
         ev = ema20[s].iloc[di] if s in ema20.columns else None
         if S.is_retest(px, ev):
-            buys.append({"symbol": s})
+            # Carry today's close as a price fallback so the executor never
+            # silently drops this buy on a transient live-LTP miss (ADANIENT
+            # 2026-06-01). Executor prefers live LTP; this is the safety net.
+            buys.append({"symbol": s, "px": round(float(px), 2) if px is not None else None})
             slots -= 1
 
     payload = {"model": MODEL_NAME, "date": today.strftime("%Y-%m-%d"),

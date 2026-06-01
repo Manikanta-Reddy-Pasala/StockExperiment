@@ -137,6 +137,24 @@ INTRADAY_MODELS = {
     "orb_momentum_intraday",
 }
 
+# ---- Multi-holding models: max concurrent positions (K) -------------------
+# Models that hold a BASKET of names (positions in model_holdings, not the
+# single ledger.open_symbol slot). The value is K — the max concurrent
+# positions the model may hold. RiskManager.from_model uses this so a K>1
+# model is NOT capped at the env MAX_CONCURRENT (=1 on prod), which would
+# wrongly treat momentum_retest_n500 as a single-position model.
+MULTI_HOLDING_MODELS = {
+    "momentum_retest_n500": 4,   # K4 (see tools/models/momentum_retest_n500/strategy.py)
+}
+
+
+def model_max_holdings(model_name: str):
+    """K (max concurrent positions) for a multi-holding model, else None.
+
+    None = single-position model; the caller keeps its env/default concurrency.
+    """
+    return MULTI_HOLDING_MODELS.get(model_name)
+
 
 def product_for_model(model_name: str) -> str:
     """Canonical order product for a model: 'INTRADAY' for intraday models,

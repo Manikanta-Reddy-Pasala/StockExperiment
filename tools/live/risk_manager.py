@@ -147,10 +147,23 @@ class RiskManager:
 
         # Other risk knobs from env (overridable per deployment)
         max_concurrent = int(os.environ.get("MAX_CONCURRENT", 2))
+        # Multi-holding models (K>1) must not be capped at the env MAX_CONCURRENT
+        # (=1 on prod) — that would treat a K=4 basket model as single-position.
+        # Use the model's K, and let it spend up to its full capital per order
+        # (it splits internally as cash/N), instead of capital//max_concurrent.
+        _is_multi = False
+        try:
+            from src.services.trading.model_ledger_service import model_max_holdings
+            _k = model_max_holdings(model_name)
+            if _k:
+                max_concurrent = _k
+                _is_multi = True
+        except Exception as _me:
+            log.debug("model_max_holdings('%s') failed: %s", model_name, _me)
         env_per_trade = os.environ.get("MAX_PER_TRADE_INR")
         max_per_trade = (
             int(env_per_trade) if env_per_trade
-            else max(1, capital // max(1, max_concurrent))
+            else (capital if _is_multi else max(1, capital // max(1, max_concurrent)))
         )
         cfg = RiskConfig(
             capital_inr=capital,

@@ -30,6 +30,54 @@ from src.services.trading import model_ledger_service as MLS
 log = logging.getLogger("fyers_executor_multi")
 
 
+def pick_buy_price(live, signal, last):
+    """First POSITIVE price among (live LTP, signal-file price, last-known).
+
+    A brand-new BUY starts with no price; if the single live-LTP fetch misses
+    (transient quote hiccup), we must NOT silently drop the order — fall back
+    to the signal-file close, then any last-known price. Returns None only when
+    every candidate is missing/<=0 (genuine "no price").
+    """
+    for p in (live, signal, last):
+        try:
+            v = float(p)
+        except (TypeError, ValueError):
+            continue
+        if v > 0:
+            return v
+    return None
+
+
+def _last_close_for(sym):
+    """Final price safety net: last fyers close from historical_data. Returns
+    None on any error (the caller then truly has no price and skips)."""
+    try:
+        from tools.shared.ohlcv_cache import _get_engine
+        from sqlalchemy import text
+        bare = to_fyers_symbol(sym)
+        eng = _get_engine()
+        with eng.connect() as c:
+            row = c.execute(text(
+                "SELECT close FROM historical_data WHERE symbol=:s "
+                "AND data_source='fyers' ORDER BY date DESC LIMIT 1"
+            ), {"s": bare}).fetchone()
+        return float(row[0]) if row and row[0] else None
+    except Exception as e:
+        log.debug(f"last-close lookup {sym} failed: {e}")
+        return None
+
+
+def _fetch_live_ltp_retry(svc, user_id, sym, tries=3):
+    """live LTP with a few retries — a single quote hiccup at the market-open
+    window dropped a buy (ADANIENT 2026-06-01). Returns the first positive LTP
+    or None after `tries` attempts."""
+    for _ in range(max(1, tries)):
+        v = _fetch_live_ltp(svc, user_id, sym)
+        if v and v > 0:
+            return v
+    return None
+
+
 def multi_trading_blocked(enabled: bool, is_trading_day: bool):
     """Pre-flight gate for a LIVE multi-holding run. Returns an abort reason
     string, or None when trading is allowed.
@@ -140,6 +188,26 @@ def main() -> int:
                 pass
 
 
+def _audit(model, sym, side, qty, ordered_px, status, *, fill_px=None,
+           fill_qty=None, order_id="", error=None, req=None, res=None):
+    """Best-effort audit_orders write for the multi path (parity with the
+    single executor, which always audited; the multi path wrote NOTHING — so a
+    skipped/failed buy left no trace, e.g. the ADANIENT silent drop). Fail-open.
+    """
+    try:
+        from src.services.audit_service import write_order
+        write_order(
+            model_name=model, symbol=to_fyers_symbol(sym), side=side.upper(),
+            qty=int(qty), ordered_price=float(ordered_px or 0),
+            fill_price=fill_px, fill_qty=fill_qty,
+            product=MLS.product_for_model(model), pricetype="LIMIT",
+            status=status, fyers_order_id=order_id or "",
+            error_text=error, raw_request=req, raw_response=res,
+        )
+    except Exception as _ae:
+        log.debug(f"multi audit write failed ({sym} {status}): {_ae}")
+
+
 def _run_orders(a, model, sells, buys, held, svc) -> int:
     # place_limit_with_fallback REQUIRES rm_cfg (LIMIT tol / retry / slippage-cap
     # knobs). Build it per-model so the multi path gets the same per-model bands
@@ -156,7 +224,7 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
         qty = h["qty"]
         if a.dry_run:
             log.info(f"  [dry] SELL {qty}x{sym} ({reason})"); continue
-        ltp = _fetch_live_ltp(svc, a.user_id, sym) or h["entry_px"]
+        ltp = _fetch_live_ltp_retry(svc, a.user_id, sym) or h["entry_px"]
         res = place_limit_with_fallback(svc, a.user_id, sym, qty, "SELL", ltp,
                                         rm_cfg, tag=f"{model}_sell")
         if res.get("filled"):
@@ -168,8 +236,12 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
                               fyers_order_id=res.get("order_id"),
                               qty=(_fq if _fq > 0 else None))
             log.info(f"  SOLD {_fq or qty}x{sym}@{px} ({reason})")
+            _audit(model, sym, "SELL", qty, ltp, "filled", fill_px=float(px),
+                   fill_qty=(_fq or qty), order_id=res.get("order_id", ""), res=res)
         else:
             log.error(f"  SELL {sym} not filled: {res.get('status')}")
+            _audit(model, sym, "SELL", qty, ltp, "rejected",
+                   error=f"not filled: {res.get('status')}", res=res)
 
     # ---- BUYS (equal-weight across open slots) ----
     if buys:
@@ -187,20 +259,40 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
             log.info(f"  account available cash (Fyers): ₹{_acct:,.2f}")
         for b in buys:
             sym = b["symbol"]
-            ltp = (h["entry_px"] if (h := held.get(sym)) else None)
-            if svc:
-                ltp = _fetch_live_ltp(svc, a.user_id, sym) or ltp
+            # (b) Already-held guard: never re-buy a name this model already
+            # holds (the signal generator excludes held names, but a stale /
+            # re-run signal file must not double-buy). Skip silently — not drift.
+            if sym in held:
+                log.info(f"  BUY {sym}: already held, skip"); continue
+            # (a) Price resolution with retry + fallback. A brand-new buy starts
+            # priceless; one missed live fetch must NOT drop it (ADANIENT
+            # 2026-06-01). Order of trust: live LTP (retried) -> signal px ->
+            # any last-known. _last_close_for is the final safety net.
+            live = _fetch_live_ltp_retry(svc, a.user_id, sym) if svc else None
+            signal_px = b.get("px")
+            last = (h["entry_px"] if (h := held.get(sym)) else None)
+            if last is None and not signal_px and live is None:
+                last = _last_close_for(sym)
+            ltp = pick_buy_price(live, signal_px, last)
             if not ltp:
-                log.warning(f"  BUY {sym}: no price, skip"); continue
+                log.warning(f"  BUY {sym}: no price after retry+fallback, skip")
+                _audit(model, sym, "BUY", b.get("qty") or 0, 0, "skipped",
+                       error="no price (live miss + no signal/last fallback)")
+                continue
             # Honor an explicit per-buy qty (e.g. ORB's per-slot invested/SELECT_TOP
             # sizing); else fall back to equal-weight cash/N.
             qty = int(b["qty"]) if b.get("qty") else int(alloc / float(ltp))
             if qty < 1:
-                log.warning(f"  BUY {sym}: qty<1 (alloc {alloc:.0f} @ {ltp})"); continue
+                log.warning(f"  BUY {sym}: qty<1 (alloc {alloc:.0f} @ {ltp})")
+                _audit(model, sym, "BUY", 0, ltp, "skipped",
+                       error=f"qty<1 (alloc {alloc:.0f} @ {ltp})")
+                continue
             _cost = qty * float(ltp)
             if _acct is not None and _cost > _acct:
                 log.error(f"  BUY {sym}: cost ₹{_cost:,.0f} > account cash "
                           f"₹{_acct:,.0f} — skip (margin gate).")
+                _audit(model, sym, "BUY", qty, ltp, "skipped",
+                       error=f"margin gate: cost {_cost:.0f} > acct {_acct:.0f}")
                 continue
             if a.dry_run:
                 log.info(f"  [dry] BUY {qty}x{sym} @~{ltp} (alloc {alloc:.0f})"); continue
@@ -214,8 +306,13 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
                 if _acct is not None:
                     _acct = max(0.0, _acct - _fqb * float(px))
                 log.info(f"  BOUGHT {_fqb}x{sym}@{px}")
+                _audit(model, sym, "BUY", qty, ltp, "filled",
+                       fill_px=float(px), fill_qty=_fqb,
+                       order_id=res.get("order_id", ""), res=res)
             else:
                 log.error(f"  BUY {sym} not filled: {res.get('status')}")
+                _audit(model, sym, "BUY", qty, ltp, "rejected",
+                       error=f"not filled: {res.get('status')}", res=res)
     return 0
 
 
