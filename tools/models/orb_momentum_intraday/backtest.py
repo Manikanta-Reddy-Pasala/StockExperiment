@@ -47,10 +47,29 @@ def _daily_close(start: date, end: date) -> pd.DataFrame:
 
 
 def run(start: date, end: date, capital: float = DEFAULT_CAP, out_dir=None):
-    five = load_all_cached()                       # {symbol: 5-min DataFrame}
     dcl = _daily_close(start, end)
     ddates = dcl.index
-    # pre-index 5-min by (symbol, day) for fast lookup
+    # MEMORY: only the daily-SELECTED leaders ever need 5-min bars (top-SELECT_TOP
+    # per day), not the whole ~700-symbol universe. Pre-pass to collect that union,
+    # then lazy-load only those pickles (was load_all_cached() -> ~1.1GB OOM).
+    from pathlib import Path as _P
+    from tools.models.orb_momentum_intraday.data import CACHE_DIR as _CACHE
+    needed = set(); _seen0 = set()
+    for di in range(len(ddates)):
+        d = ddates[di]
+        if d.date() < start or d.date() in _seen0:
+            continue
+        _seen0.add(d.date())
+        needed.update(S.rank_momentum(dcl, di, set(eligible_at(S.INDEX, d.date()))))
+    five = {}
+    for s in needed:
+        p = _P(_CACHE) / f"{s.replace('NSE:', '').replace('-EQ', '')}.pkl"
+        if p.exists():
+            try:
+                five[s] = pd.read_pickle(p)
+            except Exception:
+                pass
+    # pre-index 5-min by (symbol, day) for fast lookup (only the needed subset)
     by_day = {s: {dy: g for dy, g in df.groupby("day")} for s, df in five.items()}
 
     trades = []
