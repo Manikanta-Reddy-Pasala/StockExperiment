@@ -83,7 +83,13 @@ def main():
     n500 = [f"NSE:{s}-EQ" for s, _ in nifty500_symbols()]
     df = load_panel(n500)
     if df.empty:
-        log.error("No data."); sig_path.write_text(json.dumps({"model": MODEL_NAME, "sells": [], "buys": []})); return 1
+        log.error("No data.")
+        try:
+            from tools.live.telegram_notify import alert_data_missing
+            alert_data_missing(MODEL_NAME, "No N500 daily price data returned from the DB.")
+        except Exception as _e:
+            log.debug(f"tg alert failed: {_e}")
+        sig_path.write_text(json.dumps({"model": MODEL_NAME, "sells": [], "buys": []})); return 1
     cl = df.pivot(index="date", columns="symbol", values="close").ffill()
     adv_rs = df.pivot(index="date", columns="symbol", values="adv")
     adv20, sma200, ema20 = S.indicators(cl, adv_rs)
@@ -99,6 +105,11 @@ def main():
         if (today.date() - _last_day).days > 7:
             log.error(f"Panel STALE — last equity day {_last_day} > 7d before "
                       f"{today.date()}; refusing to emit (fail-safe).")
+            try:
+                from tools.live.telegram_notify import alert_data_missing
+                alert_data_missing(MODEL_NAME, f"Daily price data STALE — last close {_last_day} (>7d old).")
+            except Exception as _e:
+                log.debug(f"tg alert failed: {_e}")
             sig_path.write_text(json.dumps({"model": MODEL_NAME, "sells": [], "buys": []}))
             return 1
 

@@ -39,6 +39,15 @@ from tools.models.orb_momentum_intraday.data import fetch_5min, _fyers # noqa: E
 MODEL_NAME = "orb_momentum_intraday"
 
 
+def _orb_alert_missing(detail: str):
+    """Telegram alert (deduped) that ORB has missing/stale data this run."""
+    try:
+        from tools.live.telegram_notify import alert_data_missing
+        alert_data_missing(MODEL_NAME, detail)
+    except Exception:
+        pass
+
+
 def _today_leaders(today: date = None):
     """Top-SELECT_TOP momentum leaders for today (daily DB close + live N500).
 
@@ -56,6 +65,7 @@ def _today_leaders(today: date = None):
             "AND date >= :a ORDER BY symbol,date"
         ), c, params={"s": syms, "a": (today - timedelta(days=90)).isoformat()})
     if df.empty:
+        _orb_alert_missing("No N500 daily price data returned from the DB.")
         return []
     df["date"] = pd.to_datetime(df["date"])
     cl = df.pivot(index="date", columns="symbol", values="close").ffill()
@@ -64,6 +74,7 @@ def _today_leaders(today: date = None):
     if (today - last_day).days > S.DAILY_STALE_MAX_DAYS:
         print(f"orb: daily panel STALE — last close {last_day} > "
               f"{S.DAILY_STALE_MAX_DAYS}d before {today}; no leaders.")
+        _orb_alert_missing(f"Daily ranking data STALE — last close {last_day} (>{S.DAILY_STALE_MAX_DAYS}d old).")
         return []
     elig = set(universe_union(S.INDEX))   # live: today's official N500 list
     return S.rank_momentum(cl, len(cl) - 1, elig)
@@ -120,11 +131,16 @@ def emit_signals(now: dt.datetime = None) -> dict:
     held = _held_symbols()
     invested = _invested()
     fy = _fyers()
+    _missing_intraday = []
     for sym in leaders:
         if sym in held:
             continue           # already in this name — don't re-buy
         df = fetch_5min(sym, today, today, fy=fy)
         if df is None or len(df) < S.OR_BARS + 1:
+            # No / too-few intraday bars for a leader we'd otherwise watch.
+            # Past the opening-range window this means a broken Fyers feed.
+            if mins >= (9 * 60 + 35):
+                _missing_intraday.append(sym.replace("NSE:", "").replace("-EQ", ""))
             continue
         # Intraday FRESHNESS gate — refuse to act on stale/wrong-day bars:
         #  (1) the latest bar must be TODAY (not a cached/old session), and
@@ -156,6 +172,9 @@ def emit_signals(now: dt.datetime = None) -> dict:
                 "entry_hint": entry_hint, "stop": round(orl, 2),
                 "target": round(orh + S.TARGET_MULT * width, 2),
             })
+    if _missing_intraday:
+        _orb_alert_missing("No intraday 5-min bars for: " + ", ".join(_missing_intraday)
+                           + " — Fyers intraday feed may be down.")
     return out
 
 

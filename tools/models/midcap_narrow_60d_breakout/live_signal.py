@@ -297,6 +297,11 @@ def main() -> int:
     df = load_daily(syms, days_back=max(SMA_LONG + 60, 365))
     if df.empty:
         log.error("No historical data — cannot emit signals")
+        try:
+            from tools.live.telegram_notify import alert_data_missing
+            alert_data_missing("midcap_narrow_60d_breakout", "No midcap daily price data returned from the DB.")
+        except Exception as _e:
+            log.debug(f"tg alert failed: {_e}")
         Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
         Path(args.signals_out).write_text(json.dumps([]))
         return 1
@@ -309,6 +314,11 @@ def main() -> int:
     if (datetime.now().date() - _last_day).days > 7:
         log.error(f"Panel STALE — last bar {_last_day} > 7d before "
                   f"{datetime.now().date()}; refusing to emit (fail-safe).")
+        try:
+            from tools.live.telegram_notify import alert_data_missing
+            alert_data_missing("midcap_narrow_60d_breakout", f"Daily price data STALE — last bar {_last_day} (>7d old).")
+        except Exception as _e:
+            log.debug(f"tg alert failed: {_e}")
         Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
         Path(args.signals_out).write_text(json.dumps([]))
         return 1

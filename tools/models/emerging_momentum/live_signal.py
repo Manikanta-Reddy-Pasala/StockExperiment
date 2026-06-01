@@ -347,6 +347,11 @@ def main():
     if len(dates) and panel_is_stale(dates[di], today):
         log.error(f"Panel stale — last equity day {pd.Timestamp(dates[di]).date()} "
                   f"vs today {today.date()}; aborting (no signals).")
+        try:
+            from tools.live.telegram_notify import alert_data_missing
+            alert_data_missing(MODEL_NAME, f"Daily price data STALE — last close {pd.Timestamp(dates[di]).date()} (>7d old).")
+        except Exception as _e:
+            log.debug(f"tg alert failed: {_e}")
         _write_empty()
         return 1
 

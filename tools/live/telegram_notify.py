@@ -63,6 +63,37 @@ def send(text: str, parse_mode: str = "Markdown",
     return res
 
 
+def alert_data_missing(model: str, detail: str, dedup_seconds: int = 3600) -> dict:
+    """Telegram alert that a model has MISSING/STALE data and is NOT trading.
+
+    Fail-open. dedup_seconds>0 suppresses a repeat of the same (model, detail)
+    within the window (Dragonfly-backed) so a model that scans many times a
+    morning (ORB) doesn't spam the same 'data missing' alert each scan.
+    """
+    cs = None
+    key = None
+    if dedup_seconds and dedup_seconds > 0:
+        try:
+            import hashlib
+            from src.services.utils.cache_service import get_cache_service
+            cs = get_cache_service()
+            key = "alert:datamissing:" + hashlib.sha1(
+                f"{model}|{detail}".encode()).hexdigest()
+            if cs.get(key):
+                return {"ok": True, "deduped": True}
+        except Exception:
+            cs = None
+            key = None
+    res = send(f"🛑 *Data missing — not trading* `{model}`\n{detail}\n"
+               f"Model skipped this run (fail-safe; will retry when data returns).")
+    if cs is not None and key:
+        try:
+            cs.set(key, "1", dedup_seconds)
+        except Exception:
+            pass
+    return res
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("text", nargs="?", default=None)
