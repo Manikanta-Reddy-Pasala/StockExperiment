@@ -510,8 +510,16 @@ def _cancel_and_confirm(svc, user_id: int, order_id: str,
     return 'still_live'
 
 
-def _snap_tick(px: float, tick: float = 0.05) -> float:
-    """Snap price to NSE equity tick size (default 0.05)."""
+def _snap_tick(px: float, tick: float = 0.10) -> float:
+    """Snap a LIMIT price to a UNIVERSALLY-valid NSE equity tick.
+
+    Default 0.10: a multiple of 0.10 is also a valid multiple of 0.05 and 0.01,
+    so it is accepted for EVERY NSE equity tick size. High-priced names (e.g.
+    ENRIN ~₹3872) use a 0.10 tick and rejected a 0.05-snapped limit
+    ("LimitPrice not a multiple of tick size 0.1000", err -50). Snapping to 0.10
+    costs at most one 0.05 step of precision on a tolerance limit — immaterial —
+    and never gets tick-rejected.
+    """
     return round(round(px / tick) * tick, 2)
 
 
