@@ -221,12 +221,28 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
             _audit(model, sym, "SELL", qty, ltp, "rejected",
                    error=f"not filled: {res.get('status')}", res=res)
 
-    # ---- BUYS (equal-weight across open slots) ----
+    # ---- BUYS (equal-weight across the K-NAME TARGET basket) ----
     if buys:
         led = MLS.get_ledger(model) or {}
         cash = float(led.get("cash") or 0)
-        n = len(buys)
-        alloc = cash / n if n else 0
+        # Size each name as allocated_capital / K (target slots), NOT
+        # cash/this-run's-buys. The old cash/N over-allocated the FIRST fills
+        # (e.g. 2 morning buys took cash/3 each = 15k of 45k) and starved later
+        # retest entries. per_slot is stable across runs so all K names get an
+        # equal share; capped by remaining cash so we never overspend.
+        K = MLS.model_max_holdings(model) or len(buys) or 1
+        invested = 0.0
+        try:
+            _cfg = next((s for s in (MLS.get_all_settings() or [])
+                         if s.get("model_name") == model), {})
+            invested = float(_cfg.get("invested_amount") or 0)
+        except Exception as _se:
+            log.debug(f"invested lookup failed ({_se}); using cash")
+        invested = invested or cash
+        per_slot = (invested / K) if K else cash
+        remaining_cash = cash
+        log.info(f"  basket sizing: K={K} invested=₹{invested:,.0f} "
+                 f"per_slot=₹{per_slot:,.0f} cash=₹{cash:,.0f}")
         # Account-wide margin gate (parity with single executor): the per-model
         # ledger.cash bounds this model, but the SHARED Fyers account must also
         # not be over-committed. Fetch once, decrement per placed buy. None =
@@ -254,13 +270,14 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
                        error="no live LTP after retry — refused stale-price entry")
                 _tg_skip(model, sym, "no live LTP after retry — not placing on a stale price. Will retry next cycle.")
                 continue
-            # Honor an explicit per-buy qty (e.g. ORB's per-slot invested/SELECT_TOP
-            # sizing); else fall back to equal-weight cash/N.
-            qty = int(b["qty"]) if b.get("qty") else int(alloc / float(ltp))
+            # Honor an explicit per-buy qty (e.g. ORB's per-slot sizing); else
+            # use the K-slot budget, capped by cash left after earlier fills.
+            slot_budget = min(per_slot, remaining_cash)
+            qty = int(b["qty"]) if b.get("qty") else int(slot_budget / float(ltp))
             if qty < 1:
-                log.warning(f"  BUY {sym}: qty<1 (alloc {alloc:.0f} @ {ltp})")
+                log.warning(f"  BUY {sym}: qty<1 (slot_budget {slot_budget:.0f} @ {ltp})")
                 _audit(model, sym, "BUY", 0, ltp, "skipped",
-                       error=f"qty<1 (alloc {alloc:.0f} @ {ltp})")
+                       error=f"qty<1 (slot_budget {slot_budget:.0f} @ {ltp})")
                 continue
             _cost = qty * float(ltp)
             if _acct is not None and _cost > _acct:
@@ -270,7 +287,9 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
                        error=f"margin gate: cost {_cost:.0f} > acct {_acct:.0f}")
                 continue
             if a.dry_run:
-                log.info(f"  [dry] BUY {qty}x{sym} @~{ltp} (alloc {alloc:.0f})"); continue
+                log.info(f"  [dry] BUY {qty}x{sym} @~{ltp} (slot_budget {slot_budget:.0f})")
+                remaining_cash = max(0.0, remaining_cash - qty * float(ltp))
+                continue
             res = place_limit_with_fallback(svc, a.user_id, sym, qty, "BUY", ltp,
                                             rm_cfg, tag=f"{model}_buy")
             if res.get("filled"):
@@ -278,6 +297,7 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
                 _fqb = int(res.get("fill_qty") or qty)
                 record_buy_multi(model, sym, _fqb, float(px),
                                  fyers_order_id=res.get("order_id"))
+                remaining_cash = max(0.0, remaining_cash - _fqb * float(px))
                 if _acct is not None:
                     _acct = max(0.0, _acct - _fqb * float(px))
                 log.info(f"  BOUGHT {_fqb}x{sym}@{px}")

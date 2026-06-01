@@ -27,7 +27,7 @@ const MODELS = [
   {key: "n20_daily_large_only",        title: "Weekly Top-40",        desc: "Weekly rotation • top-40 ADV ∩ N100 • uptrend",                           schedule: "weekly"},
   {key: "midcap_narrow_60d_breakout",  title: "Midcap Breakout",      desc: "Event-driven • 40-day high + vol surge + 200d SMA",                       schedule: "event"},
   {key: "momentum_pseudo_n100_adv",    title: "Liquid 100 Momentum",  desc: "Monthly rotation • top-100 ADV from N500 • rank-1 (fixed May universe anchor)",  schedule: "monthly"},
-  {key: "momentum_retest_n500",        title: "Retest Momentum",      desc: "Monthly top-2 momentum (top-120 ADV N500) • buy within 20% of 20-EMA • retain top-4", schedule: "monthly"},
+  {key: "momentum_retest_n500",        title: "Retest Momentum",      desc: "Monthly basket of 4 (top-120 ADV N500) • buy each within 20% of 20-EMA • retain top-4", schedule: "monthly", multi: 4},
   {key: "emerging_momentum",           title: "Emerging Momentum",    desc: "Single-position (max-1) momentum rotation on emerging mid/small caps (PIT N500 minus N100) • 15d ret>0 • ≤₹3000 • retain-3 • monthly + mid-month (5% lead)", schedule: "monthly"},
   {key: "orb_momentum_intraday",       title: "Morning ORB (Intraday)", desc: "DAY-TRADE • top-3 N500 momentum leaders • LONG the 15-min opening-range breakout before 10:00 • flat by 15:25 • BACKTEST-ONLY (no live orders)", schedule: "daily"},
 ];
@@ -218,8 +218,18 @@ function renderCard(m, idx, ranking, status) {
     rows = top.map(r => {
       const held = heldSym && (heldSym.replace('NSE:','').replace('-EQ','') === r.symbol.replace('NSE:','').replace('-EQ',''));
       const rowCls = held ? 'row-held' : '';
+      // Multi (basket) models: the top-K names are ALL targets — badge them
+      // "TARGET", not a single ★ rank-1. Single-position models keep ★ 1.
+      let rankCell;
+      if (m.multi) {
+        rankCell = r.rank <= m.multi
+          ? `<span class="badge bg-success">TARGET ${r.rank}</span>`
+          : '#' + r.rank;
+      } else {
+        rankCell = r.rank === 1 ? '<span class="badge badge-rank-1">★ 1</span>' : '#' + r.rank;
+      }
       return `<tr class="${rowCls}">
-        <td>${r.rank === 1 ? '<span class="badge badge-rank-1">★ 1</span>' : '#'+r.rank}</td>
+        <td>${rankCell}</td>
         <td><strong>${r.symbol}</strong></td>
         <td class="small text-muted">${r.name || ''}</td>
         <td class="text-end ${cls(r.ret_30d_pct)}">${fmtPct(r.ret_30d_pct)}</td>
@@ -255,15 +265,27 @@ function renderCard(m, idx, ranking, status) {
   // Top pick summary shown when collapsed — gives operator the most important
   // signal at a glance without needing to expand. Click header to see top-5.
   const isNearMiss = rank1 && rank1.name && rank1.name.includes('near-miss');
-  const topPickHtml = rank1
-    ? `<div class="mt-2 small">
-         <span class="badge ${isNearMiss ? 'bg-warning text-dark' : 'badge-rank-1'} me-1">${isNearMiss ? 'NEAR' : '★ 1'}</span>
-         <strong>${rank1.symbol}</strong>
-         <span class="text-muted">${(rank1.name || '').replace(' (near-miss)', '')}</span>
-         <span class="ms-2 ${cls(rank1.ret_30d_pct)}">${fmtPct(rank1.ret_30d_pct)}</span>
-         <span class="ms-2 text-muted">${fmtINR(rank1.price)}</span>
-       </div>`
-    : '<div class="mt-2 small text-muted">No top pick available</div>';
+  let topPickHtml;
+  if (m.multi) {
+    // Basket model: summarise the top-K target names, no single ★ rank-1.
+    const basket = top.slice(0, m.multi);
+    topPickHtml = basket.length
+      ? `<div class="mt-2 small">
+           <span class="badge bg-success me-1">Basket of ${m.multi}</span>
+           ${basket.map(r => `<span class="me-2"><strong>${r.symbol}</strong> <span class="${cls(r.ret_30d_pct)}">${fmtPct(r.ret_30d_pct)}</span></span>`).join('')}
+         </div>`
+      : '<div class="mt-2 small text-muted">No targets available</div>';
+  } else {
+    topPickHtml = rank1
+      ? `<div class="mt-2 small">
+           <span class="badge ${isNearMiss ? 'bg-warning text-dark' : 'badge-rank-1'} me-1">${isNearMiss ? 'NEAR' : '★ 1'}</span>
+           <strong>${rank1.symbol}</strong>
+           <span class="text-muted">${(rank1.name || '').replace(' (near-miss)', '')}</span>
+           <span class="ms-2 ${cls(rank1.ret_30d_pct)}">${fmtPct(rank1.ret_30d_pct)}</span>
+           <span class="ms-2 text-muted">${fmtINR(rank1.price)}</span>
+         </div>`
+      : '<div class="mt-2 small text-muted">No top pick available</div>';
+  }
 
   // Model-emitted note (e.g. midcap "no breakout today, showing near-miss")
   const noteHtml = (ranking && ranking.note)
@@ -277,7 +299,7 @@ function renderCard(m, idx, ranking, status) {
   //   - Model-picked entry (regular monthly/daily rotation) → wait or force
   //   - Manual sync entry (LINK_FYERS_POSITION, SEED) → not a model pick
   let heldBannerHtml = '';
-  if (heldSym && status && status.current_position) {
+  if (heldSym && status && status.current_position && !m.multi) {
     const heldNorm = heldSym.replace('NSE:','').replace('-EQ','');
     const inTop = (top || []).some(r =>
       r.symbol.replace('NSE:','').replace('-EQ','') === heldNorm);
