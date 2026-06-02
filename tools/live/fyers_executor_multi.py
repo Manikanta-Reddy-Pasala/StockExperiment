@@ -23,7 +23,7 @@ from tools.shared.model_universe import is_in_universe
 
 from tools.live.fyers_executor import (
     place_limit_with_fallback, _fetch_live_ltp, to_fyers_symbol,
-    _resolve_fill_price, _tg_safe,
+    _resolve_fill_price, _tg_safe, resolve_sell_product_qty,
 )
 from src.services.trading.multi_holding_service import (
     get_holdings, record_buy_multi, record_sell_multi,
@@ -217,8 +217,30 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
         if a.dry_run:
             log.info(f"  [dry] SELL {qty}x{sym} ({reason})"); continue
         ltp = _fetch_live_ltp_retry(svc, a.user_id, sym) or h["entry_px"]
-        res = place_limit_with_fallback(svc, a.user_id, sym, qty, "SELL", ltp,
-                                        rm_cfg, tag=f"{model}_sell")
+        # Sell the product the shares are ACTUALLY held in at the broker, and
+        # never more than is held — checked PER SYMBOL before placing. Prevents
+        # the 2026-06-02 SPARC phantom short (ledger said 148 → sold INTRADAY,
+        # but the shares were CNC → opened a short). Also skips cleanly if the
+        # name was already flattened elsewhere (e.g. a manual sell).
+        sell_prod, sell_qty, src = resolve_sell_product_qty(svc, a.user_id, sym, qty)
+        if src == "flat":
+            log.warning(f"  SELL {sym}: broker shows FLAT (already sold elsewhere) "
+                        f"— NOT placing a sell; closing the ledger row.")
+            record_sell_multi(model, sym, float(ltp), f"{reason}_BROKER_FLAT",
+                              fyers_order_id="", qty=None)
+            _tg_safe(
+                f"ℹ️ *SELL skipped {model}* `{sym}`\n"
+                f"Broker shows no position (already flat / sold manually). "
+                f"Closed the ledger row, placed no order (no phantom short).",
+                is_fail=False)
+            continue
+        if sell_qty <= 0:
+            log.warning(f"  SELL {sym}: resolved sell_qty<=0 — skip."); continue
+        if sell_qty != qty or src == "broker":
+            log.info(f"  SELL {sym}: broker-resolved {sell_qty}x as {sell_prod} "
+                     f"(ledger qty {qty}, source={src})")
+        res = place_limit_with_fallback(svc, a.user_id, sym, sell_qty, "SELL", ltp,
+                                        rm_cfg, tag=f"{model}_sell", product=sell_prod)
         if res.get("filled"):
             px = _resolve_fill_price(res, ltp)
             # Forward ACTUAL filled qty so a partial fill keeps the residual
@@ -227,20 +249,20 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
             record_sell_multi(model, sym, float(px), reason,
                               fyers_order_id=res.get("order_id"),
                               qty=(_fq if _fq > 0 else None))
-            log.info(f"  SOLD {_fq or qty}x{sym}@{px} ({reason})")
+            log.info(f"  SOLD {_fq or sell_qty}x{sym}@{px} as {sell_prod} ({reason})")
             # Telegram/DB-feed ping (parity with single executor — the multi
             # path NEVER notified fills, so retest/orb trades were silent).
             _tg_safe(
                 f"💰 *SELL {model}*\n"
-                f"`{sym}` x{_fq or qty} @ ₹{float(px):.2f}  reason=`{reason}`\n"
+                f"`{sym}` x{_fq or sell_qty} @ ₹{float(px):.2f}  reason=`{reason}`\n"
                 f"order_id=`{res.get('order_id') or '—'}`",
                 is_fail=False,
             )
-            _audit(model, sym, "SELL", qty, ltp, "filled", fill_px=float(px),
-                   fill_qty=(_fq or qty), order_id=res.get("order_id", ""), res=res)
+            _audit(model, sym, "SELL", sell_qty, ltp, "filled", fill_px=float(px),
+                   fill_qty=(_fq or sell_qty), order_id=res.get("order_id", ""), res=res)
         else:
             log.error(f"  SELL {sym} not filled: {res.get('status')}")
-            _audit(model, sym, "SELL", qty, ltp, "rejected",
+            _audit(model, sym, "SELL", sell_qty, ltp, "rejected",
                    error=f"not filled: {res.get('status')}", res=res)
             # Real-time alert on a REJECTED sell. The fill path pings but this
             # branch was silent — a failed square-off / rotation exit went
@@ -250,7 +272,7 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
             _is_eod = (reason == "EOD_FLAT")
             _tg_safe(
                 f"🛑 *SELL FAILED {model}*\n"
-                f"`{sym}` x{qty}  reason=`{reason}`\n"
+                f"`{sym}` x{sell_qty} ({sell_prod})  reason=`{reason}`\n"
                 f"status=`{res.get('status')}` — LIMIT→MARKET escalation did not fill.\n"
                 + ("⚠️ INTRADAY square-off miss — 15:13 retry + broker auto-square-off "
                    "are the backstops; verify the position is flat."

@@ -94,6 +94,7 @@ def _placeorder(svc, user_id: int, symbol: str, qty: int, side: str,
     row capturing request/response. Optional so older callers still work.
     """
     _model = _audit_model or _CURRENT_MODEL
+    _explicit_product = product is not None
     if product is None:
         try:
             from src.services.trading.model_ledger_service import product_for_model
@@ -101,34 +102,40 @@ def _placeorder(svc, user_id: int, symbol: str, qty: int, side: str,
         except Exception:
             product = "CNC"   # safe fallback = delivery
     # Product-safety guard (2026-06-02 SPARC phantom-short root cause). An
-    # INTRADAY model must place MIS; a swing model must place CNC. Product is
-    # resolved from the MUTABLE global _CURRENT_MODEL — if that was ever lost
-    # (-> None -> CNC fallback), an intraday ENTRY books delivery while the
-    # 15:10 square-off still sells INTRADAY → the sell opens a phantom short
-    # instead of closing the position (exactly what happened to SPARC: CNC
-    # entry @09:50 + MIS square-off @15:11 → intraday short auto-covered @15:17).
-    # Re-resolve from the known model name and force-correct + alert on any
-    # mismatch so entry and exit can never disagree on product again.
-    try:
-        from src.services.trading.model_ledger_service import INTRADAY_MODELS
-        if _model:
-            want = "INTRADAY" if _model in INTRADAY_MODELS else "CNC"
-            if product != want:
-                log.error(f"PRODUCT MISMATCH for {_model}: resolved {product}, "
-                          f"forcing {want} (intraday/CNC policy). symbol={symbol}")
-                _tg_safe(
-                    f"⚠️ *Product auto-corrected*\n"
-                    f"Model `{_model}` order was `{product}`, forced `{want}` "
-                    f"({symbol}). Check _CURRENT_MODEL wiring — a mismatch causes "
-                    f"phantom shorts at square-off.",
-                    is_fail=True)
-                product = want
-        else:
-            log.error(f"placeorder with NO model set (_CURRENT_MODEL + _audit_model "
-                      f"both None) — product defaulting to {product} for {symbol}; "
-                      f"an intraday model could silently book CNC. Check executor wiring.")
-    except Exception:
-        pass
+    # INTRADAY model must place MIS; a swing model must place CNC. Product on
+    # the AUTO-RESOLVED (entry) path comes from the mutable global
+    # _CURRENT_MODEL — if that was ever lost (-> None -> CNC fallback), an
+    # intraday ENTRY books delivery while square-off sells INTRADAY → phantom
+    # short. Re-resolve from the known model and force-correct + alert.
+    #
+    # NOTE: an ENTRY (BUY) is ALWAYS policy-corrected — an entry must open the
+    # position in the model's product so square-off can close it cleanly. A SELL
+    # that passes product explicitly is an EXIT deliberately matching the
+    # product the shares are ACTUALLY held in at the broker (held_product_qty),
+    # so it closes that exact leg instead of opening a short — honor it, don't
+    # override. (A SELL with no explicit product still gets policy-resolved.)
+    if (not _explicit_product) or (side or "").upper() == "BUY":
+        try:
+            from src.services.trading.model_ledger_service import INTRADAY_MODELS
+            if _model:
+                want = "INTRADAY" if _model in INTRADAY_MODELS else "CNC"
+                if product != want:
+                    log.error(f"PRODUCT MISMATCH for {_model}: resolved {product}, "
+                              f"forcing {want} (intraday/CNC policy). symbol={symbol}")
+                    _tg_safe(
+                        f"⚠️ *Product auto-corrected*\n"
+                        f"Model `{_model}` order was `{product}`, forced `{want}` "
+                        f"({symbol}). Check _CURRENT_MODEL wiring — a mismatch "
+                        f"causes phantom shorts at square-off.",
+                        is_fail=True)
+                    product = want
+            else:
+                log.error(f"placeorder with NO model set (_CURRENT_MODEL + "
+                          f"_audit_model both None) — product defaulting to "
+                          f"{product} for {symbol}; an intraday model could "
+                          f"silently book CNC. Check executor wiring.")
+        except Exception:
+            pass
     fyers_sym = to_fyers_symbol(symbol)
     safe_tag = _sanitize_tag(tag)
     req = {
@@ -318,6 +325,78 @@ def fill_confirmed_by_position(side: str, base_net: int, cur_net: int, qty: int)
         return moved >= int(qty)
     except (TypeError, ValueError):
         return False
+
+
+def held_product_qty(svc, user_id: int, symbol: str):
+    """What is actually SELLABLE for `symbol` at the broker, split by product.
+
+    Returns {"CNC": qty, "INTRADAY": qty} (long qty only, >=0), or None if the
+    broker lookup wholly failed (caller falls back to model-policy product).
+
+    WHY (2026-06-02 SPARC phantom short): the morning ORB entry was held as CNC
+    but the square-off sold INTRADAY (model policy) — selling intraday against a
+    delivery long did NOT close it, it opened a phantom short. An EXIT must sell
+    the SAME product the shares are really in, and never more than is held. This
+    resolver gives both: delivery (T+1 holdings) → CNC; same-day open positions →
+    classified by their productType.
+    """
+    bare = (symbol or "").upper().replace("NSE:", "").replace("-EQ", "")
+    if not bare:
+        return None
+    out = {"CNC": 0, "INTRADAY": 0}
+    any_ok = False
+    # Settled delivery (T+1+) lives in holdings → always CNC.
+    try:
+        for r in (svc.holdings(user_id) or {}).get("data") or []:
+            if isinstance(r, dict) and bare in (r.get("symbol") or "").upper():
+                out["CNC"] += int(float(r.get("quantity") or 0))
+        any_ok = True
+    except Exception as e:
+        log.debug(f"held_product_qty holdings fetch failed ({symbol}): {e}")
+    # Same-day positions → classify long legs by productType (CNC vs INTRADAY).
+    try:
+        raw = svc._get_api_instance(user_id)._make_request("GET", "positions") or {}
+        for r in (raw.get("data") or []):
+            if not isinstance(r, dict) or bare not in (r.get("symbol") or "").upper():
+                continue
+            nq = int(float(r.get("netQty") or 0))
+            if nq <= 0:               # only LONG legs are sellable
+                continue
+            prod = (r.get("productType") or "").upper()
+            out["INTRADAY" if "INTRA" in prod else "CNC"] += nq
+        any_ok = True
+    except Exception as e:
+        log.debug(f"held_product_qty positions fetch failed ({symbol}): {e}")
+    return out if any_ok else None
+
+
+def resolve_sell_product_qty(svc, user_id: int, symbol: str, want_qty: int):
+    """Decide the product + qty to use for an EXIT of `symbol`.
+
+    Returns (product, sell_qty, source):
+      - ("CNC"|"INTRADAY", n, "broker"): broker holds n of that product; sell
+        min(want_qty, n) as that product (matches where the shares are; capped
+        so we never short).
+      - (None, 0, "flat"): broker shows ZERO long for the symbol — already flat
+        (e.g. user sold manually); caller must SKIP the order, not place one.
+      - (None, want_qty, "fallback"): broker lookup failed — caller falls back
+        to model-policy product + the requested qty (preserves old behaviour on
+        an API hiccup; the over-sell guard inside place_limit_with_fallback is
+        the remaining backstop).
+    """
+    hb = held_product_qty(svc, user_id, symbol)
+    if hb is None:
+        return (None, int(want_qty), "fallback")
+    cnc, intra = int(hb["CNC"]), int(hb["INTRADAY"])
+    if cnc + intra <= 0:
+        return (None, 0, "flat")
+    # Sell the leg that actually holds the shares. If split across both products
+    # (rare), sell the larger leg this run; the next cycle mops up the remainder.
+    if cnc >= intra and cnc > 0:
+        product, avail = "CNC", cnc
+    else:
+        product, avail = "INTRADAY", intra
+    return (product, min(int(want_qty), avail), "broker")
 
 
 def _net_qty(svc, user_id: int, symbol: str) -> int:
@@ -699,7 +778,7 @@ def _fetch_account_available_cash(svc, user_id: int) -> Optional[float]:
 
 def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
                               side: str, last_price: float, rm_cfg,
-                              tag: str = "") -> Dict:
+                              tag: str = "", product: Optional[str] = None) -> Dict:
     """Place a LIMIT order with tolerance; widen once; MARKET as last resort.
 
     Returns dict: {filled, status, order_id, fill_price (best-effort),
@@ -709,6 +788,12 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
       t=0      : place LIMIT @ tol_pct off last_price
       t=~50%   : if unfilled, cancel + replace with retry_pct (wider)
       t=full   : if still unfilled, cancel + place MARKET, log WARN
+
+    product: explicit order product (CNC/INTRADAY). Default None = resolve per
+    model policy inside _placeorder. An EXIT passes the product the shares are
+    ACTUALLY held in at the broker (see held_product_qty) so it closes that leg
+    rather than opening a phantom short — that explicit value bypasses the
+    model-policy guard.
     """
     tol = float(rm_cfg.limit_tol_pct) / 100.0
     retry = float(rm_cfg.limit_retry_pct) / 100.0
@@ -755,7 +840,7 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
     log.info(f"  LIMIT {side} {symbol} qty={qty} px={first_px} "
              f"(last={last_price}, tol={rm_cfg.limit_tol_pct}%)")
     res = _placeorder(svc, user_id, symbol, qty, side,
-                      pricetype="LIMIT", price=first_px, tag=tag)
+                      pricetype="LIMIT", price=first_px, tag=tag, product=product)
     if not _is_ok(res):
         return {"filled": False, "status": "place_failed", "order_id": "",
                 "fill_price": None, "fill_qty": 0, "reason": str(res)}
@@ -825,7 +910,7 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
             if _pf:
                 return _pf
             res2 = _placeorder(svc, user_id, symbol, qty, side,
-                               pricetype="LIMIT", price=retry_px, tag=tag)
+                               pricetype="LIMIT", price=retry_px, tag=tag, product=product)
             if _is_ok(res2):
                 order_id = _extract_order_id(res2)
             else:
@@ -890,7 +975,7 @@ def place_limit_with_fallback(svc, user_id: int, symbol: str, qty: int,
 
     log.warning(f"  MARKET fallback for {side} {symbol} qty={qty} "
                 f"(last={last_price}, prior order={order_id})")
-    res3 = _placeorder(svc, user_id, symbol, qty, side, pricetype="MARKET", tag=tag)
+    res3 = _placeorder(svc, user_id, symbol, qty, side, pricetype="MARKET", tag=tag, product=product)
     if not _is_ok(res3):
         return {"filled": False, "status": "market_failed", "order_id": "",
                 "fill_price": None, "fill_qty": 0, "reason": str(res3)}
@@ -1228,10 +1313,35 @@ def main() -> int:
             log.info(f"DRY-RUN PASS-1 EXIT {sym} qty={held.qty} "
                      f"side={exit_side} @ ~{price} (would LIMIT then MARKET)")
         else:
+            # Sell the product the shares are ACTUALLY held in at the broker, and
+            # cap to broker-available qty (never short). For a long exit
+            # (exit_side SELL) resolve per symbol; a BUY-to-cover exit keeps the
+            # policy product. If the broker shows the name already FLAT (e.g. a
+            # manual sell), the exit goal is already met — mark closed WITHOUT
+            # placing an order or aborting entries.
+            _exit_prod, _exit_qty = None, held.qty
+            if exit_side == "SELL":
+                _exit_prod, _exit_qty, _src = resolve_sell_product_qty(
+                    svc, args.user_id, sym, held.qty)
+                if _src == "flat":
+                    log.warning(f"EXIT {sym}: broker shows FLAT (already closed "
+                                f"elsewhere) — marking exit done, no order placed.")
+                    _record_model_sell(args.model_name, price,
+                                       f"{sig_type}_BROKER_FLAT", "",
+                                       qty=held.qty, svc=svc, user_id=args.user_id)
+                    closed += 1
+                    continue
+                if _exit_qty <= 0:
+                    log.warning(f"EXIT {sym}: resolved sell_qty<=0 — skip.")
+                    skipped += 1
+                    continue
+                if _exit_qty != held.qty or _src == "broker":
+                    log.info(f"EXIT {sym}: broker-resolved {_exit_qty}x as "
+                             f"{_exit_prod} (ledger qty {held.qty}, source={_src})")
             res = place_limit_with_fallback(
-                svc, args.user_id, sym, held.qty, exit_side,
+                svc, args.user_id, sym, _exit_qty, exit_side,
                 last_price=price, rm_cfg=rm.cfg,
-                tag=f"exit:{sig_type}",
+                tag=f"exit:{sig_type}", product=_exit_prod,
             )
             status = res.get("status", "unknown")
             order_id = res.get("order_id", "")
@@ -1255,15 +1365,18 @@ def main() -> int:
             # it). Warn + alert on a genuine partial so the operator knows the
             # exit is incomplete and shares remain held at the broker.
             fq = int(res.get("fill_qty") or 0)
-            actual_qty = fq if fq > 0 else held.qty
-            if 0 < fq < held.qty:
-                log.warning(f"PARTIAL EXIT {sym}: filled {fq}/{held.qty} — "
-                            f"recording partial; {held.qty - fq} shares still held")
+            actual_qty = fq if fq > 0 else _exit_qty
+            # Partial is measured against what we ACTUALLY tried to sell
+            # (_exit_qty, capped to broker-available), not the raw ledger qty —
+            # else a full exit of a broker-reduced holding looks "partial".
+            if 0 < fq < _exit_qty:
+                log.warning(f"PARTIAL EXIT {sym}: filled {fq}/{_exit_qty} — "
+                            f"recording partial; {_exit_qty - fq} shares still held")
                 _tg_safe(
                     f"⚠️ *PARTIAL EXIT fill*\n"
                     f"Model: `{args.model_name or '(env)'}`\n"
-                    f"Symbol: `{sym}` filled {fq}/{held.qty} @ ₹{fill_price:,.2f}\n"
-                    f"{held.qty - fq} shares still held — manual review."
+                    f"Symbol: `{sym}` filled {fq}/{_exit_qty} @ ₹{fill_price:,.2f}\n"
+                    f"{_exit_qty - fq} shares still held — manual review."
                 )
 
         pnl = (fill_price - held.entry_price) * actual_qty * (
@@ -1278,7 +1391,7 @@ def main() -> int:
         # PASS-2 can_enter blocks a new entry (and the model is NOT free to
         # rotate into a different symbol while shares remain). Only a FULL exit
         # frees the slot.
-        _partial_exit = (not args.dry_run) and 0 < int(res.get("fill_qty") or 0) < held.qty
+        _partial_exit = (not args.dry_run) and 0 < int(res.get("fill_qty") or 0) < _exit_qty
         if _partial_exit:
             held.qty = held.qty - actual_qty  # reduce in-memory residual
         else:
