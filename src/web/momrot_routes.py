@@ -296,11 +296,42 @@ def _portfolio_state() -> Dict:
     total_pct = (total_pnl / position_cost * 100) if position_cost > 0 else 0.0
     has_data = bool(open_positions) or cash > 0 or total_margin > 0
 
+    # Txn charges — Fyers has NO charges API, so the ACTUAL charges come from the
+    # imported account statement (broker_charges_daily, from the Charges CSV) for
+    # the days it covers, + the formula estimate for trades AFTER that (today,
+    # before the next export). Mirrors the account P&L: broker truth + estimate.
+    acct_charges = 0.0
+    acct_charges_through = None
+    acct_charges_est_today = 0.0
+    try:
+        from src.models.database import get_database_manager as _gdb
+        from sqlalchemy import text as _t
+        _db = _gdb()
+        with _db.get_session() as _s:
+            _r = _s.execute(_t("SELECT COALESCE(SUM(total),0), MAX(trade_date) "
+                               "FROM broker_charges_daily")).fetchone()
+            acct_charges = float((_r and _r[0]) or 0)
+            acct_charges_through = _r[1] if _r else None
+            if acct_charges_through is not None:
+                acct_charges_est_today = float(_s.execute(_t(
+                    "SELECT COALESCE(SUM(charges_inr),0) FROM model_trades "
+                    "WHERE side IN ('BUY','SELL') AND COALESCE(fyers_order_id,'') <> '' "
+                    "AND trade_at::date > :d"), {"d": acct_charges_through}).scalar() or 0)
+    except Exception as _e:
+        logger.debug(f"acct charges lookup failed: {_e}")
+
     history = _read_history()
     return {
         "source": "fyers",
         "has_data": has_data,
         "starting_capital": STARTING_CAPITAL,  # reference ceiling, not P&L baseline
+        # Fyers actual txn charges (from imported statement) thru its last day +
+        # formula estimate for trades after it.
+        "account_txn_charges": round(acct_charges + acct_charges_est_today, 2),
+        "account_txn_charges_actual": round(acct_charges, 2),
+        "account_txn_charges_through": (acct_charges_through.isoformat()
+                                        if acct_charges_through else None),
+        "account_txn_charges_est_today": round(acct_charges_est_today, 2),
         "cash": cash,
         "total_margin": total_margin,
         "utilized_margin": utilized_margin,
