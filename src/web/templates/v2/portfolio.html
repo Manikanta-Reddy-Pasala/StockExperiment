@@ -101,7 +101,7 @@
       <div class="col-6 col-lg-2"><div class="text-muted small">Total NAV</div><div class="fs-5 fw-bold" id="agg_nav">--</div></div>
       <div class="col-6 col-lg-2"><div class="text-muted small">Total P&amp;L</div><div class="fs-5 fw-bold" id="agg_pnl">--</div></div>
       <div class="col-6 col-lg-2"><div class="text-muted small">Realized P&amp;L</div><div class="fs-5 fw-bold" id="agg_realized">--</div></div>
-      <div class="col-6 col-lg-2"><div class="text-muted small" title="Approximate lifetime broker charges (formula-based). Info only — already deducted from cash.">Approx Txn Charges</div><div class="fs-5 fw-bold neg" id="agg_charges">--</div></div>
+      <div class="col-6 col-lg-2"><div class="text-muted small" title="Fyers ACTUAL charges (imported CSV) through the last imported day + formula estimate for trades after it.">Txn Charges (actual+est)</div><div class="fs-5 fw-bold neg" id="agg_charges">--</div></div>
     </div>
     <!-- Per-model breakdown is collapsible — the aggregate strip above is the
          at-a-glance summary; the full table is opt-in (mobile space). -->
@@ -214,7 +214,7 @@ async function loadAggregate() {
     realEl.textContent = fmtINR(t.realized_pnl);
     realEl.className = 'fs-5 fw-bold ' + cls(t.realized_pnl);
     const chEl = document.getElementById('agg_charges');
-    if (chEl) chEl.textContent = fmtINR(t.total_txn_charges);
+    if (chEl) chEl.textContent = fmtINR(t.authoritative_txn_charges ?? t.total_txn_charges);
 
     Object.keys(SYMBOL_TO_MODEL).forEach(k => delete SYMBOL_TO_MODEL[k]);
     (d.models||[]).forEach(m => {
