@@ -145,11 +145,13 @@
 </div>
 
 <div class="card">
-  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"
+       data-bs-toggle="collapse" data-bs-target="#open_body" aria-expanded="true" style="cursor:pointer">
     <span><i class="bi bi-briefcase me-2"></i>Open Positions — by Model
       <span class="text-muted small ms-2 d-none d-sm-inline">each model's own qty &amp; cost (live MTM)</span></span>
-    <span class="text-muted small" id="open_pnl_sum"></span>
+    <span class="d-flex align-items-center gap-2"><span class="text-muted small" id="open_pnl_sum"></span><i class="bi bi-chevron-down"></i></span>
   </div>
+  <div class="collapse show" id="open_body">
   <div class="card-body">
     <div id="positions_grid"><div class="text-muted py-2">Loading…</div></div>
     <div class="d-flex justify-content-between align-items-center mt-2 pager" id="open_pager" style="display:none!important;">
@@ -158,14 +160,17 @@
       <button class="btn btn-sm btn-outline-secondary" data-grid="open" data-dir="1">Next ›</button>
     </div>
   </div>
+  </div>
 </div>
 
 <div class="card mt-3">
-  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"
+       data-bs-toggle="collapse" data-bs-target="#closed_body" aria-expanded="true" style="cursor:pointer">
     <span><i class="bi bi-check2-square me-2"></i>Closed Positions — by Model
       <span class="text-muted small ms-2 d-none d-sm-inline">realized P&amp;L from closed trades (newest first)</span></span>
-    <span class="text-muted small" id="closed_pnl_sum"></span>
+    <span class="d-flex align-items-center gap-2"><span class="text-muted small" id="closed_pnl_sum"></span><i class="bi bi-chevron-down"></i></span>
   </div>
+  <div class="collapse show" id="closed_body">
   <div class="card-body">
     <div id="closed_grid"><div class="text-muted py-2">Loading…</div></div>
     <div class="d-flex justify-content-between align-items-center mt-2 pager" id="closed_pager" style="display:none!important;">
@@ -173,6 +178,7 @@
       <span class="small text-muted" id="closed_page_label">—</span>
       <button class="btn btn-sm btn-outline-secondary" data-grid="closed" data-dir="1">Next ›</button>
     </div>
+  </div>
   </div>
 </div>
 
