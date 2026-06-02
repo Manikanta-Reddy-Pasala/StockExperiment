@@ -242,6 +242,22 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
             log.error(f"  SELL {sym} not filled: {res.get('status')}")
             _audit(model, sym, "SELL", qty, ltp, "rejected",
                    error=f"not filled: {res.get('status')}", res=res)
+            # Real-time alert on a REJECTED sell. The fill path pings but this
+            # branch was silent — a failed square-off / rotation exit went
+            # unnoticed until the reconciler caught the drift. For an INTRADAY
+            # model (ORB) an unsold name is open risk until the 15:13 retry /
+            # broker auto-square-off, so surface it immediately.
+            _is_eod = (reason == "EOD_FLAT")
+            _tg_safe(
+                f"🛑 *SELL FAILED {model}*\n"
+                f"`{sym}` x{qty}  reason=`{reason}`\n"
+                f"status=`{res.get('status')}` — LIMIT→MARKET escalation did not fill.\n"
+                + ("⚠️ INTRADAY square-off miss — 15:13 retry + broker auto-square-off "
+                   "are the backstops; verify the position is flat."
+                   if _is_eod else
+                   "Will retry next cycle; verify the position."),
+                is_fail=True,
+            )
 
     # ---- BUYS (equal-weight across the K-NAME TARGET basket) ----
     if buys:
