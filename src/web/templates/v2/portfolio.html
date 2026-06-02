@@ -88,11 +88,6 @@
         <span class="text-muted small" title="Day's P&L from Fyers: Σ qty × (LTP − prev close) across all holdings.">Today's P&amp;L (Fyers)</span>
         <div class="fs-6 fw-bold" id="fyers_today_pnl">--</div>
       </div>
-      <div class="col-md-auto">
-        <span class="text-muted small" title="Computed from the Fyers API using Fyers' published rates: charges to acquire your current holdings + today's actual fills. No CSV.">Txn Charges (Fyers)</span>
-        <div class="fs-6 fw-bold neg" id="fyers_txn_charges">--</div>
-        <div class="text-muted" style="font-size:.66rem" id="fyers_txn_charges_note"></div>
-      </div>
       <div class="col-12">
         <span class="text-muted" style="font-size:.72rem">
           Whole Fyers account (all models share it). “Cash to Trade” = free cash to buy; “Money in Stocks” = live market value of all your holdings; “Total Account” = the two added (your real account worth). Per-model split is in the table below.
@@ -115,7 +110,7 @@
       <div class="col-6 col-lg-2"><div class="text-muted small" title="Realized (from trades) + Unrealized (open, live)">Total P&amp;L</div><div class="fs-5 fw-bold" id="agg_pnl">--</div></div>
       <div class="col-6 col-lg-2"><div class="text-muted small" title="Day MTM change on open positions + realized from trades closed today">Today's P&amp;L</div><div class="fs-5 fw-bold" id="agg_today">--</div></div>
       <div class="col-6 col-lg-2"><div class="text-muted small">Realized P&amp;L</div><div class="fs-5 fw-bold" id="agg_realized">--</div></div>
-      <div class="col-6 col-lg-2"><div class="text-muted small" title="Sum of every model's charges (formula on real broker trades). The whole-account Fyers figure is in the Fyers-account card above.">Txn Charges (models)</div><div class="fs-5 fw-bold neg" id="agg_charges">--</div></div>
+      <div class="col-6 col-lg-2"><div class="text-muted small" title="Total broker charges across all models, calculated from each trade at Fyers rates. Sums the per-model charges below.">Txn Charges</div><div class="fs-5 fw-bold neg" id="agg_charges">--</div></div>
     </div>
     <!-- Per-model breakdown is collapsible — the aggregate strip above is the
          at-a-glance summary; the full table is opt-in (mobile space). -->
@@ -328,14 +323,6 @@ async function loadFyersFunds() {
     if (tp) { const v = Number(s.account_total_pnl || 0); tp.textContent = fmtINR(v); tp.className = 'fs-6 fw-bold ' + cls(v); }
     const dp = document.getElementById('fyers_today_pnl');
     if (dp) { const v = Number(s.account_today_pnl || 0); dp.textContent = fmtINR(v); dp.className = 'fs-6 fw-bold ' + cls(v); }
-    const ch = document.getElementById('fyers_txn_charges');
-    if (ch) { ch.textContent = fmtINR(Number(s.account_txn_charges || 0)); }
-    const chN = document.getElementById('fyers_txn_charges_note');
-    if (chN) {
-      const hold = Number(s.account_txn_charges_holdings || 0);
-      const tdy = Number(s.account_txn_charges_today || 0);
-      chN.textContent = (hold || tdy) ? `holdings ₹${hold.toFixed(2)} + today ₹${tdy.toFixed(2)}` : '';
-    }
     document.getElementById('fyers_funds_ts').textContent =
       window.fmtIST ? window.fmtIST(s.ledger_updated_at) : (s.ledger_updated_at || '');
   } catch(e) { console.error(e); }
