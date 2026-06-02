@@ -935,32 +935,6 @@ def get_portfolio_stats(price_lookup=None) -> Dict:
             float(total_pnl / total_allocated * 100) if total_allocated > 0 else 0
         )
 
-        # AUTHORITATIVE txn charges = ACTUAL Fyers charges (broker_charges_daily,
-        # imported from the account CSV) THROUGH the last imported day, PLUS the
-        # formula estimate (model_trades, real order_id) for trades AFTER that day
-        # (e.g. today, before the next CSV export). Falls back to pure estimate if
-        # nothing imported yet.
-        actual_charges = 0.0
-        actual_through = None
-        est_after = round(total_charges_all, 2)
-        try:
-            from sqlalchemy import text as _text
-            _r = s.execute(_text(
-                "SELECT COALESCE(SUM(total),0), MAX(trade_date) "
-                "FROM broker_charges_daily")).fetchone()
-            actual_charges = float((_r and _r[0]) or 0)
-            actual_through = _r[1] if _r else None
-            if actual_through is not None:
-                est_after = float(s.execute(_text(
-                    "SELECT COALESCE(SUM(charges_inr),0) FROM model_trades "
-                    "WHERE side IN ('BUY','SELL') AND COALESCE(fyers_order_id,'') <> '' "
-                    "AND trade_at::date > :d"), {"d": actual_through}).scalar() or 0)
-        except Exception:
-            actual_charges = 0.0
-            actual_through = None
-            est_after = round(total_charges_all, 2)
-        authoritative_charges = round(actual_charges + est_after, 2)
-
         return {
             "models": models,
             "total": {
@@ -973,12 +947,6 @@ def get_portfolio_stats(price_lookup=None) -> Dict:
                 "return_pct": round(total_return_pct, 2),
                 "realized_pnl": float(total_realized),
                 "total_trades": total_trades,
-                # Actual(CSV thru date) + estimate(after) — the headline figure.
-                "actual_txn_charges": round(actual_charges, 2),
-                "actual_charges_through": (actual_through.isoformat()
-                                           if actual_through else None),
-                "estimated_txn_charges_after": round(est_after, 2),
-                "authoritative_txn_charges": authoritative_charges,
                 # Global approx broker charges (all models) + net realized.
                 "total_charges": round(total_charges_all, 2),
                 "net_realized_pnl": round(float(total_realized) - total_charges_all, 2),

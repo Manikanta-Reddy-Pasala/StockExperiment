@@ -126,8 +126,7 @@
         <div class="kv"><span class="k" title="Locked-in P&L from closed trades across all models">Realized (closed trades)</span><span class="v" id="td_realized">—</span></div>
         <div class="kv"><span class="k">+ Unrealized (MTM − cost)</span><span class="v" id="td_unreal">—</span></div>
         <div class="kv"><span class="k"><strong>≈ Total P&amp;L</strong></span><span class="v" id="td_pnl2">—</span></div>
-        <div class="kv mt-2 pt-2" style="border-top:1px dashed #dee2e6;"><span class="k" title="Fyers ACTUAL charges (imported from your CSV) through the last imported day, PLUS the formula estimate for trades after it (e.g. today).">Txn Charges (actual + est)</span><span class="v neg" id="td_charges">—</span></div>
-        <div class="text-muted text-end" style="font-size:0.68rem;" id="td_charges_note"></div>
+        <div class="kv mt-2 pt-2" style="border-top:1px dashed #dee2e6;"><span class="k" title="Approximate lifetime broker charges across all models (formula-based, real broker trades). Info only — already deducted from cash at trade time.">Approx Txn Charges (info)</span><span class="v neg" id="td_charges">—</span></div>
         <div class="text-muted" style="font-size:0.75rem; margin-top:6px;">
           Approximate breakdown. Exact match with NAV − Invested may differ by small charge rounding — charges are formula-estimated, not broker-exact.
         </div>
@@ -360,7 +359,7 @@ function renderTotals(t, models) {
   const allocVal = Number(t.invested_amount ?? t.allocated_capital ?? 0);
   const pnlVal = Number(t.pnl_total ?? 0);
   const realVal = Number(t.realized_pnl ?? 0);
-  const chgVal = Number(t.authoritative_txn_charges ?? t.total_txn_charges ?? 0);
+  const chgVal = Number(t.total_txn_charges ?? 0);
   const unrealVal = pnlVal - realVal;
   const setText = (id, val, signed) => {
     const el = document.getElementById(id);
@@ -375,15 +374,6 @@ function renderTotals(t, models) {
   setText('td_realized', realVal, true);
   setText('td_unreal', unrealVal, true);
   setText('td_charges', chgVal, false);
-  const noteEl = document.getElementById('td_charges_note');
-  if (noteEl) {
-    const act = Number(t.actual_txn_charges || 0);
-    const est = Number(t.estimated_txn_charges_after || 0);
-    const thru = t.actual_charges_through;
-    noteEl.textContent = thru
-      ? `Fyers actual ₹${act.toFixed(2)} thru ${thru} + est ₹${est.toFixed(2)} after`
-      : 'formula estimate (no Fyers CSV imported yet)';
-  }
 }
 
 function renderSignalsWidget(data) {
