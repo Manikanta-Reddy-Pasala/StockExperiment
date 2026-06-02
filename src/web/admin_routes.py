@@ -1067,7 +1067,7 @@ def get_model_portfolio():
         from sqlalchemy import text
 
         ensure_models_seeded()
-        stats = get_portfolio_stats(price_lookup=_live_mtm_lookup_for_model(None))
+        stats = get_portfolio_stats(quote_lookup=_live_quote_lookup_for_model(None))
 
         # Layer on per-model broker txn charges. Source = model_trades.charges_inr
         # for trades that ACTUALLY hit the broker (real fyers_order_id) — the SAME
@@ -1405,6 +1405,55 @@ def _resolve_live_prices(symbols):
     return out
 
 
+def _resolve_live_quotes(symbols):
+    """Like _resolve_live_prices but returns {bare: {'ltp','prev_close'}} so the
+    caller can compute day-change (Today's P&L). Falls back to DB last-close for
+    ltp (prev_close 0) when Fyers is unavailable."""
+    bare_set = sorted({(s or "").replace("NSE:", "").replace("-EQ", "")
+                       for s in symbols if s})
+    out = {}
+    if not bare_set:
+        return out
+    fyers_syms = [f"NSE:{b}-EQ" for b in bare_set]
+    try:
+        from src.services.brokers.fyers_service import FyersService
+        svc = FyersService()
+        qr = svc.quotes_multiple(1, fyers_syms) or {}
+        for fs, qd in (qr.get("data") or {}).items():
+            b = fs.replace("NSE:", "").replace("-EQ", "")
+            ltp = float((qd or {}).get("ltp") or 0)
+            pc = float((qd or {}).get("prev_close") or 0)
+            if ltp > 0:
+                out[b] = {"ltp": ltp, "prev_close": pc}
+    except Exception as e:
+        logger.warning(f"Fyers quotes(day) batch failed: {e}")
+    # DB close fallback for any missing (ltp only, no day-change)
+    missing = [b for b in bare_set if b not in out]
+    if missing:
+        px = _resolve_live_prices(missing)
+        for b, v in px.items():
+            out[b] = {"ltp": v, "prev_close": 0.0}
+    return out
+
+
+def _live_quote_lookup_for_model(model_name):
+    """Closure for get_portfolio_stats(quote_lookup=...) → {'ltp','prev_close'}
+    per held symbol (open_symbol + model_holdings), pre-resolved up front."""
+    from src.models.model_ledger_models import ModelLedger, ModelHolding
+    from src.models.database import get_database_manager
+    db = get_database_manager()
+    with db.get_session() as s:
+        rows = s.query(ModelLedger).all()
+        open_syms = [l.open_symbol for l in rows if l.open_symbol]
+        open_syms += [h.symbol for h in s.query(ModelHolding).all() if h.symbol]
+    quotes = _resolve_live_quotes(list(set(open_syms)))
+
+    def _lookup(sym):
+        return quotes.get((sym or "").replace("NSE:", "").replace("-EQ", ""))
+
+    return _lookup
+
+
 def _live_mtm_lookup_for_model(model_name):
     """Pre-resolve the given model's open-position MTM and return a closure
     suitable for get_portfolio_stats(price_lookup=...)."""
@@ -1452,7 +1501,7 @@ def model_balance_sheet(model_name):
         from sqlalchemy import text
 
         ensure_models_seeded()
-        stats = get_portfolio_stats(price_lookup=_live_mtm_lookup_for_model(model_name))
+        stats = get_portfolio_stats(quote_lookup=_live_quote_lookup_for_model(model_name))
 
         per_model = next(
             (m for m in stats["models"] if m["model_name"] == model_name),
@@ -2146,7 +2195,7 @@ def model_triggers_status(model_name):
         # Portfolio stats — pre-resolve live MTM outside any open session so
         # get_portfolio_stats's internal session doesn't conflict with the
         # one we used for the trade queries above.
-        stats = get_portfolio_stats(price_lookup=_live_mtm_lookup_for_model(model_name))
+        stats = get_portfolio_stats(quote_lookup=_live_quote_lookup_for_model(model_name))
 
         per_model = next(
             (m for m in stats["models"] if m["model_name"] == model_name), {}

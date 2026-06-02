@@ -796,11 +796,19 @@ def get_trades(model_name: str, limit: int = 50) -> List[Dict]:
 
 # ---- Aggregate ----
 
-def get_portfolio_stats(price_lookup=None) -> Dict:
+def get_portfolio_stats(price_lookup=None, quote_lookup=None) -> Dict:
     """Return per-model stats + portfolio total.
 
     price_lookup: optional callable(symbol) -> last_price for MTM of open
     positions. If None, uses last entry price as proxy.
+    quote_lookup: optional callable(symbol) -> {"ltp", "prev_close"} for the
+    live MTM + day-change. Enables P&L the way the user wants it:
+      - unrealized / open P&L  = qty × (live LTP − entry)        [Fyers LTP]
+      - realized P&L           = Σ closed-trade pnl from model_trades
+      - total P&L              = realized + unrealized
+      - TODAY's P&L            = Σ qty × (LTP − prev_close) on open holds
+                                 + realized from trades closed today
+    Falls back to price_lookup (ltp only; no day-change) when not given.
     """
     db = get_database_manager()
     with db.get_session() as s:
@@ -831,52 +839,98 @@ def get_portfolio_stats(price_lookup=None) -> Dict:
         except Exception:
             charges_by_model = {}
 
+        # Realized P&L per model FROM TRADES (closed-trade pnl on real broker
+        # sells), + the slice realized TODAY — drives total + today's P&L
+        # without trusting the stored ledger.realized_pnl aggregate.
+        realized_by_model: Dict[str, float] = {}
+        today_realized_by_model: Dict[str, float] = {}
+        try:
+            from sqlalchemy import text as _t
+            for r in s.execute(_t(
+                "SELECT model_name, COALESCE(SUM(pnl),0) FROM model_trades "
+                "WHERE side='SELL' AND pnl IS NOT NULL AND COALESCE(fyers_order_id,'')<>'' "
+                "GROUP BY model_name")).fetchall():
+                realized_by_model[r[0]] = float(r[1] or 0)
+            for r in s.execute(_t(
+                "SELECT model_name, COALESCE(SUM(pnl),0) FROM model_trades "
+                "WHERE side='SELL' AND pnl IS NOT NULL AND COALESCE(fyers_order_id,'')<>'' "
+                "AND trade_at::date = CURRENT_DATE GROUP BY model_name")).fetchall():
+                today_realized_by_model[r[0]] = float(r[1] or 0)
+        except Exception:
+            pass
+
+        def _q(sym):
+            """{'ltp','prev_close'} for sym — quote_lookup if given, else
+            price_lookup (ltp only, prev_close 0 → today MTM falls back to 0)."""
+            if quote_lookup:
+                try:
+                    qd = quote_lookup(sym) or {}
+                    return {"ltp": float(qd.get("ltp") or 0),
+                            "prev_close": float(qd.get("prev_close") or 0)}
+                except Exception:
+                    pass
+            lp = 0.0
+            if price_lookup:
+                try:
+                    lp = float(price_lookup(sym) or 0)
+                except Exception:
+                    lp = 0.0
+            return {"ltp": lp, "prev_close": 0.0}
+
         models = []
         total_allocated = Decimal(0)
         total_nav = Decimal(0)
         total_realized = Decimal(0)
         total_trades = 0
         total_charges_all = 0.0
+        total_unrealized = 0.0
+        total_today_pnl = 0.0
+        total_realized_trades = 0.0
 
         for l in ledger_rows:
             cfg = settings_rows.get(l.model_name)
             cash = l.cash or Decimal(0)
             pos_value = Decimal(0)
             mtm_price = None
+            unrealized = 0.0       # Σ qty × (LTP − entry)        — open P&L (Fyers LTP)
+            today_unrealized = 0.0  # Σ qty × (LTP − prev_close)  — day MTM change
             if l.open_symbol and l.open_qty:
-                if price_lookup:
-                    try:
-                        mtm_price = price_lookup(l.open_symbol)
-                    except Exception:
-                        mtm_price = None
-                if mtm_price is None and l.open_entry_px:
-                    mtm_price = float(l.open_entry_px)
-                if mtm_price is not None:
-                    pos_value = Decimal(str(mtm_price)) * Decimal(str(l.open_qty))
+                q = _q(l.open_symbol)
+                ltp = q["ltp"]
+                entry = float(l.open_entry_px or 0)
+                if ltp <= 0:
+                    ltp = entry  # no live price → flat MTM
+                mtm_price = ltp
+                qty = int(l.open_qty or 0)
+                pos_value = Decimal(str(ltp)) * Decimal(str(qty))
+                if entry > 0:
+                    unrealized += qty * (ltp - entry)
+                if q["prev_close"] > 0:
+                    today_unrealized += qty * (ltp - q["prev_close"])
 
-            # Multi-holding positions: MTM each, add to pos_value, and expose
-            # the list so the dashboard can render a K>1 model's open names.
+            # Multi-holding positions: MTM each, add to pos_value + unrealized.
             holdings_list = []
             for h in holdings_by_model.get(l.model_name, []):
                 h_qty = int(h.qty or 0)
                 if h_qty <= 0:
                     continue
-                h_mtm = None
-                if price_lookup:
-                    try:
-                        h_mtm = price_lookup(h.symbol)
-                    except Exception:
-                        h_mtm = None
-                if h_mtm is None and h.entry_px:
-                    h_mtm = float(h.entry_px)
-                h_val = Decimal(str(h_mtm)) * Decimal(str(h_qty)) if h_mtm is not None else Decimal(0)
+                hq = _q(h.symbol)
+                h_ltp = hq["ltp"]
+                h_entry = float(h.entry_px or 0)
+                if h_ltp <= 0:
+                    h_ltp = h_entry
+                h_val = Decimal(str(h_ltp)) * Decimal(str(h_qty))
                 pos_value += h_val
+                if h_entry > 0:
+                    unrealized += h_qty * (h_ltp - h_entry)
+                if hq["prev_close"] > 0:
+                    today_unrealized += h_qty * (h_ltp - hq["prev_close"])
                 holdings_list.append({
                     "symbol": h.symbol,
                     "qty": h_qty,
                     "entry_px": float(h.entry_px) if h.entry_px else None,
                     "entry_date": h.entry_date.isoformat() if h.entry_date else None,
-                    "mtm_price": h_mtm,
+                    "mtm_price": h_ltp,
                     "value": float(h_val),
                 })
 
@@ -887,6 +941,12 @@ def get_portfolio_stats(price_lookup=None) -> Dict:
             return_pct = (
                 float(pnl_total / invested * 100) if invested > 0 else 0
             )
+            # P&L the user wants: realized from TRADES, open from live (Fyers LTP),
+            # total = realized + unrealized, today = day MTM + realized today.
+            realized_trades = realized_by_model.get(l.model_name, 0.0)
+            today_realized = today_realized_by_model.get(l.model_name, 0.0)
+            total_pnl_trades = round(realized_trades + unrealized, 2)
+            today_pnl = round(today_unrealized + today_realized, 2)
 
             models.append({
                 "model_name": l.model_name,
@@ -902,6 +962,14 @@ def get_portfolio_stats(price_lookup=None) -> Dict:
                 "pnl_total": float(pnl_total),
                 "return_pct": round(return_pct, 2),
                 "realized_pnl": float(l.realized_pnl or 0),
+                # P&L (user spec): open=live LTP MTM, realized=from trades,
+                # total=realized+unrealized, today=day MTM + realized today.
+                "unrealized_pnl": round(unrealized, 2),
+                "realized_pnl_trades": round(realized_trades, 2),
+                "total_pnl_trades": total_pnl_trades,
+                "today_pnl": today_pnl,
+                "today_realized": round(today_realized, 2),
+                "today_unrealized": round(today_unrealized, 2),
                 "open_symbol": l.open_symbol,
                 "open_qty": l.open_qty,
                 "open_entry_px": float(l.open_entry_px) if l.open_entry_px else None,
@@ -925,6 +993,9 @@ def get_portfolio_stats(price_lookup=None) -> Dict:
             total_nav += nav
             total_realized += l.realized_pnl or Decimal(0)
             total_trades += l.total_trades or 0
+            total_unrealized += unrealized
+            total_today_pnl += today_pnl
+            total_realized_trades += realized_trades
             # charges_by_model already counts only broker-executed trades (real
             # fyers_order_id), so paper trades are excluded at the source and an
             # observe model's REAL trades are correctly included here.
@@ -947,6 +1018,12 @@ def get_portfolio_stats(price_lookup=None) -> Dict:
                 "return_pct": round(total_return_pct, 2),
                 "realized_pnl": float(total_realized),
                 "total_trades": total_trades,
+                # Aggregate P&L (user spec): open=live, realized=trades,
+                # total=realized+unrealized, today=day MTM + realized today.
+                "unrealized_pnl": round(total_unrealized, 2),
+                "realized_pnl_trades": round(total_realized_trades, 2),
+                "total_pnl_trades": round(total_realized_trades + total_unrealized, 2),
+                "today_pnl": round(total_today_pnl, 2),
                 # Global approx broker charges (all models) + net realized.
                 "total_charges": round(total_charges_all, 2),
                 "net_realized_pnl": round(float(total_realized) - total_charges_all, 2),
