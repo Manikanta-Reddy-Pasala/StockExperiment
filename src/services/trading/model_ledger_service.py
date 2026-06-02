@@ -920,7 +920,11 @@ def get_portfolio_stats(price_lookup=None) -> Dict:
             total_nav += nav
             total_realized += l.realized_pnl or Decimal(0)
             total_trades += l.total_trades or 0
-            total_charges_all += charges_by_model.get(l.model_name, 0.0)
+            # GLOBAL real charges exclude signals_only (paper/observe) models —
+            # they never place a real Fyers order, so their charges are
+            # hypothetical and must not inflate the actual account charge total.
+            if not bool(cfg and getattr(cfg, "signals_only", False)):
+                total_charges_all += charges_by_model.get(l.model_name, 0.0)
 
         total_pnl = total_nav - total_allocated
         total_return_pct = (
