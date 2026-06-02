@@ -128,7 +128,7 @@
         <div class="kv"><span class="k" title="Open positions at live Fyers LTP">+ Unrealized (open, live)</span><span class="v" id="td_unreal">—</span></div>
         <div class="kv"><span class="k"><strong>= Total P&amp;L</strong></span><span class="v" id="td_pnl2">—</span></div>
         <div class="kv"><span class="k" title="Day MTM change on open positions + realized from trades closed today">Today's P&amp;L</span><span class="v" id="td_today">—</span></div>
-        <div class="kv mt-2 pt-2" style="border-top:1px dashed #dee2e6;"><span class="k" title="Computed from the Fyers API using Fyers' published rates: charges to acquire your current holdings + today's actual fills. No CSV.">Txn Charges (Fyers)</span><span class="v neg" id="td_charges">—</span></div>
+        <div class="kv mt-2 pt-2" style="border-top:1px dashed #dee2e6;"><span class="k" title="Sum of every model's charges (formula on its real broker trades). The whole-account Fyers figure (incl. untracked lots) is on the Portfolio → Fyers account card.">Txn Charges (models)</span><span class="v neg" id="td_charges">—</span></div>
         <div class="text-muted text-end" style="font-size:0.68rem;" id="td_charges_note"></div>
         <div class="text-muted" style="font-size:0.75rem; margin-top:6px;">
           Approximate breakdown. Exact match with NAV − Invested may differ by small charge rounding — charges are formula-estimated, not broker-exact.
@@ -371,7 +371,7 @@ function renderTotals(t, models) {
 
   const navVal = Number(t.current_amount ?? t.nav ?? 0);
   const allocVal = Number(t.invested_amount ?? t.allocated_capital ?? 0);
-  const chgVal = Number(t.txn_charges ?? t.total_txn_charges ?? 0);
+  const chgVal = Number(t.total_charges ?? t.total_txn_charges ?? 0);
   const setText = (id, val, signed) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -388,11 +388,8 @@ function renderTotals(t, models) {
   setText('td_charges', chgVal, false);
   const cnote = document.getElementById('td_charges_note');
   if (cnote) {
-    const hold = Number(t.txn_charges_holdings || 0);
-    const tdy = Number(t.txn_charges_today || 0);
-    cnote.textContent = (hold || tdy)
-      ? `Fyers API: holdings ₹${hold.toFixed(2)} + today ₹${tdy.toFixed(2)}`
-      : 'formula estimate';
+    const fy = Number(t.txn_charges || 0);
+    cnote.textContent = fy ? `Fyers whole-account: ₹${fy.toFixed(2)} (Portfolio card)` : '';
   }
 }
 

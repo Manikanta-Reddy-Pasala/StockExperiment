@@ -115,7 +115,7 @@
       <div class="col-6 col-lg-2"><div class="text-muted small" title="Realized (from trades) + Unrealized (open, live)">Total P&amp;L</div><div class="fs-5 fw-bold" id="agg_pnl">--</div></div>
       <div class="col-6 col-lg-2"><div class="text-muted small" title="Day MTM change on open positions + realized from trades closed today">Today's P&amp;L</div><div class="fs-5 fw-bold" id="agg_today">--</div></div>
       <div class="col-6 col-lg-2"><div class="text-muted small">Realized P&amp;L</div><div class="fs-5 fw-bold" id="agg_realized">--</div></div>
-      <div class="col-6 col-lg-2"><div class="text-muted small" title="Computed from the Fyers API: charges to acquire current holdings + today's actual fills. Same as the Fyers-account card.">Txn Charges (Fyers)</div><div class="fs-5 fw-bold neg" id="agg_charges">--</div></div>
+      <div class="col-6 col-lg-2"><div class="text-muted small" title="Sum of every model's charges (formula on real broker trades). The whole-account Fyers figure is in the Fyers-account card above.">Txn Charges (models)</div><div class="fs-5 fw-bold neg" id="agg_charges">--</div></div>
     </div>
     <!-- Per-model breakdown is collapsible — the aggregate strip above is the
          at-a-glance summary; the full table is opt-in (mobile space). -->
@@ -232,7 +232,7 @@ async function loadAggregate() {
     realEl.textContent = fmtINR(t.realized_pnl_trades ?? t.realized_pnl);
     realEl.className = 'fs-5 fw-bold ' + cls(t.realized_pnl_trades ?? t.realized_pnl);
     const chEl = document.getElementById('agg_charges');
-    if (chEl) chEl.textContent = fmtINR(t.txn_charges ?? t.total_txn_charges);
+    if (chEl) chEl.textContent = fmtINR(t.total_charges ?? t.total_txn_charges);
 
     Object.keys(SYMBOL_TO_MODEL).forEach(k => delete SYMBOL_TO_MODEL[k]);
     (d.models||[]).forEach(m => {
