@@ -145,12 +145,34 @@
 </div>
 
 <div class="card">
-  <div class="card-header">
-    <i class="bi bi-briefcase me-2"></i>Open Positions — by Model
-    <span class="text-muted small ms-2 d-none d-sm-inline">each model's own qty &amp; cost (live MTM). A stock held by two models shows once per model.</span>
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span><i class="bi bi-briefcase me-2"></i>Open Positions — by Model
+      <span class="text-muted small ms-2 d-none d-sm-inline">each model's own qty &amp; cost (live MTM)</span></span>
+    <span class="text-muted small" id="open_pnl_sum"></span>
   </div>
   <div class="card-body">
     <div id="positions_grid"><div class="text-muted py-2">Loading…</div></div>
+    <div class="d-flex justify-content-between align-items-center mt-2 pager" id="open_pager" style="display:none!important;">
+      <button class="btn btn-sm btn-outline-secondary" data-grid="open" data-dir="-1">‹ Prev</button>
+      <span class="small text-muted" id="open_page_label">—</span>
+      <button class="btn btn-sm btn-outline-secondary" data-grid="open" data-dir="1">Next ›</button>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-3">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span><i class="bi bi-check2-square me-2"></i>Closed Positions — by Model
+      <span class="text-muted small ms-2 d-none d-sm-inline">realized P&amp;L from closed trades (newest first)</span></span>
+    <span class="text-muted small" id="closed_pnl_sum"></span>
+  </div>
+  <div class="card-body">
+    <div id="closed_grid"><div class="text-muted py-2">Loading…</div></div>
+    <div class="d-flex justify-content-between align-items-center mt-2 pager" id="closed_pager" style="display:none!important;">
+      <button class="btn btn-sm btn-outline-secondary" data-grid="closed" data-dir="-1">‹ Prev</button>
+      <span class="small text-muted" id="closed_page_label">—</span>
+      <button class="btn btn-sm btn-outline-secondary" data-grid="closed" data-dir="1">Next ›</button>
+    </div>
   </div>
 </div>
 
@@ -361,21 +383,102 @@ async function loadState() {
     const r = await fetch('/admin/models/portfolio', {cache: 'no-store'});
     const d = await r.json();
     if (!d.success) return;
-    const cards = [];
+    const cards = []; let openPnl = 0;
     (d.models || []).forEach(m => {
       if (!m.enabled) return;
-      if (m.open_symbol && m.open_qty) {
-        cards.push(posCard(m.model_name, m.open_symbol, m.open_qty, m.open_entry_px, m.open_mtm_price));
-      }
-      (m.holdings || []).forEach(h => {
-        cards.push(posCard(m.model_name, h.symbol, h.qty, h.entry_px, h.mtm_price));
+      const add = (sym, qty, entry, live) => {
+        const c = (Number(qty)||0)*(Number(entry)||0), mv = (Number(qty)||0)*((Number(live)||0)||Number(entry)||0);
+        openPnl += (mv - c);
+        cards.push(posCard(m.model_name, sym, qty, entry, live));
+      };
+      if (m.open_symbol && m.open_qty) add(m.open_symbol, m.open_qty, m.open_entry_px, m.open_mtm_price);
+      (m.holdings || []).forEach(h => add(h.symbol, h.qty, h.entry_px, h.mtm_price));
+    });
+    const ope = document.getElementById('open_pnl_sum');
+    if (ope) { ope.textContent = `${cards.length} open · P&L ${fmtINR(openPnl)}`; ope.className = 'text-muted small ' + cls(openPnl); }
+    PAGER.open.items = cards.length ? cards : ['<div class="text-muted py-2">No open positions</div>'];
+    PAGER.open.page = 0; renderPage('open');
+    loadClosed();
+  } catch(e) { console.error(e); }
+}
+
+// ---- Pagination (client-side) for the Open + Closed position grids ----
+const PAGE_SIZE = 6;
+const PAGER = {
+  open:   { items: [], page: 0, grid: 'positions_grid', label: 'open_page_label',   pager: 'open_pager' },
+  closed: { items: [], page: 0, grid: 'closed_grid',     label: 'closed_page_label', pager: 'closed_pager' },
+};
+function renderPage(which) {
+  const p = PAGER[which];
+  const pages = Math.max(1, Math.ceil(p.items.length / PAGE_SIZE));
+  if (p.page >= pages) p.page = pages - 1;
+  if (p.page < 0) p.page = 0;
+  const slice = p.items.slice(p.page * PAGE_SIZE, p.page * PAGE_SIZE + PAGE_SIZE);
+  document.getElementById(p.grid).innerHTML = slice.join('');
+  const lbl = document.getElementById(p.label);
+  if (lbl) lbl.textContent = `Page ${p.page + 1} / ${pages} · ${p.items.length} total`;
+  const pgr = document.getElementById(p.pager);
+  if (pgr) pgr.style.setProperty('display', p.items.length > PAGE_SIZE ? 'flex' : 'none', 'important');
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-grid]');
+  if (!b) return;
+  const p = PAGER[b.dataset.grid];
+  if (!p) return;
+  p.page += Number(b.dataset.dir);
+  renderPage(b.dataset.grid);
+});
+
+// Closed positions = SELL trades (realized P&L) across all enabled models.
+async function loadClosed() {
+  try {
+    const r = await fetch('/admin/models/portfolio', {cache: 'no-store'});
+    const d = await r.json();
+    if (!d.success) return;
+    const models = (d.models || []).filter(m => m.enabled).map(m => m.model_name);
+    const lists = await Promise.all(models.map(m =>
+      fetch(`/admin/${m}/trade-history?limit=500`, {cache: 'no-store'}).then(r => r.json()).catch(() => ({trades:[]}))
+    ));
+    const closed = [];
+    lists.forEach((res, i) => {
+      const model = models[i];
+      (res.trades || []).forEach(t => {
+        if ((t.side || '').toUpperCase() !== 'SELL' || t.pnl == null) return;
+        closed.push({ model, ...t });
       });
     });
-    const grid = document.getElementById('positions_grid');
-    grid.innerHTML = cards.length
-      ? cards.join('')
-      : '<div class="text-muted py-2">No open positions</div>';
+    closed.sort((a, b) => String(b.trade_at).localeCompare(String(a.trade_at)));
+    let realized = 0;
+    const cards = closed.map(t => { realized += Number(t.pnl || 0); return closedCard(t); });
+    const cpe = document.getElementById('closed_pnl_sum');
+    if (cpe) { cpe.textContent = `${closed.length} closed · Realized ${fmtINR(realized)}`; cpe.className = 'text-muted small ' + cls(realized); }
+    PAGER.closed.items = cards.length ? cards : ['<div class="text-muted py-2">No closed positions yet</div>'];
+    PAGER.closed.page = 0; renderPage('closed');
   } catch(e) { console.error(e); }
+}
+
+function closedCard(t) {
+  const qty = Number(t.qty || 0), exit = Number(t.price || 0), pnl = Number(t.pnl || 0);
+  const value = Number(t.value || 0);
+  const entry = qty > 0 ? (value - pnl) / qty : 0;   // cost = proceeds − pnl
+  const pct = (entry > 0) ? (pnl / (entry * qty) * 100) : 0;
+  const sym = (t.symbol || '').replace('NSE:', '').replace('-EQ', '');
+  const when = (window.fmtIST ? window.fmtIST(t.trade_at) : (t.trade_at || '').replace('T', ' ').slice(0, 16));
+  return `
+    <div class="pos-card">
+      <div class="pc-top">
+        <div>
+          <div class="pc-sym">${sym}</div>
+          <a href="/admin/models/${t.model}/detail" class="badge bg-primary text-decoration-none">${modelLabel(t.model)}</a>
+        </div>
+        <div class="pc-pnl ${cls(pnl)}">${fmtINR(pnl)}<div class="small">(${fmtPct(pct)})</div></div>
+      </div>
+      <div class="pc-meta">Qty <strong>${qty.toLocaleString('en-IN')}</strong> · Entry ${fmtINR(entry)} → Exit ${fmtINR(exit)}</div>
+      <div class="pc-foot">
+        <span class="pc-val">${when}</span>
+        <span class="badge bg-secondary">${t.reason || 'closed'}</span>
+      </div>
+    </div>`;
 }
 
 async function rebalanceModel(model) {
