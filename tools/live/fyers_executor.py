@@ -93,12 +93,42 @@ def _placeorder(svc, user_id: int, symbol: str, qty: int, side: str,
     _audit_model — if set, every placeorder call writes an audit_orders
     row capturing request/response. Optional so older callers still work.
     """
+    _model = _audit_model or _CURRENT_MODEL
     if product is None:
         try:
             from src.services.trading.model_ledger_service import product_for_model
-            product = product_for_model(_audit_model or _CURRENT_MODEL)
+            product = product_for_model(_model)
         except Exception:
             product = "CNC"   # safe fallback = delivery
+    # Product-safety guard (2026-06-02 SPARC phantom-short root cause). An
+    # INTRADAY model must place MIS; a swing model must place CNC. Product is
+    # resolved from the MUTABLE global _CURRENT_MODEL — if that was ever lost
+    # (-> None -> CNC fallback), an intraday ENTRY books delivery while the
+    # 15:10 square-off still sells INTRADAY → the sell opens a phantom short
+    # instead of closing the position (exactly what happened to SPARC: CNC
+    # entry @09:50 + MIS square-off @15:11 → intraday short auto-covered @15:17).
+    # Re-resolve from the known model name and force-correct + alert on any
+    # mismatch so entry and exit can never disagree on product again.
+    try:
+        from src.services.trading.model_ledger_service import INTRADAY_MODELS
+        if _model:
+            want = "INTRADAY" if _model in INTRADAY_MODELS else "CNC"
+            if product != want:
+                log.error(f"PRODUCT MISMATCH for {_model}: resolved {product}, "
+                          f"forcing {want} (intraday/CNC policy). symbol={symbol}")
+                _tg_safe(
+                    f"⚠️ *Product auto-corrected*\n"
+                    f"Model `{_model}` order was `{product}`, forced `{want}` "
+                    f"({symbol}). Check _CURRENT_MODEL wiring — a mismatch causes "
+                    f"phantom shorts at square-off.",
+                    is_fail=True)
+                product = want
+        else:
+            log.error(f"placeorder with NO model set (_CURRENT_MODEL + _audit_model "
+                      f"both None) — product defaulting to {product} for {symbol}; "
+                      f"an intraday model could silently book CNC. Check executor wiring.")
+    except Exception:
+        pass
     fyers_sym = to_fyers_symbol(symbol)
     safe_tag = _sanitize_tag(tag)
     req = {
