@@ -307,7 +307,7 @@ function renderModelCard(m, sig) {
           })()}
           </div>
           <div class="footer-bar">
-            <span class="text-muted">${m.total_trades||0} trades · ${m.wins||0}W/${m.losses||0}L</span>
+            <span class="text-muted">${m.total_trades||0} trades · ${m.wins||0}W/${m.losses||0}L · <span class="neg" title="Approx lifetime broker charges for this model (real broker trades only). Info — already deducted from cash.">Txn Chg ₹${Number(m.total_txn_charges||0).toFixed(2)}</span></span>
             ${sigBadge}
           </div>
           <div class="mt-2 text-end">
