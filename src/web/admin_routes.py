@@ -1105,6 +1105,18 @@ def get_model_portfolio():
         except Exception as _e:
             logger.debug(f"charges enrich failed: {_e}")
 
+        # AUTHORITATIVE account txn charges — computed from the Fyers API + rates
+        # (NO CSV): acquire-cost of current holdings + today's per-order fills.
+        # This is the dashboard "Txn Charges (Fyers)" headline.
+        try:
+            _ac = _fyers_account_txn_charges(1)
+            if "total" in stats and _ac.get("total"):
+                stats["total"]["txn_charges"] = _ac["total"]
+                stats["total"]["txn_charges_holdings"] = _ac["holdings"]
+                stats["total"]["txn_charges_today"] = _ac["today"]
+        except Exception as _e:
+            logger.debug(f"fyers account charges failed: {_e}")
+
         # Per-model BUY charges for the CURRENT open position only (latest
         # filled BUY matching open_symbol). Lets the dashboard reconcile
         # Allocated = Cost Basis + Open-Pos Charges + Idle Cash + Realized.
@@ -1402,6 +1414,52 @@ def _resolve_live_prices(symbols):
                         out[b] = float(r.close)
         except Exception as e:
             logger.warning(f"DB close fallback failed: {e}")
+    return out
+
+
+def _fyers_account_txn_charges(user_id: int = 1):
+    """Compute account txn charges from the Fyers API + Fyers' published rates
+    (tools.live.broker_charges) — NO manual CSV. Fyers exposes no charges API and
+    no historical trades, so the best automatic estimate is:
+      • buy-side charges to ACQUIRE every CURRENT holding (delivery), from the
+        holdings API (real qty + avg cost — includes lots the models don't track,
+        e.g. HFCL 705), and
+      • TODAY's actual fills from the tradebook, grouped per ORDER (Fyers bills
+        per order, not per fill) so a multi-fill order isn't over-charged.
+    Returns {"total","holdings","today"} (₹). Best-effort; 0s on API failure.
+    """
+    from tools.live.broker_charges import compute_charges
+    out = {"total": 0.0, "holdings": 0.0, "today": 0.0}
+    try:
+        from src.services.brokers.fyers_service import FyersService
+        svc = FyersService()
+        api = svc._get_api_instance(user_id)
+        # (a) acquire-cost of current holdings (delivery buys)
+        h = svc.holdings(user_id) or {}
+        hc = 0.0
+        for r in (h.get("data") or []):
+            q = int(float(r.get("quantity") or 0))
+            avg = float(r.get("average_price") or r.get("costPrice") or 0)
+            if q > 0 and avg > 0:
+                hc += compute_charges("BUY", q, avg, "CNC").get("total", 0.0)
+        # (b) today's fills, grouped per order
+        tb = api._make_request("GET", "tradebook") or {}
+        orders = {}
+        for r in (tb.get("data") or []):
+            key = r.get("orderNumber") or r.get("orderDateTime")
+            o = orders.setdefault(key, {"side": "BUY" if r.get("side") == 1 else "SELL",
+                                        "prod": r.get("productType") or "CNC",
+                                        "qty": 0, "val": 0.0})
+            q = int(float(r.get("tradedQty") or 0))
+            o["qty"] += q
+            o["val"] += q * float(r.get("tradePrice") or 0)
+        tc = 0.0
+        for o in orders.values():
+            if o["qty"] > 0:
+                tc += compute_charges(o["side"], o["qty"], o["val"] / o["qty"], o["prod"]).get("total", 0.0)
+        out = {"total": round(hc + tc, 2), "holdings": round(hc, 2), "today": round(tc, 2)}
+    except Exception as e:
+        logger.warning(f"_fyers_account_txn_charges failed: {e}")
     return out
 
 

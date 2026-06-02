@@ -89,7 +89,7 @@
         <div class="fs-6 fw-bold" id="fyers_today_pnl">--</div>
       </div>
       <div class="col-md-auto">
-        <span class="text-muted small" title="ACTUAL broker charges from your imported Fyers statement (Fyers has no charges API) + a formula estimate for trades after the statement's last day.">Txn Charges (Fyers)</span>
+        <span class="text-muted small" title="Computed from the Fyers API using Fyers' published rates: charges to acquire your current holdings + today's actual fills. No CSV.">Txn Charges (Fyers)</span>
         <div class="fs-6 fw-bold neg" id="fyers_txn_charges">--</div>
         <div class="text-muted" style="font-size:.66rem" id="fyers_txn_charges_note"></div>
       </div>
@@ -332,10 +332,9 @@ async function loadFyersFunds() {
     if (ch) { ch.textContent = fmtINR(Number(s.account_txn_charges || 0)); }
     const chN = document.getElementById('fyers_txn_charges_note');
     if (chN) {
-      const act = Number(s.account_txn_charges_actual || 0);
-      const est = Number(s.account_txn_charges_est_today || 0);
-      const thru = s.account_txn_charges_through;
-      chN.textContent = thru ? `actual ₹${act.toFixed(2)} thru ${thru} + est ₹${est.toFixed(2)}` : 'no statement imported';
+      const hold = Number(s.account_txn_charges_holdings || 0);
+      const tdy = Number(s.account_txn_charges_today || 0);
+      chN.textContent = (hold || tdy) ? `holdings ₹${hold.toFixed(2)} + today ₹${tdy.toFixed(2)}` : '';
     }
     document.getElementById('fyers_funds_ts').textContent =
       window.fmtIST ? window.fmtIST(s.ledger_updated_at) : (s.ledger_updated_at || '');
