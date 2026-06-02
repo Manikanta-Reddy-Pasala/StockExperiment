@@ -95,6 +95,9 @@ class ModelTrade(Base):
     pnl = Column(Numeric(14, 2))               # only on SELL
     reason = Column(String(32))                # ENTRY | TARGET | TRAIL | SMA | MAX_HOLD
     fyers_order_id = Column(String(64))
+    # Approx broker charges (Fyers rates) for THIS leg — auto-stamped by the
+    # before_insert listener below so all ~9 insert sites get it for free.
+    charges_inr = Column(Numeric(14, 4))
     # Naive timestamp in container's local time (TZ=Asia/Kolkata → IST).
     # UI fmtIST helper treats naive ISO as already-IST and doesn't re-shift.
     trade_at = Column(DateTime, default=datetime.now, index=True)
@@ -114,6 +117,28 @@ class ModelTrade(Base):
 try:
     from sqlalchemy import event as _sa_event
     from sqlalchemy.orm import Session as _SASession
+
+    @_sa_event.listens_for(ModelTrade, "before_insert")
+    def _stamp_trade_charges(_mapper, _connection, target):
+        """Auto-compute approx broker charges (Fyers rates) for every BUY/SELL
+        leg so model_trades carries charges without each insert site doing it.
+        Best-effort + pure; NEVER blocks the trade insert."""
+        try:
+            if target.charges_inr is not None:
+                return
+            side = (target.side or "").upper()
+            if side not in ("BUY", "SELL"):
+                target.charges_inr = 0
+                return
+            # Lazy imports avoid a circular import with the service layer.
+            from tools.live.broker_charges import compute_charges
+            from src.services.trading.model_ledger_service import product_for_model
+            prod = product_for_model(target.model_name)
+            c = compute_charges(side, int(target.qty or 0),
+                                float(target.price or 0), prod)
+            target.charges_inr = c.get("total", 0)
+        except Exception:
+            pass  # a charge estimate must never fail a real trade insert
 
     _SETTINGS_FIELDS = ("enabled", "invested_amount", "current_amount", "description")
     _LEDGER_FIELDS = (

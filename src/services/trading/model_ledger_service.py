@@ -814,11 +814,24 @@ def get_portfolio_stats(price_lookup=None) -> Dict:
         for h in s.query(ModelHolding).all():
             holdings_by_model.setdefault(h.model_name, []).append(h)
 
+        # Approx broker charges per model = sum of stamped model_trades.charges_inr
+        # (one grouped query). Powers the per-model + global charge totals.
+        charges_by_model: Dict[str, float] = {}
+        try:
+            from sqlalchemy import func as _func
+            for mn, csum in (s.query(ModelTrade.model_name,
+                                     _func.coalesce(_func.sum(ModelTrade.charges_inr), 0))
+                               .group_by(ModelTrade.model_name).all()):
+                charges_by_model[mn] = float(csum or 0)
+        except Exception:
+            charges_by_model = {}
+
         models = []
         total_allocated = Decimal(0)
         total_nav = Decimal(0)
         total_realized = Decimal(0)
         total_trades = 0
+        total_charges_all = 0.0
 
         for l in ledger_rows:
             cfg = settings_rows.get(l.model_name)
@@ -897,12 +910,17 @@ def get_portfolio_stats(price_lookup=None) -> Dict:
                 "win_rate_pct": round(
                     100.0 * (l.wins or 0) / max(1, l.total_trades or 0), 1
                 ),
+                # Lifetime approx broker charges for this model + net-of-charges P&L.
+                "total_charges": round(charges_by_model.get(l.model_name, 0.0), 2),
+                "net_realized_pnl": round(float(l.realized_pnl or 0)
+                                          - charges_by_model.get(l.model_name, 0.0), 2),
             })
 
             total_allocated += invested
             total_nav += nav
             total_realized += l.realized_pnl or Decimal(0)
             total_trades += l.total_trades or 0
+            total_charges_all += charges_by_model.get(l.model_name, 0.0)
 
         total_pnl = total_nav - total_allocated
         total_return_pct = (
@@ -921,6 +939,9 @@ def get_portfolio_stats(price_lookup=None) -> Dict:
                 "return_pct": round(total_return_pct, 2),
                 "realized_pnl": float(total_realized),
                 "total_trades": total_trades,
+                # Global approx broker charges (all models) + net realized.
+                "total_charges": round(total_charges_all, 2),
+                "net_realized_pnl": round(float(total_realized) - total_charges_all, 2),
             },
             "as_of": datetime.now().isoformat(),  # IST (container TZ=Asia/Kolkata)
         }
@@ -962,6 +983,17 @@ def _ledger_dict(l: ModelLedger) -> Dict:
 
 
 def _trade_dict(t: ModelTrade) -> Dict:
+    # Stored approx charges (before_insert listener / backfill). Fall back to an
+    # on-the-fly estimate for any legacy row whose column is still null so the
+    # UI never shows a blank.
+    charges = float(t.charges_inr) if t.charges_inr is not None else None
+    if charges is None and (t.side or "").upper() in ("BUY", "SELL"):
+        try:
+            from tools.live.broker_charges import compute_charges
+            charges = compute_charges(t.side, int(t.qty or 0), float(t.price or 0),
+                                      product_for_model(t.model_name)).get("total", 0.0)
+        except Exception:
+            charges = 0.0
     return {
         "id": t.id,
         "model_name": t.model_name,
@@ -971,6 +1003,7 @@ def _trade_dict(t: ModelTrade) -> Dict:
         "price": float(t.price),
         "value": float(t.value),
         "pnl": float(t.pnl) if t.pnl is not None else None,
+        "charges": round(charges, 2) if charges is not None else 0.0,
         "reason": t.reason,
         "fyers_order_id": t.fyers_order_id,
         "trade_at": t.trade_at.isoformat() if t.trade_at else None,

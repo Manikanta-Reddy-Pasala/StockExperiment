@@ -1683,16 +1683,9 @@ def model_trade_history_full(model_name):
             side = (t.get("side") or "").upper()
             val = float(t.get("value") or 0)
             pnl = t.get("pnl")
-            # Per-leg approx charges (BUY/SELL only; deposits/withdrawals = 0).
-            charge = 0.0
-            if side in ("BUY", "SELL"):
-                try:
-                    charge = compute_charges(side, int(t.get("qty") or 0),
-                                             float(t.get("price") or 0),
-                                             _product).get("total", 0.0)
-                except Exception:
-                    charge = 0.0
-            t["charges"] = round(charge, 2)
+            # Per-leg approx charges — already stamped on the trade row by
+            # _trade_dict (stored column, or on-the-fly fallback).
+            charge = float(t.get("charges") or 0.0)
             total_charges += charge
             if side == "BUY":
                 total_buys += 1
