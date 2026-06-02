@@ -814,13 +814,18 @@ def get_portfolio_stats(price_lookup=None) -> Dict:
         for h in s.query(ModelHolding).all():
             holdings_by_model.setdefault(h.model_name, []).append(h)
 
-        # Approx broker charges per model = sum of stamped model_trades.charges_inr
-        # (one grouped query). Powers the per-model + global charge totals.
+        # Approx broker charges per model = sum of model_trades.charges_inr for
+        # trades that ACTUALLY hit the broker (a real fyers_order_id). This is
+        # the right discriminator, NOT the model's signals_only flag: an
+        # observe-mode model can still have placed real orders (those DO incur
+        # charges and must count), while a paper trade (no order_id) must not.
         charges_by_model: Dict[str, float] = {}
         try:
             from sqlalchemy import func as _func
             for mn, csum in (s.query(ModelTrade.model_name,
                                      _func.coalesce(_func.sum(ModelTrade.charges_inr), 0))
+                               .filter(ModelTrade.side.in_(("BUY", "SELL")))
+                               .filter(_func.coalesce(ModelTrade.fyers_order_id, "") != "")
                                .group_by(ModelTrade.model_name).all()):
                 charges_by_model[mn] = float(csum or 0)
         except Exception:
@@ -920,11 +925,10 @@ def get_portfolio_stats(price_lookup=None) -> Dict:
             total_nav += nav
             total_realized += l.realized_pnl or Decimal(0)
             total_trades += l.total_trades or 0
-            # GLOBAL real charges exclude signals_only (paper/observe) models —
-            # they never place a real Fyers order, so their charges are
-            # hypothetical and must not inflate the actual account charge total.
-            if not bool(cfg and getattr(cfg, "signals_only", False)):
-                total_charges_all += charges_by_model.get(l.model_name, 0.0)
+            # charges_by_model already counts only broker-executed trades (real
+            # fyers_order_id), so paper trades are excluded at the source and an
+            # observe model's REAL trades are correctly included here.
+            total_charges_all += charges_by_model.get(l.model_name, 0.0)
 
         total_pnl = total_nav - total_allocated
         total_return_pct = (
