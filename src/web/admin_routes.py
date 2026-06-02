@@ -1081,7 +1081,8 @@ def get_model_portfolio():
                            COALESCE(SUM(charges_inr),0) AS c
                     FROM model_trades
                     WHERE side IN ('BUY','SELL')
-                      AND COALESCE(fyers_order_id,'') <> ''
+                      AND (COALESCE(fyers_order_id,'') <> ''
+                           OR reason = 'LINK_FYERS_POSITION')
                     GROUP BY model_name, side
                 """)).fetchall()
             ch_map = {}
@@ -1688,7 +1689,8 @@ def model_balance_sheet(model_name):
                     SELECT side, COALESCE(SUM(charges_inr),0) AS c
                     FROM model_trades
                     WHERE model_name = :m AND side IN ('BUY','SELL')
-                      AND COALESCE(fyers_order_id,'') <> ''
+                      AND (COALESCE(fyers_order_id,'') <> ''
+                           OR reason = 'LINK_FYERS_POSITION')
                     GROUP BY side
                 """), {"m": model_name}).fetchall()
             for row in _r:
@@ -1809,7 +1811,7 @@ def model_trade_history_full(model_name):
             # only trades that really hit the broker (real fyers_order_id), so it
             # reconciles with the dashboard/portfolio cards + the global total.
             charge = float(t.get("charges") or 0.0)
-            if (t.get("fyers_order_id") or "").strip():
+            if (t.get("fyers_order_id") or "").strip() or t.get("reason") == "LINK_FYERS_POSITION":
                 total_charges += charge
             if side == "BUY":
                 total_buys += 1

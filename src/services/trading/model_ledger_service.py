@@ -829,11 +829,16 @@ def get_portfolio_stats(price_lookup=None, quote_lookup=None) -> Dict:
         # charges and must count), while a paper trade (no order_id) must not.
         charges_by_model: Dict[str, float] = {}
         try:
-            from sqlalchemy import func as _func
+            from sqlalchemy import func as _func, or_ as _or
             for mn, csum in (s.query(ModelTrade.model_name,
                                      _func.coalesce(_func.sum(ModelTrade.charges_inr), 0))
                                .filter(ModelTrade.side.in_(("BUY", "SELL")))
-                               .filter(_func.coalesce(ModelTrade.fyers_order_id, "") != "")
+                               # real broker charge = a placed order (has order_id)
+                               # OR a linked real broker holding (LINK_FYERS_POSITION,
+                               # which has no order_id but is a real position that
+                               # cost money). Only genuine paper/sim trades excluded.
+                               .filter(_or(_func.coalesce(ModelTrade.fyers_order_id, "") != "",
+                                           ModelTrade.reason == "LINK_FYERS_POSITION"))
                                .group_by(ModelTrade.model_name).all()):
                 charges_by_model[mn] = float(csum or 0)
         except Exception:
