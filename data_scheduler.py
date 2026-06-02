@@ -467,6 +467,32 @@ def refresh_universe_csvs():
                            capture_output=True, text=True, timeout=180, cwd="/app")
         if r.returncode == 0:
             logger.info(f"  ✅ download_niftyindices: {r.stdout.strip().splitlines()[-1] if r.stdout.strip() else 'ok'}")
+            # Roll the PIT membership table (n100/n500_membership.csv) forward to
+            # the freshly-downloaded current lists. eligible_at() reads that table
+            # for the LIVE universe guard + signal selection; without this it only
+            # tracks NSE rebalances (Mar/Sep) when someone rebuilds it by hand from
+            # factsheet PDFs. Roll-forward closes that lag automatically (close
+            # leavers, open joiners), is idempotent + self-guarded against a bad
+            # download. ONLY runs after a successful download (never reconciles
+            # against a stale/partial current list).
+            try:
+                rf = subprocess.run(["python3", "tools/analysis/rollforward_membership.py"],
+                                    capture_output=True, text=True, timeout=120, cwd="/app")
+                _tail = (rf.stdout.strip().splitlines()[-1] if rf.stdout.strip() else "ok")
+                if rf.returncode == 0:
+                    logger.info(f"  ✅ rollforward_membership: {_tail}")
+                    if "changes applied" in rf.stdout:
+                        _tg_alert("📌 *Index membership rolled forward*\n"
+                                  "n100/n500_membership.csv updated to the new NSE "
+                                  "lists (rebalance). eligible_at now tracks live.\n"
+                                  f"```{rf.stdout.strip()[-400:]}```")
+                else:
+                    logger.error(f"  ❌ rollforward_membership aborted (rc={rf.returncode}): {rf.stderr.strip()[-200:] or _tail}")
+                    _tg_alert("⚠️ *Membership roll-forward aborted*\n"
+                              "Current NSE list looked suspect or as_of invalid — "
+                              "membership table left UNCHANGED. Check data_scheduler logs.")
+            except Exception as e:
+                logger.error(f"  ❌ rollforward_membership exception: {e}")
         else:
             logger.error(f"  ❌ download_niftyindices failed (rc={r.returncode}): {r.stderr.strip()[-200:]}")
     except Exception as e:
