@@ -1069,15 +1069,19 @@ def get_model_portfolio():
         ensure_models_seeded()
         stats = get_portfolio_stats(price_lookup=_live_mtm_lookup_for_model(None))
 
-        # Layer on per-model broker txn charges (lifetime sum of audit_orders.charges_inr)
+        # Layer on per-model broker txn charges. Source = model_trades.charges_inr
+        # for trades that ACTUALLY hit the broker (real fyers_order_id) — the SAME
+        # source as get_portfolio_stats.total_charges + the History page, so every
+        # screen reconciles. (Was audit_orders, which is sparse and disagreed.)
         try:
             db = get_database_manager()
             with db.get_session() as s:
                 rows = s.execute(text("""
                     SELECT COALESCE(model_name,'(unattributed)') AS m, side,
                            COALESCE(SUM(charges_inr),0) AS c
-                    FROM audit_orders
-                    WHERE status IN ('placed','filled','partial')
+                    FROM model_trades
+                    WHERE side IN ('BUY','SELL')
+                      AND COALESCE(fyers_order_id,'') <> ''
                     GROUP BY model_name, side
                 """)).fetchall()
             ch_map = {}
@@ -1565,7 +1569,9 @@ def model_balance_sheet(model_name):
         # Lookup pretty label if available in MODEL_PATHS
         label = MODEL_PATHS.get(model_name, {}).get("label", model_name)
 
-        # Lifetime broker txn charges (audit_orders sum)
+        # Lifetime broker txn charges — model_trades.charges_inr for trades that
+        # really hit the broker (real fyers_order_id). SAME source as the
+        # portfolio cards + History, so every screen reconciles.
         buy_charges = sell_charges = 0.0
         try:
             from src.models.database import get_database_manager as _gdb
@@ -1573,8 +1579,9 @@ def model_balance_sheet(model_name):
             with _db.get_session() as _s:
                 _r = _s.execute(text("""
                     SELECT side, COALESCE(SUM(charges_inr),0) AS c
-                    FROM audit_orders
-                    WHERE model_name = :m AND status IN ('placed','filled','partial')
+                    FROM model_trades
+                    WHERE model_name = :m AND side IN ('BUY','SELL')
+                      AND COALESCE(fyers_order_id,'') <> ''
                     GROUP BY side
                 """), {"m": model_name}).fetchall()
             for row in _r:
@@ -1684,9 +1691,13 @@ def model_trade_history_full(model_name):
             val = float(t.get("value") or 0)
             pnl = t.get("pnl")
             # Per-leg approx charges — already stamped on the trade row by
-            # _trade_dict (stored column, or on-the-fly fallback).
+            # _trade_dict (stored column, or on-the-fly fallback). The per-row
+            # value is shown for every trade (info), but the model TOTAL counts
+            # only trades that really hit the broker (real fyers_order_id), so it
+            # reconciles with the dashboard/portfolio cards + the global total.
             charge = float(t.get("charges") or 0.0)
-            total_charges += charge
+            if (t.get("fyers_order_id") or "").strip():
+                total_charges += charge
             if side == "BUY":
                 total_buys += 1
                 total_buy_value += val
