@@ -75,6 +75,16 @@ def is_trading_day(d: datetime = None) -> bool:
 
 # ---- pure helpers (unit-tested without DB) ---------------------------------
 
+def _held_list(held_symbol) -> list:
+    """Normalize held_symbol (str | list | None) to a clean list of names.
+    Multi-holding models (K>1) pass a list; single-position models pass a str."""
+    if held_symbol is None:
+        return []
+    if isinstance(held_symbol, (list, tuple, set)):
+        return [str(h) for h in held_symbol if h]
+    return [str(held_symbol)] if held_symbol else []
+
+
 def _decision_signature(signals, held_symbol) -> str:
     """Stable signature of a model's verdict. Same verdict twice in a day =
     same signature = deduped; a change within the day re-notifies."""
@@ -84,7 +94,8 @@ def _decision_signature(signals, held_symbol) -> str:
             for s in signals
         )
         return "|".join(parts)
-    return f"HOLD:{held_symbol or 'FLAT'}"
+    held = ",".join(sorted(_held_list(held_symbol))) or "FLAT"
+    return f"HOLD:{held}"
 
 
 def _decision_message(model_name, signals, held_symbol, held_ret, note):
@@ -109,14 +120,18 @@ def _decision_message(model_name, signals, held_symbol, held_ret, note):
         body = "Planned for execution (09:30):\n" + "\n".join(lines)
     else:
         title = f"{model_name}: no change"
-        if held_symbol:
+        held_list = _held_list(held_symbol)
+        if len(held_list) == 1:
             ret_txt = ""
             try:
                 if held_ret is not None:
                     ret_txt = f" ({float(held_ret):+.2f}%)"
             except (TypeError, ValueError):
                 ret_txt = ""
-            body = f"No change — holding `{held_symbol}`{ret_txt}"
+            body = f"No change — holding `{held_list[0]}`{ret_txt}"
+        elif held_list:
+            names = ", ".join(f"`{h}`" for h in held_list)
+            body = f"No change — holding {len(held_list)} positions: {names}"
         else:
             body = "No change — flat, no entry today"
     if note:

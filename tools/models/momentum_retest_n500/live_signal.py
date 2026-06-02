@@ -207,7 +207,10 @@ def main():
                 + [{"signal": "RETEST_ENTRY", "symbol": b.get("symbol", ""), "side": "BUY"}
                    for b in buys]
             )
-            notify_model_decision(MODEL_NAME, _dec, trigger="CRON")
+            # Multi-holding (K=4): pass the full held set so a no-change ping
+            # lists ALL names ("holding A, B, C, D"), not "flat".
+            notify_model_decision(MODEL_NAME, _dec,
+                                  held_symbol=sorted(holds), trigger="CRON")
         except Exception as _ne:
             log.debug(f"notify decision failed: {_ne}")
     return 0
