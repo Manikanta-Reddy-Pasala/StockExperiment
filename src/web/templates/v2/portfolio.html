@@ -80,6 +80,14 @@
         <span class="text-muted small" title="Your true account value = Cash to Trade + Money in Stocks">Total Account</span>
         <div class="fs-6 fw-bold" id="fyers_total_account">--</div>
       </div>
+      <div class="col-md-auto">
+        <span class="text-muted small" title="Whole-account P&L from Fyers (Holdings tab): live unrealized on all stock lots. Broker truth.">Total P&amp;L (Fyers)</span>
+        <div class="fs-6 fw-bold" id="fyers_total_pnl">--</div>
+      </div>
+      <div class="col-md-auto">
+        <span class="text-muted small" title="Day's P&L from Fyers: Σ qty × (LTP − prev close) across all holdings.">Today's P&amp;L (Fyers)</span>
+        <div class="fs-6 fw-bold" id="fyers_today_pnl">--</div>
+      </div>
       <div class="col-12">
         <span class="text-muted" style="font-size:.72rem">
           Whole Fyers account (all models share it). “Cash to Trade” = free cash to buy; “Money in Stocks” = live market value of all your holdings; “Total Account” = the two added (your real account worth). Per-model split is in the table below.
@@ -311,6 +319,10 @@ async function loadFyersFunds() {
     document.getElementById('fyers_available_cash').textContent = fmtINR(cashToTrade);
     document.getElementById('fyers_used_margin').textContent = fmtINR(inStocks);
     document.getElementById('fyers_total_account').textContent = fmtINR(totalAcct);
+    const tp = document.getElementById('fyers_total_pnl');
+    if (tp) { const v = Number(s.account_total_pnl || 0); tp.textContent = fmtINR(v); tp.className = 'fs-6 fw-bold ' + cls(v); }
+    const dp = document.getElementById('fyers_today_pnl');
+    if (dp) { const v = Number(s.account_today_pnl || 0); dp.textContent = fmtINR(v); dp.className = 'fs-6 fw-bold ' + cls(v); }
     document.getElementById('fyers_funds_ts').textContent =
       window.fmtIST ? window.fmtIST(s.ledger_updated_at) : (s.ledger_updated_at || '');
   } catch(e) { console.error(e); }

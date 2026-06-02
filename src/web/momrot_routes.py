@@ -155,6 +155,7 @@ def _portfolio_state() -> Dict:
     # often stale (yesterday's close or pre-market snapshot). We override with
     # real-time quotes; DB latest close is the final fallback.
     fresh_ltp: Dict[str, float] = {}
+    fresh_pc: Dict[str, float] = {}   # prev_close → Today's P&L (day MTM)
     fyers_syms_for_quote = []
     for p in holdings:
         s = (p.get("symbol") or "").strip()
@@ -177,6 +178,9 @@ def _portfolio_state() -> Dict:
                 v = float((qd or {}).get("ltp") or 0)
                 if v > 0:
                     fresh_ltp[bare] = v
+                pcv = float((qd or {}).get("prev_close") or 0)
+                if pcv > 0:
+                    fresh_pc[bare] = pcv
         except Exception as e:
             logger.warning(f"quotes_multiple fail in _portfolio_state: {e}")
 
@@ -194,6 +198,7 @@ def _portfolio_state() -> Dict:
     position_cost = 0.0
     market_value = 0.0
     unrealized_total = 0.0
+    today_pnl_total = 0.0   # Σ qty × (LTP − prev_close) over all broker lots
 
     # 1. Settled holdings (T+2+)
     for p in holdings:
@@ -210,6 +215,9 @@ def _portfolio_state() -> Dict:
         position_cost += cost
         market_value += mv
         unrealized_total += pnl
+        _pc = fresh_pc.get(sym, 0.0)
+        if _pc > 0:
+            today_pnl_total += (ltp - _pc) * qty
         seen_syms.add(sym)
         open_positions.append({
             "symbol": sym,
@@ -243,6 +251,9 @@ def _portfolio_state() -> Dict:
         position_cost += cost
         market_value += mv
         unrealized_total += pnl
+        _pc = fresh_pc.get(sym, 0.0)
+        if _pc > 0:
+            today_pnl_total += (ltp - _pc) * net_qty
         seen_syms.add(sym)
         open_positions.append({
             "symbol": sym,
@@ -299,6 +310,13 @@ def _portfolio_state() -> Dict:
         # Plain-language funds for the portfolio card (gross, no symbol-dedup):
         "holdings_value": holdings_value,        # live ₹ in all stock lots
         "account_total": account_total,          # cash + holdings_value (true total)
+        # WHOLE-ACCOUNT P&L straight from Fyers (matches the broker app's
+        # Holdings tab): total = live unrealized on all lots; today = day MTM
+        # (Σ qty × (LTP − prev_close)). Broker truth — the per-model figures
+        # (a subset) won't sum to this when the account holds untracked lots.
+        "account_total_pnl": round(unrealized_total, 2),
+        "account_today_pnl": round(today_pnl_total, 2),
+        "account_invested": round(position_cost, 2),
         "realized_pnl": 0.0,
         "unrealized_pnl": unrealized_total,
         "total_pnl": total_pnl,
