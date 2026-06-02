@@ -99,7 +99,8 @@
     <div class="row g-3 mb-3">
       <div class="col-6 col-lg-2"><div class="text-muted small">Allocated</div><div class="fs-5 fw-bold" id="agg_alloc">--</div></div>
       <div class="col-6 col-lg-2"><div class="text-muted small">Total NAV</div><div class="fs-5 fw-bold" id="agg_nav">--</div></div>
-      <div class="col-6 col-lg-2"><div class="text-muted small">Total P&amp;L</div><div class="fs-5 fw-bold" id="agg_pnl">--</div></div>
+      <div class="col-6 col-lg-2"><div class="text-muted small" title="Realized (from trades) + Unrealized (open, live)">Total P&amp;L</div><div class="fs-5 fw-bold" id="agg_pnl">--</div></div>
+      <div class="col-6 col-lg-2"><div class="text-muted small" title="Day MTM change on open positions + realized from trades closed today">Today's P&amp;L</div><div class="fs-5 fw-bold" id="agg_today">--</div></div>
       <div class="col-6 col-lg-2"><div class="text-muted small">Realized P&amp;L</div><div class="fs-5 fw-bold" id="agg_realized">--</div></div>
       <div class="col-6 col-lg-2"><div class="text-muted small" title="Approximate lifetime broker charges (formula-based, real broker trades). Info only — already deducted from cash.">Approx Txn Charges</div><div class="fs-5 fw-bold neg" id="agg_charges">--</div></div>
     </div>
@@ -120,14 +121,15 @@
           <th class="text-end" title="Cash not tied up in any open position">Idle Cash</th>
           <th>Open Position</th>
           <th class="text-end" title="Live MTM = qty × LTP">Position Value</th>
-          <th class="text-end" title="Locked-in profit/loss from closed trades">Realized</th>
+          <th class="text-end" title="Locked-in profit/loss from closed trades (model_trades)">Realized</th>
+          <th class="text-end" title="Day MTM change + realized from trades closed today">Today's P&amp;L</th>
           <th class="text-end" title="Cash + live position value">Available (Net Worth)</th>
-          <th class="text-end" title="NAV vs Allocated">Total P&amp;L</th>
+          <th class="text-end" title="Realized (from trades) + Unrealized (open, live)">Total P&amp;L</th>
           <th class="text-end" title="Approximate lifetime broker charges (Buy + Sell), formula-based">Approx Txn Chg</th>
           <th class="text-end">Trades</th>
           <th class="text-center" style="min-width:140px;">Actions</th>
         </tr></thead>
-        <tbody id="agg_tbody"><tr><td colspan="12" class="text-center text-muted py-3">Loading…</td></tr></tbody>
+        <tbody id="agg_tbody"><tr><td colspan="13" class="text-center text-muted py-3">Loading…</td></tr></tbody>
       </table>
     </div>
     </div>
@@ -207,12 +209,15 @@ async function loadAggregate() {
     const t = d.total || {};
     document.getElementById('agg_alloc').textContent = fmtINR(t.allocated_capital);
     document.getElementById('agg_nav').textContent = fmtINR(t.nav);
+    const totalPnl = (t.total_pnl_trades ?? t.pnl_total);
     const pnlEl = document.getElementById('agg_pnl');
-    pnlEl.textContent = fmtINR(t.pnl_total) + ' (' + fmtPct(t.return_pct) + ')';
-    pnlEl.className = 'fs-5 fw-bold ' + cls(t.pnl_total);
+    pnlEl.textContent = fmtINR(totalPnl);
+    pnlEl.className = 'fs-5 fw-bold ' + cls(totalPnl);
+    const todayEl = document.getElementById('agg_today');
+    if (todayEl) { todayEl.textContent = fmtINR(t.today_pnl ?? 0); todayEl.className = 'fs-5 fw-bold ' + cls(t.today_pnl ?? 0); }
     const realEl = document.getElementById('agg_realized');
-    realEl.textContent = fmtINR(t.realized_pnl);
-    realEl.className = 'fs-5 fw-bold ' + cls(t.realized_pnl);
+    realEl.textContent = fmtINR(t.realized_pnl_trades ?? t.realized_pnl);
+    realEl.className = 'fs-5 fw-bold ' + cls(t.realized_pnl_trades ?? t.realized_pnl);
     const chEl = document.getElementById('agg_charges');
     if (chEl) chEl.textContent = fmtINR(t.total_txn_charges);
 
@@ -272,9 +277,10 @@ async function loadAggregate() {
         <td class="text-end" data-label="Idle Cash">${fmtINR(m.cash)}</td>
         <td class="cell-pos" data-label="Open">${posHtml}</td>
         <td class="text-end" data-label="Position Value">${fmtINR(m.position_value)}</td>
-        <td class="text-end ${cls(m.realized_pnl)}" data-label="Realized">${fmtINR(m.realized_pnl)}</td>
+        <td class="text-end ${cls(m.realized_pnl_trades ?? m.realized_pnl)}" data-label="Realized">${fmtINR(m.realized_pnl_trades ?? m.realized_pnl)}</td>
+        <td class="text-end ${cls(m.today_pnl)}" data-label="Today's P&L">${fmtINR(m.today_pnl ?? 0)}</td>
         <td class="text-end" data-label="Available (NAV)"><strong>${fmtINR(m.nav)}</strong></td>
-        <td class="text-end ${cls(m.pnl_total)}" data-label="Total P&L">${fmtINR(m.pnl_total)} (${fmtPct(m.return_pct)})</td>
+        <td class="text-end ${cls(m.total_pnl_trades ?? m.pnl_total)}" data-label="Total P&L">${fmtINR(m.total_pnl_trades ?? m.pnl_total)}</td>
         <td class="text-end neg" data-label="Approx Txn Chg" title="Buy ${fmtINR(m.buy_txn_charges)} + Sell ${fmtINR(m.sell_txn_charges)}"><strong>${fmtINR(m.total_txn_charges)}</strong></td>
         <td class="text-end" data-label="Trades">${m.total_trades} (${m.wins}W/${m.losses}L)</td>
         <td class="text-center actions-cell" data-label="Actions"><div class="d-flex flex-column flex-md-row gap-1 justify-content-center align-items-stretch">${rebalBtn}${exitBtn}</div></td>
@@ -282,7 +288,7 @@ async function loadAggregate() {
       tbody.appendChild(tr);
     });
     if (!tbody.children.length) {
-      tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted py-3">No enabled models. <a href="/settings">Enable one in Settings</a>.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="13" class="text-center text-muted py-3">No enabled models. <a href="/settings">Enable one in Settings</a>.</td></tr>';
     }
     const _cntEl = document.getElementById('agg_model_count');
     if (_cntEl) _cntEl.textContent = (d.models||[]).filter(m => m.enabled).length + ' models';

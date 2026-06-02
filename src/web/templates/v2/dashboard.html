@@ -103,8 +103,9 @@
     <div class="row text-end g-3 flex-grow-1 justify-content-end align-items-center">
       <div class="col-auto"><div class="text-muted small" title="Original capital invested across all models">Invested</div><div class="fs-5 fw-bold" id="tot_invested">--</div></div>
       <div class="col-auto"><div class="text-muted small" title="Cash + live position value. Identity: NAV = Invested + Total P&L.">Current NAV</div><div class="fs-5 fw-bold" id="tot_nav">--</div></div>
-      <div class="col-auto"><div class="text-muted small" title="+ Current open positions: Live MTM − Cost Basis">+ Current P&amp;L (open pos)</div><div class="fs-5 fw-bold" id="tot_current_pnl">--</div></div>
-      <div class="col-auto"><div class="text-muted small" title="= NAV − Invested. Charges already deducted from cash.">= Total P&amp;L</div><div class="fs-5 fw-bold" id="tot_pnl">--</div></div>
+      <div class="col-auto"><div class="text-muted small" title="Open positions marked at live Fyers LTP (Σ qty × (LTP − entry)).">+ Current P&amp;L (open pos)</div><div class="fs-5 fw-bold" id="tot_current_pnl">--</div></div>
+      <div class="col-auto"><div class="text-muted small" title="Day's P&L: Σ qty × (LTP − prev close) on open positions + P&L realized from trades closed today.">Today's P&amp;L</div><div class="fs-5 fw-bold" id="tot_today">--</div></div>
+      <div class="col-auto"><div class="text-muted small" title="Realized (from trades) + Unrealized (open, live).">= Total P&amp;L</div><div class="fs-5 fw-bold" id="tot_pnl">--</div></div>
       <div class="col-auto align-self-center">
         <a href="/settings" class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation()"><i class="bi bi-sliders"></i> Manage Allocations</a>
       </div>
@@ -123,9 +124,10 @@
       </div>
       <div class="col-12 col-md-6">
         <div class="text-muted small text-uppercase mb-2" style="letter-spacing:0.5px;">Total P&amp;L breakdown (approx)</div>
-        <div class="kv"><span class="k" title="Locked-in P&L from closed trades across all models">Realized (closed trades)</span><span class="v" id="td_realized">—</span></div>
-        <div class="kv"><span class="k">+ Unrealized (MTM − cost)</span><span class="v" id="td_unreal">—</span></div>
-        <div class="kv"><span class="k"><strong>≈ Total P&amp;L</strong></span><span class="v" id="td_pnl2">—</span></div>
+        <div class="kv"><span class="k" title="Locked-in P&L from closed trades (model_trades) across all models">Realized (from trades)</span><span class="v" id="td_realized">—</span></div>
+        <div class="kv"><span class="k" title="Open positions at live Fyers LTP">+ Unrealized (open, live)</span><span class="v" id="td_unreal">—</span></div>
+        <div class="kv"><span class="k"><strong>= Total P&amp;L</strong></span><span class="v" id="td_pnl2">—</span></div>
+        <div class="kv"><span class="k" title="Day MTM change on open positions + realized from trades closed today">Today's P&amp;L</span><span class="v" id="td_today">—</span></div>
         <div class="kv mt-2 pt-2" style="border-top:1px dashed #dee2e6;"><span class="k" title="Approximate lifetime broker charges across all models (formula-based, real broker trades). Info only — already deducted from cash at trade time.">Approx Txn Charges (info)</span><span class="v neg" id="td_charges">—</span></div>
         <div class="text-muted" style="font-size:0.75rem; margin-top:6px;">
           Approximate breakdown. Exact match with NAV − Invested may differ by small charge rounding — charges are formula-estimated, not broker-exact.
@@ -226,14 +228,18 @@ function renderModelCard(m, sig) {
 
   const detailHref = `/admin/models/${encodeURIComponent(m.model_name)}/detail`;
   const collapseId = `mc_${m.model_name.replace(/[^a-zA-Z0-9_]/g,'_')}`;
-  const headlinePnlCls = cls(m.pnl_total);
   const headlineInvested = Number(m.invested_amount ?? m.allocated_capital ?? 0);
   const headlineNav = Number(m.nav || 0);
   const headlinePosCost = _posCost;
   const headlinePosValue = Number(m.position_value || 0);
-  const headlineCurPnl = headlinePosValue ? (headlinePosValue - headlinePosCost) : 0;
+  // Open P&L (live), Total = realized(trades)+unrealized, Today = day MTM + today realized.
+  const headlineCurPnl = Number(m.unrealized_pnl ?? (headlinePosValue ? headlinePosValue - headlinePosCost : 0));
   const headlineCurPct = headlinePosCost > 0 ? (headlineCurPnl / headlinePosCost * 100) : 0;
   const headlineCurCls = cls(headlineCurPnl);
+  const headlineTotalPnl = Number(m.total_pnl_trades ?? m.pnl_total ?? 0);
+  const headlinePnlCls = cls(headlineTotalPnl);
+  const headlineToday = Number(m.today_pnl ?? 0);
+  const headlineTodayCls = cls(headlineToday);
   return `
     <div class="col-12 col-md-6 col-xl-4">
       <div class="${cardCls}">
@@ -251,8 +257,9 @@ function renderModelCard(m, sig) {
             <div class="model-headline">
               <span><span class="lbl">Allocated</span><span class="val">${fmtINR(headlineInvested)}</span></span>
               <span><span class="lbl">NAV</span><span class="val">${fmtINR(headlineNav)}</span></span>
-              <span title="Live MTM − Cost basis on open position (gross of sell charges)"><span class="lbl">Current P&amp;L</span><span class="val ${headlineCurCls}">${fmtINR(headlineCurPnl)}${headlinePosCost > 0 ? ` <small>(${fmtPct(headlineCurPct)})</small>` : ''}</span></span>
-              <span><span class="lbl">Total P&amp;L</span><span class="val ${headlinePnlCls}">${fmtINR(m.pnl_total)} <small>(${fmtPct(m.return_pct)})</small></span></span>
+              <span title="Open position at live Fyers LTP: qty × (LTP − entry)"><span class="lbl">Current P&amp;L</span><span class="val ${headlineCurCls}">${fmtINR(headlineCurPnl)}${headlinePosCost > 0 ? ` <small>(${fmtPct(headlineCurPct)})</small>` : ''}</span></span>
+              <span title="Day MTM change on open positions + P&L realized from trades closed today"><span class="lbl">Today's P&amp;L</span><span class="val ${headlineTodayCls}">${fmtINR(headlineToday)}</span></span>
+              <span title="Realized (from trades) + Unrealized (open, live)"><span class="lbl">Total P&amp;L</span><span class="val ${headlinePnlCls}">${fmtINR(headlineTotalPnl)}</span></span>
             </div>
           </div>
           <div class="collapse" id="${collapseId}">
@@ -267,8 +274,10 @@ function renderModelCard(m, sig) {
             // is in the Portfolio "Open Positions — by Model" table).
             const ltp = (!_hold && Number(m.open_qty || 0) > 0 && posValue > 0)
               ? posValue / Number(m.open_qty) : 0;
-            const unreal = posValue ? posValue - posCost : 0;
-            const realized = Number(m.realized_pnl || 0);
+            const unreal = Number(m.unrealized_pnl ?? (posValue ? posValue - posCost : 0));
+            const realized = Number(m.realized_pnl_trades ?? m.realized_pnl ?? 0);
+            const todayP = Number(m.today_pnl ?? 0);
+            const totalP = Number(m.total_pnl_trades ?? m.pnl_total ?? 0);
             const nav = Number(m.nav || (idleCash + posValue));
             const curPctGross = posCost > 0 ? (unreal / posCost * 100) : 0;
             return `
@@ -293,9 +302,10 @@ function renderModelCard(m, sig) {
                 </div>
                 <div class="col-12 col-md-6">
                   <div class="text-muted text-uppercase" style="font-size:0.7rem; letter-spacing:0.5px; margin:8px 0 4px;">Total P&amp;L breakdown (approx)</div>
-                  <div class="kv"><span class="k" title="Lifetime closed-trade P&L">Realized</span><span class="v ${cls(realized)}">${fmtINR(realized)}</span></div>
-                  <div class="kv"><span class="k" title="Open position: Live MTM − Cost basis">+ Unrealized (MTM − cost)</span><span class="v ${cls(unreal)}">${fmtINR(unreal)}</span></div>
-                  <div class="kv"><span class="k"><strong>≈ Total P&amp;L</strong></span><span class="v ${pnlCls}"><strong>${fmtINR(m.pnl_total)}</strong></span></div>
+                  <div class="kv"><span class="k" title="Closed-trade P&L from model_trades">Realized (from trades)</span><span class="v ${cls(realized)}">${fmtINR(realized)}</span></div>
+                  <div class="kv"><span class="k" title="Open position at live Fyers LTP">+ Unrealized (open, live)</span><span class="v ${cls(unreal)}">${fmtINR(unreal)}</span></div>
+                  <div class="kv"><span class="k"><strong>= Total P&amp;L</strong></span><span class="v ${pnlCls}"><strong>${fmtINR(totalP)}</strong></span></div>
+                  <div class="kv"><span class="k" title="Day MTM change + realized from trades closed today">Today's P&amp;L</span><span class="v ${cls(todayP)}">${fmtINR(todayP)}</span></div>
                   <div class="text-muted" style="font-size:0.72rem; margin-top:4px; line-height:1.4;">
                     Approx Txn Charges (info only): ₹${Number(m.total_txn_charges||0).toFixed(2)}
                     = Buy ₹${Number(m.buy_txn_charges||0).toFixed(2)} + Sell ₹${Number(m.sell_txn_charges||0).toFixed(2)}.
@@ -339,28 +349,28 @@ function renderTotals(t, models) {
       totCostOpen += posCost;
     }
   });
-  const curPct = totCostOpen > 0 ? (totUnreal / totCostOpen * 100) : 0;
+  // Open P&L (unrealized) = server value, marked at live Fyers LTP.
+  const unrealVal = Number(t.unrealized_pnl ?? (totUnreal));
+  const curPct = totCostOpen > 0 ? (unrealVal / totCostOpen * 100) : 0;
   const curEl = document.getElementById('tot_current_pnl');
   if (curEl) {
-    if (totCostOpen > 0) {
-      curEl.textContent = fmtINR(totUnreal) + ' (' + fmtPct(curPct) + ')';
-      curEl.className = 'fs-5 fw-bold ' + cls(totUnreal);
-    } else {
-      curEl.textContent = '—';
-      curEl.className = 'fs-5 fw-bold text-muted';
-    }
+    curEl.textContent = totCostOpen > 0 ? (fmtINR(unrealVal) + ' (' + fmtPct(curPct) + ')') : fmtINR(unrealVal);
+    curEl.className = 'fs-5 fw-bold ' + cls(unrealVal);
   }
 
+  // Total P&L = realized(from trades) + unrealized(open, live).
+  const totalPnl = Number(t.total_pnl_trades ?? t.pnl_total ?? 0);
+  const todayPnl = Number(t.today_pnl ?? 0);
+  const realVal = Number(t.realized_pnl_trades ?? t.realized_pnl ?? 0);
   const pnlEl = document.getElementById('tot_pnl');
-  pnlEl.textContent = fmtINR(t.pnl_total) + ' (' + fmtPct(t.return_pct) + ')';
-  pnlEl.className = 'fs-5 fw-bold ' + cls(t.pnl_total);
+  pnlEl.textContent = fmtINR(totalPnl);
+  pnlEl.className = 'fs-5 fw-bold ' + cls(totalPnl);
+  const todayEl = document.getElementById('tot_today');
+  if (todayEl) { todayEl.textContent = fmtINR(todayPnl); todayEl.className = 'fs-5 fw-bold ' + cls(todayPnl); }
 
   const navVal = Number(t.current_amount ?? t.nav ?? 0);
   const allocVal = Number(t.invested_amount ?? t.allocated_capital ?? 0);
-  const pnlVal = Number(t.pnl_total ?? 0);
-  const realVal = Number(t.realized_pnl ?? 0);
   const chgVal = Number(t.total_txn_charges ?? 0);
-  const unrealVal = pnlVal - realVal;
   const setText = (id, val, signed) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -369,10 +379,11 @@ function renderTotals(t, models) {
   };
   setText('td_nav', navVal, false);
   setText('td_alloc', allocVal, false);
-  setText('td_pnl', pnlVal, true);
-  setText('td_pnl2', pnlVal, true);
+  setText('td_pnl', totalPnl, true);
+  setText('td_pnl2', totalPnl, true);
   setText('td_realized', realVal, true);
   setText('td_unreal', unrealVal, true);
+  setText('td_today', todayPnl, true);
   setText('td_charges', chgVal, false);
 }
 
