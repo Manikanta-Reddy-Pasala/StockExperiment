@@ -109,7 +109,7 @@
                 </div>
                 <div class="offcanvas-body p-0">
                     <ul class="nav flex-column p-3" id="mobile-nav">
-                        <li class="nav-item"><a class="nav-link" href="/"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
                         <li class="nav-item"><a class="nav-link" href="/picks"><i class="bi bi-lightbulb"></i> Today's Picks</a></li>
                         <li class="nav-item"><a class="nav-link" href="/portfolio"><i class="bi bi-journal-text"></i> Portfolio</a></li>
                         <li class="nav-item"><a class="nav-link" href="/history"><i class="bi bi-clock-history"></i> History</a></li>
@@ -134,7 +134,7 @@
 
                     <ul class="nav flex-column" id="sidebar-nav">
                         <li class="nav-item">
-                            <a class="nav-link" href="/"><i class="bi bi-speedometer2"></i> Dashboard</a>
+                            <a class="nav-link" href="/dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="/picks"><i class="bi bi-lightbulb"></i> Today's Picks</a>
@@ -535,7 +535,9 @@
         // /admin (Admin Triggers) only matches /admin and /admin/momrot* —
         // NOT /admin/models/*/detail (Balance Sheet pages get no sidebar match).
         document.addEventListener('DOMContentLoaded', function() {
-            const path = window.location.pathname;
+            // Home ('/') serves Today's Picks → treat it as /picks for active state.
+            let path = window.location.pathname;
+            if (path === '/') path = '/picks';
             const groups = ['#sidebar-nav', '#mobile-nav'];
             groups.forEach(sel => {
                 const links = document.querySelectorAll(sel + ' .nav-link');
