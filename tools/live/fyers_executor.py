@@ -44,6 +44,7 @@ sys.path.insert(0, str(ROOT))
 
 from tools.live.risk_manager import RiskManager, Position  # noqa: E402
 from tools.shared import nse_calendar  # noqa: E402
+from tools.shared.model_universe import is_in_universe  # noqa: E402  central universe gate
 
 log = logging.getLogger("fyers_executor")
 
@@ -1281,6 +1282,23 @@ def main() -> int:
 
     for sig in entry_signals:
         sym = sig["symbol"]
+        # UNIVERSE GUARD (central, every model): refuse an ENTRY for a name that
+        # is NOT a point-in-time member of the model's index today. Independent
+        # second line of defence behind the signal layer's eligible_at filter
+        # (cf. the 2026-06-02 ORB/SPARC survivorship bug). Fail-OPEN — only a
+        # positive False (proven off-universe) blocks; file-based / unknown
+        # models and unreadable membership data return None and pass through.
+        if is_in_universe(args.model_name, sym, date.today()) is False:
+            log.error(f"SKIP ENTRY {sym}: NOT a point-in-time member of "
+                      f"{args.model_name}'s index — refusing (universe guard). "
+                      f"Likely signal regression.")
+            _tg_safe(
+                f"⚠️ *ENTRY blocked — universe guard*\n"
+                f"Model: `{args.model_name or '(env)'}`\n"
+                f"Symbol: `{sym}` is not a current index member; refusing to "
+                f"place a real order. The signal layer may have regressed.",
+                is_fail=True)
+            continue
         signal_price = float(sig.get("price") or 0)
         live_px = None if args.dry_run else _fetch_live_ltp(svc, args.user_id, sym)
         price = live_px if live_px else signal_price

@@ -13,10 +13,13 @@ Usage:
   python tools/live/fyers_executor_multi.py --signals <signals.json> [--dry-run] [--user-id 1]
 """
 import sys, json, argparse, logging
+from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+
+from tools.shared.model_universe import is_in_universe
 
 from tools.live.fyers_executor import (
     place_limit_with_fallback, _fetch_live_ltp, to_fyers_symbol,
@@ -277,6 +280,21 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
             # re-run signal file must not double-buy). Skip silently — not drift.
             if sym in held:
                 log.info(f"  BUY {sym}: already held, skip"); continue
+            # (c) UNIVERSE GUARD (central, every model): refuse a BUY for a name
+            # that is NOT a point-in-time member of the model's index today. The
+            # signal layer already filters via eligible_at; this is the second,
+            # independent line of defence against a future regression (cf. the
+            # 2026-06-02 ORB/SPARC survivorship bug). Fail-OPEN: is_in_universe
+            # returns None for file-based / unknown models or unreadable
+            # membership data, and only False blocks.
+            if is_in_universe(model, sym, date.today()) is False:
+                log.error(f"  BUY {sym}: NOT a point-in-time member of {model}'s "
+                          f"index — REFUSING (universe guard). Likely signal regression.")
+                _audit(model, sym, "BUY", b.get("qty") or 0, 0, "skipped",
+                       error="universe-guard: symbol not a point-in-time index member")
+                _tg_skip(model, sym, "blocked by universe guard — not a current index "
+                                     "member. Signal layer may have regressed.")
+                continue
             # (a) Entries price off LIVE LTP ONLY (3 retries) — never a stale
             # signal price. A persistent miss must NOT silently drop the order
             # (ADANIENT 2026-06-01): skip + AUDIT + Telegram alert + retry next

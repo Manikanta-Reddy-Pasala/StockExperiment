@@ -55,6 +55,7 @@ sys.path.insert(0, str(ROOT))
 
 from tools.shared.ohlcv_cache import _get_engine  # noqa: E402
 from tools.shared.universes import nifty100_symbols, nifty500_symbols  # noqa: E402
+from tools.shared.index_membership import eligible_at  # noqa: E402  PIT n100 gate
 from tools.shared.rotation_strategy import decide_rotation  # noqa: E402
 from tools.models.n40.strategy import (  # noqa: E402  shared w/ backtest
     UNIV_SIZE, ADV_WIN, SMA_LONG, RETAIN, LOOKBACK as LOOKBACK_RET)
@@ -353,14 +354,24 @@ def main() -> int:
         Path(args.signals_out).write_text(json.dumps([]))
         return 0
 
-    # Build Nifty 100 set (plain symbol form)
-    n100 = {s for s, _ in nifty100_symbols()}
+    # Build Nifty 100 set (plain symbol form). POINT-IN-TIME via eligible_at —
+    # NOT the current ind_nifty100list.csv. The backtest filters its large-cap
+    # universe through eligible_at("n100", d) (strategy.py:_n100_at); the live
+    # path used the current CSV, which can drift from the authoritative
+    # membership table and (like the 2026-06-02 ORB survivorship bug) let a name
+    # that is NOT a current Nifty-100 member into the selection. Use the
+    # membership table so live and backtest agree on the universe gate. Fall
+    # back to the CSV only if the membership table yields nothing (missing file).
+    n100 = set(eligible_at("n100", today.date()))
     if not n100:
-        log.error("Nifty 100 CSV missing — run tools/analysis/download_niftyindices.py")
+        log.warning("eligible_at('n100') empty — falling back to current nifty100.csv")
+        n100 = {s for s, _ in nifty100_symbols()}
+    if not n100:
+        log.error("Nifty 100 universe missing — run tools/analysis/download_niftyindices.py")
         Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
         Path(args.signals_out).write_text(json.dumps([]))
         return 1
-    log.info(f"Nifty 100 set: {len(n100)} symbols")
+    log.info(f"Nifty 100 set (PIT eligible_at): {len(n100)} symbols")
 
     # Load OHLCV for full N500 (PIT ranking pool)
     n500_fyers = [f"NSE:{s}-EQ" for s, _ in nifty500_symbols()]

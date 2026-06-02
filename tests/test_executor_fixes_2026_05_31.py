@@ -242,6 +242,10 @@ def test_multi_run_orders_passes_rm_cfg(monkeypatch):
         return {"filled": True, "fill_price": 100.0, "fill_qty": qty, "order_id": "OID"}
 
     monkeypatch.setattr(m, "place_limit_with_fallback", fake_place)
+    # Neutralise the central universe guard: this test uses a placeholder symbol
+    # ("X") that is not a real index member, which the guard would (correctly)
+    # block. None = "no opinion, allow" so the order path under test runs.
+    monkeypatch.setattr(m, "is_in_universe", lambda *a, **k: None)
     monkeypatch.setattr(m, "_fetch_live_ltp", lambda *a, **k: 100.0)
     monkeypatch.setattr(m, "record_buy_multi", lambda *a, **k: {})
     monkeypatch.setattr(m, "record_sell_multi", lambda *a, **k: {})

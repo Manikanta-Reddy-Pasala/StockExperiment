@@ -24,6 +24,7 @@ import pandas as pd
 from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
 from tools.shared.universes import nifty500_symbols
+from tools.shared.index_membership import eligible_at
 from tools.models.momentum_retest_n500 import strategy as S
 
 log = logging.getLogger("momentum_retest_n500")
@@ -118,6 +119,15 @@ def main():
 
     sells, buys = [], []
     rk = S.rank_targets(cl, adv20, sma200, S.load_smallcap(), di)
+    # POINT-IN-TIME N500 filter (parity with backtest.py:77 — the live path was
+    # MISSING this, the same survivorship bug that bought SPARC in ORB on
+    # 2026-06-02). rank_targets ranks over the CURRENT nifty500_symbols() CSV;
+    # restrict to names actually in the Nifty 500 ON the panel's last bar so a
+    # stale-CSV / non-current member can never become a live target. Mirror the
+    # backtest exactly: it filters rk through eligible_at("n500", d) per rebalance.
+    last_day = pd.Timestamp(dates[di]).date()
+    elig500 = eligible_at("n500", last_day)
+    rk = [s for s in rk if s.replace("NSE:", "").replace("-EQ", "") in elig500]
     log.info(f"PIT ranked {len(rk)} leaders; top-{S.K}: {[s.split(':')[1] for s in rk[:S.K]]}")
 
     # Monthly check: refresh watch list + flag exits (held out of top-RETAIN)
