@@ -1006,6 +1006,31 @@ def get_portfolio_stats(price_lookup=None, quote_lookup=None) -> Dict:
             float(total_pnl / total_allocated * 100) if total_allocated > 0 else 0
         )
 
+        # AUTHORITATIVE txn charges (the formula on model_trades is incomplete —
+        # missing trades + DP/Call&Trade fees — so it under-counts). Use the
+        # ACTUAL Fyers charges from the imported statement (broker_charges_daily)
+        # thru its last day + the formula estimate for trades after it. Same
+        # source as the Portfolio "Txn Charges (Fyers)".
+        actual_charges = 0.0
+        actual_through = None
+        est_after = 0.0
+        try:
+            from sqlalchemy import text as _tc
+            _r = s.execute(_tc("SELECT COALESCE(SUM(total),0), MAX(trade_date) "
+                               "FROM broker_charges_daily")).fetchone()
+            actual_charges = float((_r and _r[0]) or 0)
+            actual_through = _r[1] if _r else None
+            if actual_through is not None:
+                est_after = float(s.execute(_tc(
+                    "SELECT COALESCE(SUM(charges_inr),0) FROM model_trades "
+                    "WHERE side IN ('BUY','SELL') AND COALESCE(fyers_order_id,'') <> '' "
+                    "AND trade_at::date > :d"), {"d": actual_through}).scalar() or 0)
+        except Exception:
+            actual_charges = 0.0
+            actual_through = None
+            est_after = 0.0
+        authoritative_charges = round(actual_charges + est_after, 2) if actual_through else round(total_charges_all, 2)
+
         return {
             "models": models,
             "total": {
@@ -1024,9 +1049,15 @@ def get_portfolio_stats(price_lookup=None, quote_lookup=None) -> Dict:
                 "realized_pnl_trades": round(total_realized_trades, 2),
                 "total_pnl_trades": round(total_realized_trades + total_unrealized, 2),
                 "today_pnl": round(total_today_pnl, 2),
-                # Global approx broker charges (all models) + net realized.
+                # Formula estimate (model_trades) — kept for reference.
                 "total_charges": round(total_charges_all, 2),
                 "net_realized_pnl": round(float(total_realized) - total_charges_all, 2),
+                # Authoritative txn charges = Fyers actual (statement) + est today.
+                # This is what the dashboard "Txn Charges" shows.
+                "txn_charges": authoritative_charges,
+                "txn_charges_actual": round(actual_charges, 2),
+                "txn_charges_through": (actual_through.isoformat() if actual_through else None),
+                "txn_charges_est_today": round(est_after, 2),
             },
             "as_of": datetime.now().isoformat(),  # IST (container TZ=Asia/Kolkata)
         }
