@@ -362,14 +362,18 @@ function renderTotals(t, models) {
   const totalPnl = Number(t.total_pnl_trades ?? t.pnl_total ?? 0);
   const todayPnl = Number(t.today_pnl ?? 0);
   const realVal = Number(t.realized_pnl_trades ?? t.realized_pnl ?? 0);
-  const pnlEl = document.getElementById('tot_pnl');
-  pnlEl.textContent = fmtINR(totalPnl);
-  pnlEl.className = 'fs-5 fw-bold ' + cls(totalPnl);
-  const todayEl = document.getElementById('tot_today');
-  if (todayEl) { todayEl.textContent = fmtINR(todayPnl); todayEl.className = 'fs-5 fw-bold ' + cls(todayPnl); }
-
   const navVal = Number(t.current_amount ?? t.nav ?? 0);
   const allocVal = Number(t.invested_amount ?? t.allocated_capital ?? 0);
+  // Total P&L % = return on invested capital. Today's P&L % = day move vs
+  // yesterday's portfolio value (NAV − today's P&L), matching the broker.
+  const totalPct = allocVal > 0 ? (totalPnl / allocVal * 100) : 0;
+  const todayPct = (navVal - todayPnl) > 0 ? (todayPnl / (navVal - todayPnl) * 100) : 0;
+  const pnlEl = document.getElementById('tot_pnl');
+  pnlEl.textContent = fmtINR(totalPnl) + ' (' + fmtPct(totalPct) + ')';
+  pnlEl.className = 'fs-5 fw-bold ' + cls(totalPnl);
+  const todayEl = document.getElementById('tot_today');
+  if (todayEl) { todayEl.textContent = fmtINR(todayPnl) + ' (' + fmtPct(todayPct) + ')'; todayEl.className = 'fs-5 fw-bold ' + cls(todayPnl); }
+
   const chgVal = Number(t.total_charges ?? t.total_txn_charges ?? 0);
   const setText = (id, val, signed) => {
     const el = document.getElementById(id);
