@@ -34,6 +34,8 @@
     <div class="card h-100"><div class="card-body py-3 text-center">
       <div class="text-muted small mb-1">Realized P&amp;L</div>
       <div id="realized" class="fs-4 fw-bold">--</div>
+      <div class="small text-muted">Charges <span id="charges">--</span></div>
+      <div class="small">Net <span id="net_pnl" class="fw-semibold">--</span></div>
     </div></div>
   </div>
   <div class="col-6 col-lg-3">
@@ -51,10 +53,11 @@
       <thead><tr>
         <th>Timestamp</th><th>Side</th><th>Symbol</th>
         <th class="text-end">Qty</th><th class="text-end">Price ₹</th>
-        <th class="text-end">Value ₹</th><th class="text-end">P&amp;L ₹</th>
+        <th class="text-end">Value ₹</th><th class="text-end">Charges ₹</th>
+        <th class="text-end">P&amp;L ₹</th>
         <th>Reason</th>
       </tr></thead>
-      <tbody id="hist"><tr><td colspan="8" class="text-center text-muted py-3">Loading…</td></tr></tbody>
+      <tbody id="hist"><tr><td colspan="9" class="text-center text-muted py-3">Loading…</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -118,10 +121,17 @@ async function load() {
     document.getElementById('realized').className = 'fs-4 fw-bold ' + cls(total);
     const best = closed.reduce((b,t)=>Math.max(b, t.pnl||0), 0);
     document.getElementById('best').textContent = fmtINR(best);
+    // Charges + net-of-charges P&L from the server summary (approx, Fyers rates).
+    const sum = d.summary || {};
+    document.getElementById('charges').textContent = fmtINR(sum.total_charges || 0);
+    const net = (sum.net_pnl !== undefined) ? sum.net_pnl : (total - (sum.total_charges||0));
+    const netEl = document.getElementById('net_pnl');
+    netEl.textContent = fmtINR(net);
+    netEl.className = 'fw-semibold ' + cls(net);
 
     const body = document.getElementById('hist');
     if (trades.length === 0) {
-      body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No trades yet for this model</td></tr>';
+      body.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">No trades yet for this model</td></tr>';
     } else {
       body.innerHTML = trades.map(t => `
         <tr>
@@ -131,7 +141,8 @@ async function load() {
           <td class="text-end">${(t.qty||0).toLocaleString('en-IN')}</td>
           <td class="text-end">${fmtINR(t.price)}</td>
           <td class="text-end">${fmtINR(t.value)}</td>
-          <td class="text-end ${cls(t.pnl)}">${t.pnl !== null && t.pnl !== undefined ? fmtINR(t.pnl) : '—'}</td>
+          <td class="text-end text-muted">${t.charges ? fmtINR(t.charges) : '—'}</td>
+          <td class="text-end ${cls(t.pnl)}">${t.pnl !== null && t.pnl !== undefined ? fmtINR(t.pnl) : '—'}${(t.net_pnl !== undefined) ? `<div class="small ${cls(t.net_pnl)}">net ${fmtINR(t.net_pnl)}</div>` : ''}</td>
           <td><span class="badge bg-secondary">${t.reason||''}</span></td>
         </tr>
       `).join('');

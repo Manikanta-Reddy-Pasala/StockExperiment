@@ -1661,6 +1661,13 @@ def model_trade_history_full(model_name):
         # Trades come newest-first from service; UI wants chronological too,
         # but newest-first is fine for transaction-list display.
 
+        # Approx broker charges per leg — using THIS model's product (ORB intraday,
+        # the rest delivery). Stamped on every trade row + rolled into a
+        # net-of-charges P&L so the UI can show real take-home, not just gross.
+        from tools.live.broker_charges import compute_charges
+        from src.services.trading.model_ledger_service import product_for_model
+        _product = product_for_model(model_name)
+
         # Summary roll-up
         total_buys = 0
         total_sells = 0
@@ -1669,12 +1676,24 @@ def model_trade_history_full(model_name):
         total_buy_value = 0.0
         total_sell_value = 0.0
         total_pnl = 0.0
+        total_charges = 0.0
         wins = 0
         losses = 0
         for t in trades:
             side = (t.get("side") or "").upper()
             val = float(t.get("value") or 0)
             pnl = t.get("pnl")
+            # Per-leg approx charges (BUY/SELL only; deposits/withdrawals = 0).
+            charge = 0.0
+            if side in ("BUY", "SELL"):
+                try:
+                    charge = compute_charges(side, int(t.get("qty") or 0),
+                                             float(t.get("price") or 0),
+                                             _product).get("total", 0.0)
+                except Exception:
+                    charge = 0.0
+            t["charges"] = round(charge, 2)
+            total_charges += charge
             if side == "BUY":
                 total_buys += 1
                 total_buy_value += val
@@ -1688,6 +1707,15 @@ def model_trade_history_full(model_name):
                         wins += 1
                     elif pnl_f < 0:
                         losses += 1
+                    # Net P&L for this exit ≈ gross pnl − (this sell's charges +
+                    # the buy leg's charges, approximated at the same value/product).
+                    try:
+                        buy_chg = compute_charges("BUY", int(t.get("qty") or 0),
+                                                  float(t.get("price") or 0),
+                                                  _product).get("total", 0.0)
+                    except Exception:
+                        buy_chg = 0.0
+                    t["net_pnl"] = round(pnl_f - charge - buy_chg, 2)
             elif side == "DEPOSIT":
                 total_deposits += 1
             elif side == "WITHDRAW":
@@ -1699,6 +1727,7 @@ def model_trade_history_full(model_name):
         return jsonify({
             "success": True,
             "model_name": model_name,
+            "product": _product,
             "trades": trades,
             "summary": {
                 "total_buys": total_buys,
@@ -1708,6 +1737,8 @@ def model_trade_history_full(model_name):
                 "total_buy_value": round(total_buy_value, 2),
                 "total_sell_value": round(total_sell_value, 2),
                 "total_pnl": round(total_pnl, 2),
+                "total_charges": round(total_charges, 2),
+                "net_pnl": round(total_pnl - total_charges, 2),
                 "wins": wins,
                 "losses": losses,
                 "win_rate_pct": win_rate_pct,
