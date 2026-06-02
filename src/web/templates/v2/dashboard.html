@@ -364,10 +364,9 @@ function renderTotals(t, models) {
   const realVal = Number(t.realized_pnl_trades ?? t.realized_pnl ?? 0);
   const navVal = Number(t.current_amount ?? t.nav ?? 0);
   const allocVal = Number(t.invested_amount ?? t.allocated_capital ?? 0);
-  // Total P&L % = return on invested capital. Today's P&L % = day move vs
-  // yesterday's portfolio value (NAV − today's P&L), matching the broker.
+  // Both % on the invested (allocated) capital.
   const totalPct = allocVal > 0 ? (totalPnl / allocVal * 100) : 0;
-  const todayPct = (navVal - todayPnl) > 0 ? (todayPnl / (navVal - todayPnl) * 100) : 0;
+  const todayPct = allocVal > 0 ? (todayPnl / allocVal * 100) : 0;
   const pnlEl = document.getElementById('tot_pnl');
   pnlEl.textContent = fmtINR(totalPnl) + ' (' + fmtPct(totalPct) + ')';
   pnlEl.className = 'fs-5 fw-bold ' + cls(totalPnl);
