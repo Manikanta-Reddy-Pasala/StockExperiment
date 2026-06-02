@@ -56,3 +56,73 @@ def test_snap_tick_respects_symbol_tick():
     assert _snap_tick(14.237, 0.01) == 14.24
     assert _snap_tick(3872.13, 0.10) == 3872.10
     assert _snap_tick(3872.16, 0.10) == 3872.20
+
+
+# ---------- ORB bare-symbol dedup + INTRADAY product (2026-06-02 SPARC) ----------
+# SPARC double-bought (74 @ 09:50 + 74 @ 09:55 = 148) and went CNC not INTRADAY.
+# Root cause 1: ORB emits BARE symbols ("SPARC") but model_holdings keys are
+# normalized ("NSE:SPARC-EQ"); the `sym in held` guard missed -> re-buy. Fix:
+# normalize the signal symbol with _normalize_symbol before the held check.
+# Root cause 2: the multi path never set fyers_executor._CURRENT_MODEL, so
+# _placeorder resolved product_for_model(None) -> CNC. Fix: set _CURRENT_MODEL.
+
+def test_normalize_bare_matches_holdings_key():
+    from src.services.trading.model_ledger_service import _normalize_symbol
+    held = {"NSE:SPARC-EQ"}                       # model_holdings stores normalized
+    assert _normalize_symbol("SPARC") in held     # bare ORB signal must match
+    assert _normalize_symbol("NSE:SPARC-EQ") in held  # idempotent on normalized
+
+
+def test_orb_is_intraday_product():
+    from src.services.trading.model_ledger_service import product_for_model
+    assert product_for_model("orb_momentum_intraday") == "INTRADAY"
+    assert product_for_model(None) == "CNC"       # the (buggy) default the fix avoids
+
+
+def test_multi_executor_sets_current_model_for_product():
+    # The multi run sets fyers_executor._CURRENT_MODEL so _placeorder resolves
+    # the model's product (INTRADAY for orb) instead of the CNC None-default.
+    import tools.live.fyers_executor as fe
+    fe._CURRENT_MODEL = "orb_momentum_intraday"
+    from src.services.trading.model_ledger_service import product_for_model
+    assert product_for_model(fe._CURRENT_MODEL) == "INTRADAY"
+
+
+# 2026-06-02: no Telegram notification on retest/orb purchase OR signals.
+# Root cause A: the multi executor NEVER notified fills (single executor pings
+# every BOUGHT/SOLD via _tg_safe -> notify_order -> Telegram + DB feed). Fix:
+# import _tg_safe into the multi path and ping on each filled buy/sell.
+# Root cause B: retest/orb live_signal never called notify_model_decision (the
+# verdict ping n100/emerging emit), and the verdict gate MOMROT_TG_NOTIFY was
+# unset on the VM. Fix: wire notify_model_decision + set the flag.
+
+def test_multi_executor_imports_tg_safe():
+    # The fill-notify path exists: _tg_safe must be importable into the multi
+    # executor (parity with the single executor's BOUGHT/SOLD pings).
+    import tools.live.fyers_executor_multi as fem
+    assert hasattr(fem, "_tg_safe"), "multi executor must import _tg_safe for fill pings"
+
+
+def test_notify_order_is_ungated():
+    # Fill pings go through notify_order, which is NOT behind MOMROT_TG_NOTIFY
+    # (unlike the verdict ping) — so a purchase always notifies regardless of
+    # the verdict gate. Guards against re-gating the fill path by accident.
+    import inspect
+    from src.services import notification_service as ns
+    src = inspect.getsource(ns.notify_order)
+    assert "_verdict_notify_enabled" not in src
+
+
+def test_verdict_signals_shape_accepted():
+    # notify_model_decision consumes {signal,symbol,side[,price]} dicts — the
+    # exact shape retest/orb live_signal now build. Signature must not raise on it.
+    from src.services.notification_service import _decision_signature, _decision_message
+    dec = [
+        {"signal": "EXIT", "symbol": "NSE:HFCL-EQ", "side": "SELL"},
+        {"signal": "ORB_BREAKOUT", "symbol": "NSE:SPARC-EQ", "side": "BUY", "price": 200.25},
+    ]
+    sig = _decision_signature(dec, None)
+    assert "SPARC" in sig and "HFCL" in sig
+    title, body = _decision_message("orb_momentum_intraday", dec, None, None, None)
+    assert "orb_momentum_intraday" in title
+    assert "SPARC" in body

@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT))
 
 from tools.live.fyers_executor import (
     place_limit_with_fallback, _fetch_live_ltp, to_fyers_symbol,
-    _resolve_fill_price,
+    _resolve_fill_price, _tg_safe,
 )
 from src.services.trading.multi_holding_service import (
     get_holdings, record_buy_multi, record_sell_multi,
@@ -193,9 +193,20 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
     from tools.live.risk_manager import RiskManager
     rm_cfg = RiskManager.from_model(model).cfg
 
+    # Order product (INTRADAY vs CNC) is resolved inside _placeorder from
+    # fyers_executor._CURRENT_MODEL. The single executor sets it in main(); the
+    # multi path must set it too, else product_for_model(None)->CNC and an
+    # intraday model (orb) wrongly trades delivery (no EOD square-off leverage).
+    import tools.live.fyers_executor as _fe
+    _fe._CURRENT_MODEL = model
+
     # ---- SELLS first (free up cash + slots) ----
     for sl in sells:
-        sym = sl["symbol"]; reason = sl.get("reason", "ROTATE")
+        # ORB (and any model) may emit BARE symbols ("SPARC"); model_holdings
+        # keys are normalized ("NSE:SPARC-EQ"). Normalize so held lookups +
+        # the already-held dedup match (a raw-vs-normalized mismatch double-
+        # bought SPARC 2026-06-02 and would also break square-off sells).
+        sym = MLS._normalize_symbol(sl["symbol"]); reason = sl.get("reason", "ROTATE")
         h = held.get(sym)
         if not h:
             log.warning(f"  SELL {sym}: not held, skip"); continue
@@ -214,6 +225,14 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
                               fyers_order_id=res.get("order_id"),
                               qty=(_fq if _fq > 0 else None))
             log.info(f"  SOLD {_fq or qty}x{sym}@{px} ({reason})")
+            # Telegram/DB-feed ping (parity with single executor — the multi
+            # path NEVER notified fills, so retest/orb trades were silent).
+            _tg_safe(
+                f"💰 *SELL {model}*\n"
+                f"`{sym}` x{_fq or qty} @ ₹{float(px):.2f}  reason=`{reason}`\n"
+                f"order_id=`{res.get('order_id') or '—'}`",
+                is_fail=False,
+            )
             _audit(model, sym, "SELL", qty, ltp, "filled", fill_px=float(px),
                    fill_qty=(_fq or qty), order_id=res.get("order_id", ""), res=res)
         else:
@@ -252,7 +271,7 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
         if _acct is not None:
             log.info(f"  account available cash (Fyers): ₹{_acct:,.2f}")
         for b in buys:
-            sym = b["symbol"]
+            sym = MLS._normalize_symbol(b["symbol"])  # match normalized held keys
             # (b) Already-held guard: never re-buy a name this model already
             # holds (the signal generator excludes held names, but a stale /
             # re-run signal file must not double-buy). Skip silently — not drift.
@@ -301,6 +320,14 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
                 if _acct is not None:
                     _acct = max(0.0, _acct - _fqb * float(px))
                 log.info(f"  BOUGHT {_fqb}x{sym}@{px}")
+                # Telegram/DB-feed ping (parity with single executor).
+                _tg_safe(
+                    f"✅ *BUY {model}*\n"
+                    f"`{sym}` x{_fqb} @ ₹{float(px):.2f} = "
+                    f"₹{float(_fqb)*float(px):,.0f}\n"
+                    f"order_id=`{res.get('order_id') or '—'}`",
+                    is_fail=False,
+                )
                 _audit(model, sym, "BUY", qty, ltp, "filled",
                        fill_px=float(px), fill_qty=_fqb,
                        order_id=res.get("order_id", ""), res=res)

@@ -17,6 +17,7 @@ x-common-env: &common-env
   LIMIT_FALLBACK_S: ${LIMIT_FALLBACK_S:-20}
   TG_BOT_TOKEN: ${TG_BOT_TOKEN:-}
   TG_CHAT_ID: ${TG_CHAT_ID:-}
+  MOMROT_TG_NOTIFY: ${MOMROT_TG_NOTIFY:-}
 
 x-screening-env: &screening-env
   # Data Provider Mode

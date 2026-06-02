@@ -32,7 +32,7 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
 from tools.shared.ohlcv_cache import _get_engine                       # noqa: E402
-from tools.shared.index_membership import universe_union               # noqa: E402
+from tools.shared.index_membership import universe_union, eligible_at  # noqa: E402
 from tools.models.orb_momentum_intraday import strategy as S           # noqa: E402
 from tools.models.orb_momentum_intraday.data import fetch_5min, _fyers # noqa: E402
 
@@ -76,7 +76,13 @@ def _today_leaders(today: date = None):
               f"{S.DAILY_STALE_MAX_DAYS}d before {today}; no leaders.")
         _orb_alert_missing(f"Daily ranking data STALE — last close {last_day} (>{S.DAILY_STALE_MAX_DAYS}d old).")
         return []
-    elig = set(universe_union(S.INDEX))   # live: today's official N500 list
+    # POINT-IN-TIME eligibility (NOT universe_union). universe_union is the
+    # survivorship-biased UNION of every name that was EVER in the index — it
+    # let non-current members rank top-3 and trade live (SPARC bought 2026-06-02
+    # though it's not a current N500 member), which the backtest would NEVER do
+    # and which mismatched the displayed watchlist. backtest.py and the admin
+    # watchlist both rank over eligible_at(INDEX, date) — the live path must too.
+    elig = set(eligible_at(S.INDEX, last_day))
     return S.rank_momentum(cl, len(cl) - 1, elig)
 
 
@@ -189,6 +195,23 @@ def main():
     Path(a.signals_out).write_text(json.dumps(sig, indent=2))
     print(f"{MODEL_NAME}: {len(sig['buys'])} buys, {len(sig['sells'])} sells "
           f"-> {a.signals_out}")
+    # Telegram/PWA verdict ping (ORB previously NEVER pinged a signal). Only
+    # ping when there's an actual action — ORB scans ~6x a morning and is FLAT
+    # most of them; a daily "no change" ping would be pure noise for an
+    # intraday scanner. Deduped per (model, verdict, day); MOMROT_TG_NOTIFY=1.
+    if sig["buys"] or sig["sells"]:
+        try:
+            from src.services.notification_service import notify_model_decision
+            _dec = (
+                [{"signal": "EXIT", "symbol": s.get("symbol", ""), "side": "SELL"}
+                 for s in sig["sells"]]
+                + [{"signal": "ORB_BREAKOUT", "symbol": b.get("symbol", ""),
+                    "side": "BUY", "price": b.get("entry_hint")}
+                   for b in sig["buys"]]
+            )
+            notify_model_decision(MODEL_NAME, _dec, trigger="ORB_SCAN")
+        except Exception as _ne:
+            print(f"notify decision failed: {_ne}", file=sys.stderr)
     return 0
 
 

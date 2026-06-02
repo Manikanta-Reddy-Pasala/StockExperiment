@@ -183,6 +183,23 @@ def main():
                              reason="no signal emitted")
         except Exception as _e:
             log.debug(f"audit hook failed: {_e}")
+
+    # Telegram/PWA verdict ping (parity with n100/emerging — retest emitted
+    # signals but NEVER pinged the decision, so its daily plan was invisible).
+    # Weekend-silent + deduped per (model, verdict, day); gated by
+    # MOMROT_TG_NOTIFY=1. notify_model_decision wants {signal,symbol,side}.
+    if not args.force:
+        try:
+            from src.services.notification_service import notify_model_decision
+            _dec = (
+                [{"signal": "EXIT", "symbol": s.get("symbol", ""), "side": "SELL"}
+                 for s in sells]
+                + [{"signal": "RETEST_ENTRY", "symbol": b.get("symbol", ""), "side": "BUY"}
+                   for b in buys]
+            )
+            notify_model_decision(MODEL_NAME, _dec, trigger="CRON")
+        except Exception as _ne:
+            log.debug(f"notify decision failed: {_ne}")
     return 0
 
 
