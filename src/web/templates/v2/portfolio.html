@@ -383,17 +383,22 @@ async function loadState() {
     const r = await fetch('/admin/models/portfolio', {cache: 'no-store'});
     const d = await r.json();
     if (!d.success) return;
-    const cards = []; let openPnl = 0;
+    const pos = []; let openPnl = 0;
     (d.models || []).forEach(m => {
       if (!m.enabled) return;
       const add = (sym, qty, entry, live) => {
         const c = (Number(qty)||0)*(Number(entry)||0), mv = (Number(qty)||0)*((Number(live)||0)||Number(entry)||0);
         openPnl += (mv - c);
-        cards.push(posCard(m.model_name, sym, qty, entry, live));
+        pos.push({ model: m.model_name, sym, qty, entry, live, _sym: (sym||'').replace('NSE:','').replace('-EQ',''), _mv: mv });
       };
       if (m.open_symbol && m.open_qty) add(m.open_symbol, m.open_qty, m.open_entry_px, m.open_mtm_price);
       (m.holdings || []).forEach(h => add(h.symbol, h.qty, h.entry_px, h.mtm_price));
     });
+    // Group same-symbol positions together (so a stock held by 2 models shows
+    // adjacent — e.g. HFCL by pseudo + emerging — not split across pages),
+    // bigger market value first within a symbol.
+    pos.sort((a, b) => a._sym.localeCompare(b._sym) || (b._mv - a._mv));
+    const cards = pos.map(p => posCard(p.model, p.sym, p.qty, p.entry, p.live));
     const ope = document.getElementById('open_pnl_sum');
     if (ope) { ope.textContent = `${cards.length} open · P&L ${fmtINR(openPnl)}`; ope.className = 'text-muted small ' + cls(openPnl); }
     PAGER.open.items = cards.length ? cards : ['<div class="text-muted py-2">No open positions</div>'];
@@ -403,7 +408,7 @@ async function loadState() {
 }
 
 // ---- Pagination (client-side) for the Open + Closed position grids ----
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 12;
 const PAGER = {
   open:   { items: [], page: 0, grid: 'positions_grid', label: 'open_page_label',   pager: 'open_pager' },
   closed: { items: [], page: 0, grid: 'closed_grid',     label: 'closed_page_label', pager: 'closed_pager' },
