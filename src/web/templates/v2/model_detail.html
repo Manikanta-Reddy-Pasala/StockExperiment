@@ -127,6 +127,7 @@
             <th class="text-end">Qty</th>
             <th class="text-end">Price</th>
             <th class="text-end">Value</th>
+            <th class="text-end">Charges</th>
             <th class="text-end">P&amp;L</th>
             <th class="text-end">P&amp;L %</th>
             <th>Reason</th>
@@ -134,7 +135,7 @@
           </tr>
         </thead>
         <tbody id="txn_body">
-          <tr><td colspan="11" class="empty-state">Loading transactions…</td></tr>
+          <tr><td colspan="12" class="empty-state">Loading transactions…</td></tr>
         </tbody>
       </table>
     </div>
@@ -345,7 +346,7 @@ async function loadTradeHistory() {
     const body = document.getElementById('txn_body');
     if (!trades.length) {
       body.innerHTML =
-        '<tr><td colspan="11" class="empty-state">No trades yet for this model.</td></tr>';
+        '<tr><td colspan="12" class="empty-state">No trades yet for this model.</td></tr>';
       return;
     }
 
@@ -379,6 +380,7 @@ async function loadTradeHistory() {
           <td class="text-end">${qty}</td>
           <td class="text-end">${px}</td>
           <td class="text-end">${fmtINR(t.value)}</td>
+          <td class="text-end text-muted">${(t.charges != null && t.charges !== 0) ? fmtINR(t.charges) : '—'}</td>
           <td class="text-end">${pnlCell}</td>
           <td class="text-end">${pnlPctCell}</td>
           <td><small class="text-muted">${t.reason || ''}</small></td>
@@ -390,7 +392,7 @@ async function loadTradeHistory() {
   } catch (e) {
     console.error('trade-history load failed', e);
     document.getElementById('txn_body').innerHTML =
-      `<tr><td colspan="11" class="empty-state text-danger">Error: ${e.message || e}</td></tr>`;
+      `<tr><td colspan="12" class="empty-state text-danger">Error: ${e.message || e}</td></tr>`;
   }
 }
 
