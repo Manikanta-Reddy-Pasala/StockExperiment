@@ -83,8 +83,9 @@
             <tr><td class="k" title="Live MTM = qty × current LTP">Position Value (Live MTM)</td><td class="v" id="bs_position_value">—</td></tr>
             <tr><td class="k" title="Current position P&L = Live MTM − Cost basis">Current Position P&amp;L</td><td class="v headline" id="bs_unrealized">—</td></tr>
             <tr class="bs-section"><td colspan="2" class="bs-section-hdr">P&amp;L summary</td></tr>
-            <tr><td class="k" title="Realized P&L from closed trades">Realized P&amp;L (closed trades)</td><td class="v" id="bs_realized">—</td></tr>
-            <tr><td class="k" title="NAV − Allocated. Charges already deducted from cash at trade time."><strong>Total P&amp;L (NAV − Allocated)</strong></td><td class="v headline" id="bs_total_pnl">—</td></tr>
+            <tr><td class="k" title="Realized P&L from closed trades (model_trades)">Realized P&amp;L (from trades)</td><td class="v" id="bs_realized">—</td></tr>
+            <tr><td class="k" title="Day MTM change on open position + realized from trades closed today"><strong>Today's P&amp;L</strong></td><td class="v headline" id="bs_today_pnl">—</td></tr>
+            <tr><td class="k" title="Realized (from trades) + Unrealized (open, live)"><strong>Total P&amp;L</strong></td><td class="v headline" id="bs_total_pnl">—</td></tr>
             <tr><td class="k"><strong>NAV (cash + position MTM)</strong></td><td class="v headline" id="bs_nav">—</td></tr>
             <tr><td class="k"><strong>Return %</strong></td><td class="v headline" id="bs_return_pct">—</td></tr>
             <tr><td class="k">Trades (W / L)</td><td class="v" id="bs_trades">—</td></tr>
@@ -242,17 +243,23 @@ async function loadBalanceSheet() {
     } else {
       posValueEl.innerHTML = '<span class="text-muted">— (flat)</span>';
     }
+    const realizedV = (data.realized_pnl_trades ?? data.realized_pnl);
     const realizedEl = document.getElementById('bs_realized');
-    realizedEl.textContent = fmtINR(data.realized_pnl);
-    realizedEl.className = 'v ' + cls(data.realized_pnl);
+    realizedEl.textContent = fmtINR(realizedV);
+    realizedEl.className = 'v ' + cls(realizedV);
 
     const unrealEl = document.getElementById('bs_unrealized');
     unrealEl.textContent = fmtINR(data.unrealized_pnl);
     unrealEl.className = 'v ' + cls(data.unrealized_pnl);
 
+    const todayV = Number(data.today_pnl || 0);
+    const todayEl = document.getElementById('bs_today_pnl');
+    if (todayEl) { todayEl.textContent = fmtINR(todayV); todayEl.className = 'v headline ' + cls(todayV); }
+
+    const totalV = (data.total_pnl_trades ?? data.total_pnl);
     const totalEl = document.getElementById('bs_total_pnl');
-    totalEl.textContent = fmtINR(data.total_pnl);
-    totalEl.className = 'v headline ' + cls(data.total_pnl);
+    totalEl.textContent = fmtINR(totalV);
+    totalEl.className = 'v headline ' + cls(totalV);
 
     document.getElementById('bs_nav').textContent = fmtINR(data.nav);
     const retEl = document.getElementById('bs_return_pct');

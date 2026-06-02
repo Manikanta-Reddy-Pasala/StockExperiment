@@ -1670,6 +1670,12 @@ def model_balance_sheet(model_name):
             "realized_pnl_gross": round(realized_gross, 2),
             "unrealized_pnl": round(float(unrealized_pnl), 2),
             "total_pnl": round(float(total_pnl), 2),
+            # P&L (user spec): realized from trades, open live, total, today.
+            "realized_pnl_trades": float(per_model.get("realized_pnl_trades", 0.0) or 0.0),
+            "total_pnl_trades": float(per_model.get("total_pnl_trades", total_pnl) or 0.0),
+            "today_pnl": float(per_model.get("today_pnl", 0.0) or 0.0),
+            "today_realized": float(per_model.get("today_realized", 0.0) or 0.0),
+            "today_unrealized": float(per_model.get("today_unrealized", 0.0) or 0.0),
             "nav": round(float(nav), 2),
             "return_pct": round(float(return_pct), 2),
             "total_trades": per_model.get("total_trades", 0) or 0,
