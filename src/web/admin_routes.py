@@ -2959,8 +2959,18 @@ def admin_model_ranking(model_name):
             if recalc:
                 cmd.append("--force")
             try:
+                # DISPLAY run must stay SILENT. live_signal's notify funnel
+                # (notify_model_decision) fires whenever MOMROT_TG_NOTIFY=1 and
+                # the run is non-force — which a bare (no --rebalance-only)
+                # display run is. The web app inherits MOMROT_TG_NOTIFY=1, so a
+                # mere Today's Picks page view was sending a misleading
+                # "Planned for execution 09:30: SELL/BUY" Telegram for a
+                # rotation the gated 09:30 cron will NOT perform on a
+                # non-rebalance day. Force it OFF for the display subprocess;
+                # only the schedule-gated cron emits trade notifications.
+                _disp_env = {**os.environ, "MOMROT_TG_NOTIFY": "0"}
                 r = subprocess.run(cmd, capture_output=True, text=True,
-                                   timeout=180)
+                                   timeout=180, env=_disp_env)
                 if r.returncode == 0:
                     ran_now = True
                 else:
