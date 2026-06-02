@@ -27,6 +27,32 @@
   .disabled-badge { background: #f1f3f5; color: #6c757d; border: 1px solid #dee2e6; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
   .observe-badge { background: #cff4fc; color: #055160; border: 1px solid #9eeaf9; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.5px; }
   .empty-state { padding: 30px; text-align: center; color: #6c757d; font-style: italic; }
+
+  /* Mobile/PWA: the 12-column Transaction History table overflows a phone and
+     gets cropped at the right. Stack each row into a labeled card instead (same
+     pattern as the Portfolio table). No horizontal scroll, nothing clipped. */
+  @media (max-width: 768px) {
+    .txn-table thead { display: none; }
+    .txn-table, .txn-table tbody, .txn-table tr, .txn-table td { display: block; width: 100%; }
+    .txn-table tr {
+      border: 1px solid #e2e6ee; border-radius: 10px;
+      margin: 0 0 10px; padding: 6px 10px; background: #fff;
+    }
+    .txn-table td {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 12px; text-align: right; padding: 5px 0; border: 0;
+      border-bottom: 1px solid #f1f3f7;
+    }
+    .txn-table td:last-child { border-bottom: 0; }
+    .txn-table td::before {
+      content: attr(data-label); text-align: left; font-weight: 600;
+      color: #6b7280; font-size: .78rem; flex: 0 0 auto;
+    }
+    .txn-table td[data-label="Date"] { font-weight: 600; border-bottom: 2px solid #eef0f5; }
+    .txn-table .empty-state { display: block; }
+    /* Keep the page from ever overflowing horizontally on a phone. */
+    .table-responsive { overflow-x: visible; }
+  }
 </style>
 
 <!-- Header -->
@@ -380,18 +406,18 @@ async function loadTradeHistory() {
       const px  = isCashflow ? '—' : fmtINR(t.price);
       return `
         <tr>
-          <td>${fmtDate(t.trade_at)}</td>
-          <td><span class="model-tag">${modelLabel(t.model_name || MODEL_NAME)}</span></td>
-          <td><span class="side-badge side-${side}">${side || '—'}</span></td>
-          <td><code>${sym}</code></td>
-          <td class="text-end">${qty}</td>
-          <td class="text-end">${px}</td>
-          <td class="text-end">${fmtINR(t.value)}</td>
-          <td class="text-end text-muted">${(t.charges != null && t.charges !== 0) ? fmtINR(t.charges) : '—'}</td>
-          <td class="text-end">${pnlCell}</td>
-          <td class="text-end">${pnlPctCell}</td>
-          <td><small class="text-muted">${t.reason || ''}</small></td>
-          <td><small class="text-muted">${t.fyers_order_id || ''}</small></td>
+          <td data-label="Date">${fmtDate(t.trade_at)}</td>
+          <td data-label="Model"><span class="model-tag">${modelLabel(t.model_name || MODEL_NAME)}</span></td>
+          <td data-label="Side"><span class="side-badge side-${side}">${side || '—'}</span></td>
+          <td data-label="Symbol"><code>${sym}</code></td>
+          <td class="text-end" data-label="Qty">${qty}</td>
+          <td class="text-end" data-label="Price">${px}</td>
+          <td class="text-end" data-label="Value">${fmtINR(t.value)}</td>
+          <td class="text-end text-muted" data-label="Charges">${(t.charges != null && t.charges !== 0) ? fmtINR(t.charges) : '—'}</td>
+          <td class="text-end" data-label="P&L">${pnlCell}</td>
+          <td class="text-end" data-label="P&L %">${pnlPctCell}</td>
+          <td data-label="Reason"><small class="text-muted">${t.reason || ''}</small></td>
+          <td data-label="Order ID"><small class="text-muted">${t.fyers_order_id || ''}</small></td>
         </tr>
       `;
     }).join('');
