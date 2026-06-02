@@ -316,7 +316,7 @@ def create_app():
                 _flask_session.permanent = True
                 login_user(user, remember=remember)
                 next_page = request.args.get('next')
-                return redirect(next_page) if next_page else redirect(url_for('picks'))
+                return redirect(next_page) if next_page else redirect(url_for('dashboard'))
             except ValueError as e:
                 flash(str(e), 'error')
         
@@ -369,12 +369,13 @@ def create_app():
 
 
     
-    # Primary UI routes (v2 templates). Home ('/') = Today's Picks (the PWA
-    # start_url is also /picks) so opening the app lands on the picks page.
+    # Primary UI routes (v2 templates). Home ('/') = Dashboard (the PWA
+    # start_url is also /dashboard) so opening the app lands on the dashboard.
+    @app.route('/')
     @app.route('/dashboard')
     @login_required
     def dashboard():
-        """Dashboard page."""
+        """Dashboard page — the app home ('/')."""
         return render_template('v2/dashboard.html')
 
     # PWA: serve manifest + service worker from root so SW can claim '/' scope.
@@ -400,11 +401,10 @@ def create_app():
         resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         return resp
 
-    @app.route('/')
     @app.route('/picks')
     @login_required
     def picks():
-        """Today's Picks page — the app home ('/')."""
+        """Today's Picks page."""
         return render_template('v2/picks.html')
 
     @app.route('/picks/<model_key>/signals')
