@@ -217,15 +217,16 @@ def _run_orders(a, model, sells, buys, held, svc) -> int:
         if a.dry_run:
             log.info(f"  [dry] SELL {qty}x{sym} ({reason})"); continue
         ltp = _fetch_live_ltp_retry(svc, a.user_id, sym) or h["entry_px"]
-        # Sell the product the shares are ACTUALLY held in at the broker, and
-        # never more than is held — checked PER SYMBOL before placing. Prevents
-        # the 2026-06-02 SPARC phantom short (ledger said 148 → sold INTRADAY,
-        # but the shares were CNC → opened a short). Also skips cleanly if the
-        # name was already flattened elsewhere (e.g. a manual sell).
-        sell_prod, sell_qty, src = resolve_sell_product_qty(svc, a.user_id, sym, qty)
+        # Sell THIS model's qty (`qty`, from model_holdings — the account is
+        # shared across models, so never the account-wide broker qty), in the
+        # model's policy product, capped to what the account holds in that
+        # product so we never short the ACCOUNT. Prevents the 2026-06-02 SPARC
+        # phantom short and is safe when multiple models hold the same stock.
+        sell_prod, sell_qty, src = resolve_sell_product_qty(
+            svc, a.user_id, sym, qty, MLS.product_for_model(model))
         if src == "flat":
-            log.warning(f"  SELL {sym}: broker shows FLAT (already sold elsewhere) "
-                        f"— NOT placing a sell; closing the ledger row.")
+            log.warning(f"  SELL {sym}: account holds 0x {sell_prod} for this name "
+                        f"(already squared elsewhere) — NOT placing; closing ledger row.")
             record_sell_multi(model, sym, float(ltp), f"{reason}_BROKER_FLAT",
                               fyers_order_id="", qty=None)
             _tg_safe(

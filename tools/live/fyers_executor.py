@@ -370,32 +370,36 @@ def held_product_qty(svc, user_id: int, symbol: str):
     return out if any_ok else None
 
 
-def resolve_sell_product_qty(svc, user_id: int, symbol: str, want_qty: int):
-    """Decide the product + qty to use for an EXIT of `symbol`.
+def resolve_sell_product_qty(svc, user_id: int, symbol: str, want_qty: int,
+                             product: str):
+    """Decide the qty to SELL for an EXIT of `symbol`, in the MODEL's product.
 
-    Returns (product, sell_qty, source):
-      - ("CNC"|"INTRADAY", n, "broker"): broker holds n of that product; sell
-        min(want_qty, n) as that product (matches where the shares are; capped
-        so we never short).
-      - (None, 0, "flat"): broker shows ZERO long for the symbol — already flat
-        (e.g. user sold manually); caller must SKIP the order, not place one.
-      - (None, want_qty, "fallback"): broker lookup failed — caller falls back
-        to model-policy product + the requested qty (preserves old behaviour on
-        an API hiccup; the over-sell guard inside place_limit_with_fallback is
-        the remaining backstop).
+    The Fyers account is SHARED across every model — two models can hold the
+    same stock — so the SELL qty is driven by the MODEL's own holding
+    (`want_qty`, from model_holdings / the ledger), NEVER the account-wide
+    broker qty. The broker is only used as a per-product CAP so we never short
+    the ACCOUNT: sell_qty = min(model_qty, account-available IN THAT PRODUCT).
+
+    `product` is the model's policy product (product_for_model) — the product
+    its shares are held in (the entry-product guard ensures that). It is NOT
+    overridden from the broker (the broker can't attribute a position to a
+    model). Returns (product, sell_qty, source):
+      - (product, min(want_qty, avail), "broker"): normal — model qty, capped
+        to what the account actually holds in that product (avail >= want_qty in
+        the common case, so the full model qty sells).
+      - (product, 0, "flat"): the account holds ZERO of this product for the
+        symbol — nothing of the model's leg is there to sell (e.g. it was
+        already squared elsewhere). Caller SKIPS (no order → no account short).
+      - (product, want_qty, "fallback"): broker lookup failed → sell the full
+        model qty in the policy product (old behaviour; the in-call over-sell
+        guard is the remaining backstop).
     """
     hb = held_product_qty(svc, user_id, symbol)
     if hb is None:
-        return (None, int(want_qty), "fallback")
-    cnc, intra = int(hb["CNC"]), int(hb["INTRADAY"])
-    if cnc + intra <= 0:
-        return (None, 0, "flat")
-    # Sell the leg that actually holds the shares. If split across both products
-    # (rare), sell the larger leg this run; the next cycle mops up the remainder.
-    if cnc >= intra and cnc > 0:
-        product, avail = "CNC", cnc
-    else:
-        product, avail = "INTRADAY", intra
+        return (product, int(want_qty), "fallback")
+    avail = int(hb.get(product, 0))
+    if avail <= 0:
+        return (product, 0, "flat")
     return (product, min(int(want_qty), avail), "broker")
 
 
@@ -1313,16 +1317,18 @@ def main() -> int:
             log.info(f"DRY-RUN PASS-1 EXIT {sym} qty={held.qty} "
                      f"side={exit_side} @ ~{price} (would LIMIT then MARKET)")
         else:
-            # Sell the product the shares are ACTUALLY held in at the broker, and
-            # cap to broker-available qty (never short). For a long exit
-            # (exit_side SELL) resolve per symbol; a BUY-to-cover exit keeps the
-            # policy product. If the broker shows the name already FLAT (e.g. a
-            # manual sell), the exit goal is already met — mark closed WITHOUT
-            # placing an order or aborting entries.
+            # Sell THIS model's qty (held.qty, from the ledger — the broker
+            # account is shared across models) in the model's policy product,
+            # capped to what the account holds in that product so we never short
+            # the account. A BUY-to-cover exit keeps the policy product. If the
+            # account holds 0 of that product for the name (already squared
+            # elsewhere), mark closed WITHOUT placing an order or aborting entries.
             _exit_prod, _exit_qty = None, held.qty
             if exit_side == "SELL":
+                from src.services.trading.model_ledger_service import product_for_model
                 _exit_prod, _exit_qty, _src = resolve_sell_product_qty(
-                    svc, args.user_id, sym, held.qty)
+                    svc, args.user_id, sym, held.qty,
+                    product_for_model(args.model_name))
                 if _src == "flat":
                     log.warning(f"EXIT {sym}: broker shows FLAT (already closed "
                                 f"elsewhere) — marking exit done, no order placed.")

@@ -35,54 +35,69 @@ class _Svc:
 
 
 def test_cnc_delivery_holding_resolves_cnc():
-    # 148 held as delivery (holdings) → sell CNC, capped to 148.
+    # Model qty 148 in CNC; account holds 148 CNC → sell CNC 148.
     svc = _Svc(holdings=[{"symbol": "NSE:SPARC-EQ", "quantity": "148"}])
-    prod, qty, src = FE.resolve_sell_product_qty(svc, 1, "NSE:SPARC-EQ", 148)
+    prod, qty, src = FE.resolve_sell_product_qty(svc, 1, "NSE:SPARC-EQ", 148, "CNC")
     assert (prod, qty, src) == ("CNC", 148, "broker")
 
 
 def test_cnc_position_same_day_resolves_cnc():
-    # Same-day CNC buy shows in positions with productType CNC (not yet in
-    # holdings) — this is the exact SPARC case. Must sell CNC, not INTRADAY.
+    # Same-day CNC buy shows in positions with productType CNC (the SPARC case).
     svc = _Svc(positions=[{"symbol": "NSE:SPARC-EQ", "netQty": "148", "productType": "CNC"}])
-    prod, qty, src = FE.resolve_sell_product_qty(svc, 1, "NSE:SPARC-EQ", 148)
+    prod, qty, src = FE.resolve_sell_product_qty(svc, 1, "NSE:SPARC-EQ", 148, "CNC")
     assert (prod, qty, src) == ("CNC", 148, "broker")
 
 
-def test_intraday_position_resolves_intraday():
+def test_intraday_model_sells_intraday():
     svc = _Svc(positions=[{"symbol": "NSE:HFCL-EQ", "netQty": "500", "productType": "INTRADAY"}])
-    prod, qty, src = FE.resolve_sell_product_qty(svc, 1, "NSE:HFCL-EQ", 500)
+    prod, qty, src = FE.resolve_sell_product_qty(svc, 1, "NSE:HFCL-EQ", 500, "INTRADAY")
     assert (prod, qty, src) == ("INTRADAY", 500, "broker")
 
 
-def test_caps_qty_to_broker_available():
-    # Ledger thinks 148, broker only has 100 (partial manual sale) → sell 100,
-    # never 148 (selling 148 would short 48).
+def test_qty_comes_from_model_not_account_when_shared():
+    # CRITICAL: account holds 248 CNC (two models share SPARC), but THIS model
+    # only owns 148. Must sell the MODEL's 148, never the account-wide 248.
+    svc = _Svc(holdings=[{"symbol": "NSE:SPARC-EQ", "quantity": "248"}])
+    prod, qty, src = FE.resolve_sell_product_qty(svc, 1, "NSE:SPARC-EQ", 148, "CNC")
+    assert (prod, qty, src) == ("CNC", 148, "broker")
+
+
+def test_caps_to_account_available_to_avoid_account_short():
+    # Model thinks 148 but the account only holds 100 of that product (something
+    # already squared) → cap to 100 so we never short the account.
     svc = _Svc(holdings=[{"symbol": "NSE:SPARC-EQ", "quantity": "100"}])
-    prod, qty, src = FE.resolve_sell_product_qty(svc, 1, "NSE:SPARC-EQ", 148)
+    prod, qty, src = FE.resolve_sell_product_qty(svc, 1, "NSE:SPARC-EQ", 148, "CNC")
     assert (prod, qty, src) == ("CNC", 100, "broker")
 
 
-def test_broker_flat_returns_flat():
-    # Nothing held at the broker (already sold manually) → flat → caller SKIPS.
+def test_account_flat_for_product_returns_flat():
+    # Account holds 0 of the model's product for the symbol → flat → caller SKIPS.
     svc = _Svc(holdings=[], positions=[])
-    prod, qty, src = FE.resolve_sell_product_qty(svc, 1, "NSE:SPARC-EQ", 148)
-    assert (prod, qty, src) == (None, 0, "flat")
+    prod, qty, src = FE.resolve_sell_product_qty(svc, 1, "NSE:SPARC-EQ", 148, "CNC")
+    assert (prod, qty, src) == ("CNC", 0, "flat")
+
+
+def test_only_other_product_held_is_flat_for_this_product():
+    # Model is INTRADAY but the account only holds the name in CNC (another
+    # model's delivery). This INTRADAY model has nothing to sell → flat (it must
+    # NOT sell the other model's CNC shares).
+    svc = _Svc(holdings=[{"symbol": "NSE:SPARC-EQ", "quantity": "100"}])
+    prod, qty, src = FE.resolve_sell_product_qty(svc, 1, "NSE:SPARC-EQ", 50, "INTRADAY")
+    assert (prod, qty, src) == ("INTRADAY", 0, "flat")
 
 
 def test_short_position_not_sellable():
-    # A net SHORT (negative) is not a sellable long → flat (don't sell into a short).
     svc = _Svc(positions=[{"symbol": "NSE:X-EQ", "netQty": "-50", "productType": "INTRADAY"}])
-    prod, qty, src = FE.resolve_sell_product_qty(svc, 1, "NSE:X-EQ", 50)
+    prod, qty, src = FE.resolve_sell_product_qty(svc, 1, "NSE:X-EQ", 50, "INTRADAY")
     assert src == "flat"
 
 
-def test_api_failure_falls_back():
-    # Both broker calls fail → fall back to model-policy product + ledger qty so
-    # an API hiccup never blocks a real exit (over-sell guard is the backstop).
+def test_api_failure_falls_back_to_model_qty():
+    # Both broker calls fail → sell the full MODEL qty in the policy product
+    # (old behaviour; in-call over-sell guard backstops).
     svc = _Svc(raise_holdings=True, raise_positions=True)
-    prod, qty, src = FE.resolve_sell_product_qty(svc, 1, "NSE:SPARC-EQ", 148)
-    assert (prod, qty, src) == (None, 148, "fallback")
+    prod, qty, src = FE.resolve_sell_product_qty(svc, 1, "NSE:SPARC-EQ", 148, "CNC")
+    assert (prod, qty, src) == ("CNC", 148, "fallback")
 
 
 def test_explicit_product_bypasses_policy_guard(monkeypatch):
