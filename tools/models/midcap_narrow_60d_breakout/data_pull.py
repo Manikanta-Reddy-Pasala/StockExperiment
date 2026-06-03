@@ -33,7 +33,10 @@ sys.path.insert(0, str(ROOT))
 log = logging.getLogger(__name__)
 
 UNIVERSE_OUT = "/app/logs/momrot/universes/midcap_narrow.json"
-SKIP_TOP = 30
+# SKIP_TOP=0 to match backtest.py (V3 rule: top-100 ADV from N500 minus Large,
+# SKIP_TOP=0). Was 30, which silently skipped the 30 most-liquid names and built
+# a different live universe than the validated backtest. KEEP_NEXT(=top) stays.
+SKIP_TOP = 0
 KEEP_NEXT = 100
 
 
