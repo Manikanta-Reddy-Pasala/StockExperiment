@@ -125,9 +125,18 @@ def rank_momentum(daily_close: pd.DataFrame, di: int, eligible: set) -> List[str
     return [s for s, _ in sorted(rets.items(), key=lambda kv: -kv[1])][:SELECT_TOP]
 
 
-def opening_range(day_bars: pd.DataFrame) -> Optional[Tuple[float, float]]:
-    """(ORH, ORL) from the first OR_BARS 5-min bars, or None if not enough data."""
-    if len(day_bars) < OR_BARS + 5:
+def opening_range(day_bars: pd.DataFrame,
+                  min_post_bars: int = 5) -> Optional[Tuple[float, float]]:
+    """(ORH, ORL) from the first OR_BARS 5-min bars, or None if not enough data.
+
+    `min_post_bars` = how many bars beyond the opening range must already exist
+    before a range is returned. The backtest keeps the historical default (5),
+    so full-day results stay byte-identical. The LIVE scanner passes 1: it only
+    needs a single post-range bar to test a breakout, so it can fire from the
+    first scan after the opening range (~09:35) instead of waiting for 8 bars
+    (~09:50) and missing early breakouts the backtest would take.
+    """
+    if len(day_bars) < OR_BARS + min_post_bars:
         return None
     orh = float(day_bars["h"].iloc[:OR_BARS].max())
     orl = float(day_bars["l"].iloc[:OR_BARS].min())

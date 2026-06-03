@@ -162,7 +162,11 @@ def emit_signals(now: dt.datetime = None) -> dict:
             print(f"orb: {sym} last 5-min bar {last_bar_age_min:.0f}m old "
                   f"(> {S.STALE_BAR_MAX_MIN}m) — stale feed, skip.")
             continue
-        rng = S.opening_range(df)
+        # min_post_bars=1: live only needs one bar past the opening range to test
+        # a breakout (the emit guard above already requires OR_BARS + 1 bars), so
+        # the 09:35+ scans can fire instead of waiting for the backtest default
+        # (8 bars / ~09:50) and missing early breakouts.
+        rng = S.opening_range(df, min_post_bars=1)
         if rng is None:
             continue
         orh, orl = rng

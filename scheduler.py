@@ -616,6 +616,25 @@ def run_scheduler():
 
     schedule.every(5).minutes.do(_reconcile_market_hours)
 
+    # Daily heartbeat — ONE consolidated Telegram listing every model's state.
+    # The gated models (n100/pseudo/n40/emerging) notify_skip(telegram=False) on
+    # non-rebalance days, so without this the user gets NO Telegram confirming
+    # they ran. Fires at 09:40, after the 09:30-09:35 executes settle. Weekend /
+    # NSE-holiday silent + deduped-per-day inside the script.
+    def _daily_summary():
+        try:
+            import subprocess
+            r = subprocess.run(["python3", "tools/daily_summary.py"],
+                               capture_output=True, text=True, timeout=120)
+            if r.returncode != 0:
+                logger.error(f"daily_summary exit={r.returncode}: {r.stderr[-300:]}")
+            elif r.stdout:
+                logger.info(r.stdout[-300:])
+        except Exception as e:
+            logger.error(f"daily_summary call failed: {e}")
+
+    schedule.every().day.at("09:40").do(_daily_summary)
+
     # Schedule weekly cleanup on Sunday at 3:00 AM
     schedule.every().sunday.at("03:00").do(cleanup_old_snapshots)
 

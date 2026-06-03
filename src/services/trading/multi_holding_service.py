@@ -49,7 +49,8 @@ def held_symbols(model_name: str) -> set:
 
 
 def record_buy_multi(model_name: str, symbol: str, qty: int, price: float,
-                     fyers_order_id: str = None, product: str = "CNC") -> Dict:
+                     fyers_order_id: str = None, product: str = "CNC",
+                     trade_at=None) -> Dict:
     """Record a BUY for a multi-holding model.
 
     cash -= qty*price + charges; current_amount -= charges; insert (or weighted-
@@ -83,16 +84,26 @@ def record_buy_multi(model_name: str, symbol: str, qty: int, price: float,
             s.add(ModelHolding(model_name=model_name, symbol=norm, qty=qty,
                                entry_px=price_d, entry_date=date.today()))
         settings.current_amount = (settings.current_amount or Decimal(0)) - charges
-        s.add(ModelTrade(model_name=model_name, side="BUY", symbol=norm, qty=qty,
+        # trade_at: pass the broker's actual fill time when re-recording a
+        # historical fill (reconcile/backfill) so the trade is attributed to the
+        # day it ACTUALLY happened, not the re-record time. A late re-record that
+        # defaults to now() mis-dates the trade and pollutes today's realized P&L
+        # (e.g. a 06-02 round-trip re-recorded at 06-03 01:12 showed as today's
+        # P&L on a flat intraday model). None → column default (now) for live
+        # fills, which are recorded seconds after the fill — correct.
+        _bt = ModelTrade(model_name=model_name, side="BUY", symbol=norm, qty=qty,
                          price=price_d, value=cost, reason="ENTRY",
-                         fyers_order_id=fyers_order_id))
+                         fyers_order_id=fyers_order_id)
+        if trade_at is not None:
+            _bt.trade_at = trade_at
+        s.add(_bt)
         log.info(f"{model_name}: BUY {qty}x{norm}@{price} (multi-holding)")
         return _ledger_dict(l)
 
 
 def record_sell_multi(model_name: str, symbol: str, exit_price: float,
                       reason: str = "ROTATE", fyers_order_id: str = None,
-                      product: str = "CNC", qty: int = None) -> Dict:
+                      product: str = "CNC", qty: int = None, trade_at=None) -> Dict:
     """Record a SELL of one held symbol for a multi-holding model.
 
     cash += proceeds - charges; realized_pnl/wins/losses updated; ModelTrade
@@ -126,9 +137,14 @@ def record_sell_multi(model_name: str, symbol: str, exit_price: float,
         elif pnl < 0:
             l.losses = (l.losses or 0) + 1   # exact break-even counts as neither
         settings.current_amount = (settings.current_amount or Decimal(0)) - charges
-        s.add(ModelTrade(model_name=model_name, side="SELL", symbol=norm, qty=sell_qty,
+        # trade_at: real broker fill time on re-record (see record_buy_multi) so
+        # a back-dated round-trip is not mis-attributed to today's realized P&L.
+        _st = ModelTrade(model_name=model_name, side="SELL", symbol=norm, qty=sell_qty,
                          price=price_d, value=proceeds, pnl=pnl, reason=reason,
-                         fyers_order_id=fyers_order_id))
+                         fyers_order_id=fyers_order_id)
+        if trade_at is not None:
+            _st.trade_at = trade_at
+        s.add(_st)
         if is_full:
             s.delete(h)
         else:

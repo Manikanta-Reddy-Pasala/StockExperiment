@@ -1,0 +1,47 @@
+"""ORB live breakout must be detectable from the first post-range bar (~09:35),
+not blocked until 8 bars exist (~09:50).
+
+Bug (2026-06-03): strategy.opening_range() required len >= OR_BARS + 5 (= 8 bars)
+before returning a range. The live scanner (live_signal.emit_signals) reuses this
+helper, so the 09:30/09:35/09:40/09:45 cron scans could NEVER fire — the earliest
+a range was returned was ~09:50 (the 8th 5-min bar). The backtest (orb_trade on a
+full ~75-bar day) enters on the first breakout right after the opening range, so
+live structurally entered late / missed early breakouts the backtest takes
+(proven: the 06-02 SPARC live entry filled 09:50-09:55, exactly the 8-bar gate).
+
+Fix: opening_range gains `min_post_bars` (default 5 -> backtest byte-identical);
+the live path passes min_post_bars=1 so a range is returned as soon as there is
+one bar beyond the opening range (OR_BARS + 1 = 4 bars, ~09:35).
+"""
+import pandas as pd
+
+from tools.models.orb_momentum_intraday import strategy as S
+
+
+def _bars(n: int) -> pd.DataFrame:
+    """n synthetic 5-min bars; opening range (first OR_BARS) high=110, low=90."""
+    h = [110.0] * S.OR_BARS + [120.0] * (n - S.OR_BARS)
+    l = [90.0] * S.OR_BARS + [100.0] * (n - S.OR_BARS)
+    c = [105.0] * S.OR_BARS + [119.0] * (n - S.OR_BARS)
+    return pd.DataFrame({"h": h[:n], "l": l[:n], "c": c[:n]})
+
+
+def test_default_gate_unchanged_backtest_safe():
+    # Backtest default still demands OR_BARS + 5 bars -> a 4..7 bar day yields None.
+    for n in range(S.OR_BARS + 1, S.OR_BARS + 5):
+        assert S.opening_range(_bars(n)) is None, f"{n} bars should be None by default"
+    rng = S.opening_range(_bars(S.OR_BARS + 5))
+    assert rng is not None and rng[0] == 110.0 and rng[1] == 90.0
+
+
+def test_live_gate_returns_range_from_first_post_range_bar():
+    # Live passes min_post_bars=1 -> a range is available at OR_BARS + 1 (~09:35).
+    df = _bars(S.OR_BARS + 1)
+    rng = S.opening_range(df, min_post_bars=1)
+    assert rng is not None
+    assert rng == (110.0, 90.0)
+
+
+def test_live_gate_still_none_with_only_range_bars():
+    # With exactly OR_BARS bars there is no post-range bar to test a breakout.
+    assert S.opening_range(_bars(S.OR_BARS), min_post_bars=1) is None
