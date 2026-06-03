@@ -145,6 +145,22 @@ def opening_range(day_bars: pd.DataFrame,
     return orh, orl
 
 
+def live_breakout(day_bars: pd.DataFrame, orh: float) -> bool:
+    """True if any bar AFTER the opening range printed a high >= orh.
+
+    Mirrors the backtest's intrabar breakout test (orb_trade scans
+    ``g["h"].iloc[i] >= orh`` over range(OR_BARS, len)). The live scanner used
+    to test only the LAST bar's CLOSE >= orh, so it missed intrabar breakouts
+    that spiked above the range and closed back under — a divergence that made
+    live take fewer entries than the backtested edge. Using the same high-based
+    rule keeps live and backtest detecting the same breakouts.
+    """
+    for i in range(OR_BARS, len(day_bars)):
+        if float(day_bars["h"].iloc[i]) >= orh:
+            return True
+    return False
+
+
 def orb_trade(day_bars: pd.DataFrame, symbol: str) -> Optional[OrbTrade]:
     """Run the long-only morning ORB on one stock's 5-min bars for one day.
 

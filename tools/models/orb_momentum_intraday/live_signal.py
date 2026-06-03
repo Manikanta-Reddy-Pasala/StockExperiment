@@ -171,8 +171,10 @@ def emit_signals(now: dt.datetime = None) -> dict:
             continue
         orh, orl = rng
         width = orh - orl
-        last = float(df["c"].iloc[-1])
-        if last >= orh:   # broken out — signal a long, one slot of capital
+        # Backtest-parity breakout: any post-range bar high >= orh (intrabar),
+        # NOT just the last bar's close — see strategy.live_breakout. Catches
+        # breakouts that spiked above the range and closed back under.
+        if S.live_breakout(df, orh):   # broken out — signal a long, one slot
             entry_hint = round(orh * (1 + S.SLIPPAGE), 2)
             qty = S.slot_qty(invested, S.SELECT_TOP, entry_hint)
             if qty < 1:

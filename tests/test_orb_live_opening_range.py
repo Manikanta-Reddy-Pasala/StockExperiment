@@ -45,3 +45,32 @@ def test_live_gate_returns_range_from_first_post_range_bar():
 def test_live_gate_still_none_with_only_range_bars():
     # With exactly OR_BARS bars there is no post-range bar to test a breakout.
     assert S.opening_range(_bars(S.OR_BARS), min_post_bars=1) is None
+
+
+def test_live_breakout_high_based_matches_backtest():
+    # Post-range bar spikes a HIGH above ORH (110) but CLOSES back under it.
+    # Old live logic (last close >= orh) would miss this; live_breakout (high
+    # >= orh, like the backtest) must detect it.
+    h = [110.0, 110.0, 110.0, 115.0]   # 4th bar high 115 > ORH 110
+    l = [90.0, 90.0, 90.0, 100.0]
+    c = [105.0, 105.0, 105.0, 104.0]   # 4th bar CLOSES at 104 < ORH
+    df = pd.DataFrame({"h": h, "l": l, "c": c})
+    assert S.live_breakout(df, 110.0) is True
+    assert float(df["c"].iloc[-1]) < 110.0   # the old close-based test would fail
+
+
+def test_live_breakout_false_when_range_not_pierced():
+    h = [110.0, 110.0, 110.0, 109.9]   # never reaches ORH 110
+    l = [90.0] * 4
+    c = [105.0] * 4
+    df = pd.DataFrame({"h": h, "l": l, "c": c})
+    assert S.live_breakout(df, 110.0) is False
+
+
+def test_live_breakout_ignores_opening_range_bars():
+    # A high inside the opening range itself must NOT count as a breakout.
+    h = [110.0, 110.0, 110.0, 100.0]   # only range bars touch 110; post-range low
+    l = [90.0] * 4
+    c = [95.0] * 4
+    df = pd.DataFrame({"h": h, "l": l, "c": c})
+    assert S.live_breakout(df, 110.0) is False
