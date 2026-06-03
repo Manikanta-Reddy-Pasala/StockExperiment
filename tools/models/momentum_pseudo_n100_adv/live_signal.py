@@ -245,8 +245,12 @@ def rank_universe(symbols: List[str], today_ts: int,
             continue  # missing price on either anchor — cannot rank
         if c_now > MAX_PRICE:
             continue  # MAX_PRICE (₹3000) gate — share-count floor / giant-loser guard
-        if not _close_above_sma200(fyers_sym, today_ts):
-            continue  # 200d-SMA uptrend gate
+        # 200d-SMA uptrend gate — ONLY when SMA_GATE is on. The backtest gates
+        # this inside `if SMA_GATE:` and strategy.SMA_GATE=False (dropping it
+        # lifted CAGR +71->+77%), so live must skip it too; otherwise live buys
+        # a different, lower-ranked name than the validated edge.
+        if S.SMA_GATE and not _close_above_sma200(fyers_sym, today_ts):
+            continue
         ret = (c_now / c_past - 1) * 100  # 30-day trailing return %
         rows.append((fyers_sym, plain_sym, ret, c_now))
     rows.sort(key=lambda r: -r[2])  # rank by 30d return, descending
