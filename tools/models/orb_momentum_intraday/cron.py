@@ -7,10 +7,11 @@ Schedule (IST):
          fyers_executor_multi places them (INTRADAY/MIS via product_for_model).
          Each scan re-checks holdings so a name is never double-bought, and
          entries stop after ENTRY_CUTOFF (10:00).
-  15:10  SQUARE-OFF: emit SELLS for every held name -> executor flattens.
+  15:15  SQUARE-OFF: emit SELLS for every held name -> executor flattens.
          (MIS broker auto-square-off is the backstop; this is the explicit exit.)
+         15:15 matches the backtest EOD exit so live==backtest (no CAGR drift).
 
-INTRADAY → flat by 15:10, ZERO overnight risk. Multi-holding (up to SELECT_TOP).
+INTRADAY → flat by 15:15, ZERO overnight risk. Multi-holding (up to SELECT_TOP).
 live_signal self-gates on time, so firing the same job daily is safe.
 """
 from __future__ import annotations
@@ -82,8 +83,10 @@ def scan_and_execute():
 
 
 def square_off():
-    """15:10 forced flatten — same path; live_signal emits SELLS for all held."""
-    log.info("orb: 15:10 SQUARE-OFF")
+    """15:15 forced flatten — same path; live_signal emits SELLS for all held.
+    15:15 matches the backtest EOD exit (EOD_FLAT_MIN) so live and backtest
+    flatten at the same bar (CAGR parity)."""
+    log.info("orb: 15:15 SQUARE-OFF")
     scan_and_execute()
 
 
@@ -97,10 +100,10 @@ def register_data_jobs(schedule):
 
 
 def register_trading_jobs(schedule):
-    """Morning breakout scans + 15:10 square-off. live_signal self-gates on time
-    (no entries after 10:00; sells only at/after 15:10)."""
+    """Morning breakout scans + 15:15 square-off. live_signal self-gates on time
+    (no entries after 10:00; sells only at/after 15:15 = EOD_FLAT_MIN)."""
     for t in ("09:30", "09:35", "09:40", "09:45", "09:50", "09:55"):
         schedule.every().day.at(t).do(scan_and_execute)
-    schedule.every().day.at("15:10").do(square_off)
-    # Safety re-attempt in case the 15:10 flatten partially filled.
-    schedule.every().day.at("15:13").do(square_off)
+    schedule.every().day.at("15:15").do(square_off)
+    # Safety re-attempt in case the 15:15 flatten partially filled.
+    schedule.every().day.at("15:18").do(square_off)

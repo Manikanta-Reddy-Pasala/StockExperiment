@@ -74,3 +74,36 @@ def test_live_breakout_ignores_opening_range_bars():
     c = [95.0] * 4
     df = pd.DataFrame({"h": h, "l": l, "c": c})
     assert S.live_breakout(df, 110.0) is False
+
+
+def _day_bars(post_h, post_l, post_c):
+    """A full 75-bar trading day (09:15..15:25 IST). Opening range = first OR_BARS
+    bars (high 110 / low 90); every post-range bar shares (post_h, post_l, post_c)."""
+    n = 75
+    dt = pd.date_range("2026-06-03 09:15", periods=n, freq="5min", tz="Asia/Kolkata")
+    h = [110.0] * S.OR_BARS + [post_h] * (n - S.OR_BARS)
+    l = [90.0] * S.OR_BARS + [post_l] * (n - S.OR_BARS)
+    c = [105.0] * S.OR_BARS + [post_c] * (n - S.OR_BARS)
+    o = c
+    return pd.DataFrame({"o": o, "h": h, "l": l, "c": c, "dt": dt})
+
+
+def test_orb_trade_eod_squares_off_at_eod_flat_min():
+    # PARITY: backtest and live both flatten at EOD_FLAT_MIN (15:25). orb_trade's
+    # EOD exit must be the 15:25 bar's close, driven by the shared EOD_FLAT_MIN
+    # constant (pre-2026-06-04 it was defined but unused — orb_trade held to the
+    # last bar regardless; harmless at 15:25 but it broke the moment live used a
+    # different time, and locks the live==backtest contract going forward).
+    df = _day_bars(post_h=115.0, post_l=100.0, post_c=112.0)  # breaks ORH 110, no stop(90)/target(150)
+    t = S.orb_trade(df, "TEST")
+    assert t is not None and t.reason == "eod"
+    assert t.entry_time == "09:30"          # breakout on the first post-range bar
+    assert t.exit_time == "15:15", f"EOD exit must be 15:15 (EOD_FLAT_MIN), got {t.exit_time}"
+    assert t.exit_px == 112.0               # close of the 15:15 bar
+
+
+def test_orb_trade_stop_target_still_take_priority_over_eod():
+    # A stop hit before EOD_FLAT must still exit at the stop (EOD gate is last).
+    df = _day_bars(post_h=115.0, post_l=80.0, post_c=112.0)   # low 80 <= stop 90
+    t = S.orb_trade(df, "TEST")
+    assert t is not None and t.reason == "stop"

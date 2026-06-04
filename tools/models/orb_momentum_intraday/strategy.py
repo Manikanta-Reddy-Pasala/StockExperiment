@@ -21,7 +21,7 @@ Each trading day:
   4. STOP / TARGET — stop at ORL (one range-width below entry); target at
      entry-side ORH + TARGET_MULT (2.0) × width.
   5. EXIT — whichever comes first: stop, target, or a forced square-off at
-     EOD_FLAT (15:10). Most trades exit flat at EOD (riding the intraday
+     EOD_FLAT (15:15). Most trades exit flat at EOD (riding the intraday
      trend); the rest stop/target. ZERO overnight risk.
 
 Position sizing (live): per-slot reserve = invested_amount / SELECT_TOP (e.g.
@@ -63,7 +63,13 @@ SELECT_TOP = 3          # trade the top-3 momentum leaders each day
 OR_BARS = 3             # opening-range = first 3 × 5-min bars (09:15-09:30 = 15 min)
 ENTRY_CUTOFF_MIN = 600  # only enter if the breakout fires before 10:00 (=10*60 min)
 TARGET_MULT = 2.0       # target = entry + TARGET_MULT × opening-range width
-EOD_FLAT_MIN = 910      # force square-off at/after 15:10 (=15*60+10); intraday only
+EOD_FLAT_MIN = 915      # force square-off at/after 15:15 (=15*60+15); intraday only.
+                        # SHARED by backtest (orb_trade EOD exit) AND live (emit
+                        # SELLS + cron square-off) so live and backtest flatten at
+                        # the SAME time — no CAGR drift from a mismatched exit.
+                        # 15:15 = robust peak of the EOD-time sweep (CAGR +323% /
+                        # Calmar 22.92); holding to the 15:25/close bar fades hard
+                        # (+235%). Before broker MIS auto-square-off (~15:20).
 MAX_PRICE = 1e9         # no price cap (liquid N500 names)
 MIN_PRICE = 100.0       # drop sub-₹100 penny names: their tiny opening ranges (a
                         # ₹0.10 tick = a huge %) whipsaw the ORB into fake breakouts
@@ -199,7 +205,12 @@ def orb_trade(day_bars: pd.DataFrame, symbol: str) -> Optional[OrbTrade]:
                     return OrbTrade(symbol, str(g["dt"].iloc[0].date()), times[i],
                                     times[j], round(entry, 2), round(target, 2),
                                     round((target / entry - 1 - ROUND_TRIP_COST) * 100, 3), "target")
-            cpx = float(g["c"].iloc[-1])            # EOD square-off at the close
+                if tmin.iloc[j] >= EOD_FLAT_MIN:    # EOD square-off at 15:15 — LIVE
+                    cpx = float(g["c"].iloc[j])     # PARITY: the live cron flattens
+                    return OrbTrade(symbol, str(g["dt"].iloc[0].date()), times[i],  # at EOD_FLAT_MIN, so
+                                    times[j], round(entry, 2), round(cpx, 2),       # the backtest must
+                                    round((cpx / entry - 1 - ROUND_TRIP_COST) * 100, 3), "eod")  # exit at the same bar
+            cpx = float(g["c"].iloc[-1])            # day ended before EOD_FLAT (half-session) -> last close
             return OrbTrade(symbol, str(g["dt"].iloc[0].date()), times[i],
                             times[-1], round(entry, 2), round(cpx, 2),
                             round((cpx / entry - 1 - ROUND_TRIP_COST) * 100, 3), "eod")

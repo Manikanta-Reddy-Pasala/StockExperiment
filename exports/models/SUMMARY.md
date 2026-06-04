@@ -6,7 +6,7 @@ All figures net of costs, ₹10L start, true point-in-time universes.
 
 | Model | Status | CAGR | maxDD | Calmar | Total |
 |---|---|---|---|---|---|
-| [Morning ORB (Intraday)](orb_momentum_intraday/SUMMARY.md) | OBSERVE (paper) | +235.1% | 15.5% | 15.18 | +203.0% |
+| [Morning ORB (Intraday)](orb_momentum_intraday/SUMMARY.md) | OBSERVE (paper) | +323.0% | 14.1% | 22.92 | +275.1% |
 | [Emerging Momentum](emerging_momentum/SUMMARY.md) | LIVE | +119.9% | 37.9% | 3.16 | +5902.4% |
 | [Liquid 100 Momentum](momentum_pseudo_n100_adv/SUMMARY.md) | LIVE | +77.4% | 43.8% | 1.77 | +1923.9% |
 | [Nifty 100 Momentum](momentum_n100_top5_max1/SUMMARY.md) | LIVE | +59.9% | 46.4% | 1.29 | +1075.6% |
