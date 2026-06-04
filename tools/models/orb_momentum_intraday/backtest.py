@@ -57,10 +57,14 @@ def run(start: date, end: date, capital: float = DEFAULT_CAP, out_dir=None):
     needed = set(); _seen0 = set()
     for di in range(len(ddates)):
         d = ddates[di]
-        if d.date() < start or d.date() in _seen0:
+        if d.date() < start or d.date() in _seen0 or di < 1:
             continue
         _seen0.add(d.date())
-        needed.update(S.rank_momentum(dcl, di, set(eligible_at(S.INDEX, d.date()))))
+        # Rank on the PRIOR daily close (di-1), NOT today's — no lookahead.
+        # Live ranks on the last available close (yesterday; today's daily bar is
+        # pulled ~20:30), then trades today's intraday. The backtest must match.
+        pri = ddates[di - 1].date()
+        needed.update(S.rank_momentum(dcl, di - 1, set(eligible_at(S.INDEX, pri))))
     five = {}
     for s in needed:
         p = _P(_CACHE) / f"{s.replace('NSE:', '').replace('-EQ', '')}.pkl"
@@ -73,15 +77,18 @@ def run(start: date, end: date, capital: float = DEFAULT_CAP, out_dir=None):
     by_day = {s: {dy: g for dy, g in df.groupby("day")} for s, df in five.items()}
 
     trades = []
-    daily_rets = []      # equal-weight basket return per trading day
+    daily_rets = []      # single all-in trade return per trading day (full capital)
     seen = set()
     for di in range(len(ddates)):
         d = ddates[di]
-        if d.date() < start or d.date() in seen:
+        if d.date() < start or d.date() in seen or di < 1:
             continue
         seen.add(d.date())
-        elig = set(eligible_at(S.INDEX, d.date()))
-        leaders = S.rank_momentum(dcl, di, elig)
+        # Rank on the PRIOR daily close (di-1) — NO lookahead, matching live
+        # (_today_leaders ranks on the last available close = yesterday, then
+        # trades today's intraday bars). Trade day = di's 5-min bars.
+        elig = set(eligible_at(S.INDEX, ddates[di - 1].date()))
+        leaders = S.rank_momentum(dcl, di - 1, elig)
         # ALL-IN single position: pick the ONE leader to commit full capital to
         # (earliest breakout, rank tiebreak — strategy.pick_leader, the SAME pick
         # live makes). One trade/day, full-capital, no re-entry. This is the real

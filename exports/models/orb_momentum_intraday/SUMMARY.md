@@ -1,6 +1,6 @@
 # Morning ORB (Intraday) (`orb_momentum_intraday`)
 
-**Status:** OBSERVE (paper)  
+**Status:** OBSERVE — NO EDGE  
 DAY-TRADE: watch top-3 momentum leaders (≥₹100); go ALL-IN (full capital, ONE position) on the FIRST to break above its 15-min opening-range high before 10:00; stop=OR-low, target=2×range, FORCED FLAT by 15:15. Zero overnight. One trade/day, no re-entry.
 
 **Universe:** Nifty 500 (PIT) — top-3 by 20d momentum, traded intraday
@@ -21,23 +21,23 @@ Backtest window: **2021-03-01 → 2026-05-29** (full ~5.2-year cycle: 2021 bull,
 
 | Metric | Value |
 |---|---|
-| Final NAV (₹10L start) | ₹4,585,775 |
-| Total return | +358.6% |
-| CAGR (annualized) | +426.7% |
-| Max drawdown | 21.7% |
-| Calmar | 19.65 |
-| Trades | 231 (124W / 107L) · 54% win |
+| Final NAV (₹10L start) | ₹369,110 |
+| Total return | -63.1% |
+| CAGR (annualized) | -71.7% |
+| Max drawdown | 67.3% |
+| Calmar | -1.07 |
+| Trades | 199 (71W / 128L) · 36% win |
 
 ## Year-by-year breakdown
 
 | Year | Return % | Intra-yr DD % |
 |---|---:|---:|
-| 2025 | +272.1% | 21.7% |
-| 2026 | +23.2% | 13.3% |
+| 2025 | -37.2% | 41.3% |
+| 2026 | -41.2% | 43.5% |
 
 ## Note
 
-The only intraday model. Momentum SELECT + long-only opening-range-breakout EXECUTION (momentum filter is the edge — raw ORB on random names is −13%). 2025-03→2026-05 on PIT N500 (realistic 0.15% slippage + 0.15% round-trip): +359% total / +427% CAGR / 21.7% DD / Calmar 19.65 / Sharpe ~3.96 / 231 trades / WR 54%. THREE 2026-06-04 changes: (1) MIN_PRICE ≥ ₹100 (drops sub-₹100 penny whipsaws — IDEA ~₹8, ALLCARGO — that fake-fired live); (2) EOD square-off moved off the close to 15:15 (sweep: the 15:15→15:30 bar fades hard, 15:25=+235% vs the 15:00-15:20 plateau peak); (3) ALL-IN SINGLE POSITION — full capital into the one best-momentum breakout, replacing the old 1/SELECT_TOP per-slot split that left ~45% of capital idle (≈49% of days only one of three leaders fires). The single all-in ≈ tripled the deployed return (fixed-slot ~+106% total vs +359%) at a higher DD (5.7%→21.7%) — same trade quality, more capital at work. Selection (rank_momentum+MIN_PRICE+pick_leader), exit (live_exit_reason) and EOD (EOD_FLAT_MIN) all in shared strategy → live == backtest, no drift; the only residual gap is fill PRICE (slippage model vs live LTP). ⚠️ SLIPPAGE-SENSITIVE and validated on ONE bull regime only (Feb-26 −11.9% chop-risk; no intraday bear tested). Cron scans every 5 min 09:30→15:10 (entries pre-10:00, stop/target all session) + 15:15 square-off, INTRADAY/MIS. OBSERVE/paper — flip to live in Settings after paper fills confirm slippage.
+⛔ NO DEMONSTRATED EDGE — DO NOT ENABLE LIVE. 2026-06-04 recheck found the old positive results (+251/+323/+427% across the day's iterations) were entirely LOOKAHEAD BIAS: the backtest ranked momentum on the SAME-DAY close (15:30) to pick that day's 09:30 morning breakout — using future information live cannot have (the daily bar isn't pulled until ~20:30, so live correctly ranks on the PRIOR close). Fixing the backtest to rank on the prior close (no lookahead, matching live) collapses it to −63% total / −72% CAGR / 67% DD / Sharpe −3.37 / 36% WR, NEGATIVE every year (2025 −37%, 2026 −41%). The intraday breakout of prior-close momentum leaders has no edge. The engineering work is sound and live==backtest (shared rank_momentum+MIN_PRICE+pick_leader / live_exit_reason / EOD_FLAT_MIN; MIN_PRICE≥₹100 still correctly kills the live penny fake-signals like IDEA) — but the SIGNAL loses money, so ORB stays OBSERVE/paper (zero real money at risk) until a genuinely-predictive selection is found. Other 6 models are unaffected: they rank and transact at the SAME observed close, no lookahead.
 
 ---
 *Auto-generated from summary.json by tools/analysis/refresh_export_docs.py — do not hand-edit.*

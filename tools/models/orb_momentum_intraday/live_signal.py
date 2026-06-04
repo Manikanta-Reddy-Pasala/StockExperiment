@@ -3,17 +3,20 @@
 Uses the SHARED core strategy.py (rank_momentum / orb_trade / params) — the same
 code the backtest runs, so live and backtest cannot drift.
 
-Designed to be called REPEATEDLY through the morning (e.g. an intraday cron every
-5 min, 09:30–10:00). On each call it:
-  1. Ranks today's top-SELECT_TOP momentum leaders (daily DB close + today's N500).
-  2. Pulls today's 5-min bars so far for those leaders (Fyers).
-  3. For any leader that has broken above its opening-range high BEFORE the cutoff
-     and isn't already held, emits a BUY with stop (ORL) + target (ORH+2×width).
-  4. After EOD_FLAT, emits SELL (force-flat) for anything still open.
+Called REPEATEDLY through the session (cron scans every 5 min 09:30–15:10). Each
+call mirrors the backtest (orb_trade / pick_leader / live_exit_reason — shared
+strategy.py, so live and backtest cannot drift):
+  1. Ranks today's top-SELECT_TOP momentum leaders (daily DB close + PIT N500,
+     price ≥ MIN_PRICE) and pulls their 5-min bars so far.
+  2. ENTRY (before 10:00, only when flat): ALL-IN — one BUY for the full capital
+     on the leader pick_leader chooses (earliest breakout, rank tiebreak). Single
+     position, one trade/day, no re-entry after the exit.
+  3. EXIT (every scan): SELL a held name that has hit STOP (ORL) or TARGET
+     (ORH+2×width) — live_exit_reason, same rule as orb_trade.
+  4. At/after EOD_FLAT (15:15): SELL (force-flat) anything still open.
 
-This writes a signals JSON; a separate executor consumes it (places the long +
-bracket order). NOTE: the intraday cron + executor are not wired yet — this is the
-signal layer. Run ad-hoc:
+This writes a signals JSON; the executor (fyers_executor_multi) consumes it. Run
+ad-hoc:
   python -m tools.models.orb_momentum_intraday.live_signal --signals-out /tmp/orb.json
 """
 from __future__ import annotations
@@ -156,9 +159,11 @@ def emit_signals(now: dt.datetime = None) -> dict:
       via stop/target; without this live would ride everything to EOD and NOT
       reproduce the backtest. The cron scans every 5 min all session so these
       fire intraday.)
-    - Before the entry cutoff (10:00): emit a BUY for each top leader that has
-      broken above its opening-range high and is NOT already held, sized to one
-      slot (invested/SELECT_TOP). After the cutoff: no new buys.
+    - Before the entry cutoff (10:00) and only when flat: emit ONE BUY — ALL-IN
+      (full capital, strategy.full_qty) on the leader strategy.pick_leader
+      chooses (earliest breakout among the watched top-SELECT_TOP, rank tiebreak),
+      the SAME pick the backtest makes. One trade/day, no re-entry after exit
+      (held / sold-this-scan / already-bought-today all block re-entry).
     """
     now = now or dt.datetime.now()
     mins = now.hour * 60 + now.minute

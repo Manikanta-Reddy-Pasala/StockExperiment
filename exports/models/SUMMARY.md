@@ -6,13 +6,13 @@ All figures net of costs, ₹10L start, true point-in-time universes.
 
 | Model | Status | CAGR | maxDD | Calmar | Total |
 |---|---|---|---|---|---|
-| [Morning ORB (Intraday)](orb_momentum_intraday/SUMMARY.md) | OBSERVE (paper) | +426.7% | 21.7% | 19.65 | +358.6% |
 | [Emerging Momentum](emerging_momentum/SUMMARY.md) | LIVE | +119.9% | 37.9% | 3.16 | +5902.4% |
 | [Liquid 100 Momentum](momentum_pseudo_n100_adv/SUMMARY.md) | LIVE | +77.4% | 43.8% | 1.77 | +1923.9% |
 | [Nifty 100 Momentum](momentum_n100_top5_max1/SUMMARY.md) | LIVE | +59.9% | 46.4% | 1.29 | +1075.6% |
 | [Retest Momentum](momentum_retest_n500/SUMMARY.md) | DISABLED (₹0) | +57.2% | 38.8% | 1.47 | +973.6% |
 | [Weekly Top-40](n40/SUMMARY.md) | LIVE | +48.1% | 37.0% | 1.3 | +684.7% |
 | [Midcap Breakout](midcap_narrow_60d_breakout/SUMMARY.md) | LIVE | +11.2% | 57.2% | 0.2 | +74.6% |
+| [Morning ORB (Intraday)](orb_momentum_intraday/SUMMARY.md) | OBSERVE — NO EDGE | -71.7% | 67.3% | -1.07 | -63.1% |
 
 **Caveats:**
 - `momentum_pseudo_n100_adv` = optimistic upper bound (ADV-selection bias, not real index).

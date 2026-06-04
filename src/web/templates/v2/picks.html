@@ -29,7 +29,7 @@ const MODELS = [
   {key: "momentum_pseudo_n100_adv",    title: "Liquid 100 Momentum",  desc: "Monthly rotation • top-100 ADV from N500 • rank-1 (fixed May universe anchor)",  schedule: "monthly"},
   {key: "momentum_retest_n500",        title: "Retest Momentum",      desc: "Monthly basket of 4 (top-120 ADV N500) • buy each within 20% of 20-EMA • retain top-4", schedule: "monthly", multi: 4},
   {key: "emerging_momentum",           title: "Emerging Momentum",    desc: "Single-position (max-1) momentum rotation on emerging mid/small caps (PIT N500 minus N100) • 15d ret>0 • ≤₹3000 • retain-3 • monthly + mid-month (5% lead)", schedule: "monthly"},
-  {key: "orb_momentum_intraday",       title: "Morning ORB (Intraday)", desc: "DAY-TRADE • watch top-3 N500 momentum (≥₹100) • ALL-IN full capital on the FIRST 15-min opening-range breakout before 10:00 (single position) • exit stop (ORL) / target (ORH+2×width) / force-flat 15:15 • OBSERVE (paper)", schedule: "daily"},
+  {key: "orb_momentum_intraday",       title: "Morning ORB (Intraday)", desc: "⛔ NO EDGE (paper only) — backtest +edge was lookahead bias; honest = −63% • DAY-TRADE watch top-3 N500 momentum (≥₹100) • all-in first opening-range breakout before 10:00 • exit stop/target/15:15", schedule: "daily"},
 ];
 
 // Format YYYY-MM-DD in local TZ (avoid toISOString → UTC date drift).

@@ -563,9 +563,9 @@ const MODEL_META = {
       ['Opening range', 'First 15 min (3× 5-min bars, 09:15–09:30): ORH/ORL'],
       ['Entry', 'ALL-IN, SINGLE position: full capital into the FIRST of the 3 to break above ORH before 10:00 (rank tiebreak). One trade/day, no re-entry'],
       ['Exit', 'Stop=ORL · target=ORH+2×width · else force-flat at 15:15 (checked every 5 min all session; same rules live as backtest)'],
-      ['Backtest 2025-03→2026-05 (PIT, slip 0.15%)', '+359% total / +427% CAGR / 21.7% DD / Calmar 19.7 / Sharpe 3.96'],
-      ['Trades', '231 (~1/day, single position) · WR 54%'],
-      ['Note', 'OBSERVE/paper. 06-04: ALL-IN single position (full capital into the one best-momentum breakout — was 1/3-per-slot, which idled ~45% capital; tripled deployed return, DD 5.7%→21.7%) + ₹100 filter + 15:15 EOD. Slippage-sensitive; one bull regime — watch live fills'],
+      ['Backtest 2025-03→2026-05 (PIT, no lookahead)', '⛔ −63% total / −72% CAGR / 67% DD / Sharpe −3.37 / 36% WR — NEGATIVE every year'],
+      ['Trades', '199 (~1/day, single position) · WR 36%'],
+      ['Note', '⛔ NO EDGE — DO NOT ENABLE LIVE. 06-04 recheck: the old +427% was LOOKAHEAD bias (ranked on the same-day 15:30 close to pick the 09:30 trade). Ranking on the prior close (what live actually does) → −63%, loses every year. Engineering is sound (live==backtest, ₹100 filter still kills penny fakes) but the signal has no intraday edge. Stays OBSERVE/paper until a predictive selection is found'],
     ],
   },
 };
