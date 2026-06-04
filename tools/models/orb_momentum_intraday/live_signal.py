@@ -95,6 +95,23 @@ def _held_symbols() -> set:
         return set()
 
 
+def _entered_today(today: date) -> bool:
+    """True if ORB already opened a position (a BUY fill) today. ORB takes ONE
+    all-in trade per day with no re-entry after the exit — matching the backtest
+    — so once today's BUY is logged, later scans must not re-enter."""
+    try:
+        from src.models.database import get_database_manager
+        from src.models.model_ledger_models import ModelTrade
+        db = get_database_manager()
+        with db.get_session() as s:
+            row = (s.query(ModelTrade)
+                   .filter(ModelTrade.model_name == MODEL_NAME, ModelTrade.side == "BUY")
+                   .order_by(ModelTrade.trade_at.desc()).first())
+            return bool(row and row.trade_at and row.trade_at.date() == today)
+    except Exception:
+        return False
+
+
 def _invested() -> float:
     """orb invested_amount (capital cap) from model_settings."""
     try:
@@ -168,43 +185,40 @@ def emit_signals(now: dt.datetime = None) -> dict:
             out["sells"].append({"symbol": sym, "reason": reason})
             sold.add(sym)
 
-    # ---- entries: morning only ----
+    # ---- entry: morning only, SINGLE ALL-IN position ----
     if mins >= S.ENTRY_CUTOFF_MIN:
         return out             # no new entries after the morning cutoff
+    if held or sold or _entered_today(today):
+        # already in the day's position, just sold it, or already traded today —
+        # ORB takes ONE all-in trade per day (no re-entry), matching the backtest.
+        return out
     leaders = _today_leaders(today)
     if not leaders:
         return out
     invested = _invested()
-    _missing_intraday = []
+    leaders_bars, _missing_intraday = [], []
     for sym in leaders:
-        if sym in held or sym in sold:
-            continue           # already in this name (or just sold it) — don't buy
-        df = _fresh_today_bars(sym, today, now, fy)
-        if df is None:
-            # Past the opening-range window, missing bars mean a broken Fyers feed.
-            if mins >= (9 * 60 + 35):
-                _missing_intraday.append(sym.replace("NSE:", "").replace("-EQ", ""))
-            continue
-        # min_post_bars=1: live only needs one bar past the opening range to test
-        # a breakout, so the 09:35+ scans can fire instead of waiting for the
-        # backtest default (8 bars / ~09:50) and missing early breakouts.
+        df = _fresh_today_bars(sym, today, now, fy)   # min_post_bars handled in pick_leader
+        leaders_bars.append(df)
+        if df is None and mins >= (9 * 60 + 35):
+            _missing_intraday.append(sym.replace("NSE:", "").replace("-EQ", ""))
+    # pick_leader = the SAME choice the backtest makes: earliest breakout (rank
+    # tiebreak) among the watched leaders. Commit the FULL capital to that one.
+    ci = S.pick_leader(leaders_bars)
+    if ci is not None:
+        chosen, df = leaders[ci], leaders_bars[ci]
         rng = S.opening_range(df, min_post_bars=1)
-        if rng is None:
-            continue
-        orh, orl = rng
-        width = orh - orl
-        # Backtest-parity breakout: any post-range bar high >= orh (intrabar),
-        # NOT just the last bar's close — see strategy.live_breakout.
-        if S.live_breakout(df, orh):   # broken out — signal a long, one slot
+        if rng is not None:
+            orh, orl = rng
+            width = orh - orl
             entry_hint = round(orh * (1 + S.SLIPPAGE), 2)
-            qty = S.slot_qty(invested, S.SELECT_TOP, entry_hint)
-            if qty < 1:
-                continue
-            out["buys"].append({
-                "symbol": sym, "qty": qty, "ref_high": round(orh, 2),
-                "entry_hint": entry_hint, "stop": round(orl, 2),
-                "target": round(orh + S.TARGET_MULT * width, 2),
-            })
+            qty = S.full_qty(invested, entry_hint)     # ALL-IN, full capital
+            if qty >= 1:
+                out["buys"].append({
+                    "symbol": chosen, "qty": qty, "ref_high": round(orh, 2),
+                    "entry_hint": entry_hint, "stop": round(orl, 2),
+                    "target": round(orh + S.TARGET_MULT * width, 2),
+                })
     if _missing_intraday:
         _orb_alert_missing("No intraday 5-min bars for: " + ", ".join(_missing_intraday)
                            + " — Fyers intraday feed may be down.")

@@ -82,19 +82,19 @@ def run(start: date, end: date, capital: float = DEFAULT_CAP, out_dir=None):
         seen.add(d.date())
         elig = set(eligible_at(S.INDEX, d.date()))
         leaders = S.rank_momentum(dcl, di, elig)
-        day_tr = []
-        for sym in leaders:
-            g = by_day.get(sym, {}).get(d.date())
-            if g is None:
-                continue
-            t = S.orb_trade(g, sym)
+        # ALL-IN single position: pick the ONE leader to commit full capital to
+        # (earliest breakout, rank tiebreak — strategy.pick_leader, the SAME pick
+        # live makes). One trade/day, full-capital, no re-entry. This is the real
+        # live sizing; the old per-slot/mean basket left ~45% of capital idle.
+        leaders_bars = [by_day.get(sym, {}).get(d.date()) for sym in leaders]
+        ci = S.pick_leader(leaders_bars)
+        if ci is not None:
+            t = S.orb_trade(leaders_bars[ci], leaders[ci])
             if t is not None:
                 trades.append(t)
-                day_tr.append(t.ret_pct / 100.0)
-        if day_tr:
-            daily_rets.append((d, float(np.mean(day_tr))))
+                daily_rets.append((d, t.ret_pct / 100.0))   # full capital into the one pick
 
-    # equity curve from equal-weight daily basket returns
+    # equity curve from the single all-in daily trade (full-capital)
     idx = pd.DatetimeIndex([d for d, _ in daily_rets])
     sr = pd.Series([r for _, r in daily_rets], index=idx)
     eq = (1 + sr).cumprod()

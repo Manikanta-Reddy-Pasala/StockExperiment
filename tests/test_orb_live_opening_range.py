@@ -138,3 +138,44 @@ def test_live_exit_reason_holds_when_no_trigger_pre_eod():
     assert S.live_exit_reason(df, now_mins=S.EOD_FLAT_MIN - 5) is None
     # …and the same bars at/after EOD_FLAT -> EOD square-off.
     assert S.live_exit_reason(df, now_mins=S.EOD_FLAT_MIN) == "EOD_FLAT"
+
+
+# ---- single all-in selection (full capital into ONE best-momentum breakout) ----
+
+def _day_break_at(b, n=75):
+    """75-bar day; opening range (first OR_BARS) high110/low90; price stays UNDER
+    ORH (110) until bar `b`, then breaks (high 115). No stop (lows >= 100)."""
+    dt = pd.date_range("2026-06-03 09:15", periods=n, freq="5min", tz="Asia/Kolkata")
+    h = [110.0] * S.OR_BARS + [105.0] * (b - S.OR_BARS) + [115.0] * (n - b)
+    l = [90.0] * S.OR_BARS + [100.0] * (n - S.OR_BARS)
+    c = [105.0] * n
+    return pd.DataFrame({"o": c, "h": h, "l": l, "c": c, "dt": dt})
+
+
+def test_breakout_bar_index():
+    assert S.breakout_bar_index(_day_break_at(6)) == 6
+    # never breaks (all post-range highs stay under ORH 110) -> None
+    flat = _day_break_at(6); flat["h"] = [110.0] * S.OR_BARS + [105.0] * (len(flat) - S.OR_BARS)
+    assert S.breakout_bar_index(flat) is None
+
+
+def test_pick_leader_earliest_breakout():
+    # rank-1 (idx1) breaks at bar 4, rank-0 at bar 6 -> earliest wins (idx1),
+    # achievable live (commit at the first breakout, not the strongest-by-EOD).
+    assert S.pick_leader([_day_break_at(6), _day_break_at(4), None]) == 1
+
+
+def test_pick_leader_rank_tiebreak_same_bar():
+    # both break on the same bar -> strongest momentum rank (lowest index) wins.
+    assert S.pick_leader([_day_break_at(5), _day_break_at(5)]) == 0
+
+
+def test_pick_leader_none_when_no_breakout():
+    flat = _day_break_at(6); flat["h"] = [110.0] * S.OR_BARS + [105.0] * (len(flat) - S.OR_BARS)
+    assert S.pick_leader([flat, None]) is None
+
+
+def test_full_qty_all_in():
+    assert S.full_qty(30000, 100.0) == 300     # full capital, single position
+    assert S.full_qty(30000, 0) == 0
+    assert S.full_qty(0, 100.0) == 0

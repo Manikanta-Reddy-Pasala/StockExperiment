@@ -13,22 +13,24 @@ Each trading day:
      on random names just whipsaws — the momentum filter is the edge.)
   2. OPENING RANGE — for each leader, the first OR_BARS (3 × 5-min = 15 min,
      09:15-09:30) define the opening range: ORH = high, ORL = low, width = ORH-ORL.
-  3. ENTRY — go LONG when price breaks ABOVE ORH, but ONLY if that breakout
-     happens before ENTRY_CUTOFF (10:00). Late breakouts are skipped (they have
-     less room to run and a worse edge — morning-only nearly doubled the return).
-     Long-only: we never short, because on up-momentum names the downside break
-     mostly fails.
+  3. ENTRY — watch the top SELECT_TOP leaders; go ALL-IN (full capital, ONE
+     position) on the FIRST to break ABOVE its ORH, but ONLY if that breakout is
+     before ENTRY_CUTOFF (10:00). The pick is the earliest breakout (rank as the
+     tiebreak) — achievable live, we commit the moment the first one breaks
+     without needing to know which others break later. Long-only. One trade per
+     day: after the position exits there is no re-entry.
   4. STOP / TARGET — stop at ORL (one range-width below entry); target at
      entry-side ORH + TARGET_MULT (2.0) × width.
   5. EXIT — whichever comes first: stop, target, or a forced square-off at
      EOD_FLAT (15:15). Most trades exit flat at EOD (riding the intraday
      trend); the rest stop/target. ZERO overnight risk.
 
-Position sizing (live): per-slot reserve = invested_amount / SELECT_TOP (e.g.
-₹30k/3 = ₹10k per leader). Each breakout takes ONE slot, so a single morning
-breakout deploys only its ₹10k and leaves the other slots' cash free for later
-breakouts (the incremental nature of ORB entries). Already-held names are not
-re-bought.
+Position sizing (live): ALL-IN, single position. The full model capital
+(invested_amount) goes into the one best-momentum leader that breaks out
+(strategy.full_qty + pick_leader). The earlier 1/SELECT_TOP-per-slot scheme left
+~45% of capital idle (≈49% of days only one of three leaders fires), roughly a
+third of the achievable return — so ORB now concentrates into the single
+breakout instead of reserving slots for leaders that may never break.
 
 ================================ WHY THESE PARAMS ============================
 6-yr daily momentum work established that momentum is the only ≥60% edge on NSE.
@@ -206,6 +208,66 @@ def live_exit_reason(day_bars: pd.DataFrame, now_mins: int) -> Optional[str]:
             if float(g["h"].iloc[j]) >= target:  # target
                 return "TARGET"
     return "EOD_FLAT" if now_mins >= EOD_FLAT_MIN else None
+
+
+def breakout_bar_index(day_bars: pd.DataFrame) -> Optional[int]:
+    """Index of the FIRST post-opening-range bar whose HIGH breaks ORH before the
+    entry cutoff (the bar a long would enter on), or None if no qualifying
+    breakout. Same breakout + cutoff test as orb_trade's entry scan."""
+    g = day_bars.reset_index(drop=True)
+    rng = opening_range(g, min_post_bars=1)
+    if rng is None:
+        return None
+    orh, _ = rng
+    tmin = g["dt"].dt.hour * 60 + g["dt"].dt.minute
+    for i in range(OR_BARS, len(g)):
+        if tmin.iloc[i] >= ENTRY_CUTOFF_MIN:
+            return None
+        if float(g["h"].iloc[i]) >= orh:
+            return i
+    return None
+
+
+def pick_leader(leaders_bars: List[Optional[pd.DataFrame]]) -> Optional[int]:
+    """Choose the ONE leader to go ALL-IN on (single full-capital position).
+
+    `leaders_bars` is ordered by momentum rank (index 0 = strongest); each entry
+    is that leader's day bars (or None if no data). Returns the chosen index, or
+    None if no leader broke out before the cutoff.
+
+    Pick = the EARLIEST breakout (so it is achievable LIVE — we commit the moment
+    the first leader breaks, never needing to know which others break later),
+    with momentum RANK as the tiebreak when two break on the same bar. Shared by
+    backtest and live so both pick the same name (no lookahead, no drift). ORB
+    holds ONE position with the full model capital, not a 1/SELECT_TOP slice —
+    reserving slots for leaders that may never break wastes ~45% of capital
+    (≈49% of days only one of three fires).
+    """
+    best_key = None
+    best_idx = None
+    for rank, bars in enumerate(leaders_bars):
+        if bars is None:
+            continue
+        bi = breakout_bar_index(bars)
+        if bi is None:
+            continue
+        key = (bi, rank)          # earliest bar first, then strongest (lowest) rank
+        if best_key is None or key < best_key:
+            best_key, best_idx = key, rank
+    return best_idx
+
+
+def full_qty(invested: float, entry_px: float) -> int:
+    """Shares for an ALL-IN single position = floor(invested / entry_px).
+    ORB commits the full model capital to the one best-momentum leader that
+    breaks out (single position), so there is no per-slot split. Returns 0 on
+    bad inputs."""
+    try:
+        if invested > 0 and entry_px > 0:
+            return int(float(invested) / float(entry_px))
+    except (TypeError, ValueError, ZeroDivisionError):
+        pass
+    return 0
 
 
 def orb_trade(day_bars: pd.DataFrame, symbol: str) -> Optional[OrbTrade]:
