@@ -107,3 +107,34 @@ def test_orb_trade_stop_target_still_take_priority_over_eod():
     df = _day_bars(post_h=115.0, post_l=80.0, post_c=112.0)   # low 80 <= stop 90
     t = S.orb_trade(df, "TEST")
     assert t is not None and t.reason == "stop"
+
+
+# ---- live<->backtest EXIT parity (the live cron must exit on the SAME rule) ----
+
+_EXIT_MAP = {"stop": "STOP", "target": "TARGET", "eod": "EOD_FLAT"}
+
+
+def test_live_exit_reason_matches_orb_trade():
+    # For the SAME day bars, the live exit decision (live_exit_reason) must match
+    # the backtest's realized exit (orb_trade.reason). Pre-2026-06-04 live had NO
+    # intraday stop/target -> it rode every position to EOD, missing the 41% of
+    # backtest trades that exit on stop/target. Lock the parity.
+    cases = {
+        "stop":   _day_bars(post_h=115.0, post_l=80.0,  post_c=112.0),  # low 80 <= ORL 90
+        "target": _day_bars(post_h=150.0, post_l=100.0, post_c=140.0),  # high 150 >= target 150
+        "eod":    _day_bars(post_h=115.0, post_l=100.0, post_c=112.0),  # neither -> ride to EOD
+    }
+    for bt_reason, df in cases.items():
+        t = S.orb_trade(df, "TEST")
+        assert t is not None and t.reason == bt_reason, f"orb_trade should be {bt_reason}"
+        # now_mins past EOD so the eod case resolves (stop/target are clock-free)
+        live = S.live_exit_reason(df, now_mins=S.EOD_FLAT_MIN)
+        assert live == _EXIT_MAP[bt_reason], f"{bt_reason}: live={live}, want {_EXIT_MAP[bt_reason]}"
+
+
+def test_live_exit_reason_holds_when_no_trigger_pre_eod():
+    # No stop/target and before EOD_FLAT -> hold (None), do not square off early.
+    df = _day_bars(post_h=115.0, post_l=100.0, post_c=112.0)
+    assert S.live_exit_reason(df, now_mins=S.EOD_FLAT_MIN - 5) is None
+    # …and the same bars at/after EOD_FLAT -> EOD square-off.
+    assert S.live_exit_reason(df, now_mins=S.EOD_FLAT_MIN) == "EOD_FLAT"

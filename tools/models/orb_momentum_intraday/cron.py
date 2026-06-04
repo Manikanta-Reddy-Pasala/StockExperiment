@@ -1,13 +1,17 @@
 """Cron wiring for orb_momentum_intraday (the only INTRADAY model).
 
 Schedule (IST):
-  09:30, 09:35, 09:40, 09:45, 09:50, 09:55  breakout scan + execute
-      -> live_signal.emit_signals writes today's BUY set (leaders that broke
-         above ORH, not already held, sized to one invested/SELECT_TOP slot);
-         fyers_executor_multi places them (INTRADAY/MIS via product_for_model).
-         Each scan re-checks holdings so a name is never double-bought, and
-         entries stop after ENTRY_CUTOFF (10:00).
-  15:15  SQUARE-OFF: emit SELLS for every held name -> executor flattens.
+  every 5 min 09:30 → 15:10  scan + execute
+      -> live_signal.emit_signals does BOTH, mirroring the backtest orb_trade:
+         (a) ENTRY (before the 10:00 cutoff): BUY leaders that broke above ORH,
+             not already held, sized to one invested/SELECT_TOP slot.
+         (b) EXIT (all session): SELL a held name the moment it hits its STOP
+             (ORL) or TARGET (ORH+2×width) — strategy.live_exit_reason, same
+             rule as the backtest. (Without all-session scans live could not see
+             a midday stop/target and would ride to EOD, breaking parity.)
+         fyers_executor_multi places them (INTRADAY/MIS). Each scan re-checks
+         holdings so a name is never double-bought; entries stop after 10:00.
+  15:15  SQUARE-OFF: emit SELLS for every still-held name -> executor flattens.
          (MIS broker auto-square-off is the backstop; this is the explicit exit.)
          15:15 matches the backtest EOD exit so live==backtest (no CAGR drift).
 
@@ -100,10 +104,20 @@ def register_data_jobs(schedule):
 
 
 def register_trading_jobs(schedule):
-    """Morning breakout scans + 15:15 square-off. live_signal self-gates on time
-    (no entries after 10:00; sells only at/after 15:15 = EOD_FLAT_MIN)."""
-    for t in ("09:30", "09:35", "09:40", "09:45", "09:50", "09:55"):
-        schedule.every().day.at(t).do(scan_and_execute)
+    """Scan every 5 min 09:30→15:10, then square off at 15:15.
+
+    The 5-min cadence mirrors the 5-min bar and lets live_signal check BOTH:
+      - ENTRY breakouts (only fire before the 10:00 cutoff; emit self-gates), and
+      - intraday STOP/TARGET exits on held names (orb_trade exits 41% of trades
+        this way — backtest parity needs live to check all session, not just AM).
+    live_signal self-gates on time, so firing the same job every 5 min is safe
+    (no double-buy: held names are skipped; nothing to do = no executor call)."""
+    h, m = 9, 30
+    while (h, m) <= (15, 10):
+        schedule.every().day.at(f"{h:02d}:{m:02d}").do(scan_and_execute)
+        m += 5
+        if m >= 60:
+            h, m = h + 1, m - 60
     schedule.every().day.at("15:15").do(square_off)
     # Safety re-attempt in case the 15:15 flatten partially filled.
     schedule.every().day.at("15:18").do(square_off)

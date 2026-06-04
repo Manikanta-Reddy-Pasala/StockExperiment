@@ -105,17 +105,43 @@ def _invested() -> float:
         return 0.0
 
 
+def _fresh_today_bars(sym: str, today: date, now: dt.datetime, fy):
+    """Today's 5-min bars for `sym`, or None if missing/stale/wrong-day.
+
+    Shared freshness gate for BOTH the entry breakout test and the intraday
+    stop/target exit test so they act on the same data quality bar.
+    """
+    df = fetch_5min(sym, today, today, fy=fy)
+    if df is None or len(df) < S.OR_BARS + 1:
+        return None
+    if df["day"].iloc[-1] != today:          # not today's session (cached/old)
+        return None
+    try:
+        age = (now - df["dt"].iloc[-1].to_pydatetime().replace(tzinfo=None)).total_seconds() / 60.0
+    except Exception:
+        age = 0.0
+    if age > S.STALE_BAR_MAX_MIN:             # halted/dead feed — don't act
+        print(f"orb: {sym} last 5-min bar {age:.0f}m old (> {S.STALE_BAR_MAX_MIN}m) — stale, skip.")
+        return None
+    return df
+
+
 def emit_signals(now: dt.datetime = None) -> dict:
     """Current intraday signal set in the MULTI-executor schema:
     {model, ts, sells:[{symbol,reason}], buys:[{symbol,qty,...}]}.
 
-    - At/after EOD_FLAT (15:10): emit SELLS for EVERY currently-held name
+    Mirrors the backtest (orb_trade) end-to-end so live == backtest:
+    - At/after EOD_FLAT (15:15): emit SELLS for EVERY currently-held name
       (force square-off; reason EOD_FLAT). No buys.
-    - Before the entry cutoff: emit a BUY for each top leader that has broken
-      above its opening-range high and is NOT already held, sized to one slot
-      (invested/SELECT_TOP). After the cutoff: no new buys.
-    The executor (fyers_executor_multi) places these; stop/target are carried as
-    hints for a future bracket-order extension (the executor ignores them today).
+    - BEFORE EOD, every scan: for each held name, emit a SELL if it has hit its
+      STOP (ORL) or TARGET (ORH+2×width) — strategy.live_exit_reason, the SAME
+      stop/target rule and priority as orb_trade. (orb_trade exits 41% of trades
+      via stop/target; without this live would ride everything to EOD and NOT
+      reproduce the backtest. The cron scans every 5 min all session so these
+      fire intraday.)
+    - Before the entry cutoff (10:00): emit a BUY for each top leader that has
+      broken above its opening-range high and is NOT already held, sized to one
+      slot (invested/SELECT_TOP). After the cutoff: no new buys.
     """
     now = now or dt.datetime.now()
     mins = now.hour * 60 + now.minute
@@ -127,53 +153,48 @@ def emit_signals(now: dt.datetime = None) -> dict:
             out["sells"].append({"symbol": sym, "reason": "EOD_FLAT"})
         return out
 
+    today = now.date()
+    fy = _fyers()
+    held = _held_symbols()
+
+    # ---- intraday STOP/TARGET exits (backtest parity; runs every scan pre-EOD) ----
+    sold = set()
+    for sym in sorted(held):
+        df = _fresh_today_bars(sym, today, now, fy)
+        if df is None:
+            continue           # can't verify -> hold; the 15:15 EOD flatten is the backstop
+        reason = S.live_exit_reason(df, mins)
+        if reason in ("STOP", "TARGET"):
+            out["sells"].append({"symbol": sym, "reason": reason})
+            sold.add(sym)
+
+    # ---- entries: morning only ----
     if mins >= S.ENTRY_CUTOFF_MIN:
         return out             # no new entries after the morning cutoff
-
-    today = now.date()
     leaders = _today_leaders(today)
     if not leaders:
         return out
-    held = _held_symbols()
     invested = _invested()
-    fy = _fyers()
     _missing_intraday = []
     for sym in leaders:
-        if sym in held:
-            continue           # already in this name — don't re-buy
-        df = fetch_5min(sym, today, today, fy=fy)
-        if df is None or len(df) < S.OR_BARS + 1:
-            # No / too-few intraday bars for a leader we'd otherwise watch.
-            # Past the opening-range window this means a broken Fyers feed.
+        if sym in held or sym in sold:
+            continue           # already in this name (or just sold it) — don't buy
+        df = _fresh_today_bars(sym, today, now, fy)
+        if df is None:
+            # Past the opening-range window, missing bars mean a broken Fyers feed.
             if mins >= (9 * 60 + 35):
                 _missing_intraday.append(sym.replace("NSE:", "").replace("-EQ", ""))
             continue
-        # Intraday FRESHNESS gate — refuse to act on stale/wrong-day bars:
-        #  (1) the latest bar must be TODAY (not a cached/old session), and
-        #  (2) it must be recent (live feed alive), else a halted/dead feed
-        #      could read an old close as a "breakout". A missed entry is safe.
-        if df["day"].iloc[-1] != today:
-            continue
-        try:
-            last_bar_age_min = (now - df["dt"].iloc[-1].to_pydatetime().replace(tzinfo=None)).total_seconds() / 60.0
-        except Exception:
-            last_bar_age_min = 0.0
-        if last_bar_age_min > S.STALE_BAR_MAX_MIN:
-            print(f"orb: {sym} last 5-min bar {last_bar_age_min:.0f}m old "
-                  f"(> {S.STALE_BAR_MAX_MIN}m) — stale feed, skip.")
-            continue
         # min_post_bars=1: live only needs one bar past the opening range to test
-        # a breakout (the emit guard above already requires OR_BARS + 1 bars), so
-        # the 09:35+ scans can fire instead of waiting for the backtest default
-        # (8 bars / ~09:50) and missing early breakouts.
+        # a breakout, so the 09:35+ scans can fire instead of waiting for the
+        # backtest default (8 bars / ~09:50) and missing early breakouts.
         rng = S.opening_range(df, min_post_bars=1)
         if rng is None:
             continue
         orh, orl = rng
         width = orh - orl
         # Backtest-parity breakout: any post-range bar high >= orh (intrabar),
-        # NOT just the last bar's close — see strategy.live_breakout. Catches
-        # breakouts that spiked above the range and closed back under.
+        # NOT just the last bar's close — see strategy.live_breakout.
         if S.live_breakout(df, orh):   # broken out — signal a long, one slot
             entry_hint = round(orh * (1 + S.SLIPPAGE), 2)
             qty = S.slot_qty(invested, S.SELECT_TOP, entry_hint)

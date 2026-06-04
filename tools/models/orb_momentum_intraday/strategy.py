@@ -173,6 +173,41 @@ def live_breakout(day_bars: pd.DataFrame, orh: float) -> bool:
     return False
 
 
+def live_exit_reason(day_bars: pd.DataFrame, now_mins: int) -> Optional[str]:
+    """The exit a HELD ORB position should take RIGHT NOW given today's bars-so-far.
+
+    Returns "STOP" / "TARGET" / "EOD_FLAT" / None(hold), using the SAME rules and
+    the SAME priority as orb_trade's exit loop so live and backtest exit on the
+    same condition (test-locked: test_live_exit_reason_matches_orb_trade):
+      - entry bar = first post-opening-range bar whose high >= ORH (the breakout);
+      - then, in order, the first later bar with low <= ORL (STOP) or high >=
+        ORH + TARGET_MULT*width (TARGET) — stop checked before target per bar,
+        exactly like orb_trade;
+      - else, if the clock has reached EOD_FLAT_MIN, EOD_FLAT (force square-off);
+      - else None (still in the trade).
+    `now_mins` is the wall-clock minute-of-day of this scan (for the EOD gate);
+    the stop/target decision is purely from the bars, so it matches the backtest.
+    """
+    g = day_bars.reset_index(drop=True)
+    rng = opening_range(g, min_post_bars=1)
+    if rng is None:
+        return "EOD_FLAT" if now_mins >= EOD_FLAT_MIN else None
+    orh, orl = rng
+    target = orh + TARGET_MULT * (orh - orl)
+    entry_i = None
+    for i in range(OR_BARS, len(g)):
+        if float(g["h"].iloc[i]) >= orh:
+            entry_i = i
+            break
+    if entry_i is not None:
+        for j in range(entry_i + 1, len(g)):
+            if float(g["l"].iloc[j]) <= orl:     # stop (same priority as orb_trade)
+                return "STOP"
+            if float(g["h"].iloc[j]) >= target:  # target
+                return "TARGET"
+    return "EOD_FLAT" if now_mins >= EOD_FLAT_MIN else None
+
+
 def orb_trade(day_bars: pd.DataFrame, symbol: str) -> Optional[OrbTrade]:
     """Run the long-only morning ORB on one stock's 5-min bars for one day.
 
