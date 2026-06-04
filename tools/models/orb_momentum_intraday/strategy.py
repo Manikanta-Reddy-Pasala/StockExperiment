@@ -65,6 +65,9 @@ ENTRY_CUTOFF_MIN = 600  # only enter if the breakout fires before 10:00 (=10*60 
 TARGET_MULT = 2.0       # target = entry + TARGET_MULT × opening-range width
 EOD_FLAT_MIN = 910      # force square-off at/after 15:10 (=15*60+10); intraday only
 MAX_PRICE = 1e9         # no price cap (liquid N500 names)
+MIN_PRICE = 100.0       # drop sub-₹100 penny names: their tiny opening ranges (a
+                        # ₹0.10 tick = a huge %) whipsaw the ORB into fake breakouts
+                        # (e.g. IDEA ~₹8) — noise, not the momentum-trend edge.
 # Data-freshness guards (live): refuse to act on stale data.
 STALE_BAR_MAX_MIN = 15  # latest 5-min bar must be within this many minutes of now
 DAILY_STALE_MAX_DAYS = 7  # daily ranking panel's last close must be within this
@@ -109,6 +112,9 @@ def rank_momentum(daily_close: pd.DataFrame, di: int, eligible: set) -> List[str
     descending. `eligible` is the PIT index membership (plain symbols, no NSE: wrap).
     Returns plain symbols best-first. Shared by backtest and live (live passes the
     last daily row + today's official Nifty-500 list).
+
+    Sub-MIN_PRICE names are dropped (penny stocks whipsaw the intraday ORB — see
+    MIN_PRICE), using the ranking-day close as the price reference.
     """
     if di < LOOKBACK:
         return []
@@ -120,7 +126,7 @@ def rank_momentum(daily_close: pd.DataFrame, di: int, eligible: set) -> List[str
         if bare not in eligible:
             continue
         a, b = now.get(s), then.get(s)
-        if pd.notna(a) and pd.notna(b) and float(b) > 0:
+        if pd.notna(a) and pd.notna(b) and float(b) > 0 and float(a) >= MIN_PRICE:
             rets[bare] = float(a) / float(b) - 1.0
     return [s for s, _ in sorted(rets.items(), key=lambda kv: -kv[1])][:SELECT_TOP]
 

@@ -33,6 +33,26 @@ def test_rank_momentum_excludes_non_eligible_names():
     assert top[:3] == ["HFCL", "WOCKPHARMA", "IDEA"]
 
 
+def test_rank_momentum_drops_sub_min_price_penny_names():
+    # 2026-06-04: penny names (IDEA ~Rs8) get huge % momentum moves and rank
+    # top-3, but their tiny opening range whipsaws the intraday ORB into fake
+    # breakouts. rank_momentum must drop names whose ranking-day close < MIN_PRICE.
+    idx = pd.date_range("2026-04-01", periods=S.LOOKBACK + 2, freq="D")
+    base = {
+        "NSE:IDEA-EQ":     [4] * (S.LOOKBACK + 1) + [8],      # +100% but Rs8 -> drop
+        "NSE:PENNY-EQ":    [50] * (S.LOOKBACK + 1) + [99],    # +98% but Rs99 -> drop
+        "NSE:RELIANCE-EQ": [1000] * (S.LOOKBACK + 1) + [1500],  # +50%, Rs1500 -> keep
+        "NSE:TCS-EQ":      [1000] * (S.LOOKBACK + 1) + [1400],  # +40%, keep
+        "NSE:INFY-EQ":     [1000] * (S.LOOKBACK + 1) + [1300],  # +30%, keep
+    }
+    cl = pd.DataFrame(base, index=idx)
+    eligible = {"IDEA", "PENNY", "RELIANCE", "TCS", "INFY"}
+    top = S.rank_momentum(cl, len(cl) - 1, eligible)
+    assert "IDEA" not in top, "sub-MIN_PRICE penny name must be dropped"
+    assert "PENNY" not in top
+    assert top == ["RELIANCE", "TCS", "INFY"], "only >=MIN_PRICE names survive, by momentum"
+
+
 def test_today_leaders_uses_eligible_at_not_union():
     # Guard the exact regression: the source must rank over eligible_at, not the
     # survivorship-biased universe_union, when building the live `elig` set.
