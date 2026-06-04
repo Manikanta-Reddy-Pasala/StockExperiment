@@ -24,12 +24,12 @@
 // 4 equity models to show. `schedule` drives the next-rebalance display.
 const MODELS = [
   {key: "momentum_n100_top5_max1",     title: "Nifty 100 Momentum",   desc: "Monthly rotation + mid-month check • real Nifty 100 • 15-trading-day return",        schedule: "monthly_midcheck"},
-  {key: "n20_daily_large_only",        title: "Weekly Top-40",        desc: "Weekly rotation • top-40 ADV ∩ N100 • uptrend",                           schedule: "weekly"},
+  {key: "n20_daily_large_only",        title: "Weekly Top-40",        desc: "Weekly rotation • top-40 ADV ∩ N100 • uptrend • −12% from-entry daily stop",   schedule: "weekly"},
   {key: "midcap_narrow_60d_breakout",  title: "Midcap Breakout",      desc: "Event-driven • 40-day high + vol surge + 200d SMA",                       schedule: "event"},
   {key: "momentum_pseudo_n100_adv",    title: "Liquid 100 Momentum",  desc: "Monthly rotation • top-100 ADV from N500 • rank-1 (fixed May universe anchor)",  schedule: "monthly"},
   {key: "momentum_retest_n500",        title: "Retest Momentum",      desc: "Monthly basket of 4 (top-120 ADV N500) • buy each within 20% of 20-EMA • retain top-4", schedule: "monthly", multi: 4},
   {key: "emerging_momentum",           title: "Emerging Momentum",    desc: "Single-position (max-1) momentum rotation on emerging mid/small caps (PIT N500 minus N100) • 15d ret>0 • ≤₹3000 • retain-3 • monthly + mid-month (5% lead)", schedule: "monthly"},
-  {key: "orb_momentum_intraday",       title: "Morning ORB (Intraday)", desc: "DAY-TRADE • top-3 N500 momentum leaders • LONG the 15-min opening-range breakout before 10:00 • flat by 15:25 • BACKTEST-ONLY (no live orders)", schedule: "daily", multi: 3},
+  {key: "orb_momentum_intraday",       title: "Morning ORB (Intraday)", desc: "DAY-TRADE • top-3 N500 momentum (≥₹100) • LONG the 15-min opening-range breakout before 10:00 • exit on stop (ORL) / target (ORH+2×width) / force-flat 15:15 • OBSERVE (paper)", schedule: "daily", multi: 3},
 ];
 
 // Format YYYY-MM-DD in local TZ (avoid toISOString → UTC date drift).
