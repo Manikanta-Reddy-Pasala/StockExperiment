@@ -198,8 +198,12 @@ def write_summary(model_dir, meta, trades, summary=None):
 """
     op = s.get('open_position')
     if op:
-        md += (f"| Open position | **{op['sym']}** qty {op['qty']:,} entry Rs.{op['entry_px']:,.2f} "
-               f"({op['entry_date']}) last Rs.{op['last_px']:,.2f} unrealized {op['unrealized_pnl']:+,.0f} |\n")
+        _sym = op.get('sym') or op.get('symbol') or '?'
+        md += f"| Open position | **{_sym}** qty {op.get('qty', 0):,} entry Rs.{op.get('entry_px', 0):,.2f}"
+        if op.get('last_px') is not None:
+            md += (f" ({op.get('entry_date', '')}) last Rs.{op['last_px']:,.2f} "
+                   f"unrealized {op.get('unrealized_pnl', 0):+,.0f}")
+        md += " |\n"
     py = (summary or {}).get("per_year") or {}
     if py:
         md += "\n## Year-by-year breakdown\n\n| Year | Return % | Intra-yr DD % |\n|---|---:|---:|\n"

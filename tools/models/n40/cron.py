@@ -132,6 +132,39 @@ def execute_orders():
         _alert(f"❌ {MODEL_NAME} execute error: {e}")
 
 
+def stop_check():
+    """DAILY from-entry fixed-% hard-stop check (every trading day). live_signal
+    --stop-check writes a STOP_HIT SELL to a *_stop.json file if the held name's
+    low pierced entry*(1-STOP_PCT); if so, execute it immediately. Uses the SHARED
+    stop helper -> matches the backtest exactly. Mirrors n100's stop_check."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    SIGNALS_DIR.mkdir(parents=True, exist_ok=True)
+    stop_out = SIGNALS_DIR / f"{today}_n20_stop.json"
+    cmd = ["python3", "tools/models/n40/live_signal.py",
+           "--signals-out", str(stop_out), "--stop-check"]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=300,
+                           env={**os.environ, "MOMROT_TG_NOTIFY": "1"})
+        if r.returncode != 0:
+            log.error(f"❌ {MODEL_NAME} stop-check failed ({r.returncode}): {r.stderr[-300:]}")
+            _alert(f"❌ {MODEL_NAME} stop-check failed (rc={r.returncode})"); return
+        import json as _json
+        if stop_out.exists() and _json.loads(stop_out.read_text() or "[]"):
+            log.info(f"{MODEL_NAME} STOP_HIT -> executing {stop_out}")
+            user_id = os.environ.get("USER_ID", "1")
+            ex = subprocess.run(
+                ["python3", "tools/live/fyers_executor.py", "--signals", str(stop_out),
+                 "--user-id", user_id, "--model-name", MODEL_NAME],
+                capture_output=True, text=True, timeout=1200)
+            log.info(f"{'✅' if ex.returncode == 0 else '❌'} {MODEL_NAME} stop execute")
+            if ex.returncode != 0:
+                log.error(ex.stderr[-300:])
+                _alert(f"❌ {MODEL_NAME} stop execute failed (rc={ex.returncode})")
+    except Exception as e:
+        log.error(f"❌ {MODEL_NAME} stop-check error: {e}")
+        _alert(f"❌ {MODEL_NAME} stop-check error: {e}")
+
+
 # ---- Data-side helpers ----
 
 def _quarterly_universe():
@@ -177,3 +210,7 @@ def register_trading_jobs(schedule):
     # 09:33 (staggered off n100 09:30 / pseudo 09:31 / midcap 09:32) — one
     # scheduler thread runs these serially, so each model gets its own minute.
     schedule.every().day.at("09:33").do(execute_orders)
+    # 09:39 DAILY from-entry -12% hard-stop check (staggered after the 09:33
+    # execute and off n100's 09:37). Runs every trading day; fires a STOP_HIT
+    # SELL only if the held name's low pierced entry*(1-STOP_PCT).
+    schedule.every().day.at("09:39").do(stop_check)

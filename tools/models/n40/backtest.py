@@ -44,10 +44,12 @@ from tools.shared.universes import nifty500_symbols  # noqa: F401
 from tools.shared.backtest_engine import run_rotation_backtest
 from tools.shared.index_membership import eligible_at, universe_union
 from tools.shared.rebalance_calendar import build_weekly_calendar
+from tools.shared.rotation_strategy import decide_rotation
+from tools.shared.stops import fixed_stop_hit
 
 
 from tools.models.n40.strategy import (  # noqa: E402  shared w/ live
-    UNIV_SIZE, LOOKBACK, ADV_WIN, SMA_LONG, RETAIN)
+    UNIV_SIZE, LOOKBACK, ADV_WIN, SMA_LONG, RETAIN, STOP_PCT)
 N100_CSV  = str(ROOT / "src" / "data" / "symbols" / "nifty100.csv")
 DEFAULT_START = date(2021, 3, 1)
 DEFAULT_END   = date(2026, 5, 29)
@@ -92,7 +94,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
         # Pull 400 extra calendar days before `start` so the 200d SMA and the
         # rolling 20d ADV are fully warmed up on the first evaluated day.
         df = pd.read_sql(text(
-            "SELECT symbol,date,close,volume FROM historical_data "
+            "SELECT symbol,date,close,low,volume FROM historical_data "
             "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b AND data_source='fyers' "
             "ORDER BY symbol,date"
         ), c, params={"s": n500, "a": start - timedelta(days=400), "b": end})
@@ -101,6 +103,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
     # ADV proxy in rupees = close * volume (rupee turnover, not share count).
     df["adv_rs"] = df["close"].astype(float) * df["volume"].astype(float)
     cl = df.pivot(index="date", columns="symbol", values="close").ffill()
+    lo = df.pivot(index="date", columns="symbol", values="low").ffill()  # for the daily stop
     adv_rs = df.pivot(index="date", columns="symbol", values="adv_rs").fillna(0)
     adv20 = adv_rs.rolling(ADV_WIN).mean()      # 20-day average daily turnover
     sma200 = cl.rolling(SMA_LONG).mean()        # 200-day SMA (long uptrend ref)
@@ -147,21 +150,81 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
         rets = cl.iloc[di].reindex(pit_univ) / cl.iloc[di - LOOKBACK].reindex(pit_univ) - 1
         return list(rets.dropna().sort_values(ascending=False).index)
 
-    # retain_top_n=1 -> pure top-1 daily rotation (sell as soon as held drops
-    # below rank-1). Same knob the live path passes to decide_rotation.
-    res = run_rotation_backtest(
-        dates=dates, close=cl, calendar=calendar, rank_at=rank_at,
-        capital=capital, start=start, end=end, retain_top_n=RETAIN,
-    )
-    final, cagr = res.final_nav, res.cagr_pct
-    trades, yrs, wins, losses, open_pos = (res.trades, res.years, res.wins,
-                                           res.losses, res.open_position)
-    # Daily MTM DD is the headline risk metric for this high-churn daily model;
-    # mdd_realized (rebal-day cap_after DD) is reported only as a secondary view.
-    mdd_nav = res.max_dd_mtm_pct        # daily MTM DD — primary metric for daily rebal
-    mdd_realized = res.max_dd_pct       # rebal cap_after DD
-    # Calmar = CAGR / drawdown; clamp denominator so a ~0 DD can't divide-by-zero.
+    # DAILY-MTM single-position walk WITH the from-entry FIXED-% hard stop
+    # (shared tools.shared.stops.fixed_stop_hit — the SAME helper the live
+    # --stop-check uses, so backtest/live cannot drift). Selection/rotation stays
+    # the production rule: decide_rotation on WEEKLY calendar days, retain_top_n=
+    # RETAIN. The stop is checked EVERY trading day on the LOW. STOP_PCT=0 ->
+    # reproduces the rotation-only baseline exactly. (Replaces the shared engine,
+    # which only checked the stop on calendar/weekly steps — too coarse for a
+    # daily from-entry stop. Validated 2026-06-04: -12% lifts CAGR 41->48 / cuts
+    # DD 41->37 / Calmar 0.99->1.30.)
+    _STOP = float(STOP_PCT or 0.0)
+    cal = {pd.Timestamp(d): k for d, k in calendar}
+    cash = capital; hold = None; q = 0; entry = 0.0; entry_dt = None
+    trades = []; navdays = []; cap_marks = []
+    first_di = dates.get_loc(min(cal)) if cal else 0
+    for di in range(first_di, len(dates)):
+        d = dates[di]
+        px = float(cl[hold].iloc[di]) if hold and pd.notna(cl[hold].iloc[di]) else None
+        navdays.append((d, cash + (q * px if hold and px else 0.0)))
+        if hold and q > 0 and _STOP > 0:
+            dlow = float(lo[hold].iloc[di]) if hold in lo.columns and pd.notna(lo[hold].iloc[di]) else px
+            hit, lvl = fixed_stop_hit(entry, dlow, _STOP)
+            if hit and lvl:
+                cash += q * lvl
+                trades.append({"sym": hold.replace("NSE:", "").replace("-EQ", ""),
+                               "entry_date": entry_dt, "exit_date": d.date().isoformat(),
+                               "qty": q, "entry_px": round(entry, 2), "exit_px": round(lvl, 2),
+                               "pnl": round(q * lvl - q * entry, 0),
+                               "ret_pct": round((lvl / entry - 1) * 100, 2) if entry else 0.0,
+                               "cap_after": round(cash, 0), "exit_reason": "FIXED_STOP"})
+                cap_marks.append((d, cash)); hold = None; q = 0; entry = 0.0
+        if cal.get(d) is None:
+            continue
+        ranked = rank_at(di)
+        if not ranked:
+            continue
+        if decide_rotation(hold, ranked, retain_top_n=RETAIN).is_noop:
+            continue
+        if hold and q > 0:
+            sx = float(cl[hold].iloc[di]); cash += q * sx
+            trades.append({"sym": hold.replace("NSE:", "").replace("-EQ", ""),
+                           "entry_date": entry_dt, "exit_date": d.date().isoformat(),
+                           "qty": q, "entry_px": round(entry, 2), "exit_px": round(sx, 2),
+                           "pnl": round(q * sx - q * entry, 0),
+                           "ret_pct": round((sx / entry - 1) * 100, 2) if entry else 0.0,
+                           "cap_after": round(cash, 0), "exit_reason": "ROTATE"})
+            cap_marks.append((d, cash)); hold = None; q = 0
+        top = ranked[0]; bx = float(cl[top].iloc[di])
+        if bx > 0:
+            n = int(cash / bx)
+            if n >= 1 and n * bx <= cash:
+                cash -= n * bx; q = n; hold = top; entry = bx; entry_dt = d.date().isoformat()
+    final = cash + (q * float(cl[hold].iloc[-1]) if hold else 0.0)
+    yrs = (end - start).days / 365.25
+    cagr = ((final / capital) ** (1 / yrs) - 1) * 100 if final > 0 else -100.0
+    _nav = pd.Series([v for _, v in navdays], index=pd.DatetimeIndex([d for d, _ in navdays]))
+    _roll = _nav.cummax()
+    # Daily MTM DD is the headline risk metric for this high-churn model;
+    # mdd_realized (exit-day cap_after DD) is the secondary view.
+    mdd_nav = float(((_roll - _nav) / _roll).max()) * 100 if len(_nav) > 1 else 0.0
+    if cap_marks:
+        _cap = pd.Series([v for _, v in cap_marks], index=pd.DatetimeIndex([d for d, _ in cap_marks]))
+        _cr = _cap.cummax(); mdd_realized = float(((_cr - _cap) / _cr).max()) * 100 if len(_cap) > 1 else 0.0
+    else:
+        mdd_realized = 0.0
     calmar = cagr / max(0.01, mdd_nav)
+    wins = sum(1 for t in trades if t["pnl"] > 0)
+    losses = sum(1 for t in trades if t["pnl"] < 0)
+    open_pos = ({"sym": hold.replace("NSE:", "").replace("-EQ", ""), "qty": q,
+                 "entry_px": round(entry, 2)} if hold else None)
+    per_year = {}
+    for yy, g in _nav.groupby(_nav.index.year):
+        if len(g) > 1:
+            rl = g.cummax()
+            per_year[int(yy)] = {"ret_pct": round((g.iloc[-1] / g.iloc[0] - 1) * 100, 1),
+                                 "dd_pct": round(float(((rl - g) / rl).max()) * 100, 1)}
 
     print(f"\n## v2 Large-only RESULTS")
     print(f"  Final NAV:    Rs.{final:,.0f}")
@@ -189,7 +252,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
             "wins": wins, "losses": losses,
             "win_rate_pct": round(wins / max(1, wins + losses) * 100, 1),
             "open_position": open_pos,
-            "per_year": res.per_year,
+            "per_year": per_year,
         }
         (out_dir / "summary.json").write_text(json.dumps(summary, indent=2))
 

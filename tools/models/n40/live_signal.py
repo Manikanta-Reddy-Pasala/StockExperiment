@@ -53,12 +53,13 @@ from sqlalchemy import text
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
-from tools.shared.ohlcv_cache import _get_engine  # noqa: E402
+from tools.shared.ohlcv_cache import _get_engine, read_cached, bar_is_stale  # noqa: E402
 from tools.shared.universes import nifty100_symbols, nifty500_symbols  # noqa: E402
 from tools.shared.index_membership import eligible_at  # noqa: E402  PIT n100 gate
 from tools.shared.rotation_strategy import decide_rotation  # noqa: E402
+from tools.shared.stops import fixed_stop_hit  # noqa: E402  shared from-entry stop helper
 from tools.models.n40.strategy import (  # noqa: E402  shared w/ backtest
-    UNIV_SIZE, ADV_WIN, SMA_LONG, RETAIN, LOOKBACK as LOOKBACK_RET)
+    UNIV_SIZE, ADV_WIN, SMA_LONG, RETAIN, STOP_PCT, LOOKBACK as LOOKBACK_RET)
 from tools.shared.rebalance_calendar import is_week_rebalance_day  # noqa: E402  weekly rebal
 
 log = logging.getLogger("n20_daily_signal")
@@ -125,6 +126,49 @@ def get_current_position() -> Optional[Dict]:
     except Exception as e:
         log.warning(f"ledger read failed: {e}")
     return None
+
+
+def run_stop_check(today: datetime, sig_path) -> int:
+    """DAILY from-entry FIXED-% hard-stop check (mirror of n100). Emits a STOP_HIT
+    SELL when the held name's LOW pierces entry*(1-STOP_PCT), via the SHARED
+    tools.shared.stops.fixed_stop_hit (the SAME helper backtest.py applies) so
+    live and backtest can never drift. Runs every trading day regardless of the
+    weekly-rebalance gate. Fail-safe: writes an empty signals file and skips on
+    flat / missing entry / missing or stale data (never sells on bad input)."""
+    sig_path = Path(sig_path); sig_path.parent.mkdir(parents=True, exist_ok=True)
+    pct = float(STOP_PCT or 0.0)
+    if pct <= 0:
+        sig_path.write_text(json.dumps([])); return 0
+    pos = get_current_position()
+    sym = pos.get("open_symbol") if pos else None
+    if not sym:
+        log.info("stop-check: flat — nothing to check."); sig_path.write_text(json.dumps([])); return 0
+    entry_px = float((pos.get("open_entry_px") if pos else 0) or 0)
+    if entry_px <= 0:
+        log.warning("stop-check: held has no entry_px; skip."); sig_path.write_text(json.dumps([])); return 0
+    to_ts = int(today.timestamp())
+    df = read_cached(sym, "D", to_ts - 90 * 86400, to_ts)
+    if df is None or df.empty:
+        log.warning(f"stop-check: no data for {sym}; skip."); sig_path.write_text(json.dumps([])); return 0
+    if bar_is_stale(int(df.iloc[-1]["timestamp"]), to_ts):
+        log.error("stop-check: data stale; skip (fail-safe)."); sig_path.write_text(json.dumps([])); return 1
+    day_low = float(df["low"].iloc[-1])
+    hit, lvl = fixed_stop_hit(entry_px, day_low, pct)
+    log.info(f"stop-check {sym}: entry={entry_px:.2f} stop={lvl} day_low={day_low:.2f} "
+             f"-> {'HIT' if hit else 'ok'}")
+    if hit:
+        sig_path.write_text(json.dumps([{
+            "model": MODEL_NAME, "symbol": sym,
+            "company": sym.split(":")[-1].replace("-EQ", ""),
+            "ts": today.strftime("%Y-%m-%d %H:%M:%S"), "side": "SELL",
+            "signal": "STOP_HIT", "price": float(lvl), "sl": 0.0, "target": 0.0,
+            "note": f"fixed -{pct*100:.0f}% from-entry stop: low {day_low:.2f} <= "
+                    f"entry {entry_px:.2f} x (1-{pct}) ({lvl:.2f})",
+        }]))
+        log.info(f"stop-check: STOP_HIT emitted for {sym} @ {lvl:.2f}")
+    else:
+        sig_path.write_text(json.dumps([]))
+    return 0
 
 
 def load_panel(symbols: List[str], days_back: int = 400) -> pd.DataFrame:
@@ -327,6 +371,10 @@ def main() -> int:
     ap.add_argument("--top-n", type=int, default=1)
     ap.add_argument("--force", action="store_true",
                     help="Bypass weekday + enabled checks")
+    ap.add_argument("--stop-check", dest="stop_check", action="store_true",
+                    help="DAILY from-entry fixed-% hard-stop check: emit STOP_HIT "
+                         "SELL if the held name's low pierces entry*(1-STOP_PCT). "
+                         "Runs every trading day (independent of weekly rebalance).")
     args = ap.parse_args()
 
     logging.basicConfig(level=logging.INFO,
@@ -335,6 +383,11 @@ def main() -> int:
     today = datetime.now()
     log.info(f"{MODEL_NAME} signal run: today={today.date()} "
              f"weekday={today.strftime('%A')}")
+
+    # DAILY hard-stop check runs before the enabled/rebalance gates — a protective
+    # SELL must fire on any trading day the held name breaches its stop.
+    if args.stop_check:
+        return run_stop_check(today, args.signals_out)
 
     if not args.force and not is_model_enabled():
         log.warning(f"{MODEL_NAME}: model_settings.enabled is False — "

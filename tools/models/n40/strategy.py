@@ -14,3 +14,10 @@ LOOKBACK = 30        # momentum window (TRADING days)
 ADV_WIN = 20         # ADV averaging window
 SMA_LONG = 200       # uptrend filter: close > 200d SMA
 RETAIN = 1           # exit band — top-1 weekly rotation
+# From-entry FIXED-% hard stop (backtest-validated 2026-06-04 via n40 daily-MTM
+# stop sweep). n40 was the only momentum model without a stop. -12% won on BOTH
+# axes: full 2021-26 CAGR 41.1->48.1 / DD 41.4->37.1 / Calmar 0.99->1.30
+# (-10% ~equal: 46.4/35.6/1.30; smooth plateau, not a spike). SHARED with
+# backtest + live --stop-check via tools.shared.stops. Level = entry*(1-STOP_PCT),
+# checked daily on the LOW. Set STOP_PCT=0 to disable.
+STOP_PCT = 0.12
