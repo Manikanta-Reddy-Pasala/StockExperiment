@@ -144,14 +144,45 @@
   </div>
 </div>
 
-<div class="card">
+<div class="card" id="gl_card" style="display:none;">
+  <div class="card-header d-flex justify-content-between align-items-center"
+       data-bs-toggle="collapse" data-bs-target="#gl_body" aria-expanded="false" style="cursor:pointer">
+    <span><i class="bi bi-graph-up-arrow me-2"></i>Gainers &amp; Losers
+      <span class="text-muted small ms-2 d-none d-sm-inline">open positions, by % move</span></span>
+    <i class="bi bi-chevron-down"></i>
+  </div>
+  <div class="collapse" id="gl_body">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-6">
+          <div class="fw-bold small text-success mb-1"><i class="bi bi-arrow-up-right"></i> Top Gainers</div>
+          <div id="gl_gainers"><div class="text-muted small">—</div></div>
+        </div>
+        <div class="col-6">
+          <div class="fw-bold small text-danger mb-1"><i class="bi bi-arrow-down-right"></i> Top Losers</div>
+          <div id="gl_losers"><div class="text-muted small">—</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-3">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"
-       data-bs-toggle="collapse" data-bs-target="#open_body" aria-expanded="true" style="cursor:pointer">
+       data-bs-toggle="collapse" data-bs-target="#open_body" aria-expanded="false" style="cursor:pointer">
     <span><i class="bi bi-briefcase me-2"></i>Open Positions — by Model
       <span class="text-muted small ms-2 d-none d-sm-inline">each model's own qty &amp; cost (live MTM)</span></span>
-    <span class="d-flex align-items-center gap-2"><span class="text-muted small" id="open_pnl_sum"></span><i class="bi bi-chevron-down"></i></span>
+    <span class="d-flex align-items-center gap-2">
+      <select id="open_sort" class="form-select form-select-sm w-auto" onclick="event.stopPropagation()" onchange="renderOpen()" title="Sort open positions">
+        <option value="sym">Sort: Symbol</option>
+        <option value="gain">Gain ₹ (high→low)</option>
+        <option value="gainpct">Gain % (high→low)</option>
+        <option value="loss">Losers first</option>
+        <option value="value">Value (high→low)</option>
+      </select>
+      <span class="text-muted small" id="open_pnl_sum"></span><i class="bi bi-chevron-down"></i></span>
   </div>
-  <div class="collapse show" id="open_body">
+  <div class="collapse" id="open_body">
   <div class="card-body">
     <div id="positions_grid"><div class="text-muted py-2">Loading…</div></div>
     <div class="d-flex justify-content-between align-items-center mt-2 pager" id="open_pager" style="display:none!important;">
@@ -165,12 +196,19 @@
 
 <div class="card mt-3">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"
-       data-bs-toggle="collapse" data-bs-target="#closed_body" aria-expanded="true" style="cursor:pointer">
+       data-bs-toggle="collapse" data-bs-target="#closed_body" aria-expanded="false" style="cursor:pointer">
     <span><i class="bi bi-check2-square me-2"></i>Closed Positions — by Model
-      <span class="text-muted small ms-2 d-none d-sm-inline">realized P&amp;L from closed trades (newest first)</span></span>
-    <span class="d-flex align-items-center gap-2"><span class="text-muted small" id="closed_pnl_sum"></span><i class="bi bi-chevron-down"></i></span>
+      <span class="text-muted small ms-2 d-none d-sm-inline">realized P&amp;L from closed trades</span></span>
+    <span class="d-flex align-items-center gap-2">
+      <select id="closed_sort" class="form-select form-select-sm w-auto" onclick="event.stopPropagation()" onchange="renderClosed()" title="Sort closed positions">
+        <option value="date">Sort: Newest</option>
+        <option value="gain">Gain ₹ (high→low)</option>
+        <option value="gainpct">Gain % (high→low)</option>
+        <option value="loss">Losers first</option>
+      </select>
+      <span class="text-muted small" id="closed_pnl_sum"></span><i class="bi bi-chevron-down"></i></span>
   </div>
-  <div class="collapse show" id="closed_body">
+  <div class="collapse" id="closed_body">
   <div class="card-body">
     <div id="closed_grid"><div class="text-muted py-2">Loading…</div></div>
     <div class="d-flex justify-content-between align-items-center mt-2 pager" id="closed_pager" style="display:none!important;">
@@ -224,6 +262,10 @@ const WIRED_MODELS = new Set([
 
 // Symbol -> [model_name] map. Filled by loadAggregate, consumed by loadState.
 const SYMBOL_TO_MODEL = {};
+
+// Cached raw position arrays so the sort dropdowns re-render without re-fetching.
+let OPEN_POS = [];
+let CLOSED_POS = [];
 function _norm(sym) {
   if (!sym) return '';
   return sym.toUpperCase().replace(/^NSE:/, '').replace(/-EQ$/, '');
@@ -389,26 +431,20 @@ async function loadState() {
     const r = await fetch('/admin/models/portfolio', {cache: 'no-store'});
     const d = await r.json();
     if (!d.success) return;
-    const pos = []; let openPnl = 0;
+    OPEN_POS = [];
     (d.models || []).forEach(m => {
       if (!m.enabled) return;
       const add = (sym, qty, entry, live) => {
-        const c = (Number(qty)||0)*(Number(entry)||0), mv = (Number(qty)||0)*((Number(live)||0)||Number(entry)||0);
-        openPnl += (mv - c);
-        pos.push({ model: m.model_name, sym, qty, entry, live, _sym: (sym||'').replace('NSE:','').replace('-EQ',''), _mv: mv });
+        const q = Number(qty)||0, e = Number(entry)||0, l = (Number(live)||0)||e;
+        const c = q*e, mv = q*l, pnl = mv - c;
+        OPEN_POS.push({ model: m.model_name, sym, qty, entry, live,
+          _sym: (sym||'').replace('NSE:','').replace('-EQ',''), _mv: mv,
+          _pnl: pnl, _pct: c>0 ? (pnl/c*100) : 0 });
       };
       if (m.open_symbol && m.open_qty) add(m.open_symbol, m.open_qty, m.open_entry_px, m.open_mtm_price);
       (m.holdings || []).forEach(h => add(h.symbol, h.qty, h.entry_px, h.mtm_price));
     });
-    // Group same-symbol positions together (so a stock held by 2 models shows
-    // adjacent — e.g. HFCL by pseudo + emerging — not split across pages),
-    // bigger market value first within a symbol.
-    pos.sort((a, b) => a._sym.localeCompare(b._sym) || (b._mv - a._mv));
-    const cards = pos.map(p => posCard(p.model, p.sym, p.qty, p.entry, p.live));
-    const ope = document.getElementById('open_pnl_sum');
-    if (ope) { ope.textContent = `${cards.length} open · P&L ${fmtINR(openPnl)}`; ope.className = 'text-muted small ' + cls(openPnl); }
-    PAGER.open.items = cards.length ? cards : ['<div class="text-muted py-2">No open positions</div>'];
-    PAGER.open.page = 0; renderPage('open');
+    renderOpen();
     loadClosed();
   } catch(e) { console.error(e); }
 }
@@ -458,14 +494,64 @@ async function loadClosed() {
         closed.push({ model, ...t });
       });
     });
-    closed.sort((a, b) => String(b.trade_at).localeCompare(String(a.trade_at)));
-    let realized = 0;
-    const cards = closed.map(t => { realized += Number(t.pnl || 0); return closedCard(t); });
-    const cpe = document.getElementById('closed_pnl_sum');
-    if (cpe) { cpe.textContent = `${closed.length} closed · Realized ${fmtINR(realized)}`; cpe.className = 'text-muted small ' + cls(realized); }
-    PAGER.closed.items = cards.length ? cards : ['<div class="text-muted py-2">No closed positions yet</div>'];
-    PAGER.closed.page = 0; renderPage('closed');
+    CLOSED_POS = closed;
+    renderClosed();
   } catch(e) { console.error(e); }
+}
+
+// Sort + render the OPEN positions grid per the #open_sort dropdown, refresh
+// the header P&L summary, and the Gainers/Losers card. Re-runnable on sort
+// change without re-fetching (operates on the cached OPEN_POS array).
+function renderOpen() {
+  const mode = (document.getElementById('open_sort') || {}).value || 'sym';
+  const arr = OPEN_POS.slice();
+  if (mode === 'sym')          arr.sort((a,b)=> a._sym.localeCompare(b._sym) || (b._mv - a._mv));
+  else if (mode === 'gain')    arr.sort((a,b)=> b._pnl - a._pnl);
+  else if (mode === 'gainpct') arr.sort((a,b)=> b._pct - a._pct);
+  else if (mode === 'loss')    arr.sort((a,b)=> a._pnl - b._pnl);
+  else if (mode === 'value')   arr.sort((a,b)=> b._mv - a._mv);
+  const openPnl = OPEN_POS.reduce((s,p)=> s + p._pnl, 0);
+  const cards = arr.map(p => posCard(p.model, p.sym, p.qty, p.entry, p.live));
+  const ope = document.getElementById('open_pnl_sum');
+  if (ope) { ope.textContent = `${cards.length} open · P&L ${fmtINR(openPnl)}`; ope.className = 'text-muted small ' + cls(openPnl); }
+  PAGER.open.items = cards.length ? cards : ['<div class="text-muted py-2">No open positions</div>'];
+  PAGER.open.page = 0; renderPage('open');
+  renderGainersLosers();
+}
+
+// Top 5 gainers + top 5 losers among open positions, by % move. Hidden until
+// at least one position has a live price (otherwise % is meaningless).
+function renderGainersLosers() {
+  const card = document.getElementById('gl_card');
+  const withPx = OPEN_POS.filter(p => (Number(p.live)||0) > 0 && (Number(p.entry)||0) > 0);
+  if (!withPx.length) { if (card) card.style.display = 'none'; return; }
+  if (card) card.style.display = '';
+  const row = p => `<div class="d-flex justify-content-between small py-1 border-bottom">
+      <span><strong>${p._sym}</strong> <span class="text-muted">${modelLabel(p.model)}</span></span>
+      <span class="${cls(p._pnl)}">${fmtPct(p._pct)} <span class="text-muted">${fmtINR(p._pnl)}</span></span>
+    </div>`;
+  const g = withPx.filter(p=>p._pnl>0).sort((a,b)=>b._pct-a._pct).slice(0,5);
+  const l = withPx.filter(p=>p._pnl<0).sort((a,b)=>a._pct-b._pct).slice(0,5);
+  document.getElementById('gl_gainers').innerHTML = g.length ? g.map(row).join('') : '<div class="text-muted small">none</div>';
+  document.getElementById('gl_losers').innerHTML  = l.length ? l.map(row).join('') : '<div class="text-muted small">none</div>';
+}
+
+// Sort + render the CLOSED positions grid per the #closed_sort dropdown.
+function renderClosed() {
+  const mode = (document.getElementById('closed_sort') || {}).value || 'date';
+  const pctOf = t => { const qty=Number(t.qty||0), pnl=Number(t.pnl||0), value=Number(t.value||0),
+                       entry = qty>0 ? (value-pnl)/qty : 0; return entry>0 ? (pnl/(entry*qty)*100) : 0; };
+  const arr = CLOSED_POS.slice();
+  if (mode === 'date')         arr.sort((a,b)=> String(b.trade_at).localeCompare(String(a.trade_at)));
+  else if (mode === 'gain')    arr.sort((a,b)=> Number(b.pnl||0) - Number(a.pnl||0));
+  else if (mode === 'gainpct') arr.sort((a,b)=> pctOf(b) - pctOf(a));
+  else if (mode === 'loss')    arr.sort((a,b)=> Number(a.pnl||0) - Number(b.pnl||0));
+  const realized = CLOSED_POS.reduce((s,t)=> s + Number(t.pnl||0), 0);
+  const cards = arr.map(closedCard);
+  const cpe = document.getElementById('closed_pnl_sum');
+  if (cpe) { cpe.textContent = `${CLOSED_POS.length} closed · Realized ${fmtINR(realized)}`; cpe.className = 'text-muted small ' + cls(realized); }
+  PAGER.closed.items = cards.length ? cards : ['<div class="text-muted py-2">No closed positions yet</div>'];
+  PAGER.closed.page = 0; renderPage('closed');
 }
 
 function closedCard(t) {
