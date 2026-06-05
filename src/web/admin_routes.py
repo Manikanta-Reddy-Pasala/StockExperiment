@@ -936,9 +936,13 @@ def models_status():
             # freshness of the model's last ranking file. N500 coverage is
             # computed ONCE and reused by both cards.
             # ============================================================
+            # Use the CURRENTLY-ELIGIBLE N500 (today's ~500 tradeable members),
+            # NOT universe_union (the ~703 superset of every historical member —
+            # which includes delisted names that legitimately have no recent data
+            # and were falsely flagged as "missing").
             try:
-                from tools.shared.index_membership import universe_union as _uu
-                n500_plain = sorted(_uu("n500"))
+                from tools.shared.index_membership import eligible_at as _elig
+                n500_plain = sorted(_elig("n500", today))
             except Exception:
                 n500_plain = []
             n500_fyers = [f"NSE:{s}-EQ" for s in n500_plain]
@@ -987,7 +991,7 @@ def models_status():
                 ("momentum_retest_n500", "/app/logs/momentum_retest_n500/ranking"),
             ]:
                 _cnt, _age, _gd, _usize = _latest_ranking(_rdir)
-                _data_ok = (len(n500_fyers) >= 300 and n500_cov >= 85
+                _data_ok = (len(n500_fyers) >= 400 and n500_cov >= 85
                             and n500_stale <= 3 and _cnt > 0)
                 models.append({
                     "name": _mname,
@@ -995,10 +999,10 @@ def models_status():
                     "wired": _wired(_mname),
                     "data_sufficient": bool(_data_ok),
                     "items": [
-                        {"label": "N500 price pool size",
+                        {"label": "N500 eligible universe (today)",
                          "value": len(n500_fyers),
-                         "required": ">= 300 syms",
-                         "ok": len(n500_fyers) >= 300},
+                         "required": ">= 400 syms",
+                         "ok": len(n500_fyers) >= 400},
                         {"label": f"Symbols w/ >= 90 trading days (last {window_calendar_days}d)",
                          "value": f"{len(n500_ok_syms)} / {len(n500_fyers)}",
                          "required": ">= 85% coverage",
