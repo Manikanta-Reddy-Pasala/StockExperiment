@@ -49,7 +49,7 @@ from tools.shared.stops import fixed_stop_hit
 
 
 from tools.models.n40.strategy import (  # noqa: E402  shared w/ live
-    UNIV_SIZE, LOOKBACK, ADV_WIN, SMA_LONG, RETAIN, STOP_PCT)
+    UNIV_SIZE, LOOKBACK, ADV_WIN, SMA_LONG, RETAIN, STOP_PCT, PROFIT_TAKE_PCT)
 N100_CSV  = str(ROOT / "src" / "data" / "symbols" / "nifty100.csv")
 DEFAULT_START = date(2021, 3, 1)
 DEFAULT_END   = date(2026, 5, 29)
@@ -160,14 +160,25 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
     # daily from-entry stop. Validated 2026-06-04: -12% lifts CAGR 41->48 / cuts
     # DD 41->37 / Calmar 0.99->1.30.)
     _STOP = float(STOP_PCT or 0.0)
+    _PT = float(PROFIT_TAKE_PCT or 0.0)
     cal = {pd.Timestamp(d): k for d, k in calendar}
-    cash = capital; hold = None; q = 0; entry = 0.0; entry_dt = None
+    cash = capital; hold = None; q = 0; entry = 0.0; entry_dt = None; took = False
     trades = []; navdays = []; cap_marks = []
     first_di = dates.get_loc(min(cal)) if cal else 0
     for di in range(first_di, len(dates)):
         d = dates[di]
         px = float(cl[hold].iloc[di]) if hold and pd.notna(cl[hold].iloc[di]) else None
         navdays.append((d, cash + (q * px if hold and px else 0.0)))
+        # --- DAILY partial profit-take: book HALF once at entry*(1+PT) ---
+        if hold and q >= 2 and _PT > 0 and not took and px is not None and px >= entry * (1 + _PT):
+            sell = q // 2; cash += sell * px
+            trades.append({"sym": hold.replace("NSE:", "").replace("-EQ", ""),
+                           "entry_date": entry_dt, "exit_date": d.date().isoformat(),
+                           "qty": sell, "entry_px": round(entry, 2), "exit_px": round(px, 2),
+                           "pnl": round(sell * px - sell * entry, 0),
+                           "ret_pct": round((px / entry - 1) * 100, 2) if entry else 0.0,
+                           "cap_after": round(cash, 0), "exit_reason": "PROFIT_TAKE"})
+            q -= sell; took = True
         if hold and q > 0 and _STOP > 0:
             dlow = float(lo[hold].iloc[di]) if hold in lo.columns and pd.notna(lo[hold].iloc[di]) else px
             hit, lvl = fixed_stop_hit(entry, dlow, _STOP)
@@ -200,7 +211,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
         if bx > 0:
             n = int(cash / bx)
             if n >= 1 and n * bx <= cash:
-                cash -= n * bx; q = n; hold = top; entry = bx; entry_dt = d.date().isoformat()
+                cash -= n * bx; q = n; hold = top; entry = bx; entry_dt = d.date().isoformat(); took = False
     final = cash + (q * float(cl[hold].iloc[-1]) if hold else 0.0)
     yrs = (end - start).days / 365.25
     cagr = ((final / capital) ** (1 / yrs) - 1) * 100 if final > 0 else -100.0

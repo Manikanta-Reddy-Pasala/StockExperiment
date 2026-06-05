@@ -46,6 +46,10 @@ RETEST_HI = 0.20    # entry: price <= 20EMA * (1 + 20%) — widened from 8% (see
 ADV_WIN = 20        # ADV averaging window
 SMA_LONG = 200      # uptrend gate
 EMA_FAST = 20       # retest reference EMA
+# Partial profit-take: book HALF a holding once it closes >= entry*(1+PCT), the
+# rest rides until it leaves the retain band. Default OFF (0.0); test/enable per
+# the 2026-06-06 emerging finding (helps high-vol names). Set >0 to enable.
+PROFIT_TAKE_PCT = 0.0
 
 
 def load_smallcap() -> set:

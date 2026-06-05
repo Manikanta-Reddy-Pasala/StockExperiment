@@ -113,13 +113,26 @@ def run(start, end, capital, out_dir=None):
         return s.replace("NSE:", "").replace("-EQ", "")
 
     cap = capital
-    hold = None; qty = 0; entry_px = 0.0; entry_date = None
+    hold = None; qty = 0; entry_px = 0.0; entry_date = None; took = False
+    _PT = float(getattr(S, "PROFIT_TAKE_PCT", 0.0) or 0.0)
     trades = []; nav_by_day = []
     first_di = dates.get_loc(min(cal)) if cal else 0
     for di in range(first_di, len(dates)):
         d = dates[di]
         px = float(cl[hold].iloc[di]) if hold and pd.notna(cl[hold].iloc[di]) else None
         nav_by_day.append((d, cap + (qty * px if hold and px else 0.0)))
+        # --- DAILY partial profit-take: book HALF once at entry*(1+PT) ---
+        if hold and qty >= 2 and _PT > 0 and not took and px is not None \
+                and px >= entry_px * (1 + _PT):
+            sell = qty // 2
+            cap += sell * px
+            trades.append({"sym": _lbl(hold), "entry_date": entry_date,
+                "exit_date": d.date().isoformat(), "qty": sell,
+                "entry_px": round(entry_px, 2), "exit_px": round(px, 2),
+                "pnl": round(sell * px - sell * entry_px, 0),
+                "ret_pct": round((px / entry_px - 1) * 100, 2),
+                "cap_after": round(cap, 0), "exit_reason": "PROFIT_TAKE"})
+            qty -= sell; took = True
         # --- DAILY ATR-from-entry stop (shared helper) ---
         if hold and qty > 0:
             av = atr[hold].iloc[di] if hold in atr.columns else None
@@ -166,7 +179,7 @@ def run(start, end, capital, out_dir=None):
             q = int(cap / bx)
             if q >= 1 and q * bx <= cap:
                 cap -= q * bx; qty = q; hold = top; entry_px = bx
-                entry_date = d.date().isoformat()
+                entry_date = d.date().isoformat(); took = False
 
     final = cap
     open_pos = None

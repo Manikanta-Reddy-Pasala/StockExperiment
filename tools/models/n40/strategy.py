@@ -21,3 +21,9 @@ RETAIN = 1           # exit band — top-1 weekly rotation
 # backtest + live --stop-check via tools.shared.stops. Level = entry*(1-STOP_PCT),
 # checked daily on the LOW. Set STOP_PCT=0 to disable.
 STOP_PCT = 0.12
+
+# Partial profit-take: book HALF once price closes >= entry*(1+PCT), rest rides
+# under the from-entry stop. Default OFF (0.0) — n40 is large-cap (top-40 ADV ∩
+# N100), rarely spikes enough to trigger; validated as a win only on the high-vol
+# emerging universe (2026-06-06). Set >0 to test/enable.
+PROFIT_TAKE_PCT = 0.0

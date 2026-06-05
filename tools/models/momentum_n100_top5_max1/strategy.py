@@ -29,3 +29,9 @@ INDEX_NAME = "n100"
 # SHARED with backtest + live --stop-check via tools.shared.stops. Level =
 # entry*(1-STOP_PCT), checked daily on the LOW. Set STOP_PCT=0 to disable.
 STOP_PCT = 0.12
+
+# Partial profit-take: book HALF the position once price closes >= entry*(1+PCT),
+# the rest rides under the from-entry stop. Default OFF (0.0) for n100 — large-cap
+# Nifty-100 names rarely spike enough to trigger it; validated as a both-axes win
+# only on the high-vol emerging universe (2026-06-06). Set >0 to enable.
+PROFIT_TAKE_PCT = 0.0

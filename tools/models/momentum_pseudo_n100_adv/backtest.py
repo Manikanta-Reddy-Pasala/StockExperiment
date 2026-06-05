@@ -211,7 +211,8 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
     # walk reproduces the rotation-only baseline exactly.
     from tools.shared.stops import atr_stop_hit as _atr_hit
     cal = {pd.Timestamp(d): k for d, k in calendar}
-    cash = capital; hold = None; q = 0; entry = 0.0; entry_dt = None
+    cash = capital; hold = None; q = 0; entry = 0.0; entry_dt = None; took = False
+    _PT = float(getattr(S, "PROFIT_TAKE_PCT", 0.0) or 0.0)
     trades = []; navs = []; navdays = []
     first_di = dates.get_loc(min(cal)) if cal else 0
     for di in range(first_di, len(dates)):
@@ -219,6 +220,16 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
         px = float(cl[hold].iloc[di]) if hold and pd.notna(cl[hold].iloc[di]) else None
         nav_t = cash + (q * px if hold and px else 0.0)
         navs.append(nav_t); navdays.append((d, nav_t))
+        # --- DAILY partial profit-take: book HALF once at entry*(1+PT) ---
+        if hold and q >= 2 and _PT > 0 and not took and px is not None and px >= entry * (1 + _PT):
+            sell = q // 2; cash += sell * px
+            trades.append({"sym": hold.replace("NSE:", "").replace("-EQ", ""),
+                           "entry_date": entry_dt, "exit_date": d.date().isoformat(),
+                           "qty": sell, "entry_px": round(entry, 2), "exit_px": round(px, 2),
+                           "pnl": round(sell * px - sell * entry, 0),
+                           "ret_pct": round((px / entry - 1) * 100, 2) if entry else 0.0,
+                           "cap_after": round(cash, 0), "exit_reason": "PROFIT_TAKE"})
+            q -= sell; took = True
         # daily from-entry ATR stop
         if hold and q > 0 and S.ATR_STOP_MULT and S.ATR_STOP_MULT > 0:
             av = atr[hold].iloc[di] if hold in atr.columns else None
@@ -262,7 +273,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
         if bx > 0:
             n = int(cash / bx)
             if n >= 1 and n * bx <= cash:
-                cash -= n * bx; q = n; hold = top; entry = bx; entry_dt = d.date().isoformat()
+                cash -= n * bx; q = n; hold = top; entry = bx; entry_dt = d.date().isoformat(); took = False
     final = cash + (q * float(cl[hold].iloc[-1]) if hold else 0.0)
     yrs = (end - start).days / 365.25
     cagr = ((final / capital) ** (1 / yrs) - 1) * 100 if final > 0 else -100.0

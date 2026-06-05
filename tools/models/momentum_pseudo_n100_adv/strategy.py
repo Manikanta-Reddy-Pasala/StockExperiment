@@ -43,6 +43,11 @@ MIDMONTH_LEAD = 3.0  # only used by the opt-in --mid-month-check path (default O
 ATR_STOP_MULT = 3.0
 ATR_WIN = 14
 
+# Partial profit-take: book HALF the position once price closes >= entry*(1+PCT),
+# the rest rides under the from-entry ATR stop. Default OFF (0.0) — validated as a
+# both-axes win only on the high-vol emerging universe (2026-06-06). Set >0 to test/enable.
+PROFIT_TAKE_PCT = 0.0
+
 # Universe re-anchor date — FIXED calendar (month, day), NOT the backtest start.
 # Live rebuilds yearly_universes.json once a year at the mid-May NSE rebalance
 # (cron _yearly_universe fires May 15 -> build_universe --end-date ~May-13). The

@@ -69,8 +69,29 @@ def run(start, end, capital, out_dir=None):
             m = 1; y += 1
     cash = capital; pos = {}; watch = []; trades = []; navs = []; nd = []
     warm = max(S.LOOKBACK, S.SMA_LONG)
+    _PT = float(getattr(S, "PROFIT_TAKE_PCT", 0.0) or 0.0)
     for di in range(i0, i1):
         d = dates[di]; crow = cl.iloc[di]
+        # --- DAILY partial profit-take: book HALF a holding once at entry*(1+PT) ---
+        if _PT > 0 and pos:
+            for s in list(pos.keys()):
+                p = pos[s]; px = crow.get(s)
+                if p.get("took") or p["qty"] < 2 or pd.isna(px):
+                    continue
+                px = float(px)
+                if px >= p["entry"] * (1 + _PT):
+                    sell = p["qty"] // 2; cash += sell * px * (1 - COST)
+                    trades.append({
+                        "sym": s.replace("NSE:", "").replace("-EQ", ""),
+                        "entry_date": p["in"], "exit_date": d.date().isoformat(),
+                        "qty": sell, "entry_px": round(p["entry"], 2),
+                        "exit_px": round(px, 2),
+                        "pnl": round(sell * px * (1 - COST) - sell * p["entry"], 0),
+                        "ret_pct": round((px / p["entry"] - 1) * 100, 2),
+                        "cap_after": round(cash, 0), "exit_reason": "PROFIT_TAKE",
+                        "cap": classify_pit(s, date.fromisoformat(p["in"])),
+                    })
+                    p["qty"] -= sell; p["took"] = True
         if d in rebals and di >= warm:
             rk = S.rank_targets(cl, adv20, sma200, smallcap, di)
             # PIT N500 filter: keep only names actually in Nifty 500 on this date.
@@ -110,7 +131,7 @@ def run(start, end, capital, out_dir=None):
                     q = int((cash / max(1, slots)) / px)
                     if q >= 1:
                         cash -= q * px * (1 + COST)
-                        pos[s] = {"qty": q, "entry": px, "in": d.date().isoformat()}
+                        pos[s] = {"qty": q, "entry": px, "in": d.date().isoformat(), "took": False}
                         slots -= 1; watch.remove(s)
         mv = cash + sum(p["qty"] * float(crow.get(s)) for s, p in pos.items()
                         if pd.notna(crow.get(s)))

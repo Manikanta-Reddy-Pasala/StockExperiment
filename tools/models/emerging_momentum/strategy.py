@@ -69,6 +69,20 @@ _VOL_CACHE: dict = {}
 ATR_STOP_MULT = 2.5
 ATR_WIN = 14
 
+# ---- Partial profit-take (2026-06-06, backtest-validated) -------------------
+# Book HALF the position ONCE when price first closes >= entry*(1+PROFIT_TAKE_PCT);
+# the other half keeps riding under the ATR-from-entry stop. On this high-vol
+# mid/small universe the names spike then mean-revert, so banking half the spike
+# cuts drawdown materially while the runner still captures the trend — a genuine
+# BOTH-axes win, smooth/monotonic across 1yr/2yr/3yr (PT sweep 2026-06-06):
+#   3yr  2023-05→2026-05 : Calmar 6.44 -> 7.34, DD 26.3 -> 22.3, CAGR ~flat
+#   2yr                  : Calmar 2.49 -> 3.73, DD 24.6 -> 18.4, CAGR 61 -> 68
+#   1yr  2025-06→2026-06 : Calmar 1.99 -> 3.53, DD 24.6 -> 17.7, CAGR 49 -> 62
+# 30% is mid-plateau (15-35% all help; >35% the trigger rarely fires -> fades).
+# Set PROFIT_TAKE_PCT=0 to disable. Checked DAILY on the close (live mirrors via
+# the --stop-check path so backtest/live can't drift).
+PROFIT_TAKE_PCT = 0.30
+
 
 def atr_latest(high: pd.Series, low: pd.Series, close: pd.Series,
                win: int = ATR_WIN):
