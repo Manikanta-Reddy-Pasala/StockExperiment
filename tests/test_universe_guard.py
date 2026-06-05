@@ -3,7 +3,7 @@
 Belt-and-suspenders behind every model's signal layer: the order executors call
 is_in_universe() and REFUSE a buy whose symbol is not a point-in-time member of
 the model's index on the trade date. This guards against a FUTURE regression in
-any model re-introducing the 2026-06-02 ORB/SPARC survivorship bug.
+any model re-introducing the 2026-06-02 SPARC survivorship bug.
 
 Deterministic: patches model_universe.eligible_at so the test does not depend on
 the live membership CSV contents.
@@ -19,15 +19,14 @@ def _fake_eligible(monkeypatch, mapping):
 
 
 def test_blocks_off_universe_buy(monkeypatch):
-    # SPARC not in n500 -> orb/retest must report False (executor blocks).
+    # SPARC not in n500 -> retest must report False (executor blocks).
     _fake_eligible(monkeypatch, {"n500": {"HFCL", "IDEA", "WOCKPHARMA"}})
-    assert MU.is_in_universe("orb_momentum_intraday", "NSE:SPARC-EQ", date(2026, 6, 2)) is False
     assert MU.is_in_universe("momentum_retest_n500", "SPARC", date(2026, 6, 2)) is False
 
 
 def test_allows_member_buy(monkeypatch):
     _fake_eligible(monkeypatch, {"n500": {"HFCL", "IDEA", "WOCKPHARMA"}})
-    assert MU.is_in_universe("orb_momentum_intraday", "NSE:HFCL-EQ", date(2026, 6, 2)) is True
+    assert MU.is_in_universe("momentum_retest_n500", "NSE:HFCL-EQ", date(2026, 6, 2)) is True
 
 
 def test_n40_uses_n100_index(monkeypatch):
@@ -53,21 +52,21 @@ def test_fails_open_on_empty_membership(monkeypatch):
     # Empty / unreadable membership table -> None (allow), never block a real
     # trade on a data-loading hiccup. Only a positive False ever blocks.
     _fake_eligible(monkeypatch, {})  # eligible_at returns empty set
-    assert MU.is_in_universe("orb_momentum_intraday", "SPARC", date(2026, 6, 2)) is None
+    assert MU.is_in_universe("momentum_retest_n500", "SPARC", date(2026, 6, 2)) is None
 
 
 def test_fails_open_on_membership_exception(monkeypatch):
     def _boom(idx, d):
         raise FileNotFoundError("membership csv missing")
     monkeypatch.setattr(MU, "eligible_at", _boom)
-    assert MU.is_in_universe("orb_momentum_intraday", "SPARC", date(2026, 6, 2)) is None
+    assert MU.is_in_universe("momentum_retest_n500", "SPARC", date(2026, 6, 2)) is None
 
 
 def test_every_known_model_is_registered():
     # The registry must list every live model so none silently bypasses the gate
     # (a new model with no entry would be treated as unknown -> ungated).
     expected = {
-        "orb_momentum_intraday", "momentum_retest_n500", "n20_daily_large_only",
+        "momentum_retest_n500", "n20_daily_large_only",
         "emerging_momentum", "momentum_n100_top5_max1", "momentum_pseudo_n100_adv",
         "midcap_narrow_60d_breakout",
     }

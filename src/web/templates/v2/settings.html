@@ -551,23 +551,6 @@ const MODEL_META = {
       ['Recent 2023-05→2026-05 (+stop)', '+165% CAGR / 26% DD — UNLEVERED; recheck=live logic (PIT, no-lookahead, no borrow)'],
     ],
   },
-  'orb_momentum_intraday': {
-    universe: 'Nifty 500 (PIT) • intraday', kind: 'intraday',
-    title: 'Morning ORB (Intraday)',
-    rules: { top_n: 1, max_concurrent: 1, lookback: '20d mom + 15m OR',
-             rebalance: 'Intraday daily (entry before 10:00)', stop: 'OR-low (ORL)', target: '2× OR width',
-             exit: 'Stop / target / force-flat 15:15 (0 overnight)' },
-    strategy: [
-      ['Type', 'DAY-TRADE — only intraday model (MIS); flat every night (0 overnight risk)'],
-      ['Select', 'WATCH top-3 Nifty-500 by 20-day momentum, price ≥ ₹100 (drops penny whipsaws)'],
-      ['Opening range', 'First 15 min (3× 5-min bars, 09:15–09:30): ORH/ORL'],
-      ['Entry', 'ALL-IN, SINGLE position: full capital into the FIRST of the 3 to break above ORH before 10:00 (rank tiebreak). One trade/day, no re-entry'],
-      ['Exit', 'Stop=ORL · target=ORH+2×width · else force-flat at 15:15 (checked every 5 min all session; same rules live as backtest)'],
-      ['Backtest 2025-03→2026-05 (PIT, no lookahead)', '⛔ −63% total / −72% CAGR / 67% DD / Sharpe −3.37 / 36% WR — NEGATIVE every year'],
-      ['Trades', '199 (~1/day, single position) · WR 36%'],
-      ['Note', '⛔ NO EDGE — DO NOT ENABLE LIVE. 06-04 recheck: the old +427% was LOOKAHEAD bias (ranked on the same-day 15:30 close to pick the 09:30 trade). Ranking on the prior close (what live actually does) → −63%, loses every year. Engineering is sound (live==backtest, ₹100 filter still kills penny fakes) but the signal has no intraday edge. Stays OBSERVE/paper until a predictive selection is found'],
-    ],
-  },
 };
 
 async function loadAllocations() {

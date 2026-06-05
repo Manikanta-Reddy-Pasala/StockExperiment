@@ -31,7 +31,6 @@ from tools.shared.index_membership import eligible_at
 # model_name -> index for eligible_at, or None to skip (file-based universe).
 # Keys are the model_name strings written into the signals file / model_settings.
 MODEL_INDEX: dict[str, Optional[str]] = {
-    "orb_momentum_intraday":      "n500",
     "momentum_retest_n500":       "n500",
     "n20_daily_large_only":       "n100",   # n40: selection is ∩ Nifty-100
     "emerging_momentum":          "n500",   # universe = n500 minus n100; n500 is a safe superset gate

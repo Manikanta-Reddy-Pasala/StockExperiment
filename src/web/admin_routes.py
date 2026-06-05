@@ -1994,25 +1994,7 @@ def signals_today():
                 "has_file": found_path is not None,
             })
 
-        # orb_momentum_intraday has no signal-file cron (intraday, backtest-only).
-        # Surface its daily WATCHLIST: the top-3 momentum leaders it would watch
-        # for a morning opening-range breakout. Computed live from daily data.
-        try:
-            orb_picks = _orb_today_watchlist()
-            results.append({
-                "model_name": "orb_momentum_intraday",
-                "date": date_str, "path": "(computed watchlist)",
-                "count": len(orb_picks), "signals": orb_picks,
-                "error": None, "has_file": True,
-                "note": "Intraday watchlist — top-3 momentum leaders to watch for a "
-                        "morning opening-range breakout (BACKTEST-ONLY, no live orders).",
-            })
-            # Persist orb's watchlist to the DB once per day (it has no signal
-            # cron — its picks are computed here). Observe/backtest models still
-            # belong in audit_model_signals. Dedup: write only if today has none.
-            _persist_orb_watchlist(date_str, orb_picks)
-        except Exception as _e:
-            logger.debug(f"orb watchlist failed: {_e}")
+        # (ORB intraday model ARCHIVED 2026-06-05 — no edge; watchlist removed.)
 
         total = sum(r["count"] for r in results)
         return jsonify({
@@ -2024,143 +2006,6 @@ def signals_today():
     except Exception as e:
         logger.error(f"signals/today error: {e}", exc_info=True)
         return jsonify({"success": False, "error": str(e)}), 500
-
-
-def _persist_orb_watchlist(date_str, picks):
-    """Save orb's daily watchlist to audit_model_signals ONCE per day.
-
-    orb has no signal cron (its picks are computed on demand), so without this
-    it was the only model missing from the DB. Idempotent: skips if today
-    already has orb rows, and only writes for TODAY (not ?date= history views).
-    """
-    try:
-        from datetime import date as _dd
-        td = _dd.today()
-        if date_str != td.isoformat() or not picks:
-            return
-        from src.models.database import get_database_manager
-        from src.models.audit_models import AuditModelSignal
-        from src.services.audit_service import write_signal
-        db = get_database_manager()
-        with db.get_session() as s:
-            exists = s.query(AuditModelSignal).filter_by(
-                model_name="orb_momentum_intraday", trading_date=td).count()
-        if exists:
-            return
-        for p in picks:
-            write_signal("orb_momentum_intraday", td, "WATCHLIST",
-                         p.get("symbol") or "", "WATCH", price=p.get("price"),
-                         reason="intraday ORB watchlist (backtest-only)")
-    except Exception as e:
-        logger.debug(f"orb watchlist persist failed: {e}")
-
-
-def _orb_today_watchlist():
-    """Top-3 momentum leaders the intraday ORB model would watch today.
-
-    The SELECT step of orb_momentum_intraday (20d momentum rank over PIT N500),
-    computed from daily close — no intraday feed needed. Returns signal dicts.
-    """
-    from datetime import date as _d, timedelta as _td
-    from sqlalchemy import text as _text
-    from tools.shared.ohlcv_cache import _get_engine
-    from tools.shared.index_membership import universe_union, eligible_at
-    from tools.models.orb_momentum_intraday import strategy as _S
-    import pandas as _pd
-
-    eng = _get_engine()
-    syms = [f"NSE:{s}-EQ" for s in sorted(universe_union(_S.INDEX))]
-    with eng.connect() as c:
-        df = _pd.read_sql(_text(
-            "SELECT symbol,date,close FROM historical_data "
-            "WHERE symbol=ANY(:s) AND data_source='fyers' AND date >= :a "
-            "ORDER BY symbol,date"
-        ), c, params={"s": syms, "a": (_d.today() - _td(days=90)).isoformat()})
-    if df.empty:
-        return []
-    df["date"] = _pd.to_datetime(df["date"])
-    cl = df.pivot(index="date", columns="symbol", values="close").ffill()
-    di = len(cl) - 1
-    elig = set(eligible_at(_S.INDEX, cl.index[di].date()))
-    leaders = _S.rank_momentum(cl, di, elig)
-    now, then = cl.iloc[di], cl.iloc[di - _S.LOOKBACK]
-    out = []
-    for s in leaders:
-        fs = f"NSE:{s}-EQ"
-        a, b = now.get(fs), then.get(fs)
-        ret = round((float(a) / float(b) - 1) * 100, 1) if (a is not None and b) else 0.0
-        out.append({"symbol": s, "ret_20d_pct": ret, "action": "WATCH",
-                    "price": round(float(a), 2) if a is not None else 0.0,
-                    "note": "morning ORB breakout candidate"})
-    return out
-
-
-# =============================================================================
-# T7 + T9 — Per-model Admin Triggers + Today's Picks
-# =============================================================================
-
-# Per-equity-model wiring: where each model writes signals/rankings, and how
-# to invoke its live_signal.py. Kept here so future models = single-row diff.
-MODEL_PATHS = {
-    "momentum_n100_top5_max1": {
-        "signals_dir": "/app/logs/momrot/signals",
-        "ranking_dir": "/app/logs/momrot/ranking",
-        "live_signal": "tools/models/momentum_n100_top5_max1/live_signal.py",
-        "extra_args": [
-            "--universe-file", "/app/logs/momrot/universes/n100_current.json",
-            "--top-n", "5",
-        ],
-        "label": "N100 monthly rotation top-5 (mc=1)",
-        "universe_path": "/app/logs/momrot/universes/n100_current.json",
-    },
-    "momentum_pseudo_n100_adv": {
-        "signals_dir": "/app/logs/momrot_pseudo/signals",
-        "ranking_dir": "/app/logs/momrot_pseudo/ranking",
-        "live_signal": "tools/models/momentum_pseudo_n100_adv/live_signal.py",
-        "extra_args": [
-            "--universes-file",
-            "tools/models/momentum_pseudo_n100_adv/yearly_universes.json",
-            "--top-n", "5",
-        ],
-        "label": "Pseudo-N100 monthly rotation top-5 (mc=1)",
-        "universe_path":
-            "tools/models/momentum_pseudo_n100_adv/yearly_universes.json",
-    },
-    "midcap_narrow_60d_breakout": {
-        "signals_dir": "/app/logs/midcap_narrow/signals",
-        "ranking_dir": "/app/logs/midcap_narrow/ranking",
-        "live_signal": "tools/models/midcap_narrow_60d_breakout/live_signal.py",
-        "extra_args": [
-            "--universe-file", "/app/logs/momrot/universes/midcap_narrow.json",
-        ],
-        "label": "Midcap 60d-high breakout (event-driven)",
-        "universe_path": "/app/logs/momrot/universes/midcap_narrow.json",
-    },
-    "n20_daily_large_only": {
-        "signals_dir": "/app/logs/n20_daily/signals",
-        "ranking_dir": "/app/logs/n20_daily/ranking",
-        "live_signal": "tools/models/n40/live_signal.py",
-        "extra_args": ["--top-n", "1"],
-        "label": "Top-40 ADV ∩ N100 weekly rotation (mc=1)",
-        "universe_path": None,  # PIT built each run from N500 OHLCV
-    },
-    "emerging_momentum": {
-        "signals_dir": "/app/logs/emerging_momentum/signals",
-        "ranking_dir": "/app/logs/emerging_momentum/ranking",
-        "live_signal": "tools/models/emerging_momentum/live_signal.py",
-        "extra_args": [],  # builds its own PIT mid/small pool each run
-        "label": "Emerging mid/small momentum, single-pos + mid-month (mc=1)",
-        "universe_path": None,
-    },
-    "momentum_retest_n500": {
-        "signals_dir": "/app/logs/momentum_retest_n500/signals",
-        "ranking_dir": "/app/logs/momentum_retest_n500/ranking",
-        "live_signal": "tools/models/momentum_retest_n500/live_signal.py",
-        "extra_args": [],  # builds its own N500 panel each run (K=4 multi)
-        "label": "Retest momentum K=4 multi (N500, retest entry)",
-        "universe_path": None,
-    },
-}
 
 
 def _latest_signal_file(signals_dir: str):
@@ -2882,22 +2727,7 @@ def admin_model_ranking(model_name):
     rerun fills the gap when a user opens Today's Picks before the cron
     has fired.
     """
-    # orb_momentum_intraday has no signal-file pipeline (intraday, backtest-only)
-    # and isn't in MODEL_PATHS. Serve its daily momentum watchlist as the ranking
-    # so Today's Picks can render its card — no subprocess, no live orders.
-    if model_name == "orb_momentum_intraday":
-        try:
-            picks = _orb_today_watchlist()
-        except Exception:
-            picks = []
-        top_n = [{"rank": i + 1, "symbol": p["symbol"],
-                  "ret_30d_pct": p.get("ret_20d_pct", 0.0),
-                  "price": p.get("price", 0.0)} for i, p in enumerate(picks)]
-        return jsonify({"success": True, "model": model_name,
-                        "date": datetime.now().strftime("%Y-%m-%d"),
-                        "top_n": top_n, "held": None,
-                        "note": "Intraday morning-ORB watchlist (BACKTEST-ONLY)."})
-
+    # (ORB intraday model ARCHIVED 2026-06-05 — no edge; on-demand ranking removed.)
     paths = MODEL_PATHS.get(model_name)
     if not paths:
         return jsonify({"success": False,

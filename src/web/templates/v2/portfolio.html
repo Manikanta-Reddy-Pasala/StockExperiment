@@ -291,8 +291,8 @@ async function loadAggregate() {
       }
       const wired = WIRED_MODELS.has(m.model_name);
       // Rebalance only for models wired into MODEL_PATHS (needs live_signal +
-      // executor). Unwired models (e.g. orb_momentum_intraday, backtest-only)
-      // get no Rebalance — the POST would 400.
+      // executor). Unwired / backtest-only models get no Rebalance — the POST
+      // would 400.
       const rebalBtn = wired
         ? `<button class="btn btn-sm btn-danger" onclick="rebalanceModel('${m.model_name}')">
              <i class="bi bi-arrow-repeat"></i> Rebalance</button>`

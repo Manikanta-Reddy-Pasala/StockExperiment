@@ -12,7 +12,6 @@ All figures net of costs, ₹10L start, true point-in-time universes.
 | [Retest Momentum](momentum_retest_n500/SUMMARY.md) | DISABLED (₹0) | +57.3% | 38.8% | 1.48 | +973.6% |
 | [Weekly Top-40](n40/SUMMARY.md) | LIVE | +48.1% | 37.0% | 1.3 | +684.7% |
 | [Midcap Breakout](midcap_narrow_60d_breakout/SUMMARY.md) | LIVE | +11.2% | 57.2% | 0.2 | +74.6% |
-| [Morning ORB (Intraday)](orb_momentum_intraday/SUMMARY.md) | OBSERVE — NO EDGE | -71.7% | 67.3% | -1.07 | -63.1% |
 
 **Caveats:**
 - `momentum_pseudo_n100_adv` = optimistic upper bound (ADV-selection bias, not real index).

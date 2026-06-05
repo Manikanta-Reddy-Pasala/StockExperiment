@@ -333,17 +333,4 @@ def test_atr_latest_simple():
     assert a is not None and abs(a - 4.0) < 1e-6
 
 
-# --- 12. ORB per-slot sizing (invested/SELECT_TOP per breakout) --------------
-
-def test_orb_slot_qty_reserves_one_slot():
-    from tools.models.orb_momentum_intraday.strategy import slot_qty
-    # ₹30k invested, 3 slots, entry ₹100 -> ₹10k/slot -> 100 shares
-    assert slot_qty(30000, 3, 100.0) == 100
-
-
-def test_orb_slot_qty_floors_and_guards():
-    from tools.models.orb_momentum_intraday.strategy import slot_qty
-    assert slot_qty(30000, 3, 137.0) == int((10000) / 137.0)  # floor
-    assert slot_qty(0, 3, 100.0) == 0          # no capital
-    assert slot_qty(30000, 0, 100.0) == 0      # bad slots
-    assert slot_qty(30000, 3, 0) == 0          # bad price
+# (ORB per-slot sizing tests removed — ORB archived 2026-06-05.)

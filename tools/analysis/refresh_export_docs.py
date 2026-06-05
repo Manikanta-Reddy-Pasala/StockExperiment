@@ -51,12 +51,6 @@ DESC = {
         "strategy": "Event-driven single-position breakout: 40d-high + 2× vol + >200DMA. Target +100% / stop −20% / trail −20% off peak / 120d max-hold.",
         "note": "⚠️ Lumpy single-position event model (only ~16 trades/5yr). On AUTHORITATIVE PIT membership (2026-05-31) the full-cycle 2021-03→2026-05 is ≈ +11.2% CAGR / 57% DD / Calmar 0.2 (only 13 trades/5yr) — effectively DEAD. Its earlier +40% was living off large-cap winners that leaked through the buggy Wayback N100 exclusion; with the correct PIT N100 removed it has no edge. Confirms the long-standing 'midcap ignore' call.",
     },
-    "orb_momentum_intraday": {
-        "title": "Morning ORB (Intraday)", "live": "OBSERVE — NO EDGE",
-        "universe": "Nifty 500 (PIT) — top-3 by 20d momentum, traded intraday",
-        "strategy": "DAY-TRADE: watch top-3 momentum leaders (≥₹100); go ALL-IN (full capital, ONE position) on the FIRST to break above its 15-min opening-range high before 10:00; stop=OR-low, target=2×range, FORCED FLAT by 15:15. Zero overnight. One trade/day, no re-entry.",
-        "note": "⛔ NO DEMONSTRATED EDGE — DO NOT ENABLE LIVE. 2026-06-04 recheck found the old positive results (+251/+323/+427% across the day's iterations) were entirely LOOKAHEAD BIAS: the backtest ranked momentum on the SAME-DAY close (15:30) to pick that day's 09:30 morning breakout — using future information live cannot have (the daily bar isn't pulled until ~20:30, so live correctly ranks on the PRIOR close). Fixing the backtest to rank on the prior close (no lookahead, matching live) collapses it to −63% total / −72% CAGR / 67% DD / Sharpe −3.37 / 36% WR, NEGATIVE every year (2025 −37%, 2026 −41%). The intraday breakout of prior-close momentum leaders has no edge. The engineering work is sound and live==backtest (shared rank_momentum+MIN_PRICE+pick_leader / live_exit_reason / EOD_FLAT_MIN; MIN_PRICE≥₹100 still correctly kills the live penny fake-signals like IDEA) — but the SIGNAL loses money, so ORB stays OBSERVE/paper (zero real money at risk) until a genuinely-predictive selection is found. Other 6 models are unaffected: they rank and transact at the SAME observed close, no lookahead.",
-    },
 }
 
 WIN = "Backtest window: **2021-03-01 → 2026-05-29** (full ~5.2-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 recovery). Recent clean-data window also reported: **2025-03-01 → 2026-05-29**."
@@ -106,13 +100,6 @@ RULES = {
         "Entry": "BUY (next day's open) on a breakout: close > prior-40-day high AND volume ≥ 2× the 20d average volume. Single position (max 1); the highest volume-ratio breakout wins.",
         "Exit": "Event exits (whichever first): target +100%, hard stop −20%, trailing stop −20% off the peak, or 120-day max hold.",
         "Source": "Backtest+live: PIT `n500_membership.csv` MINUS `n100_membership.csv` (factsheet-derived). Prices: Fyers daily OHLCV.",
-    },
-    "orb_momentum_intraday": {
-        "Rebalance": "Intraday, every day. Selection at the open; entries scanned each 5-min bar 09:30–10:00.",
-        "Universe & filters": "Nifty 500 (PIT eligible_at), MIN_PRICE ≥ ₹100 (sub-₹100 penny names dropped — their tiny opening ranges whipsaw the ORB into fake breakouts). Each day rank by 20-day return, WATCH the top-3 momentum leaders.",
-        "Entry": "ALL-IN, single position: commit the FULL capital to the FIRST of the 3 watched leaders to break above its 15-min opening-range high (rank as tiebreak), but ONLY before 10:00. Long-only. One trade/day — no re-entry after the exit.",
-        "Exit": "Stop at opening-range low; target at OR-high + 2×range; else forced flat at 15:15 (EOD_FLAT_MIN — robust peak of the EOD-time sweep; the 15:15→close bar fades hard). Always flat overnight (0-day hold).",
-        "Source": "Selection: DB historical_data (daily close, Fyers) + PIT n500. Execution: Fyers 5-min bars (resolution=5), cached under tools/models/orb_momentum_intraday/cache5min/.",
     },
 }
 

@@ -106,16 +106,6 @@ KNOWN_MODELS = [
         "enabled": True,
         "description": "Equity daily rotation top-20-ADV ∩ Nifty 100 by 30d return",
     },
-    {
-        # BACKTEST-ONLY intraday day-trade model. Seeded DISABLED + ₹0 so it is
-        # VISIBLE in the dashboard / settings UI (with its MODEL_META strategy
-        # card) but never allocated capital or auto-traded. No scheduler/executor
-        # wiring exists for it yet — enabling alone would not place orders.
-        "name": "orb_momentum_intraday",
-        "default_capital": 0,
-        "enabled": False,
-        "description": "Intraday morning opening-range breakout on top-3 Nifty-500 momentum leaders (day-trade, flat EOD). BACKTEST-ONLY.",
-    },
 ]
 
 # Models intentionally removed from the system. ensure_models_seeded() purges
@@ -125,6 +115,8 @@ KNOWN_MODELS = [
 # allocation. Rows WITH trades are left intact (forensic safety) and logged.
 RETIRED_MODELS = [
     "finnifty_ic_otm4_w300_lots5",  # FinNifty options IC — removed 2026-05-25
+    "orb_momentum_intraday",        # ORB intraday — ARCHIVED 2026-06-05, no edge
+                                    # (lookahead-inflated backtest; faithful −63%)
 ]
 
 # ---- Order product-type policy (single source of truth) -------------------
@@ -134,7 +126,7 @@ RETIRED_MODELS = [
 # never accidentally fire an MIS order, and an intraday model can never hold
 # overnight as CNC. Add a new intraday model's name here to switch it to MIS.
 INTRADAY_MODELS = {
-    "orb_momentum_intraday",
+    # (ORB archived 2026-06-05; no intraday models currently active.)
 }
 
 # ---- Multi-holding models: max concurrent positions (K) -------------------
@@ -145,7 +137,6 @@ INTRADAY_MODELS = {
 # wrongly treat momentum_retest_n500 as a single-position model.
 MULTI_HOLDING_MODELS = {
     "momentum_retest_n500": 4,   # K4 (see tools/models/momentum_retest_n500/strategy.py)
-    "orb_momentum_intraday": 1,  # SINGLE all-in position (full capital into the best-momentum breakout; 2026-06-04)
 }
 
 

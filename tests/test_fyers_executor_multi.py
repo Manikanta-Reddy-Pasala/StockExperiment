@@ -73,19 +73,11 @@ def test_normalize_bare_matches_holdings_key():
     assert _normalize_symbol("NSE:SPARC-EQ") in held  # idempotent on normalized
 
 
-def test_orb_is_intraday_product():
+def test_product_for_model_defaults_cnc():
+    # No intraday models remain (ORB archived 2026-06-05) -> everything is CNC.
     from src.services.trading.model_ledger_service import product_for_model
-    assert product_for_model("orb_momentum_intraday") == "INTRADAY"
-    assert product_for_model(None) == "CNC"       # the (buggy) default the fix avoids
-
-
-def test_multi_executor_sets_current_model_for_product():
-    # The multi run sets fyers_executor._CURRENT_MODEL so _placeorder resolves
-    # the model's product (INTRADAY for orb) instead of the CNC None-default.
-    import tools.live.fyers_executor as fe
-    fe._CURRENT_MODEL = "orb_momentum_intraday"
-    from src.services.trading.model_ledger_service import product_for_model
-    assert product_for_model(fe._CURRENT_MODEL) == "INTRADAY"
+    assert product_for_model(None) == "CNC"
+    assert product_for_model("momentum_retest_n500") == "CNC"
 
 
 # 2026-06-02: no Telegram notification on retest/orb purchase OR signals.
@@ -123,6 +115,6 @@ def test_verdict_signals_shape_accepted():
     ]
     sig = _decision_signature(dec, None)
     assert "SPARC" in sig and "HFCL" in sig
-    title, body = _decision_message("orb_momentum_intraday", dec, None, None, None)
-    assert "orb_momentum_intraday" in title
+    title, body = _decision_message("momentum_retest_n500", dec, None, None, None)
+    assert "momentum_retest_n500" in title
     assert "SPARC" in body

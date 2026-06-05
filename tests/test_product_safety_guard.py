@@ -32,18 +32,8 @@ def _place(monkeypatch, model, product=None):
     return svc.captured.get("product")
 
 
-def test_intraday_model_places_mis(monkeypatch):
-    assert _place(monkeypatch, "orb_momentum_intraday") == "INTRADAY"
-
-
 def test_swing_model_places_cnc(monkeypatch):
     assert _place(monkeypatch, "momentum_retest_n500") == "CNC"
-
-
-def test_guard_corrects_cnc_forced_on_intraday_model(monkeypatch):
-    # Even if a caller forces product="CNC", an intraday model must end up MIS
-    # (this is the exact mismatch that caused the SPARC phantom short).
-    assert _place(monkeypatch, "orb_momentum_intraday", product="CNC") == "INTRADAY"
 
 
 def test_guard_corrects_mis_forced_on_swing_model(monkeypatch):
