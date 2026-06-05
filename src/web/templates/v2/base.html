@@ -11,8 +11,26 @@
     <link rel="alternate icon" type="image/png" href="{{ url_for('static', filename='icon-192.png') }}?v=2">
     <!-- PWA: installable on Android / iOS. Manifest cache-busted so
          Chrome refetches it when icon URLs change. -->
-    <link rel="manifest" href="/manifest.json?v=3">
+    <link rel="manifest" href="/manifest.json?v=4">
     <meta name="theme-color" content="#15a36b">
+    <script>
+      // Stale-install fix: older installs captured start_url=/picks (now it's
+      // /dashboard). iOS bakes the launch URL into the home-screen icon and
+      // won't auto-update it, so the app still cold-launches to Today's Picks.
+      // Detect a COLD standalone launch (no in-app referrer) that landed on
+      // /picks and bounce it to the real home. In-app taps to Picks carry a
+      // same-origin referrer, so normal navigation is untouched.
+      (function () {
+        try {
+          var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+            || window.navigator.standalone === true;
+          if (!standalone || location.pathname !== '/picks') return;
+          var cold = !document.referrer;
+          if (!cold) { try { cold = new URL(document.referrer).origin !== location.origin; } catch (e) { cold = true; } }
+          if (cold) location.replace('/dashboard');
+        } catch (e) {}
+      })();
+    </script>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Trading">
