@@ -19,10 +19,11 @@ Strategy ("Emerging Momentum") — SINGLE-POSITION rotation (Config 1):
     as momentum_n100_top5_max1); live path = tools/live/fyers_executor.py via the
     single-position model_ledger.
 
-Backtest (PIT N500-minus-N100, gross-of-fee rotation engine, same-day close):
-  FULL 2023-05-15..2026-05-12 : ~+111% CAGR / ~23% DD / Calmar ~4.75  (climber ON)
-  (climber OFF baseline = ~+98% CAGR / ~23% DD / Calmar ~4.2)
-Config 1 (lb15, sma off) + MCAP CLIMBER filter (see CLIMBER_ENABLED below).
+Backtest (PIT N500-minus-N100, same-day close, vol-adj rank + 2.5×ATR stop):
+  FULL 2021-03..2026-05 : ~+121% CAGR / ~38% DD / Calmar ~3.19
+  RECENT 2023-05..2026-05 : ~+165% CAGR / ~26% DD
+  ALL UNLEVERED (own cash only — no borrow). Rechecked 2026-06-05: backtest ==
+  live core (PIT, no-lookahead). Current config = vol-adj rank, RETAIN=1, lb30.
 """
 from __future__ import annotations
 

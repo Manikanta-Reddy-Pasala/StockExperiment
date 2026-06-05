@@ -21,11 +21,11 @@ Backtest window: **2021-03-01 → 2026-05-29** (full ~5.2-year cycle: 2021 bull,
 
 | Metric | Value |
 |---|---|
-| Final NAV (₹10L start) | ₹60,024,422 |
-| Total return | +5902.4% |
-| CAGR (annualized) | +119.9% |
+| Final NAV (₹10L start) | ₹63,854,947 |
+| Total return | +6285.5% |
+| CAGR (annualized) | +121.0% |
 | Max drawdown | 37.9% |
-| Calmar | 3.16 |
+| Calmar | 3.19 |
 | Trades | 67 (43W / 24L) · 64% win |
 
 ## Year-by-year breakdown
@@ -37,11 +37,11 @@ Backtest window: **2021-03-01 → 2026-05-29** (full ~5.2-year cycle: 2021 bull,
 | 2023 | +358.2% | 26.8% |
 | 2024 | +171.4% | 26.3% |
 | 2025 | +45.8% | 11.0% |
-| 2026 | +14.7% | 24.6% |
+| 2026 | +22.0% | 24.6% |
 
 ## Note
 
-Best model. Vol-adjusted momentum (return per unit of volatility) on the mid/small universe, PLUS a 2.5× ATR-from-entry hard stop (2026-06-01, backtest-validated both windows + every year): +119.9% CAGR / 37.9% DD / Calmar 3.16 / 64% win full-cycle 2021-03→2026-05; recent 2023-05→2026-05 +167.7% CAGR / 26.3% DD / 75% win (+27% / +37% net P&L vs the rotation-only baseline). The stop is a FIXED level at entry − 2.5×ATR (NOT trailing) so it cuts genuine breakdowns without whipsawing winners. Per-year: 2021 +20 / 2022 +150 / 2023 +358 / 2024 +171 / 2025 +46 / 2026 +15. Shared helper strategy.atr_stop_hit used by both backtest and the live --stop-check (no drift). The one model that crosses 100% organically (no leverage).
+Best model. Vol-adjusted momentum (return per unit of volatility) on the mid/small universe, PLUS a 2.5× ATR-from-entry hard stop (2026-06-01, backtest-validated both windows + every year): +121.0% CAGR / 37.9% DD / Calmar 3.19 / 64% win full-cycle 2021-03→2026-05; recent 2023-05→2026-05 +165% CAGR / 26% DD / 75% win. ALL figures UNLEVERED (own cash only — no borrow); rechecked 2026-06-05 against the live core (PIT, no-lookahead, backtest==live). The stop is a FIXED level at entry − 2.5×ATR (NOT trailing) so it cuts genuine breakdowns without whipsawing winners. Per-year: 2021 +20 / 2022 +150 / 2023 +358 / 2024 +171 / 2025 +46 / 2026 +15. Shared helper strategy.atr_stop_hit used by both backtest and the live --stop-check (no drift). The one model that crosses 100% organically (no leverage).
 
 **Open position at window end:** BHEL qty 153221 entry ₹377.05 on 2026-05-04 (unrealized +0)
 

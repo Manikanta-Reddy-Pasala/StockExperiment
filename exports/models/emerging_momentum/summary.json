@@ -1,14 +1,14 @@
 {
   "model": "emerging_momentum",
   "start": "2021-03-01",
-  "end": "2026-05-12",
-  "years": 5.196,
+  "end": "2026-05-29",
+  "years": 5.243,
   "capital": 1000000.0,
-  "final_nav": 60024422.0,
-  "total_return_pct": 5902.44,
-  "cagr_pct": 119.9,
+  "final_nav": 63854947.0,
+  "total_return_pct": 6285.49,
+  "cagr_pct": 120.96,
   "max_dd_pct": 37.92,
-  "calmar": 3.16,
+  "calmar": 3.19,
   "trades": 67,
   "wins": 43,
   "losses": 24,
@@ -18,7 +18,7 @@
     "qty": 153221,
     "entry_px": 377.05,
     "entry_date": "2026-05-04",
-    "last_px": 391.75
+    "last_px": 416.75
   },
   "atr_stop_mult": 2.5,
   "per_year": {
@@ -43,7 +43,7 @@
       "dd_pct": 11.0
     },
     "2026": {
-      "ret_pct": 14.7,
+      "ret_pct": 22.0,
       "dd_pct": 24.6
     }
   }

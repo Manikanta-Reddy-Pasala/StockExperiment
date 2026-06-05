@@ -17,11 +17,12 @@ Strategy:
              rotation fires only when a new leader beats the held name's 15d
              return by >= 5pp (MIDMONTH_LEAD).
 
-CONFIG 1 (lb15, sma off) + MCAP-CLIMBER. Full-cycle 2021-04→2026-05 on
-authoritative PIT membership ≈ +46.9% CAGR / 37.7% DD / Calmar 1.24 — see
-exports/models/emerging_momentum/SUMMARY.md. (An earlier ~+98-121% figure was on
-the buggy Wayback N100, which leaked large-cap winners into this mid/small model;
-the correct PIT N100 exclusion since 2026-05-31 gives the honest +46.9%.)
+CURRENT (vol-adj rank, RETAIN=1, lb30, +2.5×ATR stop): full-cycle 2021-03→2026-05
+on authoritative PIT membership ≈ +121.0% CAGR / 37.9% DD / Calmar 3.19; recent
+2023-05→2026-05 ≈ +165% CAGR / 26% DD — UNLEVERED (own cash only). See
+exports/models/emerging_momentum/SUMMARY.md. (The old +46.9% was the pre-vol-adj
+rotation-only config; the vol-adjusted ranking + ATR stop lifted it to +121%.)
+Rechecked 2026-06-05: backtest == live core (PIT, no-lookahead, no borrow).
 
 Run: python3 tools/models/emerging_momentum/backtest.py \
        --from 2023-05-15 --to 2026-05-12 --out exports/models/emerging_momentum
