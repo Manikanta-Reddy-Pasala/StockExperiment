@@ -2008,6 +2008,74 @@ def signals_today():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+# Per-model file/exec routing for live_signal + ranking + executor wiring.
+# (ORB intraday ARCHIVED 2026-06-05 — no edge; intentionally absent here so
+# every UI/route that looks a model up via MODEL_PATHS treats it as unwired.)
+# NOTE: this dict was accidentally removed by the ORB-archive commit, which left
+# 9 dangling MODEL_PATHS references (ranking recalc, triggers/status, rebalance)
+# all raising NameError -> 500. Restored with the 6 active models only.
+MODEL_PATHS = {
+    "momentum_n100_top5_max1": {
+        "signals_dir": "/app/logs/momrot/signals",
+        "ranking_dir": "/app/logs/momrot/ranking",
+        "live_signal": "tools/models/momentum_n100_top5_max1/live_signal.py",
+        "extra_args": [
+            "--universe-file", "/app/logs/momrot/universes/n100_current.json",
+            "--top-n", "5",
+        ],
+        "label": "N100 monthly rotation top-5 (mc=1)",
+        "universe_path": "/app/logs/momrot/universes/n100_current.json",
+    },
+    "momentum_pseudo_n100_adv": {
+        "signals_dir": "/app/logs/momrot_pseudo/signals",
+        "ranking_dir": "/app/logs/momrot_pseudo/ranking",
+        "live_signal": "tools/models/momentum_pseudo_n100_adv/live_signal.py",
+        "extra_args": [
+            "--universes-file",
+            "tools/models/momentum_pseudo_n100_adv/yearly_universes.json",
+            "--top-n", "5",
+        ],
+        "label": "Pseudo-N100 monthly rotation top-5 (mc=1)",
+        "universe_path":
+            "tools/models/momentum_pseudo_n100_adv/yearly_universes.json",
+    },
+    "midcap_narrow_60d_breakout": {
+        "signals_dir": "/app/logs/midcap_narrow/signals",
+        "ranking_dir": "/app/logs/midcap_narrow/ranking",
+        "live_signal": "tools/models/midcap_narrow_60d_breakout/live_signal.py",
+        "extra_args": [
+            "--universe-file", "/app/logs/momrot/universes/midcap_narrow.json",
+        ],
+        "label": "Midcap 60d-high breakout (event-driven)",
+        "universe_path": "/app/logs/momrot/universes/midcap_narrow.json",
+    },
+    "n20_daily_large_only": {
+        "signals_dir": "/app/logs/n20_daily/signals",
+        "ranking_dir": "/app/logs/n20_daily/ranking",
+        "live_signal": "tools/models/n40/live_signal.py",
+        "extra_args": ["--top-n", "1"],
+        "label": "Top-40 ADV ∩ N100 weekly rotation (mc=1)",
+        "universe_path": None,  # PIT built each run from N500 OHLCV
+    },
+    "emerging_momentum": {
+        "signals_dir": "/app/logs/emerging_momentum/signals",
+        "ranking_dir": "/app/logs/emerging_momentum/ranking",
+        "live_signal": "tools/models/emerging_momentum/live_signal.py",
+        "extra_args": [],  # builds its own PIT mid/small pool each run
+        "label": "Emerging mid/small momentum, single-pos + mid-month (mc=1)",
+        "universe_path": None,
+    },
+    "momentum_retest_n500": {
+        "signals_dir": "/app/logs/momentum_retest_n500/signals",
+        "ranking_dir": "/app/logs/momentum_retest_n500/ranking",
+        "live_signal": "tools/models/momentum_retest_n500/live_signal.py",
+        "extra_args": [],  # builds its own N500 panel each run (K=4 multi)
+        "label": "Retest momentum K=4 multi (N500, retest entry)",
+        "universe_path": None,
+    },
+}
+
+
 def _latest_signal_file(signals_dir: str):
     """Return (path, mtime_iso) of newest *.json signal file or (None, None)."""
     try:

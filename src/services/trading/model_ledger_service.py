@@ -212,7 +212,10 @@ def get_all_settings() -> List[Dict]:
     db = get_database_manager()
     with db.get_session() as s:
         rows = s.query(ModelSettings).order_by(ModelSettings.model_name).all()
-        return [_settings_dict(r) for r in rows]
+        # Retired models keep their rows when they have trade history (purge
+        # preserves the audit trail) but must never surface in the UI.
+        return [_settings_dict(r) for r in rows
+                if r.model_name not in RETIRED_MODELS]
 
 
 def deposit(model_name: str, amount: float) -> Dict:
@@ -884,6 +887,11 @@ def get_portfolio_stats(price_lookup=None, quote_lookup=None) -> Dict:
         total_realized_trades = 0.0
 
         for l in ledger_rows:
+            # Retired models (e.g. archived ORB) may still have a flat ledger
+            # row preserved for audit — hide them from all portfolio/dashboard
+            # stats so the UI shows only live models.
+            if l.model_name in RETIRED_MODELS:
+                continue
             cfg = settings_rows.get(l.model_name)
             cash = l.cash or Decimal(0)
             pos_value = Decimal(0)
