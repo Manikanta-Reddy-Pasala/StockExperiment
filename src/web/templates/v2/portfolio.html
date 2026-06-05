@@ -81,36 +81,43 @@
      account (shared by all models), live from Fyers. Separate from the
      per-model cards below (those come from the internal ledger). -->
 <div class="card mb-3" id="fyers-funds-card">
-  <div class="card-body py-2">
-    <div class="row g-2 align-items-center">
-      <div class="col-auto"><i class="bi bi-bank2 text-primary"></i></div>
-      <div class="col-md-auto">
-        <span class="text-muted small" title="Free money you can use to buy new stocks right now">Cash to Trade</span>
-        <div class="fs-5 fw-bold" id="fyers_available_cash">--</div>
-      </div>
-      <div class="col-md-auto">
-        <span class="text-muted small" title="Live market value of every stock you currently hold (all lots)">Money in Stocks</span>
-        <div class="fs-6" id="fyers_used_margin">--</div>
-      </div>
-      <div class="col-md-auto">
-        <span class="text-muted small" title="Your true account value = Cash to Trade + Money in Stocks">Total Account</span>
-        <div class="fs-6 fw-bold" id="fyers_total_account">--</div>
-      </div>
-      <div class="col-md-auto">
-        <span class="text-muted small" title="Whole-account P&L from Fyers (Holdings tab): live unrealized on all stock lots. Broker truth.">Total P&amp;L (Fyers)</span>
-        <div class="fs-6 fw-bold" id="fyers_total_pnl">--</div>
-      </div>
-      <div class="col-md-auto">
-        <span class="text-muted small" title="Day's P&L from Fyers: Σ qty × (LTP − prev close) across all holdings.">Today's P&amp;L (Fyers)</span>
-        <div class="fs-6 fw-bold" id="fyers_today_pnl">--</div>
-      </div>
-      <div class="col-12">
-        <span class="text-muted" style="font-size:.72rem">
-          Whole Fyers account (all models share it). “Cash to Trade” = free cash to buy; “Money in Stocks” = live market value of all your holdings; “Total Account” = the two added (your real account worth). Per-model split is in the table below.
-        </span>
-      </div>
-      <div class="col-md-auto ms-auto">
-        <span class="small-mute" id="fyers_funds_ts">--</span>
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"
+       data-bs-toggle="collapse" data-bs-target="#funds_body" aria-expanded="false" style="cursor:pointer">
+    <span><i class="bi bi-bank2 text-primary me-2"></i>Fyers Account
+      <span class="fw-bold ms-2" id="fyers_total_account">--</span>
+      <span class="small ms-1" id="fyers_total_pnl">--</span>
+    </span>
+    <span class="d-flex align-items-center gap-2">
+      <span class="text-muted small d-none d-sm-inline">Cash <span id="fyers_available_cash">--</span></span>
+      <i class="bi bi-chevron-down"></i>
+    </span>
+  </div>
+  <div class="collapse" id="funds_body">
+    <div class="card-body py-2">
+      <div class="row g-3 align-items-center">
+        <div class="col-6 col-md-auto">
+          <span class="text-muted small" title="Free money you can use to buy new stocks right now">Cash to Trade</span>
+          <div class="fs-6 fw-bold" id="fyers_available_cash_d">--</div>
+        </div>
+        <div class="col-6 col-md-auto">
+          <span class="text-muted small" title="Live market value of every stock you currently hold (all lots)">Money in Stocks</span>
+          <div class="fs-6" id="fyers_used_margin">--</div>
+        </div>
+        <div class="col-6 col-md-auto">
+          <span class="text-muted small" title="Your true account value = Cash + Money in Stocks">Total Account</span>
+          <div class="fs-6 fw-bold" id="fyers_total_account_d">--</div>
+        </div>
+        <div class="col-6 col-md-auto">
+          <span class="text-muted small" title="Whole-account P&L from Fyers (Holdings tab): live unrealized on all stock lots.">Total P&amp;L</span>
+          <div class="fs-6 fw-bold" id="fyers_total_pnl_d">--</div>
+        </div>
+        <div class="col-6 col-md-auto">
+          <span class="text-muted small" title="Day's P&L: Σ qty × (LTP − prev close) across all holdings.">Today's P&amp;L</span>
+          <div class="fs-6 fw-bold" id="fyers_today_pnl">--</div>
+        </div>
+        <div class="col-md-auto ms-md-auto">
+          <span class="small-mute" id="fyers_funds_ts">--</span>
+        </div>
       </div>
     </div>
   </div>
@@ -164,7 +171,7 @@
   <div class="card-header d-flex justify-content-between align-items-center"
        data-bs-toggle="collapse" data-bs-target="#gl_body" aria-expanded="false" style="cursor:pointer">
     <span><i class="bi bi-graph-up-arrow me-2"></i>Gainers &amp; Losers
-      <span class="text-muted small ms-2 d-none d-sm-inline">open positions, by % move</span></span>
+      <span class="small ms-2" id="gl_teaser"></span></span>
     <i class="bi bi-chevron-down"></i>
   </div>
   <div class="collapse" id="gl_body">
@@ -410,15 +417,19 @@ async function loadFyersFunds() {
     const cashToTrade = Number(s.cash || 0);
     const inStocks = Number(s.holdings_value || 0);
     const totalAcct = Number(s.account_total || (cashToTrade + inStocks));
-    document.getElementById('fyers_available_cash').textContent = fmtINR(cashToTrade);
-    document.getElementById('fyers_used_margin').textContent = fmtINR(inStocks);
-    document.getElementById('fyers_total_account').textContent = fmtINR(totalAcct);
-    const tp = document.getElementById('fyers_total_pnl');
-    if (tp) { const v = Number(s.account_total_pnl || 0); tp.textContent = fmtINR(v); tp.className = 'fs-6 fw-bold ' + cls(v); }
-    const dp = document.getElementById('fyers_today_pnl');
-    if (dp) { const v = Number(s.account_today_pnl || 0); dp.textContent = fmtINR(v); dp.className = 'fs-6 fw-bold ' + cls(v); }
-    document.getElementById('fyers_funds_ts').textContent =
-      window.fmtIST ? window.fmtIST(s.ledger_updated_at) : (s.ledger_updated_at || '');
+    const totalPnl = Number(s.account_total_pnl || 0);
+    const setTxt = (id, t, klass) => { const el = document.getElementById(id); if (el) { el.textContent = t; if (klass) el.className = klass; } };
+    // Header (always-visible summary) + detail (inside collapse) share values.
+    setTxt('fyers_available_cash', fmtINR(cashToTrade));
+    setTxt('fyers_available_cash_d', fmtINR(cashToTrade));
+    setTxt('fyers_used_margin', fmtINR(inStocks));
+    setTxt('fyers_total_account', fmtINR(totalAcct), 'fw-bold ms-2');
+    setTxt('fyers_total_account_d', fmtINR(totalAcct), 'fs-6 fw-bold');
+    setTxt('fyers_total_pnl', fmtINR(totalPnl), 'small ms-1 ' + cls(totalPnl));
+    setTxt('fyers_total_pnl_d', fmtINR(totalPnl), 'fs-6 fw-bold ' + cls(totalPnl));
+    const dpv = Number(s.account_today_pnl || 0);
+    setTxt('fyers_today_pnl', fmtINR(dpv), 'fs-6 fw-bold ' + cls(dpv));
+    setTxt('fyers_funds_ts', window.fmtIST ? window.fmtIST(s.ledger_updated_at) : (s.ledger_updated_at || ''));
   } catch(e) { console.error(e); }
 }
 
@@ -558,6 +569,14 @@ function renderGainersLosers() {
   const l = withPx.filter(p=>p._pnl<0).sort((a,b)=>a._pct-b._pct).slice(0,5);
   document.getElementById('gl_gainers').innerHTML = g.length ? g.map(row).join('') : '<div class="text-muted small">none</div>';
   document.getElementById('gl_losers').innerHTML  = l.length ? l.map(row).join('') : '<div class="text-muted small">none</div>';
+  // Collapsed-state teaser: best gainer + worst loser at a glance.
+  const te = document.getElementById('gl_teaser');
+  if (te) {
+    const parts = [];
+    if (g[0]) parts.push(`<span class="pos">▲ ${g[0]._sym} ${fmtPct(g[0]._pct)}</span>`);
+    if (l[0]) parts.push(`<span class="neg">▼ ${l[0]._sym} ${fmtPct(l[0]._pct)}</span>`);
+    te.innerHTML = parts.join(' · ') || '<span class="text-muted">—</span>';
+  }
 }
 
 // Sort + render the CLOSED positions grid per the #closed_sort dropdown.
