@@ -28,7 +28,7 @@ const MODELS = [
   {key: "midcap_narrow_60d_breakout",  title: "Midcap Breakout",      desc: "Event-driven • 40-day high + vol surge + 200d SMA",                       schedule: "event"},
   {key: "momentum_pseudo_n100_adv",    title: "Liquid 100 Momentum",  desc: "Monthly rotation • top-100 ADV from N500 • rank-1 (fixed May universe anchor)",  schedule: "monthly"},
   {key: "momentum_retest_n500",        title: "Retest Momentum",      desc: "Monthly basket of 4 (top-120 ADV N500) • buy each within 20% of 20-EMA • retain top-4", schedule: "monthly", multi: 4},
-  {key: "emerging_momentum",           title: "Emerging Momentum",    desc: "Single-position (max-1) momentum rotation on emerging mid/small caps (PIT N500 minus N100) • 30d vol-adj ret>0 • ≤₹3000 • retain-1 • monthly + mid-month (5% lead)", schedule: "monthly_midcheck"},
+  {key: "emerging_momentum",           title: "Emerging Momentum",    desc: "Single-position (max-1) momentum rotation on emerging mid/small caps (PIT N500 minus N100) • 30d vol-adj ret>0 • ≤₹3000 • retain-1 • monthly + mid-month (5% lead) • ½ profit-take @ +30%", schedule: "monthly_midcheck"},
 ];
 
 // Format YYYY-MM-DD in local TZ (avoid toISOString → UTC date drift).

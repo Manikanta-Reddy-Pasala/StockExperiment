@@ -52,6 +52,10 @@ class ModelLedger(Base):
     open_qty = Column(Integer)
     open_entry_px = Column(Numeric(14, 4))
     open_entry_date = Column(Date)
+    # True once a partial profit-take has fired for the CURRENT open position, so
+    # the daily check books HALF only once (reset to False on every fresh buy).
+    # Only used by models with strategy.PROFIT_TAKE_PCT > 0 (emerging).
+    profit_taken = Column(Boolean, default=False, nullable=False, server_default="false")
     realized_pnl = Column(Numeric(14, 2), default=0)
     total_trades = Column(Integer, default=0)
     wins = Column(Integer, default=0)

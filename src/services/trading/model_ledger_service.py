@@ -683,6 +683,7 @@ def record_buy(model_name: str, symbol: str, qty: int, price: float,
             l.open_qty = qty
             l.open_entry_px = price_d
             l.open_entry_date = date.today()
+            l.profit_taken = False   # fresh position: partial profit-take re-armed
         settings.current_amount = (settings.current_amount or Decimal(0)) - charges
         s.add(ModelTrade(
             model_name=model_name,
@@ -760,6 +761,10 @@ def record_sell(model_name: str, exit_price: float, reason: str,
             # leave. NAV = realized cash + remaining shares at entry cost.
             l.open_qty = remaining_qty
             settings.current_amount = l.cash + Decimal(str(remaining_qty)) * entry_px
+            # A partial PROFIT_TAKE arms the once-per-position flag so the daily
+            # check never books a second half off the same entry.
+            if reason and "PROFIT_TAKE" in str(reason):
+                l.profit_taken = True
             log.warning(f"{model_name}: PARTIAL SELL {sell_qty}/{sell_qty + remaining_qty} "
                         f"{symbol} — retaining {remaining_qty} open shares.")
         s.add(ModelTrade(
@@ -1069,6 +1074,7 @@ def _ledger_dict(l: ModelLedger) -> Dict:
         "open_qty": l.open_qty,
         "open_entry_px": float(l.open_entry_px) if l.open_entry_px else None,
         "open_entry_date": l.open_entry_date.isoformat() if l.open_entry_date else None,
+        "profit_taken": bool(getattr(l, "profit_taken", False)),
         "realized_pnl": float(l.realized_pnl or 0),
         "total_trades": l.total_trades or 0,
         "wins": l.wins or 0,

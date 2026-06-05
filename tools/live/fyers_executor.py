@@ -1269,14 +1269,16 @@ def main() -> int:
             log.warning(f"DB open_positions load failed: {_le}; "
                         "treating as flat")
 
-    # Partition signals into exits and entries (preserve order within each)
+    # Partition signals into exits and entries (preserve order within each).
+    # PROFIT_TAKE is an exit-side signal but a PARTIAL one — it sells only the
+    # signal's `qty` (half) and KEEPS the residual position open (no slot freed).
     exit_signals = [s for s in signals
-                    if s.get("signal") in ("STOP_HIT", "TARGET_HIT", "EXIT")]
+                    if s.get("signal") in ("STOP_HIT", "TARGET_HIT", "EXIT", "PROFIT_TAKE")]
     entry_signals = [s for s in signals
                      if s.get("signal") in ("ENTRY1", "ENTRY2")]
     other_signals = [s for s in signals
                      if s.get("signal") not in (
-                         "STOP_HIT", "TARGET_HIT", "EXIT", "ENTRY1", "ENTRY2"
+                         "STOP_HIT", "TARGET_HIT", "EXIT", "PROFIT_TAKE", "ENTRY1", "ENTRY2"
                      )]
 
     log.info(f"Signal mix: exits={len(exit_signals)} entries={len(entry_signals)} "
@@ -1294,6 +1296,10 @@ def main() -> int:
     # ---- PASS 1: EXITS FIRST (block on each fill) ----
     for sig in exit_signals:
         sig_type = sig.get("signal")
+        # PROFIT_TAKE is a PARTIAL exit: sell only the signal's qty (half) and
+        # retain the residual open position (never frees the slot / rotates).
+        _is_ptake = (sig_type == "PROFIT_TAKE")
+        _ptake_qty = int(sig.get("qty") or 0)
         sym = sig["symbol"]
         signal_price = float(sig.get("price") or 0)
         live_px = None if args.dry_run else _fetch_live_ltp(svc, args.user_id, sym)
@@ -1313,9 +1319,21 @@ def main() -> int:
         # the whole intended qty.
         actual_qty = held.qty
 
+        if _is_ptake:
+            # cap the half-sell to what we actually hold (defensive)
+            actual_qty = max(1, min(_ptake_qty or (held.qty // 2), held.qty - 1)) if held.qty >= 2 else 0
+            if actual_qty <= 0:
+                log.info(f"SKIP PROFIT_TAKE {sym}: qty too small to halve")
+                skipped += 1
+                continue
+
         if args.dry_run:
-            log.info(f"DRY-RUN PASS-1 EXIT {sym} qty={held.qty} "
-                     f"side={exit_side} @ ~{price} (would LIMIT then MARKET)")
+            if _is_ptake:
+                log.info(f"DRY-RUN PASS-1 PROFIT_TAKE {sym} sell {actual_qty}/{held.qty} "
+                         f"@ ~{price} (keeps {held.qty - actual_qty} open)")
+            else:
+                log.info(f"DRY-RUN PASS-1 EXIT {sym} qty={held.qty} "
+                         f"side={exit_side} @ ~{price} (would LIMIT then MARKET)")
         else:
             # Sell THIS model's qty (held.qty, from the ledger — the broker
             # account is shared across models) in the model's policy product,
@@ -1323,11 +1341,12 @@ def main() -> int:
             # the account. A BUY-to-cover exit keeps the policy product. If the
             # account holds 0 of that product for the name (already squared
             # elsewhere), mark closed WITHOUT placing an order or aborting entries.
-            _exit_prod, _exit_qty = None, held.qty
+            _want_qty = actual_qty if _is_ptake else held.qty
+            _exit_prod, _exit_qty = None, _want_qty
             if exit_side == "SELL":
                 from src.services.trading.model_ledger_service import product_for_model
                 _exit_prod, _exit_qty, _src = resolve_sell_product_qty(
-                    svc, args.user_id, sym, held.qty,
+                    svc, args.user_id, sym, _want_qty,
                     product_for_model(args.model_name))
                 if _src == "flat":
                     log.warning(f"EXIT {sym}: broker shows FLAT (already closed "
@@ -1398,11 +1417,14 @@ def main() -> int:
         # rotate into a different symbol while shares remain). Only a FULL exit
         # frees the slot.
         _partial_exit = (not args.dry_run) and 0 < int(res.get("fill_qty") or 0) < _exit_qty
-        if _partial_exit:
-            held.qty = held.qty - actual_qty  # reduce in-memory residual
+        # A PROFIT_TAKE keeps the residual open by design (it's a deliberate half
+        # sell, not a broker shortfall) — never free the slot for it.
+        if _partial_exit or _is_ptake:
+            held.qty = max(0, held.qty - actual_qty)  # reduce in-memory residual, stay open
         else:
             open_positions = [p for p in open_positions if p.symbol != sym]
-        log.info(f"{'DRY-RUN' if args.dry_run else ('PARTIAL-CLOSE' if _partial_exit else 'CLOSED')} PASS-1 {sym} qty={actual_qty} "
+        _state = 'DRY-RUN' if args.dry_run else ('PROFIT-TAKE' if _is_ptake else ('PARTIAL-CLOSE' if _partial_exit else 'CLOSED'))
+        log.info(f"{_state} PASS-1 {sym} qty={actual_qty} "
                  f"entry={held.entry_price} exit={fill_price} pnl=₹{pnl:.0f} "
                  f"reason={sig_type}")
         closed += 1

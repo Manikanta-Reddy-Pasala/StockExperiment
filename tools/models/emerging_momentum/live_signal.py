@@ -131,6 +131,8 @@ def held_from_db() -> List[Dict]:
             return [{
                 "symbol": l["open_symbol"],
                 "entry_price": float(l.get("open_entry_px") or 0),
+                "qty": int(l.get("open_qty") or 0),
+                "profit_taken": bool(l.get("profit_taken", False)),
             }]
     except Exception as e:
         log.warning(f"DB ledger read failed: {e}; treating as flat")
@@ -287,6 +289,29 @@ def main():
                                df["close"].astype(float))
         day_low = float(df["low"].iloc[-1])
         last_close = float(df["close"].iloc[-1])
+        # --- PARTIAL PROFIT-TAKE: book HALF once at entry*(1+PROFIT_TAKE_PCT) ---
+        # Checked on the close (an UP move), BEFORE the down-side ATR stop. Fires
+        # once per position (model_ledger.profit_taken). Mirrors the backtest walk
+        # so live + backtest cannot drift.
+        _PT = float(getattr(S, "PROFIT_TAKE_PCT", 0.0) or 0.0)
+        held_qty = int(h.get("qty") or 0)
+        if (_PT > 0 and not h.get("profit_taken") and held_qty >= 2
+                and entry_px > 0 and last_close >= entry_px * (1 + _PT)):
+            sell_qty = held_qty // 2
+            signals = [{
+                "model": MODEL_NAME, "symbol": sym,
+                "company": sym.split(":")[-1].replace("-EQ", ""),
+                "ts": today.strftime("%Y-%m-%d %H:%M:%S"),
+                "side": "SELL", "signal": "PROFIT_TAKE", "reason": "PROFIT_TAKE",
+                "qty": sell_qty, "price": float(last_close), "sl": 0.0, "target": 0.0,
+                "note": f"partial profit-take: close {last_close:.2f} >= "
+                        f"entry {entry_px:.2f} x (1+{_PT:.0%}); booking half "
+                        f"({sell_qty}/{held_qty}), runner rides the ATR stop",
+            }]
+            with open(sig_path, "w") as f:
+                json.dump(signals, f)
+            log.info(f"stop-check: PROFIT_TAKE emitted for {sym} — sell {sell_qty}/{held_qty} @ {last_close:.2f}")
+            return 0
         hit, lvl = S.atr_stop_hit(entry_px, atr_val, day_low)
         log.info(f"stop-check {sym}: entry={entry_px:.2f} ATR={atr_val} "
                  f"stop_level={lvl} day_low={day_low:.2f} -> {'HIT' if hit else 'ok'}")
