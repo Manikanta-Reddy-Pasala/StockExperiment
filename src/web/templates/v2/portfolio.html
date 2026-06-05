@@ -170,7 +170,7 @@
 <div class="card" id="gl_card" style="display:none;">
   <div class="card-header d-flex justify-content-between align-items-center"
        data-bs-toggle="collapse" data-bs-target="#gl_body" aria-expanded="false" style="cursor:pointer">
-    <span><i class="bi bi-graph-up-arrow me-2"></i>Gainers &amp; Losers
+    <span><i class="bi bi-graph-up-arrow me-2"></i>Gainers &amp; Losers <span class="text-muted small">(today)</span>
       <span class="small ms-2" id="gl_teaser"></span></span>
     <i class="bi bi-chevron-down"></i>
   </div>
@@ -469,15 +469,20 @@ async function loadState() {
     OPEN_POS = [];
     (d.models || []).forEach(m => {
       if (!m.enabled) return;
-      const add = (sym, qty, entry, live) => {
+      const add = (sym, qty, entry, live, prev) => {
         const q = Number(qty)||0, e = Number(entry)||0, l = (Number(live)||0)||e;
+        const pc = Number(prev)||0;
         const c = q*e, mv = q*l, pnl = mv - c;
+        // Today's move = qty × (LTP − prev close); null when no prev close.
+        const today = pc>0 ? q*(l-pc) : null;
+        const todaypct = pc>0 ? (l/pc-1)*100 : null;
         OPEN_POS.push({ model: m.model_name, sym, qty, entry, live,
           _sym: (sym||'').replace('NSE:','').replace('-EQ',''), _mv: mv,
-          _pnl: pnl, _pct: c>0 ? (pnl/c*100) : 0 });
+          _pnl: pnl, _pct: c>0 ? (pnl/c*100) : 0,
+          _today: today, _todaypct: todaypct });
       };
-      if (m.open_symbol && m.open_qty) add(m.open_symbol, m.open_qty, m.open_entry_px, m.open_mtm_price);
-      (m.holdings || []).forEach(h => add(h.symbol, h.qty, h.entry_px, h.mtm_price));
+      if (m.open_symbol && m.open_qty) add(m.open_symbol, m.open_qty, m.open_entry_px, m.open_mtm_price, m.open_prev_close);
+      (m.holdings || []).forEach(h => add(h.symbol, h.qty, h.entry_px, h.mtm_price, h.prev_close));
     });
     renderOpen();
     loadClosed();
@@ -556,26 +561,28 @@ function renderOpen() {
 
 // Top 5 gainers + top 5 losers among open positions, by % move. Hidden until
 // at least one position has a live price (otherwise % is meaningless).
+// Gainers/Losers by TODAY's move (LTP vs prev close), not since-entry P&L.
 function renderGainersLosers() {
   const card = document.getElementById('gl_card');
-  const withPx = OPEN_POS.filter(p => (Number(p.live)||0) > 0 && (Number(p.entry)||0) > 0);
-  if (!withPx.length) { if (card) card.style.display = 'none'; return; }
+  // Only positions with a prev close (a live trading session) qualify.
+  const withDay = OPEN_POS.filter(p => p._todaypct != null);
+  if (!withDay.length) { if (card) card.style.display = 'none'; return; }
   if (card) card.style.display = '';
   const row = p => `<div class="glrow">
       <span><span class="glsym">${p._sym}</span><br><span class="glmodel">${modelLabel(p.model)}</span></span>
-      <span class="${cls(p._pnl)} text-end">${fmtPct(p._pct)}<br><span class="glmodel">${fmtINR(p._pnl)}</span></span>
+      <span class="${cls(p._today)} text-end">${fmtPct(p._todaypct)}<br><span class="glmodel">${fmtINR(p._today)}</span></span>
     </div>`;
-  const g = withPx.filter(p=>p._pnl>0).sort((a,b)=>b._pct-a._pct).slice(0,5);
-  const l = withPx.filter(p=>p._pnl<0).sort((a,b)=>a._pct-b._pct).slice(0,5);
-  document.getElementById('gl_gainers').innerHTML = g.length ? g.map(row).join('') : '<div class="text-muted small">none</div>';
-  document.getElementById('gl_losers').innerHTML  = l.length ? l.map(row).join('') : '<div class="text-muted small">none</div>';
-  // Collapsed-state teaser: best gainer + worst loser at a glance.
+  const g = withDay.filter(p=>p._today>0).sort((a,b)=>b._todaypct-a._todaypct).slice(0,5);
+  const l = withDay.filter(p=>p._today<0).sort((a,b)=>a._todaypct-b._todaypct).slice(0,5);
+  document.getElementById('gl_gainers').innerHTML = g.length ? g.map(row).join('') : '<div class="text-muted small">none today</div>';
+  document.getElementById('gl_losers').innerHTML  = l.length ? l.map(row).join('') : '<div class="text-muted small">none today</div>';
+  // Collapsed-state teaser: top mover up + down today.
   const te = document.getElementById('gl_teaser');
   if (te) {
     const parts = [];
-    if (g[0]) parts.push(`<span class="pos">▲ ${g[0]._sym} ${fmtPct(g[0]._pct)}</span>`);
-    if (l[0]) parts.push(`<span class="neg">▼ ${l[0]._sym} ${fmtPct(l[0]._pct)}</span>`);
-    te.innerHTML = parts.join(' · ') || '<span class="text-muted">—</span>';
+    if (g[0]) parts.push(`<span class="pos">▲ ${g[0]._sym} ${fmtPct(g[0]._todaypct)}</span>`);
+    if (l[0]) parts.push(`<span class="neg">▼ ${l[0]._sym} ${fmtPct(l[0]._todaypct)}</span>`);
+    te.innerHTML = parts.join(' · ') || '<span class="text-muted">flat today</span>';
   }
 }
 

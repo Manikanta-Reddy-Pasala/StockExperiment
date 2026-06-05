@@ -896,6 +896,7 @@ def get_portfolio_stats(price_lookup=None, quote_lookup=None) -> Dict:
             cash = l.cash or Decimal(0)
             pos_value = Decimal(0)
             mtm_price = None
+            open_prev_close = None  # yesterday's close for the single open symbol
             unrealized = 0.0       # Σ qty × (LTP − entry)        — open P&L (Fyers LTP)
             today_unrealized = 0.0  # Σ qty × (LTP − prev_close)  — day MTM change
             if l.open_symbol and l.open_qty:
@@ -910,6 +911,7 @@ def get_portfolio_stats(price_lookup=None, quote_lookup=None) -> Dict:
                 if entry > 0:
                     unrealized += qty * (ltp - entry)
                 if q["prev_close"] > 0:
+                    open_prev_close = q["prev_close"]
                     today_unrealized += qty * (ltp - q["prev_close"])
 
             # Multi-holding positions: MTM each, add to pos_value + unrealized.
@@ -927,7 +929,9 @@ def get_portfolio_stats(price_lookup=None, quote_lookup=None) -> Dict:
                 pos_value += h_val
                 if h_entry > 0:
                     unrealized += h_qty * (h_ltp - h_entry)
+                h_prev = None
                 if hq["prev_close"] > 0:
+                    h_prev = hq["prev_close"]
                     today_unrealized += h_qty * (h_ltp - hq["prev_close"])
                 holdings_list.append({
                     "symbol": h.symbol,
@@ -935,6 +939,7 @@ def get_portfolio_stats(price_lookup=None, quote_lookup=None) -> Dict:
                     "entry_px": float(h.entry_px) if h.entry_px else None,
                     "entry_date": h.entry_date.isoformat() if h.entry_date else None,
                     "mtm_price": h_ltp,
+                    "prev_close": h_prev,
                     "value": float(h_val),
                 })
 
@@ -979,6 +984,7 @@ def get_portfolio_stats(price_lookup=None, quote_lookup=None) -> Dict:
                 "open_entry_px": float(l.open_entry_px) if l.open_entry_px else None,
                 "open_entry_date": l.open_entry_date.isoformat() if l.open_entry_date else None,
                 "open_mtm_price": mtm_price,
+                "open_prev_close": open_prev_close,
                 "holdings": holdings_list,
                 "is_multi": bool(holdings_list),
                 "total_trades": l.total_trades or 0,
