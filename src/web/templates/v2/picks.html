@@ -94,30 +94,42 @@ function _tradingDaysUntil(target) {
   return n;
 }
 
-// Compute next rebalance date+days for a given schedule. Mirrors backend
-// _next_rebalance() logic so UI doesn't need an extra API round trip.
+// Compute the REAL next rebalance date+days for a given schedule, holiday-aware.
+// Mirrors the shared tools/shared/rebalance_calendar.py rule exactly:
+//   monthly         = first NSE trading day of each month
+//   monthly_midcheck= + first trading day on/after the 15th (mid-month check)
+//   weekly          = first NSE trading day of each ISO week (Mon-anchored)
+//   daily           = every trading day
+// We build the list of upcoming rebalance instants and pick the SOONEST one that
+// has not already passed (>= today, so a rebalance day shows "today / 0 td").
+// This fixes (a) monthly showing this-month's already-done date, and (b) weekly
+// falling through to the event-driven fallback.
 function nextRebalance(schedule) {
   const today = new Date();
   const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const y = today.getFullYear(), mo = today.getMonth(), dd = today.getDate();
+  const pick = (cands) => cands.sort((a,b)=>a.d-b.d).find(c => c.d >= startOfToday);
 
-  if (schedule === "monthly_midcheck") {
-    // Two candidate dates:
-    //   (1) first weekday on/after the 15th of THIS month
-    //   (2) first weekday of NEXT month
-    // Return whichever is SOONER and still in the future.
-    let mid = _firstWeekday(new Date(today.getFullYear(), today.getMonth(), 15));
-    let next = _firstWeekday(new Date(today.getFullYear(), today.getMonth()+1, 1));
-    let target, kind;
-    if (mid > startOfToday) { target = mid; kind = 'mid-month'; }
-    else                    { target = next; kind = 'monthly'; }
-    return {label: _ymdLocal(target), tradingDays: _tradingDaysUntil(target), kind};
+  if (schedule === "monthly" || schedule === "monthly_midcheck") {
+    const cands = [];
+    // this month + next month month-starts (and mid-month checks if applicable)
+    for (const dm of [0, 1, 2]) {
+      cands.push({d: _firstWeekday(new Date(y, mo+dm, 1)), kind: 'monthly'});
+      if (schedule === "monthly_midcheck")
+        cands.push({d: _firstWeekday(new Date(y, mo+dm, 15)), kind: 'mid-month'});
+    }
+    const c = pick(cands);
+    return {label: _ymdLocal(c.d), tradingDays: _tradingDaysUntil(c.d), kind: c.kind};
   }
 
-  if (schedule === "monthly") {
-    let target = today.getDate() <= 7
-      ? _firstWeekday(startOfToday)
-      : _firstWeekday(new Date(today.getFullYear(), today.getMonth()+1, 1));
-    return {label: _ymdLocal(target), tradingDays: _tradingDaysUntil(target), kind: 'monthly'};
+  if (schedule === "weekly") {
+    // ISO week anchored on Monday. Build the Monday of this week + next 3 weeks,
+    // resolve each to its first trading day, pick the soonest not-yet-passed.
+    const dow = (today.getDay() + 6) % 7;            // 0 = Monday
+    const cands = [0, 1, 2, 3].map(w =>
+      ({d: _firstWeekday(new Date(y, mo, dd - dow + w*7)), kind: 'weekly'}));
+    const c = pick(cands);
+    return {label: _ymdLocal(c.d), tradingDays: _tradingDaysUntil(c.d), kind: c.kind};
   }
 
   if (schedule === "daily") {
