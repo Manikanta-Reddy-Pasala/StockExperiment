@@ -927,6 +927,102 @@ def models_status():
                 ],
             })
 
+            # ============================================================
+            # Models 6 & 7: emerging_momentum + momentum_retest_n500
+            # Both rank a POINT-IN-TIME slice of the Nifty-500 price pool
+            # (emerging = N500 minus N100 mid/small; retest = top-120 ADV of
+            # N500), so neither has a static universe file like models 1/4/5.
+            # Data sufficiency = trading-day coverage of the shared N500 pool +
+            # freshness of the model's last ranking file. N500 coverage is
+            # computed ONCE and reused by both cards.
+            # ============================================================
+            try:
+                from tools.shared.index_membership import universe_union as _uu
+                n500_plain = sorted(_uu("n500"))
+            except Exception:
+                n500_plain = []
+            n500_fyers = [f"NSE:{s}-EQ" for s in n500_plain]
+            n500_per_sym = {}
+            n500_latest = {}
+            if n500_fyers:
+                rows = session.execute(text("""
+                    SELECT symbol, COUNT(DISTINCT date) days, MAX(date) latest
+                    FROM historical_data
+                    WHERE symbol = ANY(:syms) AND date >= :since
+                    GROUP BY symbol
+                """), {"syms": n500_fyers, "since": since}).fetchall()
+                n500_per_sym = {r.symbol: int(r.days) for r in rows}
+                n500_latest = {r.symbol: r.latest for r in rows}
+            n500_ok_syms = [s for s in n500_fyers if n500_per_sym.get(s, 0) >= 90]
+            n500_missing = [s for s in n500_fyers if s not in n500_per_sym]
+            n500_cov = (len(n500_ok_syms) / len(n500_fyers) * 100) if n500_fyers else 0
+            _n5_dates = [d for d in n500_latest.values() if d]
+            n500_overall_latest = max(_n5_dates) if _n5_dates else None
+            n500_stale = (today - n500_overall_latest).days if n500_overall_latest else 999
+
+            def _latest_ranking(ranking_dir):
+                """(ranked_count, age_days, gen_date_iso, universe_size) from the
+                newest ranking JSON. Ranked names live under `top_n`; the
+                post-filter candidate count is `universe_size`."""
+                try:
+                    files = sorted(Path(ranking_dir).glob("*.json"))
+                    if not files:
+                        return 0, None, None, None
+                    f = files[-1]
+                    data = json.loads(f.read_text())
+                    rk = data.get("top_n") or data.get("ranking") or data.get("stocks") or []
+                    cnt = len(rk) if isinstance(rk, list) else 0
+                    usize = data.get("universe_size")
+                    try:
+                        gd = date.fromisoformat(f.stem)
+                    except Exception:
+                        gd = None
+                    age = (today - gd).days if gd else None
+                    return cnt, age, (gd.isoformat() if gd else None), usize
+                except Exception:
+                    return 0, None, None, None
+
+            for _mname, _rdir in [
+                ("emerging_momentum", "/app/logs/emerging_momentum/ranking"),
+                ("momentum_retest_n500", "/app/logs/momentum_retest_n500/ranking"),
+            ]:
+                _cnt, _age, _gd, _usize = _latest_ranking(_rdir)
+                _data_ok = (len(n500_fyers) >= 300 and n500_cov >= 85
+                            and n500_stale <= 3 and _cnt > 0)
+                models.append({
+                    "name": _mname,
+                    "type": "equity",
+                    "wired": _wired(_mname),
+                    "data_sufficient": bool(_data_ok),
+                    "items": [
+                        {"label": "N500 price pool size",
+                         "value": len(n500_fyers),
+                         "required": ">= 300 syms",
+                         "ok": len(n500_fyers) >= 300},
+                        {"label": f"Symbols w/ >= 90 trading days (last {window_calendar_days}d)",
+                         "value": f"{len(n500_ok_syms)} / {len(n500_fyers)}",
+                         "required": ">= 85% coverage",
+                         "ok": n500_cov >= 85,
+                         "extra": f"{n500_cov:.1f}% coverage"},
+                        {"label": "Symbols completely missing",
+                         "value": len(n500_missing),
+                         "required": "0 (few OK)",
+                         "ok": len(n500_missing) <= 20},
+                        {"label": "Last ranking generated",
+                         "value": _gd or "—",
+                         "required": "model cadence",
+                         "ok": _cnt > 0,
+                         "extra": (f"{_cnt} ranked"
+                                   + (f", universe {_usize}" if _usize is not None else "")
+                                   + (f", {_age}d old" if _age is not None else ""))},
+                        {"label": "Latest equity close",
+                         "value": n500_overall_latest.isoformat() if n500_overall_latest else "—",
+                         "required": "<= 3d old (holiday OK)",
+                         "ok": n500_stale <= 3,
+                         "extra": f"{n500_stale}d old"},
+                    ],
+                })
+
         # Append a "Data synced (IST)" check to EVERY model card — the wall-clock
         # time the daily Fyers price pull last wrote rows (updated_at). This is
         # the freshness stamp shown on each data-status card. Container TZ is IST
