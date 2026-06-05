@@ -343,24 +343,24 @@ def _portfolio_state() -> Dict:
 
 
 def _next_rebalance() -> Dict:
-    """Compute next rotation date (first weekday on/after 1st of next month)."""
-    today = datetime.now()
-    # First trading day on/after the 1st of current month — if today already past day 7, target next month
-    if today.day <= 7 and today.weekday() < 5:
-        nxt = today.date()
-        days_to = 0
+    """Next monthly rotation = first NSE TRADING day of the next month (or this
+    month's, if it hasn't occurred yet), HOLIDAY-AWARE. `days_until` counts
+    trading SESSIONS (not calendar days), mirroring the picks.html per-model
+    countdown and the shared rebalance_calendar rule so the two never disagree."""
+    from tools.shared.nse_calendar import first_trading_day_of_month, is_trading_day
+    today = datetime.now().date()
+    this_first = first_trading_day_of_month(today)
+    if today < this_first:
+        target = this_first
     else:
-        # Next month's 1st
-        if today.month == 12:
-            target = datetime(today.year + 1, 1, 1)
-        else:
-            target = datetime(today.year, today.month + 1, 1)
-        # Skip to weekday
-        while target.weekday() >= 5:
-            target += timedelta(days=1)
-        nxt = target.date()
-        days_to = (target.date() - today.date()).days
-    return {"date": str(nxt), "days_until": days_to, "weekday": nxt.strftime("%A")}
+        nxt_month = (today.replace(day=1) + timedelta(days=32)).replace(day=1)
+        target = first_trading_day_of_month(nxt_month)
+    sessions, cur = 0, today
+    while cur < target:                       # trading sessions strictly after today
+        cur += timedelta(days=1)
+        if is_trading_day(cur):
+            sessions += 1
+    return {"date": str(target), "days_until": sessions, "weekday": target.strftime("%A")}
 
 
 def _current_ranking(top: int = 10, live_prices: bool = True) -> List[Dict]:
