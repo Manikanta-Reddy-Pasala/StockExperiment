@@ -59,6 +59,22 @@
     .btn-sm { padding: .42rem .75rem; min-height: 42px; }
     .pos-card .btn-sm { min-height: 44px; }
   }
+
+  /* Sort toolbar — lives in the card body (not the collapse header) so it
+     never crowds the tap-to-collapse target. */
+  .sort-bar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 12px; }
+  .sort-bar label { color: #6b7280; font-size: .8rem; margin: 0; white-space: nowrap; }
+  .sort-bar select { width: auto; min-width: 168px; }
+  @media (max-width: 480px) { .sort-bar { justify-content: stretch; } .sort-bar select { flex: 1; min-width: 0; } }
+
+  /* Gainers & Losers — bordered boxes so each column reads as a real panel
+     instead of a cramped half-width list. */
+  .gl-box { background: #f7f8fa; border: 1px solid #e2e6ee; border-radius: 10px; padding: 12px; min-height: 132px; }
+  .gl-box .gl-title { font-weight: 700; font-size: .85rem; margin-bottom: 8px; }
+  .gl-box .glrow { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #eef0f5; font-size: .9rem; }
+  .gl-box .glrow:last-child { border-bottom: 0; }
+  .gl-box .glrow .glsym { font-weight: 600; }
+  .gl-box .glrow .glmodel { color: #9aa1ad; font-size: .72rem; }
 </style>
 
 <!-- Fyers broker account funds — plain-language. This is the WHOLE broker
@@ -154,13 +170,17 @@
   <div class="collapse" id="gl_body">
     <div class="card-body">
       <div class="row g-3">
-        <div class="col-6">
-          <div class="fw-bold small text-success mb-1"><i class="bi bi-arrow-up-right"></i> Top Gainers</div>
-          <div id="gl_gainers"><div class="text-muted small">—</div></div>
+        <div class="col-12 col-sm-6">
+          <div class="gl-box">
+            <div class="gl-title text-success"><i class="bi bi-arrow-up-right"></i> Top Gainers</div>
+            <div id="gl_gainers"><div class="text-muted small">—</div></div>
+          </div>
         </div>
-        <div class="col-6">
-          <div class="fw-bold small text-danger mb-1"><i class="bi bi-arrow-down-right"></i> Top Losers</div>
-          <div id="gl_losers"><div class="text-muted small">—</div></div>
+        <div class="col-12 col-sm-6">
+          <div class="gl-box">
+            <div class="gl-title text-danger"><i class="bi bi-arrow-down-right"></i> Top Losers</div>
+            <div id="gl_losers"><div class="text-muted small">—</div></div>
+          </div>
         </div>
       </div>
     </div>
@@ -172,18 +192,20 @@
        data-bs-toggle="collapse" data-bs-target="#open_body" aria-expanded="false" style="cursor:pointer">
     <span><i class="bi bi-briefcase me-2"></i>Open Positions — by Model
       <span class="text-muted small ms-2 d-none d-sm-inline">each model's own qty &amp; cost (live MTM)</span></span>
-    <span class="d-flex align-items-center gap-2">
-      <select id="open_sort" class="form-select form-select-sm w-auto" onclick="event.stopPropagation()" onchange="renderOpen()" title="Sort open positions">
-        <option value="sym">Sort: Symbol</option>
+    <span class="d-flex align-items-center gap-2"><span class="text-muted small" id="open_pnl_sum"></span><i class="bi bi-chevron-down"></i></span>
+  </div>
+  <div class="collapse" id="open_body">
+  <div class="card-body">
+    <div class="sort-bar">
+      <label for="open_sort"><i class="bi bi-sort-down me-1"></i>Sort</label>
+      <select id="open_sort" class="form-select form-select-sm" onchange="renderOpen()" title="Sort open positions">
+        <option value="sym">Symbol</option>
         <option value="gain">Gain ₹ (high→low)</option>
         <option value="gainpct">Gain % (high→low)</option>
         <option value="loss">Losers first</option>
         <option value="value">Value (high→low)</option>
       </select>
-      <span class="text-muted small" id="open_pnl_sum"></span><i class="bi bi-chevron-down"></i></span>
-  </div>
-  <div class="collapse" id="open_body">
-  <div class="card-body">
+    </div>
     <div id="positions_grid"><div class="text-muted py-2">Loading…</div></div>
     <div class="d-flex justify-content-between align-items-center mt-2 pager" id="open_pager" style="display:none!important;">
       <button class="btn btn-sm btn-outline-secondary" data-grid="open" data-dir="-1">‹ Prev</button>
@@ -199,17 +221,19 @@
        data-bs-toggle="collapse" data-bs-target="#closed_body" aria-expanded="false" style="cursor:pointer">
     <span><i class="bi bi-check2-square me-2"></i>Closed Positions — by Model
       <span class="text-muted small ms-2 d-none d-sm-inline">realized P&amp;L from closed trades</span></span>
-    <span class="d-flex align-items-center gap-2">
-      <select id="closed_sort" class="form-select form-select-sm w-auto" onclick="event.stopPropagation()" onchange="renderClosed()" title="Sort closed positions">
-        <option value="date">Sort: Newest</option>
+    <span class="d-flex align-items-center gap-2"><span class="text-muted small" id="closed_pnl_sum"></span><i class="bi bi-chevron-down"></i></span>
+  </div>
+  <div class="collapse" id="closed_body">
+  <div class="card-body">
+    <div class="sort-bar">
+      <label for="closed_sort"><i class="bi bi-sort-down me-1"></i>Sort</label>
+      <select id="closed_sort" class="form-select form-select-sm" onchange="renderClosed()" title="Sort closed positions">
+        <option value="date">Newest</option>
         <option value="gain">Gain ₹ (high→low)</option>
         <option value="gainpct">Gain % (high→low)</option>
         <option value="loss">Losers first</option>
       </select>
-      <span class="text-muted small" id="closed_pnl_sum"></span><i class="bi bi-chevron-down"></i></span>
-  </div>
-  <div class="collapse" id="closed_body">
-  <div class="card-body">
+    </div>
     <div id="closed_grid"><div class="text-muted py-2">Loading…</div></div>
     <div class="d-flex justify-content-between align-items-center mt-2 pager" id="closed_pager" style="display:none!important;">
       <button class="btn btn-sm btn-outline-secondary" data-grid="closed" data-dir="-1">‹ Prev</button>
@@ -526,9 +550,9 @@ function renderGainersLosers() {
   const withPx = OPEN_POS.filter(p => (Number(p.live)||0) > 0 && (Number(p.entry)||0) > 0);
   if (!withPx.length) { if (card) card.style.display = 'none'; return; }
   if (card) card.style.display = '';
-  const row = p => `<div class="d-flex justify-content-between small py-1 border-bottom">
-      <span><strong>${p._sym}</strong> <span class="text-muted">${modelLabel(p.model)}</span></span>
-      <span class="${cls(p._pnl)}">${fmtPct(p._pct)} <span class="text-muted">${fmtINR(p._pnl)}</span></span>
+  const row = p => `<div class="glrow">
+      <span><span class="glsym">${p._sym}</span><br><span class="glmodel">${modelLabel(p.model)}</span></span>
+      <span class="${cls(p._pnl)} text-end">${fmtPct(p._pct)}<br><span class="glmodel">${fmtINR(p._pnl)}</span></span>
     </div>`;
   const g = withPx.filter(p=>p._pnl>0).sort((a,b)=>b._pct-a._pct).slice(0,5);
   const l = withPx.filter(p=>p._pnl<0).sort((a,b)=>a._pct-b._pct).slice(0,5);
