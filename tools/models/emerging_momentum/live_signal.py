@@ -11,7 +11,7 @@ Strategy:
   - Universe: PIT emerging mid/small (top-100 20d-ADV of N500 minus N100),
     rebuilt per year-start (strategy.build_pools).
   - Rank: 15-trading-day return, ret > 0, price in (0, 3000]; NO sma gate.
-  - max_concurrent = 1, retain_top_n = 3 (hold while in top-3).
+  - max_concurrent = 1, retain_top_n = 1 (hold while in top-1).
   - rebalance: 1st trading day of month + mid-month (day-15-weekday) lead-gate.
 
 Logic per run (single-position, STATEFUL via the DB model_ledger):
@@ -158,7 +158,7 @@ def load_panel(symbols, days_back=420):
 
 
 def emit_signals(ranked: List[str], midret: List[tuple], held: List[Dict],
-                 cl, di, retain_top_n: int = 3) -> List[Dict]:
+                 cl, di, retain_top_n: int = S.RETAIN) -> List[Dict]:
     """Turn a ranking + current holding into SELL/BUY signal dicts.
 
     Delegates the keep/rotate decision to the shared decide_rotation core so
@@ -172,7 +172,7 @@ def emit_signals(ranked: List[str], midret: List[tuple], held: List[Dict],
         held: Current holding list (0 or 1 entry) from the DB ledger.
         cl: close panel (date x symbol) for price lookup.
         di: latest row index in `cl` (today).
-        retain_top_n: exit retention band (3 = canonical Config-1).
+        retain_top_n: exit retention band (S.RETAIN = 1 = canonical Config-1).
 
     Returns:
         list[dict]: 0–2 signal dicts (SELL rotation exit and/or BUY ENTRY1).

@@ -11,7 +11,7 @@ Strategy:
   Universe: POINT-IN-TIME mid/small caps = top-100 by 20d ADV from
             (eligible_at n500 MINUS eligible_at n100), rebuilt per year-start.
   Signal:   rank by 15-trading-day return (ret > 0), price in (0, 3000]; no sma.
-  Position: max_concurrent=1, retain_top_n=3 (hold while in top-3 rank).
+  Position: max_concurrent=1, retain_top_n=S.RETAIN=1 (hold while in top-1 rank).
   Rebalance: 1st trading day of each month ("full") + a mid-month ("mid")
              check on the first trading day with 15<=day<=18; the mid-month
              rotation fires only when a new leader beats the held name's 15d
