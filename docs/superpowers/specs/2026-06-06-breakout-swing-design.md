@@ -1,7 +1,9 @@
 # breakout_swing_n500 — Momentum-Burst Short-Hold (1–5d) Model
 
 **Date:** 2026-06-06
-**Status:** Design approved, pending backtest validation
+**Status:** ARCHIVED 2026-06-06 — backtest found no gate-clearing edge (ceiling
+~16-17% CAGR / Calmar ~0.8 across ~1700 configs). Not shipped. See
+`tools/models/_archived/breakout_swing_n500/SUMMARY.md`.
 **Author:** brainstorming session (user + Claude)
 
 ## Context & Motivation
