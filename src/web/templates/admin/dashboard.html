@@ -541,7 +541,10 @@ async function loadSystemStatus() {
             const status = data.status;
             document.getElementById('totalStocks').textContent = status.stocks.total.toLocaleString();
             document.getElementById('historyRecords').textContent = status.historical_data.records.toLocaleString();
-            document.getElementById('latestData').textContent = status.stocks.last_updated ? status.stocks.last_updated.split('T')[0] : '-';
+            // "Latest Data" = freshness of the PRICE data the models actually use
+            // (historical_data.date), NOT stocks-table metadata last_updated which
+            // is only bulk-rewritten occasionally and reads misleadingly stale.
+            document.getElementById('latestData').textContent = status.historical_data.latest_date ? status.historical_data.latest_date.split('T')[0] : '-';
             document.getElementById('snapshots').textContent = status.daily_snapshots.total.toLocaleString();
         }
     } catch (error) {
