@@ -5,9 +5,9 @@ shared core `strategy.py` (rank_targets / is_retest / params) — the SAME code
 live_signal.py uses, so backtest and live cannot drift. This file only owns the
 offline walk: load panels, build the monthly calendar, replay buy/sell, score.
 
-Strategy (see strategy.py / SUMMARY.md): monthly pick top-2 momentum leaders
-from the top-120-ADV liquid N500 pool; buy each within 20% of the 20-EMA; hold
-while in the top-4 rank. K=4 (2026-05-31 re-tune, was K2). Full-cycle
+Strategy (see strategy.py / SUMMARY.md): monthly pick top-K (K=4) momentum
+leaders from the top-120-ADV liquid N500 pool; buy each within 20% of the
+20-EMA; hold while in the top-4 rank. K=4 (2026-05-31 re-tune, was K2). Full-cycle
 2021-03→2026-05 on PIT N500 (net 0.15%/side): ≈ +57.3% CAGR / 38.8% DD /
 Calmar 1.48; recent 2025-03→2026-05 ≈ +53% CAGR / 15% DD — see
 exports/models/momentum_retest_n500/SUMMARY.md. K2→K4 diversified the basket:

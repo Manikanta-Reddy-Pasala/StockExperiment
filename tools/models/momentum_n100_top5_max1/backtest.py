@@ -98,9 +98,10 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
     """
     # retain_top_n: hold the position while it stays in the top-N by 30d return;
     # rotate (sell + buy new rank-1) only when it drops OUT of the top-N band.
-    # retain_top_n=1 == legacy "rotate whenever held isn't rank-1" (canonical
-    # backtest). retain_top_n=5 mirrors the LIVE exit (live_signal.py keeps the
-    # stock through top-5). Entry always buys rank-1.
+    # retain_top_n=1 == legacy "rotate whenever held isn't rank-1". The CURRENT
+    # canonical band is RETAIN=3 (strategy.py) — backtest default and live
+    # (live_signal.py --retain-top-n default=S.RETAIN) both hold through top-3.
+    # Entry always buys rank-1.
     n100_syms = load_n100_union(index_name)
     print(f"NSE {index_name.upper()} universe (union of all snapshots): {len(n100_syms)} symbols")
 

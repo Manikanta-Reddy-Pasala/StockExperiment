@@ -284,7 +284,7 @@ def run_stop_check(today, sig_path) -> int:
 
 
 def emit_signals(top_picks: List[tuple], held: List[Dict],
-                  top_n: int, retain_top_n: int = 3) -> List[Dict]:
+                  top_n: int, retain_top_n: int = S.RETAIN) -> List[Dict]:
     """Turn a ranking + current holding into SELL/BUY signal dicts.
 
     Delegates the keep/rotate decision to the shared decide_rotation core so
