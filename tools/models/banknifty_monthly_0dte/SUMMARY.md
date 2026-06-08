@@ -25,11 +25,35 @@ profit) · **2× credit hard stop** intraday · expiry settlement.
 | Max drawdown | 4.2% |
 | Worst trade | -4.2% (capped by wings) |
 
-### Year-by-year
-| Year | Trades | Return % (margin) | Win % |
+## How the % is derived
+`return % = P&L ÷ margin deployed`, where **margin = wing width − credit** (the
+defined-risk capital locked per iron-fly). Per-unit (lot-size independent).
+
+## Capital simulation — ₹2,00,000 margin per trade
+Deploy a fixed **₹2,00,000** of margin on each trade (rupee P&L = ₹2L × return%):
+| Metric | Value |
+|---|---|
+| Margin in / trade | ₹2,00,000 |
+| Avg P&L / trade | ₹6,204 |
+| **Total P&L (14 trades)** | **₹86,853** |
+| Best trade | ₹14,536 |
+| Worst trade | ₹-8,383 (max loss capped by wings) |
+
+*Fixed ₹2L per trade (profit pocketed, not compounded). Assumes ₹2L fully
+deployed as margin; real lots are discrete (NIFTY lot 75, BankNifty 35) so actual
+sizing rounds to whole lots.*
+
+## Execution — BASKET / multi-leg order ONLY
+The 4 legs are entered as **one basket (multi-leg) order**, never 4 individual
+orders — legging in separately risks partial fills + the index moving between
+legs, which breaks the defined-risk structure. Backtest/paper price all 4 legs
+at the same instant (the basket). **Paper only — no real broker orders.**
+
+### Year-by-year (₹2L/trade)
+| Year | Trades | Return % (margin) | P&L (₹2L/trade) |
 |---|---:|---:|---:|
-| 2025 | 10 | 32.1% | 90.0% |
-| 2026 | 4 | 11.4% | 75.0% |
+| 2025 | 10 | 32.1% | ₹64,200 |
+| 2026 | 4 | 11.4% | ₹22,800 |
 
 ## Caveats
 - in-sample single regime (2025-26, seller-friendly)

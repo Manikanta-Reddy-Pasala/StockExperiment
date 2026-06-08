@@ -82,8 +82,18 @@ def cell(legs, role):
     flag = "" if l["filled"] else " ⚠️"
     return f"{l['action']} {l['strike']} ({l['pct']:+.2f}%) · ₹{l['price']} · vol {l['volume']:,}{flag}"
 
+# ---- ₹2L-per-trade rupee simulation (deploy ₹2,00,000 margin each trade) ----
+CAP = 200000
+sum_ret = sum(rets)
+total_pnl_2L = round(CAP * sum_ret)
+avg_pnl_2L = round(CAP * st.mean(rets))
+best_inr = round(CAP * max(rets))
+worst_inr = round(CAP * min(rets))
+def inr(x):
+    return f"₹{x:,.0f}"
+
 # SUMMARY.md — consistent report (strategy + entry/exit + regenerated results)
-py = "\n".join(f"| {y} | {v['trades']} | {v['ret_margin_pct']}% | {v['win_rate_pct']}% |"
+py = "\n".join(f"| {y} | {v['trades']} | {v['ret_margin_pct']}% | {inr(round(CAP*v['ret_margin_pct']/100))} |"
                for y, v in summary["per_year"].items())
 exp_word = "weekly expiry (Tuesday)" if SPEC["cadence"] == "weekly" else "monthly expiry (last Tuesday)"
 sm = f"""# {SPEC['name']} (`{_A.model}`)
@@ -113,8 +123,32 @@ profit) · **2× credit hard stop** intraday · expiry settlement.
 | Max drawdown | {summary['max_dd_pct']}% |
 | Worst trade | {summary['worst_trade_pct']}% (capped by wings) |
 
-### Year-by-year
-| Year | Trades | Return % (margin) | Win % |
+## How the % is derived
+`return % = P&L ÷ margin deployed`, where **margin = wing width − credit** (the
+defined-risk capital locked per iron-fly). Per-unit (lot-size independent).
+
+## Capital simulation — ₹2,00,000 margin per trade
+Deploy a fixed **₹2,00,000** of margin on each trade (rupee P&L = ₹2L × return%):
+| Metric | Value |
+|---|---|
+| Margin in / trade | ₹2,00,000 |
+| Avg P&L / trade | {inr(avg_pnl_2L)} |
+| **Total P&L ({summary['trades']} trades)** | **{inr(total_pnl_2L)}** |
+| Best trade | {inr(best_inr)} |
+| Worst trade | {inr(worst_inr)} (max loss capped by wings) |
+
+*Fixed ₹2L per trade (profit pocketed, not compounded). Assumes ₹2L fully
+deployed as margin; real lots are discrete (NIFTY lot 75, BankNifty 35) so actual
+sizing rounds to whole lots.*
+
+## Execution — BASKET / multi-leg order ONLY
+The 4 legs are entered as **one basket (multi-leg) order**, never 4 individual
+orders — legging in separately risks partial fills + the index moving between
+legs, which breaks the defined-risk structure. Backtest/paper price all 4 legs
+at the same instant (the basket). **Paper only — no real broker orders.**
+
+### Year-by-year (₹2L/trade)
+| Year | Trades | Return % (margin) | P&L (₹2L/trade) |
 |---|---:|---:|---:|
 {py}
 
@@ -131,15 +165,22 @@ open(f"{OUT}/SUMMARY.md", "w").write(sm)
 md = [f"# {SPEC['name']} — Trade Ledger\n",
       f"{len(ledger)} trades (in-sample backtest, expiry-day OHLC proxy). "
       "Each row: index (spot) at entry, the 4 legs (strike · % from spot · entry "
-      "price · day volume), credit, P&L. ⚠️ = leg traded < 100 contracts that day "
-      "(thin). All prices are the 9:15 expiry-day open.\n",
-      "| Expiry | Spot | Short CE | Short PE | Long CE (wing) | Long PE (wing) | Credit | P&L | Ret/margin | All filled | Exit |",
-      "|---|---:|---|---|---|---|---:|---:|---:|:---:|---|"]
+      "price · day volume), then the rupee result on a **fixed ₹2,00,000 margin "
+      "deployed per trade** (In → Out). ⚠️ = leg traded < 100 contracts (thin). "
+      "Entered as ONE basket order. All prices are the 9:15 expiry-day open.\n",
+      "| Expiry | Spot | Short CE | Short PE | Long CE (wing) | Long PE (wing) | "
+      "Capital In | P&L ₹ | Capital Out | Ret% | Filled | Exit |",
+      "|---|---:|---|---|---|---|---:|---:|---:|---:|:---:|---|"]
 for t in ledger:
     L = t["legs"]
+    ret = t["ret_margin_pct"] / 100.0
+    pnl_inr = round(CAP * ret)
+    out_inr = CAP + pnl_inr
     md.append(f"| {t['expiry']} | {t['spot']} | {cell(L,'short_CE')} | "
               f"{cell(L,'short_PE')} | {cell(L,'long_CE')} | {cell(L,'long_PE')} | "
-              f"{t['credit']} | {t['pnl']} | {t['ret_margin_pct']}% | "
+              f"{inr(CAP)} | {inr(pnl_inr)} | {inr(out_inr)} | {t['ret_margin_pct']}% | "
               f"{'✅' if t['all_legs_filled'] else '⚠️ NO'} | {t['reason']} |")
+md.append(f"\n**Total on ₹2L/trade: {inr(total_pnl_2L)} P&L across {len(ledger)} "
+          f"trades** (avg {inr(avg_pnl_2L)}/trade, best {inr(best_inr)}, worst {inr(worst_inr)}).")
 open(f"{OUT}/TRADE_LEDGER.md", "w").write("\n".join(md))
 print(json.dumps(summary, indent=2))
