@@ -530,6 +530,11 @@ async function loadPaperDte() {
               <div class="col"><div class="text-muted small">Paper WR</div><div class="fw-bold">${wr}</div></div>
               <div class="col"><div class="text-muted small">Paper ret/margin</div><div class="fw-bold">${tot}</div></div>
             </div>
+            <div class="small mt-2" style="background:#f3eefc;border-radius:6px;padding:4px 8px;">
+              <span class="text-muted">₹2,00,000 in / trade →</span>
+              <strong class="${(p.total_pnl_inr||0)>=0?'pos':'neg'}">Total P&L ${fmtINR(p.total_pnl_inr)}</strong>
+              ${p.n_closed?`<span class="text-muted">(${p.n_closed} trades)</span>`:''}
+            </div>
             <div class="small text-muted mt-2">${openTxt}</div>
             <div class="small text-muted mt-1" style="font-size:0.72rem;">
               Backtest (in-sample, daily-OHLC proxy): ${btTxt} · max loss capped ${b.worst_capped_pct}%

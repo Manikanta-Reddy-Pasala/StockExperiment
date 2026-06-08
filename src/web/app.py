@@ -983,12 +983,17 @@ def create_app():
                 closed = [t for t in trades if t['status'] == 'CLOSED']
                 wins = sum(1 for t in closed if (t['pnl'] or 0) > 0)
                 open_t = next((t for t in trades if t['status'] == 'OPEN'), None)
+                CAP = 200000   # ₹2L margin deployed per trade (fixed, pocketed)
+                tot_ret = sum(t['ret_margin_pct'] for t in closed)
                 models.append(dict(
                     model=k, status='PAPER', title=meta['title'],
                     config=meta['config'], backtest=meta['backtest'],
                     paper=dict(n_closed=len(closed), wins=wins,
                                win_rate_pct=round(100 * wins / len(closed), 1) if closed else None,
-                               total_ret_margin_pct=round(sum(t['ret_margin_pct'] for t in closed), 1),
+                               total_ret_margin_pct=round(tot_ret, 1),
+                               cap_inr=CAP,
+                               total_pnl_inr=round(CAP * tot_ret / 100),
+                               last_pnl_inr=round(CAP * closed[-1]['ret_margin_pct'] / 100) if closed else None,
                                open=open_t, last=closed[-1] if closed else None)))
             return jsonify(dict(success=True, models=models))
         except Exception as e:
