@@ -429,9 +429,17 @@ async function loadPaperPick(container) {
     if (!d.success) { card.innerHTML = '<div class="card-body small text-muted">Paper model unavailable.</div>'; return; }
     const p = d.paper, b = d.backtest;
     const wr = p.win_rate_pct == null ? '—' : p.win_rate_pct + '%';
+    const t = p.open || p.last;
     const sig = p.open
-      ? `<span class="text-info">OPEN today</span> · ${d.config} · credit ${p.open.credit} · stop @ 2× · settles 15:25`
-      : (p.last ? `last expiry: ${p.last.reason} ${(p.last.ret_margin_pct>=0?'+':'')+p.last.ret_margin_pct}%` : 'no trade yet — fires on weekly expiry (Tue)');
+      ? `<span class="text-info">OPEN today</span> · credit ${p.open.credit} · stop @ 2× · settles 15:25`
+      : (p.last ? `last expiry ${p.last.trade_date}: ${p.last.reason} ${(p.last.ret_margin_pct>=0?'+':'')+p.last.ret_margin_pct}%` : 'no trade yet — fires on weekly expiry (Tue)');
+    let legsHtml = '';
+    if (t && t.legs && t.legs.length) {
+      legsHtml = `<div class="mt-2" style="font-size:.72rem;">
+        <div class="text-muted">Spot ${t.spot} · legs:</div>` +
+        t.legs.map(l => `<div>${l.action} <strong>${l.strike}</strong> (${l.pct>=0?'+':''}${l.pct}%) · ₹${l.price} · vol ${Number(l.volume).toLocaleString('en-IN')} ${l.filled?'✅':'⚠️ thin'}</div>`).join('') +
+        `</div>`;
+    }
     card.innerHTML = `
       <div class="card-header d-flex justify-content-between align-items-center">
         <div>

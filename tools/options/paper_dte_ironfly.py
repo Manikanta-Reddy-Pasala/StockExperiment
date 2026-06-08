@@ -19,7 +19,7 @@ Modes (run by cron on the VM):
 
 Prices via Fyers history 5m (live contracts). No real capital at risk.
 """
-import argparse, sys
+import argparse, json, sys
 from datetime import date, datetime, timedelta, timezone
 sys.path.insert(0, "/app")
 import psycopg
@@ -60,9 +60,10 @@ def bars(svc, s, day):
     for c in (cs or []):
         if isinstance(c, dict):
             out.append((float(c["open"]), float(c["high"]), float(c["low"]),
-                        float(c["close"])))
+                        float(c["close"]), int(float(c.get("volume", 0)))))
         else:
-            out.append((float(c[1]), float(c[2]), float(c[3]), float(c[4])))
+            out.append((float(c[1]), float(c[2]), float(c[3]), float(c[4]),
+                        int(float(c[5])) if len(c) > 5 else 0))
     return out
 
 
@@ -108,7 +109,9 @@ def ensure_table(cur):
       stop_loss double precision,
       exit_value double precision, pnl double precision,
       ret_margin double precision, reason text, status text,
-      entered_at timestamp, settled_at timestamp)""")
+      entered_at timestamp, settled_at timestamp, legs text)""")
+    # additive migration for pre-existing tables
+    cur.execute("ALTER TABLE paper_dte_trades ADD COLUMN IF NOT EXISTS legs text")
 
 
 def legs(atm, exp):
@@ -128,12 +131,20 @@ def do_enter(svc, cur, today, force):
     if not atm:
         print("no spot — token?"); return
     sce, spe, lce, lpe, scs, sps, bcs, bps = legs(atm, exp)
-    px = {}
+    px, vol = {}, {}
     for s in (sce, spe, lce, lpe):
         b = bars(svc, s, today)
         if not b:
             print(f"no open bar for {s} — abort"); return
-        px[s] = b[0][0]                 # open
+        px[s] = b[0][0]                 # 9:15 open
+        vol[s] = b[0][4]                # first-bar volume (fill proxy at entry)
+    # per-leg detail: strike, % from spot, entry price, volume, fill (>0 traded)
+    leg_detail = [
+        dict(role="short_CE", action="SELL", strike=scs, pct=round(100*(scs/atm-1),2), price=round(px[sce],2), volume=vol[sce], filled=vol[sce] > 0),
+        dict(role="short_PE", action="SELL", strike=sps, pct=round(100*(sps/atm-1),2), price=round(px[spe],2), volume=vol[spe], filled=vol[spe] > 0),
+        dict(role="long_CE",  action="BUY",  strike=bcs, pct=round(100*(bcs/atm-1),2), price=round(px[lce],2), volume=vol[lce], filled=vol[lce] > 0),
+        dict(role="long_PE",  action="BUY",  strike=bps, pct=round(100*(bps/atm-1),2), price=round(px[lpe],2), volume=vol[lpe], filled=vol[lpe] > 0),
+    ]
     credit = (px[sce] + px[spe]) * (1 - SLIP) - (px[lce] + px[lpe]) * (1 + SLIP)
     wing_w = min(bcs - scs, sps - bps)
     if credit <= 0 or credit >= 0.95 * wing_w:
@@ -142,14 +153,17 @@ def do_enter(svc, cur, today, force):
     stop_loss = STOP_MULT * credit
     cur.execute("""INSERT INTO paper_dte_trades
       (trade_date,expiry,atm,spot_entry,short_ce,short_pe,long_ce,long_pe,
-       entry_credit,margin,stop_loss,status,entered_at)
-      VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'OPEN',%s)
+       entry_credit,margin,stop_loss,status,entered_at,legs)
+      VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'OPEN',%s,%s)
       ON CONFLICT (trade_date) DO NOTHING""",
       (today, exp, atm, spot, sce, spe, lce, lpe, round(credit, 2),
-       round(margin, 2), round(stop_loss, 2), datetime.now(IST).replace(tzinfo=None)))
-    print(f"PAPER ENTER {today} exp={exp} atm={atm} credit={credit:.1f} "
-          f"margin={margin:.1f} stop@-{stop_loss:.1f}\n  short {sce}/{spe} "
-          f"wings {lce}/{lpe}")
+       round(margin, 2), round(stop_loss, 2), datetime.now(IST).replace(tzinfo=None),
+       json.dumps(leg_detail)))
+    print(f"PAPER ENTER {today} exp={exp} spot/atm={atm} credit={credit:.1f} "
+          f"margin={margin:.1f} stop@-{stop_loss:.1f}")
+    for l in leg_detail:
+        print(f"  {l['action']} {l['role']} {l['strike']} ({l['pct']:+.2f}%) "
+              f"₹{l['price']} vol={l['volume']:,} {'OK' if l['filled'] else 'THIN'}")
 
 
 def do_settle(svc, cur, today, force):

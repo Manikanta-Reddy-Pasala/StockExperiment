@@ -12,9 +12,11 @@ OUT = "/app/tools/models/nifty_0dte_ironfly"
 tr = m.backtest(CFG["otm"], CFG["stop"], CFG["structure"], CFG["wing"], 0, START, None)
 tr.sort(key=lambda t: t["expiry"])
 
-ledger = [dict(expiry=t["expiry"], structure="ironfly", credit=t["credit"],
-               pnl=t["pnl"], ret_margin_pct=round(100 * t["ret"], 2),
-               reason=t["reason"], atm=t["atm"], min_leg_volume=t["minvol"])
+ledger = [dict(expiry=t["expiry"], structure="ironfly", spot=t["spot"],
+               credit=t["credit"], pnl=t["pnl"],
+               ret_margin_pct=round(100 * t["ret"], 2), reason=t["reason"],
+               atm=t["atm"], min_leg_volume=t["minvol"],
+               all_legs_filled=t["all_filled"], legs=t["legs"])
           for t in tr]
 
 rets = [t["ret"] for t in tr]
@@ -56,4 +58,27 @@ import os
 os.makedirs(OUT, exist_ok=True)
 json.dump(summary, open(f"{OUT}/summary.json", "w"), indent=2)
 json.dump(ledger, open(f"{OUT}/trade_ledger.json", "w"), indent=2)
+
+# detailed TRADE_LEDGER.md — shows index level + each leg's strike/%/price/volume/fill
+def cell(legs, role):
+    l = next((x for x in legs if x["role"] == role), None)
+    if not l:
+        return "—"
+    flag = "" if l["filled"] else " ⚠️"
+    return f"{l['action']} {l['strike']} ({l['pct']:+.2f}%) · ₹{l['price']} · vol {l['volume']:,}{flag}"
+
+md = ["# NIFTY 0DTE Iron-Fly — Trade Ledger\n",
+      f"{len(ledger)} trades (in-sample backtest, expiry-day OHLC proxy). "
+      "Each row: index (spot) at entry, the 4 legs (strike · % from spot · entry "
+      "price · day volume), credit, P&L. ⚠️ = leg traded < 100 contracts that day "
+      "(thin). All prices are the 9:15 expiry-day open.\n",
+      "| Expiry | Spot | Short CE | Short PE | Long CE (wing) | Long PE (wing) | Credit | P&L | Ret/margin | All filled | Exit |",
+      "|---|---:|---|---|---|---|---:|---:|---:|:---:|---|"]
+for t in ledger:
+    L = t["legs"]
+    md.append(f"| {t['expiry']} | {t['spot']} | {cell(L,'short_CE')} | "
+              f"{cell(L,'short_PE')} | {cell(L,'long_CE')} | {cell(L,'long_PE')} | "
+              f"{t['credit']} | {t['pnl']} | {t['ret_margin_pct']}% | "
+              f"{'✅' if t['all_legs_filled'] else '⚠️ NO'} | {t['reason']} |")
+open(f"{OUT}/TRADE_LEDGER.md", "w").write("\n".join(md))
 print(json.dumps(summary, indent=2))

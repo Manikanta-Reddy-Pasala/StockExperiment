@@ -950,12 +950,19 @@ def create_app():
             with db.get_session() as session:
                 rows = session.execute(text(
                     "SELECT trade_date, expiry, atm, entry_credit, margin, pnl, "
-                    "ret_margin, reason, status FROM paper_dte_trades "
-                    "ORDER BY trade_date")).fetchall()
+                    "ret_margin, reason, status, spot_entry, legs "
+                    "FROM paper_dte_trades ORDER BY trade_date")).fetchall()
+            import json as _json
+            def _legs(v):
+                try:
+                    return _json.loads(v) if v else None
+                except Exception:
+                    return None
             trades = [dict(trade_date=str(r[0]), expiry=str(r[1]), atm=r[2],
                            credit=r[3], margin=r[4], pnl=r[5],
                            ret_margin_pct=round((r[6] or 0) * 100, 1),
-                           reason=r[7], status=r[8]) for r in rows]
+                           reason=r[7], status=r[8], spot=r[9],
+                           legs=_legs(r[10])) for r in rows]
             closed = [t for t in trades if t['status'] == 'CLOSED']
             wins = sum(1 for t in closed if (t['pnl'] or 0) > 0)
             cum = 1.0

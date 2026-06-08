@@ -72,7 +72,9 @@ def nearest(snap, target, kind, min_vol):
     return min(cs, key=lambda s: abs(s - target)) if cs else None
 
 
-def backtest(otm, stop, structure, wing, min_vol, start, end):
+def backtest(otm, stop, structure, wing, min_vol, start, end, maxloss_margin=None):
+    """maxloss_margin: if set (e.g. 0.12), hard-stop at that fraction of margin
+    instead of `stop`× credit — a true −X% of capital per-trade cap."""
     data = load_expiry_ohlc(start, end)
     trades = []
     for exp in sorted(data):
@@ -105,28 +107,41 @@ def backtest(otm, stop, structure, wing, min_vol, start, end):
         worst_buyback = ce[1] + pe[1]           # both highs (conservative upper)
         if structure == "ironfly":
             worst_buyback -= snap[(bc, "CE")][2] + snap[(bp, "PE")][2]
-        # stop: if intraday worst loss exceeds stop*credit, exit at stop level
-        max_loss_allowed = stop * credit
-        pnl_close = credit - legs_buyback_close * (1 + SLIP)
-        pnl_worst = credit - worst_buyback * (1 + SLIP)
-        if -pnl_worst >= max_loss_allowed:
-            pnl = -max_loss_allowed             # stopped intraday
-            reason = "STOP"
-        else:
-            pnl = pnl_close
-            reason = "SETTLE"
+        # margin first (the stop can be expressed as a % of it)
         if structure == "ironfly":
             if not bw or credit >= 0.9 * bw:     # reject mispriced/illiquid wing
                 continue
             margin = max(bw - credit, 0.25 * bw)  # floor at 25% of wing, no blowup
         else:
             margin = MARGIN_FRAC * atm
+        # stop threshold: a hard −X% of margin if maxloss_margin set, else stop×credit
+        max_loss_allowed = (maxloss_margin * margin) if maxloss_margin else (stop * credit)
+        pnl_close = credit - legs_buyback_close * (1 + SLIP)
+        pnl_worst = credit - worst_buyback * (1 + SLIP)
+        if -pnl_worst >= max_loss_allowed:
+            pnl = -max_loss_allowed             # stopped intraday at the cap
+            reason = "STOP"
+        else:
+            pnl = pnl_close
+            reason = "SETTLE"
         legvol = min(ce[4], pe[4])
         if structure == "ironfly":
             legvol = min(legvol, snap[(bc, "CE")][4], snap[(bp, "PE")][4])
-        trades.append(dict(expiry=str(exp), credit=round(credit, 1),
+        MIN_FILL = 100   # contracts traded that day to consider the leg fillable
+        def leg(role, side, strike, v):
+            return dict(role=role, action=side, strike=strike,
+                        pct=round(100 * (strike / atm - 1), 2),
+                        price=round(v[0], 2), volume=int(v[4]),
+                        filled=bool(v[4] >= MIN_FILL))
+        legs = [leg("short_CE", "SELL", sc, ce), leg("short_PE", "SELL", sp, pe)]
+        if structure == "ironfly":
+            legs += [leg("long_CE", "BUY", bc, snap[(bc, "CE")]),
+                     leg("long_PE", "BUY", bp, snap[(bp, "PE")])]
+        all_filled = all(l["filled"] for l in legs)
+        trades.append(dict(expiry=str(exp), spot=atm, credit=round(credit, 1),
                            pnl=round(pnl, 1), ret=pnl / margin, reason=reason,
-                           atm=atm, minvol=legvol))
+                           atm=atm, minvol=legvol, all_filled=all_filled,
+                           legs=legs))
     return trades
 
 
