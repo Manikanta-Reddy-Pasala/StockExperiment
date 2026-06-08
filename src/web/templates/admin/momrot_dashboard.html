@@ -845,23 +845,26 @@ async function loadDataStatus() {
 // like equity models; it prices live on expiry days). Read-only / observe.
 async function _paperDataStatusRow() {
   const d = await _fetchJson('/api/paper/dte');
-  const p = (d && d.success) ? d.paper : null;
-  const lastTd = (p && p.last) ? p.last.trade_date : ((p && p.open) ? p.open.trade_date : null);
-  const status = (p && p.open) ? '<span class="badge bg-info text-dark">OPEN today</span>'
-                 : (p && p.n_closed ? `<span class="badge bg-success">${p.n_closed} paper</span>`
-                                    : '<span class="badge bg-secondary">awaiting expiry</span>');
-  return `<tr style="background:#f7f3fc;">
-    <td><strong>nifty_0dte_ironfly</strong></td>
-    <td><span class="badge" style="background:#6f42c1;">PAPER</span>
-        <span class="badge bg-info text-dark">OBSERVE</span></td>
-    <td><span class="badge bg-secondary" title="Paper model, not in executor MODEL_PATHS">PAPER</span></td>
-    <td>${status}</td>
-    <td class="small">${_dash(lastTd)}</td>
-    <td class="small">${_dash(lastTd)}</td>
-    <td class="small"><span class="small-mute">expiry-day</span></td>
-    <td class="text-end">NIFTY 0DTE</td>
-    <td class="text-end">${_dash(p ? p.n_closed : null)}</td>
-  </tr>`;
+  const models = (d && d.success && d.models) ? d.models : [];
+  return models.map(m => {
+    const p = m.paper;
+    const lastTd = (p && p.last) ? p.last.trade_date : ((p && p.open) ? p.open.trade_date : null);
+    const status = (p && p.open) ? '<span class="badge bg-info text-dark">OPEN today</span>'
+                   : (p && p.n_closed ? `<span class="badge bg-success">${p.n_closed} paper</span>`
+                                      : '<span class="badge bg-secondary">awaiting expiry</span>');
+    return `<tr style="background:#f7f3fc;">
+      <td><strong>${m.model}</strong></td>
+      <td><span class="badge" style="background:#6f42c1;">PAPER</span>
+          <span class="badge bg-info text-dark">OBSERVE</span></td>
+      <td><span class="badge bg-secondary" title="Paper model, not in executor MODEL_PATHS">PAPER</span></td>
+      <td>${status}</td>
+      <td class="small">${_dash(lastTd)}</td>
+      <td class="small">${_dash(lastTd)}</td>
+      <td class="small"><span class="small-mute">expiry-day</span></td>
+      <td class="text-end">${m.title.split(' ').slice(0,2).join(' ')}</td>
+      <td class="text-end">${_dash(p ? p.n_closed : null)}</td>
+    </tr>`;
+  }).join('');
 }
 
 document.getElementById('btn_datastatus_refresh').addEventListener('click', loadDataStatus);

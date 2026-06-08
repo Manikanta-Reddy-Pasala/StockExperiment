@@ -500,23 +500,27 @@ async function loadPaperDte() {
   if (!grid) return;
   try {
     const d = await fetch('/api/paper/dte', {cache:'no-store'}).then(r => r.json());
-    if (!d.success) { grid.innerHTML = '<div class="col-12 text-muted small">Paper model not available yet.</div>'; return; }
-    const p = d.paper, b = d.backtest;
-    const wr = p.win_rate_pct == null ? '—' : p.win_rate_pct + '%';
-    const cum = p.n_closed ? ('×' + p.cum_mult) : '—';
-    const tot = p.n_closed ? fmtPct(p.total_ret_margin_pct) : '—';
-    const openTxt = p.open
-      ? `OPEN ${p.open.trade_date} · credit ${p.open.credit} · stop@2×`
-      : (p.last ? `last ${p.last.trade_date}: ${p.last.reason} ${fmtPct(p.last.ret_margin_pct)}` : 'no trades yet');
-    grid.innerHTML = `
+    if (!d.success || !d.models) { grid.innerHTML = '<div class="col-12 text-muted small">Paper models not available yet.</div>'; return; }
+    grid.innerHTML = d.models.map(m => {
+      const p = m.paper, b = m.backtest;
+      const wr = p.win_rate_pct == null ? '—' : p.win_rate_pct + '%';
+      const tot = p.n_closed ? fmtPct(p.total_ret_margin_pct) : '—';
+      const openTxt = p.open
+        ? `OPEN ${p.open.trade_date} · credit ${p.open.credit} · stop@2×`
+        : (p.last ? `last ${p.last.trade_date}: ${p.last.reason} ${fmtPct(p.last.ret_margin_pct)}` : 'no trades yet — fires on its expiry');
+      const btTxt = b.cagr_pct != null
+        ? `CAGR ${b.cagr_pct}% · WR ${b.win_rate_pct}%`
+        : `+${b.avg_trade_pct}%/trade · WR ${b.win_rate_pct}% (${b.trades} trades)`;
+      return `
       <div class="col-12 col-lg-6">
         <div class="card" style="border-left:4px solid #6f42c1;">
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-start">
               <div>
-                <div class="fw-bold">NIFTY 0DTE Iron-Fly
-                  <span class="badge" style="background:#6f42c1;">PAPER</span></div>
-                <div class="text-muted small">${d.config}</div>
+                <div class="fw-bold">${m.title}
+                  <span class="badge" style="background:#6f42c1;">PAPER</span>
+                  <span class="badge bg-info text-dark">OBSERVE</span></div>
+                <div class="text-muted small">${m.config}</div>
               </div>
               <a href="/picks" class="text-muted small">details</a>
             </div>
@@ -525,17 +529,17 @@ async function loadPaperDte() {
               <div class="col"><div class="text-muted small">Paper trades</div><div class="fw-bold">${p.n_closed}</div></div>
               <div class="col"><div class="text-muted small">Paper WR</div><div class="fw-bold">${wr}</div></div>
               <div class="col"><div class="text-muted small">Paper ret/margin</div><div class="fw-bold">${tot}</div></div>
-              <div class="col"><div class="text-muted small">Cum</div><div class="fw-bold">${cum}</div></div>
             </div>
             <div class="small text-muted mt-2">${openTxt}</div>
             <div class="small text-muted mt-1" style="font-size:0.72rem;">
-              Backtest (in-sample, daily-OHLC proxy): CAGR ${b.cagr_pct}% · WR ${b.win_rate_pct}% · max loss capped ${b.worst_capped_pct}%
+              Backtest (in-sample, daily-OHLC proxy): ${btTxt} · max loss capped ${b.worst_capped_pct}%
             </div>
           </div>
         </div>
       </div>`;
+    }).join('');
   } catch (e) {
-    grid.innerHTML = '<div class="col-12 text-muted small">Paper model load failed.</div>';
+    grid.innerHTML = '<div class="col-12 text-muted small">Paper models load failed.</div>';
   }
 }
 

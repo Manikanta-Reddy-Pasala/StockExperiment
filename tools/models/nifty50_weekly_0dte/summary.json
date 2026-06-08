@@ -1,41 +1,42 @@
 {
-  "model": "nifty_0dte_ironfly",
+  "model": "nifty50_weekly_0dte",
   "status": "PAPER / RESEARCH \u2014 not live, no real capital",
-  "instrument": "NIFTY weekly 0DTE iron-fly (defined risk)",
+  "instrument": "NIFTY 50 Weekly 0DTE Iron-Fly (defined risk)",
   "config": {
     "short_otm_pct": 1.2,
     "wing_pct": 2.0,
     "stop_x_credit": 2.0,
+    "cadence": "weekly",
     "entry": "expiry-day open",
     "exit": "expiry-day close or 2x stop"
   },
   "data": "historical_options expiry-day OHLC (daily bhavcopy proxy for 0DTE)",
   "window": "2025-03-01..now",
-  "trades": 64,
-  "wins": 49,
-  "losses": 15,
-  "win_rate_pct": 76.6,
-  "cagr_pct": 156.0,
-  "avg_ret_margin_pct": 2.12,
-  "max_dd_pct": 24.2,
-  "worst_trade_pct": -24.2,
+  "trades": 49,
+  "wins": 37,
+  "losses": 12,
+  "win_rate_pct": 75.5,
+  "cagr_pct": 234.9,
+  "avg_ret_margin_pct": 2.64,
+  "max_dd_pct": 12.6,
+  "worst_trade_pct": -11.0,
   "max_loss_capped": "yes \u2014 bought wings (worst day structurally bounded)",
   "per_year": {
     "2025": {
-      "trades": 44,
-      "ret_margin_pct": 31.5,
-      "win_rate_pct": 75.0
+      "trades": 34,
+      "ret_margin_pct": 17.6,
+      "win_rate_pct": 73.5
     },
     "2026": {
-      "trades": 20,
-      "ret_margin_pct": 103.9,
+      "trades": 15,
+      "ret_margin_pct": 111.7,
       "win_rate_pct": 80.0
     }
   },
   "caveats": [
     "in-sample single regime (2025-26, seller-friendly)",
     "daily-OHLC proxy not true intraday (recorder accumulating real 5m)",
-    "64 trades = thin sample, no walk-forward yet",
+    "49 trades = thin sample, no walk-forward yet",
     "live execution slippage will reduce returns"
   ]
 }

@@ -1,15 +1,26 @@
 #!/usr/bin/env python3
-"""Generate summary.json + trade_ledger.json for the nifty_0dte_ironfly model
-(recommended config), in the same shape as the equity live models."""
-import sys, json, statistics as st
+"""Generate summary.json + trade_ledger.json + TRADE_LEDGER.md for a 0DTE
+iron-fly paper model. Parameterized: --model nifty50_weekly_0dte | banknifty_monthly_0dte."""
+import sys, json, argparse, statistics as st
 sys.path.insert(0, "/app/tools/options")
 import opt_0dte as m
 
 START = "2025-03-01"
-CFG = dict(structure="ironfly", otm=0.012, stop=2.0, wing=0.02)
-OUT = "/app/tools/models/nifty_0dte_ironfly"
+SPECS = {
+    "nifty50_weekly_0dte": dict(underlying="NIFTY", cadence="weekly", otm=0.012,
+                                wing=0.02, name="NIFTY 50 Weekly 0DTE Iron-Fly"),
+    "banknifty_monthly_0dte": dict(underlying="BANKNIFTY", cadence="monthly",
+                                   otm=0.012, wing=0.02,
+                                   name="Bank Nifty Monthly 0DTE Iron-Fly"),
+}
+_ap = argparse.ArgumentParser(); _ap.add_argument("--model", default="nifty50_weekly_0dte")
+_A = _ap.parse_args()
+SPEC = SPECS[_A.model]
+CFG = dict(structure="ironfly", otm=SPEC["otm"], stop=2.0, wing=SPEC["wing"])
+OUT = f"/app/tools/models/{_A.model}"
 
-tr = m.backtest(CFG["otm"], CFG["stop"], CFG["structure"], CFG["wing"], 0, START, None)
+tr = m.backtest(CFG["otm"], CFG["stop"], CFG["structure"], CFG["wing"], 0, START,
+                None, underlying=SPEC["underlying"], cadence=SPEC["cadence"])
 tr.sort(key=lambda t: t["expiry"])
 
 ledger = [dict(expiry=t["expiry"], structure="ironfly", spot=t["spot"],
@@ -24,7 +35,8 @@ wins = sum(1 for t in tr if t["pnl"] > 0)
 eq = peak = mdd = 0.0; ceq = 1.0
 for r in rets:
     eq += r; peak = max(peak, eq); mdd = max(mdd, peak - eq); ceq *= (1 + r)
-cagr = (ceq ** (52.0 / len(rets)) - 1) if rets else 0
+per_yr_count = 52 if SPEC["cadence"] == "weekly" else 12   # expiries/year
+cagr = (ceq ** (per_yr_count / len(rets)) - 1) if rets else 0
 per_year = {}
 for t in tr:
     y = t["expiry"][:4]
@@ -34,10 +46,11 @@ per_year = {y: dict(trades=len(v), ret_margin_pct=round(100 * sum(v), 1),
             for y, v in per_year.items()}
 
 summary = dict(
-    model="nifty_0dte_ironfly",
+    model=_A.model,
     status="PAPER / RESEARCH — not live, no real capital",
-    instrument="NIFTY weekly 0DTE iron-fly (defined risk)",
+    instrument=SPEC["name"] + " (defined risk)",
     config=dict(short_otm_pct=1.2, wing_pct=2.0, stop_x_credit=2.0,
+                cadence=SPEC["cadence"],
                 entry="expiry-day open", exit="expiry-day close or 2x stop"),
     data="historical_options expiry-day OHLC (daily bhavcopy proxy for 0DTE)",
     window=f"{START}..now", trades=len(tr),
@@ -51,8 +64,10 @@ summary = dict(
     per_year=per_year,
     caveats=["in-sample single regime (2025-26, seller-friendly)",
              "daily-OHLC proxy not true intraday (recorder accumulating real 5m)",
-             "64 trades = thin sample, no walk-forward yet",
-             "live execution slippage will reduce returns"])
+             f"{len(tr)} trades = thin sample, no walk-forward yet",
+             "live execution slippage will reduce returns"]
+    + ([] if SPEC["cadence"] == "weekly" else
+       ["monthly-only (~12/yr); BankNifty options less liquid than NIFTY; diversifier not standalone"]))
 
 import os
 os.makedirs(OUT, exist_ok=True)
@@ -67,7 +82,53 @@ def cell(legs, role):
     flag = "" if l["filled"] else " ⚠️"
     return f"{l['action']} {l['strike']} ({l['pct']:+.2f}%) · ₹{l['price']} · vol {l['volume']:,}{flag}"
 
-md = ["# NIFTY 0DTE Iron-Fly — Trade Ledger\n",
+# SUMMARY.md — consistent report (strategy + entry/exit + regenerated results)
+py = "\n".join(f"| {y} | {v['trades']} | {v['ret_margin_pct']}% | {v['win_rate_pct']}% |"
+               for y, v in summary["per_year"].items())
+exp_word = "weekly expiry (Tuesday)" if SPEC["cadence"] == "weekly" else "monthly expiry (last Tuesday)"
+sm = f"""# {SPEC['name']} (`{_A.model}`)
+
+**Status:** PAPER / RESEARCH — not live, no real capital.
+
+Defined-risk 0DTE premium selling on {SPEC['underlying']} {exp_word}.
+
+## Strategy — entry & exit
+**Trade only on {exp_word}** — on expiry day the option has one session left; time
+value collapses to ~0 by close. Sell at the open, let it decay to settlement.
+
+**ENTRY (9:15 open):** find ATM via put-call parity (spot ≈ median K+CE−PE);
+**sell 1.2%-OTM CE + PE**; **buy wings 2% beyond each** (defines max loss).
+Net credit = max profit; **max loss = wing width − credit** (fixed at entry, gap-proof).
+
+**EXIT (first of):** hold to close if NIFTY stays between shorts (decays to ~max
+profit) · **2× credit hard stop** intraday · expiry settlement.
+
+## Results (backtest {summary['window']}, in-sample, daily-OHLC proxy)
+| Metric | Value |
+|---|---|
+| Trades | {summary['trades']} ({summary['wins']}W / {summary['losses']}L) |
+| Win rate | {summary['win_rate_pct']}% |
+| CAGR | {summary['cagr_pct']}% |
+| Avg return / trade (margin) | {summary['avg_ret_margin_pct']}% |
+| Max drawdown | {summary['max_dd_pct']}% |
+| Worst trade | {summary['worst_trade_pct']}% (capped by wings) |
+
+### Year-by-year
+| Year | Trades | Return % (margin) | Win % |
+|---|---:|---:|---:|
+{py}
+
+## Caveats
+{chr(10).join('- ' + c for c in summary['caveats'])}
+
+## Live paper
+Paper-only (no orders). Crons enter 09:20 IST / settle 15:25 IST on its expiry days
+→ table `paper_dte_trades` (model=`{_A.model}`).
+`python tools/options/paper_dte_ironfly.py --report --model {_A.model}`.
+"""
+open(f"{OUT}/SUMMARY.md", "w").write(sm)
+
+md = [f"# {SPEC['name']} — Trade Ledger\n",
       f"{len(ledger)} trades (in-sample backtest, expiry-day OHLC proxy). "
       "Each row: index (spot) at entry, the 4 legs (strike · % from spot · entry "
       "price · day volume), credit, P&L. ⚠️ = leg traded < 100 contracts that day "

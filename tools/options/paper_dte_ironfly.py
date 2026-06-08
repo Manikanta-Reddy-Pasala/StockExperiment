@@ -1,23 +1,18 @@
 #!/usr/bin/env python3
 """
-PAPER-TRADING model: 0DTE NIFTY iron-fly (defined risk).
+PAPER-TRADING: 0DTE iron-fly (defined risk) on index expiry days. PAPER ONLY —
+no broker orders; logs to paper_dte_trades; compares to backtest.
 
-Strategy (backtest: ~156% CAGR / 77% WR / loss hard-capped at -24%, see
-stockexp-options-model memory):
-  - Only on NIFTY weekly EXPIRY days (Tuesday post Sep-2025).
-  - At OPEN: sell 1.2%-OTM CE + 1.2%-OTM PE; buy wings 2% beyond each (defined
-    risk). Net credit collected.
-  - Hard stop at 2x credit loss (intraday, via 5m bar highs).
-  - Settle at CLOSE.
-  - PAPER ONLY: no broker orders. Logs to paper_dte_trades; compares to backtest.
+Two models (current NSE regime = Tuesday expiries):
+  nifty50_weekly_0dte    — NIFTY 50, every weekly expiry (Tuesday)
+  banknifty_monthly_0dte — Bank Nifty, monthly expiry only (last Tuesday;
+                           BankNifty weeklies discontinued by SEBI Nov-2024)
 
-Modes (run by cron on the VM):
-  --enter   ~09:20 IST on expiry day: price legs at open, record OPEN paper trade
-  --settle  ~15:25 IST on expiry day: mark out at close / stop, record pnl
-  --report  print all paper trades + running WR / return
-  --force   ignore the expiry-day gate (for testing)
+Both: sell 1.2%-OTM CE+PE at the open, buy 2% wings (defined risk), 2× credit
+hard stop, settle at close. Prices via Fyers history 5m (live contracts only,
+so this MUST run daily — each run captures that day if it's the model's expiry).
 
-Prices via Fyers history 5m (live contracts). No real capital at risk.
+Modes: --enter / --settle / --report / --force / --date / --model <key>
 """
 import argparse, json, sys
 from datetime import date, datetime, timedelta, timezone
@@ -31,28 +26,70 @@ MW = {1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6", 7: "7", 8: "8", 9: "9",
       10: "O", 11: "N", 12: "D"}
 MON3U = {1: "JAN", 2: "FEB", 3: "MAR", 4: "APR", 5: "MAY", 6: "JUN", 7: "JUL",
          8: "AUG", 9: "SEP", 10: "OCT", 11: "NOV", 12: "DEC"}
-STEP = 50
-EXPIRY_WD = 1            # Tuesday
-OTM = 0.012              # short strikes 1.2% OTM
-WING = 0.02              # long wings 2% beyond shorts
-STOP_MULT = 2.0          # exit if loss >= 2x credit
 SLIP = 0.02
-MARGIN_FLOOR = 0.25      # floor margin at 25% of wing width
+MARGIN_FLOOR = 0.25
+EXPIRY_WD = 1   # Tuesday (current NSE index expiry weekday)
+
+MODELS = {
+    "nifty50_weekly_0dte": dict(
+        title="NIFTY 50 Weekly 0DTE Iron-Fly", underlying="NIFTY",
+        fyers_idx="NIFTY50-INDEX", cadence="weekly", step=50,
+        otm=0.012, wing=0.02, stop=2.0),
+    "banknifty_monthly_0dte": dict(
+        title="Bank Nifty Monthly 0DTE Iron-Fly", underlying="BANKNIFTY",
+        fyers_idx="NIFTYBANK-INDEX", cadence="monthly", step=100,
+        otm=0.012, wing=0.02, stop=2.0),
+}
+
+
+def _is_trading_day(d):
+    try:
+        from tools.shared.nse_calendar import is_trading_day
+        return is_trading_day(d)
+    except Exception:
+        return d.weekday() < 5
+
+
+def _holiday_back(d):
+    while not _is_trading_day(d):
+        d -= timedelta(days=1)
+    return d
+
+
+def this_expiry(today, cadence):
+    """weekly = next Tuesday on/after today; monthly = last Tuesday of the month
+    (roll to next month once past it). Holiday-adjusted to prior trading day."""
+    if cadence == "weekly":
+        tue = today
+        while tue.weekday() != EXPIRY_WD:
+            tue += timedelta(days=1)
+        return _holiday_back(tue)
+    # monthly: last Tuesday of today's month
+    def last_tue(y, mo):
+        d = date(y + (mo == 12), 1 if mo == 12 else mo + 1, 1) - timedelta(days=1)
+        while d.weekday() != EXPIRY_WD:
+            d -= timedelta(days=1)
+        return _holiday_back(d)
+    e = last_tue(today.year, today.month)
+    if today > e:
+        ny, nm = (today.year + (today.month == 12),
+                  1 if today.month == 12 else today.month + 1)
+        e = last_tue(ny, nm)
+    return e
 
 
 def is_monthly(exp):
     return (exp + timedelta(days=7)).month != exp.month
 
 
-def sym(strike, exp, kind):
+def sym(underlying, strike, exp, kind):
     yy = exp.strftime("%y")
     if is_monthly(exp):
-        return f"NIFTY{yy}{MON3U[exp.month]}{strike}{kind}"
-    return f"NIFTY{yy}{MW[exp.month]}{exp.day:02d}{strike}{kind}"
+        return f"{underlying}{yy}{MON3U[exp.month]}{strike}{kind}"
+    return f"{underlying}{yy}{MW[exp.month]}{exp.day:02d}{strike}{kind}"
 
 
 def bars(svc, s, day):
-    # Fyers needs end > start; [day, day+1) = that day's session.
     r = svc.history(user_id=1, symbol=s, exchange="NSE", interval="5m",
                     start_date=str(day), end_date=str(day + timedelta(days=1))) or {}
     cs = r.get("candles") or r.get("data", {}).get("candles")
@@ -67,42 +104,28 @@ def bars(svc, s, day):
     return out
 
 
-def spot_atm(svc, day):
-    b = bars(svc, "NIFTY50-INDEX", day)
-    if not b:
-        b = bars(svc, "NIFTY50-INDEX", day - timedelta(days=1))
+def spot_atm(svc, day, cfg):
+    b = bars(svc, cfg["fyers_idx"], day) or bars(svc, cfg["fyers_idx"], day - timedelta(days=1))
     if not b:
         return None, None
-    spot = b[0][0]                      # today's open
-    return spot, round(spot / STEP) * STEP
+    spot = b[0][0]
+    return spot, round(spot / cfg["step"]) * cfg["step"]
 
 
-def _is_trading_day(d):
-    """NSE trading-day check via the project calendar; fall back to weekday."""
-    try:
-        from tools.shared.nse_calendar import is_trading_day
-        return is_trading_day(d)
-    except Exception:
-        return d.weekday() < 5
-
-
-def this_expiry(today):
-    """NIFTY weekly expiry = Tuesday; if that Tuesday is an NSE holiday, NSE
-    moves the expiry to the PREVIOUS trading day. Returns the actual expiry
-    date for the current weekly cycle (>= today's week)."""
-    tue = today
-    while tue.weekday() != EXPIRY_WD:        # next Tuesday on/after today
-        tue += timedelta(days=1)
-    exp = tue
-    while not _is_trading_day(exp):          # holiday → walk back to prev trading day
-        exp -= timedelta(days=1)
-    return exp
+def legs(atm, exp, cfg):
+    st = cfg["step"]; u = cfg["underlying"]
+    sc = round(atm * (1 + cfg["otm"]) / st) * st
+    sp = round(atm * (1 - cfg["otm"]) / st) * st
+    bc = round(sc * (1 + cfg["wing"]) / st) * st
+    bp = round(sp * (1 - cfg["wing"]) / st) * st
+    return (sym(u, sc, exp, "CE"), sym(u, sp, exp, "PE"),
+            sym(u, bc, exp, "CE"), sym(u, bp, exp, "PE"), sc, sp, bc, bp)
 
 
 def ensure_table(cur):
     cur.execute("""
     CREATE TABLE IF NOT EXISTS paper_dte_trades(
-      id serial PRIMARY KEY, trade_date date UNIQUE, expiry date,
+      id serial PRIMARY KEY, model text, trade_date date, expiry date,
       atm int, spot_entry double precision,
       short_ce text, short_pe text, long_ce text, long_pe text,
       entry_credit double precision, margin double precision,
@@ -110,35 +133,30 @@ def ensure_table(cur):
       exit_value double precision, pnl double precision,
       ret_margin double precision, reason text, status text,
       entered_at timestamp, settled_at timestamp, legs text)""")
-    # additive migration for pre-existing tables
+    cur.execute("ALTER TABLE paper_dte_trades ADD COLUMN IF NOT EXISTS model text")
     cur.execute("ALTER TABLE paper_dte_trades ADD COLUMN IF NOT EXISTS legs text")
+    # legacy rows (pre-multi-model) were NIFTY weekly
+    cur.execute("UPDATE paper_dte_trades SET model='nifty50_weekly_0dte' WHERE model IS NULL")
+    # old schema had UNIQUE(trade_date); drop it so 2 models can trade same day
+    cur.execute("ALTER TABLE paper_dte_trades DROP CONSTRAINT IF EXISTS paper_dte_trades_trade_date_key")
+    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_paper_model_date "
+                "ON paper_dte_trades(model, trade_date)")
 
 
-def legs(atm, exp):
-    sc = round(atm * (1 + OTM) / STEP) * STEP
-    sp = round(atm * (1 - OTM) / STEP) * STEP
-    bc = round(sc * (1 + WING) / STEP) * STEP
-    bp = round(sp * (1 - WING) / STEP) * STEP
-    return (sym(sc, exp, "CE"), sym(sp, exp, "PE"),
-            sym(bc, exp, "CE"), sym(bp, exp, "PE"), sc, sp, bc, bp)
-
-
-def do_enter(svc, cur, today, force):
-    exp = this_expiry(today)
+def do_enter(svc, cur, today, model, cfg, force):
+    exp = this_expiry(today, cfg["cadence"])
     if not force and today != exp:
-        print(f"{today}: not a NIFTY expiry day (next {exp}) — skip"); return
-    spot, atm = spot_atm(svc, today)
+        print(f"[{model}] {today}: not an expiry day (next {exp}) — skip"); return
+    spot, atm = spot_atm(svc, today, cfg)
     if not atm:
-        print("no spot — token?"); return
-    sce, spe, lce, lpe, scs, sps, bcs, bps = legs(atm, exp)
+        print(f"[{model}] no spot — token?"); return
+    sce, spe, lce, lpe, scs, sps, bcs, bps = legs(atm, exp, cfg)
     px, vol = {}, {}
     for s in (sce, spe, lce, lpe):
         b = bars(svc, s, today)
         if not b:
-            print(f"no open bar for {s} — abort"); return
-        px[s] = b[0][0]                 # 9:15 open
-        vol[s] = b[0][4]                # first-bar volume (fill proxy at entry)
-    # per-leg detail: strike, % from spot, entry price, volume, fill (>0 traded)
+            print(f"[{model}] no open bar for {s} — abort"); return
+        px[s] = b[0][0]; vol[s] = b[0][4]
     leg_detail = [
         dict(role="short_CE", action="SELL", strike=scs, pct=round(100*(scs/atm-1),2), price=round(px[sce],2), volume=vol[sce], filled=vol[sce] > 0),
         dict(role="short_PE", action="SELL", strike=sps, pct=round(100*(sps/atm-1),2), price=round(px[spe],2), volume=vol[spe], filled=vol[spe] > 0),
@@ -148,74 +166,67 @@ def do_enter(svc, cur, today, force):
     credit = (px[sce] + px[spe]) * (1 - SLIP) - (px[lce] + px[lpe]) * (1 + SLIP)
     wing_w = min(bcs - scs, sps - bps)
     if credit <= 0 or credit >= 0.95 * wing_w:
-        print(f"bad credit {credit:.1f} vs wing {wing_w} — skip"); return
+        print(f"[{model}] bad credit {credit:.1f} vs wing {wing_w} — skip"); return
     margin = max(wing_w - credit, MARGIN_FLOOR * wing_w)
-    stop_loss = STOP_MULT * credit
+    stop_loss = cfg["stop"] * credit
     cur.execute("""INSERT INTO paper_dte_trades
-      (trade_date,expiry,atm,spot_entry,short_ce,short_pe,long_ce,long_pe,
+      (model,trade_date,expiry,atm,spot_entry,short_ce,short_pe,long_ce,long_pe,
        entry_credit,margin,stop_loss,status,entered_at,legs)
-      VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'OPEN',%s,%s)
-      ON CONFLICT (trade_date) DO NOTHING""",
-      (today, exp, atm, spot, sce, spe, lce, lpe, round(credit, 2),
+      VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'OPEN',%s,%s)
+      ON CONFLICT (model,trade_date) DO NOTHING""",
+      (model, today, exp, atm, spot, sce, spe, lce, lpe, round(credit, 2),
        round(margin, 2), round(stop_loss, 2), datetime.now(IST).replace(tzinfo=None),
        json.dumps(leg_detail)))
-    print(f"PAPER ENTER {today} exp={exp} spot/atm={atm} credit={credit:.1f} "
-          f"margin={margin:.1f} stop@-{stop_loss:.1f}")
+    print(f"PAPER ENTER [{model}] {today} exp={exp} spot/atm={atm} "
+          f"credit={credit:.1f} margin={margin:.1f} stop@-{stop_loss:.1f}")
     for l in leg_detail:
         print(f"  {l['action']} {l['role']} {l['strike']} ({l['pct']:+.2f}%) "
               f"₹{l['price']} vol={l['volume']:,} {'OK' if l['filled'] else 'THIN'}")
 
 
-def do_settle(svc, cur, today, force):
-    cur.execute("SELECT * FROM paper_dte_trades WHERE trade_date=%s AND status='OPEN'",
-                (today,))
+def do_settle(svc, cur, today, model, cfg, force):
+    cur.execute("SELECT * FROM paper_dte_trades WHERE model=%s AND trade_date=%s "
+                "AND status='OPEN'", (model, today))
     row = cur.fetchone()
     if not row:
-        print(f"{today}: no open paper trade"); return
-    cols = [d[0] for d in cur.description]
-    t = dict(zip(cols, row))
+        print(f"[{model}] {today}: no open paper trade"); return
+    cols = [d[0] for d in cur.description]; t = dict(zip(cols, row))
     legs4 = [t["short_ce"], t["short_pe"], t["long_ce"], t["long_pe"]]
     bb = {s: bars(svc, s, today) for s in legs4}
     if any(not bb[s] for s in legs4):
-        print("missing settle bars — retry later"); return
+        print(f"[{model}] missing settle bars — retry later"); return
     close_val = ((bb[t["short_ce"]][-1][3] + bb[t["short_pe"]][-1][3])
                  - (bb[t["long_ce"]][-1][3] + bb[t["long_pe"]][-1][3]))
-    # intraday worst fly value (short highs - long lows) for stop check
     worst_val = ((max(b[1] for b in bb[t["short_ce"]]) + max(b[1] for b in bb[t["short_pe"]]))
                  - (min(b[2] for b in bb[t["long_ce"]]) + min(b[2] for b in bb[t["long_pe"]])))
     credit = t["entry_credit"]
     if (credit - worst_val) <= -t["stop_loss"]:
-        pnl = -t["stop_loss"]; reason = "STOP"; exitv = credit + t["stop_loss"]
+        pnl, reason, exitv = -t["stop_loss"], "STOP", credit + t["stop_loss"]
     else:
-        exitv = close_val * (1 + SLIP)
-        pnl = credit - exitv; reason = "SETTLE"
+        exitv = close_val * (1 + SLIP); pnl = credit - exitv; reason = "SETTLE"
     cur.execute("""UPDATE paper_dte_trades SET exit_value=%s,pnl=%s,ret_margin=%s,
       reason=%s,status='CLOSED',settled_at=%s WHERE id=%s""",
       (round(exitv, 2), round(pnl, 2), round(pnl / t["margin"], 4), reason,
        datetime.now(IST).replace(tzinfo=None), t["id"]))
-    print(f"PAPER SETTLE {today}: {reason} pnl={pnl:.1f} "
+    print(f"PAPER SETTLE [{model}] {today}: {reason} pnl={pnl:.1f} "
           f"ret_margin={100*pnl/t['margin']:.1f}%")
 
 
-def do_report(cur):
+def do_report(cur, model):
     cur.execute("SELECT trade_date,reason,entry_credit,pnl,ret_margin,status "
-                "FROM paper_dte_trades ORDER BY trade_date")
+                "FROM paper_dte_trades WHERE model=%s ORDER BY trade_date", (model,))
     rows = cur.fetchall()
+    print(f"=== {model} ===")
     if not rows:
-        print("no paper trades yet"); return
-    closed = [r for r in rows if r[5] == "CLOSED"]
-    print(f"{'date':12} {'reason':7} {'credit':>7} {'pnl':>8} {'ret%':>7} status")
+        print("  no paper trades yet"); return
     for r in rows:
-        print(f"{str(r[0]):12} {r[1] or '-':7} {r[2] or 0:>7} {r[3] or 0:>8} "
-              f"{100*(r[4] or 0):>6.1f}% {r[5]}")
+        print(f"  {r[0]} {r[1] or '-':7} credit {r[2] or 0} pnl {r[3] or 0} "
+              f"{100*(r[4] or 0):.1f}% {r[5]}")
+    closed = [r for r in rows if r[5] == "CLOSED"]
     if closed:
-        rets = [r[4] for r in closed]
         wins = sum(1 for r in closed if r[3] > 0)
-        cum = 1.0
-        for x in rets:
-            cum *= (1 + x)
-        print(f"\nCLOSED {len(closed)}: WR {100*wins/len(closed):.0f}% "
-              f"total ret/margin {100*sum(rets):.1f}% cum x{cum:.2f}")
+        print(f"  CLOSED {len(closed)} · WR {100*wins/len(closed):.0f}% · "
+              f"total ret/margin {100*sum(r[4] for r in closed):.1f}%")
 
 
 def main():
@@ -224,18 +235,23 @@ def main():
     ap.add_argument("--settle", action="store_true")
     ap.add_argument("--report", action="store_true")
     ap.add_argument("--force", action="store_true")
-    ap.add_argument("--date", help="override 'today' (YYYY-MM-DD), for testing")
+    ap.add_argument("--date")
+    ap.add_argument("--model", default="all",
+                    help="nifty50_weekly_0dte | banknifty_monthly_0dte | all")
     a = ap.parse_args()
+    keys = list(MODELS) if a.model == "all" else [a.model]
     conn = psycopg.connect(DB); cur = conn.cursor()
     ensure_table(cur); conn.commit()
-    today = (date.fromisoformat(a.date) if a.date else datetime.now(IST).date())
+    today = date.fromisoformat(a.date) if a.date else datetime.now(IST).date()
     svc = FyersService() if (a.enter or a.settle) else None
-    if a.enter:
-        do_enter(svc, cur, today, a.force)
-    if a.settle:
-        do_settle(svc, cur, today, a.force)
-    if a.report:
-        do_report(cur)
+    for k in keys:
+        cfg = MODELS[k]
+        if a.enter:
+            do_enter(svc, cur, today, k, cfg, a.force)
+        if a.settle:
+            do_settle(svc, cur, today, k, cfg, a.force)
+        if a.report:
+            do_report(cur, k)
     conn.commit(); conn.close()
 
 

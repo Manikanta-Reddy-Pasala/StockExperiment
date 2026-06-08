@@ -941,45 +941,56 @@ def create_app():
 
     @app.route('/api/paper/dte', methods=['GET'])
     def api_paper_dte():
-        """Read-only PAPER 0DTE iron-fly model summary (paper_dte_trades table).
-        Paper-only — no real orders, separate from the live equity models."""
+        """Read-only PAPER 0DTE iron-fly models (paper_dte_trades table). Returns
+        BOTH models. Paper-only — no real orders, separate from live equity."""
+        META = {
+            'nifty50_weekly_0dte': dict(
+                title='NIFTY 50 Weekly 0DTE Iron-Fly',
+                config='NIFTY 50 · weekly (Tue) · 1.2% OTM · 2% wings · 2× stop',
+                backtest=dict(cagr_pct=235.7, win_rate_pct=75.5, max_dd_pct=12.6,
+                              worst_capped_pct=-11.0, trades=49)),
+            'banknifty_monthly_0dte': dict(
+                title='Bank Nifty Monthly 0DTE Iron-Fly',
+                config='Bank Nifty · monthly (last Tue) · 1.2% OTM · 2% wings · 2× stop',
+                backtest=dict(cagr_pct=43.6, win_rate_pct=85.7, max_dd_pct=4.2,
+                              worst_capped_pct=-4.2, trades=14)),
+        }
         try:
             from src.models.database import get_database_manager
             from sqlalchemy import text
+            import json as _json
             db = get_database_manager()
             with db.get_session() as session:
                 rows = session.execute(text(
-                    "SELECT trade_date, expiry, atm, entry_credit, margin, pnl, "
-                    "ret_margin, reason, status, spot_entry, legs "
+                    "SELECT model, trade_date, expiry, atm, entry_credit, margin, "
+                    "pnl, ret_margin, reason, status, spot_entry, legs "
                     "FROM paper_dte_trades ORDER BY trade_date")).fetchall()
-            import json as _json
+
             def _legs(v):
                 try:
                     return _json.loads(v) if v else None
                 except Exception:
                     return None
-            trades = [dict(trade_date=str(r[0]), expiry=str(r[1]), atm=r[2],
-                           credit=r[3], margin=r[4], pnl=r[5],
-                           ret_margin_pct=round((r[6] or 0) * 100, 1),
-                           reason=r[7], status=r[8], spot=r[9],
-                           legs=_legs(r[10])) for r in rows]
-            closed = [t for t in trades if t['status'] == 'CLOSED']
-            wins = sum(1 for t in closed if (t['pnl'] or 0) > 0)
-            cum = 1.0
-            for t in closed:
-                cum *= (1 + (t['ret_margin_pct'] / 100.0))
-            open_t = next((t for t in trades if t['status'] == 'OPEN'), None)
-            return jsonify(dict(
-                success=True, model='nifty_0dte_ironfly', status='PAPER',
-                config='NIFTY 0DTE iron-fly · 1.2% OTM · 2% wings · 2× stop',
-                backtest=dict(cagr_pct=157.0, win_rate_pct=76.6, max_dd_pct=24.2,
-                              worst_capped_pct=-24.2, trades=64),
-                paper=dict(n_closed=len(closed), wins=wins,
-                           win_rate_pct=round(100 * wins / len(closed), 1) if closed else None,
-                           total_ret_margin_pct=round(sum(t['ret_margin_pct'] for t in closed), 1),
-                           cum_mult=round(cum, 3),
-                           open=open_t, last=closed[-1] if closed else None),
-                recent=trades[-15:]))
+            by_model = {}
+            for r in rows:
+                by_model.setdefault(r[0] or 'nifty50_weekly_0dte', []).append(dict(
+                    trade_date=str(r[1]), expiry=str(r[2]), atm=r[3], credit=r[4],
+                    margin=r[5], pnl=r[6], ret_margin_pct=round((r[7] or 0) * 100, 1),
+                    reason=r[8], status=r[9], spot=r[10], legs=_legs(r[11])))
+            models = []
+            for k, meta in META.items():
+                trades = by_model.get(k, [])
+                closed = [t for t in trades if t['status'] == 'CLOSED']
+                wins = sum(1 for t in closed if (t['pnl'] or 0) > 0)
+                open_t = next((t for t in trades if t['status'] == 'OPEN'), None)
+                models.append(dict(
+                    model=k, status='PAPER', title=meta['title'],
+                    config=meta['config'], backtest=meta['backtest'],
+                    paper=dict(n_closed=len(closed), wins=wins,
+                               win_rate_pct=round(100 * wins / len(closed), 1) if closed else None,
+                               total_ret_margin_pct=round(sum(t['ret_margin_pct'] for t in closed), 1),
+                               open=open_t, last=closed[-1] if closed else None)))
+            return jsonify(dict(success=True, models=models))
         except Exception as e:
             return jsonify(dict(success=False, error=str(e)))
 

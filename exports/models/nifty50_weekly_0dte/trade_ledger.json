@@ -150,56 +150,6 @@
     ]
   },
   {
-    "expiry": "2025-03-27",
-    "structure": "ironfly",
-    "spot": 23450,
-    "credit": 15.5,
-    "pnl": 15.3,
-    "ret_margin_pct": 3.52,
-    "reason": "SETTLE",
-    "atm": 23450,
-    "min_leg_volume": 699853,
-    "all_legs_filled": true,
-    "legs": [
-      {
-        "role": "short_CE",
-        "action": "SELL",
-        "strike": 23750,
-        "pct": 1.28,
-        "price": 9.0,
-        "volume": 3811026,
-        "filled": true
-      },
-      {
-        "role": "short_PE",
-        "action": "SELL",
-        "strike": 23150,
-        "pct": -1.28,
-        "price": 9.9,
-        "volume": 1286848,
-        "filled": true
-      },
-      {
-        "role": "long_CE",
-        "action": "BUY",
-        "strike": 24250,
-        "pct": 3.41,
-        "price": 1.3,
-        "volume": 699853,
-        "filled": true
-      },
-      {
-        "role": "long_PE",
-        "action": "BUY",
-        "strike": 22700,
-        "pct": -3.2,
-        "price": 1.65,
-        "volume": 1053148,
-        "filled": true
-      }
-    ]
-  },
-  {
     "expiry": "2025-04-03",
     "structure": "ironfly",
     "spot": 23200,
@@ -400,56 +350,6 @@
     ]
   },
   {
-    "expiry": "2025-04-30",
-    "structure": "ironfly",
-    "spot": 24300,
-    "credit": 6.6,
-    "pnl": 6.5,
-    "ret_margin_pct": 1.33,
-    "reason": "SETTLE",
-    "atm": 24300,
-    "min_leg_volume": 570465,
-    "all_legs_filled": true,
-    "legs": [
-      {
-        "role": "short_CE",
-        "action": "SELL",
-        "strike": 24600,
-        "pct": 1.23,
-        "price": 3.15,
-        "volume": 2893517,
-        "filled": true
-      },
-      {
-        "role": "short_PE",
-        "action": "SELL",
-        "strike": 24000,
-        "pct": -1.23,
-        "price": 6.8,
-        "volume": 2811573,
-        "filled": true
-      },
-      {
-        "role": "long_CE",
-        "action": "BUY",
-        "strike": 25100,
-        "pct": 3.29,
-        "price": 0.6,
-        "volume": 570465,
-        "filled": true
-      },
-      {
-        "role": "long_PE",
-        "action": "BUY",
-        "strike": 23500,
-        "pct": -3.29,
-        "price": 2.45,
-        "volume": 1521085,
-        "filled": true
-      }
-    ]
-  },
-  {
     "expiry": "2025-05-08",
     "structure": "ironfly",
     "spot": 24400,
@@ -600,56 +500,6 @@
     ]
   },
   {
-    "expiry": "2025-05-29",
-    "structure": "ironfly",
-    "spot": 24850,
-    "credit": 35.0,
-    "pnl": 34.7,
-    "ret_margin_pct": 7.46,
-    "reason": "SETTLE",
-    "atm": 24850,
-    "min_leg_volume": 503686,
-    "all_legs_filled": true,
-    "legs": [
-      {
-        "role": "short_CE",
-        "action": "SELL",
-        "strike": 25150,
-        "pct": 1.21,
-        "price": 18.9,
-        "volume": 2501545,
-        "filled": true
-      },
-      {
-        "role": "short_PE",
-        "action": "SELL",
-        "strike": 24550,
-        "pct": -1.21,
-        "price": 20.0,
-        "volume": 3570362,
-        "filled": true
-      },
-      {
-        "role": "long_CE",
-        "action": "BUY",
-        "strike": 25650,
-        "pct": 3.22,
-        "price": 1.6,
-        "volume": 546921,
-        "filled": true
-      },
-      {
-        "role": "long_PE",
-        "action": "BUY",
-        "strike": 24050,
-        "pct": -3.22,
-        "price": 1.45,
-        "volume": 503686,
-        "filled": true
-      }
-    ]
-  },
-  {
     "expiry": "2025-06-05",
     "structure": "ironfly",
     "spot": 24650,
@@ -795,56 +645,6 @@
         "pct": -3.23,
         "price": 1.05,
         "volume": 3093020,
-        "filled": true
-      }
-    ]
-  },
-  {
-    "expiry": "2025-06-26",
-    "structure": "ironfly",
-    "spot": 25300,
-    "credit": 8.1,
-    "pnl": -16.1,
-    "ret_margin_pct": -3.28,
-    "reason": "STOP",
-    "atm": 25300,
-    "min_leg_volume": 1172605,
-    "all_legs_filled": true,
-    "legs": [
-      {
-        "role": "short_CE",
-        "action": "SELL",
-        "strike": 25600,
-        "pct": 1.19,
-        "price": 3.4,
-        "volume": 15963183,
-        "filled": true
-      },
-      {
-        "role": "short_PE",
-        "action": "SELL",
-        "strike": 25000,
-        "pct": -1.19,
-        "price": 7.95,
-        "volume": 4971730,
-        "filled": true
-      },
-      {
-        "role": "long_CE",
-        "action": "BUY",
-        "strike": 26100,
-        "pct": 3.16,
-        "price": 0.8,
-        "volume": 1172605,
-        "filled": true
-      },
-      {
-        "role": "long_PE",
-        "action": "BUY",
-        "strike": 24500,
-        "pct": -3.16,
-        "price": 2.2,
-        "volume": 2114705,
         "filled": true
       }
     ]
@@ -1050,56 +850,6 @@
     ]
   },
   {
-    "expiry": "2025-07-31",
-    "structure": "ironfly",
-    "spot": 24700,
-    "credit": 14.2,
-    "pnl": 14.0,
-    "ret_margin_pct": 2.88,
-    "reason": "SETTLE",
-    "atm": 24700,
-    "min_leg_volume": 768846,
-    "all_legs_filled": true,
-    "legs": [
-      {
-        "role": "short_CE",
-        "action": "SELL",
-        "strike": 25000,
-        "pct": 1.21,
-        "price": 9.3,
-        "volume": 16053105,
-        "filled": true
-      },
-      {
-        "role": "short_PE",
-        "action": "SELL",
-        "strike": 24400,
-        "pct": -1.21,
-        "price": 7.0,
-        "volume": 2799248,
-        "filled": true
-      },
-      {
-        "role": "long_CE",
-        "action": "BUY",
-        "strike": 25500,
-        "pct": 3.24,
-        "price": 0.95,
-        "volume": 1530376,
-        "filled": true
-      },
-      {
-        "role": "long_PE",
-        "action": "BUY",
-        "strike": 23900,
-        "pct": -3.24,
-        "price": 0.75,
-        "volume": 768846,
-        "filled": true
-      }
-    ]
-  },
-  {
     "expiry": "2025-08-07",
     "structure": "ironfly",
     "spot": 24500,
@@ -1245,56 +995,6 @@
         "pct": -3.19,
         "price": 0.9,
         "volume": 863687,
-        "filled": true
-      }
-    ]
-  },
-  {
-    "expiry": "2025-08-28",
-    "structure": "ironfly",
-    "spot": 24650,
-    "credit": 9.6,
-    "pnl": 9.5,
-    "ret_margin_pct": 1.93,
-    "reason": "SETTLE",
-    "atm": 24650,
-    "min_leg_volume": 353247,
-    "all_legs_filled": true,
-    "legs": [
-      {
-        "role": "short_CE",
-        "action": "SELL",
-        "strike": 24950,
-        "pct": 1.22,
-        "price": 7.45,
-        "volume": 2147029,
-        "filled": true
-      },
-      {
-        "role": "short_PE",
-        "action": "SELL",
-        "strike": 24350,
-        "pct": -1.22,
-        "price": 4.9,
-        "volume": 2995777,
-        "filled": true
-      },
-      {
-        "role": "long_CE",
-        "action": "BUY",
-        "strike": 25450,
-        "pct": 3.25,
-        "price": 1.25,
-        "volume": 353247,
-        "filled": true
-      },
-      {
-        "role": "long_PE",
-        "action": "BUY",
-        "strike": 23850,
-        "pct": -3.25,
-        "price": 1.25,
-        "volume": 441010,
         "filled": true
       }
     ]
@@ -1500,56 +1200,6 @@
     ]
   },
   {
-    "expiry": "2025-09-30",
-    "structure": "ironfly",
-    "spot": 24700,
-    "credit": 5.2,
-    "pnl": 5.1,
-    "ret_margin_pct": 1.03,
-    "reason": "SETTLE",
-    "atm": 24700,
-    "min_leg_volume": 705694,
-    "all_legs_filled": true,
-    "legs": [
-      {
-        "role": "short_CE",
-        "action": "SELL",
-        "strike": 25000,
-        "pct": 1.21,
-        "price": 3.9,
-        "volume": 2662440,
-        "filled": true
-      },
-      {
-        "role": "short_PE",
-        "action": "SELL",
-        "strike": 24400,
-        "pct": -1.21,
-        "price": 3.9,
-        "volume": 3805060,
-        "filled": true
-      },
-      {
-        "role": "long_CE",
-        "action": "BUY",
-        "strike": 25500,
-        "pct": 3.24,
-        "price": 1.3,
-        "volume": 1288001,
-        "filled": true
-      },
-      {
-        "role": "long_PE",
-        "action": "BUY",
-        "strike": 23900,
-        "pct": -3.24,
-        "price": 1.1,
-        "volume": 705694,
-        "filled": true
-      }
-    ]
-  },
-  {
     "expiry": "2025-10-07",
     "structure": "ironfly",
     "spot": 25100,
@@ -1700,56 +1350,6 @@
     ]
   },
   {
-    "expiry": "2025-10-28",
-    "structure": "ironfly",
-    "spot": 26000,
-    "credit": 5.1,
-    "pnl": -10.1,
-    "ret_margin_pct": -2.05,
-    "reason": "STOP",
-    "atm": 26000,
-    "min_leg_volume": 304790,
-    "all_legs_filled": true,
-    "legs": [
-      {
-        "role": "short_CE",
-        "action": "SELL",
-        "strike": 26300,
-        "pct": 1.15,
-        "price": 4.4,
-        "volume": 3098705,
-        "filled": true
-      },
-      {
-        "role": "short_PE",
-        "action": "SELL",
-        "strike": 25700,
-        "pct": -1.15,
-        "price": 3.95,
-        "volume": 9137096,
-        "filled": true
-      },
-      {
-        "role": "long_CE",
-        "action": "BUY",
-        "strike": 26850,
-        "pct": 3.27,
-        "price": 1.05,
-        "volume": 304790,
-        "filled": true
-      },
-      {
-        "role": "long_PE",
-        "action": "BUY",
-        "strike": 25200,
-        "pct": -3.08,
-        "price": 2.0,
-        "volume": 1083667,
-        "filled": true
-      }
-    ]
-  },
-  {
     "expiry": "2025-11-04",
     "structure": "ironfly",
     "spot": 25750,
@@ -1895,56 +1495,6 @@
         "pct": -3.08,
         "price": 1.85,
         "volume": 341586,
-        "filled": true
-      }
-    ]
-  },
-  {
-    "expiry": "2025-11-25",
-    "structure": "ironfly",
-    "spot": 26000,
-    "credit": 3.9,
-    "pnl": 3.8,
-    "ret_margin_pct": 0.76,
-    "reason": "SETTLE",
-    "atm": 26000,
-    "min_leg_volume": 324439,
-    "all_legs_filled": true,
-    "legs": [
-      {
-        "role": "short_CE",
-        "action": "SELL",
-        "strike": 26300,
-        "pct": 1.15,
-        "price": 2.55,
-        "volume": 2578760,
-        "filled": true
-      },
-      {
-        "role": "short_PE",
-        "action": "SELL",
-        "strike": 25700,
-        "pct": -1.15,
-        "price": 3.9,
-        "volume": 2668226,
-        "filled": true
-      },
-      {
-        "role": "long_CE",
-        "action": "BUY",
-        "strike": 26850,
-        "pct": 3.27,
-        "price": 1.25,
-        "volume": 324439,
-        "filled": true
-      },
-      {
-        "role": "long_PE",
-        "action": "BUY",
-        "strike": 25200,
-        "pct": -3.08,
-        "price": 1.1,
-        "volume": 650931,
         "filled": true
       }
     ]
@@ -2150,56 +1700,6 @@
     ]
   },
   {
-    "expiry": "2025-12-30",
-    "structure": "ironfly",
-    "spot": 25950,
-    "credit": 1.9,
-    "pnl": 1.9,
-    "ret_margin_pct": 0.39,
-    "reason": "SETTLE",
-    "atm": 25950,
-    "min_leg_volume": 159663,
-    "all_legs_filled": true,
-    "legs": [
-      {
-        "role": "short_CE",
-        "action": "SELL",
-        "strike": 26250,
-        "pct": 1.16,
-        "price": 2.95,
-        "volume": 1245296,
-        "filled": true
-      },
-      {
-        "role": "short_PE",
-        "action": "SELL",
-        "strike": 25650,
-        "pct": -1.16,
-        "price": 1.35,
-        "volume": 925328,
-        "filled": true
-      },
-      {
-        "role": "long_CE",
-        "action": "BUY",
-        "strike": 26800,
-        "pct": 3.28,
-        "price": 1.55,
-        "volume": 462590,
-        "filled": true
-      },
-      {
-        "role": "long_PE",
-        "action": "BUY",
-        "strike": 25150,
-        "pct": -3.08,
-        "price": 0.7,
-        "volume": 159663,
-        "filled": true
-      }
-    ]
-  },
-  {
     "expiry": "2026-01-06",
     "structure": "ironfly",
     "spot": 26250,
@@ -2350,56 +1850,6 @@
     ]
   },
   {
-    "expiry": "2026-01-27",
-    "structure": "ironfly",
-    "spot": 25100,
-    "credit": 28.0,
-    "pnl": 27.7,
-    "ret_margin_pct": 5.88,
-    "reason": "SETTLE",
-    "atm": 25100,
-    "min_leg_volume": 1215621,
-    "all_legs_filled": true,
-    "legs": [
-      {
-        "role": "short_CE",
-        "action": "SELL",
-        "strike": 25400,
-        "pct": 1.2,
-        "price": 16.7,
-        "volume": 8715422,
-        "filled": true
-      },
-      {
-        "role": "short_PE",
-        "action": "SELL",
-        "strike": 24800,
-        "pct": -1.2,
-        "price": 17.6,
-        "volume": 11028472,
-        "filled": true
-      },
-      {
-        "role": "long_CE",
-        "action": "BUY",
-        "strike": 25900,
-        "pct": 3.19,
-        "price": 2.05,
-        "volume": 1215621,
-        "filled": true
-      },
-      {
-        "role": "long_PE",
-        "action": "BUY",
-        "strike": 24300,
-        "pct": -3.19,
-        "price": 3.5,
-        "volume": 1216273,
-        "filled": true
-      }
-    ]
-  },
-  {
     "expiry": "2026-02-03",
     "structure": "ironfly",
     "spot": 25900,
@@ -2545,56 +1995,6 @@
         "pct": -3.12,
         "price": 1.55,
         "volume": 599874,
-        "filled": true
-      }
-    ]
-  },
-  {
-    "expiry": "2026-02-24",
-    "structure": "ironfly",
-    "spot": 25600,
-    "credit": 14.1,
-    "pnl": 13.9,
-    "ret_margin_pct": 2.86,
-    "reason": "SETTLE",
-    "atm": 25600,
-    "min_leg_volume": 1021636,
-    "all_legs_filled": true,
-    "legs": [
-      {
-        "role": "short_CE",
-        "action": "SELL",
-        "strike": 25900,
-        "pct": 1.17,
-        "price": 9.7,
-        "volume": 2639890,
-        "filled": true
-      },
-      {
-        "role": "short_PE",
-        "action": "SELL",
-        "strike": 25300,
-        "pct": -1.17,
-        "price": 8.1,
-        "volume": 19665647,
-        "filled": true
-      },
-      {
-        "role": "long_CE",
-        "action": "BUY",
-        "strike": 26400,
-        "pct": 3.12,
-        "price": 1.45,
-        "volume": 1021636,
-        "filled": true
-      },
-      {
-        "role": "long_PE",
-        "action": "BUY",
-        "strike": 24800,
-        "pct": -3.12,
-        "price": 1.8,
-        "volume": 1508615,
         "filled": true
       }
     ]
@@ -2800,56 +2200,6 @@
     ]
   },
   {
-    "expiry": "2026-03-30",
-    "structure": "ironfly",
-    "spot": 22600,
-    "credit": 48.7,
-    "pnl": -97.3,
-    "ret_margin_pct": -24.25,
-    "reason": "STOP",
-    "atm": 22600,
-    "min_leg_volume": 2449080,
-    "all_legs_filled": true,
-    "legs": [
-      {
-        "role": "short_CE",
-        "action": "SELL",
-        "strike": 22850,
-        "pct": 1.11,
-        "price": 32.0,
-        "volume": 5782175,
-        "filled": true
-      },
-      {
-        "role": "short_PE",
-        "action": "SELL",
-        "strike": 22350,
-        "pct": -1.11,
-        "price": 30.3,
-        "volume": 17292275,
-        "filled": true
-      },
-      {
-        "role": "long_CE",
-        "action": "BUY",
-        "strike": 23300,
-        "pct": 3.1,
-        "price": 6.9,
-        "volume": 2456610,
-        "filled": true
-      },
-      {
-        "role": "long_PE",
-        "action": "BUY",
-        "strike": 21900,
-        "pct": -3.1,
-        "price": 5.25,
-        "volume": 2449080,
-        "filled": true
-      }
-    ]
-  },
-  {
     "expiry": "2026-04-07",
     "structure": "ironfly",
     "spot": 22850,
@@ -3000,65 +2350,15 @@
     ]
   },
   {
-    "expiry": "2026-04-28",
-    "structure": "ironfly",
-    "spot": 24050,
-    "credit": 17.0,
-    "pnl": 17.0,
-    "ret_margin_pct": 3.51,
-    "reason": "SETTLE",
-    "atm": 24050,
-    "min_leg_volume": 357453,
-    "all_legs_filled": true,
-    "legs": [
-      {
-        "role": "short_CE",
-        "action": "SELL",
-        "strike": 24350,
-        "pct": 1.25,
-        "price": 11.9,
-        "volume": 3058471,
-        "filled": true
-      },
-      {
-        "role": "short_PE",
-        "action": "SELL",
-        "strike": 23750,
-        "pct": -1.25,
-        "price": 7.9,
-        "volume": 3262912,
-        "filled": true
-      },
-      {
-        "role": "long_CE",
-        "action": "BUY",
-        "strike": 24850,
-        "pct": 3.33,
-        "price": 1.5,
-        "volume": 357453,
-        "filled": true
-      },
-      {
-        "role": "long_PE",
-        "action": "BUY",
-        "strike": 23250,
-        "pct": -3.33,
-        "price": 0.9,
-        "volume": 417809,
-        "filled": true
-      }
-    ]
-  },
-  {
     "expiry": "2026-05-05",
     "structure": "ironfly",
     "spot": 24050,
-    "credit": 11.0,
-    "pnl": 11.0,
-    "ret_margin_pct": 2.49,
+    "credit": 10.7,
+    "pnl": 10.6,
+    "ret_margin_pct": 2.18,
     "reason": "SETTLE",
     "atm": 24050,
-    "min_leg_volume": 435391,
+    "min_leg_volume": 379965,
     "all_legs_filled": true,
     "legs": [
       {
@@ -3091,10 +2391,10 @@
       {
         "role": "long_PE",
         "action": "BUY",
-        "strike": 23300,
-        "pct": -3.12,
-        "price": 0.6,
-        "volume": 927268,
+        "strike": 23250,
+        "pct": -3.33,
+        "price": 0.9,
+        "volume": 379965,
         "filled": true
       }
     ]
@@ -3145,56 +2445,6 @@
         "pct": -3.16,
         "price": 0.75,
         "volume": 2285809,
-        "filled": true
-      }
-    ]
-  },
-  {
-    "expiry": "2026-05-19",
-    "structure": "ironfly",
-    "spot": 23700,
-    "credit": 16.8,
-    "pnl": 16.7,
-    "ret_margin_pct": 3.87,
-    "reason": "SETTLE",
-    "atm": 23700,
-    "min_leg_volume": 750850,
-    "all_legs_filled": true,
-    "legs": [
-      {
-        "role": "short_CE",
-        "action": "SELL",
-        "strike": 24000,
-        "pct": 1.27,
-        "price": 5.0,
-        "volume": 7779182,
-        "filled": true
-      },
-      {
-        "role": "short_PE",
-        "action": "SELL",
-        "strike": 23400,
-        "pct": -1.27,
-        "price": 15.0,
-        "volume": 6761063,
-        "filled": true
-      },
-      {
-        "role": "long_CE",
-        "action": "BUY",
-        "strike": 24500,
-        "pct": 3.38,
-        "price": 0.8,
-        "volume": 1315571,
-        "filled": true
-      },
-      {
-        "role": "long_PE",
-        "action": "BUY",
-        "strike": 22950,
-        "pct": -3.16,
-        "price": 1.9,
-        "volume": 750850,
         "filled": true
       }
     ]

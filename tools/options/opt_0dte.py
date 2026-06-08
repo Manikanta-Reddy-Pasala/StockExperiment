@@ -28,15 +28,15 @@ import psycopg
 DB = "postgresql://trader:trader_password@database:5432/trading_system"
 
 
-def load_expiry_ohlc(start, end):
+def load_expiry_ohlc(start, end, underlying="NIFTY"):
     """expiry -> {(strike,kind): (open,high,low,close,vol)} for the EXPIRY-DAY bar."""
     c = psycopg.connect(DB); cur = c.cursor()
     q = ("SELECT expiry, strike, opt_type, open, high, low, close, volume "
-         "FROM historical_options WHERE underlying='NIFTY' "
+         "FROM historical_options WHERE underlying=%s "
          "AND candle_time::date = expiry")        # expiry-day bar only
+    args = [underlying]
     if start:
-        q += " AND expiry >= %s"
-    args = [start] if start else []
+        q += " AND expiry >= %s"; args.append(start)
     if end:
         q += " AND expiry <= %s"; args.append(end)
     cur.execute(q, args)
@@ -72,12 +72,22 @@ def nearest(snap, target, kind, min_vol):
     return min(cs, key=lambda s: abs(s - target)) if cs else None
 
 
-def backtest(otm, stop, structure, wing, min_vol, start, end, maxloss_margin=None):
-    """maxloss_margin: if set (e.g. 0.12), hard-stop at that fraction of margin
-    instead of `stop`× credit — a true −X% of capital per-trade cap."""
-    data = load_expiry_ohlc(start, end)
+def backtest(otm, stop, structure, wing, min_vol, start, end, maxloss_margin=None,
+             underlying="NIFTY", cadence="all"):
+    """maxloss_margin: if set (e.g. 0.12), hard-stop at that fraction of margin.
+    cadence: 'all' | 'weekly' | 'monthly' (monthly = last expiry of its month)."""
+    data = load_expiry_ohlc(start, end, underlying)
+    # monthly = the latest expiry within each (year, month)
+    by_ym = {}
+    for e in data:
+        by_ym.setdefault((e.year, e.month), []).append(e)
+    monthlies = {max(v) for v in by_ym.values()}
     trades = []
     for exp in sorted(data):
+        if cadence == "monthly" and exp not in monthlies:
+            continue
+        if cadence == "weekly" and exp in monthlies:
+            continue
         snap = data[exp]
         atm = atm_from_open(snap)
         if atm is None:
