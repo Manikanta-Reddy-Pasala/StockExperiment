@@ -428,9 +428,10 @@ async function loadPaperPick(container) {
     wrap.innerHTML = d.models.map(m => {
       const p = m.paper, b = m.backtest, t = p.open || p.last;
       const wr = p.win_rate_pct == null ? '—' : p.win_rate_pct + '%';
+      const qty = m.qty;
       const sig = p.open
-        ? `<span class="text-info">OPEN today</span> · credit ${p.open.credit} · stop @ 2× · settles 15:25`
-        : (p.last ? `last ${p.last.trade_date}: ${p.last.reason} ${(p.last.ret_margin_pct>=0?'+':'')+p.last.ret_margin_pct}%` : 'no trade yet — fires on its expiry');
+        ? `<span class="text-info">OPEN today</span> · invested ₹${Number(p.open_margin_inr||0).toLocaleString('en-IN')} (2 lots) · credit ${p.open.credit} · settles 15:25`
+        : (p.last ? `last ${p.last.trade_date}: invested ₹${Number(Math.round((p.last.margin||0)*qty)).toLocaleString('en-IN')} → return ₹${Number(p.last_pnl_inr||0).toLocaleString('en-IN')} (${(p.last.ret_margin_pct>=0?'+':'')+p.last.ret_margin_pct}%)` : 'no trade yet — fires on its expiry');
       let legsHtml = '';
       if (t && t.legs && t.legs.length) {
         legsHtml = `<div class="mt-2" style="font-size:.72rem;"><div class="text-muted">Spot ${t.spot} · legs:</div>` +

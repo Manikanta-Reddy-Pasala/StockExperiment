@@ -211,25 +211,35 @@ def do_settle(svc, cur, today, model, cfg, force):
       reason=%s,status='CLOSED',settled_at=%s WHERE id=%s""",
       (round(exitv, 2), round(pnl, 2), round(pnl / t["margin"], 4), reason,
        datetime.now(IST).replace(tzinfo=None), t["id"]))
-    print(f"PAPER SETTLE [{model}] {today}: {reason} pnl={pnl:.1f} "
-          f"ret_margin={100*pnl/t['margin']:.1f}%")
+    qty = LOTS * cfg["lot"]
+    invested = t["margin"] * qty          # ₹ margin blocked (2 lots)
+    pnl_inr = pnl * qty
+    print(f"PAPER SETTLE [{model}] {today}: {reason} | 2 lots ({qty} qty) | "
+          f"INVESTED ₹{invested:,.0f} → RETURN ₹{pnl_inr:,.0f} "
+          f"({100*pnl/t['margin']:+.1f}%) → OUT ₹{invested+pnl_inr:,.0f}")
 
 
 def do_report(cur, model):
-    cur.execute("SELECT trade_date,reason,entry_credit,pnl,ret_margin,status "
+    qty = LOTS * MODELS[model]["lot"]
+    cur.execute("SELECT trade_date,reason,entry_credit,margin,pnl,ret_margin,status "
                 "FROM paper_dte_trades WHERE model=%s ORDER BY trade_date", (model,))
     rows = cur.fetchall()
-    print(f"=== {model} ===")
+    print(f"=== {model} (2 lots = {qty} qty/leg) ===")
     if not rows:
         print("  no paper trades yet"); return
-    for r in rows:
-        print(f"  {r[0]} {r[1] or '-':7} credit {r[2] or 0} pnl {r[3] or 0} "
-              f"{100*(r[4] or 0):.1f}% {r[5]}")
-    closed = [r for r in rows if r[5] == "CLOSED"]
+    print(f"  {'date':12} {'status':7} {'Invested ₹':>12} {'Return ₹':>10} {'Ret%':>7} {'Out ₹':>12} {'exit':7}")
+    tot_pnl = 0.0
+    for d_, reason, credit, margin, pnl, ret, status in rows:
+        inv = (margin or 0) * qty
+        pnl_inr = (pnl or 0) * qty
+        tot_pnl += pnl_inr if status == "CLOSED" else 0
+        print(f"  {str(d_):12} {status:7} {inv:>12,.0f} {pnl_inr:>10,.0f} "
+              f"{100*(ret or 0):>6.1f}% {inv+pnl_inr:>12,.0f} {reason or '-':7}")
+    closed = [r for r in rows if r[6] == "CLOSED"]
     if closed:
-        wins = sum(1 for r in closed if r[3] > 0)
-        print(f"  CLOSED {len(closed)} · WR {100*wins/len(closed):.0f}% · "
-              f"total ret/margin {100*sum(r[4] for r in closed):.1f}%")
+        wins = sum(1 for r in closed if r[4] > 0)
+        print(f"  ── CLOSED {len(closed)} · WR {100*wins/len(closed):.0f}% · "
+              f"TOTAL RETURN ₹{tot_pnl:,.0f} (2 lots) ──")
 
 
 def main():

@@ -505,9 +505,10 @@ async function loadPaperDte() {
       const p = m.paper, b = m.backtest;
       const wr = p.win_rate_pct == null ? '—' : p.win_rate_pct + '%';
       const tot = p.n_closed ? fmtPct(p.total_ret_margin_pct) : '—';
+      const qty = m.qty;
       const openTxt = p.open
-        ? `OPEN ${p.open.trade_date} · credit ${p.open.credit} · stop@2×`
-        : (p.last ? `last ${p.last.trade_date}: ${p.last.reason} ${fmtPct(p.last.ret_margin_pct)}` : 'no trades yet — fires on its expiry');
+        ? `<span class="text-info">OPEN ${p.open.trade_date}</span> · invested ${fmtINR(p.open_margin_inr)} (2 lots) · settles 15:25`
+        : (p.last ? `last ${p.last.trade_date}: invested ${fmtINR(Math.round((p.last.margin||0)*qty))} → return <strong class="${(p.last_pnl_inr||0)>=0?'pos':'neg'}">${fmtINR(p.last_pnl_inr)}</strong> (${fmtPct(p.last.ret_margin_pct)})` : 'no trades yet — fires on its expiry');
       const btTxt = b.cagr_pct != null
         ? `CAGR ${b.cagr_pct}% · WR ${b.win_rate_pct}%`
         : `+${b.avg_trade_pct}%/trade · WR ${b.win_rate_pct}% (${b.trades} trades)`;
