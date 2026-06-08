@@ -16,7 +16,7 @@
   "wins": 37,
   "losses": 12,
   "win_rate_pct": 75.5,
-  "cagr_pct": 234.9,
+  "cagr_pct": 235.7,
   "avg_ret_margin_pct": 2.64,
   "max_dd_pct": 12.6,
   "worst_trade_pct": -11.0,
@@ -24,12 +24,12 @@
   "per_year": {
     "2025": {
       "trades": 34,
-      "ret_margin_pct": 17.6,
+      "ret_margin_pct": 17.5,
       "win_rate_pct": 73.5
     },
     "2026": {
       "trades": 15,
-      "ret_margin_pct": 111.7,
+      "ret_margin_pct": 112.0,
       "win_rate_pct": 80.0
     }
   },

@@ -149,7 +149,8 @@ def backtest(otm, stop, structure, wing, min_vol, start, end, maxloss_margin=Non
                      leg("long_PE", "BUY", bp, snap[(bp, "PE")])]
         all_filled = all(l["filled"] for l in legs)
         trades.append(dict(expiry=str(exp), spot=atm, credit=round(credit, 1),
-                           pnl=round(pnl, 1), ret=pnl / margin, reason=reason,
+                           pnl=round(pnl, 1), ret=pnl / margin,
+                           margin=round(margin, 1), reason=reason,
                            atm=atm, minvol=legvol, all_filled=all_filled,
                            legs=legs))
     return trades

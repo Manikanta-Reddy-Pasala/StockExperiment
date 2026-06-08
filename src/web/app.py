@@ -945,16 +945,17 @@ def create_app():
         BOTH models. Paper-only — no real orders, separate from live equity."""
         META = {
             'nifty50_weekly_0dte': dict(
-                title='NIFTY 50 Weekly 0DTE Iron-Fly',
-                config='NIFTY 50 · weekly (Tue) · 1.2% OTM · 2% wings · 2× stop',
+                title='NIFTY 50 Weekly 0DTE Iron-Fly', lot=65,
+                config='NIFTY 50 · weekly (Tue) · 1.2% OTM · 2% wings · 2× stop · 2 lots',
                 backtest=dict(cagr_pct=235.7, win_rate_pct=75.5, max_dd_pct=12.6,
                               worst_capped_pct=-11.0, trades=49)),
             'banknifty_monthly_0dte': dict(
-                title='Bank Nifty Monthly 0DTE Iron-Fly',
-                config='Bank Nifty · monthly (last Tue) · 1.2% OTM · 2% wings · 2× stop',
+                title='Bank Nifty Monthly 0DTE Iron-Fly', lot=30,
+                config='Bank Nifty · monthly (last Tue) · 1.2% OTM · 2% wings · 2× stop · 2 lots',
                 backtest=dict(cagr_pct=43.6, win_rate_pct=85.7, max_dd_pct=4.2,
                               worst_capped_pct=-4.2, trades=14)),
         }
+        LOTS = 2
         try:
             from src.models.database import get_database_manager
             from sqlalchemy import text
@@ -983,17 +984,19 @@ def create_app():
                 closed = [t for t in trades if t['status'] == 'CLOSED']
                 wins = sum(1 for t in closed if (t['pnl'] or 0) > 0)
                 open_t = next((t for t in trades if t['status'] == 'OPEN'), None)
-                CAP = 200000   # ₹2L margin deployed per trade (fixed, pocketed)
+                qty = meta['lot'] * LOTS    # 2 lots per leg
                 tot_ret = sum(t['ret_margin_pct'] for t in closed)
+                total_pnl_inr = round(sum((t['pnl'] or 0) for t in closed) * qty)
                 models.append(dict(
                     model=k, status='PAPER', title=meta['title'],
                     config=meta['config'], backtest=meta['backtest'],
+                    lots=LOTS, lot=meta['lot'], qty=qty,
                     paper=dict(n_closed=len(closed), wins=wins,
                                win_rate_pct=round(100 * wins / len(closed), 1) if closed else None,
                                total_ret_margin_pct=round(tot_ret, 1),
-                               cap_inr=CAP,
-                               total_pnl_inr=round(CAP * tot_ret / 100),
-                               last_pnl_inr=round(CAP * closed[-1]['ret_margin_pct'] / 100) if closed else None,
+                               total_pnl_inr=total_pnl_inr,
+                               last_pnl_inr=round((closed[-1]['pnl'] or 0) * qty) if closed else None,
+                               open_margin_inr=round((open_t['margin'] or 0) * qty) if open_t else None,
                                open=open_t, last=closed[-1] if closed else None)))
             return jsonify(dict(success=True, models=models))
         except Exception as e:

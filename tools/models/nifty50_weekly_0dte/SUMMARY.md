@@ -20,7 +20,7 @@ profit) · **2× credit hard stop** intraday · expiry settlement.
 |---|---|
 | Trades | 49 (37W / 12L) |
 | Win rate | 75.5% |
-| CAGR | 236.0% |
+| CAGR | 235.7% |
 | Avg return / trade (margin) | 2.64% |
 | Max drawdown | 12.6% |
 | Worst trade | -11.0% (capped by wings) |
@@ -29,19 +29,19 @@ profit) · **2× credit hard stop** intraday · expiry settlement.
 `return % = P&L ÷ margin deployed`, where **margin = wing width − credit** (the
 defined-risk capital locked per iron-fly). Per-unit (lot-size independent).
 
-## Capital simulation — ₹2,00,000 margin per trade
-Deploy a fixed **₹2,00,000** of margin on each trade (rupee P&L = ₹2L × return%):
+## Capital simulation — 2 LOTS per trade (NIFTY lot 65 → 130 qty/leg)
+Fixed **2 lots** (130 qty) per leg, both shorts and both wings (one basket order):
 | Metric | Value |
 |---|---|
-| Margin in / trade | ₹2,00,000 |
-| Avg P&L / trade | ₹5,288 |
-| **Total P&L (49 trades)** | **₹259,118** |
-| Best trade | ₹93,566 |
-| Worst trade | ₹-22,069 (max loss capped by wings) |
+| Size | 2 lots = 130 qty / leg |
+| Margin / trade (≈) | ₹59,608 (= (wing−credit) × 130) |
+| Avg P&L / trade | ₹1,381 |
+| **Total P&L (49 trades)** | **₹67,691** |
+| Best trade | ₹20,683 |
+| Worst trade | ₹-4,459 (max loss capped by wings) |
 
-*Fixed ₹2L per trade (profit pocketed, not compounded). Assumes ₹2L fully
-deployed as margin; real lots are discrete (NIFTY lot 75, BankNifty 35) so actual
-sizing rounds to whole lots.*
+*Profit pocketed per trade (not compounded). Margin varies per trade (defined
+risk = wing − credit). NIFTY lot = 65.*
 
 ## Execution — BASKET / multi-leg order ONLY
 The 4 legs are entered as **one basket (multi-leg) order**, never 4 individual
@@ -49,11 +49,11 @@ orders — legging in separately risks partial fills + the index moving between
 legs, which breaks the defined-risk structure. Backtest/paper price all 4 legs
 at the same instant (the basket). **Paper only — no real broker orders.**
 
-### Year-by-year (₹2L/trade)
-| Year | Trades | Return % (margin) | P&L (₹2L/trade) |
+### Year-by-year (2 lots)
+| Year | Trades | Return % (margin) | P&L (2 lots) |
 |---|---:|---:|---:|
-| 2025 | 34 | 17.5% | ₹35,000 |
-| 2026 | 15 | 112.0% | ₹224,000 |
+| 2025 | 34 | 17.5% | ₹11,609 |
+| 2026 | 15 | 112.0% | ₹56,082 |
 
 ## Caveats
 - in-sample single regime (2025-26, seller-friendly)

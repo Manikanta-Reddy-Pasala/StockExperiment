@@ -30,14 +30,15 @@ SLIP = 0.02
 MARGIN_FLOOR = 0.25
 EXPIRY_WD = 1   # Tuesday (current NSE index expiry weekday)
 
+LOTS = 2   # trade 2 lots per leg
 MODELS = {
     "nifty50_weekly_0dte": dict(
         title="NIFTY 50 Weekly 0DTE Iron-Fly", underlying="NIFTY",
-        fyers_idx="NIFTY50-INDEX", cadence="weekly", step=50,
+        fyers_idx="NIFTY50-INDEX", cadence="weekly", step=50, lot=65,
         otm=0.012, wing=0.02, stop=2.0),
     "banknifty_monthly_0dte": dict(
         title="Bank Nifty Monthly 0DTE Iron-Fly", underlying="BANKNIFTY",
-        fyers_idx="NIFTYBANK-INDEX", cadence="monthly", step=100,
+        fyers_idx="NIFTYBANK-INDEX", cadence="monthly", step=100, lot=30,
         otm=0.012, wing=0.02, stop=2.0),
 }
 
@@ -177,11 +178,13 @@ def do_enter(svc, cur, today, model, cfg, force):
       (model, today, exp, atm, spot, sce, spe, lce, lpe, round(credit, 2),
        round(margin, 2), round(stop_loss, 2), datetime.now(IST).replace(tzinfo=None),
        json.dumps(leg_detail)))
-    print(f"PAPER ENTER [{model}] {today} exp={exp} spot/atm={atm} "
-          f"credit={credit:.1f} margin={margin:.1f} stop@-{stop_loss:.1f}")
+    qty = LOTS * cfg["lot"]
+    print(f"PAPER ENTER [{model}] {today} exp={exp} spot/atm={atm} | "
+          f"2 lots = {qty} qty/leg | credit {credit:.1f}pts (₹{credit*qty:,.0f}) "
+          f"margin {margin:.1f}pts (₹{margin*qty:,.0f}) maxloss ₹{stop_loss*qty:,.0f}")
     for l in leg_detail:
-        print(f"  {l['action']} {l['role']} {l['strike']} ({l['pct']:+.2f}%) "
-              f"₹{l['price']} vol={l['volume']:,} {'OK' if l['filled'] else 'THIN'}")
+        print(f"  {l['action']} {l['role']} {l['strike']} ({l['pct']:+.2f}%) x{qty} "
+              f"@₹{l['price']} vol={l['volume']:,} {'OK' if l['filled'] else 'THIN'}")
 
 
 def do_settle(svc, cur, today, model, cfg, force):

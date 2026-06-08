@@ -8,11 +8,13 @@ import opt_0dte as m
 START = "2025-03-01"
 SPECS = {
     "nifty50_weekly_0dte": dict(underlying="NIFTY", cadence="weekly", otm=0.012,
-                                wing=0.02, name="NIFTY 50 Weekly 0DTE Iron-Fly"),
+                                wing=0.02, lot=65,
+                                name="NIFTY 50 Weekly 0DTE Iron-Fly"),
     "banknifty_monthly_0dte": dict(underlying="BANKNIFTY", cadence="monthly",
-                                   otm=0.012, wing=0.02,
+                                   otm=0.012, wing=0.02, lot=30,
                                    name="Bank Nifty Monthly 0DTE Iron-Fly"),
 }
+LOTS = 2   # trade 2 lots per leg (fixed size)
 _ap = argparse.ArgumentParser(); _ap.add_argument("--model", default="nifty50_weekly_0dte")
 _A = _ap.parse_args()
 SPEC = SPECS[_A.model]
@@ -24,7 +26,7 @@ tr = m.backtest(CFG["otm"], CFG["stop"], CFG["structure"], CFG["wing"], 0, START
 tr.sort(key=lambda t: t["expiry"])
 
 ledger = [dict(expiry=t["expiry"], structure="ironfly", spot=t["spot"],
-               credit=t["credit"], pnl=t["pnl"],
+               credit=t["credit"], pnl=t["pnl"], margin=t["margin"],
                ret_margin_pct=round(100 * t["ret"], 2), reason=t["reason"],
                atm=t["atm"], min_leg_volume=t["minvol"],
                all_legs_filled=t["all_filled"], legs=t["legs"])
@@ -82,18 +84,25 @@ def cell(legs, role):
     flag = "" if l["filled"] else " ⚠️"
     return f"{l['action']} {l['strike']} ({l['pct']:+.2f}%) · ₹{l['price']} · vol {l['volume']:,}{flag}"
 
-# ---- ₹2L-per-trade rupee simulation (deploy ₹2,00,000 margin each trade) ----
-CAP = 200000
-sum_ret = sum(rets)
-total_pnl_2L = round(CAP * sum_ret)
-avg_pnl_2L = round(CAP * st.mean(rets))
-best_inr = round(CAP * max(rets))
-worst_inr = round(CAP * min(rets))
+# ---- 2-LOT rupee simulation (fixed 2 lots per leg) ----
+LOT = SPEC["lot"]; QTY = LOTS * LOT          # qty per leg
+pnls_inr = [t["pnl"] * QTY for t in tr]      # ₹ P&L per trade (points × qty)
+margins_inr = [t["margin"] * QTY for t in tr]
+total_pnl = round(sum(pnls_inr))
+avg_pnl = round(st.mean(pnls_inr))
+best_inr = round(max(pnls_inr)); worst_inr = round(min(pnls_inr))
+avg_margin = round(st.mean(margins_inr))
 def inr(x):
     return f"₹{x:,.0f}"
 
+# per-year ₹ on 2 lots
+py_inr = {}
+for t in tr:
+    py_inr.setdefault(t["expiry"][:4], 0)
+    py_inr[t["expiry"][:4]] += t["pnl"] * QTY
+
 # SUMMARY.md — consistent report (strategy + entry/exit + regenerated results)
-py = "\n".join(f"| {y} | {v['trades']} | {v['ret_margin_pct']}% | {inr(round(CAP*v['ret_margin_pct']/100))} |"
+py = "\n".join(f"| {y} | {v['trades']} | {v['ret_margin_pct']}% | {inr(round(py_inr.get(y,0)))} |"
                for y, v in summary["per_year"].items())
 exp_word = "weekly expiry (Tuesday)" if SPEC["cadence"] == "weekly" else "monthly expiry (last Tuesday)"
 sm = f"""# {SPEC['name']} (`{_A.model}`)
@@ -127,19 +136,19 @@ profit) · **2× credit hard stop** intraday · expiry settlement.
 `return % = P&L ÷ margin deployed`, where **margin = wing width − credit** (the
 defined-risk capital locked per iron-fly). Per-unit (lot-size independent).
 
-## Capital simulation — ₹2,00,000 margin per trade
-Deploy a fixed **₹2,00,000** of margin on each trade (rupee P&L = ₹2L × return%):
+## Capital simulation — 2 LOTS per trade ({SPEC['underlying']} lot {LOT} → {QTY} qty/leg)
+Fixed **2 lots** ({QTY} qty) per leg, both shorts and both wings (one basket order):
 | Metric | Value |
 |---|---|
-| Margin in / trade | ₹2,00,000 |
-| Avg P&L / trade | {inr(avg_pnl_2L)} |
-| **Total P&L ({summary['trades']} trades)** | **{inr(total_pnl_2L)}** |
+| Size | 2 lots = {QTY} qty / leg |
+| Margin / trade (≈) | {inr(avg_margin)} (= (wing−credit) × {QTY}) |
+| Avg P&L / trade | {inr(avg_pnl)} |
+| **Total P&L ({summary['trades']} trades)** | **{inr(total_pnl)}** |
 | Best trade | {inr(best_inr)} |
 | Worst trade | {inr(worst_inr)} (max loss capped by wings) |
 
-*Fixed ₹2L per trade (profit pocketed, not compounded). Assumes ₹2L fully
-deployed as margin; real lots are discrete (NIFTY lot 75, BankNifty 35) so actual
-sizing rounds to whole lots.*
+*Profit pocketed per trade (not compounded). Margin varies per trade (defined
+risk = wing − credit). {SPEC['underlying']} lot = {LOT}.*
 
 ## Execution — BASKET / multi-leg order ONLY
 The 4 legs are entered as **one basket (multi-leg) order**, never 4 individual
@@ -147,8 +156,8 @@ orders — legging in separately risks partial fills + the index moving between
 legs, which breaks the defined-risk structure. Backtest/paper price all 4 legs
 at the same instant (the basket). **Paper only — no real broker orders.**
 
-### Year-by-year (₹2L/trade)
-| Year | Trades | Return % (margin) | P&L (₹2L/trade) |
+### Year-by-year (2 lots)
+| Year | Trades | Return % (margin) | P&L (2 lots) |
 |---|---:|---:|---:|
 {py}
 
@@ -164,23 +173,24 @@ open(f"{OUT}/SUMMARY.md", "w").write(sm)
 
 md = [f"# {SPEC['name']} — Trade Ledger\n",
       f"{len(ledger)} trades (in-sample backtest, expiry-day OHLC proxy). "
-      "Each row: index (spot) at entry, the 4 legs (strike · % from spot · entry "
-      "price · day volume), then the rupee result on a **fixed ₹2,00,000 margin "
-      "deployed per trade** (In → Out). ⚠️ = leg traded < 100 contracts (thin). "
-      "Entered as ONE basket order. All prices are the 9:15 expiry-day open.\n",
+      f"Each row: index (spot) at entry, the 4 legs (strike · % from spot · entry "
+      f"price · day volume), then the rupee result on **2 lots = {QTY} qty/leg** "
+      f"({SPEC['underlying']} lot {LOT}). Margin In = (wing−credit) × {QTY}. "
+      "⚠️ = leg < 100 contracts (thin). One basket order. Prices = 9:15 open.\n",
       "| Expiry | Spot | Short CE | Short PE | Long CE (wing) | Long PE (wing) | "
-      "Capital In | P&L ₹ | Capital Out | Ret% | Filled | Exit |",
-      "|---|---:|---|---|---|---|---:|---:|---:|---:|:---:|---|"]
+      f"Lots/Qty | Margin In | P&L ₹ | Capital Out | Ret% | Filled | Exit |",
+      "|---|---:|---|---|---|---|---:|---:|---:|---:|---:|:---:|---|"]
 for t in ledger:
     L = t["legs"]
-    ret = t["ret_margin_pct"] / 100.0
-    pnl_inr = round(CAP * ret)
-    out_inr = CAP + pnl_inr
+    margin_inr = round(t["margin"] * QTY)
+    pnl_inr = round(t["pnl"] * QTY)
+    out_inr = margin_inr + pnl_inr
     md.append(f"| {t['expiry']} | {t['spot']} | {cell(L,'short_CE')} | "
               f"{cell(L,'short_PE')} | {cell(L,'long_CE')} | {cell(L,'long_PE')} | "
-              f"{inr(CAP)} | {inr(pnl_inr)} | {inr(out_inr)} | {t['ret_margin_pct']}% | "
-              f"{'✅' if t['all_legs_filled'] else '⚠️ NO'} | {t['reason']} |")
-md.append(f"\n**Total on ₹2L/trade: {inr(total_pnl_2L)} P&L across {len(ledger)} "
-          f"trades** (avg {inr(avg_pnl_2L)}/trade, best {inr(best_inr)}, worst {inr(worst_inr)}).")
+              f"2 / {QTY} | {inr(margin_inr)} | {inr(pnl_inr)} | {inr(out_inr)} | "
+              f"{t['ret_margin_pct']}% | {'✅' if t['all_legs_filled'] else '⚠️ NO'} | {t['reason']} |")
+md.append(f"\n**Total on 2 lots ({QTY} qty/leg): {inr(total_pnl)} P&L across "
+          f"{len(ledger)} trades** (avg {inr(avg_pnl)}/trade · ≈{inr(avg_margin)} "
+          f"margin/trade · best {inr(best_inr)} · worst {inr(worst_inr)}).")
 open(f"{OUT}/TRADE_LEDGER.md", "w").write("\n".join(md))
 print(json.dumps(summary, indent=2))
