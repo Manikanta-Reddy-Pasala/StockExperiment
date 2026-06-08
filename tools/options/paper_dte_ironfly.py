@@ -76,11 +76,26 @@ def spot_atm(svc, day):
     return spot, round(spot / STEP) * STEP
 
 
+def _is_trading_day(d):
+    """NSE trading-day check via the project calendar; fall back to weekday."""
+    try:
+        from tools.shared.nse_calendar import is_trading_day
+        return is_trading_day(d)
+    except Exception:
+        return d.weekday() < 5
+
+
 def this_expiry(today):
-    d = today
-    while d.weekday() != EXPIRY_WD:
-        d += timedelta(days=1)
-    return d
+    """NIFTY weekly expiry = Tuesday; if that Tuesday is an NSE holiday, NSE
+    moves the expiry to the PREVIOUS trading day. Returns the actual expiry
+    date for the current weekly cycle (>= today's week)."""
+    tue = today
+    while tue.weekday() != EXPIRY_WD:        # next Tuesday on/after today
+        tue += timedelta(days=1)
+    exp = tue
+    while not _is_trading_day(exp):          # holiday → walk back to prev trading day
+        exp -= timedelta(days=1)
+    return exp
 
 
 def ensure_table(cur):
