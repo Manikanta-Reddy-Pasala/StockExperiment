@@ -174,21 +174,24 @@ open(f"{OUT}/SUMMARY.md", "w").write(sm)
 md = [f"# {SPEC['name']} — Trade Ledger\n",
       f"{len(ledger)} trades (in-sample backtest, expiry-day OHLC proxy). "
       f"Each row: index (spot) at entry, the 4 legs (strike · % from spot · entry "
-      f"price · day volume), then the rupee result on **2 lots = {QTY} qty/leg** "
-      f"({SPEC['underlying']} lot {LOT}). Margin In = (wing−credit) × {QTY}. "
+      f"price · day volume), **Net Credit** (premium collected = max profit), then "
+      f"the rupee result on **2 lots = {QTY} qty/leg** ({SPEC['underlying']} lot "
+      f"{LOT}). Margin In = (wing−credit) × {QTY}. "
       "⚠️ = leg < 100 contracts (thin). One basket order. Prices = 9:15 open.\n",
       "| Expiry | Spot | Short CE | Short PE | Long CE (wing) | Long PE (wing) | "
-      f"Lots/Qty | Margin In | P&L ₹ | Capital Out | Ret% | Filled | Exit |",
-      "|---|---:|---|---|---|---|---:|---:|---:|---:|---:|:---:|---|"]
+      f"Net Credit | Lots/Qty | Margin In | P&L ₹ | Capital Out | Ret% | Filled | Exit |",
+      "|---|---:|---|---|---|---|---:|---:|---:|---:|---:|---:|:---:|---|"]
 for t in ledger:
     L = t["legs"]
+    credit_inr = round(t["credit"] * QTY)
     margin_inr = round(t["margin"] * QTY)
     pnl_inr = round(t["pnl"] * QTY)
     out_inr = margin_inr + pnl_inr
     md.append(f"| {t['expiry']} | {t['spot']} | {cell(L,'short_CE')} | "
               f"{cell(L,'short_PE')} | {cell(L,'long_CE')} | {cell(L,'long_PE')} | "
-              f"2 / {QTY} | {inr(margin_inr)} | {inr(pnl_inr)} | {inr(out_inr)} | "
-              f"{t['ret_margin_pct']}% | {'✅' if t['all_legs_filled'] else '⚠️ NO'} | {t['reason']} |")
+              f"{t['credit']}pts ({inr(credit_inr)}) | 2 / {QTY} | {inr(margin_inr)} | "
+              f"{inr(pnl_inr)} | {inr(out_inr)} | {t['ret_margin_pct']}% | "
+              f"{'✅' if t['all_legs_filled'] else '⚠️ NO'} | {t['reason']} |")
 md.append(f"\n**Total on 2 lots ({QTY} qty/leg): {inr(total_pnl)} P&L across "
           f"{len(ledger)} trades** (avg {inr(avg_pnl)}/trade · ≈{inr(avg_margin)} "
           f"margin/trade · best {inr(best_inr)} · worst {inr(worst_inr)}).")
