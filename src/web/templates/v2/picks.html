@@ -413,6 +413,45 @@ function renderCard(m, idx, ranking, status) {
   `;
 }
 
+// PAPER / OBSERVE model card — 0DTE iron-fly. Not in MODELS (no equity-signal
+// endpoint); fetched from /api/paper/dte. Read-only, no real orders.
+async function loadPaperPick(container) {
+  let card = document.getElementById('paper_dte_pick_card');
+  if (!card) {
+    card = document.createElement('div');
+    card.id = 'paper_dte_pick_card';
+    card.className = 'card mb-3';
+    card.style.borderLeft = '4px solid #6f42c1';
+    container.appendChild(card);
+  }
+  try {
+    const d = await fetch('/api/paper/dte', {cache:'no-store'}).then(r=>r.json());
+    if (!d.success) { card.innerHTML = '<div class="card-body small text-muted">Paper model unavailable.</div>'; return; }
+    const p = d.paper, b = d.backtest;
+    const wr = p.win_rate_pct == null ? '—' : p.win_rate_pct + '%';
+    const sig = p.open
+      ? `<span class="text-info">OPEN today</span> · ${d.config} · credit ${p.open.credit} · stop @ 2× · settles 15:25`
+      : (p.last ? `last expiry: ${p.last.reason} ${(p.last.ret_margin_pct>=0?'+':'')+p.last.ret_margin_pct}%` : 'no trade yet — fires on weekly expiry (Tue)');
+    card.innerHTML = `
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+          <strong>NIFTY 0DTE Iron-Fly</strong>
+          <span class="badge" style="background:#6f42c1;">PAPER</span>
+          <span class="badge bg-info text-dark" title="Signals only, no real orders">OBSERVE</span>
+        </div>
+        <span class="text-muted small">expiry-day only</span>
+      </div>
+      <div class="card-body small">
+        <div>${sig}</div>
+        <div class="text-muted mt-1">Sell 1.2%-OTM CE+PE at open · buy 2% wings (defined risk) · exit at close / 2×-credit stop.</div>
+        <div class="text-muted mt-1" style="font-size:.72rem;">
+          Paper: ${p.n_closed} trades · ${wr} WR · ret/margin ${(p.total_ret_margin_pct>=0?'+':'')+p.total_ret_margin_pct}% &nbsp;|&nbsp;
+          Backtest (in-sample): ${b.cagr_pct}% CAGR · ${b.win_rate_pct}% WR · loss capped ${b.worst_capped_pct}%
+        </div>
+      </div>`;
+  } catch(e) { card.innerHTML = '<div class="card-body small text-muted">Paper model load failed.</div>'; }
+}
+
 async function load() {
   const container = document.getElementById('picks_container');
 
@@ -425,6 +464,7 @@ async function load() {
   if (!hasSlots) {
     container.innerHTML = MODELS.map(m => renderLoadingCard(m)).join('');
   }
+  loadPaperPick(container);   // observe-mode paper card (appended, persists)
 
   // 2) Holidays drive nextRebalance() inside renderCard. Load once (cheap,
   //    fail-safe) and reuse across all card renders. Kick off in parallel with

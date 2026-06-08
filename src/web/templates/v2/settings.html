@@ -553,15 +553,38 @@ const MODEL_META = {
       ['Recent 2023-05→2026-05 (+stop +½@30%)', '+164% CAGR / 22% DD / Calmar 7.34 — profit-take lifts recent Calmar (1yr 1.99→3.53); small full-cycle trade-off (caps the 2023 +358% year). UNLEVERED, no borrow.'],
     ],
   },
+  'nifty_0dte_ironfly': {
+    paper: true,
+    universe: 'NIFTY weekly options', kind: 'options · PAPER',
+    title: 'NIFTY 0DTE Iron-Fly',
+    rules: { top_n: '—', max_concurrent: 1, lookback: 'expiry day only',
+             rebalance: 'each weekly expiry (Tue)',
+             stop: '2× credit (intraday)', target: 'theta decay to close',
+             exit: '2×-credit stop / expiry settlement' },
+    strategy: [
+      ['Type', 'Defined-risk 0DTE premium selling (iron-fly) — PAPER, no real capital'],
+      ['Days', 'NIFTY weekly expiry day only (Tuesday, post Sep-2025)'],
+      ['Entry (9:15 open)', 'ATM via put-call parity; sell 1.2%-OTM CE + PE; buy wings 2% beyond each'],
+      ['Credit / risk', 'Net credit = max profit; MAX LOSS = wing width − credit (fixed at entry, gap-proof)'],
+      ['Exit', 'Hold to close if inside shorts · 2×-credit hard stop intraday · expiry settlement'],
+      ['Backtest 2025-03→now (daily-OHLC proxy, in-sample)', '+157% CAGR / 76.6% WR / 24.2% DD / worst −24.2% (capped)'],
+      ['Per-year', '2025 +31.6% / 2026 +104.3% (return on margin)'],
+      ['Status', 'PAPER signals only — validating live vs backtest; recorder building real intraday for walk-forward'],
+    ],
+  },
 };
+
+// PAPER models — surfaced in settings/data-status sections but NOT in the live
+// capital totals (no real money). Synthetic rows; enabled flag = always shown.
+const PAPER_MODELS = [{ model_name: 'nifty_0dte_ironfly', enabled: true, paper: true }];
 
 async function loadAllocations() {
   try {
     const r = await fetch('/admin/models/portfolio', {cache: 'no-store'});
     const d = await r.json();
     if (!d.success) return;
-    renderRotationRules(d.models || []);
-    renderStrategyInfo(d.models || []);
+    renderRotationRules([...(d.models || []), ...PAPER_MODELS]);
+    renderStrategyInfo([...(d.models || []), ...PAPER_MODELS]);
     const tbody = document.getElementById('alloc_tbody');
     tbody.innerHTML = '';
     (d.models||[]).forEach(m => {
@@ -636,7 +659,39 @@ async function loadAllocations() {
       `;
       tbody.appendChild(tr);
     });
+    await appendPaperAllocRows(tbody);
   } catch(e) { console.error('alloc load failed', e); }
+}
+
+// PAPER models: read-only rows (no real capital, no deposit/withdraw/seed).
+async function appendPaperAllocRows(tbody) {
+  let paper = null;
+  try { paper = await fetch('/api/paper/dte', {cache:'no-store'}).then(r=>r.json()); } catch(e){}
+  PAPER_MODELS.forEach(pm => {
+    const meta = MODEL_META[pm.model_name] || {};
+    const p = (paper && paper.success && paper.model === pm.model_name) ? paper.paper : null;
+    const openTxt = p && p.open ? `OPEN ${p.open.trade_date} · credit ${p.open.credit}`
+                    : (p && p.last ? `last ${p.last.reason} ${fmtPct(p.last.ret_margin_pct)}` : 'flat');
+    const wr = (p && p.win_rate_pct != null) ? p.win_rate_pct + '%' : '—';
+    const tr = document.createElement('tr');
+    tr.style.background = '#f7f3fc';
+    tr.innerHTML = `
+      <td class="col-model">
+        <strong>${meta.title || pm.model_name}</strong>
+        <span class="badge" style="background:#6f42c1;">PAPER</span>
+        <span class="badge bg-info text-dark" title="Signals only, no real orders">OBSERVE</span>
+        <span class="universe-tag">${meta.universe} · ${meta.kind}</span>
+        <div class="text-muted" style="font-size:.65rem;font-family:monospace;">${pm.model_name}</div>
+      </td>
+      <td class="text-end num text-muted">— <div class="small">no capital</div></td>
+      <td class="text-end num text-muted">—</td>
+      <td class="col-position">${openTxt}</td>
+      <td class="text-end num text-muted">paper</td>
+      <td class="text-end num text-muted">${p ? p.n_closed + ' trades · ' + wr + ' WR' : '—'}</td>
+      <td class="text-center"><span class="small text-info">Observe</span></td>
+      <td class="text-end col-actions"><a href="/picks" class="btn btn-sm btn-outline-secondary" title="Paper signals">view</a></td>`;
+    tbody.appendChild(tr);
+  });
 }
 
 function openCap(model, action) {
@@ -860,9 +915,11 @@ function renderRotationRules(models) {
     if (!meta) return '';
     const r = meta.rules || {};
     const disabledCls = m.enabled ? '' : ' style="opacity:0.55;"';
-    const badge = m.enabled
-      ? '<span class="badge bg-success ms-1">ON</span>'
-      : '<span class="badge bg-secondary ms-1">OFF</span>';
+    const badge = meta.paper
+      ? '<span class="badge ms-1" style="background:#6f42c1;">PAPER</span>'
+      : (m.enabled
+        ? '<span class="badge bg-success ms-1">ON</span>'
+        : '<span class="badge bg-secondary ms-1">OFF</span>');
     return `<tr${disabledCls}>
       <td><strong>${meta.title || m.model_name}</strong>${badge}<br>
           <span class="text-muted small">${m.model_name}</span></td>
@@ -885,9 +942,11 @@ function renderStrategyInfo(models) {
     const meta = MODEL_META[m.model_name];
     if (!meta) return '';
     const disabledCls = m.enabled ? '' : ' style="opacity:0.6;"';
-    const badge = m.enabled
-      ? '<span class="badge bg-success ms-1">ON</span>'
-      : '<span class="badge bg-secondary ms-1">DISABLED</span>';
+    const badge = meta.paper
+      ? '<span class="badge ms-1" style="background:#6f42c1;">PAPER · OBSERVE</span>'
+      : (m.enabled
+        ? '<span class="badge bg-success ms-1">ON</span>'
+        : '<span class="badge bg-secondary ms-1">DISABLED</span>');
     const rows = (meta.strategy || []).map(([k, v]) =>
       `<li><strong>${k}:</strong> ${v}</li>`).join('');
     return `<div class="col-lg-6"${disabledCls}>
