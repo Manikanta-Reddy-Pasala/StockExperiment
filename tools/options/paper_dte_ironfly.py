@@ -165,7 +165,7 @@ def do_enter(svc, cur, today, model, cfg, force):
         dict(role="long_PE",  action="BUY",  strike=bps, pct=round(100*(bps/atm-1),2), price=round(px[lpe],2), volume=vol[lpe], filled=vol[lpe] > 0),
     ]
     credit = (px[sce] + px[spe]) * (1 - SLIP) - (px[lce] + px[lpe]) * (1 + SLIP)
-    wing_w = min(bcs - scs, sps - bps)
+    wing_w = max(bcs - scs, sps - bps)   # max loss = WIDER wing − credit (margin)
     if credit <= 0 or credit >= 0.95 * wing_w:
         print(f"[{model}] bad credit {credit:.1f} vs wing {wing_w} — skip"); return
     margin = max(wing_w - credit, MARGIN_FLOOR * wing_w)

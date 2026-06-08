@@ -947,12 +947,12 @@ def create_app():
             'nifty50_weekly_0dte': dict(
                 title='NIFTY 50 Weekly 0DTE Iron-Fly', lot=65,
                 config='NIFTY 50 · weekly (Tue) · 1.2% OTM · 2% wings · 2× stop · 2 lots',
-                backtest=dict(cagr_pct=235.7, win_rate_pct=75.5, max_dd_pct=12.6,
-                              worst_capped_pct=-11.0, trades=49)),
+                backtest=dict(cagr_pct=242.9, win_rate_pct=75.5, max_dd_pct=12.6,
+                              worst_capped_pct=-7.1, trades=49)),
             'banknifty_monthly_0dte': dict(
                 title='Bank Nifty Monthly 0DTE Iron-Fly', lot=30,
                 config='Bank Nifty · monthly (last Tue) · 1.2% OTM · 2% wings · 2× stop · 2 lots',
-                backtest=dict(cagr_pct=43.6, win_rate_pct=85.7, max_dd_pct=4.2,
+                backtest=dict(cagr_pct=43.2, win_rate_pct=85.7, max_dd_pct=4.2,
                               worst_capped_pct=-4.2, trades=14)),
         }
         LOTS = 2

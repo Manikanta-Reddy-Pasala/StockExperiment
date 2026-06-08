@@ -20,8 +20,8 @@ profit) · **2× credit hard stop** intraday · expiry settlement.
 |---|---|
 | Trades | 14 (12W / 2L) |
 | Win rate | 85.7% |
-| CAGR | 43.6% |
-| Avg return / trade (margin) | 3.1% |
+| CAGR | 43.2% |
+| Avg return / trade (margin) | 3.08% |
 | Max drawdown | 4.2% |
 | Worst trade | -4.2% (capped by wings) |
 
@@ -34,7 +34,7 @@ Fixed **2 lots** (60 qty) per leg, both shorts and both wings (one basket order)
 | Metric | Value |
 |---|---|
 | Size | 2 lots = 60 qty / leg |
-| Margin / trade (≈) | ₹63,066 (= (wing−credit) × 60) |
+| Margin / trade (≈) | ₹63,494 (= (wing−credit) × 60) |
 | Avg P&L / trade | ₹1,981 |
 | **Total P&L (14 trades)** | **₹27,738** |
 | Best trade | ₹4,470 |
@@ -52,7 +52,7 @@ at the same instant (the basket). **Paper only — no real broker orders.**
 ### Year-by-year (2 lots)
 | Year | Trades | Return % (margin) | P&L (2 lots) |
 |---|---:|---:|---:|
-| 2025 | 10 | 32.1% | ₹19,932 |
+| 2025 | 10 | 31.7% | ₹19,932 |
 | 2026 | 4 | 11.4% | ₹7,806 |
 
 ## Caveats

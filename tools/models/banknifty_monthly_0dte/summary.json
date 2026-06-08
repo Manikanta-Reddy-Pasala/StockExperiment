@@ -16,15 +16,15 @@
   "wins": 12,
   "losses": 2,
   "win_rate_pct": 85.7,
-  "cagr_pct": 43.6,
-  "avg_ret_margin_pct": 3.1,
+  "cagr_pct": 43.2,
+  "avg_ret_margin_pct": 3.08,
   "max_dd_pct": 4.2,
   "worst_trade_pct": -4.2,
   "max_loss_capped": "yes \u2014 bought wings (worst day structurally bounded)",
   "per_year": {
     "2025": {
       "trades": 10,
-      "ret_margin_pct": 32.1,
+      "ret_margin_pct": 31.7,
       "win_rate_pct": 90.0
     },
     "2026": {

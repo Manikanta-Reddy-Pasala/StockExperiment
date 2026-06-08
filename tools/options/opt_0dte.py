@@ -110,7 +110,7 @@ def backtest(otm, stop, structure, wing, min_vol, start, end, maxloss_margin=Non
                 continue
             credit -= (snap[(bc, "CE")][0] + snap[(bp, "PE")][0]) * (1 + SLIP)
             legs_buyback_close -= snap[(bc, "CE")][3] + snap[(bp, "PE")][3]
-            bw = min(bc - sc, sp - bp)
+            bw = max(bc - sc, sp - bp)   # max loss = WIDER wing − credit (margin)
             if bw <= 0 or credit <= 0:
                 continue
         # intraday worst: short legs' HIGH => max cost to be forced out
