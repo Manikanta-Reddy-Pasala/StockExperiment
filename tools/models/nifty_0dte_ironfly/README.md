@@ -5,12 +5,30 @@
 0DTE NIFTY weekly **iron-fly** (defined-risk premium selling). The only options
 model in this repo that clears >100% CAGR with a *bounded* worst case.
 
-## Strategy
-- Trade only on NIFTY weekly **expiry days** (Tuesday, post Sep-2025).
-- At the **open**: sell 1.2%-OTM CE + 1.2%-OTM PE; **buy wings 2% beyond** each
-  (defined risk — the wings cap the max loss, so no gap can blow up the account).
-- **Hard stop** at 2× credit loss (intraday).
-- **Settle** at the close.
+## Strategy — entry & exit (step by step)
+
+**Idea:** on a NIFTY weekly *expiry day*, options have one session of life left;
+time value collapses to zero by 3:30 PM. Sell at 9:15, let it decay to
+settlement → harvest the collapse, *if* NIFTY stays inside the sold strikes. The
+bought wings cap the loss if it doesn't.
+
+Trade **only on expiry day** (Tuesday post-Sep-2025), one trade per expiry (~52/yr).
+
+**ENTRY (9:15 open):**
+1. Find ATM from the chain via put-call parity (spot ≈ median `strike+CE−PE`).
+2. Sell body: 1.2%-OTM CE + 1.2%-OTM PE (collect premium).
+3. Buy wings 2% beyond each short (≈3.2% OTM) → **defines max loss**.
+4. Net credit = shorts − wings = max profit. **Max loss = wing width − credit**
+   (fixed, known at entry; no gap can exceed it).
+
+**EXIT (first of):**
+1. **Settlement** — stays between shorts → decays to ~max profit, marked at close.
+2. **Hard stop** — loss hits **2× credit** intraday → exit.
+3. **Expiry** — remainder marked out at the close.
+
+Worst case structurally bounded (~−24% margin in backtest) — even an −8% gap
+can't blow up the account (wings pay off in tandem). Trade-off vs naked strangle
+(higher raw CAGR, unbounded tail).
 
 ## Backtest (in-sample, 2025-03 → now)
 | Metric | Value |

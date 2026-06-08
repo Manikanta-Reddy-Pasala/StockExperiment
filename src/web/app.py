@@ -939,6 +939,43 @@ def create_app():
             app.logger.error(f"Error fetching portfolio positions for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
+    @app.route('/api/paper/dte', methods=['GET'])
+    def api_paper_dte():
+        """Read-only PAPER 0DTE iron-fly model summary (paper_dte_trades table).
+        Paper-only — no real orders, separate from the live equity models."""
+        try:
+            from src.models.database import get_database_manager
+            from sqlalchemy import text
+            db = get_database_manager()
+            with db.get_session() as session:
+                rows = session.execute(text(
+                    "SELECT trade_date, expiry, atm, entry_credit, margin, pnl, "
+                    "ret_margin, reason, status FROM paper_dte_trades "
+                    "ORDER BY trade_date")).fetchall()
+            trades = [dict(trade_date=str(r[0]), expiry=str(r[1]), atm=r[2],
+                           credit=r[3], margin=r[4], pnl=r[5],
+                           ret_margin_pct=round((r[6] or 0) * 100, 1),
+                           reason=r[7], status=r[8]) for r in rows]
+            closed = [t for t in trades if t['status'] == 'CLOSED']
+            wins = sum(1 for t in closed if (t['pnl'] or 0) > 0)
+            cum = 1.0
+            for t in closed:
+                cum *= (1 + (t['ret_margin_pct'] / 100.0))
+            open_t = next((t for t in trades if t['status'] == 'OPEN'), None)
+            return jsonify(dict(
+                success=True, model='nifty_0dte_ironfly', status='PAPER',
+                config='NIFTY 0DTE iron-fly · 1.2% OTM · 2% wings · 2× stop',
+                backtest=dict(cagr_pct=157.0, win_rate_pct=76.6, max_dd_pct=24.2,
+                              worst_capped_pct=-24.2, trades=64),
+                paper=dict(n_closed=len(closed), wins=wins,
+                           win_rate_pct=round(100 * wins / len(closed), 1) if closed else None,
+                           total_ret_margin_pct=round(sum(t['ret_margin_pct'] for t in closed), 1),
+                           cum_mult=round(cum, 3),
+                           open=open_t, last=closed[-1] if closed else None),
+                recent=trades[-15:]))
+        except Exception as e:
+            return jsonify(dict(success=False, error=str(e)))
+
     # Orders API Routes
     @app.route('/api/orders/history', methods=['GET'])
     @login_required

@@ -142,6 +142,15 @@
   <div class="col-12 text-center text-muted py-3">Loading models…</div>
 </div>
 
+<!-- PAPER / RESEARCH section — 0DTE iron-fly (no real money) -->
+<div class="d-flex align-items-center mb-2 mt-4">
+  <span class="strategy-pill" style="background:#6f42c1;color:#fff;">Paper / Research</span>
+  <span class="text-muted small ms-2">simulated signals · no real orders · separate from live models</span>
+</div>
+<div class="row g-3 mb-4" id="paper_grid">
+  <div class="col-12 text-muted small py-2">Loading paper model…</div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -486,8 +495,53 @@ async function loadPortfolio() {
   }
 }
 
+async function loadPaperDte() {
+  const grid = document.getElementById('paper_grid');
+  if (!grid) return;
+  try {
+    const d = await fetch('/api/paper/dte', {cache:'no-store'}).then(r => r.json());
+    if (!d.success) { grid.innerHTML = '<div class="col-12 text-muted small">Paper model not available yet.</div>'; return; }
+    const p = d.paper, b = d.backtest;
+    const wr = p.win_rate_pct == null ? '—' : p.win_rate_pct + '%';
+    const cum = p.n_closed ? ('×' + p.cum_mult) : '—';
+    const tot = p.n_closed ? fmtPct(p.total_ret_margin_pct) : '—';
+    const openTxt = p.open
+      ? `OPEN ${p.open.trade_date} · credit ${p.open.credit} · stop@2×`
+      : (p.last ? `last ${p.last.trade_date}: ${p.last.reason} ${fmtPct(p.last.ret_margin_pct)}` : 'no trades yet');
+    grid.innerHTML = `
+      <div class="col-12 col-lg-6">
+        <div class="card" style="border-left:4px solid #6f42c1;">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <div class="fw-bold">NIFTY 0DTE Iron-Fly
+                  <span class="badge" style="background:#6f42c1;">PAPER</span></div>
+                <div class="text-muted small">${d.config}</div>
+              </div>
+              <a href="/picks" class="text-muted small">details</a>
+            </div>
+            <hr class="my-2">
+            <div class="row text-center g-2">
+              <div class="col"><div class="text-muted small">Paper trades</div><div class="fw-bold">${p.n_closed}</div></div>
+              <div class="col"><div class="text-muted small">Paper WR</div><div class="fw-bold">${wr}</div></div>
+              <div class="col"><div class="text-muted small">Paper ret/margin</div><div class="fw-bold">${tot}</div></div>
+              <div class="col"><div class="text-muted small">Cum</div><div class="fw-bold">${cum}</div></div>
+            </div>
+            <div class="small text-muted mt-2">${openTxt}</div>
+            <div class="small text-muted mt-1" style="font-size:0.72rem;">
+              Backtest (in-sample, daily-OHLC proxy): CAGR ${b.cagr_pct}% · WR ${b.win_rate_pct}% · max loss capped ${b.worst_capped_pct}%
+            </div>
+          </div>
+        </div>
+      </div>`;
+  } catch (e) {
+    grid.innerHTML = '<div class="col-12 text-muted small">Paper model load failed.</div>';
+  }
+}
+
 function load() {
   loadPortfolio();
+  loadPaperDte();
 }
 load();
 setInterval(load, 30000);

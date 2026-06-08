@@ -4,6 +4,30 @@
 
 NIFTY weekly 0DTE iron-fly (defined risk). Defined-risk 0DTE premium selling — the only options model in this repo that clears >100% CAGR with a *bounded* worst case.
 
+## Strategy — how it works (entry & exit, step by step)
+
+**Idea:** On a NIFTY weekly *expiry day*, options have one trading session of life left. Time value (theta) collapses to zero by 3:30 PM. A seller who opens a position at 9:15 and lets it decay to settlement harvests that collapse — *as long as NIFTY stays inside the sold strikes*. The bought wings cap the loss if it doesn't.
+
+**Trade only on expiry day.** No position on non-expiry days. Post-Sep-2025 NIFTY weekly expiry = Tuesday. (One trade per expiry → ~52/year.)
+
+### ENTRY (at 9:15 AM open, expiry day)
+1. **Find ATM** from the option chain itself via put-call parity (spot ≈ median of `strike + CE − PE` over liquid strikes) — no external spot feed, immune to data issues.
+2. **Sell the body (collect premium):**
+   - Sell 1 CE at **+1.2% OTM** (strike ≈ ATM × 1.012)
+   - Sell 1 PE at **−1.2% OTM** (strike ≈ ATM × 0.988)
+3. **Buy the wings (define the risk):**
+   - Buy 1 CE **2% beyond** the short call (≈ +3.2% OTM)
+   - Buy 1 PE **2% beyond** the short put (≈ −3.2% OTM)
+4. **Net credit** = (short CE + short PE) − (long CE + long PE), collected up front. Max profit = this credit (kept if NIFTY expires between the short strikes).
+5. **Max loss = wing width − credit** — fixed, known at entry. No gap, however large, can exceed it (the long wings absorb the rest). This is the whole point of the wings.
+
+### EXIT (one of three, whichever comes first)
+1. **Profit / hold to settlement** — if NIFTY stays between the short strikes, the body decays toward zero; position settles at the close (3:30 PM) near max profit.
+2. **Hard stop (intraday)** — if the position's loss reaches **2× the credit collected**, exit immediately. Caps the typical bad day before it reaches max loss.
+3. **Expiry settlement** — any remaining position is marked out at the close (intrinsic value at expiry).
+
+**Worst case is structurally bounded** at the wing-defined max loss (≈ −24% of margin in the backtest) — even an −8% gap day cannot blow up the account, because the bought wings pay off in tandem. That is the trade-off vs a naked strangle (higher raw CAGR but unbounded tail).
+
 ## Trade rules
 
 | When | Rule |
