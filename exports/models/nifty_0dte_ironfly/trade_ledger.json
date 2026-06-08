@@ -1,0 +1,642 @@
+[
+  {
+    "expiry": "2025-03-06",
+    "structure": "ironfly",
+    "credit": 13.1,
+    "pnl": -26.1,
+    "ret_margin_pct": -11.03,
+    "reason": "STOP",
+    "atm": 22400,
+    "min_leg_volume": 1108297
+  },
+  {
+    "expiry": "2025-03-13",
+    "structure": "ironfly",
+    "credit": 9.3,
+    "pnl": 9.2,
+    "ret_margin_pct": 2.1,
+    "reason": "SETTLE",
+    "atm": 22500,
+    "min_leg_volume": 530826
+  },
+  {
+    "expiry": "2025-03-20",
+    "structure": "ironfly",
+    "credit": 10.5,
+    "pnl": 10.4,
+    "ret_margin_pct": 3.06,
+    "reason": "SETTLE",
+    "atm": 23000,
+    "min_leg_volume": 570861
+  },
+  {
+    "expiry": "2025-03-27",
+    "structure": "ironfly",
+    "credit": 15.5,
+    "pnl": 15.3,
+    "ret_margin_pct": 3.52,
+    "reason": "SETTLE",
+    "atm": 23450,
+    "min_leg_volume": 699853
+  },
+  {
+    "expiry": "2025-04-03",
+    "structure": "ironfly",
+    "credit": 19.5,
+    "pnl": 19.4,
+    "ret_margin_pct": 4.51,
+    "reason": "SETTLE",
+    "atm": 23200,
+    "min_leg_volume": 525299
+  },
+  {
+    "expiry": "2025-04-09",
+    "structure": "ironfly",
+    "credit": 53.2,
+    "pnl": 53.1,
+    "ret_margin_pct": 13.38,
+    "reason": "SETTLE",
+    "atm": 22400,
+    "min_leg_volume": 1615971
+  },
+  {
+    "expiry": "2025-04-17",
+    "structure": "ironfly",
+    "credit": 12.5,
+    "pnl": -24.9,
+    "ret_margin_pct": -5.7,
+    "reason": "STOP",
+    "atm": 23350,
+    "min_leg_volume": 993146
+  },
+  {
+    "expiry": "2025-04-24",
+    "structure": "ironfly",
+    "credit": 23.9,
+    "pnl": 23.7,
+    "ret_margin_pct": 5.55,
+    "reason": "SETTLE",
+    "atm": 24250,
+    "min_leg_volume": 785431
+  },
+  {
+    "expiry": "2025-04-30",
+    "structure": "ironfly",
+    "credit": 6.6,
+    "pnl": 6.5,
+    "ret_margin_pct": 1.33,
+    "reason": "SETTLE",
+    "atm": 24300,
+    "min_leg_volume": 570465
+  },
+  {
+    "expiry": "2025-05-08",
+    "structure": "ironfly",
+    "credit": 8.7,
+    "pnl": 7.9,
+    "ret_margin_pct": 1.6,
+    "reason": "SETTLE",
+    "atm": 24400,
+    "min_leg_volume": 1233861
+  },
+  {
+    "expiry": "2025-05-15",
+    "structure": "ironfly",
+    "credit": 14.6,
+    "pnl": -29.1,
+    "ret_margin_pct": -6.0,
+    "reason": "STOP",
+    "atm": 24650,
+    "min_leg_volume": 571601
+  },
+  {
+    "expiry": "2025-05-22",
+    "structure": "ironfly",
+    "credit": 35.7,
+    "pnl": 35.2,
+    "ret_margin_pct": 7.58,
+    "reason": "SETTLE",
+    "atm": 24700,
+    "min_leg_volume": 1144306
+  },
+  {
+    "expiry": "2025-05-29",
+    "structure": "ironfly",
+    "credit": 35.0,
+    "pnl": 34.7,
+    "ret_margin_pct": 7.46,
+    "reason": "SETTLE",
+    "atm": 24850,
+    "min_leg_volume": 503686
+  },
+  {
+    "expiry": "2025-06-05",
+    "structure": "ironfly",
+    "credit": 17.1,
+    "pnl": -34.3,
+    "ret_margin_pct": -7.1,
+    "reason": "STOP",
+    "atm": 24650,
+    "min_leg_volume": 186792
+  },
+  {
+    "expiry": "2025-06-12",
+    "structure": "ironfly",
+    "credit": 13.5,
+    "pnl": -26.9,
+    "ret_margin_pct": -5.53,
+    "reason": "STOP",
+    "atm": 25100,
+    "min_leg_volume": 841409
+  },
+  {
+    "expiry": "2025-06-19",
+    "structure": "ironfly",
+    "credit": 15.6,
+    "pnl": 15.4,
+    "ret_margin_pct": 3.17,
+    "reason": "SETTLE",
+    "atm": 24800,
+    "min_leg_volume": 1439984
+  },
+  {
+    "expiry": "2025-06-26",
+    "structure": "ironfly",
+    "credit": 8.1,
+    "pnl": -16.1,
+    "ret_margin_pct": -3.28,
+    "reason": "STOP",
+    "atm": 25300,
+    "min_leg_volume": 1172605
+  },
+  {
+    "expiry": "2025-07-03",
+    "structure": "ironfly",
+    "credit": 8.1,
+    "pnl": 8.0,
+    "ret_margin_pct": 1.62,
+    "reason": "SETTLE",
+    "atm": 25500,
+    "min_leg_volume": 274440
+  },
+  {
+    "expiry": "2025-07-10",
+    "structure": "ironfly",
+    "credit": 6.8,
+    "pnl": 6.6,
+    "ret_margin_pct": 1.33,
+    "reason": "SETTLE",
+    "atm": 25500,
+    "min_leg_volume": 451458
+  },
+  {
+    "expiry": "2025-07-17",
+    "structure": "ironfly",
+    "credit": 4.3,
+    "pnl": 4.2,
+    "ret_margin_pct": 1.21,
+    "reason": "SETTLE",
+    "atm": 25250,
+    "min_leg_volume": 227609
+  },
+  {
+    "expiry": "2025-07-24",
+    "structure": "ironfly",
+    "credit": 2.7,
+    "pnl": -5.4,
+    "ret_margin_pct": -1.08,
+    "reason": "STOP",
+    "atm": 25250,
+    "min_leg_volume": 232549
+  },
+  {
+    "expiry": "2025-07-31",
+    "structure": "ironfly",
+    "credit": 14.2,
+    "pnl": 14.0,
+    "ret_margin_pct": 2.88,
+    "reason": "SETTLE",
+    "atm": 24700,
+    "min_leg_volume": 768846
+  },
+  {
+    "expiry": "2025-08-07",
+    "structure": "ironfly",
+    "credit": 11.4,
+    "pnl": 11.4,
+    "ret_margin_pct": 2.33,
+    "reason": "SETTLE",
+    "atm": 24500,
+    "min_leg_volume": 616379
+  },
+  {
+    "expiry": "2025-08-14",
+    "structure": "ironfly",
+    "credit": 7.8,
+    "pnl": 7.7,
+    "ret_margin_pct": 1.56,
+    "reason": "SETTLE",
+    "atm": 24650,
+    "min_leg_volume": 200588
+  },
+  {
+    "expiry": "2025-08-21",
+    "structure": "ironfly",
+    "credit": 5.1,
+    "pnl": 5.1,
+    "ret_margin_pct": 1.15,
+    "reason": "SETTLE",
+    "atm": 25100,
+    "min_leg_volume": 291865
+  },
+  {
+    "expiry": "2025-08-28",
+    "structure": "ironfly",
+    "credit": 9.6,
+    "pnl": 9.5,
+    "ret_margin_pct": 1.93,
+    "reason": "SETTLE",
+    "atm": 24650,
+    "min_leg_volume": 353247
+  },
+  {
+    "expiry": "2025-09-02",
+    "structure": "ironfly",
+    "credit": 2.3,
+    "pnl": 2.2,
+    "ret_margin_pct": 0.45,
+    "reason": "SETTLE",
+    "atm": 24650,
+    "min_leg_volume": 490847
+  },
+  {
+    "expiry": "2025-09-09",
+    "structure": "ironfly",
+    "credit": 4.0,
+    "pnl": 3.9,
+    "ret_margin_pct": 0.79,
+    "reason": "SETTLE",
+    "atm": 24850,
+    "min_leg_volume": 328996
+  },
+  {
+    "expiry": "2025-09-16",
+    "structure": "ironfly",
+    "credit": 3.8,
+    "pnl": 3.7,
+    "ret_margin_pct": 0.74,
+    "reason": "SETTLE",
+    "atm": 25100,
+    "min_leg_volume": 367723
+  },
+  {
+    "expiry": "2025-09-23",
+    "structure": "ironfly",
+    "credit": 4.1,
+    "pnl": 4.0,
+    "ret_margin_pct": 0.8,
+    "reason": "SETTLE",
+    "atm": 25250,
+    "min_leg_volume": 344459
+  },
+  {
+    "expiry": "2025-09-30",
+    "structure": "ironfly",
+    "credit": 5.2,
+    "pnl": 5.1,
+    "ret_margin_pct": 1.03,
+    "reason": "SETTLE",
+    "atm": 24700,
+    "min_leg_volume": 705694
+  },
+  {
+    "expiry": "2025-10-07",
+    "structure": "ironfly",
+    "credit": 2.9,
+    "pnl": 2.9,
+    "ret_margin_pct": 0.59,
+    "reason": "SETTLE",
+    "atm": 25100,
+    "min_leg_volume": 533027
+  },
+  {
+    "expiry": "2025-10-14",
+    "structure": "ironfly",
+    "credit": 5.2,
+    "pnl": -10.4,
+    "ret_margin_pct": -2.1,
+    "reason": "STOP",
+    "atm": 25250,
+    "min_leg_volume": 436229
+  },
+  {
+    "expiry": "2025-10-20",
+    "structure": "ironfly",
+    "credit": 6.9,
+    "pnl": 6.9,
+    "ret_margin_pct": 1.41,
+    "reason": "SETTLE",
+    "atm": 25850,
+    "min_leg_volume": 428960
+  },
+  {
+    "expiry": "2025-10-28",
+    "structure": "ironfly",
+    "credit": 5.1,
+    "pnl": -10.1,
+    "ret_margin_pct": -2.05,
+    "reason": "STOP",
+    "atm": 26000,
+    "min_leg_volume": 304790
+  },
+  {
+    "expiry": "2025-11-04",
+    "structure": "ironfly",
+    "credit": 6.6,
+    "pnl": 6.5,
+    "ret_margin_pct": 1.31,
+    "reason": "SETTLE",
+    "atm": 25750,
+    "min_leg_volume": 283330
+  },
+  {
+    "expiry": "2025-11-11",
+    "structure": "ironfly",
+    "credit": 4.9,
+    "pnl": -9.8,
+    "ret_margin_pct": -1.97,
+    "reason": "STOP",
+    "atm": 25650,
+    "min_leg_volume": 251758
+  },
+  {
+    "expiry": "2025-11-18",
+    "structure": "ironfly",
+    "credit": 4.3,
+    "pnl": 4.1,
+    "ret_margin_pct": 0.83,
+    "reason": "SETTLE",
+    "atm": 25950,
+    "min_leg_volume": 341586
+  },
+  {
+    "expiry": "2025-11-25",
+    "structure": "ironfly",
+    "credit": 3.9,
+    "pnl": 3.8,
+    "ret_margin_pct": 0.76,
+    "reason": "SETTLE",
+    "atm": 26000,
+    "min_leg_volume": 324439
+  },
+  {
+    "expiry": "2025-12-02",
+    "structure": "ironfly",
+    "credit": 5.5,
+    "pnl": 5.5,
+    "ret_margin_pct": 1.11,
+    "reason": "SETTLE",
+    "atm": 26150,
+    "min_leg_volume": 249741
+  },
+  {
+    "expiry": "2025-12-09",
+    "structure": "ironfly",
+    "credit": 3.9,
+    "pnl": -7.9,
+    "ret_margin_pct": -1.59,
+    "reason": "STOP",
+    "atm": 25900,
+    "min_leg_volume": 705291
+  },
+  {
+    "expiry": "2025-12-16",
+    "structure": "ironfly",
+    "credit": 5.2,
+    "pnl": 5.2,
+    "ret_margin_pct": 1.06,
+    "reason": "SETTLE",
+    "atm": 25950,
+    "min_leg_volume": 215048
+  },
+  {
+    "expiry": "2025-12-23",
+    "structure": "ironfly",
+    "credit": 2.2,
+    "pnl": 2.1,
+    "ret_margin_pct": 0.42,
+    "reason": "SETTLE",
+    "atm": 26150,
+    "min_leg_volume": 278730
+  },
+  {
+    "expiry": "2025-12-30",
+    "structure": "ironfly",
+    "credit": 2.6,
+    "pnl": 2.5,
+    "ret_margin_pct": 0.51,
+    "reason": "SETTLE",
+    "atm": 25950,
+    "min_leg_volume": 159663
+  },
+  {
+    "expiry": "2026-01-06",
+    "structure": "ironfly",
+    "credit": 3.4,
+    "pnl": 3.4,
+    "ret_margin_pct": 0.68,
+    "reason": "SETTLE",
+    "atm": 26250,
+    "min_leg_volume": 225499
+  },
+  {
+    "expiry": "2026-01-13",
+    "structure": "ironfly",
+    "credit": 6.2,
+    "pnl": -12.3,
+    "ret_margin_pct": -2.5,
+    "reason": "STOP",
+    "atm": 25850,
+    "min_leg_volume": 510264
+  },
+  {
+    "expiry": "2026-01-20",
+    "structure": "ironfly",
+    "credit": 4.4,
+    "pnl": -8.8,
+    "ret_margin_pct": -1.77,
+    "reason": "STOP",
+    "atm": 25550,
+    "min_leg_volume": 486196
+  },
+  {
+    "expiry": "2026-01-27",
+    "structure": "ironfly",
+    "credit": 28.0,
+    "pnl": 27.7,
+    "ret_margin_pct": 5.88,
+    "reason": "SETTLE",
+    "atm": 25100,
+    "min_leg_volume": 1215621
+  },
+  {
+    "expiry": "2026-02-03",
+    "structure": "ironfly",
+    "credit": 160.0,
+    "pnl": 159.1,
+    "ret_margin_pct": 46.78,
+    "reason": "SETTLE",
+    "atm": 25900,
+    "min_leg_volume": 1714958
+  },
+  {
+    "expiry": "2026-02-10",
+    "structure": "ironfly",
+    "credit": 7.6,
+    "pnl": 7.4,
+    "ret_margin_pct": 1.51,
+    "reason": "SETTLE",
+    "atm": 25900,
+    "min_leg_volume": 962718
+  },
+  {
+    "expiry": "2026-02-17",
+    "structure": "ironfly",
+    "credit": 23.3,
+    "pnl": 23.2,
+    "ret_margin_pct": 4.87,
+    "reason": "SETTLE",
+    "atm": 25650,
+    "min_leg_volume": 389357
+  },
+  {
+    "expiry": "2026-02-24",
+    "structure": "ironfly",
+    "credit": 14.1,
+    "pnl": 13.9,
+    "ret_margin_pct": 2.86,
+    "reason": "SETTLE",
+    "atm": 25600,
+    "min_leg_volume": 1021636
+  },
+  {
+    "expiry": "2026-03-02",
+    "structure": "ironfly",
+    "credit": 39.2,
+    "pnl": 38.7,
+    "ret_margin_pct": 8.4,
+    "reason": "SETTLE",
+    "atm": 24900,
+    "min_leg_volume": 1916963
+  },
+  {
+    "expiry": "2026-03-10",
+    "structure": "ironfly",
+    "credit": 38.1,
+    "pnl": 38.0,
+    "ret_margin_pct": 8.23,
+    "reason": "SETTLE",
+    "atm": 24200,
+    "min_leg_volume": 2037269
+  },
+  {
+    "expiry": "2026-03-17",
+    "structure": "ironfly",
+    "credit": 35.5,
+    "pnl": 35.3,
+    "ret_margin_pct": 8.51,
+    "reason": "SETTLE",
+    "atm": 23450,
+    "min_leg_volume": 1357109
+  },
+  {
+    "expiry": "2026-03-24",
+    "structure": "ironfly",
+    "credit": 66.9,
+    "pnl": 66.6,
+    "ret_margin_pct": 17.38,
+    "reason": "SETTLE",
+    "atm": 22800,
+    "min_leg_volume": 2936135
+  },
+  {
+    "expiry": "2026-03-30",
+    "structure": "ironfly",
+    "credit": 48.7,
+    "pnl": -97.3,
+    "ret_margin_pct": -24.25,
+    "reason": "STOP",
+    "atm": 22600,
+    "min_leg_volume": 2449080
+  },
+  {
+    "expiry": "2026-04-07",
+    "structure": "ironfly",
+    "credit": 47.6,
+    "pnl": 26.0,
+    "ret_margin_pct": 6.45,
+    "reason": "SETTLE",
+    "atm": 22850,
+    "min_leg_volume": 807800
+  },
+  {
+    "expiry": "2026-04-13",
+    "structure": "ironfly",
+    "credit": 54.5,
+    "pnl": 54.3,
+    "ret_margin_pct": 13.73,
+    "reason": "SETTLE",
+    "atm": 23700,
+    "min_leg_volume": 815674
+  },
+  {
+    "expiry": "2026-04-21",
+    "structure": "ironfly",
+    "credit": 16.4,
+    "pnl": 16.1,
+    "ret_margin_pct": 3.33,
+    "reason": "SETTLE",
+    "atm": 24350,
+    "min_leg_volume": 424528
+  },
+  {
+    "expiry": "2026-04-28",
+    "structure": "ironfly",
+    "credit": 16.9,
+    "pnl": 16.9,
+    "ret_margin_pct": 3.89,
+    "reason": "SETTLE",
+    "atm": 24050,
+    "min_leg_volume": 357453
+  },
+  {
+    "expiry": "2026-05-05",
+    "structure": "ironfly",
+    "credit": 11.0,
+    "pnl": 11.0,
+    "ret_margin_pct": 2.49,
+    "reason": "SETTLE",
+    "atm": 24050,
+    "min_leg_volume": 435391
+  },
+  {
+    "expiry": "2026-05-12",
+    "structure": "ironfly",
+    "credit": 13.3,
+    "pnl": -26.5,
+    "ret_margin_pct": -6.08,
+    "reason": "STOP",
+    "atm": 23750,
+    "min_leg_volume": 745640
+  },
+  {
+    "expiry": "2026-05-19",
+    "structure": "ironfly",
+    "credit": 16.8,
+    "pnl": 16.7,
+    "ret_margin_pct": 3.87,
+    "reason": "SETTLE",
+    "atm": 23700,
+    "min_leg_volume": 750850
+  }
+]
