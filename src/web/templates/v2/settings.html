@@ -467,7 +467,7 @@ const MODEL_META = {
     universe: 'Pseudo-N100 ADV (PIT)', kind: 'equity',
     title: 'Liquid 100 Momentum',
     rules: { top_n: 1, max_concurrent: 1, lookback: '30 trading days',
-             rebalance: 'MONTHLY (1st trading day) rotate; DAILY SMA200/ATR stop check',
+             rebalance: 'MONTHLY (1st trading day) rotate; NO mid-month; DAILY 3×ATR(14) from-entry stop check',
              stop: '3× ATR from entry (daily)', target: '≤₹3000 entry cap',
              exit: 'Rank-1 rotation OR 3× ATR-from-entry stop' },
     strategy: [
