@@ -970,24 +970,52 @@ document.addEventListener('click', async (e) => {
   try {
     const d = await fetch(`/admin/momrot/models/${model}/invest-preview`, {cache:'no-store'}).then(r=>r.json());
     if (!d.success) { body.innerHTML = `<div class="text-danger">Error: ${d.error}</div>`; return; }
-    _investCtx = {model, buys: d.buys, token: d.token};
-    const rows = (d.buys||[]).map(b => `<tr><td>${b.symbol}</td><td class="text-end">₹${Number(b.ltp).toFixed(2)}</td><td class="text-end">${b.qty}</td><td class="text-end">₹${Number(b.amount).toLocaleString('en-IN')}</td></tr>`).join('');
+    _investCtx = {model, token: d.token};
+    // Suggested qty is the MAX; operator may DECREASE (0..max) before approving.
+    const rows = (d.buys||[]).map((b,i) => `<tr>
+        <td>${b.symbol}</td>
+        <td class="text-end">₹${Number(b.ltp).toFixed(2)}</td>
+        <td class="text-end" style="width:7rem"><input type="number" class="form-control form-control-sm text-end invest-qty" data-symbol="${b.symbol}" data-ltp="${b.ltp}" data-max="${b.qty}" value="${b.qty}" min="0" max="${b.qty}" step="1"></td>
+        <td class="text-end invest-amt" data-i="${i}">₹${Number(b.amount).toLocaleString('en-IN')}</td>
+      </tr>`).join('');
     body.innerHTML = `
       <div class="small text-muted mb-2">Idle ₹${Number(d.idle_cash).toLocaleString('en-IN')} · broker free ₹${Number(d.broker_free).toLocaleString('en-IN')} · deployable <strong>₹${Number(d.deployable).toLocaleString('en-IN')}</strong></div>
-      ${rows ? `<table class="table table-sm"><thead><tr><th>Symbol</th><th class="text-end">LTP</th><th class="text-end">Qty</th><th class="text-end">₹</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="text-muted">Nothing to deploy.</div>'}
+      ${rows ? `<table class="table table-sm align-middle"><thead><tr><th>Symbol</th><th class="text-end">LTP</th><th class="text-end">Qty (max — decrease ok)</th><th class="text-end">₹</th></tr></thead><tbody>${rows}</tbody></table><div class="text-end small">Total: <strong id="investTotal">₹0</strong></div>` : '<div class="text-muted">Nothing to deploy.</div>'}
       ${d.market_open ? '' : '<div class="text-warning small">⚠ Market closed — deploys next session.</div>'}`;
-    approve.disabled = !(d.market_open && (d.buys||[]).length);
+    const recalc = () => {
+      let tot = 0;
+      body.querySelectorAll('.invest-qty').forEach(inp => {
+        let q = Math.max(0, Math.min(parseInt(inp.value||'0',10)||0, parseInt(inp.dataset.max,10)));
+        if (String(q) !== inp.value) inp.value = q;   // clamp in-place
+        const amt = q * Number(inp.dataset.ltp);
+        const cell = inp.closest('tr').querySelector('.invest-amt');
+        if (cell) cell.textContent = '₹' + Number(amt).toLocaleString('en-IN');
+        tot += amt;
+      });
+      const tEl = document.getElementById('investTotal');
+      if (tEl) tEl.textContent = '₹' + Number(tot).toLocaleString('en-IN');
+      approve.disabled = !(d.market_open && tot > 0);
+    };
+    body.querySelectorAll('.invest-qty').forEach(inp => inp.addEventListener('input', recalc));
+    recalc();
   } catch (err) { body.innerHTML = '<div class="text-danger">Load failed.</div>'; }
 });
 const _investApproveBtn = document.getElementById('investApprove');
 if (_investApproveBtn) _investApproveBtn.addEventListener('click', async () => {
   if (!_investCtx) return;
   const approve = document.getElementById('investApprove');
+  // read the (possibly decreased) qty inputs
+  const buys = [];
+  document.querySelectorAll('#investBody .invest-qty').forEach(inp => {
+    const q = Math.max(0, Math.min(parseInt(inp.value||'0',10)||0, parseInt(inp.dataset.max,10)));
+    if (q >= 1) buys.push({symbol: inp.dataset.symbol, qty: q});
+  });
+  if (!buys.length) return;
   approve.disabled = true; approve.textContent = 'Investing…';
   try {
     const d = await fetch(`/admin/momrot/models/${_investCtx.model}/invest-execute`, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({buys: _investCtx.buys, token: _investCtx.token})
+      body: JSON.stringify({buys, token: _investCtx.token})
     }).then(r=>r.json());
     document.getElementById('investBody').innerHTML = d.success
       ? `<div class="text-success">Deployed ₹${Number(d.deployed).toLocaleString('en-IN')}. ${(d.fills||[]).map(f=>f.order_id?`${f.symbol} x${f.qty} ✅`:`${f.symbol} ❌ ${f.error||''}`).join(', ')}</div>`

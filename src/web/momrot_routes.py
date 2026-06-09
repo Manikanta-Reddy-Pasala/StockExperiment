@@ -1058,8 +1058,12 @@ def api_telegram_status():
 
 # ---------------------------------------------------------------------------
 # Per-model "Invest more": suggest deploying a model's idle sleeve cash into
-# its OWN current picks (no selling), then place the live BUY on Approve.
-# Pure sizing/policy lives in src/services/trading/model_invest_service.py.
+# its OWN current picks (no selling). The operator may DECREASE the qty before
+# Approve. Server re-derives the MAX allowed buys and CLAMPS the client request
+# to it (decrease-only, own-picks-only, idle-capped) — it never trusts the
+# client list to add symbols or increase qty. Order placement + ledger writes
+# REUSE the existing primitives (_fyers_place_market, record_buy[_multi]); this
+# module adds NO new buy/sell logic. Sizing lives in model_invest_service.py.
 # ---------------------------------------------------------------------------
 
 def _model_idle_cash(model_name: str) -> float:
@@ -1076,9 +1080,29 @@ def _model_idle_cash(model_name: str) -> float:
         return 0.0
 
 
-def _model_targets(model_name: str, user_id: int = 1):
-    """The model's current picks [{symbol, ltp}] from its ranking file, LTP
-    overlaid live. Empty list if no ranking written yet today."""
+def _model_own_held(model_name: str):
+    """Symbols THIS model holds (its own sleeve) — NOT account-wide. Multi-slot
+    models use model_holdings; single-position uses ledger.open_symbol."""
+    try:
+        from src.services.trading.model_ledger_service import model_max_holdings
+        if model_max_holdings(model_name):
+            from src.services.trading.multi_holding_service import held_symbols
+            return set(held_symbols(model_name) or set())
+        from src.models.database import get_database_manager
+        from src.models.model_ledger_models import ModelLedger
+        db = get_database_manager()
+        with db.get_session() as s:
+            row = s.query(ModelLedger).filter_by(model_name=model_name).first()
+            sym = ((row.open_symbol or "").replace("NSE:", "").replace("-EQ", "")
+                   if row else "")
+            return {sym} if sym else set()
+    except Exception:
+        logger.exception("own-held read fail")
+        return set()
+
+
+def _model_ranking_targets(model_name: str, user_id: int = 1):
+    """Model's current picks [{symbol, ltp}] from its ranking file, live LTP."""
     import json as _json
     import os as _os
     from datetime import datetime as _dt
@@ -1107,101 +1131,153 @@ def _model_targets(model_name: str, user_id: int = 1):
     return out
 
 
+def _derive_invest(model_name: str, user_id: int = 1):
+    """Server-side source of truth: the MAX buys this model may make right now.
+    Single-position models top up their CURRENT holding (or rank-1 if flat);
+    multi-slot models fill only their OWN empty slots. Sized to min(idle, broker)."""
+    from src.services.trading.model_invest_service import compute_buys
+    from src.services.trading.model_ledger_service import model_max_holdings
+    idle = _model_idle_cash(model_name)
+    broker = _fyers_available_cash(user_id)
+    maxh = model_max_holdings(model_name) or 1
+    is_multi = bool(model_max_holdings(model_name))
+    own_held = _model_own_held(model_name)
+    if is_multi:
+        targets = _model_ranking_targets(model_name, user_id)
+        open_syms = own_held
+    else:
+        # single position: top up the symbol actually held (avoids record_buy's
+        # "different symbol" raise); use rank-1 only when the model is flat.
+        held_sym = next(iter(own_held), "")
+        if held_sym:
+            ltp = _fyers_live_ltp(held_sym, user_id)
+            targets = [{"symbol": held_sym, "ltp": float(ltp or 0)}]
+        else:
+            targets = _model_ranking_targets(model_name, user_id)[:1]
+        open_syms = set()
+    buys = compute_buys(idle, broker, maxh, targets, open_syms)
+    return {"idle": idle, "broker": broker,
+            "deployable": min(max(0.0, idle), max(0.0, broker)),
+            "buys": buys, "is_multi": is_multi}
+
+
 def is_market_open_now() -> bool:
     from datetime import datetime as _dt
     from src.services.trading.model_invest_service import is_market_open
-    return is_market_open(_dt.now())
+    try:
+        from zoneinfo import ZoneInfo
+        now = _dt.now(ZoneInfo("Asia/Kolkata"))
+    except Exception:
+        now = _dt.now()
+    return is_market_open(now)
 
 
 def _token_consume(token: str) -> bool:
-    """True if the token is fresh (and mark it used); False if already used.
-    Backed by Dragonfly so it is shared across gunicorn workers. On cache
-    failure, do NOT hard-block the operator (returns True)."""
+    """Atomic single-use token via Redis SET NX. True only for the first caller.
+    On cache outage returns True (fail-open) — the trading lock plus live
+    ledger-cash re-derivation are the PRIMARY double-deploy guards."""
     if not token:
         return False
     try:
         from src.services.utils.cache_service import get_cache_service
-        cs = get_cache_service()
-        key = f"invest:token:{token}"
-        if cs.get(key):
-            return False
-        cs.set(key, "1", expire_seconds=3600)
-        return True
+        return bool(get_cache_service().set_if_absent(
+            f"invest:token:{token}", "1", 3600))
     except Exception:
-        logger.warning("token cache unavailable; allowing invest")
+        logger.warning("token cache unavailable; relying on lock+ledger guard")
         return True
 
 
 @momrot_bp.route("/models/<model_name>/invest-preview", methods=["GET"])
 def api_invest_preview(model_name):
-    """Read-only: suggest deploying the model's idle cash into its own picks."""
+    """Read-only: suggest deploying the model's idle cash into its own picks.
+    The qty shown is the MAXIMUM; the operator may decrease before approving."""
     try:
         from datetime import datetime as _dt
-        from src.services.trading.model_invest_service import (
-            compute_buys, is_market_open, make_token,
-        )
-        from src.services.trading.model_ledger_service import model_max_holdings
+        from src.services.trading.model_invest_service import make_token
         user_id = int(request.args.get("user_id", 1))
-        idle = _model_idle_cash(model_name)
-        broker = _fyers_available_cash(user_id)
-        targets = _model_targets(model_name, user_id)
-        open_syms = {(p.get("symbol") or "").replace("NSE:", "").replace("-EQ", "")
-                     for p in _fyers_holdings(user_id)}
-        maxh = model_max_holdings(model_name) or 1
-        buys = compute_buys(idle, broker, maxh, targets, open_syms)
+        d = _derive_invest(model_name, user_id)
         day = _dt.now().strftime("%Y-%m-%d")
         return jsonify({
             "success": True, "model": model_name,
-            "idle_cash": idle, "broker_free": broker,
-            "deployable": min(max(0.0, idle), max(0.0, broker)),
-            "market_open": is_market_open(_dt.now()),
-            "buys": buys, "token": make_token(model_name, buys, day),
+            "idle_cash": d["idle"], "broker_free": d["broker"],
+            "deployable": d["deployable"], "market_open": is_market_open_now(),
+            "buys": d["buys"], "token": make_token(model_name, d["buys"], day),
         })
-    except Exception as e:
+    except Exception:
         logger.exception("invest-preview fail")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({"success": False, "error": "internal error"}), 500
 
 
 @momrot_bp.route("/models/<model_name>/invest-execute", methods=["POST"])
 def api_invest_execute(model_name):
-    """Place the previewed BUY list for the model. Market-hours + idempotent."""
+    """Place BUYs for the model. Re-derives the MAX allowed server-side and
+    CLAMPS the client request to it (operator may DECREASE qty, never increase
+    or substitute symbols). Market-hours only, idempotent, ledger-recorded.
+    Uses the existing _fyers_place_market + record_buy[_multi] primitives."""
     _lk = None
     try:
+        from datetime import datetime as _dt
         from src.services.trading.trade_lock import trading_lock
+        from src.services.trading.model_invest_service import make_token
         from src.services.trading.model_ledger_service import record_buy
+        from src.services.trading.multi_holding_service import record_buy_multi
         body = request.get_json(silent=True) or {}
-        buys = body.get("buys") or []
-        token = body.get("token") or ""
-        if not buys:
+        req_buys = body.get("buys") or []
+        if not req_buys:
             return jsonify({"success": False, "error": "no buys"}), 400
         if not is_market_open_now():
             return jsonify({"success": False,
                             "error": "market closed — deploys next session"}), 400
-        if not _token_consume(token):
-            return jsonify({"success": False,
-                            "error": "already submitted (duplicate token)"}), 409
         user_id = int(request.args.get("user_id", 1))
+        # serialise against cron rebalance / other order placement FIRST
         _lk = trading_lock()
         if not _lk.__enter__():
             return jsonify({"success": False,
                             "error": "another trade/rebalance in progress — retry shortly"}), 409
+        # re-derive the MAX allowed buys live (own picks, idle+broker capped)
+        d = _derive_invest(model_name, user_id)
+        allowed = {b["symbol"]: b for b in d["buys"]}
+        # clamp client request: decrease-only, own-picks-only
+        final = []
+        for b in req_buys:
+            sym = (b.get("symbol") or "")
+            if sym not in allowed:
+                continue
+            try:
+                want = int(b.get("qty") or 0)
+            except Exception:
+                continue
+            qty = min(want, int(allowed[sym]["qty"]))
+            if qty >= 1:
+                final.append({"symbol": sym, "qty": qty, "ltp": allowed[sym]["ltp"]})
+        if not final:
+            return jsonify({"success": False,
+                            "error": "nothing to deploy (suggestion changed — re-open)"}), 400
+        # idempotency (secondary to lock+ledger): token over the FINAL buys
+        day = _dt.now().strftime("%Y-%m-%d")
+        if not _token_consume(make_token(model_name, final, day)):
+            return jsonify({"success": False, "error": "already submitted — retry shortly"}), 409
         broker = _fyers_available_cash(user_id)
         spent, fills = 0.0, []
-        for b in buys:
+        for b in final:
             sym, qty = b["symbol"], int(b["qty"])
             ltp = _fyers_live_ltp(sym, user_id) or float(b.get("ltp") or 0)
             if qty < 1 or ltp <= 0:
                 continue
-            if spent + qty * ltp > broker * 0.995:   # re-validate vs live broker cash
+            if spent + qty * ltp > broker * 0.995:   # live broker-cash ceiling
                 continue
             res = _fyers_place_market(sym, qty, "BUY", user_id)
             if res.get("ok"):
                 oid = (((res.get("result") or {}).get("data") or {}).get("orderid")
-                       or (res.get("result") or {}).get("orderid") or "")
+                       or (res.get("result") or {}).get("orderid")
+                       or (res.get("result") or {}).get("id") or "")
                 try:
-                    record_buy(model_name, sym, qty, ltp, fyers_order_id=oid)
+                    if d["is_multi"]:
+                        record_buy_multi(model_name, sym, qty, ltp, fyers_order_id=oid)
+                    else:
+                        record_buy(model_name, sym, qty, ltp, fyers_order_id=oid)
                 except Exception as e:
-                    logger.warning(f"record_buy failed {model_name} {sym}: {e}")
+                    logger.warning(f"ledger record failed {model_name} {sym}: {e}")
                 spent += qty * ltp
                 fills.append({"symbol": sym, "qty": qty, "price": ltp, "order_id": oid})
                 _notify_tg(f"✅ *INVEST* `{model_name}` BUY {sym} x{qty} @ ₹{ltp:.2f} (₹{qty*ltp:,.0f})")
@@ -1209,11 +1285,12 @@ def api_invest_execute(model_name):
                 err = (res.get("result") or {}).get("message") or res.get("error") or "unknown"
                 fills.append({"symbol": sym, "qty": qty, "error": err})
                 _notify_tg(f"❌ *INVEST FAIL* `{model_name}` {sym} x{qty} — {err}")
-        return jsonify({"success": True, "model": model_name,
+        ok_all = bool(fills) and all(f.get("order_id") for f in fills)
+        return jsonify({"success": ok_all, "model": model_name,
                         "fills": fills, "deployed": round(spent, 2)})
-    except Exception as e:
+    except Exception:
         logger.exception("invest-execute fail")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({"success": False, "error": "internal error"}), 500
     finally:
         if _lk is not None:
             try:

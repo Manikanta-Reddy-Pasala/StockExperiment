@@ -39,6 +39,17 @@ class CacheService:
         """Check if Dragonfly is available."""
         return self.redis_client is not None
     
+    def set_if_absent(self, key: str, value: str, expire_seconds: int) -> bool:
+        """Atomic SET key value NX EX — True only for the FIRST caller.
+
+        Used for money-endpoint idempotency tokens: two concurrent gunicorn
+        workers cannot both win. Returns False if the key already exists.
+        Raises if the cache is unavailable so callers can decide fail policy.
+        """
+        if not self.is_available():
+            raise RuntimeError("cache unavailable")
+        return bool(self.redis_client.set(key, value, nx=True, ex=expire_seconds))
+
     def set(self, key: str, value: Any, expire_seconds: int = None) -> bool:
         """
         Set a key-value pair in cache.
