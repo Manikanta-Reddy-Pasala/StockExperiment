@@ -1168,7 +1168,10 @@ def is_market_open_now() -> bool:
         from zoneinfo import ZoneInfo
         now = _dt.now(ZoneInfo("Asia/Kolkata"))
     except Exception:
-        now = _dt.now()
+        # tzdata missing — derive IST explicitly from UTC (never trust naive
+        # local time on a UTC container, which would shift the trading window).
+        from datetime import timedelta
+        now = _dt.utcnow() + timedelta(hours=5, minutes=30)
     return is_market_open(now)
 
 

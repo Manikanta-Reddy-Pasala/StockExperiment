@@ -1017,9 +1017,15 @@ if (_investApproveBtn) _investApproveBtn.addEventListener('click', async () => {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({buys, token: _investCtx.token})
     }).then(r=>r.json());
-    document.getElementById('investBody').innerHTML = d.success
-      ? `<div class="text-success">Deployed ₹${Number(d.deployed).toLocaleString('en-IN')}. ${(d.fills||[]).map(f=>f.order_id?`${f.symbol} x${f.qty} ✅`:`${f.symbol} ❌ ${f.error||''}`).join(', ')}</div>`
-      : `<div class="text-danger">${d.error}</div>`;
+    // Render per-leg fills whenever we have them (covers PARTIAL fills where
+    // success=false but a real leg DID place) — never show a blank failure.
+    if (d.fills && d.fills.length) {
+      const legs = d.fills.map(f => f.order_id ? `${f.symbol} x${f.qty} ✅` : `${f.symbol} ❌ ${f.error||''}`).join(', ');
+      const cls = d.success ? 'text-success' : 'text-warning';
+      document.getElementById('investBody').innerHTML = `<div class="${cls}">Deployed ₹${Number(d.deployed||0).toLocaleString('en-IN')}. ${legs}</div>`;
+    } else {
+      document.getElementById('investBody').innerHTML = `<div class="text-danger">${d.error || 'No order placed.'}</div>`;
+    }
   } catch (e) { document.getElementById('investBody').innerHTML = '<div class="text-danger">Execute failed.</div>'; }
   approve.textContent = 'Approve & Invest';
   setTimeout(()=>location.reload(), 1800);
