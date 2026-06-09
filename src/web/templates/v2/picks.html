@@ -413,58 +413,6 @@ function renderCard(m, idx, ranking, status) {
   `;
 }
 
-// PAPER / OBSERVE model card — 0DTE iron-fly. Not in MODELS (no equity-signal
-// endpoint); fetched from /api/paper/dte. Read-only, no real orders.
-async function loadPaperPick(container) {
-  let wrap = document.getElementById('paper_dte_wrap');
-  if (!wrap) {
-    wrap = document.createElement('div');
-    wrap.id = 'paper_dte_wrap';
-    container.appendChild(wrap);
-  }
-  try {
-    const d = await fetch('/api/paper/dte', {cache:'no-store'}).then(r=>r.json());
-    if (!d.success || !d.models) { wrap.innerHTML = '<div class="text-muted small mb-3">Paper models unavailable.</div>'; return; }
-    wrap.innerHTML = d.models.map(m => {
-      const p = m.paper, b = m.backtest, t = p.open || p.last;
-      const wr = p.win_rate_pct == null ? '—' : p.win_rate_pct + '%';
-      const qty = m.qty;
-      const sig = p.open
-        ? `<span class="text-info">OPEN today</span> · invested ₹${Number(p.open_margin_inr||0).toLocaleString('en-IN')} (2 lots) · credit ${p.open.credit} · settles 15:25`
-        : (p.last ? `last ${p.last.trade_date}: invested ₹${Number(Math.round((p.last.margin||0)*qty)).toLocaleString('en-IN')} → return ₹${Number(p.last_pnl_inr||0).toLocaleString('en-IN')} (${(p.last.ret_margin_pct>=0?'+':'')+p.last.ret_margin_pct}%)` : 'no trade yet — fires on its expiry');
-      let legsHtml = '';
-      if (t && t.legs && t.legs.length) {
-        legsHtml = `<div class="mt-2" style="font-size:.72rem;"><div class="text-muted">Spot ${t.spot} · legs:</div>` +
-          t.legs.map(l => `<div>${l.action} <strong>${l.strike}</strong> (${l.pct>=0?'+':''}${l.pct}%) · ₹${l.price} · vol ${Number(l.volume).toLocaleString('en-IN')} ${l.filled?'✅':'⚠️ thin'}</div>`).join('') + `</div>`;
-      }
-      const btTxt = b.cagr_pct != null ? `${b.cagr_pct}% CAGR · ${b.win_rate_pct}% WR`
-                                       : `+${b.avg_trade_pct}%/trade · ${b.win_rate_pct}% WR (${b.trades} tr)`;
-      return `
-      <div class="card mb-3" style="border-left:4px solid #6f42c1;">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <div><strong>${m.title}</strong>
-            <span class="badge" style="background:#6f42c1;">PAPER</span>
-            <span class="badge bg-info text-dark" title="Signals only, no real orders">OBSERVE</span></div>
-          <span class="text-muted small">expiry-day only</span>
-        </div>
-        <div class="card-body small">
-          <div>${sig}</div>${legsHtml}
-          <div class="mt-2" style="background:#f3eefc;border-radius:6px;padding:4px 8px;">
-            2 lots (${m.qty} qty/leg) → <strong>Total P&L ₹${Number(p.total_pnl_inr||0).toLocaleString('en-IN')}</strong>
-            ${p.n_closed?` over ${p.n_closed} paper trades`:' (no closed trades yet)'}
-            ${p.open?` · open margin ₹${Number(p.open_margin_inr||0).toLocaleString('en-IN')}`:''}
-          </div>
-          <div class="text-muted mt-1">${m.config}</div>
-          <div class="text-muted mt-1" style="font-size:.72rem;">
-            Paper: ${p.n_closed} trades · ${wr} WR · ret/margin ${(p.total_ret_margin_pct>=0?'+':'')+p.total_ret_margin_pct}% &nbsp;|&nbsp;
-            Backtest (in-sample): ${btTxt} · loss capped ${b.worst_capped_pct}%
-          </div>
-        </div>
-      </div>`;
-    }).join('');
-  } catch(e) { wrap.innerHTML = '<div class="text-muted small mb-3">Paper models load failed.</div>'; }
-}
-
 async function load() {
   const container = document.getElementById('picks_container');
 
@@ -477,7 +425,6 @@ async function load() {
   if (!hasSlots) {
     container.innerHTML = MODELS.map(m => renderLoadingCard(m)).join('');
   }
-  loadPaperPick(container);   // observe-mode paper card (appended, persists)
 
   // 2) Holidays drive nextRebalance() inside renderCard. Load once (cheap,
   //    fail-safe) and reuse across all card renders. Kick off in parallel with

@@ -553,58 +553,15 @@ const MODEL_META = {
       ['Recent 2023-05→2026-05 (+stop +½@30%)', '+164% CAGR / 22% DD / Calmar 7.34 — profit-take lifts recent Calmar (1yr 1.99→3.53); small full-cycle trade-off (caps the 2023 +358% year). UNLEVERED, no borrow.'],
     ],
   },
-  'nifty50_weekly_0dte': {
-    paper: true,
-    universe: 'NIFTY 50 weekly options', kind: 'options · PAPER',
-    title: 'NIFTY 50 Weekly 0DTE Iron-Fly',
-    rules: { top_n: '—', max_concurrent: 1, lookback: 'expiry day only',
-             rebalance: 'each weekly expiry (Tue)',
-             stop: '2× credit (intraday)', target: 'theta decay to close',
-             exit: '2×-credit stop / expiry settlement' },
-    strategy: [
-      ['Type', 'Defined-risk 0DTE premium selling (iron-fly) — PAPER, no real capital'],
-      ['Days', 'NIFTY 50 weekly expiry day only (Tuesday, post Sep-2025)'],
-      ['Entry (9:15 open)', 'ATM via put-call parity; sell 1.2%-OTM CE + PE; buy wings 2% beyond each'],
-      ['Credit / risk', 'Net credit = max profit; MAX LOSS = wing width − credit (fixed at entry, gap-proof)'],
-      ['Exit', 'Hold to close if inside shorts · 2×-credit hard stop intraday · expiry settlement'],
-      ['Backtest 2025-03→now (daily-OHLC proxy, in-sample)', '+157% CAGR / 76.6% WR / 24.2% DD / worst −24.2% (capped)'],
-      ['Status', 'PAPER signals only — validating live vs backtest; recorder building real intraday for walk-forward'],
-    ],
-  },
-  'banknifty_monthly_0dte': {
-    paper: true,
-    universe: 'Bank Nifty monthly options', kind: 'options · PAPER',
-    title: 'Bank Nifty Monthly 0DTE Iron-Fly',
-    rules: { top_n: '—', max_concurrent: 1, lookback: 'expiry day only',
-             rebalance: 'monthly expiry (last Tue)',
-             stop: '2× credit (intraday)', target: 'theta decay to close',
-             exit: '2×-credit stop / expiry settlement' },
-    strategy: [
-      ['Type', 'Defined-risk 0DTE premium selling (iron-fly) — PAPER, no real capital'],
-      ['Days', 'Bank Nifty MONTHLY expiry only (last Tue; weeklies discontinued Nov-2024)'],
-      ['Entry (9:15 open)', 'ATM via put-call parity; sell 1.2%-OTM CE + PE; buy wings 2% beyond each'],
-      ['Credit / risk', 'Net credit = max profit; MAX LOSS = wing width − credit (fixed at entry, gap-proof)'],
-      ['Exit', 'Hold to close if inside shorts · 2×-credit hard stop intraday · expiry settlement'],
-      ['Backtest 2025-03→now (daily-OHLC proxy, in-sample)', '+3.1%/trade · 85.7% WR · 4.2% DD · worst −4.2% (capped) · 14 trades'],
-      ['Caveat', 'Only ~12 trades/yr (monthly only); thin sample; BankNifty options less liquid than NIFTY — diversifier, not standalone'],
-    ],
-  },
 };
-
-// PAPER models — surfaced in settings/data-status sections but NOT in the live
-// capital totals (no real money). Synthetic rows; enabled flag = always shown.
-const PAPER_MODELS = [
-  { model_name: 'nifty50_weekly_0dte', enabled: true, paper: true },
-  { model_name: 'banknifty_monthly_0dte', enabled: true, paper: true },
-];
 
 async function loadAllocations() {
   try {
     const r = await fetch('/admin/models/portfolio', {cache: 'no-store'});
     const d = await r.json();
     if (!d.success) return;
-    renderRotationRules([...(d.models || []), ...PAPER_MODELS]);
-    renderStrategyInfo([...(d.models || []), ...PAPER_MODELS]);
+    renderRotationRules(d.models || []);
+    renderStrategyInfo(d.models || []);
     const tbody = document.getElementById('alloc_tbody');
     tbody.innerHTML = '';
     (d.models||[]).forEach(m => {
@@ -679,41 +636,7 @@ async function loadAllocations() {
       `;
       tbody.appendChild(tr);
     });
-    await appendPaperAllocRows(tbody);
   } catch(e) { console.error('alloc load failed', e); }
-}
-
-// PAPER models: read-only rows (no real capital, no deposit/withdraw/seed).
-async function appendPaperAllocRows(tbody) {
-  let resp = null;
-  try { resp = await fetch('/api/paper/dte', {cache:'no-store'}).then(r=>r.json()); } catch(e){}
-  const apiModels = (resp && resp.success && resp.models) ? resp.models : [];
-  PAPER_MODELS.forEach(pm => {
-    const meta = MODEL_META[pm.model_name] || {};
-    const mm = apiModels.find(x => x.model === pm.model_name);
-    const p = mm ? mm.paper : null;
-    const openTxt = p && p.open ? `OPEN ${p.open.trade_date} · credit ${p.open.credit}`
-                    : (p && p.last ? `last ${p.last.reason} ${fmtPct(p.last.ret_margin_pct)}` : 'flat');
-    const wr = (p && p.win_rate_pct != null) ? p.win_rate_pct + '%' : '—';
-    const tr = document.createElement('tr');
-    tr.style.background = '#f7f3fc';
-    tr.innerHTML = `
-      <td class="col-model">
-        <strong>${meta.title || pm.model_name}</strong>
-        <span class="badge" style="background:#6f42c1;">PAPER</span>
-        <span class="badge bg-info text-dark" title="Signals only, no real orders">OBSERVE</span>
-        <span class="universe-tag">${meta.universe} · ${meta.kind}</span>
-        <div class="text-muted" style="font-size:.65rem;font-family:monospace;">${pm.model_name}</div>
-      </td>
-      <td class="text-end num text-muted">— <div class="small">no capital</div></td>
-      <td class="text-end num text-muted">—</td>
-      <td class="col-position">${openTxt}</td>
-      <td class="text-end num text-muted">paper</td>
-      <td class="text-end num text-muted">${p ? p.n_closed + ' trades · ' + wr + ' WR' : '—'}</td>
-      <td class="text-center"><span class="small text-info">Observe</span></td>
-      <td class="text-end col-actions"><a href="/picks" class="btn btn-sm btn-outline-secondary" title="Paper signals">view</a></td>`;
-    tbody.appendChild(tr);
-  });
 }
 
 function openCap(model, action) {
