@@ -447,7 +447,7 @@ const MODEL_META = {
     universe: 'Nifty 100 (PIT)', kind: 'equity',
     title: 'Nifty 100 Momentum',
     rules: { top_n: 3, max_concurrent: 1, lookback: '15 trading days',
-             rebalance: '1st trading day/mo + day-15 (5pp lead)',
+             rebalance: 'MONTHLY (1st trading day) rotate + MID-MONTH (day-15, ≥5pp lead); DAILY −12% stop check',
              stop: '−12% from entry (daily)', target: 'None',
              exit: 'Top-3 rotation OR −12% from-entry stop' },
     strategy: [
@@ -467,7 +467,7 @@ const MODEL_META = {
     universe: 'Pseudo-N100 ADV (PIT)', kind: 'equity',
     title: 'Liquid 100 Momentum',
     rules: { top_n: 1, max_concurrent: 1, lookback: '30 trading days',
-             rebalance: '1st trading day/mo (no mid-month)',
+             rebalance: 'MONTHLY (1st trading day) rotate; DAILY SMA200/ATR stop check',
              stop: '3× ATR from entry (daily)', target: '≤₹3000 entry cap',
              exit: 'Rank-1 rotation OR 3× ATR-from-entry stop' },
     strategy: [
@@ -488,7 +488,7 @@ const MODEL_META = {
     universe: 'Midcap 40d-high breakout (PIT)', kind: 'equity',
     title: 'Midcap Breakout',
     rules: { top_n: 1, max_concurrent: 1, lookback: '40d high',
-             rebalance: 'Event-driven (daily scan)', stop: '-20%', target: '+100%',
+             rebalance: 'EVENT: DAILY breakout scan to enter (40d-high + 2× vol); DAILY exit checks', stop: '-20%', target: '+100%',
              exit: 'STOP -20% / TRAIL / +100% / 120d max-hold' },
     strategy: [
       ['Ranker', '40-day high + vol surge (≥2×) + above 200d SMA'],
@@ -502,7 +502,7 @@ const MODEL_META = {
     universe: 'Top-40 ADV ∩ N100 (PIT)', kind: 'equity',
     title: 'Weekly Top-40',
     rules: { top_n: 1, max_concurrent: 1, lookback: '30d',
-             rebalance: 'Weekly (1st trading day of ISO week)', stop: '−12% from entry (daily)', target: 'None',
+             rebalance: 'WEEKLY (1st trading day of ISO week) rotate rank-1; DAILY −12% stop check', stop: '−12% from entry (daily)', target: 'None',
              exit: 'Weekly rotation OR −12% from-entry stop' },
     strategy: [
       ['Ranker', '30d return descending'],
@@ -519,7 +519,7 @@ const MODEL_META = {
     universe: 'Top-120 ADV N500 • retest (PIT)', kind: 'equity',
     title: 'Retest Momentum',
     rules: { top_n: 4, max_concurrent: 4, lookback: '30d',
-             rebalance: 'Monthly + daily retest entry', stop: 'None', target: 'None',
+             rebalance: 'MONTHLY (1st trading day) pick top-4 + exit laggards (out of top-4); DAILY retest-entry (buy a target into a free slot when it retests its 20-EMA)', stop: 'None', target: 'None',
              exit: 'Drops out of top-4 rank' },
     strategy: [
       ['Ranker', '30d return; filters: >200d SMA, ≤₹3000, 30d ret>10%, 10d ret>0'],
@@ -536,7 +536,7 @@ const MODEL_META = {
     universe: 'Top-100 ADV mid/small (N500−N100) • VOL-ADJ momentum', kind: 'equity',
     title: 'Emerging Momentum',
     rules: { top_n: 1, max_concurrent: 1, lookback: '30d (÷60d vol)',
-             rebalance: 'Monthly + mid-month', stop: '2.5× ATR from entry (daily)',
+             rebalance: 'MONTHLY (1st trading day) + MID-MONTH (day-15) rotate; DAILY 2.5×ATR stop + ½ profit-take @+30%', stop: '2.5× ATR from entry (daily)',
              target: 'Book ½ at +30%',
              exit: 'Rank-1 rotation OR ATR stop (runner)' },
     strategy: [
@@ -971,6 +971,17 @@ function renderStrategyInfo(models) {
         : '<span class="badge bg-secondary ms-1">DISABLED</span>');
     const rows = (meta.strategy || []).map(([k, v]) =>
       `<li><strong>${k}:</strong> ${v}</li>`).join('');
+    // Rebalance cadence banner — what the model does and how often.
+    const reb = (meta.rules || {}).reb_full || (meta.rules || {}).rebalance || '—';
+    const rl = reb.toLowerCase();
+    let cad = 'MONTHLY', col = '#0d6efd';
+    if (rl.includes('expiry')) { cad = 'EXPIRY-DAY'; col = '#6f42c1'; }
+    else if (rl.includes('event')) { cad = 'EVENT (daily scan)'; col = '#fd7e14'; }
+    else if (rl.includes('weekly')) { cad = 'WEEKLY'; col = '#198754'; }
+    else if (rl.includes('mid-month') || rl.includes('day-15')) { cad = 'MONTHLY + MID-MONTH'; col = '#0d6efd'; }
+    else if (rl.includes('daily') && !rl.includes('monthly')) { cad = 'DAILY'; col = '#dc3545'; }
+    else if (rl.includes('daily')) { cad = 'MONTHLY + DAILY'; col = '#0d6efd'; }
+    const stop = (meta.rules || {}).stop, tgt = (meta.rules || {}).target;
     return `<div class="col-lg-6"${disabledCls}>
       <div class="card h-100">
         <div class="card-header small">
@@ -978,6 +989,11 @@ function renderStrategyInfo(models) {
           <span class="text-muted ms-2">${meta.kind}</span>
         </div>
         <div class="card-body small">
+          <div class="mb-2 p-2" style="background:#f8f9fa;border-left:3px solid ${col};border-radius:4px;">
+            <span class="badge" style="background:${col};"><i class="bi bi-arrow-repeat"></i> ${cad}</span>
+            <div class="mt-1"><strong>Rebalance:</strong> ${reb}</div>
+            ${(stop||tgt)?`<div class="text-muted" style="font-size:.72rem;">Stop: ${stop||'None'} · Target: ${tgt||'None'}</div>`:''}
+          </div>
           <ul class="mb-0">${rows}</ul>
         </div>
       </div>
