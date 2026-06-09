@@ -1054,3 +1054,169 @@ def api_telegram_status():
         "configured": bool(os.environ.get("TG_BOT_TOKEN") and os.environ.get("TG_CHAT_ID")),
         "chat_id": os.environ.get("TG_CHAT_ID", ""),
     })
+
+
+# ---------------------------------------------------------------------------
+# Per-model "Invest more": suggest deploying a model's idle sleeve cash into
+# its OWN current picks (no selling), then place the live BUY on Approve.
+# Pure sizing/policy lives in src/services/trading/model_invest_service.py.
+# ---------------------------------------------------------------------------
+
+def _model_idle_cash(model_name: str) -> float:
+    """The model's uninvested sleeve cash (ModelLedger.cash)."""
+    try:
+        from src.models.database import get_database_manager
+        from src.models.model_ledger_models import ModelLedger
+        db = get_database_manager()
+        with db.get_session() as s:
+            row = s.query(ModelLedger).filter_by(model_name=model_name).first()
+            return float(row.cash or 0) if row else 0.0
+    except Exception:
+        logger.exception("idle-cash read fail")
+        return 0.0
+
+
+def _model_targets(model_name: str, user_id: int = 1):
+    """The model's current picks [{symbol, ltp}] from its ranking file, LTP
+    overlaid live. Empty list if no ranking written yet today."""
+    import json as _json
+    import os as _os
+    from datetime import datetime as _dt
+    try:
+        from src.web.admin_routes import MODEL_PATHS
+    except Exception:
+        return []
+    paths = MODEL_PATHS.get(model_name) or {}
+    rdir = paths.get("ranking_dir")
+    if not rdir:
+        return []
+    f = _os.path.join(rdir, _dt.now().strftime("%Y-%m-%d") + ".json")
+    if not _os.path.exists(f):
+        return []
+    try:
+        top = (_json.load(open(f)).get("top_n") or [])
+    except Exception:
+        return []
+    out = []
+    for r in top:
+        sym = (r.get("symbol") or "").replace("NSE:", "").replace("-EQ", "")
+        if not sym:
+            continue
+        ltp = _fyers_live_ltp(sym, user_id) or float(r.get("price") or 0)
+        out.append({"symbol": sym, "ltp": float(ltp)})
+    return out
+
+
+def is_market_open_now() -> bool:
+    from datetime import datetime as _dt
+    from src.services.trading.model_invest_service import is_market_open
+    return is_market_open(_dt.now())
+
+
+def _token_consume(token: str) -> bool:
+    """True if the token is fresh (and mark it used); False if already used.
+    Backed by Dragonfly so it is shared across gunicorn workers. On cache
+    failure, do NOT hard-block the operator (returns True)."""
+    if not token:
+        return False
+    try:
+        from src.services.utils.cache_service import get_cache_service
+        cs = get_cache_service()
+        key = f"invest:token:{token}"
+        if cs.get(key):
+            return False
+        cs.set(key, "1", expire_seconds=3600)
+        return True
+    except Exception:
+        logger.warning("token cache unavailable; allowing invest")
+        return True
+
+
+@momrot_bp.route("/models/<model_name>/invest-preview", methods=["GET"])
+def api_invest_preview(model_name):
+    """Read-only: suggest deploying the model's idle cash into its own picks."""
+    try:
+        from datetime import datetime as _dt
+        from src.services.trading.model_invest_service import (
+            compute_buys, is_market_open, make_token,
+        )
+        from src.services.trading.model_ledger_service import model_max_holdings
+        user_id = int(request.args.get("user_id", 1))
+        idle = _model_idle_cash(model_name)
+        broker = _fyers_available_cash(user_id)
+        targets = _model_targets(model_name, user_id)
+        open_syms = {(p.get("symbol") or "").replace("NSE:", "").replace("-EQ", "")
+                     for p in _fyers_holdings(user_id)}
+        maxh = model_max_holdings(model_name) or 1
+        buys = compute_buys(idle, broker, maxh, targets, open_syms)
+        day = _dt.now().strftime("%Y-%m-%d")
+        return jsonify({
+            "success": True, "model": model_name,
+            "idle_cash": idle, "broker_free": broker,
+            "deployable": min(max(0.0, idle), max(0.0, broker)),
+            "market_open": is_market_open(_dt.now()),
+            "buys": buys, "token": make_token(model_name, buys, day),
+        })
+    except Exception as e:
+        logger.exception("invest-preview fail")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@momrot_bp.route("/models/<model_name>/invest-execute", methods=["POST"])
+def api_invest_execute(model_name):
+    """Place the previewed BUY list for the model. Market-hours + idempotent."""
+    _lk = None
+    try:
+        from src.services.trading.trade_lock import trading_lock
+        from src.services.trading.model_ledger_service import record_buy
+        body = request.get_json(silent=True) or {}
+        buys = body.get("buys") or []
+        token = body.get("token") or ""
+        if not buys:
+            return jsonify({"success": False, "error": "no buys"}), 400
+        if not is_market_open_now():
+            return jsonify({"success": False,
+                            "error": "market closed — deploys next session"}), 400
+        if not _token_consume(token):
+            return jsonify({"success": False,
+                            "error": "already submitted (duplicate token)"}), 409
+        user_id = int(request.args.get("user_id", 1))
+        _lk = trading_lock()
+        if not _lk.__enter__():
+            return jsonify({"success": False,
+                            "error": "another trade/rebalance in progress — retry shortly"}), 409
+        broker = _fyers_available_cash(user_id)
+        spent, fills = 0.0, []
+        for b in buys:
+            sym, qty = b["symbol"], int(b["qty"])
+            ltp = _fyers_live_ltp(sym, user_id) or float(b.get("ltp") or 0)
+            if qty < 1 or ltp <= 0:
+                continue
+            if spent + qty * ltp > broker * 0.995:   # re-validate vs live broker cash
+                continue
+            res = _fyers_place_market(sym, qty, "BUY", user_id)
+            if res.get("ok"):
+                oid = (((res.get("result") or {}).get("data") or {}).get("orderid")
+                       or (res.get("result") or {}).get("orderid") or "")
+                try:
+                    record_buy(model_name, sym, qty, ltp, fyers_order_id=oid)
+                except Exception as e:
+                    logger.warning(f"record_buy failed {model_name} {sym}: {e}")
+                spent += qty * ltp
+                fills.append({"symbol": sym, "qty": qty, "price": ltp, "order_id": oid})
+                _notify_tg(f"✅ *INVEST* `{model_name}` BUY {sym} x{qty} @ ₹{ltp:.2f} (₹{qty*ltp:,.0f})")
+            else:
+                err = (res.get("result") or {}).get("message") or res.get("error") or "unknown"
+                fills.append({"symbol": sym, "qty": qty, "error": err})
+                _notify_tg(f"❌ *INVEST FAIL* `{model_name}` {sym} x{qty} — {err}")
+        return jsonify({"success": True, "model": model_name,
+                        "fills": fills, "deployed": round(spent, 2)})
+    except Exception as e:
+        logger.exception("invest-execute fail")
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if _lk is not None:
+            try:
+                _lk.__exit__(None, None, None)
+            except Exception:
+                pass
