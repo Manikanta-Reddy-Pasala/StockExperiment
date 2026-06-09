@@ -273,6 +273,17 @@
     </div>
   </div>
 </div>
+<!-- Invest More modal -->
+<div class="modal fade" id="investModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title" id="investTitle">Invest more</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body" id="investBody">Loading…</div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+    <button class="btn btn-success" id="investApprove" disabled>Approve &amp; Invest</button>
+  </div>
+</div></div></div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -376,6 +387,12 @@ async function loadAggregate() {
       const exitBtn =
         `<button class="btn btn-sm btn-outline-danger" onclick="exitModel('${m.model_name}')">
              <i class="bi bi-box-arrow-right"></i> Exit</button>`;
+      // Invest more: only when the model has idle sleeve cash AND is wired
+      // (needs a ranking to know what to buy). Opens the suggest/approve modal.
+      const investBtn = (wired && Number(m.cash || 0) > 0)
+        ? `<button class="btn btn-sm btn-outline-success invest-more-btn" data-model="${m.model_name}">
+             <i class="bi bi-plus-circle"></i> Invest more</button>`
+        : '';
       const posCost = (m.holdings && m.holdings.length)
         ? m.holdings.reduce((a,h) => a + Number(h.qty||0) * Number(h.entry_px||0), 0)
         : (Number(m.open_qty||0) * Number(m.open_entry_px||0)) || 0;
@@ -392,7 +409,7 @@ async function loadAggregate() {
         <td class="text-end ${cls(m.total_pnl_trades ?? m.pnl_total)}" data-label="Total P&L">${fmtINR(m.total_pnl_trades ?? m.pnl_total)}</td>
         <td class="text-end neg" data-label="Approx Txn Chg" title="Buy ${fmtINR(m.buy_txn_charges)} + Sell ${fmtINR(m.sell_txn_charges)}"><strong>${fmtINR(m.total_txn_charges)}</strong></td>
         <td class="text-end" data-label="Trades">${m.total_trades} (${m.wins}W/${m.losses}L)</td>
-        <td class="text-center actions-cell" data-label="Actions"><div class="d-flex flex-column flex-md-row gap-1 justify-content-center align-items-stretch">${rebalBtn}${exitBtn}</div></td>
+        <td class="text-center actions-cell" data-label="Actions"><div class="d-flex flex-column flex-md-row gap-1 justify-content-center align-items-stretch">${rebalBtn}${investBtn}${exitBtn}</div></td>
       `;
       tbody.appendChild(tr);
     });
@@ -938,5 +955,46 @@ async function sellNow(symbol, qty) {
 
 loadState();
 setInterval(loadState, 30000);
+
+// ---- Invest More: suggest (preview) -> approve (execute) ----
+let _investCtx = null;
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.invest-more-btn');
+  if (!btn) return;
+  const model = btn.dataset.model;
+  const body = document.getElementById('investBody');
+  const approve = document.getElementById('investApprove');
+  document.getElementById('investTitle').textContent = 'Invest more — ' + (typeof modelLabel === 'function' ? modelLabel(model) : model);
+  body.innerHTML = 'Loading suggestion…'; approve.disabled = true;
+  new bootstrap.Modal(document.getElementById('investModal')).show();
+  try {
+    const d = await fetch(`/admin/momrot/models/${model}/invest-preview`, {cache:'no-store'}).then(r=>r.json());
+    if (!d.success) { body.innerHTML = `<div class="text-danger">Error: ${d.error}</div>`; return; }
+    _investCtx = {model, buys: d.buys, token: d.token};
+    const rows = (d.buys||[]).map(b => `<tr><td>${b.symbol}</td><td class="text-end">₹${Number(b.ltp).toFixed(2)}</td><td class="text-end">${b.qty}</td><td class="text-end">₹${Number(b.amount).toLocaleString('en-IN')}</td></tr>`).join('');
+    body.innerHTML = `
+      <div class="small text-muted mb-2">Idle ₹${Number(d.idle_cash).toLocaleString('en-IN')} · broker free ₹${Number(d.broker_free).toLocaleString('en-IN')} · deployable <strong>₹${Number(d.deployable).toLocaleString('en-IN')}</strong></div>
+      ${rows ? `<table class="table table-sm"><thead><tr><th>Symbol</th><th class="text-end">LTP</th><th class="text-end">Qty</th><th class="text-end">₹</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="text-muted">Nothing to deploy.</div>'}
+      ${d.market_open ? '' : '<div class="text-warning small">⚠ Market closed — deploys next session.</div>'}`;
+    approve.disabled = !(d.market_open && (d.buys||[]).length);
+  } catch (err) { body.innerHTML = '<div class="text-danger">Load failed.</div>'; }
+});
+const _investApproveBtn = document.getElementById('investApprove');
+if (_investApproveBtn) _investApproveBtn.addEventListener('click', async () => {
+  if (!_investCtx) return;
+  const approve = document.getElementById('investApprove');
+  approve.disabled = true; approve.textContent = 'Investing…';
+  try {
+    const d = await fetch(`/admin/momrot/models/${_investCtx.model}/invest-execute`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({buys: _investCtx.buys, token: _investCtx.token})
+    }).then(r=>r.json());
+    document.getElementById('investBody').innerHTML = d.success
+      ? `<div class="text-success">Deployed ₹${Number(d.deployed).toLocaleString('en-IN')}. ${(d.fills||[]).map(f=>f.order_id?`${f.symbol} x${f.qty} ✅`:`${f.symbol} ❌ ${f.error||''}`).join(', ')}</div>`
+      : `<div class="text-danger">${d.error}</div>`;
+  } catch (e) { document.getElementById('investBody').innerHTML = '<div class="text-danger">Execute failed.</div>'; }
+  approve.textContent = 'Approve & Invest';
+  setTimeout(()=>location.reload(), 1800);
+});
 </script>
 {% endblock %}
