@@ -1087,7 +1087,10 @@ def _model_own_held(model_name: str):
         from src.services.trading.model_ledger_service import model_max_holdings
         if model_max_holdings(model_name):
             from src.services.trading.multi_holding_service import held_symbols
-            return set(held_symbols(model_name) or set())
+            # normalize to BARE symbols so they match ranking targets and feed
+            # _fyers_live_ltp / _fyers_place_market (which re-prefix NSE:..-EQ).
+            return {(s or "").replace("NSE:", "").replace("-EQ", "")
+                    for s in (held_symbols(model_name) or set()) if s}
         from src.models.database import get_database_manager
         from src.models.model_ledger_models import ModelLedger
         db = get_database_manager()
