@@ -81,7 +81,15 @@ ATR_WIN = 14
 # 30% is mid-plateau (15-35% all help; >35% the trigger rarely fires -> fades).
 # Set PROFIT_TAKE_PCT=0 to disable. Checked DAILY on the close (live mirrors via
 # the --stop-check path so backtest/live can't drift).
-PROFIT_TAKE_PCT = 0.30
+#
+# 2026-06-10 — DISABLED (set to 0) by request, to "let winners run" for max CAGR.
+# Full-window evidence (2021-03->2026-06): PT 0 vs 0.30 = CAGR 109->116 at the SAME
+# DD (38) -> Calmar 2.88->3.05, because 2022/2023 mega-trends run further
+# (2023 +269%->+358%). TRADE-OFF (recorded, eyes-open): in the recent chop regime
+# the half-bank HELPED, so disabling HURTS there -> 2025 CAGR 62->51, DD 18->25,
+# Calmar 3.48->2.08. i.e. this optimises the long bull pattern at the cost of the
+# current regime. Revert to 0.30 if the recent-regime drawdown proves worse live.
+PROFIT_TAKE_PCT = 0.0
 
 
 def atr_latest(high: pd.Series, low: pd.Series, close: pd.Series,
