@@ -12,7 +12,7 @@ import json as _json
 from datetime import datetime, time as _time
 from typing import Dict, List, Set
 
-CASH_BUFFER = 0.995  # 0.5% headroom for brokerage/STT/GST
+CASH_BUFFER = 0.997  # 0.3% headroom for brokerage/STT/GST (delivery CNC ~0.1-0.15%)
 
 try:
     from tools.shared.nse_calendar import is_trading_day

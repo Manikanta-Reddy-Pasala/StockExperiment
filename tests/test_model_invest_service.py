@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from src.services.trading.model_invest_service import (
-    compute_buys, is_market_open, make_token,
+    compute_buys, is_market_open, make_token, CASH_BUFFER,
 )
 
 
@@ -11,7 +11,7 @@ def test_single_position_topup_uses_min_of_idle_and_broker():
                         targets=[{"symbol": "ABC", "ltp": 800.0}], open_symbols=set())
     assert len(buys) == 1
     assert buys[0]["symbol"] == "ABC"
-    assert buys[0]["qty"] == int((40000 * 0.995) // 800)   # 49
+    assert buys[0]["qty"] == int((40000 * CASH_BUFFER) // 800)
     assert buys[0]["amount"] == buys[0]["qty"] * 800.0
 
 
@@ -22,7 +22,7 @@ def test_retest_fills_only_empty_slots():
                         open_symbols={"A", "B"})
     syms = {b["symbol"] for b in buys}
     assert syms == {"C", "D"}
-    assert sum(b["amount"] for b in buys) <= 100000 * 0.995 + 0.01
+    assert sum(b["amount"] for b in buys) <= 100000 * CASH_BUFFER + 0.01
 
 
 def test_zero_when_no_deployable():

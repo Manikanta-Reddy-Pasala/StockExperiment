@@ -1292,7 +1292,7 @@ def api_invest_execute(model_name):
             ltp = _fyers_live_ltp(sym, user_id) or float(b.get("ltp") or 0)
             if qty < 1 or ltp <= 0:
                 continue
-            if spent + qty * ltp > broker * 0.995:   # live broker-cash ceiling
+            if spent + qty * ltp > broker * 0.997:   # live broker-cash ceiling (0.3% headroom)
                 continue
             res = _fyers_place_market(sym, qty, "BUY", user_id)
             if res.get("ok"):
