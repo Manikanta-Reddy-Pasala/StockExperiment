@@ -1131,10 +1131,24 @@ def _model_ranking_targets(model_name: str, user_id: int = 1):
     return out
 
 
+def _held_targets(symbols, user_id: int = 1):
+    """[{symbol, ltp}] for a set of held symbols, live LTP, priced rows only."""
+    out = []
+    for sym in symbols:
+        ltp = _fyers_live_ltp(sym, user_id)
+        if ltp and float(ltp) > 0:
+            out.append({"symbol": sym, "ltp": float(ltp)})
+    return out
+
+
 def _derive_invest(model_name: str, user_id: int = 1):
-    """Server-side source of truth: the MAX buys this model may make right now.
-    Single-position models top up their CURRENT holding (or rank-1 if flat);
-    multi-slot models fill only their OWN empty slots. Sized to min(idle, broker)."""
+    """Server-side source of truth: the MAX buys this model may make right now,
+    deploying idle cash WITHOUT ever exceeding max_holdings.
+      - single position: top up its current holding (rank-1 if flat).
+      - multi-slot with FREE slots: fill the free slots with top-ranked unheld
+        ranking names.
+      - multi-slot FULL book: top up the existing holdings (no new name added).
+    Sized to min(idle, broker)."""
     from src.services.trading.model_invest_service import compute_buys
     from src.services.trading.model_ledger_service import model_max_holdings
     idle = _model_idle_cash(model_name)
@@ -1143,8 +1157,17 @@ def _derive_invest(model_name: str, user_id: int = 1):
     is_multi = bool(model_max_holdings(model_name))
     own_held = _model_own_held(model_name)
     if is_multi:
-        targets = _model_ranking_targets(model_name, user_id)
-        open_syms = own_held
+        free = maxh - len(own_held)
+        if free > 0:
+            # fill free slots with top-ranked names not yet held
+            targets = _model_ranking_targets(model_name, user_id)
+            open_syms = own_held
+            buys = compute_buys(idle, broker, maxh, targets, open_syms)
+        else:
+            # FULL book -> top up the existing holdings (stays at max_holdings;
+            # record_buy_multi accumulates onto the existing rows, no 5th name).
+            targets = _held_targets(own_held, user_id)
+            buys = compute_buys(idle, broker, len(targets) or 1, targets, set())
     else:
         # single position: top up the symbol actually held (avoids record_buy's
         # "different symbol" raise); use rank-1 only when the model is flat.
@@ -1154,8 +1177,7 @@ def _derive_invest(model_name: str, user_id: int = 1):
             targets = [{"symbol": held_sym, "ltp": float(ltp or 0)}]
         else:
             targets = _model_ranking_targets(model_name, user_id)[:1]
-        open_syms = set()
-    buys = compute_buys(idle, broker, maxh, targets, open_syms)
+        buys = compute_buys(idle, broker, maxh, targets, set())
     return {"idle": idle, "broker": broker,
             "deployable": min(max(0.0, idle), max(0.0, broker)),
             "buys": buys, "is_multi": is_multi}

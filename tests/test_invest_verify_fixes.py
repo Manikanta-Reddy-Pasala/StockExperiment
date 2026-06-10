@@ -185,3 +185,32 @@ def test_set_if_absent_true_then_false():
 
     assert svc.set_if_absent("k", "v", 60) is True    # first caller wins
     assert svc.set_if_absent("k", "v", 60) is False   # second caller loses
+
+
+def test_derive_invest_full_book_tops_up_existing(monkeypatch):
+    """Retest full 4-name book + idle cash -> top up the 4 held (no 5th name)."""
+    from src.web import momrot_routes as MR
+    import src.services.trading.model_ledger_service as L
+    monkeypatch.setattr(L, "model_max_holdings", lambda m: 4)
+    monkeypatch.setattr(MR, "_model_idle_cash", lambda m: 40000.0)
+    monkeypatch.setattr(MR, "_fyers_available_cash", lambda uid=1: 100000.0)
+    monkeypatch.setattr(MR, "_model_own_held", lambda m: {"A", "B", "C", "D"})
+    monkeypatch.setattr(MR, "_fyers_live_ltp", lambda s, uid=1: 100.0)
+    d = MR._derive_invest("momentum_retest_n500")
+    assert d["is_multi"] is True
+    assert {b["symbol"] for b in d["buys"]} == {"A", "B", "C", "D"}  # tops up held
+
+
+def test_derive_invest_free_slots_fill_new(monkeypatch):
+    """Retest holding 2 of 4 -> fill the 2 free slots with top unheld names."""
+    from src.web import momrot_routes as MR
+    import src.services.trading.model_ledger_service as L
+    monkeypatch.setattr(L, "model_max_holdings", lambda m: 4)
+    monkeypatch.setattr(MR, "_model_idle_cash", lambda m: 40000.0)
+    monkeypatch.setattr(MR, "_fyers_available_cash", lambda uid=1: 100000.0)
+    monkeypatch.setattr(MR, "_model_own_held", lambda m: {"A", "B"})
+    monkeypatch.setattr(MR, "_model_ranking_targets",
+                        lambda m, uid=1: [{"symbol": s, "ltp": 100.0} for s in ("C", "D", "E")])
+    d = MR._derive_invest("momentum_retest_n500")
+    syms = {b["symbol"] for b in d["buys"]}
+    assert syms == {"C", "D"}            # exactly 2 free slots, no overfill
