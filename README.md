@@ -8,6 +8,10 @@ Production: `77.42.45.12` · App: <https://stock.oneshell.in> · Bot: `@stocks_m
 
 ---
 
+## Recent Changes (2026-06)
+
+- **emerging → DISABLED the +30% partial profit-take (2026-06-10) — "let winners run".** `PROFIT_TAKE_PCT 0.30 → 0.0`. The half-bank at +30% capped the fat-tail years; removing it lets the full position ride under the 2.5×ATR-from-entry stop. Full-cycle 2021-03→2026-06: **CAGR 109→116% at the same 38% DD** (2023 +269→+358% as the runner rides), Calmar 2.88→3.05. Trade-off (in code + UI): the half-bank had *helped* the recent chop regime, so disabling gives some Calmar back there (2025 62→51, DD 18→25). Single constant drives backtest + live; revert to 0.30 if recent-regime DD proves worse. summary.json + Settings/Picks/Dashboard cards regenerated; SW v62.
+
 ## Recent Changes (2026-05)
 
 - **emerging → +111% CAGR via VOL-ADJUSTED momentum (2026-05-31, organic — no leverage).** Rank by 30d return ÷ 60d return-volatility (RANK_MODE=vol_adj) instead of raw return, + RET1 (top-1) + climber OFF. On the high-vol mid/small universe this picks smooth strong trends over jumpy ones and compounds far better: +65.6% → **+111.4% CAGR / 31% DD / Calmar 3.6** full-cycle 2021-03→2026-05 (DD also down). Per-year 2021 −5 / 2022 +204 / 2023 +301 / 2024 +136 / 2025 +38 / 2026 +15 — the first model over 100% organically. Vol-adjustment only helps mid/small (over-penalizes low-vol large-caps), so it is emerging-specific; live mirrors via the shared rank_pool.
@@ -346,7 +350,7 @@ point-in-time membership** (`eligible_at`) — no survivorship bias remains.
 
 | Model | CAGR | Max DD | Calmar | Trades | WR | universe |
 |---|---:|---:|---:|---:|---:|---|
-| `emerging_momentum` (**vol-adj momentum**, RET1, mid/small) | **+111.42%** | 31.17% | **3.57** | 61 | 67.2% | PIT N500−N100 |
+| `emerging_momentum` (**vol-adj momentum**, RET1, mid/small, **no profit-take**) | **+115.57%** | 37.92% | **3.05** | 68 | 64.7% | PIT N500−N100 |
 | `momentum_pseudo_n100_adv` (RET1, monthly, fixed May anchor) | +76.6% | 28.6% | 2.7 | 50 | 76.0% | PIT N500 (ADV-biased) |
 | `momentum_retest_n500` (K=2, 20% band) | +64.2% | 57.1% | 1.1 | 88 | 53.4% | PIT N500 −Smallcap (top-120 ADV; incl large+mid) |
 | `n40` (weekly, top-40 ADV ∩ N100) | +41.2% | 36.9%¹ | 1.1 | 133 | 58.3% | PIT N100 |
