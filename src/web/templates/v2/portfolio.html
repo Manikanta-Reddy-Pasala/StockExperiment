@@ -979,7 +979,7 @@ document.addEventListener('click', async (e) => {
         <td class="text-end invest-amt" data-i="${i}">₹${Number(b.amount).toLocaleString('en-IN')}</td>
       </tr>`).join('');
     body.innerHTML = `
-      <div class="small text-muted mb-2">Idle ₹${Number(d.idle_cash).toLocaleString('en-IN')} · broker free ₹${Number(d.broker_free).toLocaleString('en-IN')} · deployable <strong>₹${Number(d.deployable).toLocaleString('en-IN')}</strong></div>
+      <div class="small text-muted mb-2">Model idle cash ₹${Number(d.idle_cash).toLocaleString('en-IN')} · Broker cash available ₹${Number(d.broker_free).toLocaleString('en-IN')} · Deployable now <strong>₹${Number(d.deployable).toLocaleString('en-IN')}</strong> <span title="Smaller of your model idle cash and total broker free cash. No fees shown here.">ⓘ</span></div>
       ${rows ? `<table class="table table-sm align-middle"><thead><tr><th>Symbol</th><th class="text-end">LTP</th><th class="text-end">Qty (max — decrease ok)</th><th class="text-end">₹</th></tr></thead><tbody>${rows}</tbody></table><div class="text-end small">Total: <strong id="investTotal">₹0</strong></div>` : '<div class="text-muted">Nothing to deploy.</div>'}
       ${d.market_open ? '' : '<div class="text-warning small">⚠ Market closed — deploys next session.</div>'}`;
     const recalc = () => {
