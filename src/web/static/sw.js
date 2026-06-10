@@ -1,6 +1,6 @@
 // Service worker — fast shell + SWR for HTML pages + cache-first for static.
 // Bump CACHE_VERSION on any UI change so old clients refetch.
-const CACHE_VERSION = 'v60-2026-06-10-invest-labels';
+const CACHE_VERSION = 'v61-2026-06-10-invested-field';
 const STATIC_CACHE = 'trading-pwa-static-' + CACHE_VERSION;
 const PAGE_CACHE   = 'trading-pwa-pages-'  + CACHE_VERSION;
 // Bump ?v= on every icon-affecting change. URL-keyed, so any old cached

@@ -101,8 +101,9 @@
       <i class="bi bi-chevron-down ms-2"></i>
     </div>
     <div class="row text-end g-3 flex-grow-1 justify-content-end align-items-center">
-      <div class="col-auto"><div class="text-muted small" title="Original capital invested across all models">Invested</div><div class="fs-5 fw-bold" id="tot_invested">--</div></div>
-      <div class="col-auto"><div class="text-muted small" title="Cash + live position value. Identity: NAV = Invested + Total P&L.">Current NAV</div><div class="fs-5 fw-bold" id="tot_nav">--</div></div>
+      <div class="col-auto"><div class="text-muted small" title="Total capital allocated across all models (principal)">Allocated</div><div class="fs-5 fw-bold" id="tot_invested">--</div></div>
+      <div class="col-auto"><div class="text-muted small" title="Capital actually deployed into stocks = Σ qty × entry price (Allocated − Idle Cash)">Invested</div><div class="fs-5 fw-bold" id="tot_deployed">--</div></div>
+      <div class="col-auto"><div class="text-muted small" title="Cash + live position value. Identity: NAV = Allocated + Total P&L.">Current NAV</div><div class="fs-5 fw-bold" id="tot_nav">--</div></div>
       <div class="col-auto"><div class="text-muted small" title="Open positions marked at live Fyers LTP (Σ qty × (LTP − entry)).">+ Current P&amp;L (open pos)</div><div class="fs-5 fw-bold" id="tot_current_pnl">--</div></div>
       <div class="col-auto"><div class="text-muted small" title="Day's P&L: Σ qty × (LTP − prev close) on open positions + P&L realized from trades closed today.">Today's P&amp;L</div><div class="fs-5 fw-bold" id="tot_today">--</div></div>
       <div class="col-auto"><div class="text-muted small" title="Realized (from trades) + Unrealized (open, live).">= Total P&amp;L</div><div class="fs-5 fw-bold" id="tot_pnl">--</div></div>
@@ -254,6 +255,7 @@ function renderModelCard(m, sig) {
             </div>
             <div class="model-headline">
               <span><span class="lbl">Allocated</span><span class="val">${fmtINR(headlineInvested)}</span></span>
+              <span title="Capital deployed into stocks: qty × entry price (Allocated − Idle Cash)"><span class="lbl">Invested</span><span class="val">${fmtINR(headlinePosCost)}</span></span>
               <span><span class="lbl">NAV</span><span class="val">${fmtINR(headlineNav)}</span></span>
               <span title="Open position at live Fyers LTP: qty × (LTP − entry)"><span class="lbl">Current P&amp;L</span><span class="val ${headlineCurCls}">${fmtINR(headlineCurPnl)}${headlinePosCost > 0 ? ` <small>(${fmtPct(headlineCurPct)})</small>` : ''}</span></span>
               <span title="Day MTM change on open positions + P&L realized from trades closed today"><span class="lbl">Today's P&amp;L</span><span class="val ${headlineTodayCls}">${fmtINR(headlineToday)}</span></span>
@@ -336,17 +338,24 @@ function renderTotals(t, models) {
 
   // Aggregate current open-position P&L across models (sum of per-model
   // unrealized = MTM − cost_basis). Backend `total` doesn't have this so
-  // compute client-side from models array.
+  // compute client-side from models array. totDeployed = capital actually in
+  // stocks (cost basis), incl multi-holding models (holdings[]).
   let totUnreal = 0;
   let totCostOpen = 0;
+  let totDeployed = 0;
   (models || []).forEach(m => {
-    const posCost = (Number(m.open_qty || 0) * Number(m.open_entry_px || 0)) || 0;
+    const posCost = (m.holdings && m.holdings.length)
+      ? m.holdings.reduce((a, h) => a + Number(h.qty || 0) * Number(h.entry_px || 0), 0)
+      : (Number(m.open_qty || 0) * Number(m.open_entry_px || 0)) || 0;
     const posValue = Number(m.position_value || 0);
+    totDeployed += posCost;
     if (posCost > 0) {
       totUnreal += (posValue - posCost);
       totCostOpen += posCost;
     }
   });
+  const _deployedEl = document.getElementById('tot_deployed');
+  if (_deployedEl) _deployedEl.textContent = fmtINR(totDeployed);
   // Open P&L (unrealized) = server value, marked at live Fyers LTP.
   const unrealVal = Number(t.unrealized_pnl ?? (totUnreal));
   const curPct = totCostOpen > 0 ? (unrealVal / totCostOpen * 100) : 0;

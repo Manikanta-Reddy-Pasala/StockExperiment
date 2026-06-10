@@ -128,7 +128,8 @@
   <div class="card-header"><strong>All Models Portfolio</strong></div>
   <div class="card-body">
     <div class="row g-3 mb-3">
-      <div class="col-6 col-lg-2"><div class="text-muted small">Allocated</div><div class="fs-5 fw-bold" id="agg_alloc">--</div></div>
+      <div class="col-6 col-lg-2"><div class="text-muted small" title="Total capital allocated (principal)">Allocated</div><div class="fs-5 fw-bold" id="agg_alloc">--</div></div>
+      <div class="col-6 col-lg-2"><div class="text-muted small" title="Capital deployed into stocks = Σ qty × entry price (Allocated − Idle Cash)">Invested</div><div class="fs-5 fw-bold" id="agg_invested">--</div></div>
       <div class="col-6 col-lg-2"><div class="text-muted small">Total NAV</div><div class="fs-5 fw-bold" id="agg_nav">--</div></div>
       <div class="col-6 col-lg-2"><div class="text-muted small" title="Realized (from trades) + Unrealized (open, live)">Total P&amp;L</div><div class="fs-5 fw-bold" id="agg_pnl">--</div></div>
       <div class="col-6 col-lg-2"><div class="text-muted small" title="Day MTM change on open positions + realized from trades closed today">Today's P&amp;L</div><div class="fs-5 fw-bold" id="agg_today">--</div></div>
@@ -148,7 +149,7 @@
         <thead><tr>
           <th>Model</th>
           <th class="text-end" title="Original capital deposited">Allocated</th>
-          <th class="text-end" title="qty × entry price">Cost Basis</th>
+          <th class="text-end" title="Capital deployed into stocks: qty × entry price (Allocated − Idle Cash)">Invested</th>
           <th class="text-end" title="Cash not tied up in any open position">Idle Cash</th>
           <th>Open Position</th>
           <th class="text-end" title="Live MTM = qty × LTP">Position Value</th>
@@ -328,6 +329,15 @@ async function loadAggregate() {
     if (!d.success) return;
     const t = d.total || {};
     document.getElementById('agg_alloc').textContent = fmtINR(t.allocated_capital);
+    // Invested = capital deployed into stocks (cost basis), summed across models
+    // incl multi-holding (holdings[]). Backend total lacks it -> compute here.
+    const _aggInvested = (d.models || []).reduce((acc, m) => acc + (
+      (m.holdings && m.holdings.length)
+        ? m.holdings.reduce((a, h) => a + Number(h.qty || 0) * Number(h.entry_px || 0), 0)
+        : (Number(m.open_qty || 0) * Number(m.open_entry_px || 0)) || 0
+    ), 0);
+    const _aggInvEl = document.getElementById('agg_invested');
+    if (_aggInvEl) _aggInvEl.textContent = fmtINR(_aggInvested);
     document.getElementById('agg_nav').textContent = fmtINR(t.nav);
     const totalPnl = (t.total_pnl_trades ?? t.pnl_total);
     const pnlEl = document.getElementById('agg_pnl');
@@ -399,7 +409,7 @@ async function loadAggregate() {
       tr.innerHTML = `
         <td class="cell-model"><strong>${modelLabel(m.model_name)}</strong></td>
         <td class="text-end" data-label="Allocated">${fmtINR(m.allocated_capital)}</td>
-        <td class="text-end" data-label="Cost Basis">${fmtINR(posCost)}</td>
+        <td class="text-end" data-label="Invested">${fmtINR(posCost)}</td>
         <td class="text-end" data-label="Idle Cash">${fmtINR(m.cash)}</td>
         <td class="cell-pos" data-label="Open">${posHtml}</td>
         <td class="text-end" data-label="Position Value">${fmtINR(m.position_value)}</td>
