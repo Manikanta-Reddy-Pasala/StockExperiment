@@ -247,3 +247,50 @@ def test_corrections_signature_changes_on_content():
     assert corrections_signature(a) != corrections_signature(b)
     # adding a 2nd drift changes the signature too
     assert corrections_signature(a) != corrections_signature(a + b)
+
+
+# ---------------- multi_holding_qty_for (pure) — the n40+Retest ADANIENT bug ----------------
+
+from tools.live.position_reconciler import multi_holding_qty_for
+
+
+class _H:
+    """Minimal stand-in for a ModelHolding row (multi-holding models)."""
+    def __init__(self, model_name, symbol, qty):
+        self.model_name = model_name
+        self.symbol = symbol
+        self.qty = qty
+
+
+def test_multi_holding_qty_for_counts_other_models():
+    # Retest (multi) holds ADANIENT 3 in model_holdings; n40 (single) shares it.
+    holdings = [
+        _H("momentum_retest_n500", "NSE:ADANIENT-EQ", 3),
+        _H("momentum_retest_n500", "NSE:IDEA-EQ", 973),
+    ]
+    # n40's sibling claim from multi models on ADANIENT = Retest's 3
+    assert multi_holding_qty_for(holdings, "n20_daily_large_only",
+                                 "NSE:ADANIENT-EQ") == 3
+    # IDEA not shared by n40 -> still counts the multi holder (caller excludes self)
+    assert multi_holding_qty_for(holdings, "n20_daily_large_only",
+                                 "NSE:IDEA-EQ") == 973
+
+
+def test_multi_holding_qty_for_excludes_self_and_normalizes():
+    holdings = [_H("retest", "ADANIENT", 3), _H("retest", "NSE:ADANIENT-EQ", 2)]
+    # plain + prefixed forms both match; self excluded
+    assert multi_holding_qty_for(holdings, "n40", "NSE:ADANIENT-EQ") == 5
+    assert multi_holding_qty_for(holdings, "retest", "NSE:ADANIENT-EQ") == 0
+
+
+def test_n40_slice_after_multi_sibling_subtract_is_20():
+    # The real incident: broker net ADANIENT = 23 (n40 20 + Retest 3).
+    # n40 single-position sibling (ledger) = 0; multi sibling (Retest) = 3.
+    # decide_drift must ration: n40 slice = 23 - 3 = 20 -> NO_DRIFT when ledger=20.
+    multi_sib = multi_holding_qty_for(
+        [_H("momentum_retest_n500", "NSE:ADANIENT-EQ", 3)],
+        "n20_daily_large_only", "NSE:ADANIENT-EQ")
+    kind, fix_qty, fix_px = decide_drift(
+        expected_qty=20, expected_px=2974.35,
+        actual_qty=23, actual_px=2960.86, sibling_qty=0 + multi_sib)
+    assert kind == "NO_DRIFT"

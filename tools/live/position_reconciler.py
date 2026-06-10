@@ -79,6 +79,35 @@ def sibling_qty_for(ledgers, model_name: str, symbol: str) -> int:
     return total
 
 
+def multi_holding_qty_for(holdings, model_name: str, symbol: str) -> int:
+    """Sum qty across MULTI-holding models (model_holdings rows) that hold the
+    same (normalized) symbol, excluding `model_name`.
+
+    Companion to sibling_qty_for: that one only sees single-position claims in
+    model_ledger.open_symbol. Multi-holding models (e.g. momentum_retest_n500)
+    keep their positions in model_holdings, so without this a single-position
+    model sharing a symbol with a multi model (n40 + Retest both on ADANIENT)
+    would AUTO_MIRROR the WHOLE broker net onto itself, absorbing the multi
+    model's shares (n40 -> 23 instead of 20). Folding these into sibling_qty
+    rations the broker net correctly.
+
+    Args:
+        holdings: iterable of ModelHolding-like rows (.model_name, .symbol, .qty).
+        model_name: this row's model (excluded from the sum).
+        symbol: target symbol; both sides normalized before comparing.
+    Returns:
+        Total sibling qty held by OTHER multi-holding models on this symbol.
+    """
+    target = _normalize(symbol)
+    total = 0
+    for h in holdings or []:
+        if getattr(h, "model_name", None) == model_name:
+            continue
+        if _normalize(getattr(h, "symbol", "") or "") == target:
+            total += int(getattr(h, "qty", 0) or 0)
+    return total
+
+
 _ALERT_SIG_KEY = "reconciler:last_alert_sig"          # single-position
 _ALERT_SIG_KEY_MULTI = "reconciler:last_alert_sig_multi"
 _ALERT_SIG_TTL = 86400                                 # 24h
@@ -347,7 +376,9 @@ def reconcile_once(user_id: int = 1, dry_run: bool = False) -> List[Dict]:
             # comparing. Without this, two models holding the same name would
             # each AUTO_MIRROR the merged total into their own row (each
             # claiming 2x what it actually owns) on every reconcile pass.
-            sibling_qty = sibling_qty_for(ledgers, l.model_name, expected_sym)
+            sibling_qty = (sibling_qty_for(ledgers, l.model_name, expected_sym)
+                       + multi_holding_qty_for(multi_holdings, l.model_name,
+                                               expected_sym))
 
             # Affordability cap: the most shares this model could OWN is
             # (invested + realized) / its entry price. The reconciler must never
