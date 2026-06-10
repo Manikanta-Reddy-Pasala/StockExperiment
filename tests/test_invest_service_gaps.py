@@ -85,3 +85,20 @@ def test_broker_cash_is_the_binding_constraint():
     # idle huge, broker small -> deployable = broker (the min)
     buys = compute_buys(1_000_000.0, 5000.0, 1, targets, set())
     assert buys[0]["qty"] == int((5000.0 * CASH_BUFFER) // 100.0)
+
+
+def test_retest_full_book_buys_nothing():
+    # holds 4 of 4 (even if ranking rotated to new names) -> no new buys
+    held = {"A", "B", "C", "D"}
+    targets = [{"symbol": s, "ltp": 100.0} for s in ("E", "F", "A", "B")]
+    assert compute_buys(100000, 100000, 4, targets, held) == []
+
+
+def test_retest_caps_to_free_slots_on_rotation():
+    # holds 3 (X,Y,Z); ranking top names are new -> only 1 FREE slot may fill,
+    # never pushing the book to 5.
+    held = {"X", "Y", "Z"}
+    targets = [{"symbol": s, "ltp": 100.0} for s in ("M", "N", "O", "P")]
+    buys = compute_buys(100000, 100000, 4, targets, held)
+    assert len(buys) == 1            # exactly one free slot
+    assert buys[0]["symbol"] == "M"  # highest-ranked unheld

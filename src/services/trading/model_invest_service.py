@@ -43,9 +43,15 @@ def compute_buys(idle_cash: float, broker_cash: float, max_holdings: int,
         # single position: deploy all into rank-1 (top up even if already held)
         slots = targets[:1]
     else:
-        # multi-slot: only fill slots not already held
-        slots = [t for t in targets[:max_holdings]
-                 if t["symbol"] not in open_symbols]
+        # multi-slot: fill ONLY the FREE slots (max_holdings - already-held), so
+        # total holdings can never exceed max_holdings. On a rotation (a held
+        # name dropped out of the ranking) "invest more" must NOT add a new name
+        # on top of a full book — that's a SELL+BUY rotation, the rebalance
+        # job's responsibility, not an idle-cash top-up.
+        free = max_holdings - len(open_symbols)
+        if free <= 0:
+            return []
+        slots = [t for t in targets if t["symbol"] not in open_symbols][:free]
     if not slots:
         return []
 
