@@ -93,6 +93,21 @@ MODELS = {
         "data": "Fyers (split-adjusted cont_flag=1)",
         "live": False,
     },
+    "emerging_momentum": {
+        "title": "Emerging mid/small momentum (top-100 ADV from PIT N500 − N100). VOL-ADJ rank, top-1 monthly + mid-month. 2.5×ATR stop, NO profit-take (disabled 2026-06-10).",
+        "rebalance": "Monthly (1st trading day) + mid-month (day-15) lead-check",
+        "logic": [
+            "Universe: top-100 by 20-day ADV from PIT N500 minus PIT N100 (mid/small, yearly anchor)",
+            "Filters: 30d return > 0, close ≤ ₹3,000 (no SMA gate)",
+            "Rank by VOL-ADJUSTED momentum: 30d return ÷ 60d return-volatility, pick top-1 (RET1)",
+            "Rebalance: 1st trading day of month + mid-month check (rotate only on ≥5pp lead)",
+            "Stop: DAILY hard stop at entry − 2.5×ATR(14) (not trailing)",
+            "Profit-take: DISABLED 2026-06-10 (was book-half @+30%) — let winners run for max CAGR",
+            "Exit: rotation (held drops rank-1) OR ATR-from-entry stop fires",
+        ],
+        "data": "Fyers (split-adjusted cont_flag=1)",
+        "live": True,
+    },
 }
 
 
