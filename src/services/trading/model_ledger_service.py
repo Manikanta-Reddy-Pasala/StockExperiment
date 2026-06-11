@@ -106,18 +106,6 @@ KNOWN_MODELS = [
         "enabled": True,
         "description": "Equity daily rotation top-20-ADV ∩ Nifty 100 by 30d return",
     },
-    {
-        "name": "price_meanrev_n500",
-        "default_capital": 0,
-        "enabled": True,
-        # Seeds OBSERVE-safe (signals_only=True, 0 capital): the edge needs
-        # LIMIT fills at the dip level (close-fill = 36% vs 103% CAGR), served
-        # by the dedicated fyers_executor_limit (resting day limits + 5-min
-        # exit polling). Flip signals_only + fund via the settings UI / psql
-        # to trade real — the limit executor honors both flags.
-        "signals_only": True,
-        "description": "Price mean-reversion dip-buy K=3 (resting LIMIT @ SMA50-1ATR, exit SMA50 / 1.5ATR stop / 40d, PIT N500, dedicated limit executor)",
-    },
 ]
 
 # Models intentionally removed from the system. ensure_models_seeded() purges
@@ -129,6 +117,10 @@ RETIRED_MODELS = [
     "finnifty_ic_otm4_w300_lots5",  # FinNifty options IC — removed 2026-05-25
     "orb_momentum_intraday",        # ORB intraday — ARCHIVED 2026-06-05, no edge
                                     # (lookahead-inflated backtest; faithful −63%)
+    "price_meanrev_n500",           # limit dip-buy — ARCHIVED 2026-06-12, no edge:
+                                    # 5-min validation showed the 102.8% backtest was
+                                    # execution lookahead (EOD touch-set selection);
+                                    # live-exact replay = 4 fills/15mo, −4.8%.
 ]
 
 # ---- Order product-type policy (single source of truth) -------------------
@@ -149,7 +141,6 @@ INTRADAY_MODELS = {
 # wrongly treat momentum_retest_n500 as a single-position model.
 MULTI_HOLDING_MODELS = {
     "momentum_retest_n500": 4,   # K4 (see tools/models/momentum_retest_n500/strategy.py)
-    "price_meanrev_n500": 3,     # K3 limit dip-buy (tools/models/price_meanrev_n500/strategy.py)
 }
 
 

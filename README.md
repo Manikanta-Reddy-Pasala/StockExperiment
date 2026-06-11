@@ -356,7 +356,6 @@ point-in-time membership** (`eligible_at`) — no survivorship bias remains.
 | `n40` (weekly, top-40 ADV ∩ N100) | +41.2% | 36.9%¹ | 1.1 | 133 | 58.3% | PIT N100 |
 | `momentum_n100_top5_max1` (LB15 + mid-month + RET3) | +56.2% | 52.2% | 1.1 | 96 | 54.6% | PIT N100 |
 | `midcap_narrow_60d_breakout` (40d-high + 2× vol) | +1.65% | 68.2%¹ | 0.02 | 16 | 37.5% | PIT N500−N100 |
-| `price_meanrev_n500` (**PAPER** — LIMIT dip-buy K=3, 2026-06-11) | +38.8% | 32.8% | 1.18 | 770 | 64% | PIT N500 (recent 2025-03→: **+102.8% / 12.2% / 8.46**; positive every yr incl 2022 +37%; edge needs LIMIT fills — close-fill = 36%) |
 
 > Window: full-cycle **2021-03-01 → 2026-05-29**. **emerging is the standout** —
 > vol-adjusted momentum (return ÷ 60d volatility) on mid/small = **+111% organic

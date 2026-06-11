@@ -161,7 +161,6 @@ const MODEL_META = {
   'n20_daily_large_only':        { universe: 'Top-40 ADV ∩ N100',      kind: 'equity'  },
   'momentum_retest_n500':        { universe: 'Top-120 ADV N500 • retest', kind: 'equity'  },
   'emerging_momentum':           { universe: 'Top-100 ADV mid/small (N500−N100) • 30d vol-adj momentum • max-1 + mid-month • no profit-take', kind: 'equity'  },
-  'price_meanrev_n500':          { universe: 'PIT N500 • LIMIT dip-buy @ SMA50−1ATR • K=3 • limit executor', kind: 'equity' },
 };
 // Display order: equity models.
 const MODEL_ORDER = [
@@ -171,7 +170,6 @@ const MODEL_ORDER = [
   'n20_daily_large_only',
   'momentum_retest_n500',
   'emerging_momentum',
-  'price_meanrev_n500',
 ];
 
 let _signalsByModel = {};

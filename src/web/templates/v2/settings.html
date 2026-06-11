@@ -553,26 +553,6 @@ const MODEL_META = {
       ['Recent 2023-05→2026-06 (no profit-take)', '+153.7% CAGR / 26.3% DD / Calmar 5.85 — winners run (profit-take off). Full-cycle CAGR 109→116 at same DD; recent regime gives some Calmar back (PT had lifted 1yr Calmar). UNLEVERED, no borrow.'],
     ],
   },
-  'price_meanrev_n500': {
-    universe: 'PIT N500 • LIMIT dip-buy @ SMA50−1×ATR', kind: 'equity',
-    title: 'Price Dip-Buy (limit orders)',
-    rules: { top_n: 3, max_concurrent: 3, lookback: '60d (rank)',
-             rebalance: 'DAILY resting LIMIT orders at SMA50 − 1.0×ATR14 (prior bar); rank simultaneous triggers by 60d momentum',
-             stop: '1.5× ATR from entry (frozen)',
-             target: 'SMA50 as of entry (limit sell) — mean reversion',
-             exit: 'Target / stop / 40-trading-day time, whichever first; 10d re-entry cooldown per name' },
-    strategy: [
-      ['Style', 'PRICE-LEVEL mean-reversion: buy the intraday dip of a STRONG name, sell the revert to its mean'],
-      ['Entry', 'Resting LIMIT BUY at SMA50 − 1.0×ATR14 (levels from PRIOR bar) — fires on a low-touch'],
-      ['Ranker', '60-day momentum descending (dip in a strong name, never a falling knife)'],
-      ['Exit', 'Limit sell at SMA50 (frozen at entry) / stop entry−1.5×ATR / 40d time; 10-day cooldown after any exit'],
-      ['⚠ LIMIT execution', 'Edge LIVES in the LIMIT fill: same signals filled at the CLOSE = 36% CAGR vs 103%. Dedicated fyers_executor_limit: 09:16 resting LIMIT day orders at the levels (expire unfilled), 5-min intraday stop/target/time exit polling, 15:20 fill reconcile. NEVER routes via the market-fill executor. live_signal also keeps a parallel limit-fill paper ledger for validation.'],
-      ['Backtest 2025-03→2026-06 (PIT)', '+102.8% CAGR / 12.2% DD / Calmar 8.46 / 225 trades / WR 71%'],
-      ['Full-cycle 2021-03→2026-06 (PIT)', '+38.8% CAGR / 32.8% DD / Calmar 1.18 / 770 trades — positive EVERY year incl 2022 (+37%)'],
-      ['Per-year (full)', '2021 +27 / 2022 +37 / 2023 +10 / 2024 +33 / 2025 +51 / 2026 +38'],
-      ['Optimum', '~350-config sweep, both-windows gate: k1.0/SMA50-exit/1.5ATR/40d/cd10/K3 = Pareto optimum (every variant traded one window for the other or blew up DD)'],
-    ],
-  },
 };
 
 async function loadAllocations() {

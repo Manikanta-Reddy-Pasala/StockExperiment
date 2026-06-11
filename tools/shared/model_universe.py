@@ -32,7 +32,6 @@ from tools.shared.index_membership import eligible_at
 # Keys are the model_name strings written into the signals file / model_settings.
 MODEL_INDEX: dict[str, Optional[str]] = {
     "momentum_retest_n500":       "n500",
-    "price_meanrev_n500":         "n500",  # paper-only today; gate ready if ever live
     "n20_daily_large_only":       "n100",   # n40: selection is ∩ Nifty-100
     "emerging_momentum":          "n500",   # universe = n500 minus n100; n500 is a safe superset gate
     # file-based (curated JSON universe) — NOT index-gated:

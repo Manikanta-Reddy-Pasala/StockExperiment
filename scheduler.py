@@ -494,7 +494,6 @@ def run_scheduler():
     logger.info("  - n20_daily_large_only:       signal 09:25 + execute 09:30 (weekly rotation; key=n20 legacy, folder=n40)")
     logger.info("  - momentum_retest_n500:       signal 09:26 + execute 09:34 (K=3 multi, gated by enabled flag)")
     logger.info("  - emerging_momentum:          signal 09:29 + execute 09:37 (single, mid-month; emerging mid/small max-1, gated by enabled flag)")
-    logger.info("  - price_meanrev_n500:         signal 08:55 + LIMIT place 09:16 + exits q5min 09:30-15:10 + reconcile 15:20 (K=3 limit dip-buy, dedicated limit executor)")
     logger.info("")
     logger.info("Maintenance:")
     logger.info("  - Cleanup Old Snapshots: Weekly (Sunday) at 03:00 AM")
@@ -539,14 +538,6 @@ def run_scheduler():
         register_trading_jobs as register_emerging_jobs,
         register_data_jobs as register_emerging_data_jobs,
     )
-    # Price mean-reversion dip-buy (K=3): 08:55 emit + DEDICATED limit executor
-    # (09:16 resting LIMIT day orders, 5-min exit polling, 15:20 fill reconcile).
-    # Must NEVER route via fyers_executor_multi — the edge needs LIMIT fills at
-    # the dip level (close-fill = 36% vs 103% CAGR). Gated by enabled +
-    # signals_only flags like every model.
-    from tools.models.price_meanrev_n500.cron import (
-        register_trading_jobs as register_price_meanrev_jobs,
-    )
     register_momentum_n100_jobs(schedule)
     register_pseudo_n100_jobs(schedule)
     register_midcap_narrow_jobs(schedule)
@@ -555,9 +546,10 @@ def run_scheduler():
     register_mr500_data_jobs(schedule)
     register_emerging_jobs(schedule)
     register_emerging_data_jobs(schedule)
-    register_price_meanrev_jobs(schedule)
     # ORB (intraday) ARCHIVED 2026-06-05 — no edge (backtest gains were lookahead;
     # faithful = −63%). Disabled + moved to _archived_models. Do not re-register.
+    # price_meanrev_n500 ARCHIVED 2026-06-12 — no edge (5-min validation: the
+    # 102.8% backtest was execution lookahead; live-exact = 4 fills/15mo, −4.8%).
 
     # M3 — SAFE catch-up: if we restarted after the morning trade window on a
     # trading day, ALERT (never auto-execute) so a human can check for misses.

@@ -17,7 +17,7 @@ ACTIVE_MODELS = {
     "n20_daily_large_only",
     "emerging_momentum",
     "momentum_retest_n500",
-    "price_meanrev_n500",       # added 2026-06-11 (paper-only limit dip-buy)
+    # price_meanrev_n500 ARCHIVED 2026-06-12 (execution-lookahead backtest, no edge)
 }
 
 
