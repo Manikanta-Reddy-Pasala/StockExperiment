@@ -2173,6 +2173,14 @@ MODEL_PATHS = {
         "label": "Retest momentum K=4 multi (N500, retest entry)",
         "universe_path": None,
     },
+    "price_meanrev_n500": {
+        "signals_dir": "/app/logs/price_meanrev_n500/signals",
+        "ranking_dir": "/app/logs/price_meanrev_n500/ranking",
+        "live_signal": "tools/models/price_meanrev_n500/live_signal.py",
+        "extra_args": [],  # builds its own N500 OHLC panel each run (K=3 limit)
+        "label": "Price mean-rev dip-buy K=3 (limit @ SMA50-1ATR) — PAPER",
+        "universe_path": None,
+    },
 }
 
 

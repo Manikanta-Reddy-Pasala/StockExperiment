@@ -10,19 +10,20 @@ from pathlib import Path
 import src.web.admin_routes as ar
 from src.services.trading.model_ledger_service import RETIRED_MODELS
 
-ACTIVE_6 = {
+ACTIVE_MODELS = {
     "momentum_n100_top5_max1",
     "momentum_pseudo_n100_adv",
     "midcap_narrow_60d_breakout",
     "n20_daily_large_only",
     "emerging_momentum",
     "momentum_retest_n500",
+    "price_meanrev_n500",       # added 2026-06-11 (paper-only limit dip-buy)
 }
 
 
-def test_model_paths_defined_with_six_active_models():
+def test_model_paths_defined_with_active_models():
     assert isinstance(ar.MODEL_PATHS, dict)
-    assert set(ar.MODEL_PATHS) == ACTIVE_6
+    assert set(ar.MODEL_PATHS) == ACTIVE_MODELS
 
 
 def test_retired_models_absent_from_model_paths():

@@ -54,6 +54,20 @@ def trade_seg(t):
 
 
 MODELS = {
+    "price_meanrev_n500": {
+        "title": "Price mean-reversion dip-buy K=3 (LIMIT @ SMA50−1×ATR14, exit SMA50 / 1.5×ATR stop / 40d time, 10d cooldown, mom60 rank, PIT N500) — PAPER-ONLY.",
+        "rebalance": "Daily (resting limit orders, levels from prior bar)",
+        "logic": [
+            "Universe: PIT Nifty 500 (eligible_at per day — survivorship-clean)",
+            "ENTRY: resting LIMIT BUY at SMA50 − 1.0×ATR14 (prior bar); fires on a low-touch",
+            "Rank simultaneous triggers by 60-day momentum — buy dips in STRONG names only",
+            "EXIT (frozen at entry): target = SMA50(entry) limit sell · stop = entry − 1.5×ATR · time = 40 trading days",
+            "Cooldown: a name is banned 10 trading days after any exit (kills churn)",
+            "⚠ PAPER-ONLY: edge needs LIMIT fills (close-fill = 36% vs 103% CAGR) — never wire to the market-order executor",
+        ],
+        "data": "Fyers (split-adjusted cont_flag=1)",
+        "live": False,
+    },
     "momentum_n100_top5_max1": {
         "title": "Real NSE Nifty 100 monthly momentum rotation (top-1 by 30d ret). No price filter — honest baseline.",
         "rebalance": "Monthly (1st trading day)",

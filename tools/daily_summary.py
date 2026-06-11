@@ -36,6 +36,7 @@ MODEL_ORDER = [
     "midcap_narrow_60d_breakout",
     "emerging_momentum",
     "momentum_retest_n500",
+    "price_meanrev_n500",
 ]
 
 # Short labels so the message stays compact on a phone.
@@ -46,6 +47,7 @@ SHORT = {
     "midcap_narrow_60d_breakout": "midcap",
     "emerging_momentum": "emerging",
     "momentum_retest_n500": "retest",
+    "price_meanrev_n500": "dipbuy",
 }
 
 

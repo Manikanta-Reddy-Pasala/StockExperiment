@@ -106,6 +106,16 @@ KNOWN_MODELS = [
         "enabled": True,
         "description": "Equity daily rotation top-20-ADV ∩ Nifty 100 by 30d return",
     },
+    {
+        "name": "price_meanrev_n500",
+        "default_capital": 0,
+        "enabled": True,
+        # PAPER-ONLY by design: edge needs LIMIT fills at the dip level
+        # (close-fill = 36% vs 103% CAGR) and the executor is market-order —
+        # live_signal.py keeps its own limit-fill paper ledger instead.
+        "signals_only": True,
+        "description": "Price mean-reversion dip-buy K=3 (limit @ SMA50-1ATR, exit SMA50 / 1.5ATR stop / 40d, PIT N500) — PAPER",
+    },
 ]
 
 # Models intentionally removed from the system. ensure_models_seeded() purges
@@ -169,6 +179,7 @@ def ensure_models_seeded() -> None:
             s.add(ModelSettings(
                 model_name=m["name"],
                 enabled=m.get("enabled", True),
+                signals_only=m.get("signals_only", False),
                 invested_amount=Decimal(m["default_capital"]),
                 current_amount=Decimal(m["default_capital"]),
                 description=m["description"],

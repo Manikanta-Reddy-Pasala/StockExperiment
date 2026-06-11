@@ -1,0 +1,71 @@
+{
+  "model": "price_meanrev_n500",
+  "start": "2025-03-01",
+  "end": "2026-06-10",
+  "years": 1.276,
+  "capital": 1000000.0,
+  "final_nav": 2464296.0,
+  "total_return_pct": 146.43,
+  "cagr_pct": 102.77,
+  "max_dd_pct": 12.15,
+  "calmar": 8.46,
+  "trades": 225,
+  "wins": 159,
+  "losses": 66,
+  "win_rate_pct": 70.7,
+  "open_positions": [
+    {
+      "sym": "GALLANTT",
+      "qty": 1208,
+      "entry_px": 655.05,
+      "entry_date": "2026-06-01",
+      "last_px": 640.8,
+      "stop": 587.42,
+      "target": 715.37,
+      "mtm_value": 774086.0,
+      "unrealized_pnl": -17214.0
+    },
+    {
+      "sym": "NTPCGREEN",
+      "qty": 9435,
+      "entry_px": 99.95,
+      "entry_date": "2026-06-09",
+      "last_px": 98.32,
+      "stop": 95.7,
+      "target": 104.86,
+      "mtm_value": 927649.0,
+      "unrealized_pnl": -15379.0
+    },
+    {
+      "sym": "SCHNEIDER",
+      "qty": 705,
+      "entry_px": 1080.94,
+      "entry_date": "2026-06-10",
+      "last_px": 1082.9,
+      "stop": 979.8,
+      "target": 1148.37,
+      "mtm_value": 763445.0,
+      "unrealized_pnl": 1379.0
+    }
+  ],
+  "per_year": {
+    "2025": {
+      "ret_pct": 69.8,
+      "dd_pct": 12.2
+    },
+    "2026": {
+      "ret_pct": 37.5,
+      "dd_pct": 8.8
+    }
+  },
+  "params": {
+    "K": 3,
+    "sma_len": 50,
+    "atr_len": 14,
+    "entry_atr_k": 1.0,
+    "stop_atr": 1.5,
+    "maxhold": 40,
+    "cooldown": 10,
+    "lookback": 60
+  }
+}
