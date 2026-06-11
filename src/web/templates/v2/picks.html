@@ -29,7 +29,7 @@ const MODELS = [
   {key: "momentum_pseudo_n100_adv",    title: "Liquid 100 Momentum",  desc: "Rotation monthly • top-100 ADV from N500 • rank-1 (fixed May universe anchor) • DAILY 3×ATR from-entry stop check",  schedule: "monthly"},
   {key: "momentum_retest_n500",        title: "Retest Momentum",      desc: "Rotation monthly: basket of 4 (top-120 ADV N500) • DAILY entry on retest within 20% of 20-EMA • retain top-4 • no hard stop", schedule: "monthly", multi: 4},
   {key: "emerging_momentum",           title: "Emerging Momentum",    desc: "Single-position (max-1) momentum rotation on emerging mid/small caps (PIT N500 minus N100) • 30d vol-adj ret>0 • ≤₹3000 • retain-1 • rotation monthly + mid-month (5% lead) • DAILY checks: 2.5×ATR stop (no profit-take — winners run)", schedule: "monthly_midcheck"},
-  {key: "price_meanrev_n500",          title: "Price Dip-Buy (PAPER)", desc: "PAPER-ONLY limit dip-buy: resting LIMIT at SMA50−1×ATR on PIT N500, ranked by 60d momentum (K=3) • exit at SMA50 target / 1.5×ATR stop / 40d time • 10d re-entry cooldown • edge needs LIMIT fills (close-fill 36% vs 103% CAGR) — never market orders", schedule: "daily", multi: 3},
+  {key: "price_meanrev_n500",          title: "Price Dip-Buy",         desc: "Resting LIMIT buy at SMA50−1×ATR on PIT N500, ranked by 60d momentum (K=3) • exits: SMA50 target / 1.5×ATR stop / 40d time (5-min intraday checks) • 10d re-entry cooldown • dedicated limit executor (edge needs LIMIT fills: close-fill 36% vs 103% CAGR)", schedule: "daily", multi: 3},
 ];
 
 // Format YYYY-MM-DD in local TZ (avoid toISOString → UTC date drift).

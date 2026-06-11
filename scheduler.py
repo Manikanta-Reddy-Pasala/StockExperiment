@@ -494,7 +494,7 @@ def run_scheduler():
     logger.info("  - n20_daily_large_only:       signal 09:25 + execute 09:30 (weekly rotation; key=n20 legacy, folder=n40)")
     logger.info("  - momentum_retest_n500:       signal 09:26 + execute 09:34 (K=3 multi, gated by enabled flag)")
     logger.info("  - emerging_momentum:          signal 09:29 + execute 09:37 (single, mid-month; emerging mid/small max-1, gated by enabled flag)")
-    logger.info("  - price_meanrev_n500:         signal 08:55 only (K=3 limit dip-buy, PAPER — no execute job)")
+    logger.info("  - price_meanrev_n500:         signal 08:55 + LIMIT place 09:16 + exits q5min 09:30-15:10 + reconcile 15:20 (K=3 limit dip-buy, dedicated limit executor)")
     logger.info("")
     logger.info("Maintenance:")
     logger.info("  - Cleanup Old Snapshots: Weekly (Sunday) at 03:00 AM")
@@ -539,10 +539,11 @@ def run_scheduler():
         register_trading_jobs as register_emerging_jobs,
         register_data_jobs as register_emerging_data_jobs,
     )
-    # Price mean-reversion dip-buy (K=3, PAPER-ONLY): emit-only 08:55. NO
-    # execute job by design — the edge needs LIMIT fills at the dip level
-    # (close-fill = 36% vs 103% CAGR) and the shared executor is market-order;
-    # live_signal.py keeps its own limit-fill paper ledger instead.
+    # Price mean-reversion dip-buy (K=3): 08:55 emit + DEDICATED limit executor
+    # (09:16 resting LIMIT day orders, 5-min exit polling, 15:20 fill reconcile).
+    # Must NEVER route via fyers_executor_multi — the edge needs LIMIT fills at
+    # the dip level (close-fill = 36% vs 103% CAGR). Gated by enabled +
+    # signals_only flags like every model.
     from tools.models.price_meanrev_n500.cron import (
         register_trading_jobs as register_price_meanrev_jobs,
     )

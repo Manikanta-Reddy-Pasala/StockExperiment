@@ -8,10 +8,14 @@ never be wired into the market-order executor. These tests guard:
   3. registration: MODEL_PATHS + MODEL_INDEX + KNOWN_MODELS(signals_only=True)
   4. cron registers an emit job and does NOT register any execute job
 """
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
 import src.web.admin_routes as ar
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
 from src.services.trading.model_ledger_service import KNOWN_MODELS
 from tools.shared.model_universe import MODEL_INDEX
 from tools.models.price_meanrev_n500 import strategy as S
@@ -76,31 +80,66 @@ def test_known_models_seeds_paper_only_zero_capital():
     assert row.get("enabled", True) is True  # enabled so live_signal emits
 
 
-# ---- 4. cron: emit-only, never an execute job -------------------------------
+# ---- 4. cron: emit + LIMIT executor jobs (never the market-fill executor) ---
 class _FakeJob:
     def __init__(self, rec): self._rec = rec
     def at(self, t): self._rec["at"] = t; return self
     def do(self, fn): self._rec["fn"] = fn; return self
 
 
-class _FakeSchedule:
-    def __init__(self): self.jobs = []
-    def every(self):
-        rec = {}; self.jobs.append(rec); return _FakeDay(rec)
-
-
 class _FakeDay:
     def __init__(self, rec): self.rec = rec
     @property
     def day(self): return _FakeJob(self.rec)
+    @property
+    def minutes(self): return _FakeJob(self.rec)
 
 
-def test_cron_registers_emit_only():
+class _FakeSchedule:
+    def __init__(self): self.jobs = []
+    def every(self, n=None):
+        rec = {"every": n}; self.jobs.append(rec); return _FakeDay(rec)
+
+
+def test_cron_registers_limit_executor_jobs():
     sch = _FakeSchedule()
     C.register_trading_jobs(sch)
     C.register_data_jobs(sch)
-    assert len(sch.jobs) == 1                      # exactly one job: the emit
-    assert sch.jobs[0]["at"] == "08:55"
-    assert sch.jobs[0]["fn"].__name__ == "emit_signal"
-    # the module must not even define an execute_orders entry point
-    assert not hasattr(C, "execute_orders")
+    names = {j["fn"].__name__ for j in sch.jobs}
+    assert names == {"emit_signal", "place_orders", "exit_checks", "reconcile_fills"}
+    by_name = {j["fn"].__name__: j for j in sch.jobs}
+    assert by_name["emit_signal"]["at"] == "08:55"
+    assert by_name["place_orders"]["at"] == "09:16"      # post-open resting limits
+    assert by_name["reconcile_fills"]["at"] == "15:20"
+    assert by_name["exit_checks"]["every"] == 5          # 5-min intraday polling
+
+
+def test_cron_never_routes_through_market_fill_executor():
+    """The edge needs LIMIT fills (close-fill = 36% vs 103% CAGR) — this model
+    must NEVER execute via fyers_executor_multi's fill-now-at-LTP path."""
+    src = (ROOT_DIR / "tools/models/price_meanrev_n500/cron.py").read_text()
+    assert "fyers_executor_multi" not in src.replace(
+        "must NEVER route through fyers_executor_multi", "")
+    assert "fyers_executor_limit" in src
+
+
+# ---- 5. limit executor pure logic --------------------------------------------
+from tools.live.fyers_executor_limit import decide_exit, trading_days_between
+
+
+def test_decide_exit_stop_before_target_on_both_hit():
+    # ltp at/below stop wins even if it also clears target ordering edge cases
+    assert decide_exit(94.0, 95.0, 105.0, 0, 40) == "STOP"
+    assert decide_exit(106.0, 95.0, 105.0, 0, 40) == "TARGET"
+    assert decide_exit(100.0, 95.0, 105.0, 40, 40) == "TIME"
+    assert decide_exit(100.0, 95.0, 105.0, 39, 40) is None
+    assert decide_exit(None, 95.0, 105.0, 50, 40) is None   # no LTP -> hold
+
+
+def test_trading_days_between_counts_only_trading_days():
+    from datetime import date
+    always = lambda dt: True
+    weekdays = lambda dt: dt.weekday() < 5
+    assert trading_days_between(date(2026, 6, 1), date(2026, 6, 5), always) == 4
+    # Mon 2026-06-08 -> Mon 2026-06-15 spans one weekend: 5 weekdays
+    assert trading_days_between(date(2026, 6, 8), date(2026, 6, 15), weekdays) == 5

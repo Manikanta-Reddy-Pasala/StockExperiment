@@ -110,11 +110,13 @@ KNOWN_MODELS = [
         "name": "price_meanrev_n500",
         "default_capital": 0,
         "enabled": True,
-        # PAPER-ONLY by design: edge needs LIMIT fills at the dip level
-        # (close-fill = 36% vs 103% CAGR) and the executor is market-order —
-        # live_signal.py keeps its own limit-fill paper ledger instead.
+        # Seeds OBSERVE-safe (signals_only=True, 0 capital): the edge needs
+        # LIMIT fills at the dip level (close-fill = 36% vs 103% CAGR), served
+        # by the dedicated fyers_executor_limit (resting day limits + 5-min
+        # exit polling). Flip signals_only + fund via the settings UI / psql
+        # to trade real — the limit executor honors both flags.
         "signals_only": True,
-        "description": "Price mean-reversion dip-buy K=3 (limit @ SMA50-1ATR, exit SMA50 / 1.5ATR stop / 40d, PIT N500) — PAPER",
+        "description": "Price mean-reversion dip-buy K=3 (resting LIMIT @ SMA50-1ATR, exit SMA50 / 1.5ATR stop / 40d, PIT N500, dedicated limit executor)",
     },
 ]
 
@@ -147,6 +149,7 @@ INTRADAY_MODELS = {
 # wrongly treat momentum_retest_n500 as a single-position model.
 MULTI_HOLDING_MODELS = {
     "momentum_retest_n500": 4,   # K4 (see tools/models/momentum_retest_n500/strategy.py)
+    "price_meanrev_n500": 3,     # K3 limit dip-buy (tools/models/price_meanrev_n500/strategy.py)
 }
 
 
