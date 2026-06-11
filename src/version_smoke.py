@@ -1,0 +1,1 @@
+PIPELINE_SMOKE = "v6-workflow-2026-06-11"
