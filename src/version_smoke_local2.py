@@ -1,0 +1,1 @@
+PIPELINE_SMOKE_LOCAL2 = "local-pass-2-2026-06-11"
