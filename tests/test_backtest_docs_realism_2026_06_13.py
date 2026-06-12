@@ -25,7 +25,7 @@ MODELS = [
 EXPECTED = {
     "emerging_momentum": (105.29, 38.57, 2.73),
     "momentum_n100_top5_max1": (52.14, 49.13, 1.06),
-    "momentum_pseudo_n100_adv": (12.73, 59.42, 0.21),
+    "momentum_pseudo_n100_adv": (66.46, 44.89, 1.48),  # 2026-06-13 nosml rework
     "momentum_retest_n500": (58.71, 34.03, 1.73),
     "n40": (28.38, 43.92, 0.65),
 }
@@ -65,33 +65,33 @@ def test_settings_cards_quote_new_net_numbers():
     for needle in (
         "+105.3% CAGR",   # emerging full
         "+52.1% CAGR",    # n100 full
-        "+12.7% CAGR",    # pseudo full (collapse)
+        "+66.5% CAGR",    # pseudo full (nosml rework 2026-06-13)
         "+58.7% CAGR",    # retest full
         "+28.4% CAGR",    # n40 full
         "net of charges",
         "next-open fills",
     ):
         assert needle in html, f"settings.html missing: {needle}"
-    # the invalidated old headlines must not survive un-annotated as current
-    assert "+76.6% CAGR / 29% DD" not in html, "stale pseudo headline still in settings.html"
-    assert "+115.6% CAGR / 37.9% DD / Calmar 3.05 / 68 trades — UNLEVERED (own cash)']" not in html
+    # the collapsed/biased pseudo headline must not survive as current
+    assert "+12.7% CAGR" not in html, "stale collapsed pseudo headline still in settings.html"
 
 
-def test_pseudo_collapse_flagged_in_settings():
+def test_pseudo_nosml_flagged_in_settings():
     html = (ROOT / "src" / "web" / "templates" / "v2" / "settings.html").read_text()
-    assert "COLLAPSED" in html, "pseudo PIT-collapse warning missing from settings.html"
+    assert "nosml" in html, "pseudo nosml rework note missing from settings.html"
+    assert "survivorship" in html, "pseudo survivorship-bias explanation missing from settings.html"
 
 
 def test_readme_table_updated():
     md = (ROOT / "README.md").read_text()
-    for needle in ("+105.29%", "+58.71%", "+52.14%", "+28.38%", "+12.73%",
+    for needle in ("+105.29%", "+58.71%", "+52.14%", "+28.38%", "+66.46%",
                    "net of real Fyers CNC charges", "next-open fills"):
         assert needle in md, f"README.md missing: {needle}"
 
 
 def test_exports_index_regenerated():
     md = (ROOT / "exports" / "models" / "SUMMARY.md").read_text()
-    for needle in ("+105.3%", "+58.7%", "+52.1%", "+28.4%", "+12.7%",
+    for needle in ("+105.3%", "+58.7%", "+52.1%", "+28.4%", "+66.5%",
                    "net of real Fyers CNC charges"):
         assert needle in md, f"exports/models/SUMMARY.md missing: {needle}"
 

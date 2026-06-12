@@ -1,50 +1,50 @@
 {
   "model": "momentum_pseudo_n100_adv",
-  "start": "2021-03-01",
-  "end": "2026-05-31",
-  "years": 5.248,
+  "start": "2021-06-13",
+  "end": "2026-06-12",
+  "years": 4.997,
   "capital": 1000000.0,
-  "final_nav": 1875741.0,
-  "total_return_pct": 87.57,
-  "cagr_pct": 12.73,
-  "max_dd_pct": 59.42,
-  "calmar": 0.21,
-  "trades": 49,
-  "wins": 26,
-  "losses": 23,
-  "win_rate_pct": 53.1,
+  "final_nav": 12757236.0,
+  "total_return_pct": 1175.72,
+  "cagr_pct": 66.46,
+  "max_dd_pct": 44.89,
+  "calmar": 1.48,
+  "trades": 51,
+  "wins": 37,
+  "losses": 14,
+  "win_rate_pct": 72.5,
   "open_position": {
-    "symbol": "NSE:ADANIGREEN-EQ",
-    "qty": 1271,
-    "entry_px": 1291.0
+    "symbol": "NSE:HFCL-EQ",
+    "qty": 74230,
+    "entry_px": 180.0
   },
   "per_year": {
     "2021": {
-      "ret_pct": -2.0,
-      "dd_pct": 31.2
+      "ret_pct": 27.4,
+      "dd_pct": 15.7
     },
     "2022": {
-      "ret_pct": -17.4,
-      "dd_pct": 34.5
+      "ret_pct": -3.3,
+      "dd_pct": 36.4
     },
     "2023": {
-      "ret_pct": 85.7,
-      "dd_pct": 23.7
+      "ret_pct": 129.3,
+      "dd_pct": 23.5
     },
     "2024": {
-      "ret_pct": -23.2,
-      "dd_pct": 46.3
+      "ret_pct": 39.9,
+      "dd_pct": 44.9
     },
     "2025": {
-      "ret_pct": -2.8,
-      "dd_pct": 43.4
+      "ret_pct": 107.1,
+      "dd_pct": 28.4
     },
     "2026": {
-      "ret_pct": 55.5,
-      "dd_pct": 14.6
+      "ret_pct": 45.1,
+      "dd_pct": 17.9
     }
   },
-  "charges_total": 110268.44,
+  "charges_total": 366498.74,
   "fill_at_next_open": true,
   "charges_model": "fyers_cnc"
 }

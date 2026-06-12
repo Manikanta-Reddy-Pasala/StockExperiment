@@ -52,7 +52,7 @@ from tools.shared.rotation_strategy import decide_rotation, midmonth_lead_ok  # 
 from tools.shared.nse_calendar import is_first_trading_day_of_month  # noqa: E402
 from tools.models.momentum_pseudo_n100_adv import strategy as S  # noqa: E402
 from tools.models.momentum_pseudo_n100_adv.strategy import (  # noqa: E402  shared w/ backtest
-    LOOKBACK, MAX_PRICE, SMA_LONG, RETAIN, MIDMONTH_LEAD)
+    LOOKBACK, MAX_PRICE, SMA_LONG, RETAIN, MIDMONTH_LEAD, EXCLUDE_SMALLCAP)
 
 log = logging.getLogger("momrot_pseudo_signal")
 
@@ -254,8 +254,8 @@ def rank_universe(symbols: List[str], today_ts: int,
     """
     rows = []
     for plain_sym in symbols:
-        if plain_sym in _SMALLCAP_SET:
-            continue  # smallcap exclusion (backtest parity)
+        if EXCLUDE_SMALLCAP and plain_sym in _SMALLCAP_SET:
+            continue  # smallcap exclusion (backtest parity) — OFF by default (nosml, 2026-06-13)
         fyers_sym = f"NSE:{plain_sym}-EQ"
         c_now = get_close_at(fyers_sym, today_ts)
         # 30 TRADING days back (backtest parity), not 30 calendar days.

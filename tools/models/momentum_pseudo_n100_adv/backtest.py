@@ -1,20 +1,22 @@
-"""Standalone backtest: pseudo-N100 (ADV-rank from N500, yearly PIT rebuild, MINUS Small).
+"""Standalone backtest: pseudo-N100 (ADV-rank from N500, yearly PIT rebuild, NO smallcap excl).
 
-2026-06-13 REALISM CONVENTION (next-open fills + real Fyers CNC charges + PIT
-smallcap snapshots, see FILL_AT_NEXT_OPEN / CHARGES below) — net of charges:
-full-cycle 2021-03→2026-05 = +12.7% CAGR / 59.4% DD / Calmar 0.21 / 49 trades;
-3-yr 2023-05→2026-05 = +23.9% CAGR / 59.4% DD / Calmar 0.40 — see
+2026-06-13 "nosml" rework + REALISM CONVENTION (next-open fills + real Fyers
+CNC charges + PIT N500, see FILL_AT_NEXT_OPEN / CHARGES below) — net of charges:
+full-cycle 2021-06→2026-06 = +66.5% CAGR / 44.9% DD / Calmar 1.48 / 51 trades /
+72.5% win; 3-yr 2023-06→2026-06 = +109.3% / 44.9% DD / Calmar 2.43 / 80% win;
+since Mar-2025 = +158.8% / 25.8% DD / Calmar 6.15 — see
 exports/models/momentum_pseudo_n100_adv/SUMMARY.md.
 
-⚠⚠ COLLAPSE vs the previously-published +77.4%/43.8%/1.77: that figure was
-substantially SURVIVORSHIP-BIASED — the old smallcap exclusion applied TODAY's
-Smallcap-250 list to every historical year, silently keeping names that were
-smallcap THEN but grew large (the multibaggers the model rode). Controlled
-isolation: realism alone (next-open + charges) = 77.4→66.5% (normal haircut);
-the PIT smallcap fix = 66.5→12.7% (the entire collapse; WR 74→53%, every year
-degrades). The "drop smallcaps, +2pp free" sweep finding is INVALIDATED; the
-model is pending strategy-level review (possibly drop the smallcap exclusion
-entirely, or re-validate).
+WHY nosml (EXCLUDE_SMALLCAP=False in strategy.py): the old Smallcap-250
+exclusion was SURVIVORSHIP-BIASED — it applied TODAY's Smallcap-250 list to
+every historical year, deleting the ADV-rising midcap winners the model rides.
+Under correct PIT snapshots it collapsed full-cycle CAGR to ~13% (the prior
+published +77.4% was that bias). Dropping the exclusion restored a
+walk-forward-validated edge: stitched OOS 2023→2026 +60.3% CAGR / Calmar 1.34
+vs the old smallcap-excluded config +23.8% / 0.51, beating every fold
+(adversarially re-verified). The snapshot machinery (smallcap_at) is retained
+only to reproduce the retired biased config (flip EXCLUDE_SMALLCAP True).
+NOTE: HIGH-DD sleeve (~45% full-cycle) — size accordingly in the blend.
 
 Single-position monthly rotation (lb=30, max-1, top-1 / RET1), but universe =
 top-100 by 20-day ADV at each yearly anchor from PIT N500 instead of the real
@@ -56,7 +58,7 @@ from tools.live.broker_charges import compute_charges
 from tools.models.momentum_pseudo_n100_adv import strategy as S  # noqa: E402
 from tools.models.momentum_pseudo_n100_adv.strategy import (  # noqa: E402  shared w/ live
     LOOKBACK, ADV_WIN, UNIV_SIZE, MAX_PRICE, RETAIN, MIDMONTH_LEAD, SMA_GATE,
-    UNIVERSE_ANCHOR_MONTH, UNIVERSE_ANCHOR_DAY, build_calendar)
+    EXCLUDE_SMALLCAP, UNIVERSE_ANCHOR_MONTH, UNIVERSE_ANCHOR_DAY, build_calendar)
 
 # ── BACKTEST REALISM CONVENTION (2026-06-13, identical across all 5 models) ──
 # Decision LOGIC (lookbacks, ranks, gates, stop levels, cadence) is UNCHANGED;
@@ -269,12 +271,16 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
         pit_adv = pit_adv[[s for s in pit_adv.index
                            if s.replace("NSE:", "").replace("-EQ", "") in elig500]]
         top = pit_adv.head(UNIV_SIZE).index.tolist()
-        # Drop Small-cap names from top-100 — using the PIT smallcap snapshot
-        # in force AT THIS ANCHOR (2026-06-13 fix: was today's list applied to
-        # every year). NOTE: the old "+2pp CAGR, DD unchanged" sweep win is
-        # INVALIDATED under PIT snapshots (see module docstring).
-        sml = smallcap_at(ys.date())
-        year_universes[ys] = [s for s in top if s.replace("NSE:","").replace("-EQ","") not in sml]
+        # Smallcap-250 exclusion — DROPPED by default ("nosml", 2026-06-13,
+        # EXCLUDE_SMALLCAP=False in strategy.py). The PIT exclusion deleted the
+        # ADV-rising midcap winners the model rides (collapsed CAGR to ~11%);
+        # removing it = +69.8% CAGR / 44.9% DD, walk-forward-validated. The
+        # snapshot machinery (smallcap_at) is retained for reproducing the
+        # retired biased config (flip the flag True).
+        if EXCLUDE_SMALLCAP:
+            sml = smallcap_at(ys.date())
+            top = [s for s in top if s.replace("NSE:","").replace("-EQ","") not in sml]
+        year_universes[ys] = top
 
     def pick_universe(d):
         """Return the PIT universe in force on date `d` (latest anchor <= d)."""

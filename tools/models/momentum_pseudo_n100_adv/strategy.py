@@ -40,6 +40,15 @@ UNIV_SIZE = 100      # top-N by 20d ADV (pseudo-N100)
 MAX_PRICE = 3000.0   # skip names priced above this at entry
 SMA_LONG = 200       # uptrend filter: close > 200d SMA
 SMA_GATE = False     # 2026-05-31: dropping the 200d gate lifted CAGR +71->+77% (raises DD some); kept off.
+# 2026-06-13: Smallcap-250 exclusion DROPPED ("nosml"). The old exclusion was
+# survivorship-biased — under PIT snapshots it deleted the ADV-rising midcap
+# winners the model rides, collapsing full-cycle CAGR to ~11% (net). Removing
+# it = +69.8% CAGR / 44.9% DD / Calmar 1.56 full, walk-forward-validated
+# (stitched OOS 2023-26 +60.3% vs +23.8% baseline, beats every fold;
+# adversarially re-verified). See stockexp-model-research-2026-06-13.
+# Flip to True only to reproduce the retired biased config. Backtest + live
+# both gate on this constant for parity.
+EXCLUDE_SMALLCAP = False
 RETAIN = 1           # exit band — top-1 rotation (wins on the fixed anchor)
 MIDMONTH_LEAD = 3.0  # only used by the opt-in --mid-month-check path (default OFF)
 # From-entry ATR hard stop (backtest-validated 2026-06-02 via

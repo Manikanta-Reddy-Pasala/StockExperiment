@@ -1,7 +1,7 @@
 # Liquid 100 Momentum (`momentum_pseudo_n100_adv`)
 
 **Status:** LIVE  
-Monthly (1st trading day) rotation, single position (rank-1, RET1), 30-trading-day return rank, uptrend (>200d SMA) + ≤₹3K filter. Universe rebuilt yearly at a FIXED mid-May anchor. + DAILY from-entry ATR×3.0 hard stop (entry − 3×ATR(14)).
+Monthly (1st trading day) rotation, single position (rank-1, RET1), 30-trading-day return rank, ≤₹3K filter (200d-SMA gate off). No smallcap exclusion (nosml). Universe rebuilt yearly at a FIXED mid-May anchor. + DAILY from-entry ATR×3.0 hard stop (entry − 3×ATR(14)).
 
 **Universe:** Top-100 by 20d ADV from N500 (yearly-PIT rebuild)
 
@@ -21,30 +21,30 @@ Backtest window: **2021-03-01 → 2026-05-31** (emerging → 2026-06-10; full ~5
 
 | Metric | Value |
 |---|---|
-| Final NAV (₹10L start) | ₹1,875,741 |
-| Total return | +87.6% |
-| CAGR (annualized) | +12.7% |
-| Max drawdown | 59.4% |
-| Calmar | 0.21 |
-| Trades | 49 (26W / 23L) · 53% win |
-| Total charges (real Fyers CNC, deducted) | ₹110,268 |
+| Final NAV (₹10L start) | ₹12,757,236 |
+| Total return | +1175.7% |
+| CAGR (annualized) | +66.5% |
+| Max drawdown | 44.9% |
+| Calmar | 1.48 |
+| Trades | 51 (37W / 14L) · 72% win |
+| Total charges (real Fyers CNC, deducted) | ₹366,499 |
 
 ## Year-by-year breakdown
 
 | Year | Return % | Intra-yr DD % |
 |---|---:|---:|
-| 2021 | -2.0% | 31.2% |
-| 2022 | -17.4% | 34.5% |
-| 2023 | +85.7% | 23.7% |
-| 2024 | -23.2% | 46.3% |
-| 2025 | -2.8% | 43.4% |
-| 2026 | +55.5% | 14.6% |
+| 2021 | +27.4% | 15.7% |
+| 2022 | -3.3% | 36.4% |
+| 2023 | +129.3% | 23.5% |
+| 2024 | +39.9% | 44.9% |
+| 2025 | +107.1% | 28.4% |
+| 2026 | +45.1% | 17.9% |
 
 ## Note
 
-⚠️⚠️ COLLAPSED UNDER PIT TREATMENT (2026-06-13 realism regen, net of charges + next-open fills + PIT smallcap-250 snapshots): full-cycle 2021-03→2026-05 +12.7% CAGR / 59.4% DD / Calmar 0.21 / 53% win; 3-yr 2023-05→2026-05 +23.9% / 59.4% DD / Calmar 0.40. The previously-published +77.4% was substantially SURVIVORSHIP-BIASED: the old smallcap-exclusion applied TODAY's Smallcap-250 list to every historical year, which silently kept names that were smallcap THEN but grew large (the multibaggers the model rode). Diagnostic isolation: realism alone (next-open fills + charges) = 77.4→66.5%; the PIT smallcap fix = 66.5→12.7%. The 'drop smallcaps, +2pp free' sweep finding is INVALIDATED. Model pending strategy-level review (possibly drop the smallcap exclusion entirely or re-validate). ADV-ranked pseudo-N100 (not the real index) — ADV-selection bias remains by design. From-entry ATR×3.0 hard stop unchanged (tools.shared.stops, backtest + live --stop-check, no drift).
+2026-06-13 'nosml' rework — Smallcap-250 exclusion DROPPED (EXCLUDE_SMALLCAP=False, backtest + live in parity). Net of charges + next-open fills + PIT N500: full-cycle 2021-06→2026-06 +66.5% CAGR / 44.9% DD / Calmar 1.48 / 51 trades / 72.5% win; 3-yr 2023-06→2026-06 +109.3% / 44.9% DD / Calmar 2.43 / 80% win; since Mar-2025 +158.8% / 25.8% DD / Calmar 6.15. Per-year net: 2021 +27 / 2022 −3 / 2023 +129 / 2024 +40 / 2025 +107 / 2026 +45 (every year positive bar a flat 2022). Walk-forward-validated: stitched OOS 2023→2026 +60.3% CAGR / Calmar 1.34 vs the old smallcap-excluded config +23.8% / 0.51, beating every fold (adversarially re-verified). The old exclusion was survivorship-biased — applying TODAY's Smallcap-250 list to every historical year deleted the ADV-rising midcap winners the model rides (collapsed full-cycle CAGR to ~13% under PIT); the prior published +77.4% was that bias. ADV-ranked pseudo-N100 (not the real index) — ADV-selection bias remains by design. HIGH-DD sleeve (~45% full) — size accordingly in the blend. From-entry ATR×3.0 hard stop unchanged (tools.shared.stops, backtest + live --stop-check, no drift).
 
-**Open position at window end:** NSE:ADANIGREEN-EQ qty 1271 entry ₹1291.0 on ? (unrealized +0)
+**Open position at window end:** NSE:HFCL-EQ qty 74230 entry ₹180.0 on ? (unrealized +0)
 
 ---
 *Auto-generated from summary.json by tools/analysis/refresh_export_docs.py — do not hand-edit.*
