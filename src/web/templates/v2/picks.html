@@ -218,7 +218,7 @@ function renderCard(m, idx, ranking, status) {
   let rows = "";
   if (top.length === 0) {
     const note = (ranking && ranking.note) || 'No ranking JSON yet — generate one for this model.';
-    rows = `<tr><td colspan="5" class="text-center text-muted py-3">
+    rows = `<tr><td colspan="6" class="text-center text-muted py-3">
       <div class="mb-2">${note}</div>
       <button class="btn btn-sm btn-primary" onclick="runSignal('${m.key}', event)" title="Force re-run live_signal with latest data">
         <i class="bi bi-arrow-clockwise"></i> Re-calculate ${m.title}
@@ -243,6 +243,7 @@ function renderCard(m, idx, ranking, status) {
         <td><strong>${r.symbol}</strong></td>
         <td class="small text-muted">${r.name || ''}</td>
         <td class="text-end ${cls(r.ret_30d_pct)}">${fmtPct(r.ret_30d_pct)}</td>
+        <td class="text-end small-mute">${r.score != null ? r.score : '—'}</td>
         <td class="text-end">${fmtINR(r.price)}</td>
       </tr>`;
     }).join('');
@@ -391,7 +392,9 @@ function renderCard(m, idx, ranking, status) {
             <thead>
               <tr>
                 <th>Rank</th><th>Symbol</th><th>Name</th>
-                <th class="text-end">30d Return</th><th class="text-end">Price ₹</th>
+                <th class="text-end">30d Return</th>
+                <th class="text-end" title="The model's actual rank key. For emerging: vol-adjusted momentum = 30d return ÷ 60d return-volatility — rows are sorted by THIS, not raw return.">Score</th>
+                <th class="text-end">Price ₹</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>

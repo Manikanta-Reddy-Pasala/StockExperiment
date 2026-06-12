@@ -298,6 +298,16 @@ def rank_pool(cl, pool, di):
         pool: the PIT symbol pool in force for this date.
         di: integer row index into `cl` for the rebalance day.
     """
+    return [s for s, _ in rank_pool_scored(cl, pool, di)]
+
+
+def rank_pool_scored(cl, pool, di):
+    """Like rank_pool but returns [(symbol, rank score)] best-to-worst.
+
+    The score is the actual rank key (LOOKBACK return, or return ÷ VOL_WIN-day
+    return-vol when RANK_MODE == 'vol_adj') so the UI can show WHY the order
+    differs from raw 30d return. Same filters and order as rank_pool.
+    """
     if di < LOOKBACK:
         return []
     row, rowL = cl.iloc[di], cl.iloc[di - LOOKBACK]
@@ -317,15 +327,14 @@ def rank_pool(cl, pool, di):
             v = vp[s].iloc[di] if s in vp.columns else None
             if v is None or pd.isna(v) or v <= 0:
                 continue
-            score = ret / v        # return per unit of volatility
+            score = ret / v
         out.append((s, score))
     out.sort(key=lambda x: x[1], reverse=True)
-    ranked = [s for s, _ in out]
     if CLIMBER_ENABLED:
         rank = mcap_rank_panel(cl)
         if rank is not None:
-            ranked = [s for s in ranked if _is_climber(rank, s, di)]
-    return ranked
+            out = [(s, sc) for s, sc in out if _is_climber(rank, s, di)]
+    return out
 
 
 def midret_pool(cl, pool, di):

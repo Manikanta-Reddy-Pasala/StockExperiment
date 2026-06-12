@@ -384,7 +384,9 @@ def main():
     pool = S.pool_for_date(anchors, pools, dates[di])
     log.info(f"PIT pool: {len(pool)} emerging symbols")
 
-    ranked = S.rank_pool(cl, pool, di)
+    ranked_scored = S.rank_pool_scored(cl, pool, di)
+    ranked = [s for s, _ in ranked_scored]
+    score_by_sym = dict(ranked_scored)
     midret = S.midret_pool(cl, pool, di)
     log.info(f"Ranked {len(ranked)} leaders. Top-5: "
              f"{[s.split(':')[-1] for s in ranked[:5]]}")
@@ -434,6 +436,9 @@ def main():
                 # UI "Return" column reads ret_30d_pct → emit the actual 30d return.
                 "ret_30d_pct": (round((float(cl[s].iloc[di]) / float(cl[s].iloc[di - 30]) - 1) * 100, 2)
                                 if di >= 30 and pd.notna(cl[s].iloc[di - 30]) and float(cl[s].iloc[di - 30]) > 0 else 0.0),
+                # The ACTUAL rank key (vol-adjusted momentum: 30d ret ÷ 60d
+                # return-vol) — explains why order differs from raw 30d return.
+                "score": round(float(score_by_sym.get(s, 0.0)), 2),
                 "price": round(float(cl[s].iloc[di]), 2),
             }
             for i, s in enumerate(ranked[:5])
