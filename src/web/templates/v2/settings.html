@@ -484,20 +484,6 @@ const MODEL_META = {
       ['Note', '⚠ ADV-selection bias — optimistic upper bound vs real-index Nifty 100'],
     ],
   },
-  'midcap_narrow_60d_breakout': {
-    universe: 'Midcap 40d-high breakout (PIT)', kind: 'equity',
-    title: 'Midcap Breakout',
-    rules: { top_n: 1, max_concurrent: 1, lookback: '40d high',
-             rebalance: 'EVENT: DAILY breakout scan to enter (40d-high + 2× vol); DAILY exit checks', stop: '-20%', target: '+100%',
-             exit: 'STOP -20% / TRAIL / +100% / 120d max-hold' },
-    strategy: [
-      ['Ranker', '40-day high + vol surge (≥2×) + above 200d SMA'],
-      ['Universe', 'Top-100 ADV from PIT N500 minus PIT Nifty-100 (mid/small)'],
-      ['Entry', 'Event-driven on a fresh 40-day-high breakout (next open)'],
-      ['Exit', 'STOP -20% / TRAIL (after +10%, -20% from peak) / +100% target / 120-day max-hold'],
-      ['Backtest 2021-03→2026-05 (PIT)', '⚠ +11.2% CAGR / 57% DD / Calmar 0.2 — effectively dead (only 13 trades/5yr)'],
-    ],
-  },
   'n20_daily_large_only': {
     universe: 'Top-40 ADV ∩ N100 (PIT)', kind: 'equity',
     title: 'Weekly Top-40',

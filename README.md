@@ -47,7 +47,6 @@ Production: `77.42.45.12` · App: <https://stock.oneshell.in> · Bot: `@stocks_m
 |-------|----------|---------|---------|------|--------|
 | `momentum_n100_top5_max1` | Real Nifty 100 | Monthly (1st weekday) + mid-month | CNC delivery | until it drops below rank-1 | rank by **15-trading-day** return, hold rank-1 (top-1 rotation) |
 | `momentum_pseudo_n100_adv` | Top-100 ADV from N500 minus Smallcap-250, yearly PIT rebuild (FIXED mid-May anchor), close > 200d SMA | Monthly | CNC | until it drops below rank-1 | rank by 30d return, hold rank-1 (top-1) + uptrend + ≤₹3K |
-| `midcap_narrow_60d_breakout` | ~100 NSE midcaps (top-100 ADV minus Nifty 100) | Event-driven (daily check) | CNC | up to 120d / target +100% / trail -20% from peak | 40d-high + vol >2× + 200d SMA, ALL must fire |
 | `n20_daily_large_only` | **Top-40** ADV ∩ Nifty 100 (n40; dir keeps legacy n20 name) | **Weekly** (1st trading day of ISO week) | CNC | until it drops below rank-1 | rank by 30d return + 200d SMA uptrend filter (PIT) |
 
 **Capital model (per model):**
@@ -257,7 +256,6 @@ days (n100/n500 ≈ Mar/Sep; pseudo's yearly pool May 15; midcap monthly).
 | pseudo | `yearly_universes.json` (top-100 ADV snapshot) + `nifty_smallcap250.csv` |
 | retest | `nifty500.csv` + `nifty_smallcap250.csv` |
 | emerging | `universe_union("n500")` (PIT membership) − N100 |
-| midcap | `midcap_narrow.json` |
 
 The `nifty_midcap150.csv` / `nifty_smallcap250.csv` also feed the cap tagging
 (`tools/shared/market_cap.py`).
@@ -281,7 +279,7 @@ curl -X POST https://stock.oneshell.in/admin/n20_daily_large_only/rebalance \
   -H 'Content-Type: application/json' -d '{"dry_run":false}'
 
 # Force fresh signal recompute
-curl -s 'https://stock.oneshell.in/admin/midcap_narrow_60d_breakout/ranking?recalc=1' | jq .
+curl -s 'https://stock.oneshell.in/admin/n20_daily_large_only/ranking?recalc=1' | jq .
 
 # Disable scheduler for a model (no real orders)
 # Settings UI → toggle Enabled → ledger persists, cron skips
@@ -355,7 +353,7 @@ point-in-time membership** (`eligible_at`) — no survivorship bias remains.
 | `momentum_retest_n500` (K=2, 20% band) | +64.2% | 57.1% | 1.1 | 88 | 53.4% | PIT N500 −Smallcap (top-120 ADV; incl large+mid) |
 | `n40` (weekly, top-40 ADV ∩ N100) | +41.2% | 36.9%¹ | 1.1 | 133 | 58.3% | PIT N100 |
 | `momentum_n100_top5_max1` (LB15 + mid-month + RET3) | +56.2% | 52.2% | 1.1 | 96 | 54.6% | PIT N100 |
-| `midcap_narrow_60d_breakout` (40d-high + 2× vol) | +1.65% | 68.2%¹ | 0.02 | 16 | 37.5% | PIT N500−N100 |
+| `midcap_narrow_60d_breakout` (40d-high + 2× vol) — RETIRED 2026-06-12 | +1.65% | 68.2%¹ | 0.02 | 16 | 37.5% | PIT N500−N100 |
 
 > Window: full-cycle **2021-03-01 → 2026-05-29**. **emerging is the standout** —
 > vol-adjusted momentum (return ÷ 60d volatility) on mid/small = **+111% organic
@@ -447,7 +445,7 @@ To reproduce:
 ```bash
 # inside trading_system_app container (where the DB is reachable)
 for m in momentum_n100_top5_max1 momentum_pseudo_n100_adv \
-         n20_daily_large_only midcap_narrow_60d_breakout; do
+         n20_daily_large_only; do
   python tools/models/$m/backtest.py --from 2016-05-15 --to 2026-05-12 \
     --capital 1000000 --out /app/exports/bt10yr/$m
 done

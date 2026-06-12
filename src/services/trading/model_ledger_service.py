@@ -95,12 +95,6 @@ KNOWN_MODELS = [
         "description": "Equity monthly rotation top-1 from pseudo-N100 (top-100 ADV from N500, yearly PIT rebuild)",
     },
     {
-        "name": "midcap_narrow_60d_breakout",
-        "default_capital": 30000,
-        "enabled": True,
-        "description": "Equity 60d-high swing on midcap_narrow (event-driven)",
-    },
-    {
         "name": "n20_daily_large_only",
         "default_capital": 30000,
         "enabled": True,
@@ -121,6 +115,10 @@ RETIRED_MODELS = [
                                     # 5-min validation showed the 102.8% backtest was
                                     # execution lookahead (EOD touch-set selection);
                                     # live-exact replay = 4 fills/15mo, −4.8%.
+    "midcap_narrow_60d_breakout",   # midcap 60d-high swing — RETIRED 2026-06-12 per
+                                    # user decision; position (TRITURBINE 41) manually
+                                    # sold at broker, SELL recorded in ledger. Rows
+                                    # have trade history so they persist (UI-filtered).
 ]
 
 # ---- Order product-type policy (single source of truth) -------------------

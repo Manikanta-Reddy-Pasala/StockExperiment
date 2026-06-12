@@ -39,7 +39,7 @@ def test_n40_uses_n100_index(monkeypatch):
 def test_file_based_model_not_gated(monkeypatch):
     # File-based models (curated JSON universe) map to None -> no opinion (allow).
     _fake_eligible(monkeypatch, {"n500": set()})
-    for m in ("momentum_n100_top5_max1", "momentum_pseudo_n100_adv", "midcap_narrow_60d_breakout"):
+    for m in ("momentum_n100_top5_max1", "momentum_pseudo_n100_adv"):
         assert MU.is_in_universe(m, "ANYTHING", date(2026, 6, 2)) is None
 
 
@@ -68,7 +68,6 @@ def test_every_known_model_is_registered():
     expected = {
         "momentum_retest_n500", "n20_daily_large_only",
         "emerging_momentum", "momentum_n100_top5_max1", "momentum_pseudo_n100_adv",
-        "midcap_narrow_60d_breakout",
     }
     assert expected.issubset(set(MU.MODEL_INDEX)), (
         "a live model is missing from MODEL_INDEX — add it (index name or None)")

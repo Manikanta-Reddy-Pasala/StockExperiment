@@ -29,7 +29,6 @@ MODELS: "OrderedDict[str, str]" = OrderedDict(
     [
         ("momentum_n100_top5_max1", "n100"),
         ("momentum_pseudo_n100_adv", "pseudo"),
-        ("midcap_narrow_60d_breakout", "midcap"),
         ("n20_daily_large_only", "n20"),
     ]
 )

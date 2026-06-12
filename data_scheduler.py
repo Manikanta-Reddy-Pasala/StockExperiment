@@ -761,15 +761,11 @@ def run_scheduler():
     from tools.models.momentum_pseudo_n100_adv.cron import (
         register_data_jobs as register_pseudo_n100_data,
     )
-    from tools.models.midcap_narrow_60d_breakout.cron import (
-        register_data_jobs as register_midcap_narrow_data,
-    )
     from tools.models.n40.cron import (
         register_data_jobs as register_n20_daily_data,
     )
     register_momentum_n100_data(schedule)
     register_pseudo_n100_data(schedule)
-    register_midcap_narrow_data(schedule)
     register_n20_daily_data(schedule)
 
     # Legacy 4-step saga (run_pipeline.py / pipeline_saga) REMOVED here: it was

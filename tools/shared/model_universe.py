@@ -37,7 +37,6 @@ MODEL_INDEX: dict[str, Optional[str]] = {
     # file-based (curated JSON universe) — NOT index-gated:
     "momentum_n100_top5_max1":    None,
     "momentum_pseudo_n100_adv":   None,
-    "midcap_narrow_60d_breakout": None,
 }
 
 _SENTINEL = "__unknown__"

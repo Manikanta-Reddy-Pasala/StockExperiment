@@ -360,7 +360,6 @@ def refresh_all_fyers_tokens():
 _MODEL_SIGNAL_FILES = {
     "momentum_n100_top5_max1":   "/app/logs/momrot/signals/{today}_momrot_n100.json",
     "momentum_pseudo_n100_adv":  "/app/logs/momrot_pseudo/signals/{today}_pseudo_n100.json",
-    "midcap_narrow_60d_breakout": "/app/logs/midcap_narrow/signals/{today}_midcap_narrow.json",
     "n20_daily_large_only":      "/app/logs/n20_daily/signals/{today}_n20.json",
     "emerging_momentum":         "/app/logs/emerging_momentum/signals/{today}_emerging.json",
     # momentum_retest_n500 writes signals/latest.json (not date-stamped) — its
@@ -490,7 +489,6 @@ def run_scheduler():
     logger.info("Registered models (trading-side):")
     logger.info("  - momentum_n100_top5_max1:    signal 09:25 + execute 09:30 (always live)")
     logger.info("  - momentum_pseudo_n100_adv:   signal 09:25 + execute 09:30 (monthly rebal)")
-    logger.info("  - midcap_narrow_60d_breakout: signal 09:25 + execute 09:32 + EOD signal 15:25")
     logger.info("  - n20_daily_large_only:       signal 09:25 + execute 09:30 (weekly rotation; key=n20 legacy, folder=n40)")
     logger.info("  - momentum_retest_n500:       signal 09:26 + execute 09:34 (K=3 multi, gated by enabled flag)")
     logger.info("  - emerging_momentum:          signal 09:29 + execute 09:37 (single, mid-month; emerging mid/small max-1, gated by enabled flag)")
@@ -517,9 +515,6 @@ def run_scheduler():
     from tools.models.momentum_pseudo_n100_adv.cron import (
         register_trading_jobs as register_pseudo_n100_jobs,
     )
-    from tools.models.midcap_narrow_60d_breakout.cron import (
-        register_trading_jobs as register_midcap_narrow_jobs,
-    )
     from tools.models.n40.cron import (
         register_trading_jobs as register_n20_daily_jobs,
     )
@@ -540,7 +535,6 @@ def run_scheduler():
     )
     register_momentum_n100_jobs(schedule)
     register_pseudo_n100_jobs(schedule)
-    register_midcap_narrow_jobs(schedule)
     register_n20_daily_jobs(schedule)
     register_mr500_jobs(schedule)
     register_mr500_data_jobs(schedule)
@@ -550,6 +544,8 @@ def run_scheduler():
     # faithful = −63%). Disabled + moved to _archived_models. Do not re-register.
     # price_meanrev_n500 ARCHIVED 2026-06-12 — no edge (5-min validation: the
     # 102.8% backtest was execution lookahead; live-exact = 4 fills/15mo, −4.8%).
+    # midcap_narrow_60d_breakout RETIRED 2026-06-12 — user closed the position
+    # (TRITURBINE sold manually) and asked to remove the model. Do not re-register.
 
     # M3 — SAFE catch-up: if we restarted after the morning trade window on a
     # trading day, ALERT (never auto-execute) so a human can check for misses.

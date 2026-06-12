@@ -26,7 +26,6 @@ from src.models.model_ledger_models import ModelLedger, ModelSettings, ModelTrad
 EQUITY_MODELS = [
     "momentum_n100_top5_max1",
     "momentum_pseudo_n100_adv",
-    "midcap_narrow_60d_breakout",
     "n20_daily_large_only",
 ]
 LEGACY_REASONS = ("BOOTSTRAP_POSITION", "BOOTSTRAP_DEPOSIT", "REATTRIBUTED_PSEUDO")

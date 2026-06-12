@@ -13,11 +13,11 @@ from src.services.trading.model_ledger_service import RETIRED_MODELS
 ACTIVE_MODELS = {
     "momentum_n100_top5_max1",
     "momentum_pseudo_n100_adv",
-    "midcap_narrow_60d_breakout",
     "n20_daily_large_only",
     "emerging_momentum",
     "momentum_retest_n500",
     # price_meanrev_n500 ARCHIVED 2026-06-12 (execution-lookahead backtest, no edge)
+    # midcap_narrow_60d_breakout RETIRED 2026-06-12 (user closed position, model removed)
 }
 
 

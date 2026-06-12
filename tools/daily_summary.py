@@ -33,7 +33,6 @@ MODEL_ORDER = [
     "momentum_n100_top5_max1",
     "momentum_pseudo_n100_adv",
     "n20_daily_large_only",
-    "midcap_narrow_60d_breakout",
     "emerging_momentum",
     "momentum_retest_n500",
 ]
@@ -43,7 +42,6 @@ SHORT = {
     "momentum_n100_top5_max1": "n100",
     "momentum_pseudo_n100_adv": "pseudo",
     "n20_daily_large_only": "n40",
-    "midcap_narrow_60d_breakout": "midcap",
     "emerging_momentum": "emerging",
     "momentum_retest_n500": "retest",
 }

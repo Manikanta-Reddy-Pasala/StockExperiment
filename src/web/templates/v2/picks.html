@@ -25,7 +25,6 @@
 const MODELS = [
   {key: "momentum_n100_top5_max1",     title: "Nifty 100 Momentum",   desc: "Rotation monthly + mid-month check • real Nifty 100 • 15-trading-day return • DAILY −12% from-entry stop check",        schedule: "monthly_midcheck"},
   {key: "n20_daily_large_only",        title: "Weekly Top-40",        desc: "Weekly rotation • top-40 ADV ∩ N100 • uptrend • −12% from-entry daily stop",   schedule: "weekly"},
-  {key: "midcap_narrow_60d_breakout",  title: "Midcap Breakout",      desc: "Event-driven entry: 40-day high + 2× vol + >200d SMA • DAILY exit checks: +100% target / 20% trail (after +10%) / −20% catastrophe stop / 120-day max hold",                       schedule: "event"},
   {key: "momentum_pseudo_n100_adv",    title: "Liquid 100 Momentum",  desc: "Rotation monthly • top-100 ADV from N500 • rank-1 (fixed May universe anchor) • DAILY 3×ATR from-entry stop check",  schedule: "monthly"},
   {key: "momentum_retest_n500",        title: "Retest Momentum",      desc: "Rotation monthly: basket of 4 (top-120 ADV N500) • DAILY entry on retest within 20% of 20-EMA • retain top-4 • no hard stop", schedule: "monthly", multi: 4},
   {key: "emerging_momentum",           title: "Emerging Momentum",    desc: "Single-position (max-1) momentum rotation on emerging mid/small caps (PIT N500 minus N100) • 30d vol-adj ret>0 • ≤₹3000 • retain-1 • rotation monthly + mid-month (5% lead) • DAILY checks: 2.5×ATR stop (no profit-take — winners run)", schedule: "monthly_midcheck"},
