@@ -16,6 +16,17 @@ Modern CSS for the Automated Trading System
     --bg: #f6f7f9;            --surface: #ffffff;
     --surface-2: #f4f6fb;     --border: #e2e6ee;
     --text: #1e2533;          --muted: #6b7280;     --muted-2: #8b95a5;
+    /* Text-role aliases (2026-06-13 contrast audit). Templates may use either
+       the surface tokens above or these role names; both flip in dark mode.
+       --text-primary   = headings / section titles / values
+       --text-secondary = labels & meta (must stay >= 4.5:1 on --surface)
+       --text-disabled  = de-emphasized only — NEVER for headings/titles */
+    --text-primary: var(--text);
+    --text-secondary: var(--muted);
+    --text-disabled: var(--muted-2);
+    /* Hover tokens: any rule that swaps background on hover must pair these */
+    --hover-bg: var(--surface-2);
+    --hover-text: var(--text);
     /* Brand + P&L (single source of truth) */
     --accent: #15a36b;        /* brand green, matches theme-color meta */
     --gain: #15a36b;          --loss: #d4453a;      --flat: #4f5868;
@@ -746,6 +757,22 @@ body {
     background: var(--gradient-info) !important;
 }
 
+/* `bg-*` + `bg-opacity-*` means a pale TINT (e.g. settings.html card headers
+   "bg-info bg-opacity-25"). The full-strength gradient overrides above would
+   otherwise paint the saturated gradient and the header text becomes
+   unreadable (near-white text on bright cyan/yellow in dark mode). Restore
+   the translucent tint — it works on light AND dark surfaces. */
+.bg-primary.bg-opacity-25 { background: rgba(59, 130, 246, 0.18) !important; }
+.bg-success.bg-opacity-25 { background: rgba(34, 197, 94, 0.18) !important; }
+.bg-danger.bg-opacity-25  { background: rgba(248, 113, 113, 0.18) !important; }
+.bg-warning.bg-opacity-25 { background: rgba(251, 191, 36, 0.18) !important; }
+.bg-info.bg-opacity-25    { background: rgba(56, 189, 248, 0.18) !important; }
+.bg-primary.bg-opacity-10 { background: rgba(59, 130, 246, 0.10) !important; }
+.bg-success.bg-opacity-10 { background: rgba(34, 197, 94, 0.10) !important; }
+.bg-danger.bg-opacity-10  { background: rgba(248, 113, 113, 0.10) !important; }
+.bg-warning.bg-opacity-10 { background: rgba(251, 191, 36, 0.10) !important; }
+.bg-info.bg-opacity-10    { background: rgba(56, 189, 248, 0.10) !important; }
+
 /* Text Gradient */
 .text-gradient {
     background: var(--gradient-primary);
@@ -1139,7 +1166,10 @@ button:focus-visible, a:focus-visible, .form-control:focus-visible {
 @media (prefers-color-scheme: dark) {
     :root {
         --bg: #0f1318;          --surface: #171c23;   --surface-2: #1e242d;
-        --border: #2a313c;      --text: #e6e9ef;      --muted: #98a1ae; --muted-2: #6f7886;
+        /* --muted-2 was #6f7886 (~3.5:1 on --surface — failed WCAG AA and was
+           reported unreadable). #8b95a4 ≈ 5.6:1 on --surface / 5.2:1 on
+           --surface-2 while staying visibly quieter than --muted. */
+        --border: #2a313c;      --text: #e6e9ef;      --muted: #98a1ae; --muted-2: #8b95a4;
         --gain: #2ecc8f;        --loss: #f2655a;      --flat: #9aa3b2;
         --held-bg: #3a3320;
 
@@ -1166,9 +1196,21 @@ button:focus-visible, a:focus-visible, .form-control:focus-visible {
     }
     .navbar.d-md-none { background-color: var(--surface) !important; }
     .navbar.d-md-none .navbar-brand, .link-dark { color: var(--text) !important; }
+    /* Bootstrap's `.link-dark:hover` carries HIGHER specificity (0,2,0 +
+       !important) than the single-class remap above, so on hover the desktop
+       sidebar brand ("Trading Journal") snapped back to near-black #1a1e21 on
+       the dark surface = invisible. Same-specificity override, later file wins. */
+    .link-dark:hover, .link-dark:focus { color: var(--text) !important; }
     .offcanvas { background-color: var(--surface); color: var(--text); }
     .dropdown-menu { background: var(--surface); color: var(--text); }
     .dropdown-item { color: var(--text); }
+    /* Bootstrap `.dropdown-item:hover` re-imposes near-black #1e2125 text
+       (higher specificity than the remap above) → invisible hover text in the
+       user menu. Hover must always pair readable text with its background. */
+    .dropdown-item:hover, .dropdown-item:focus {
+        color: var(--hover-text, var(--text));
+        background-color: var(--hover-bg, var(--surface-2));
+    }
     .list-group-item { background: var(--surface); color: var(--text); border-color: var(--border); }
     .toast { background: var(--surface); color: var(--text); }
     .btn-close { filter: invert(1) grayscale(100%) brightness(180%); }
@@ -1184,6 +1226,51 @@ button:focus-visible, a:focus-visible, .form-control:focus-visible {
     }
     .form-control::placeholder { color: var(--muted-2); }
     code { color: #e58fff; }
+
+    /* The generic `.text-dark` remap (→ near-white) above is correct on dark
+       surfaces (e.g. "bg-light text-dark" badges, whose bg-light is remapped
+       dark) but WRONG on full-strength warning/info fills, which stay bright
+       in dark mode: "running" / NEAR / OBSERVE badges showed near-white text
+       on bright yellow/cyan. Keep dark ink on those. */
+    .bg-warning.text-dark, .bg-info.text-dark { color: #14181d !important; }
+
+    /* Outline-secondary controls (notification bell, Prev/Next pagers, Cancel
+       buttons): Bootstrap's #6c757d text/border is only ~4:1 on the dark bg.
+       Override Bootstrap's button CSS vars — also fixes hover/active states. */
+    .btn-outline-secondary {
+        --bs-btn-color: #aeb6c2;
+        --bs-btn-border-color: #4d5664;
+        --bs-btn-hover-color: var(--text);
+        --bs-btn-hover-bg: var(--surface-2);
+        --bs-btn-hover-border-color: #5d6776;
+        --bs-btn-active-color: var(--text);
+        --bs-btn-active-bg: var(--surface-2);
+        --bs-btn-active-border-color: #5d6776;
+    }
+
+    /* Input-group prefix chips (e.g. the ₹ box on Settings) stayed Bootstrap
+       light-grey-on-light — visually broken next to dark inputs. */
+    .input-group-text {
+        background-color: var(--surface-2);
+        color: var(--text);
+        border-color: var(--border);
+    }
+
+    /* Nav hover/active text: #3b82f6 is ~4.6:1 on the dark surface — passes,
+       but the lighter brand blue reads clearly at small nav sizes. Hover that
+       changes background must keep clearly readable text. */
+    .sidebar .nav-link:hover, .sidebar .nav-link.active,
+    .offcanvas .nav-link:hover, .offcanvas .nav-link.active,
+    .nav-tabs .nav-link:hover, .nav-tabs .nav-link.active {
+        color: var(--primary-light);
+    }
+
+    /* Default anchor blue (#0d6efd) is ~3.8:1 on dark surfaces — lift to the
+       light blues for body links + their hover state. */
+    :root {
+        --bs-link-color-rgb: 96, 165, 250;
+        --bs-link-hover-color-rgb: 147, 197, 253;
+    }
 }
 
 /* ----------------------------------------------------------------

@@ -906,7 +906,7 @@ function renderRotationRules(models) {
     const r = meta.rules || {};
     const disabledCls = m.enabled ? '' : ' style="opacity:0.55;"';
     const badge = meta.paper
-      ? '<span class="badge ms-1" style="background:#6f42c1;">PAPER</span>'
+      ? '<span class="badge ms-1" style="background:#6f42c1;color:#fff;">PAPER</span>'
       : (m.enabled
         ? '<span class="badge bg-success ms-1">ON</span>'
         : '<span class="badge bg-secondary ms-1">OFF</span>');
@@ -933,7 +933,7 @@ function renderStrategyInfo(models) {
     if (!meta) return '';
     const disabledCls = m.enabled ? '' : ' style="opacity:0.6;"';
     const badge = meta.paper
-      ? '<span class="badge ms-1" style="background:#6f42c1;">PAPER · OBSERVE</span>'
+      ? '<span class="badge ms-1" style="background:#6f42c1;color:#fff;">PAPER · OBSERVE</span>'
       : (m.enabled
         ? '<span class="badge bg-success ms-1">ON</span>'
         : '<span class="badge bg-secondary ms-1">DISABLED</span>');
