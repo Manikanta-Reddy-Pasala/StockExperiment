@@ -18,6 +18,11 @@ Set 2026-05-28: switched from today's nifty100.csv to PIT membership table
 inflated 10yr CAGR ~80pp by silently including stocks that joined the
 index after the ranking date (Adani group, Zomato, NUVAMA, etc.) and
 excluding stocks that had left (YESBANK, IL&FS, DHFL, etc.).
+
+Set 2026-06-13: REALISM convention — decisions on bar d's close fill at bar
+d+1's OPEN (live parity: rank on last completed bar, execute next morning),
+stops detected on d's low also fill at d+1 open, and real Fyers CNC charges
+are deducted at every fill. See FILL_AT_NEXT_OPEN / CHARGES below.
 """
 import sys, json, csv, argparse
 from pathlib import Path
@@ -31,9 +36,41 @@ from tools.shared.ohlcv_cache import _get_engine
 from tools.shared.backtest_engine import run_rotation_backtest
 from tools.shared.rotation_strategy import decide_rotation
 from tools.shared.index_membership import eligible_at, universe_union
+from tools.live.broker_charges import compute_charges
 from tools.models.momentum_n100_top5_max1 import strategy as S
 from tools.models.momentum_n100_top5_max1.strategy import (
     LOOKBACK, RETAIN, MIDMONTH_LEAD, build_calendar)
+
+# ── BACKTEST REALISM CONVENTION (2026-06-13; same for all 5 live models) ────
+# FILL_AT_NEXT_OPEN: every decision made on bar d's CLOSE (rotation rank,
+#   mid-month gate, profit-take trigger) and every stop DETECTED on bar d's
+#   LOW fills at bar d+1's OPEN — parity with live, which ranks on the last
+#   completed daily bar and executes next morning ~09:30-09:41. If d is the
+#   window's last bar: stops book at d's close (window-end bookkeeping);
+#   rotation/PT decisions on the last bar are dropped (the open position is
+#   marked at the last close, charge-free, exactly as before).
+# CHARGES: real Fyers CNC charges (tools/live/broker_charges.compute_charges,
+#   the same engine the live ledger stamps charges_inr with) are deducted from
+#   cash at EVERY fill — buys, rotation sells, stop sells, profit-take sells.
+#   No flat percentages. NAV marking stays close-based; decision LOGIC
+#   (lookback, ranks, gates, stop levels, cadence) is unchanged.
+FILL_AT_NEXT_OPEN = True
+CHARGES = "fyers_cnc"
+
+
+def _charge_total(side: str, qty: int, price: float) -> float:
+    """Total Fyers CNC charges (₹) for one fill — live ledger's exact engine."""
+    return float(compute_charges(side, int(qty), float(price), "CNC")["total"])
+
+
+def _max_affordable_qty(cash: float, price: float) -> int:
+    """Largest share count whose cost INCLUDING buy-side charges fits in cash."""
+    if not price or price <= 0 or cash <= 0:
+        return 0
+    n = int(cash // price)
+    while n >= 1 and n * price + _charge_total("BUY", n, price) > cash:
+        n -= 1
+    return max(n, 0)
 
 # 15 TRADING days (~3 weeks). Set 2026-05-27 from a 6-year sweep: 15td beat 30td
 # on BOTH CAGR and max DD (the relative result; absolute numbers predate the
@@ -110,7 +147,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
         # Pull 400 extra calendar days before `start` so the 30d lookback has
         # warm-up history available for the earliest rebalance dates.
         df = pd.read_sql(text(
-            "SELECT symbol,date,low,close,volume FROM historical_data "
+            "SELECT symbol,date,open,low,close,volume FROM historical_data "
             "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b AND data_source=:ds "
             "ORDER BY symbol,date"
         ), c, params={"s": n100_syms, "a": start - timedelta(days=400), "b": end,
@@ -121,6 +158,10 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
     # the last known close forward over gaps so ranking never sees NaN holes.
     cl = df.pivot(index="date", columns="symbol", values="close").ffill()
     _lo = df.pivot(index="date", columns="symbol", values="low").ffill()  # for the fixed-% stop
+    # Opens for FILL_AT_NEXT_OPEN execution. NOT ffilled — a carried-forward
+    # open is a stale price; when a symbol has no bar that day the fill falls
+    # back to the (ffilled) close via _fill_px below.
+    opn = df.pivot(index="date", columns="symbol", values="open")
     dates = cl.index
     # Keep only universe symbols that actually have price columns loaded.
     present = [s for s in n100_syms if s in cl.columns]
@@ -198,36 +239,94 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
     cash = capital; hold = None; q = 0; entry = 0.0; entry_dt = None; took = False
     _PT = float(getattr(S, "PROFIT_TAKE_PCT", 0.0) or 0.0)
     trades = []; navdays = []
+    charges_total = 0.0
+    # Pending NEXT-OPEN fills (queued on bar d's close/low, filled at d+1 open).
+    pend_exit = None   # "FIXED_STOP" | "ROTATE" -> sell the ENTIRE position
+    pend_pt = False    # sell HALF (partial profit-take)
+    pend_buy = None    # symbol to buy with all available cash
+
+    def _fill_px(sym, idx):
+        """Execution price at bar `idx`: the day's OPEN (FILL_AT_NEXT_OPEN);
+        falls back to the ffilled close when the open is missing that day."""
+        if sym in opn.columns:
+            o = opn[sym].iloc[idx]
+            if pd.notna(o) and float(o) > 0:
+                return float(o)
+        if sym in cl.columns and pd.notna(cl[sym].iloc[idx]):
+            return float(cl[sym].iloc[idx])
+        return None
+
+    def _book_sell(sym, qty_s, fx, on_d, reason):
+        """Sell `qty_s` at fill price `fx`, deduct real CNC sell charges from
+        cash, append the ledger record. `charges` field = this SELL leg only
+        (buy-leg charges were already deducted from cash at entry)."""
+        nonlocal cash, charges_total
+        ch = _charge_total("SELL", qty_s, fx)
+        cash += qty_s * fx - ch; charges_total += ch
+        trades.append({"sym": sym.replace("NSE:", "").replace("-EQ", ""),
+                       "entry_date": entry_dt, "exit_date": on_d.date().isoformat(),
+                       "qty": qty_s, "entry_px": round(entry, 2), "exit_px": round(fx, 2),
+                       "pnl": round(qty_s * fx - qty_s * entry, 0),
+                       "ret_pct": round((fx / entry - 1) * 100, 2) if entry else 0.0,
+                       "charges": round(ch, 2),
+                       "cap_after": round(cash, 0), "exit_reason": reason})
+
     first_di = dates.get_loc(min(cal)) if cal else 0
+    last_di = len(dates) - 1
     for di in range(first_di, len(dates)):
         d = dates[di]
+        # ---- 1) EXECUTE fills queued on the PRIOR bar, at TODAY'S OPEN ----
+        if pend_pt and hold and q >= 2 and pend_exit is None:
+            fx = _fill_px(hold, di)
+            if fx:
+                sell = q // 2
+                _book_sell(hold, sell, fx, d, "PROFIT_TAKE")
+                q -= sell; took = True
+        pend_pt = False
+        if pend_exit and hold and q > 0:
+            fx = _fill_px(hold, di)
+            if fx:
+                _book_sell(hold, q, fx, d, pend_exit)
+                hold = None; q = 0; entry = 0.0
+        pend_exit = None
+        if pend_buy and hold is None:
+            bx = _fill_px(pend_buy, di)
+            if bx and bx > 0:
+                n = _max_affordable_qty(cash, bx)
+                if n >= 1:
+                    ch = _charge_total("BUY", n, bx)
+                    cash -= n * bx + ch; charges_total += ch
+                    q = n; hold = pend_buy; entry = bx
+                    entry_dt = d.date().isoformat(); took = False
+        pend_buy = None
+
+        # ---- 2) NAV mark — close-based, unchanged ----
         px = float(cl[hold].iloc[di]) if hold and pd.notna(cl[hold].iloc[di]) else None
         navdays.append((d, cash + (q * px if hold and px else 0.0)))
-        # --- DAILY partial profit-take: book HALF once at entry*(1+PT) ---
+
+        # ---- 3) DETECT on today's bar; queue fills for TOMORROW'S OPEN ----
+        # Partial profit-take trigger on the CLOSE (book HALF once); fills next open.
         if hold and q >= 2 and _PT > 0 and not took and px is not None and px >= entry * (1 + _PT):
-            sell = q // 2; cash += sell * px
-            trades.append({"sym": hold.replace("NSE:", "").replace("-EQ", ""),
-                           "entry_date": entry_dt, "exit_date": d.date().isoformat(),
-                           "qty": sell, "entry_px": round(entry, 2), "exit_px": round(px, 2),
-                           "pnl": round(sell * px - sell * entry, 0),
-                           "ret_pct": round((px / entry - 1) * 100, 2) if entry else 0.0,
-                           "cap_after": round(cash, 0), "exit_reason": "PROFIT_TAKE"})
-            q -= sell; took = True
+            pend_pt = True
+        # Fixed-% stop: detection unchanged (today's LOW vs level, SAME shared
+        # helper live uses); the FILL moves to tomorrow's open (gap-realistic —
+        # live detects on yesterday's completed bar and sells next morning).
+        # Window's last bar: book at today's close (no next bar).
         if hold and q > 0 and _STOP > 0:
             dlow = float(_lo[hold].iloc[di]) if hold in _lo.columns and pd.notna(_lo[hold].iloc[di]) else px
             hit, lvl = _fix_hit(entry, dlow, _STOP)
             if hit and lvl:
-                cash += q * lvl
-                trades.append({"sym": hold.replace("NSE:", "").replace("-EQ", ""),
-                               "entry_date": entry_dt, "exit_date": d.date().isoformat(),
-                               "qty": q, "entry_px": round(entry, 2), "exit_px": round(lvl, 2),
-                               "pnl": round(q * lvl - q * entry, 0),
-                               "ret_pct": round((lvl / entry - 1) * 100, 2) if entry else 0.0,
-                               "cap_after": round(cash, 0), "exit_reason": "FIXED_STOP"})
-                hold = None; q = 0; entry = 0.0
+                if di == last_di:
+                    fx = px if px is not None else float(lvl)
+                    _book_sell(hold, q, fx, d, "FIXED_STOP")
+                    hold = None; q = 0; entry = 0.0
+                else:
+                    pend_exit = "FIXED_STOP"; pend_pt = False
         kind = cal.get(d)
         if kind is None:
             continue
+        if di == last_di:
+            continue  # rotation decided here could never fill (no next bar)
         ranked = rank_at(di)
         if not ranked:
             continue
@@ -240,20 +339,13 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
         else:
             if decide_rotation(hold, ranked, retain_top_n=retain_top_n).is_noop:
                 continue
-        if hold and q > 0:
-            sx = float(cl[hold].iloc[di]); cash += q * sx
-            trades.append({"sym": hold.replace("NSE:", "").replace("-EQ", ""),
-                           "entry_date": entry_dt, "exit_date": d.date().isoformat(),
-                           "qty": q, "entry_px": round(entry, 2), "exit_px": round(sx, 2),
-                           "pnl": round(q * sx - q * entry, 0),
-                           "ret_pct": round((sx / entry - 1) * 100, 2) if entry else 0.0,
-                           "cap_after": round(cash, 0), "exit_reason": "ROTATE"})
-            hold = None; q = 0
-        bx = float(cl[top].iloc[di])
-        if bx > 0:
-            n = int(cash / bx)
-            if n >= 1 and n * bx <= cash:
-                cash -= n * bx; q = n; hold = top; entry = bx; entry_dt = d.date().isoformat(); took = False
+        # Queue BOTH legs for tomorrow's open. If today's stop already queued
+        # the exit, keep FIXED_STOP as the (single) sell and just queue the buy.
+        if hold and q > 0 and pend_exit is None:
+            pend_exit = "ROTATE"
+        if pend_exit:
+            pend_pt = False
+        pend_buy = top
     final = cash + (q * float(cl[hold].iloc[-1]) if hold else 0.0)
     yrs = (end - start).days / 365.25
     cagr = ((final / capital) ** (1 / yrs) - 1) * 100 if final > 0 else -100.0
@@ -278,6 +370,8 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
     print(f"  Trades: {len(trades)} (W={wins}, L={losses}, WR={wins/max(1,wins+losses)*100:.1f}%)")
     print(f"  Max DD: {mdd:.2f}%")
     print(f"  Calmar: {calmar:.2f}")
+    print(f"  Charges: Rs.{charges_total:,.0f} ({CHARGES}, deducted from cash; "
+          f"fills at next open: {FILL_AT_NEXT_OPEN})")
 
     if out_dir:
         out_dir = Path(out_dir)
@@ -295,6 +389,9 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
             "max_dd_pct": round(mdd, 2),
             "calmar": round(calmar, 2),
             "trades": len(trades),
+            "total_charges_inr": round(charges_total, 2),
+            "fill_convention": "next_open" if FILL_AT_NEXT_OPEN else "same_close",
+            "charges_model": CHARGES,
             "wins": wins, "losses": losses,
             "win_rate_pct": round(wins / max(1, wins + losses) * 100, 1),
             "open_position": open_pos,
@@ -315,7 +412,8 @@ if __name__ == "__main__":
                     action=argparse.BooleanOptionalAction, default=True,
                     help="Day-15 rank check + lead gate. Default ON = the LIVE "
                          "config (cron runs the mid-month job). --no-mid-month-check "
-                         "to disable. Mid ON is a big win: +87.5% vs +43.2% CAGR.")
+                         "to disable. Mid ON is a big win: +87.5% vs +43.2% CAGR "
+                         "(pre-realism convention; relative result).")
     ap.add_argument("--mid-month-lead-pct", type=float, default=5.0,
                     help="Minimum lead (pp) for mid-month rotation. Default 5.0")
     ap.add_argument("--retain-top-n", type=int, default=3,

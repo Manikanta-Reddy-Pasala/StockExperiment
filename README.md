@@ -10,6 +10,8 @@ Production: `77.42.45.12` · App: <https://stock.oneshell.in> · Bot: `@stocks_m
 
 ## Recent Changes (2026-06)
 
+- **ALL 5 backtests regenerated under the REALISM CONVENTION (2026-06-13): next-open fills + real Fyers CNC charges + PIT universe fixes.** New full-window numbers (net of charges): emerging **+105.3% / 38.6% DD / Calmar 2.73** (was 115.6 — normal charges haircut, ₹2.56M), n100 **+52.1% / 49.1% / 1.06** (was 59.9), retest **+58.7% / 34.0% / 1.73** (was 57.3 — PIT-before-ADV fix net-positive), n40 **+28.4% / 43.9% / 0.65** (was 48.1 — weekly churn × slippage+charges ₹468k), and **pseudo COLLAPSED +77.4% → +12.7% / 59.4% DD / Calmar 0.21**: the old smallcap-250 exclusion used TODAY's list for every historical year (survivorship bias — realism alone only cut 77→66; the PIT smallcap fix did 66→12.7). Pseudo's "drop smallcaps +2pp" sweep finding is INVALIDATED; strategy review pending. All older CAGR/DD figures below this entry are pre-realism (close fills, zero charges) — do not compare directly.
+
 - **emerging → DISABLED the +30% partial profit-take (2026-06-10) — "let winners run".** `PROFIT_TAKE_PCT 0.30 → 0.0`. The half-bank at +30% capped the fat-tail years; removing it lets the full position ride under the 2.5×ATR-from-entry stop. Full-cycle 2021-03→2026-06: **CAGR 109→116% at the same 38% DD** (2023 +269→+358% as the runner rides), Calmar 2.88→3.05. Trade-off (in code + UI): the half-bank had *helped* the recent chop regime, so disabling gives some Calmar back there (2025 62→51, DD 18→25). Single constant drives backtest + live; revert to 0.30 if recent-regime DD proves worse. summary.json + Settings/Picks/Dashboard cards regenerated; SW v62.
 
 ## Recent Changes (2026-05)
@@ -336,37 +338,49 @@ Run after the 2026-05-28 Fyers backfill that extended `historical_data` back to 
 - **Pseudo / n20 / midcap need 200d SMA warmup**, so they're effectively flat until ~Feb 2017.
 - **Capital ₹10L per model** (research scale); combined sim re-run at live ₹30k confirmed direction (see [Cross-Model Overlap](#cross-model-overlap)).
 
-### Per-model headline — full cycle (2021-04-01 → 2026-05-29, ~5.16yr)
+### Per-model headline — full cycle (2021-03-01 → 2026-05-31, ~5.25yr; net of charges, next-open fills)
 
 All models share this canonical window (2021 bull, 2022 correction, 2023-24 bull,
-2025 chop, 2026 bear). Net of nothing for the rotation models / 0.15%/side for
-retest. ₹10L start. Current PIT engine + current configs. Sorted by CAGR.
+2025 chop, 2026 bear). **REALISM CONVENTION (2026-06-13 regen): all figures are
+net of real Fyers CNC charges with next-open fills** (decide on bar d's close,
+fill at bar d+1's open). ₹10L start. Current PIT engine + current configs.
+Sorted by CAGR.
 
 Universe = AUTHORITATIVE NSE PIT membership (official semi-annual factsheets,
-2026-05-31 rebuild — see Recent Changes). **ALL six models now use true
-point-in-time membership** (`eligible_at`) — no survivorship bias remains.
+2026-05-31 rebuild — see Recent Changes). **ALL models now use true
+point-in-time membership** (`eligible_at`) — no survivorship bias remains
+(incl. pseudo's smallcap-250 exclusion, now period-correct PIT snapshots).
 
-| Model | CAGR | Max DD | Calmar | Trades | WR | universe |
-|---|---:|---:|---:|---:|---:|---|
-| `emerging_momentum` (**vol-adj momentum**, RET1, mid/small, **no profit-take**) | **+115.57%** | 37.92% | **3.05** | 68 | 64.7% | PIT N500−N100 |
-| `momentum_pseudo_n100_adv` (RET1, monthly, fixed May anchor) | +76.6% | 28.6% | 2.7 | 50 | 76.0% | PIT N500 (ADV-biased) |
-| `momentum_retest_n500` (K=2, 20% band) | +64.2% | 57.1% | 1.1 | 88 | 53.4% | PIT N500 −Smallcap (top-120 ADV; incl large+mid) |
-| `n40` (weekly, top-40 ADV ∩ N100) | +41.2% | 36.9%¹ | 1.1 | 133 | 58.3% | PIT N100 |
-| `momentum_n100_top5_max1` (LB15 + mid-month + RET3) | +56.2% | 52.2% | 1.1 | 96 | 54.6% | PIT N100 |
-| `midcap_narrow_60d_breakout` (40d-high + 2× vol) — RETIRED 2026-06-12 | +1.65% | 68.2%¹ | 0.02 | 16 | 37.5% | PIT N500−N100 |
+| Model | CAGR | Max DD | Calmar | Trades | WR | Charges ₹ | universe |
+|---|---:|---:|---:|---:|---:|---:|---|
+| `emerging_momentum` (**vol-adj momentum**, RET1, mid/small, **no profit-take**; window → 2026-06-10) | **+105.29%** | 38.57% | **2.73** | 68 | 63.2% | 2,555,014 | PIT N500−N100 |
+| `momentum_retest_n500` (K=4, 20% band) | +58.71% | 34.03% | 1.73 | 183 | 60.4% | 386,643 | PIT N500 −Smallcap (top-120 ADV; incl large+mid) |
+| `momentum_n100_top5_max1` (LB15 + mid-month + RET3) | +52.14% | 49.13% | 1.06 | 97 | 54.6% | 584,930 | PIT N100 |
+| `n40` (weekly, top-40 ADV ∩ N100) | +28.38% | 43.92%¹ | 0.65 | 138 | 58.0% | 468,281 | PIT N100 |
+| `momentum_pseudo_n100_adv` (RET1, monthly, fixed May anchor) | **+12.73%** ⚠ | 59.42% | 0.21 | 49 | 53.1% | 110,268 | PIT N500 (ADV-biased) |
+| `midcap_narrow_60d_breakout` (40d-high + 2× vol) — RETIRED 2026-06-12 | +1.65% | 68.2%¹ | 0.02 | 16 | 37.5% | — (pre-realism) | PIT N500−N100 |
 
-> Window: full-cycle **2021-03-01 → 2026-05-29**. **emerging is the standout** —
-> vol-adjusted momentum (return ÷ 60d volatility) on mid/small = **+111% organic
-> (no leverage)**, per-year 2021 −5 / 2022 +204 / 2023 +301 / 2024 +136 / 2025 +38 /
-> 2026 +15. Dividing momentum by volatility picks smooth strong trends; only the
-> high-vol mid/small universe benefits (it over-penalizes large-caps).
+> Window: full-cycle **2021-03-01 → 2026-05-31** (emerging → 2026-06-10).
+> **emerging is the standout** — vol-adjusted momentum (return ÷ 60d volatility)
+> on mid/small = **+105% organic, net of charges (no leverage)**, per-year (net)
+> 2021 +14 / 2022 +174 / 2023 +336 / 2024 +141 / 2025 +36 / 2026 +3. Dividing
+> momentum by volatility picks smooth strong trends; only the high-vol mid/small
+> universe benefits (it over-penalizes large-caps).
 
 ¹ n40 / midcap Max DD is daily mark-to-market; the others report realized rebal-day DD.
 
-`pseudo` tops the table (+72.9% / Calmar 2.54 / 76% win) but it is still the
-deliberately-OPTIMISTIC sibling: it ranks the top-100 by ADV (already-liquid/hot
-names), an upper bound vs the real-index `n100`. It is no longer survivorship-biased
-(PIT N500 since 2026-05-31), but the ADV-selection bias remains by design.
+⚠ **pseudo COLLAPSED under PIT treatment (2026-06-13: 77.4% → 12.7% CAGR).** Its
+old smallcap-250 exclusion applied TODAY's list to every historical year — names
+that were smallcap *then* but grew large (the multibaggers it rode) were silently
+kept. Diagnostic isolation: realism alone (next-open fills + charges) = 77.4→66.5%
+(a normal haircut); PIT smallcap snapshots = 66.5→12.7% (the entire collapse, WR
+74→53%, every year degrades). The "drop smallcaps, +2pp free" sweep finding is
+INVALIDATED; model pending strategy-level review. It also remains the deliberately
+OPTIMISTIC ADV-ranked sibling (selection bias by design) vs the real-index `n100`.
+
+3-yr window (2023-05-15 → 2026-05-12, same net-of-charges next-open convention):
+emerging +138.9% / 27.4% DD / Calmar 5.07 · retest +102.3% / 23.6% / 4.34 ·
+n100 +80.5% / 20.7% / 3.88 · n40 +48.6% / 30.9% / 1.58 · pseudo +23.9% / 59.4% / 0.40.
 
 **Two big corrections landed on 2026-05-31:** (a) the authoritative-membership rebuild
 exposed emerging's old +121% as a MIRAGE — the buggy Wayback N100 was *missing* the
@@ -460,7 +474,7 @@ python tools/backtests/combined_portfolio_sim.py \
 
 - Backtests are 3-year samples — 2018-style momentum crashes underrepresented. n100 has a 6-year backfill but its honest max DD is ~46%, not the 14.89% 3-year figure.
 - All 4 equity models are momentum-correlated; they draw down together in a regime shift. Cross-model overlap means concentration into the consensus winner is up to 2-3× the per-model cap on the shared account — accepted because the combined-portfolio sim shows allowing it dominates dedup on return AND Calmar.
-- Live forward expectation: 25-40% CAGR after slippage / STT / STCG, not the 80%+ headline backtest figures.
+- Live forward expectation: still below the headline backtest figures. Since 2026-06-13 the backtests already deduct real Fyers CNC charges (brokerage/STT/stamp/exchange) and fill at next-open, but STCG tax, partial fills and capacity/impact beyond the modeled slippage are NOT in the numbers.
 - Per-model ₹30k cap is SOFTWARE-only on one shared Fyers account (C-FAD51080). Account-margin gate + broker rejection are the hard backstops; the reconciler is the slow-burn drift safety net.
 - Fyers MIS auto-square-off at 3:20 IST → equity models use **CNC** to allow multi-day hold (matches backtest).
 - TOTP-based token refresh: see `feedback-no-yfinance.md` for the recovery flow.

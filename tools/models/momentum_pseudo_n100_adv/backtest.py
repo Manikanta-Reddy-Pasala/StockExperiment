@@ -1,8 +1,20 @@
 """Standalone backtest: pseudo-N100 (ADV-rank from N500, yearly PIT rebuild, MINUS Small).
 
-Full-cycle 2021-03→2026-05 on PIT N500 (fixed May anchor) ≈ +76.6% CAGR / 28.6%
-DD / Calmar 2.68; recent 2025-03→2026-05 ≈ +191% CAGR / 16% DD — see
+2026-06-13 REALISM CONVENTION (next-open fills + real Fyers CNC charges + PIT
+smallcap snapshots, see FILL_AT_NEXT_OPEN / CHARGES below) — net of charges:
+full-cycle 2021-03→2026-05 = +12.7% CAGR / 59.4% DD / Calmar 0.21 / 49 trades;
+3-yr 2023-05→2026-05 = +23.9% CAGR / 59.4% DD / Calmar 0.40 — see
 exports/models/momentum_pseudo_n100_adv/SUMMARY.md.
+
+⚠⚠ COLLAPSE vs the previously-published +77.4%/43.8%/1.77: that figure was
+substantially SURVIVORSHIP-BIASED — the old smallcap exclusion applied TODAY's
+Smallcap-250 list to every historical year, silently keeping names that were
+smallcap THEN but grew large (the multibaggers the model rode). Controlled
+isolation: realism alone (next-open + charges) = 77.4→66.5% (normal haircut);
+the PIT smallcap fix = 66.5→12.7% (the entire collapse; WR 74→53%, every year
+degrades). The "drop smallcaps, +2pp free" sweep finding is INVALIDATED; the
+model is pending strategy-level review (possibly drop the smallcap exclusion
+entirely, or re-validate).
 
 Single-position monthly rotation (lb=30, max-1, top-1 / RET1), but universe =
 top-100 by 20-day ADV at each yearly anchor from PIT N500 instead of the real
@@ -37,35 +49,137 @@ from tools.shared.ohlcv_cache import _get_engine
 from tools.shared.backtest_engine import run_rotation_backtest
 from tools.shared.rotation_strategy import (
     decide_rotation, midmonth_lead_ok, mid_month_retain)
-from tools.shared.index_membership import universe_union, eligible_at
+from tools.shared.index_membership import universe_union, eligible_at, _TICKER_ALIAS
+from tools.live.broker_charges import compute_charges
 
 
 from tools.models.momentum_pseudo_n100_adv import strategy as S  # noqa: E402
 from tools.models.momentum_pseudo_n100_adv.strategy import (  # noqa: E402  shared w/ live
     LOOKBACK, ADV_WIN, UNIV_SIZE, MAX_PRICE, RETAIN, MIDMONTH_LEAD, SMA_GATE,
     UNIVERSE_ANCHOR_MONTH, UNIVERSE_ANCHOR_DAY, build_calendar)
-# Drop Small-cap NSE Nifty Smallcap 250 stocks from universe (free +2pp CAGR, DD unchanged).
+
+# ── BACKTEST REALISM CONVENTION (2026-06-13, identical across all 5 models) ──
+# Decision LOGIC (lookbacks, ranks, gates, stop levels, cadence) is UNCHANGED;
+# only fill price/timing and charges differ from the old close-fill version:
+#   * FILL_AT_NEXT_OPEN: every decision made on bar d's close (rotation rank,
+#     entry, profit-take detection, ATR-stop detection on bar d's low) FILLS at
+#     bar d+1's OPEN — live ranks the last completed daily bar and executes
+#     next morning ~09:30-09:41. If d is the last bar of the window, fill at
+#     d's close (window-end bookkeeping). NAV marking stays close-based.
+#   * CHARGES: real Fyers CNC charges (tools/live/broker_charges.compute_charges,
+#     the same calculator the live ledger stamps on model_trades.charges_inr)
+#     are computed on every fill's actual qty*price and deducted from cash.
+#     No charges on the final-day unrealized mark.
+FILL_AT_NEXT_OPEN = True
+CHARGES = "fyers_cnc"
+
+
+def fill_charges(side, qty, price):
+    """Real Fyers CNC charges (₹) for one fill — same calculator as the live
+    ledger (tools/live/broker_charges.py)."""
+    return float(compute_charges(side, int(qty), float(price), "CNC")["total"])
+
+
+def next_open_fill(op, cl, dates, sym, di):
+    """Fill price per FILL_AT_NEXT_OPEN: bar di+1's OPEN (close fallback when
+    the open is missing for that bar); if di is the LAST bar of the window,
+    bar di's close. Returns (price, fill_date_iso)."""
+    if di + 1 < len(dates):
+        v = op[sym].iloc[di + 1] if sym in op.columns else None
+        if v is None or pd.isna(v) or float(v) <= 0:
+            v = cl[sym].iloc[di + 1]
+        if pd.notna(v) and float(v) > 0:
+            return float(v), dates[di + 1].date().isoformat()
+    return float(cl[sym].iloc[di]), dates[di].date().isoformat()
+
+
+def size_buy_qty(cap, px):
+    """Max whole-share qty such that qty*px + BUY charges <= cap (charges come
+    out of cash, so sizing must leave room — no negative cash)."""
+    if px <= 0:
+        return 0
+    q = int(cap / px)
+    while q >= 1 and q * px + fill_charges("BUY", q, px) > cap:
+        q -= 1
+    return max(q, 0)
+
+
+# ── PIT Nifty Smallcap 250 exclusion (2026-06-13 fix) ────────────────────────
+# These names are subtracted from the pseudo-N100 universe — a backtest sweep
+# had showed dropping them gives ~+2pp CAGR with drawdown unchanged, but that
+# finding is INVALIDATED under PIT snapshots (the +2pp was survivorship bias —
+# see module docstring; full-cycle CAGR collapses 77→13% once the exclusion is
+# period-correct). Filter kept for live parity pending strategy review. The OLD code
+# loaded only TODAY's nifty_smallcap250.csv and applied it to every year
+# 2021-2026 (NON-PIT: 2021 overlap with the current list is only ~52%). Now
+# each yearly universe anchor uses the period-correct snapshot from
+# src/data/symbols/index_history/smallcap250_YYYYMMDD.csv — the same
+# last-known-state rule as tools/shared/index_membership.eligible_at:
+# latest snapshot whose date <= anchor; before the first snapshot, fall back
+# to the first snapshot (best approximation available).
 import csv as _csv
-_SML_PATH = str(ROOT / "src" / "data" / "symbols" / "nifty_smallcap250.csv")
-def _load_smallcap():
-    """Load the set of Nifty Smallcap 250 plain symbols (EQ series only).
+_SML_DIR = ROOT / "src" / "data" / "symbols" / "index_history"
+_SML_CUR_PATH = str(ROOT / "src" / "data" / "symbols" / "nifty_smallcap250.csv")
 
-    These names are subtracted from the pseudo-N100 universe — a backtest
-    sweep showed dropping them gives ~+2pp CAGR with drawdown unchanged.
 
-    Returns:
-        set[str]: plain NSE symbols (e.g. "TATAPOWER"), empty if CSV missing.
-    """
+def _load_smallcap_current():
+    """Fallback ONLY (no PIT snapshots on disk): today's Nifty Smallcap 250
+    plain symbols (EQ series) from the current NSE list CSV."""
     out = set()
     try:
-        with open(_SML_PATH) as f:
+        with open(_SML_CUR_PATH) as f:
             for r in _csv.DictReader(f):
-                if r.get("Series","").strip()=="EQ":
+                if r.get("Series", "").strip() == "EQ":
                     out.add(r["Symbol"].strip())
     except FileNotFoundError:
         pass
     return out
-_SMALLCAP = _load_smallcap()
+
+
+def _load_smallcap_snapshots():
+    """{snapshot_date: set[plain symbols]} from the PIT smallcap250_*.csv files.
+
+    Symbols are mapped through index_membership._TICKER_ALIAS (and the raw
+    period symbol kept too) so renamed names subtract correctly against the
+    alias-mapped N500 universe the panel is built from.
+    """
+    snaps = {}
+    for p in sorted(_SML_DIR.glob("smallcap250_*.csv")):
+        ds = p.stem.split("_")[-1]
+        try:
+            snap_d = date(int(ds[:4]), int(ds[4:6]), int(ds[6:8]))
+        except (ValueError, IndexError):
+            continue
+        syms = set()
+        with open(p) as f:
+            for r in _csv.DictReader(f):
+                s = (r.get("symbol") or r.get("Symbol") or "").strip()
+                if s:
+                    syms.add(s)
+                    syms.add(_TICKER_ALIAS.get(s, s))
+        if syms:
+            snaps[snap_d] = syms
+    return snaps
+
+
+_SML_SNAPS = _load_smallcap_snapshots()
+
+
+def smallcap_at(d):
+    """PIT Nifty Smallcap 250 set in force on date `d` (latest snapshot <= d;
+    earliest snapshot if d precedes all; current-list fallback if none)."""
+    if not _SML_SNAPS:
+        return _load_smallcap_current()
+    snap_dates = sorted(_SML_SNAPS)
+    chosen = snap_dates[0]
+    for sd in snap_dates:
+        if sd <= d:
+            chosen = sd
+        else:
+            break
+    return _SML_SNAPS[chosen]
+
+
 DEFAULT_START = date(2021, 3, 1)
 DEFAULT_END   = date(2026, 5, 29)
 DEFAULT_CAP   = 1_000_000.0
@@ -109,7 +223,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
     # rolling windows are already warm on day one of the backtest.
     with eng.connect() as c:
         df = pd.read_sql(text(
-            "SELECT symbol,date,high,low,close,volume FROM historical_data "
+            "SELECT symbol,date,open,high,low,close,volume FROM historical_data "
             "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b AND data_source=:ds "
             "ORDER BY symbol,date"
         ), c, params={"s": n500, "a": start - timedelta(days=400), "b": end,
@@ -118,6 +232,10 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
     df["date"] = pd.to_datetime(df["date"])
     df["adv_rs"] = df["close"].astype(float) * df["volume"].astype(float)  # ₹ traded per day
     cl = df.pivot(index="date", columns="symbol", values="close").ffill()
+    # Opens for FILL_AT_NEXT_OPEN — same source rows as the closes. NOT ffilled:
+    # a stale open is not a tradable price — next_open_fill falls back to that
+    # bar's (ffilled) close instead.
+    op = df.pivot(index="date", columns="symbol", values="open").astype(float)
     _hi = df.pivot(index="date", columns="symbol", values="high").ffill()
     _lo = df.pivot(index="date", columns="symbol", values="low").ffill()
     # ATR panel for the from-entry hard stop (shared logic with live --stop-check).
@@ -151,8 +269,12 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
         pit_adv = pit_adv[[s for s in pit_adv.index
                            if s.replace("NSE:", "").replace("-EQ", "") in elig500]]
         top = pit_adv.head(UNIV_SIZE).index.tolist()
-        # Drop Small-cap names from top-100 (sweep showed +2pp CAGR, DD unchanged)
-        year_universes[ys] = [s for s in top if s.replace("NSE:","").replace("-EQ","") not in _SMALLCAP]
+        # Drop Small-cap names from top-100 — using the PIT smallcap snapshot
+        # in force AT THIS ANCHOR (2026-06-13 fix: was today's list applied to
+        # every year). NOTE: the old "+2pp CAGR, DD unchanged" sweep win is
+        # INVALIDATED under PIT snapshots (see module docstring).
+        sml = smallcap_at(ys.date())
+        year_universes[ys] = [s for s in top if s.replace("NSE:","").replace("-EQ","") not in sml]
 
     def pick_universe(d):
         """Return the PIT universe in force on date `d` (latest anchor <= d)."""
@@ -213,7 +335,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
     cal = {pd.Timestamp(d): k for d, k in calendar}
     cash = capital; hold = None; q = 0; entry = 0.0; entry_dt = None; took = False
     _PT = float(getattr(S, "PROFIT_TAKE_PCT", 0.0) or 0.0)
-    trades = []; navs = []; navdays = []
+    trades = []; navs = []; navdays = []; charges_total = 0.0
     first_di = dates.get_loc(min(cal)) if cal else 0
     for di in range(first_di, len(dates)):
         d = dates[di]
@@ -221,28 +343,40 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
         nav_t = cash + (q * px if hold and px else 0.0)
         navs.append(nav_t); navdays.append((d, nav_t))
         # --- DAILY partial profit-take: book HALF once at entry*(1+PT) ---
+        # Detection on bar d's CLOSE (unchanged); FILL at bar d+1's open.
         if hold and q >= 2 and _PT > 0 and not took and px is not None and px >= entry * (1 + _PT):
-            sell = q // 2; cash += sell * px
+            sell = q // 2
+            fx, fdate = next_open_fill(op, cl, dates, hold, di)
+            chg = fill_charges("SELL", sell, fx)
+            cash += sell * fx - chg; charges_total += chg
             trades.append({"sym": hold.replace("NSE:", "").replace("-EQ", ""),
-                           "entry_date": entry_dt, "exit_date": d.date().isoformat(),
-                           "qty": sell, "entry_px": round(entry, 2), "exit_px": round(px, 2),
-                           "pnl": round(sell * px - sell * entry, 0),
-                           "ret_pct": round((px / entry - 1) * 100, 2) if entry else 0.0,
+                           "entry_date": entry_dt, "exit_date": fdate,
+                           "qty": sell, "entry_px": round(entry, 2), "exit_px": round(fx, 2),
+                           "pnl": round(sell * fx - sell * entry, 0),
+                           "ret_pct": round((fx / entry - 1) * 100, 2) if entry else 0.0,
+                           "charges": round(chg, 2),
                            "cap_after": round(cash, 0), "exit_reason": "PROFIT_TAKE"})
             q -= sell; took = True
-        # daily from-entry ATR stop
+        # daily from-entry ATR stop — detection unchanged (bar d's low breaches
+        # the level, shared helper); FILL at bar d+1's open — live detects from
+        # yesterday's completed bar and sells next morning, so the fill is
+        # gap-realistic, not the exact level.
         if hold and q > 0 and S.ATR_STOP_MULT and S.ATR_STOP_MULT > 0:
             av = atr[hold].iloc[di] if hold in atr.columns else None
             dlow = float(_lo[hold].iloc[di]) if pd.notna(_lo[hold].iloc[di]) else px
             hit, lvl = _atr_hit(entry, float(av) if av is not None and pd.notna(av) else None,
                                 dlow, S.ATR_STOP_MULT)
             if hit and lvl:
-                cash += q * lvl
+                fx, fdate = next_open_fill(op, cl, dates, hold, di)
+                chg = fill_charges("SELL", q, fx)
+                cash += q * fx - chg; charges_total += chg
                 trades.append({"sym": hold.replace("NSE:", "").replace("-EQ", ""),
-                               "entry_date": entry_dt, "exit_date": d.date().isoformat(),
-                               "qty": q, "entry_px": round(entry, 2), "exit_px": round(lvl, 2),
-                               "pnl": round(q * lvl - q * entry, 0),
-                               "ret_pct": round((lvl / entry - 1) * 100, 2) if entry else 0.0,
+                               "entry_date": entry_dt, "exit_date": fdate,
+                               "qty": q, "entry_px": round(entry, 2), "exit_px": round(fx, 2),
+                               "stop_lvl": round(lvl, 2),
+                               "pnl": round(q * fx - q * entry, 0),
+                               "ret_pct": round((fx / entry - 1) * 100, 2) if entry else 0.0,
+                               "charges": round(chg, 2),
                                "cap_after": round(cash, 0), "exit_reason": "ATR_STOP"})
                 hold = None; q = 0; entry = 0.0
         kind = cal.get(d)
@@ -260,20 +394,27 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
         else:
             if decide_rotation(hold, ranked, retain_top_n=retain_top_n).is_noop:
                 continue
+        # Rotation legs: decided on bar d's close (rank unchanged), BOTH the
+        # sell and the buy fill at bar d+1's open with CNC charges.
         if hold and q > 0:
-            sx = float(cl[hold].iloc[di]); cash += q * sx
+            sx, sdate = next_open_fill(op, cl, dates, hold, di)
+            chg = fill_charges("SELL", q, sx)
+            cash += q * sx - chg; charges_total += chg
             trades.append({"sym": hold.replace("NSE:", "").replace("-EQ", ""),
-                           "entry_date": entry_dt, "exit_date": d.date().isoformat(),
+                           "entry_date": entry_dt, "exit_date": sdate,
                            "qty": q, "entry_px": round(entry, 2), "exit_px": round(sx, 2),
                            "pnl": round(q * sx - q * entry, 0),
                            "ret_pct": round((sx / entry - 1) * 100, 2) if entry else 0.0,
+                           "charges": round(chg, 2),
                            "cap_after": round(cash, 0), "exit_reason": "ROTATE"})
             hold = None; q = 0
-        bx = float(cl[top].iloc[di])
+        bx, bdate = next_open_fill(op, cl, dates, top, di)
         if bx > 0:
-            n = int(cash / bx)
-            if n >= 1 and n * bx <= cash:
-                cash -= n * bx; q = n; hold = top; entry = bx; entry_dt = d.date().isoformat(); took = False
+            n = size_buy_qty(cash, bx)
+            if n >= 1:
+                chg = fill_charges("BUY", n, bx)
+                cash -= n * bx + chg; charges_total += chg
+                q = n; hold = top; entry = bx; entry_dt = bdate; took = False
     final = cash + (q * float(cl[hold].iloc[-1]) if hold else 0.0)
     yrs = (end - start).days / 365.25
     cagr = ((final / capital) ** (1 / yrs) - 1) * 100 if final > 0 else -100.0
@@ -295,6 +436,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
     print(f"Total: {(final/capital-1)*100:+.2f}%  CAGR: {cagr:+.2f}%")
     print(f"Trades: {len(trades)} (W={wins} L={losses}, WR={wins/max(1,wins+losses)*100:.1f}%)")
     print(f"Max DD (rebal cap_after): {mdd:.2f}%  Calmar: {calmar:.2f}")
+    print(f"Charges (Fyers CNC, all fills): Rs.{charges_total:,.0f}")
 
     if out_dir:
         out_dir = Path(out_dir)
@@ -314,6 +456,9 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
             "win_rate_pct": round(wins / max(1, wins + losses) * 100, 1),
             "open_position": open_pos,
             "per_year": res.per_year,
+            "charges_total": round(charges_total, 2),
+            "fill_at_next_open": FILL_AT_NEXT_OPEN,
+            "charges_model": CHARGES,
         }
         (out_dir / "summary.json").write_text(json.dumps(summary, indent=2))
 

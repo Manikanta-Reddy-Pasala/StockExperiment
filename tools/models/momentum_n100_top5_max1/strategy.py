@@ -21,6 +21,10 @@ LOOKBACK = 15        # momentum window (TRADING days). 6-yr sweep winner (15>30)
 RETAIN = 3           # exit band — hold while in top-3 (the LIVE default: --retain-top-n=3).
 MIDMONTH_LEAD = 5.0  # mid-month rotates only if new rank-1 leads held by >= 5pp.
 INDEX_NAME = "n100"
+# CURRENT headline (2026-06-13 realism regen — net of real Fyers CNC charges,
+# next-open fills): full 2021-03→2026-05 +52.1% CAGR / 49.1% DD / Calmar 1.06;
+# 3-yr 2023-05→2026-05 +80.5% / 20.7% / 3.88. Sweep numbers below are
+# pre-realism (close fills, zero charges).
 # From-entry FIXED-% hard stop (backtest-validated 2026-06-02 via
 # tools/analysis/n100_improve_sweep.py). -12% won across windows on these
 # large-caps — full 2021-26 CAGR 56.2->59.9 / DD 56.8->46.4; crash 2022-23

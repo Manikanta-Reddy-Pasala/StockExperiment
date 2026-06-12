@@ -4,83 +4,86 @@
   "end": "2026-05-31",
   "years": 5.248,
   "capital": 1000000.0,
-  "final_nav": 10736058.0,
-  "total_return_pct": 973.61,
-  "cagr_pct": 57.18,
-  "max_dd_pct": 38.79,
-  "calmar": 1.47,
-  "trades": 182,
-  "wins": 108,
-  "losses": 74,
-  "win_rate_pct": 59.3,
+  "final_nav": 11292990.0,
+  "total_return_pct": 1029.3,
+  "cagr_pct": 58.71,
+  "max_dd_pct": 34.03,
+  "calmar": 1.73,
+  "trades": 183,
+  "wins": 110,
+  "losses": 72,
+  "win_rate_pct": 60.4,
   "open_positions": [
     {
       "sym": "ADANIPOWER",
-      "qty": 13959,
-      "entry_px": 157.11,
-      "entry_date": "2026-04-01",
+      "qty": 14808,
+      "entry_px": 154.5,
+      "entry_date": "2026-04-02",
       "last_px": 243.37,
-      "mtm_value": 3397202.0,
-      "unrealized_pnl": 1204103.0,
+      "mtm_value": 3603823.0,
+      "unrealized_pnl": 1315987.0,
       "cap": "large"
     },
     {
       "sym": "ADANIGREEN",
-      "qty": 1709,
-      "entry_px": 1290.7,
-      "entry_date": "2026-05-04",
+      "qty": 1791,
+      "entry_px": 1291.0,
+      "entry_date": "2026-05-05",
       "last_px": 1475.4,
-      "mtm_value": 2521459.0,
-      "unrealized_pnl": 315652.0,
+      "mtm_value": 2642441.0,
+      "unrealized_pnl": 330260.0,
       "cap": "large"
     },
     {
       "sym": "BHEL",
-      "qty": 5849,
-      "entry_px": 377.05,
-      "entry_date": "2026-05-04",
+      "qty": 6087,
+      "entry_px": 379.9,
+      "entry_date": "2026-05-05",
       "last_px": 416.75,
-      "mtm_value": 2437571.0,
-      "unrealized_pnl": 232205.0,
+      "mtm_value": 2536757.0,
+      "unrealized_pnl": 224306.0,
       "cap": "mid"
     },
     {
       "sym": "ADANIENSOL",
-      "qty": 1574,
-      "entry_px": 1398.4,
-      "entry_date": "2026-05-04",
+      "qty": 1658,
+      "entry_px": 1394.6,
+      "entry_date": "2026-05-05",
       "last_px": 1513.3,
-      "mtm_value": 2381934.0,
-      "unrealized_pnl": 180853.0,
+      "mtm_value": 2509051.0,
+      "unrealized_pnl": 196805.0,
       "cap": "large"
     }
   ],
   "per_year": {
     "2021": {
-      "ret_pct": 21.0,
-      "dd_pct": 23.6
+      "ret_pct": 24.5,
+      "dd_pct": 25.6
     },
     "2022": {
-      "ret_pct": 7.2,
-      "dd_pct": 32.5
+      "ret_pct": 13.1,
+      "dd_pct": 32.8
     },
     "2023": {
-      "ret_pct": 139.7,
-      "dd_pct": 21.3
+      "ret_pct": 121.6,
+      "dd_pct": 21.9
     },
     "2024": {
-      "ret_pct": 141.3,
-      "dd_pct": 18.4
+      "ret_pct": 141.1,
+      "dd_pct": 18.3
     },
     "2025": {
-      "ret_pct": 14.5,
-      "dd_pct": 22.4
+      "ret_pct": 15.5,
+      "dd_pct": 22.7
     },
     "2026": {
-      "ret_pct": 23.0,
-      "dd_pct": 15.2
+      "ret_pct": 26.7,
+      "dd_pct": 12.4
     }
   },
+  "charges_total": 386642.85,
+  "fill_at_next_open": true,
+  "charges_model": "fyers_cnc",
   "params": {
     "top_n": 120,
     "K": 4,

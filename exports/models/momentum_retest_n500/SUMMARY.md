@@ -5,7 +5,7 @@ Monthly top-4 (K=4), 30d momentum, buy within 20% of 20-EMA, retain top-4 band.
 
 **Universe:** Top-120 by 20d ADV from N500 (minus Smallcap-250)
 
-Backtest window: **2021-03-01 → 2026-05-29** (full ~5.2-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 recovery). Recent clean-data window also reported: **2025-03-01 → 2026-05-29**.
+Backtest window: **2021-03-01 → 2026-05-31** (emerging → 2026-06-10; full ~5.2-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 recovery). 3-yr window also reported in notes: **2023-05-15 → 2026-05-12**. REALISM CONVENTION (2026-06-13): all figures are **net of real Fyers CNC charges, with next-open fills** (decide on bar d's close, fill at bar d+1's open) and PIT universes.
 
 ## Trade rules
 
@@ -17,39 +17,40 @@ Backtest window: **2021-03-01 → 2026-05-29** (full ~5.2-year cycle: 2021 bull,
 | **Exit** | Rotate: SELL a holding at the monthly rebalance when it drops out of the top-4 by 30d return (RETAIN=4). |
 | **Source** | Live: niftyindices.com `ind_nifty500list.csv` + `ind_niftysmallcap250list.csv` → nifty500.csv. Backtest: PIT `n500_membership.csv` (xlsx-verified). Prices: Fyers daily OHLCV. |
 
-## Results (net of costs)
+## Results (net of charges, next-open fills)
 
 | Metric | Value |
 |---|---|
-| Final NAV (₹10L start) | ₹10,736,058 |
-| Total return | +973.6% |
-| CAGR (annualized) | +57.3% |
-| Max drawdown | 38.8% |
-| Calmar | 1.48 |
-| Trades | 182 (108W / 74L) · 59% win |
+| Final NAV (₹10L start) | ₹11,292,990 |
+| Total return | +1029.3% |
+| CAGR (annualized) | +58.7% |
+| Max drawdown | 34.0% |
+| Calmar | 1.73 |
+| Trades | 183 (110W / 72L) · 60% win |
+| Total charges (real Fyers CNC, deducted) | ₹386,643 |
 
 ## Year-by-year breakdown
 
 | Year | Return % | Intra-yr DD % |
 |---|---:|---:|
-| 2021 | +21.0% | 23.6% |
-| 2022 | +7.2% | 32.5% |
-| 2023 | +139.7% | 21.3% |
-| 2024 | +141.3% | 18.4% |
-| 2025 | +14.5% | 22.4% |
-| 2026 | +23.0% | 15.2% |
+| 2021 | +24.5% | 25.6% |
+| 2022 | +13.1% | 32.8% |
+| 2023 | +121.6% | 21.9% |
+| 2024 | +141.1% | 18.3% |
+| 2025 | +15.5% | 22.7% |
+| 2026 | +26.7% | 12.4% |
 
 ## Note
 
-Multi-holding K=4 (2026-05-31 re-tune, was K2). Full-cycle 2021-03→2026-05 ≈ +57.3% CAGR / 38.8% DD / Calmar 1.48. Recent 2025-03→2026-05 ≈ +53% CAGR / 15% DD. K2→K4 diversified the basket: recent CAGR +38→+53, recent DD 21→15, and full DD 57→39 (per-year DD now ≤32 EVERY year: 2021 D24 / 2022 D32 / 2023 D21 / 2024 D18 / 2025 D22 / 2026 D15) — for only −7pt full CAGR. K-knee: K5/K6 decay. The old K2 (+64/57) concentrated into 2 names and chained a 57% peak-to-trough; K4 is the better risk-adjusted config. Wide 20% entry band keeps leaders that never pull back to the EMA.
+Multi-holding K=4 (2026-05-31 re-tune, was K2). 2026-06-13 realism regen (net of charges, next-open fills, PIT-before-ADV universe fix): full-cycle 2021-03→2026-05 +58.7% CAGR / 34.0% DD / Calmar 1.73 / 183 trades (charges ₹386,643); 3-yr 2023-05→2026-05 +102.3% CAGR / 23.6% DD / Calmar 4.34. (Old flat-0.15%/side close-fill convention had shown +57.3%/38.8%/1.48 — the PIT-before-ADV fix was net-positive, the only model to IMPROVE under realism.) K2→K4 diversified the basket (per-year DD ≤33 every year); K-knee: K5/K6 decay. Wide 20% entry band keeps leaders that never pull back to the EMA.
 
-**Open position at window end:** ADANIPOWER [large] qty 13959 entry ₹157.11 on 2026-04-01 (unrealized +1,204,103)
+**Open position at window end:** ADANIPOWER [large] qty 14808 entry ₹154.5 on 2026-04-02 (unrealized +1,315,987)
 
-**Open position at window end:** ADANIGREEN [large] qty 1709 entry ₹1290.7 on 2026-05-04 (unrealized +315,652)
+**Open position at window end:** ADANIGREEN [large] qty 1791 entry ₹1291.0 on 2026-05-05 (unrealized +330,260)
 
-**Open position at window end:** BHEL [mid] qty 5849 entry ₹377.05 on 2026-05-04 (unrealized +232,205)
+**Open position at window end:** BHEL [mid] qty 6087 entry ₹379.9 on 2026-05-05 (unrealized +224,306)
 
-**Open position at window end:** ADANIENSOL [large] qty 1574 entry ₹1398.4 on 2026-05-04 (unrealized +180,853)
+**Open position at window end:** ADANIENSOL [large] qty 1658 entry ₹1394.6 on 2026-05-05 (unrealized +196,805)
 
 ---
 *Auto-generated from summary.json by tools/analysis/refresh_export_docs.py — do not hand-edit.*

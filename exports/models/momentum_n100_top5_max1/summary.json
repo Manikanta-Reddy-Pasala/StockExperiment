@@ -1,47 +1,50 @@
 {
   "model": "momentum_n100_top5_max1",
   "start": "2021-03-01",
-  "end": "2026-05-29",
-  "years": 5.243,
+  "end": "2026-05-31",
+  "years": 5.248,
   "capital": 1000000.0,
-  "final_nav": 11756416.0,
-  "total_return_pct": 1075.64,
-  "cagr_pct": 60.01,
-  "max_dd_pct": 46.42,
-  "calmar": 1.29,
+  "final_nav": 9046397.0,
+  "total_return_pct": 804.64,
+  "cagr_pct": 52.14,
+  "max_dd_pct": 49.13,
+  "calmar": 1.06,
   "trades": 97,
-  "wins": 54,
-  "losses": 43,
-  "win_rate_pct": 55.7,
+  "total_charges_inr": 584929.94,
+  "fill_convention": "next_open",
+  "charges_model": "fyers_cnc",
+  "wins": 53,
+  "losses": 44,
+  "win_rate_pct": 54.6,
   "open_position": {
     "symbol": "NSE:VEDL-EQ",
-    "qty": 33342,
-    "entry_px": 331.05
+    "qty": 25656,
+    "entry_px": 323.9
   },
   "per_year": {
     "2021": {
-      "ret_pct": -22.8,
-      "dd_pct": 36.2
+      "ret_pct": -27.1,
+      "dd_pct": 39.1
     },
     "2022": {
-      "ret_pct": 41.5,
-      "dd_pct": 27.8
+      "ret_pct": 44.4,
+      "dd_pct": 25.6
     },
     "2023": {
-      "ret_pct": 166.5,
+      "ret_pct": 129.8,
       "dd_pct": 20.8
     },
     "2024": {
-      "ret_pct": 71.2,
-      "dd_pct": 19.8
+      "ret_pct": 59.6,
+      "dd_pct": 20.7
     },
     "2025": {
-      "ret_pct": 47.9,
-      "dd_pct": 16.6
+      "ret_pct": 40.8,
+      "dd_pct": 17.0
     },
     "2026": {
-      "ret_pct": 58.1,
-      "dd_pct": 15.0
+      "ret_pct": 65.0,
+      "dd_pct": 14.6
     }
   }
 }

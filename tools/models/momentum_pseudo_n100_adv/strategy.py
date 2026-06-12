@@ -20,6 +20,14 @@ Config history:
     So pseudo is back to RET1 + monthly-only. The mid-month machinery stays in
     the code (backtest --mid-month-check, live --mid-month-check) but defaults
     OFF; MIDMONTH_LEAD is kept only for those opt-in paths.
+  - 2026-06-13 ⚠⚠ REALISM REGEN — MODEL COLLAPSED: net of real Fyers CNC
+    charges + next-open fills + PIT smallcap-250 snapshots, full-cycle
+    2021-03→2026-05 = +12.7% CAGR / 59.4% DD / Calmar 0.21 (was published
+    +77.4%). Isolation: realism alone 77→66% (normal haircut); the PIT
+    smallcap fix 66→12.7% — the old non-PIT smallcap exclusion was
+    survivorship-biased (today's list applied to all years kept then-smallcap
+    multibaggers). The "drop smallcaps +2pp" sweep finding is INVALIDATED;
+    pending strategy-level review. All sweep numbers above are pre-realism.
 """
 from __future__ import annotations
 

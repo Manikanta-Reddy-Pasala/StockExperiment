@@ -18,6 +18,11 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[3]
 
 # ---- Strategy parameters (K4/top120/ret4/band20% — 2026-05-31 re-tune) ----
+# CURRENT headline (2026-06-13 realism regen — net of real Fyers CNC charges,
+# next-open fills, PIT-before-ADV fix):
+#   full 2021-03→2026-05: +58.7% CAGR / 34.0% DD / Calmar 1.73 / 183 trades
+#   3-yr 2023-05→2026-05: +102.3% CAGR / 23.6% DD / Calmar 4.34
+# Sweep history below is pre-realism (close fills, flat 0.15%/side):
 # 2026-05-31: K2→K4. On both windows K4 dominates K2 on risk-adjusted return:
 #   full 2021-03→2026-05: +57% CAGR / 39% DD / Calmar 1.48 (was K2 +64/57/1.12)
 #   recent 2025-03→2026-05: +53% CAGR / 15% DD (was K2 +38/21)
@@ -78,15 +83,27 @@ def indicators(cl: pd.DataFrame, adv_rs: pd.DataFrame):
     return adv20, sma200, ema20
 
 
-def rank_targets(cl, adv20, sma200, smallcap, di):
+def rank_targets(cl, adv20, sma200, smallcap, di, eligible=None):
     """Ranked momentum leaders passing all filters, at row index `di`.
 
     Universe = top-TOPN by 20d ADV (minus smallcap). Filters: close>SMA200,
     price<=MAX_PRICE, LOOKBACK-day return>MOM_FLOOR, ACCEL_DAYS-day return>0.
     Returns Fyers-style symbols ordered best-to-worst by LOOKBACK-day return.
+
+    eligible (optional): set of PLAIN symbols (no NSE:/-EQ) that are index-
+    eligible at this date — e.g. eligible_at("n500", d) from the backtest's
+    PIT membership. When given, the ADV top-TOPN cut is taken over eligible
+    names ONLY (PIT-before-ADV, 2026-06-13 fix): previously the backtest
+    post-filtered AFTER the head(TOPN) cut, so historically-ineligible names
+    displaced eligible ones at the ADV margin. LIVE passes None — its panel
+    is built from the CURRENT nifty500 list, which is trivially PIT for
+    today, so live behavior is unchanged.
     """
     a = adv20.iloc[di].dropna()
     a = a[a > 0]
+    if eligible is not None:
+        a = a[[s for s in a.index
+               if s.replace("NSE:", "").replace("-EQ", "") in eligible]]
     univ = [s for s in a.sort_values(ascending=False).head(TOPN).index
             if s.replace("NSE:", "").replace("-EQ", "") not in smallcap]
     row, rowL, rowA = cl.iloc[di], cl.iloc[di - LOOKBACK], cl.iloc[di - ACCEL_DAYS]

@@ -19,11 +19,13 @@ Strategy ("Emerging Momentum") — SINGLE-POSITION rotation (Config 1):
     as momentum_n100_top5_max1); live path = tools/live/fyers_executor.py via the
     single-position model_ledger.
 
-Backtest (PIT N500-minus-N100, same-day close, vol-adj rank + 2.5×ATR stop):
-  FULL 2021-03..2026-05 : ~+121% CAGR / ~38% DD / Calmar ~3.19
-  RECENT 2023-05..2026-05 : ~+165% CAGR / ~26% DD
-  ALL UNLEVERED (own cash only — no borrow). Rechecked 2026-06-05: backtest ==
-  live core (PIT, no-lookahead). Current config = vol-adj rank, RETAIN=1, lb30.
+Backtest (PIT N500-minus-N100, vol-adj rank + 2.5×ATR stop) — 2026-06-13
+REALISM CONVENTION: net of real Fyers CNC charges, next-open fills:
+  FULL 2021-03..2026-06 : +105.3% CAGR / 38.6% DD / Calmar 2.73 (charges ₹2.56M)
+  RECENT 2023-05..2026-05 : +138.9% CAGR / 27.4% DD / Calmar 5.07
+  (old close-fill zero-charge convention: +115.6%/37.9% full, +165%/26% recent)
+  ALL UNLEVERED (own cash only — no borrow). Backtest == live core
+  (PIT, no-lookahead). Current config = vol-adj rank, RETAIN=1, lb30.
 """
 from __future__ import annotations
 

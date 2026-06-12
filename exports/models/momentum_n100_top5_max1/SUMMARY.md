@@ -5,7 +5,7 @@ Monthly rotation + mid-month check, single position (max 1), 15-trading-day retu
 
 **Universe:** Real NSE Nifty 100 (PIT membership)
 
-Backtest window: **2021-03-01 → 2026-05-29** (full ~5.2-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 recovery). Recent clean-data window also reported: **2025-03-01 → 2026-05-29**.
+Backtest window: **2021-03-01 → 2026-05-31** (emerging → 2026-06-10; full ~5.2-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 recovery). 3-yr window also reported in notes: **2023-05-15 → 2026-05-12**. REALISM CONVENTION (2026-06-13): all figures are **net of real Fyers CNC charges, with next-open fills** (decide on bar d's close, fill at bar d+1's open) and PIT universes.
 
 ## Trade rules
 
@@ -17,33 +17,34 @@ Backtest window: **2021-03-01 → 2026-05-29** (full ~5.2-year cycle: 2021 bull,
 | **Exit** | Hold while in the top-3 by 15d return (RETAIN=3); rotate out when it drops below rank-3, or leaves the index. Mid-month only rotates if the new rank-1 leads the held name by ≥ 5pp. |
 | **Source** | Live: niftyindices.com `ind_nifty100list.csv` → nifty100.csv → n100_current.json. Backtest: PIT `n100_membership.csv` (factsheet-derived). Prices: Fyers daily OHLCV. |
 
-## Results (net of costs)
+## Results (net of charges, next-open fills)
 
 | Metric | Value |
 |---|---|
-| Final NAV (₹10L start) | ₹11,756,416 |
-| Total return | +1075.6% |
-| CAGR (annualized) | +60.0% |
-| Max drawdown | 46.4% |
-| Calmar | 1.29 |
-| Trades | 97 (54W / 43L) · 56% win |
+| Final NAV (₹10L start) | ₹9,046,397 |
+| Total return | +804.6% |
+| CAGR (annualized) | +52.1% |
+| Max drawdown | 49.1% |
+| Calmar | 1.06 |
+| Trades | 97 (53W / 44L) · 55% win |
+| Total charges (real Fyers CNC, deducted) | ₹584,930 |
 
 ## Year-by-year breakdown
 
 | Year | Return % | Intra-yr DD % |
 |---|---:|---:|
-| 2021 | -22.8% | 36.2% |
-| 2022 | +41.5% | 27.8% |
-| 2023 | +166.5% | 20.8% |
-| 2024 | +71.2% | 19.8% |
-| 2025 | +47.9% | 16.6% |
-| 2026 | +58.1% | 15.0% |
+| 2021 | -27.1% | 39.1% |
+| 2022 | +44.4% | 25.6% |
+| 2023 | +129.8% | 20.8% |
+| 2024 | +59.6% | 20.7% |
+| 2025 | +40.8% | 17.0% |
+| 2026 | +65.0% | 14.6% |
 
 ## Note
 
-True-index version — the trustworthy-clean momentum benchmark. NOW with a from-entry fixed −12% hard stop (2026-06-02, backtest-validated): full-cycle 2021-03→2026-05 +59.9% CAGR / 46.4% DD / Calmar 1.29; recent 2025-03→2026-05 +111% CAGR / 15% DD; 2022-23 crash +95.7% CAGR / 27.8% DD — the stop's big win (was 68.7/42.9). Stop = entry×(1−0.12), checked daily on the low; shared backtest+live helper tools.shared.stops (no drift). Fixed-% fits these large-caps (uniform vol); ATR was DD-only, a price-floor threshold-fragile. DD now DAILY-MTM (stricter than the old rebal-snapshot; within-basis delta 56.8→46.4).
+True-index version — the trustworthy-clean momentum benchmark. 2026-06-13 realism regen (net of charges, next-open fills): full-cycle 2021-03→2026-05 +52.1% CAGR / 49.1% DD / Calmar 1.06 / 97 trades (charges ₹584,930); 3-yr 2023-05→2026-05 +80.5% CAGR / 20.7% DD / Calmar 3.88. (Old close-fill zero-charge convention had shown +59.9%/46.4%/1.29 — a normal ~8pp charges+slippage haircut.) From-entry fixed −12% hard stop (2026-06-02): entry×(1−0.12), checked daily on the low; shared backtest+live helper tools.shared.stops (no drift). Fixed-% fits these large-caps (uniform vol). DD is DAILY-MTM (stricter than the old rebal-snapshot basis).
 
-**Open position at window end:** NSE:VEDL-EQ qty 33342 entry ₹331.05 on ? (unrealized +0)
+**Open position at window end:** NSE:VEDL-EQ qty 25656 entry ₹323.9 on ? (unrealized +0)
 
 ---
 *Auto-generated from summary.json by tools/analysis/refresh_export_docs.py — do not hand-edit.*

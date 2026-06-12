@@ -19,35 +19,38 @@ DESC = {
         "title": "Liquid 100 Momentum", "live": "LIVE",
         "universe": "Top-100 by 20d ADV from N500 (yearly-PIT rebuild)",
         "strategy": "Monthly (1st trading day) rotation, single position (rank-1, RET1), 30-trading-day return rank, uptrend (>200d SMA) + ≤₹3K filter. Universe rebuilt yearly at a FIXED mid-May anchor. + DAILY from-entry ATR×3.0 hard stop (entry − 3×ATR(14)).",
-        "note": "⚠️ ADV-ranked pseudo-N100 (not the real index) — selects already-liquid/hot names, an OPTIMISTIC upper bound vs the real-index sibling. NOW with a from-entry ATR×3.0 hard stop (2026-06-02, backtest-validated both windows): full-cycle 2021-03→2026-05 +77.4% CAGR / 43.8% DD / Calmar 1.77 / 74% win; recent 2025-03→2026-05 +209% CAGR / 16% DD. The stop is a FIXED level at entry−3×ATR (cuts genuine breakdowns, winners run to rotation); shared helper tools.shared.stops used by backtest + live --stop-check (no drift). DD is now on the stricter DAILY-MTM (intraday-low) basis — not comparable to the prior rebal-snapshot DD; the stop's gain is the within-basis delta (50.1→43.8). ADV-selection bias remains by design.",
+        "note": "⚠️⚠️ COLLAPSED UNDER PIT TREATMENT (2026-06-13 realism regen, net of charges + next-open fills + PIT smallcap-250 snapshots): full-cycle 2021-03→2026-05 +12.7% CAGR / 59.4% DD / Calmar 0.21 / 53% win; 3-yr 2023-05→2026-05 +23.9% / 59.4% DD / Calmar 0.40. The previously-published +77.4% was substantially SURVIVORSHIP-BIASED: the old smallcap-exclusion applied TODAY's Smallcap-250 list to every historical year, which silently kept names that were smallcap THEN but grew large (the multibaggers the model rode). Diagnostic isolation: realism alone (next-open fills + charges) = 77.4→66.5%; the PIT smallcap fix = 66.5→12.7%. The 'drop smallcaps, +2pp free' sweep finding is INVALIDATED. Model pending strategy-level review (possibly drop the smallcap exclusion entirely or re-validate). ADV-ranked pseudo-N100 (not the real index) — ADV-selection bias remains by design. From-entry ATR×3.0 hard stop unchanged (tools.shared.stops, backtest + live --stop-check, no drift).",
     },
     "momentum_n100_top5_max1": {
         "title": "Nifty 100 Momentum", "live": "LIVE",
         "universe": "Real NSE Nifty 100 (PIT membership)",
         "strategy": "Monthly rotation + mid-month check, single position (max 1), 15-trading-day return rank. + DAILY from-entry FIXED −12% hard stop (entry × 0.88).",
-        "note": "True-index version — the trustworthy-clean momentum benchmark. NOW with a from-entry fixed −12% hard stop (2026-06-02, backtest-validated): full-cycle 2021-03→2026-05 +59.9% CAGR / 46.4% DD / Calmar 1.29; recent 2025-03→2026-05 +111% CAGR / 15% DD; 2022-23 crash +95.7% CAGR / 27.8% DD — the stop's big win (was 68.7/42.9). Stop = entry×(1−0.12), checked daily on the low; shared backtest+live helper tools.shared.stops (no drift). Fixed-% fits these large-caps (uniform vol); ATR was DD-only, a price-floor threshold-fragile. DD now DAILY-MTM (stricter than the old rebal-snapshot; within-basis delta 56.8→46.4).",
+        "note": "True-index version — the trustworthy-clean momentum benchmark. 2026-06-13 realism regen (net of charges, next-open fills): full-cycle 2021-03→2026-05 +52.1% CAGR / 49.1% DD / Calmar 1.06 / 97 trades (charges ₹584,930); 3-yr 2023-05→2026-05 +80.5% CAGR / 20.7% DD / Calmar 3.88. (Old close-fill zero-charge convention had shown +59.9%/46.4%/1.29 — a normal ~8pp charges+slippage haircut.) From-entry fixed −12% hard stop (2026-06-02): entry×(1−0.12), checked daily on the low; shared backtest+live helper tools.shared.stops (no drift). Fixed-% fits these large-caps (uniform vol). DD is DAILY-MTM (stricter than the old rebal-snapshot basis).",
     },
     "n40": {
         "title": "Weekly Top-40", "live": "LIVE",
         "universe": "Top-40 by ADV ∩ Nifty 100",
         "strategy": "WEEKLY rotation (first trading day of each ISO week), single position, uptrend gate.",
-        "note": "Weekly rebalance cut the daily whipsaw (55% of daily trades held ≤3d). Full-cycle 2021-03→2026-05 on the AUTHORITATIVE PIT Nifty-100 (2026-05-31 rebuild) ≈ +41.2% CAGR / 36.9% DD / Calmar 1.12 — the clean membership (no DUMMYREL/BHEL/IDEA garbage) lifted it from +25%/0.45. Recent 2025-03→2026-05 ≈ +96% CAGR / 24% DD. Per-year DD ≤27% every year — the 37% full-cycle is 2021→2022 peak-to-trough chaining.",
+        "note": "Weekly rebalance cut the daily whipsaw (55% of daily trades held ≤3d). 2026-06-13 realism regen (net of charges, next-open fills): full-cycle 2021-03→2026-05 +28.4% CAGR / 43.9% DD / Calmar 0.65 / 138 trades (charges ₹468,281); 3-yr 2023-05→2026-05 +48.6% CAGR / 30.9% DD / Calmar 1.58. (Old close-fill zero-charge convention had shown +48.1%/37.1%/1.30 — the ~20pp haircut is the realism convention compounding on the most churn-heavy weekly single-position rotation; no bug, trades 137→138, selection unchanged.) AUTHORITATIVE PIT Nifty-100 membership (2026-05-31 rebuild); per-year DD ≤36% — the 44% full-cycle is peak-to-trough chaining.",
     },
     "momentum_retest_n500": {
         "title": "Retest Momentum", "live": "DISABLED (₹0)",
         "universe": "Top-120 by 20d ADV from N500 (minus Smallcap-250)",
         "strategy": "Monthly top-4 (K=4), 30d momentum, buy within 20% of 20-EMA, retain top-4 band.",
-        "note": "Multi-holding K=4 (2026-05-31 re-tune, was K2). Full-cycle 2021-03→2026-05 ≈ +57.3% CAGR / 38.8% DD / Calmar 1.48. Recent 2025-03→2026-05 ≈ +53% CAGR / 15% DD. K2→K4 diversified the basket: recent CAGR +38→+53, recent DD 21→15, and full DD 57→39 (per-year DD now ≤32 EVERY year: 2021 D24 / 2022 D32 / 2023 D21 / 2024 D18 / 2025 D22 / 2026 D15) — for only −7pt full CAGR. K-knee: K5/K6 decay. The old K2 (+64/57) concentrated into 2 names and chained a 57% peak-to-trough; K4 is the better risk-adjusted config. Wide 20% entry band keeps leaders that never pull back to the EMA.",
+        "note": "Multi-holding K=4 (2026-05-31 re-tune, was K2). 2026-06-13 realism regen (net of charges, next-open fills, PIT-before-ADV universe fix): full-cycle 2021-03→2026-05 +58.7% CAGR / 34.0% DD / Calmar 1.73 / 183 trades (charges ₹386,643); 3-yr 2023-05→2026-05 +102.3% CAGR / 23.6% DD / Calmar 4.34. (Old flat-0.15%/side close-fill convention had shown +57.3%/38.8%/1.48 — the PIT-before-ADV fix was net-positive, the only model to IMPROVE under realism.) K2→K4 diversified the basket (per-year DD ≤33 every year); K-knee: K5/K6 decay. Wide 20% entry band keeps leaders that never pull back to the EMA.",
     },
     "emerging_momentum": {
         "title": "Emerging Momentum", "live": "LIVE",
         "universe": "Top-100 by 20d ADV from emerging mid/small (PIT N500 minus N100)",
         "strategy": "Single-position (max-1) VOL-ADJUSTED momentum: rank by 30d return ÷ 60d return-volatility; ret>0, price ≤₹3000 (no SMA gate); RET1 top-1 rotation; monthly (1st trading day) + mid-month check (≥5pp lead). + DAILY ATR-from-entry hard stop (entry − 2.5× ATR(14)).",
-        "note": "Best model. Vol-adjusted momentum (return per unit of volatility) on the mid/small universe, PLUS a 2.5× ATR-from-entry hard stop (2026-06-01, backtest-validated both windows + every year): +121.0% CAGR / 37.9% DD / Calmar 3.19 / 64% win full-cycle 2021-03→2026-05; recent 2023-05→2026-05 +165% CAGR / 26% DD / 75% win. ALL figures UNLEVERED (own cash only — no borrow); rechecked 2026-06-05 against the live core (PIT, no-lookahead, backtest==live). The stop is a FIXED level at entry − 2.5×ATR (NOT trailing) so it cuts genuine breakdowns without whipsawing winners. Per-year: 2021 +20 / 2022 +150 / 2023 +358 / 2024 +171 / 2025 +46 / 2026 +15. Shared helper strategy.atr_stop_hit used by both backtest and the live --stop-check (no drift). The one model that crosses 100% organically (no leverage).",
+        "note": "Best model. Vol-adjusted momentum (return per unit of volatility) on the mid/small universe, PLUS a 2.5× ATR-from-entry hard stop. 2026-06-13 realism regen (net of real Fyers CNC charges, next-open fills): full-cycle 2021-03→2026-06 +105.3% CAGR / 38.6% DD / Calmar 2.73 / 68 trades / 63% win (charges ₹2.56M); 3-yr 2023-05→2026-05 +138.9% CAGR / 27.4% DD / Calmar 5.07 / 40 trades. (Old close-fill zero-charge convention had shown +115.6%/37.9%/3.05 — a normal ~10pp charges haircut.) ALL figures UNLEVERED (own cash only — no borrow); decision logic byte-identical to live (PIT, no-lookahead, backtest==live). The stop is a FIXED level at entry − 2.5×ATR (NOT trailing) so it cuts genuine breakdowns without whipsawing winners. Shared helper strategy.atr_stop_hit used by both backtest and the live --stop-check (no drift). The one model that crosses 100% organically (no leverage).",
     },
 }
 
-WIN = "Backtest window: **2021-03-01 → 2026-05-29** (full ~5.2-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 recovery). Recent clean-data window also reported: **2025-03-01 → 2026-05-29**."
+WIN = ("Backtest window: **2021-03-01 → 2026-05-31** (emerging → 2026-06-10; full ~5.2-year cycle: 2021 bull, "
+       "2022 correction, 2023-24 bull, 2025 chop, 2026 recovery). 3-yr window also reported in notes: "
+       "**2023-05-15 → 2026-05-12**. REALISM CONVENTION (2026-06-13): all figures are **net of real Fyers CNC "
+       "charges, with next-open fills** (decide on bar d's close, fill at bar d+1's open) and PIT universes.")
 
 # Per-model trade rules — transcribed from the model code (strategy.py + backtest
 # rank_at / run loop) as the single source of truth. Imported by regen_exports too
@@ -114,7 +117,7 @@ def write_summary(model: str, d: dict):
              f"**Status:** {info.get('live','—')}  ", info.get("strategy", ""), "",
              f"**Universe:** {info.get('universe','—')}", "", WIN]
     lines += rules_block(model)
-    lines += ["", "## Results (net of costs)", "",
+    lines += ["", "## Results (net of charges, next-open fills)", "",
               "| Metric | Value |", "|---|---|"]
     if d.get("final_nav"):
         lines.append(f"| Final NAV (₹10L start) | ₹{d['final_nav']:,.0f} |")
@@ -129,6 +132,9 @@ def write_summary(model: str, d: dict):
             wl = f" ({d['wins']}W / {d['losses']}L)"
         wr = f" · {d['win_rate_pct']:.0f}% win" if "win_rate_pct" in d else ""
         lines.append(f"| Trades | {d['trades']}{wl}{wr} |")
+    charges = d.get("charges_total") or d.get("total_charges_inr")
+    if charges:
+        lines.append(f"| Total charges (real Fyers CNC, deducted) | ₹{charges:,.0f} |")
     py = d.get("per_year") or {}
     if py:
         lines += ["", "## Year-by-year breakdown", "", "| Year | Return % | Intra-yr DD % |", "|---|---:|---:|"]
@@ -186,7 +192,7 @@ def write_ledger(model: str):
 
 def write_index(summaries: dict):
     rows = ["# Model Backtests — Index", "", WIN, "",
-            "All figures net of costs, ₹10L start, true point-in-time universes.", "",
+            "All figures net of real Fyers CNC charges with next-open fills, ₹10L start, true point-in-time universes.", "",
             "| Model | Status | CAGR | maxDD | Calmar | Total |", "|---|---|---|---|---|---|"]
     order = sorted(summaries, key=lambda m: -summaries[m].get("cagr_pct", -999))
     for m in order:

@@ -14,6 +14,10 @@ LOOKBACK = 30        # momentum window (TRADING days)
 ADV_WIN = 20         # ADV averaging window
 SMA_LONG = 200       # uptrend filter: close > 200d SMA
 RETAIN = 1           # exit band — top-1 weekly rotation
+# CURRENT headline (2026-06-13 realism regen — net of real Fyers CNC charges,
+# next-open fills): full 2021-03→2026-05 +28.4% CAGR / 43.9% DD / Calmar 0.65;
+# 3-yr 2023-05→2026-05 +48.6% / 30.9% / 1.58. Sweep numbers below are
+# pre-realism (close fills, zero charges).
 # From-entry FIXED-% hard stop (backtest-validated 2026-06-04 via n40 daily-MTM
 # stop sweep). n40 was the only momentum model without a stop. -12% won on BOTH
 # axes: full 2021-26 CAGR 41.1->48.1 / DD 41.4->37.1 / Calmar 0.99->1.30
