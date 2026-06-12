@@ -4,34 +4,94 @@
 
 {% block content %}
 <style>
-  .pos { color: #15a36b; } .neg { color: #d4453a; } .neutral { color: #4f5868; }
-  .small-mute { font-size: 0.78rem; color: #8b95a5; }
-  th.sticky { position: sticky; top: 0; background: #fff; z-index: 2; }
+  /* Page title <code> can overflow narrow phones */
+  h1.h2 code { word-break: break-all; }
+
+  /* Toolbar: row on desktop, stacked on mobile */
+  .sig-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--sp-2) var(--sp-3);
+  }
+  .sig-toolbar-top {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-width: 0;
+  }
+  .sig-toolbar-top code { word-break: break-all; }
+  .sig-toolbar-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--sp-2) var(--sp-3);
+  }
+  .sig-toolbar-controls .form-select { width: auto; }
+  .sig-hold-check {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-bottom: 0;
+    min-height: 40px;
+  }
+
+  /* Reason column: keep full text visible (trading audit view) */
+  .table-scroll-sticky td.cell-reason,
+  .table-scroll-sticky th.cell-reason {
+    white-space: normal;
+    min-width: 180px;
+  }
+
+  @media (max-width: 767.98px) {
+    .sig-toolbar, .sig-toolbar-top, .sig-toolbar-controls {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .sig-toolbar-top .btn { min-height: var(--tap); }
+    .sig-toolbar-controls .form-select { width: 100%; }
+    .sig-hold-check {
+      min-height: var(--tap);
+      padding-left: 0;
+    }
+    .sig-hold-check .form-check-input {
+      width: 24px; height: 24px;
+      margin: 0;
+      flex-shrink: 0;
+    }
+    .sig-hold-check .form-check-label {
+      flex: 1;
+      min-height: var(--tap);
+      display: flex;
+      align-items: center;
+    }
+    #sig_count { align-self: flex-start; }
+  }
 </style>
 
-<div class="d-flex justify-content-between align-items-center mb-2">
-  <div>
+<div class="sig-toolbar mb-2">
+  <div class="sig-toolbar-top">
     <a href="/picks" class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-arrow-left"></i> Back to Picks
     </a>
-    <span class="ms-2">
+    <span>
       <strong>Model:</strong> <code>{{ model_key }}</code>
     </span>
   </div>
-  <div>
-    <label class="small-mute me-1">Window:</label>
-    <select id="days" class="form-select form-select-sm d-inline-block w-auto"
-            onchange="loadSignals()">
+  <div class="sig-toolbar-controls">
+    <label class="small-mute mb-0" for="days">Window:</label>
+    <select id="days" class="form-select form-select-sm" onchange="loadSignals()">
       <option value="7">Last 7 days</option>
       <option value="30" selected>Last 30 days</option>
       <option value="90">Last 90 days</option>
       <option value="365">Last 365 days</option>
     </select>
-    <div class="form-check form-check-inline ms-2">
+    <div class="form-check sig-hold-check">
       <input class="form-check-input" type="checkbox" id="show_holds" onchange="loadSignals()">
       <label class="form-check-label small" for="show_holds">Show HOLD (noise)</label>
     </div>
-    <span class="badge bg-secondary ms-2" id="sig_count">…</span>
+    <span class="badge bg-secondary" id="sig_count">…</span>
   </div>
 </div>
 
@@ -43,15 +103,15 @@
 
 <div class="card">
   <div class="table-responsive">
-    <table class="table table-sm table-striped align-middle mb-0">
+    <table class="table table-sm table-striped align-middle mb-0 table-scroll-sticky">
       <thead>
         <tr>
-          <th class="sticky">When (IST)</th>
-          <th class="sticky">Type</th>
-          <th class="sticky">Symbol</th>
-          <th class="sticky">Side</th>
-          <th class="sticky text-end">Price</th>
-          <th class="sticky">Reason</th>
+          <th>When (IST)</th>
+          <th>Type</th>
+          <th>Symbol</th>
+          <th>Side</th>
+          <th class="text-end">Price</th>
+          <th class="cell-reason">Reason</th>
         </tr>
       </thead>
       <tbody id="signals_tbody">
@@ -111,7 +171,7 @@ async function loadSignals() {
         '<td>' + (s.symbol || '—') + '</td>' +
         '<td class="' + sideCls + '">' + (s.side || '—') + '</td>' +
         '<td class="text-end">' + px + '</td>' +
-        '<td class="small text-muted">' + (s.reason || '—') + '</td>' +
+        '<td class="small text-muted cell-reason">' + (s.reason || '—') + '</td>' +
         '</tr>';
     }).join('');
   } catch (e) {

@@ -7,6 +7,31 @@ Modern CSS for the Automated Trading System
 
 /* CSS Variables for modern theming */
 :root {
+    /* ============================================================
+       v2 mobile-redesign design tokens (2026-06-12) — single source
+       of truth for surfaces, P&L colors, spacing, radii, type, taps.
+       Screen templates must use THESE instead of hard-coded hexes.
+       ============================================================ */
+    /* Surfaces */
+    --bg: #f6f7f9;            --surface: #ffffff;
+    --surface-2: #f4f6fb;     --border: #e2e6ee;
+    --text: #1e2533;          --muted: #6b7280;     --muted-2: #8b95a5;
+    /* Brand + P&L (single source of truth) */
+    --accent: #15a36b;        /* brand green, matches theme-color meta */
+    --gain: #15a36b;          --loss: #d4453a;      --flat: #4f5868;
+    --warn: #e0a800;          --info: #2a7de1;
+    /* Misc semantic */
+    --held-bg: #fffbea;       --rank1: #ffd60a;
+    /* Spacing scale (4pt) */
+    --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
+    /* Radii */
+    --r-sm: 8px; --r-md: 12px; --r-lg: 16px;
+    /* Type */
+    --fs-body: 0.9375rem;     /* 15px body on mobile */
+    --fs-num: 1rem;
+    --fs-num-lg: 1.25rem;
+    --tap: 44px;              /* minimum touch target */
+
     /* Modern Light Color Palette */
     --primary-color: #3b82f6;
     --primary-light: #60a5fa;
@@ -70,8 +95,8 @@ Modern CSS for the Automated Trading System
 
 body {
     font-family: var(--font-family-sans-serif);
-    background: var(--light-bg);
-    color: var(--light-color);
+    background: var(--bg);
+    color: var(--text);
     line-height: 1.6;
     font-weight: 400;
     -webkit-font-smoothing: antialiased;
@@ -126,8 +151,13 @@ body {
     color: var(--primary-color);
     background: rgba(99, 102, 241, 0.08);
     border-left-color: var(--primary-color);
-    transform: translateX(4px);
-    box-shadow: var(--shadow-md);
+}
+/* Hover-only motion — never fires on touch (no hover-stuck states) */
+@media (hover: hover) {
+    .sidebar .nav-link:hover {
+        transform: translateX(4px);
+        box-shadow: var(--shadow-md);
+    }
 }
 
 /* Broker specific styles */
@@ -136,10 +166,12 @@ body {
     border: 1px solid var(--light-border-color);
 }
 
-.broker-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
-    border-color: var(--primary-color);
+@media (hover: hover) {
+    .broker-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+        border-color: var(--primary-color);
+    }
 }
 
 .broker-status-indicator {
@@ -215,63 +247,41 @@ body {
     padding: var(--spacing-xl);
 }
 
-/* Modern Cards */
+/* Cards — canonical recipe (§2.4). No hover lift, no gradient top bar,
+   no backdrop filters. Flat, quiet, dark-mode safe. */
 .card {
-    background: var(--gradient-card);
-    border: 1px solid var(--light-border-color);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-md);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .05);
     overflow: hidden;
     position: relative;
 }
 
-.card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: var(--gradient-primary);
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.card:hover::before {
-    opacity: 1;
-}
-
-.card:hover {
-    transform: translateY(-8px);
-    box-shadow: var(--shadow-xl);
-    border-color: var(--primary-light);
-}
-
 .card-header {
     background: transparent;
-    border-bottom: 1px solid var(--light-border-color);
+    border-bottom: 1px solid var(--border);
     font-weight: 600;
-    padding: var(--spacing-lg);
-    color: var(--light-color);
-    font-size: 1.1rem;
+    padding: var(--sp-3) var(--sp-4);
+    color: var(--text);
+    font-size: 0.95rem;
 }
 
 .card-body {
-    padding: var(--spacing-lg);
+    padding: var(--sp-4);
 }
 
 /* Modern Tables */
 .table {
-    background: var(--light-card-bg);
+    background: var(--surface);
     border-radius: var(--radius-lg);
     overflow: hidden;
     box-shadow: var(--shadow-sm);
 }
 
 .table thead {
-    background: var(--light-table-header-bg);
-    border-bottom: 2px solid var(--light-border-color);
+    background: var(--surface-2);
+    border-bottom: 2px solid var(--border);
 }
 
 .table th {
@@ -280,26 +290,23 @@ body {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: var(--light-color);
+    color: var(--text);
     font-size: 0.875rem;
-    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    background: var(--surface-2);
 }
 
 .table td {
     padding: var(--spacing-lg);
     vertical-align: middle;
-    border-top: 1px solid var(--light-border-color);
-    transition: all 0.2s ease;
+    border-top: 1px solid var(--border);
 }
 
-.table tbody tr {
-    transition: all 0.2s ease;
-}
-
-.table tbody tr:hover {
-    background: var(--light-table-hover-bg);
-    transform: scale(1.01);
-    box-shadow: var(--shadow-sm);
+/* Row hover: background tint only, hover-capable devices only.
+   (The old transform:scale(1.01) caused repaint jank on touch scroll.) */
+@media (hover: hover) {
+    .table tbody tr:hover {
+        background: var(--light-table-hover-bg);
+    }
 }
 
 /* Modern Buttons */
@@ -318,30 +325,10 @@ body {
     gap: 0.5rem;
 }
 
-.btn::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-    transition: left 0.5s;
-}
-
-.btn:hover::before {
-    left: 100%;
-}
-
 .btn-primary {
     background: var(--gradient-primary);
     color: white;
     box-shadow: var(--shadow-md);
-}
-
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
 }
 
 .btn-outline-primary {
@@ -350,11 +337,38 @@ body {
     background: transparent;
 }
 
-.btn-outline-primary:hover {
+.btn-outline-primary:hover,
+.btn-outline-primary:active {
     background: var(--primary-color);
     color: white;
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
+}
+
+/* Hover-only button motion + shimmer — desktop pointer devices only */
+@media (hover: hover) {
+    .btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+        transition: left 0.5s;
+    }
+
+    .btn:hover::before {
+        left: 100%;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .btn-outline-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
 }
 
 /* Modern Form Controls */
@@ -370,7 +384,7 @@ body {
 .form-control:focus, .form-select:focus {
     border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-    background: white;
+    background: var(--surface);
 }
 
 /* Modern Badges */
@@ -422,7 +436,12 @@ body {
 
 .dropdown-item:hover {
     background: var(--light-table-hover-bg);
-    transform: translateX(4px);
+}
+
+@media (hover: hover) {
+    .dropdown-item:hover {
+        transform: translateX(4px);
+    }
 }
 
 /* Modern Alerts */
@@ -503,18 +522,19 @@ body {
     border: none;
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-2xl);
-    backdrop-filter: blur(10px);
+    background: var(--surface);
+    color: var(--text);
 }
 
 .modal-header {
-    border-bottom: 1px solid var(--light-border-color);
-    background: var(--gradient-card);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
 }
 
 .modal-footer {
-    border-top: 1px solid var(--light-border-color);
-    background: var(--light-table-header-bg);
+    border-top: 1px solid var(--border);
+    background: var(--surface-2);
     border-radius: 0 0 var(--radius-xl) var(--radius-xl);
 }
 
@@ -536,8 +556,10 @@ body {
     transition: transform 0.3s ease;
 }
 
-.hover-lift:hover {
-    transform: translateY(-4px);
+@media (hover: hover) {
+    .hover-lift:hover {
+        transform: translateY(-4px);
+    }
 }
 
 /* Animation Classes */
@@ -620,17 +642,10 @@ body {
     font-size: 0.875rem;
 }
 
-/* Card Header Improvements */
-.card-header {
-    padding: 1.25rem 1.5rem;
-    border-bottom: 1px solid var(--light-border-color);
-    background: var(--gradient-card);
-}
-
 .card-header h5 {
     margin: 0;
     font-weight: 600;
-    color: var(--light-color);
+    color: var(--text);
 }
 
 /* Form Control Improvements */
@@ -752,9 +767,11 @@ body {
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-.hover-lift:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-xl);
+@media (hover: hover) {
+    .hover-lift:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-xl);
+    }
 }
 
 /* ============================
@@ -791,10 +808,12 @@ body {
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     cursor: default;
 }
-.pick-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
-    border-color: var(--primary-light);
+@media (hover: hover) {
+    .pick-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-lg);
+        border-color: var(--primary-light);
+    }
 }
 
 /* Target badges */
@@ -843,13 +862,18 @@ body {
    Also handles iOS safe-area for PWA standalone mode.
    ============================================================ */
 
-/* iOS PWA standalone notch / status-bar safe area */
+/* iOS PWA standalone notch / status-bar safe area.
+   Top inset lives on the STICKY MOBILE NAVBAR (not body) so the bar's own
+   background covers the notch area while it sticks; left/right/bottom
+   insets stay on body. */
 @supports (padding: env(safe-area-inset-top)) {
     body {
-        padding-top: env(safe-area-inset-top);
         padding-bottom: env(safe-area-inset-bottom);
         padding-left: env(safe-area-inset-left);
         padding-right: env(safe-area-inset-right);
+    }
+    .navbar.d-md-none {
+        padding-top: calc(0.5rem + env(safe-area-inset-top)) !important;
     }
 }
 
@@ -889,20 +913,20 @@ body {
     /* Tables: smaller font, snug padding, horizontal scroll preserved */
     .table th, .table td {
         padding: 0.45rem 0.4rem !important;
-        font-size: 0.78rem !important;
+        font-size: 0.8rem !important;
         white-space: nowrap;
     }
     /* Sticky thead on scroll within .table-responsive */
     .table-responsive thead th {
-        position: sticky; top: 0; background: var(--light-table-header-bg, #f8fafc);
+        position: sticky; top: 0; background: var(--surface-2);
         z-index: 2;
     }
 
     /* Touch targets ≥44px (Apple HIG / Material guideline) */
     .btn, .form-control, .form-select {
-        min-height: 40px;
+        min-height: var(--tap);
     }
-    .btn-sm { min-height: 36px; }
+    .btn-sm { min-height: 40px; min-width: 40px; }
     .btn-lg { min-height: 48px; }
 
     /* Form fields full-width on phones */
@@ -965,18 +989,20 @@ body {
     left: 0; right: 0; bottom: 0;
     z-index: 1040;
     display: none;  /* Override on mobile breakpoint below */
-    background: #ffffff;
-    border-top: 1px solid var(--light-border-color, #e2e8f0);
+    background: var(--surface);
+    border-top: 1px solid var(--border);
     box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
     padding-bottom: env(safe-area-inset-bottom, 0);
 }
 .mobile-bottom-nav .bn-item {
     flex: 1 1 0;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 10px 4px;
-    color: #6b7280;
+    gap: 2px;
+    padding: 10px 4px 8px;
+    color: var(--muted);
     text-decoration: none;
     transition: color 0.12s ease, transform 0.12s ease;
     min-height: 56px;
@@ -988,8 +1014,15 @@ body {
     stroke-width: 2;
     transition: transform 0.12s ease, stroke-width 0.12s ease;
 }
+/* Text label under each tab icon — icons-only failed recognizability */
+.mobile-bottom-nav .bn-label {
+    font-size: 0.62rem;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    font-weight: 500;
+}
 .mobile-bottom-nav .bn-item.active {
-    color: #15a36b;
+    color: var(--accent);
 }
 .mobile-bottom-nav .bn-item.active i,
 .mobile-bottom-nav .bn-item.active svg {
@@ -1004,15 +1037,15 @@ body {
 
 @media (max-width: 767.98px) {
     .mobile-bottom-nav { display: flex; }
-    /* Pad bottom of main so last row isn't hidden behind fixed nav */
+    /* Pad bottom of main so last row isn't hidden behind fixed nav.
+       SINGLE source of truth for bottom clearance — templates must not
+       re-declare stronger overrides. */
     main.main-content, main.col-md-9 {
-        padding-bottom: calc(72px + env(safe-area-inset-bottom, 0)) !important;
+        padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
     }
-    /* Hide the offcanvas hamburger button — bottom nav covers primary routes */
-    .navbar.d-md-none .btn-outline-primary[data-bs-target="#mobileSidebar"] {
-        display: none;
-    }
-    /* But keep offcanvas reachable from top navbar long-press / settings */
+    /* Hamburger stays VISIBLE on mobile: it is the only route to
+       /notifications + admin pages (Model Data / Audit / Manage Users)
+       from a phone. Bottom nav covers the 5 primary routes only. */
 }
 
 /* ============================================================
@@ -1049,7 +1082,7 @@ body {
    Better focus rings (accessibility on touch + keyboard)
    ============================================================ */
 button:focus-visible, a:focus-visible, .form-control:focus-visible {
-    outline: 2px solid #15a36b !important;
+    outline: 2px solid var(--accent) !important;
     outline-offset: 1px;
 }
 
@@ -1069,12 +1102,12 @@ button:focus-visible, a:focus-visible, .form-control:focus-visible {
     left: 50%;
     transform: translate(-50%, -100%);
     z-index: 1050;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 999px;
     padding: 8px 16px;
     font-size: 0.85rem;
-    color: #15a36b;
+    color: var(--accent);
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     display: flex;
     align-items: center;
@@ -1088,5 +1121,278 @@ button:focus-visible, a:focus-visible, .form-control:focus-visible {
     display: inline-block;
     font-size: 1.1rem;
     transition: transform 0.05s linear;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   v2 MOBILE-FIRST REDESIGN — SHARED FOUNDATION (2026-06-12)
+   Design tokens live in :root at the top of this file.
+   This section: dark mode, typography, tap targets, table strategies
+   (.table-cards / .table-scroll-sticky), pills, side badges,
+   expand-header chevrons, bottom-sheet action menus, toast/modal
+   safe-area fixes. Screen templates consume these — do not duplicate.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ----------------------------------------------------------------
+   Dark mode — token flip. Legacy --light-* vars are remapped so
+   pre-token components inherit correct surfaces automatically.
+   ---------------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #0f1318;          --surface: #171c23;   --surface-2: #1e242d;
+        --border: #2a313c;      --text: #e6e9ef;      --muted: #98a1ae; --muted-2: #6f7886;
+        --gain: #2ecc8f;        --loss: #f2655a;      --flat: #9aa3b2;
+        --held-bg: #3a3320;
+
+        /* Legacy var remap → old rules pick up dark surfaces for free */
+        --light-bg: var(--bg);
+        --light-color: var(--text);
+        --light-sidebar-bg: var(--surface);
+        --light-card-bg: var(--surface);
+        --light-border-color: var(--border);
+        --light-table-header-bg: var(--surface-2);
+        --light-table-hover-bg: var(--surface-2);
+        --light-muted: var(--muted);
+        --gradient-card: var(--surface);
+        --gradient-sidebar: var(--surface);
+    }
+
+    /* Base chrome that still carries Bootstrap utility classes */
+    .bg-white { background-color: var(--surface) !important; }
+    .bg-light { background-color: var(--surface-2) !important; }
+    .text-dark { color: var(--text) !important; }
+    .text-muted, .text-secondary { color: var(--muted) !important; }
+    .border, .border-top, .border-bottom, .border-start, .border-end {
+        border-color: var(--border) !important;
+    }
+    .navbar.d-md-none { background-color: var(--surface) !important; }
+    .navbar.d-md-none .navbar-brand, .link-dark { color: var(--text) !important; }
+    .offcanvas { background-color: var(--surface); color: var(--text); }
+    .dropdown-menu { background: var(--surface); color: var(--text); }
+    .dropdown-item { color: var(--text); }
+    .list-group-item { background: var(--surface); color: var(--text); border-color: var(--border); }
+    .toast { background: var(--surface); color: var(--text); }
+    .btn-close { filter: invert(1) grayscale(100%) brightness(180%); }
+    .table {
+        --bs-table-bg: transparent;
+        --bs-table-color: var(--text);
+        color: var(--text);
+    }
+    .form-control, .form-select, textarea.form-control {
+        background-color: var(--surface);
+        color: var(--text);
+        border-color: var(--border);
+    }
+    .form-control::placeholder { color: var(--muted-2); }
+    code { color: #e58fff; }
+}
+
+/* ----------------------------------------------------------------
+   Typography & numbers — tabular figures everywhere values render
+   ---------------------------------------------------------------- */
+.v, .num, .pc-pnl, .pnl-line, .fs-4, .fs-5,
+td.text-end, .metric-table td {
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 767.98px) {
+    body { font-size: var(--fs-body); }
+
+    /* iOS focus-zoom prevention: any input < 16px triggers page zoom */
+    input.form-control, select.form-select,
+    .form-control-sm, .form-select-sm, textarea {
+        font-size: 16px !important;
+        min-height: var(--tap);
+    }
+
+    /* Page title row (base.html `main .d-flex.border-bottom`) — title is
+       redundant with the active tab; shrink, keep flash messages below */
+    main > .d-flex.border-bottom {
+        padding: 0.5rem 0 !important;
+        margin-bottom: 0.75rem !important;
+    }
+    main > .d-flex.border-bottom h1.h2 { font-size: 1.1rem !important; margin-bottom: 0; }
+
+    /* Toasts must clear the fixed bottom tab bar */
+    #toast-container {
+        bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
+        left: 0; right: 0;
+        padding: 0 12px;
+    }
+    #toast-container .toast { width: 100%; }
+
+    /* Modals clear the home indicator */
+    .modal-dialog { margin-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* ----------------------------------------------------------------
+   Shared text utilities
+   ---------------------------------------------------------------- */
+.small-mute { font-size: 0.78rem; color: var(--muted-2); }
+
+/* Label/value row (dashboard model cards, totals detail, portfolio) */
+.kv { display: flex; justify-content: space-between; font-size: 0.85rem; padding: 3px 0; }
+.kv .k { color: var(--muted); }
+.kv .v { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ----------------------------------------------------------------
+   Collapsible card headers — standard affordance.
+   Chevron right-aligned, rotates 180° when expanded. Works for both
+   bootstrap-icon chevrons and any .chev element.
+   ---------------------------------------------------------------- */
+.expand-header { cursor: pointer; min-height: var(--tap); }
+@media (hover: hover) {
+    .expand-header:hover { background: var(--surface-2); border-radius: 6px; }
+}
+.expand-header .bi-chevron-down,
+.expand-header .chev {
+    transition: transform 0.15s ease;
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+.expand-header[aria-expanded="true"] .bi-chevron-down,
+.expand-header[aria-expanded="true"] .chev {
+    transform: rotate(180deg);
+}
+
+/* ----------------------------------------------------------------
+   Status pills — replace JS-inline styles (OBSERVE/LIVE/etc).
+   Use class only; no inline background/color in template strings.
+   ---------------------------------------------------------------- */
+.pill-live, .pill-observe, .pill-warn, .pill-disabled {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+.pill-live     { background: #d4edda; color: #155724; }
+.pill-observe  { background: #cff4fc; color: #055160; }
+.pill-warn     { background: #fff3cd; color: #856404; }
+.pill-disabled { background: var(--surface-2); color: var(--muted); }
+@media (prefers-color-scheme: dark) {
+    .pill-live     { background: #14391f; color: #6fdb94; }
+    .pill-observe  { background: #0e3440; color: #6ed3ee; }
+    .pill-warn     { background: #3a3320; color: #e7c75c; }
+    .pill-disabled { background: var(--surface-2); color: var(--muted); }
+}
+
+/* ----------------------------------------------------------------
+   Trade side badges — shared (was model_detail.html-local).
+   history.html etc. use: <span class="side-badge side-BUY">BUY</span>
+   ---------------------------------------------------------------- */
+.side-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+.side-BUY      { background: #d4edda; color: #155724; }
+.side-SELL     { background: #f8d7da; color: #721c24; }
+.side-DEPOSIT  { background: #cfe2ff; color: #084298; }
+.side-WITHDRAW { background: #fff3cd; color: #856404; }
+@media (prefers-color-scheme: dark) {
+    .side-BUY      { background: #14391f; color: #6fdb94; }
+    .side-SELL     { background: #44201f; color: #f59a93; }
+    .side-DEPOSIT  { background: #142c4d; color: #7db4f7; }
+    .side-WITHDRAW { background: #3a3320; color: #e7c75c; }
+}
+
+/* ----------------------------------------------------------------
+   TABLE STRATEGY A — `.table-cards`: stacked label/value cards.
+   For wide tables (≥7 cols) where each row is a self-contained
+   entity. Every <td> REQUIRES data-label="..." (first td = headline).
+   Desktop rendering untouched; transform is mobile-only.
+   ---------------------------------------------------------------- */
+@media (max-width: 767.98px) {
+    .table-cards thead { display: none; }
+    .table-cards, .table-cards tbody, .table-cards tr, .table-cards td {
+        display: block; width: 100%;
+    }
+    .table-cards tr {
+        border: 1px solid var(--border);
+        border-radius: var(--r-md);
+        margin-bottom: var(--sp-3);
+        padding: var(--sp-2) var(--sp-3);
+        background: var(--surface);
+    }
+    .table-cards td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: var(--sp-3);
+        text-align: right;
+        padding: 6px 0 !important;
+        border: 0;
+        border-bottom: 1px solid var(--surface-2);
+        white-space: normal;
+    }
+    .table-cards td:last-child { border-bottom: 0; }
+    .table-cards td::before {
+        content: attr(data-label);
+        text-align: left;
+        font-weight: 600;
+        color: var(--muted);
+        font-size: .78rem;
+        flex-shrink: 0;
+    }
+    .table-cards td:first-child {
+        font-size: 1.05rem !important; /* beat the generic mobile td font rule */
+        border-bottom: 2px solid var(--surface-2);
+    }
+    /* Card mode must not live inside a sideways-scrolling container */
+    .table-responsive:has(.table-cards) { overflow-x: visible; }
+}
+
+/* ----------------------------------------------------------------
+   TABLE STRATEGY B — `.table-scroll-sticky`: horizontal scroll with
+   sticky first column + sticky header. For narrow scan tables
+   (≤6 cols) where row comparison matters (rankings, signals).
+   ---------------------------------------------------------------- */
+.table-scroll-sticky { white-space: nowrap; }
+.table-scroll-sticky th:first-child,
+.table-scroll-sticky td:first-child {
+    position: sticky; left: 0;
+    background: var(--surface);
+    z-index: 1;
+}
+.table-scroll-sticky thead th {
+    position: sticky; top: 0;
+    background: var(--surface-2);
+    z-index: 2;
+}
+.table-scroll-sticky thead th:first-child { z-index: 3; }
+/* Subtle right-edge hint that the container scrolls sideways */
+.table-responsive:has(.table-scroll-sticky) {
+    background: linear-gradient(to left, rgba(0,0,0,.06), transparent 16px)
+                right / 16px 100% no-repeat local;
+}
+
+/* ----------------------------------------------------------------
+   Bottom sheet for floating action menus (settings kebab).
+   Pure CSS on the JS-positioned .alloc-menu-floating — `!important`
+   beats the inline top/left that openKebabMenu() sets. Existing
+   outside-click/scroll/resize close handlers keep working.
+   ---------------------------------------------------------------- */
+@media (max-width: 767.98px) {
+    .alloc-menu-floating {
+        position: fixed !important;
+        top: auto !important;
+        left: 0 !important;
+        right: 0;
+        bottom: 0;
+        width: 100% !important;
+        min-width: 0 !important;
+        border-radius: var(--r-lg) var(--r-lg) 0 0;
+        padding-bottom: calc(var(--sp-2) + env(safe-area-inset-bottom, 0px));
+        box-shadow: 0 -8px 32px rgba(0,0,0,.25);
+    }
+    .alloc-menu-floating .dropdown-item {
+        padding: 14px 18px;
+        min-height: var(--tap);
+    }
 }
 

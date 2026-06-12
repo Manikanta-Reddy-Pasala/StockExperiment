@@ -1,6 +1,6 @@
 // Service worker — fast shell + SWR for HTML pages + cache-first for static.
 // Bump CACHE_VERSION on any UI change so old clients refetch.
-const CACHE_VERSION = 'v67-2026-06-12-emerging-score-col';
+const CACHE_VERSION = 'v68-2026-06-12-mobile-redesign';
 const STATIC_CACHE = 'trading-pwa-static-' + CACHE_VERSION;
 const PAGE_CACHE   = 'trading-pwa-pages-'  + CACHE_VERSION;
 // Bump ?v= on every icon-affecting change. URL-keyed, so any old cached
@@ -14,7 +14,9 @@ const PRECACHE_URLS = [
   '/static/icon-192.png?v=' + ICON_VERSION,
   '/static/icon-512.png?v=' + ICON_VERSION,
   '/static/apple-touch-icon.png?v=' + ICON_VERSION,
-  '/static/css/custom.css',
+  // Must match the ?v= base.html links to, or the precached entry is never
+  // hit (the static route is cache-first on the exact URL incl. query).
+  '/static/css/custom.css?v=20260612mr',
 ];
 
 // Top-level navigations to seed in page cache so first tab tap is instant.

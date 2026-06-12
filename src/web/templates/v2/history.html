@@ -4,16 +4,26 @@
 
 {% block content %}
 <style>
-  .pos { color: #15a36b; } .neg { color: #d4453a; } .neutral { color: #4f5868; }
+  /* Screen-unique rules only (shared utilities live in custom.css). */
+  @media (max-width: 767.98px) {
+    /* Model selector: full-width, tappable (16px font via global rule) */
+    #model_sel { width: 100% !important; }
+    .history-toolbar { flex-direction: column; align-items: stretch !important; gap: var(--sp-2); }
+    .history-toolbar .toolbar-meta { text-align: right; }
+    /* Card mode: Symbol is the visual anchor inside each trade card */
+    #hist td[data-label="Symbol"] strong { font-size: 1.05rem; }
+    /* Reason badge cell: allow wrap for long exit reasons */
+    #hist td[data-label="Reason"] .badge { white-space: normal; text-align: right; }
+  }
 </style>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="history-toolbar d-flex justify-content-between align-items-center mb-3">
   <div>
-    <label class="form-label small mb-0 me-2">Model:</label>
+    <label class="form-label small mb-0 me-2" for="model_sel">Model:</label>
     <select id="model_sel" class="form-select form-select-sm d-inline-block" style="width:auto"
             onchange="load()"></select>
   </div>
-  <div class="small text-muted">Auto-refresh 30s</div>
+  <div class="small text-muted toolbar-meta">Auto-refresh 30s</div>
 </div>
 
 <div class="row g-3 mb-4">
@@ -49,7 +59,7 @@
 <div class="card">
   <div class="card-header"><i class="bi bi-clock-history me-2"></i>Trades (Newest First)</div>
   <div class="table-responsive">
-    <table class="table table-sm align-middle mb-0">
+    <table class="table table-sm align-middle mb-0 table-cards">
       <thead><tr>
         <th>Timestamp</th><th>Side</th><th>Symbol</th>
         <th class="text-end">Qty</th><th class="text-end">Price ₹</th>
@@ -100,7 +110,7 @@ async function load() {
   const model = document.getElementById('model_sel').value;
   if (!model) {
     document.getElementById('hist').innerHTML =
-      '<tr><td colspan="8" class="text-center text-muted py-3">No enabled model selected</td></tr>';
+      '<tr><td colspan="9" class="text-center text-muted py-3">No enabled model selected</td></tr>';
     return;
   }
   try {
@@ -135,15 +145,15 @@ async function load() {
     } else {
       body.innerHTML = trades.map(t => `
         <tr>
-          <td class="small text-muted">${window.fmtIST ? window.fmtIST(t.trade_at) : (t.trade_at||'').replace('T',' ').slice(0,19)}</td>
-          <td><span class="badge ${t.side==='BUY'?'bg-primary':'bg-warning text-dark'}">${t.side}</span></td>
-          <td><strong>${t.symbol}</strong></td>
-          <td class="text-end">${(t.qty||0).toLocaleString('en-IN')}</td>
-          <td class="text-end">${fmtINR(t.price)}</td>
-          <td class="text-end">${fmtINR(t.value)}</td>
-          <td class="text-end text-muted">${t.charges ? fmtINR(t.charges) : '—'}</td>
-          <td class="text-end ${cls(t.pnl)}">${t.pnl !== null && t.pnl !== undefined ? fmtINR(t.pnl) : '—'}${(t.net_pnl !== undefined) ? `<div class="small ${cls(t.net_pnl)}">net ${fmtINR(t.net_pnl)}</div>` : ''}</td>
-          <td><span class="badge bg-secondary">${t.reason||''}</span></td>
+          <td data-label="When" class="small text-muted">${window.fmtIST ? window.fmtIST(t.trade_at) : (t.trade_at||'').replace('T',' ').slice(0,19)}</td>
+          <td data-label="Side"><span class="side-badge side-${t.side==='BUY'?'BUY':'SELL'}">${t.side}</span></td>
+          <td data-label="Symbol"><strong>${t.symbol}</strong></td>
+          <td data-label="Qty" class="text-end">${(t.qty||0).toLocaleString('en-IN')}</td>
+          <td data-label="Price ₹" class="text-end">${fmtINR(t.price)}</td>
+          <td data-label="Value ₹" class="text-end">${fmtINR(t.value)}</td>
+          <td data-label="Charges ₹" class="text-end text-muted">${t.charges ? fmtINR(t.charges) : '—'}</td>
+          <td data-label="P&L ₹" class="text-end ${cls(t.pnl)}">${t.pnl !== null && t.pnl !== undefined ? fmtINR(t.pnl) : '—'}${(t.net_pnl !== undefined) ? `<div class="small ${cls(t.net_pnl)}">net ${fmtINR(t.net_pnl)}</div>` : ''}</td>
+          <td data-label="Reason"><span class="badge bg-secondary">${t.reason||''}</span></td>
         </tr>
       `).join('');
     }

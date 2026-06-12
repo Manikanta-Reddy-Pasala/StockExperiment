@@ -4,54 +4,42 @@
 
 {% block content %}
 <style>
-  .pos { color: #15a36b; } .neg { color: #d4453a; } .neutral { color: #4f5868; }
-  .bs-card { border-radius: 10px; border: 1px solid #e3e6ef; }
-  .bs-card .card-header { background: #fafbff; border-bottom: 1px solid #e3e6ef; }
-  .metric-table td { padding: 8px 12px; font-variant-numeric: tabular-nums; }
-  .metric-table .k { color: #6c757d; width: 50%; }
+  /* Screen-unique rules only. .pos/.neg/.neutral, side badges, pills,
+     .table-cards and .table-scroll-sticky come from base.html + custom.css. */
+  .bs-card { border-radius: var(--r-md); border: 1px solid var(--border); }
+  .bs-card .card-header { background: var(--surface-2); border-bottom: 1px solid var(--border); }
+  .metric-table td { padding: 8px 12px; }
+  .metric-table .k { color: var(--muted); width: auto; max-width: 55%; }
   .metric-table .v { font-weight: 600; text-align: right; }
-  .metric-table .v.headline { font-size: 1.15rem; }
-  .metric-table tr.bs-section td.bs-section-hdr { background: #f4f6fb; color: #4f5868; font-weight: 700; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 12px; }
+  .metric-table .v.headline { font-size: var(--fs-num-lg); }
+  .metric-table tr.bs-section td.bs-section-hdr { background: var(--surface-2); color: var(--muted); font-weight: 700; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 12px; }
   .pos-card .pos-line { font-size: 1rem; line-height: 1.5; }
   .pos-card .pos-line strong { font-size: 1.15rem; }
   .txn-table { font-size: 0.85rem; }
   .txn-table tbody td { padding: 6px 10px; vertical-align: middle; font-variant-numeric: tabular-nums; }
-  .txn-table thead th { background: #fafbff; font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6c757d; padding: 8px 10px; }
-  .side-badge { font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; letter-spacing: 0.5px; }
-  .side-BUY { background: #d4edda; color: #155724; }
-  .side-SELL { background: #f8d7da; color: #721c24; }
-  .side-DEPOSIT { background: #cfe2ff; color: #084298; }
-  .side-WITHDRAW { background: #fff3cd; color: #856404; }
+  .txn-table thead th { background: var(--surface-2); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); padding: 8px 10px; }
   .model-tag { font-size: 0.65rem; padding: 1px 6px; border-radius: 8px; background: #eef2ff; color: #3a4cc8; border: 1px solid #d8e0ff; }
-  .live-badge { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.5px; }
-  .disabled-badge { background: #f1f3f5; color: #6c757d; border: 1px solid #dee2e6; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
-  .observe-badge { background: #cff4fc; color: #055160; border: 1px solid #9eeaf9; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.5px; }
-  .empty-state { padding: 30px; text-align: center; color: #6c757d; font-style: italic; }
+  @media (prefers-color-scheme: dark) {
+    .model-tag { background: #1d2440; color: #9fb0ff; border-color: #2e3a66; }
+  }
+  .empty-state { padding: 30px; text-align: center; color: var(--muted); font-style: italic; }
 
-  /* Mobile/PWA: the 12-column Transaction History table overflows a phone and
-     gets cropped at the right. Stack each row into a labeled card instead (same
-     pattern as the Portfolio table). No horizontal scroll, nothing clipped. */
-  @media (max-width: 768px) {
-    .txn-table thead { display: none; }
-    .txn-table, .txn-table tbody, .txn-table tr, .txn-table td { display: block; width: 100%; }
-    .txn-table tr {
-      border: 1px solid #e2e6ee; border-radius: 10px;
-      margin: 0 0 10px; padding: 6px 10px; background: #fff;
-    }
-    .txn-table td {
-      display: flex; justify-content: space-between; align-items: center;
-      gap: 12px; text-align: right; padding: 5px 0; border: 0;
-      border-bottom: 1px solid #f1f3f7;
-    }
-    .txn-table td:last-child { border-bottom: 0; }
-    .txn-table td::before {
-      content: attr(data-label); text-align: left; font-weight: 600;
-      color: #6b7280; font-size: .78rem; flex: 0 0 auto;
-    }
-    .txn-table td[data-label="Date"] { font-weight: 600; border-bottom: 2px solid #eef0f5; }
-    .txn-table .empty-state { display: block; }
-    /* Keep the page from ever overflowing horizontally on a phone. */
-    .table-responsive { overflow-x: visible; }
+  @media (max-width: 767.98px) {
+    /* Header actions: Back + Refresh become an equal-width 44px row */
+    .detail-header-actions { width: 100%; }
+    .detail-header-actions .btn { flex: 1; min-height: var(--tap); }
+
+    /* Txn summary stats: 2-col grid instead of one cramped flex line.
+       !important beats Bootstrap's d-flex. */
+    #txn_summary { display: grid !important; grid-template-columns: 1fr 1fr; gap: 2px 12px; width: 100%; }
+
+    /* Template-local extras on top of the shared .table-cards transform */
+    .txn-table td[data-label="Date"] { font-weight: 600; }
+    .txn-table td.empty-state { display: block; text-align: center; }
+    /* :has() fallback for older iOS — card mode must never sit in a
+       sideways-scrolling container (scoped to the txn wrapper only, so the
+       basket .table-scroll-sticky container keeps its scroll). */
+    .txn-wrap { overflow-x: visible; }
   }
 </style>
 
@@ -68,8 +56,8 @@
       })();
     </script>
   </div>
-  <div class="d-flex align-items-center gap-2">
-    <span id="enabled_badge" class="live-badge">…</span>
+  <div class="d-flex align-items-center gap-2 detail-header-actions">
+    <span id="enabled_badge" class="pill-live">…</span>
     <a href="/" class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-arrow-left"></i> Back to Dashboard
     </a>
@@ -99,7 +87,7 @@
             <tr><td class="k" title="Approximate SELL-side broker charges lifetime (formula-estimated)">+ Approx Sell Charges (lifetime)</td><td class="v neg" id="bs_sell_charges">—</td></tr>
             <tr><td class="k" id="bs_realized_label" title="Closed-trade gross P&L = qty × (sell_px − buy_px) before charges">± Closed-trade gross P&amp;L</td><td class="v" id="bs_realized_signed">—</td></tr>
             <tr><td class="k"><strong>≈ Reconcile total</strong></td><td class="v headline" id="bs_reconcile">—</td></tr>
-            <tr><td colspan="2" style="font-size:0.72rem;color:#6c757d;padding:4px 12px;line-height:1.4;">
+            <tr><td colspan="2" style="font-size:0.72rem;color:var(--muted);padding:4px 12px;line-height:1.4;">
               Approximate reconciliation. Charges are formula-estimated, not broker-exact — small drift expected.
               Realized net (<span id="bs_realized_note">—</span>) ≈
               Closed-trade gross (<span id="bs_realgross_note">—</span>)
@@ -143,8 +131,8 @@
     <div class="d-flex gap-3 small text-muted" id="txn_summary">—</div>
   </div>
   <div class="card-body p-0">
-    <div class="table-responsive">
-      <table class="table table-hover txn-table mb-0">
+    <div class="table-responsive txn-wrap">
+      <table class="table table-hover txn-table table-cards mb-0">
         <thead>
           <tr>
             <th>Date</th>
@@ -204,15 +192,15 @@ async function loadBalanceSheet() {
     // Header badge
     const badge = document.getElementById('enabled_badge');
     if (!data.enabled) {
-      badge.className = 'disabled-badge';
+      badge.className = 'pill-disabled';
       badge.textContent = 'DISABLED';
       badge.removeAttribute('title');
     } else if (data.signals_only) {
-      badge.className = 'observe-badge';
+      badge.className = 'pill-observe';
       badge.textContent = 'OBSERVE';
       badge.title = 'Enabled — emits signals but places no real orders';
     } else {
-      badge.className = 'live-badge';
+      badge.className = 'pill-live';
       badge.textContent = 'LIVE';
       badge.removeAttribute('title');
     }
@@ -315,7 +303,7 @@ async function loadBalanceSheet() {
       posBody.innerHTML = `
         <div class="pos-line mb-2"><strong>${data.holdings.length} holdings</strong> <span class="text-muted">(basket)</span></div>
         <div class="table-responsive">
-          <table class="table table-sm metric-table mb-0">
+          <table class="table table-sm metric-table table-scroll-sticky mb-0">
             <thead><tr>
               <th>Symbol</th><th class="text-end">Qty</th><th class="text-end">Entry</th>
               <th class="text-end">LTP</th><th class="text-end">Cost</th>

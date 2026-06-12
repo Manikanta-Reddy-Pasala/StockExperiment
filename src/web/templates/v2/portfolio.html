@@ -4,84 +4,93 @@
 
 {% block content %}
 <style>
-  .pos { color: #15a36b; } .neg { color: #d4453a; } .neutral { color: #4f5868; }
-  .summary-card { border-left: 4px solid #5b8def; }
   .row-disabled td { opacity: 0.55; }
 
-  /* Mobile: the 12-column "All Models Portfolio" table is too wide for a phone.
-     Turn each row into a stacked card with a label per value (data-label). */
-  @media (max-width: 768px) {
-    #agg_table thead { display: none; }
-    #agg_table, #agg_table tbody, #agg_table tr, #agg_table td { display: block; width: 100%; }
-    #agg_table tr {
-      border: 1px solid #e2e6ee; border-radius: 10px;
-      margin-bottom: 12px; padding: 6px 10px; background: #fff;
-    }
-    #agg_table td {
-      display: flex; justify-content: space-between; align-items: center;
-      gap: 12px; text-align: right; padding: 5px 0; border: 0;
-      border-bottom: 1px solid #f1f3f7;
-    }
-    #agg_table td:last-child { border-bottom: 0; }
-    #agg_table td::before {
-      content: attr(data-label); text-align: left; font-weight: 600;
-      color: #6b7280; font-size: .8rem; flex: 0 0 auto;
-    }
-    /* Model name + Open Position + Actions read better full-width */
-    #agg_table td.cell-model { font-size: 1.05rem; border-bottom: 2px solid #eef0f5; }
+  /* Template-local extras on top of the shared .table-cards utility
+     (custom.css owns the stacked-card transform for #agg_table on mobile):
+     Open Position + Actions cells read better left-aligned full-width,
+     and the action button group becomes a full-width equal-thirds row. */
+  @media (max-width: 767.98px) {
     #agg_table td.cell-pos, #agg_table td.actions-cell { text-align: left; }
     #agg_table td.actions-cell::before { align-self: center; }
-    #agg_table td.actions-cell > div { width: 100%; }
+    #agg_table td.actions-cell > div {
+      width: 100%;
+      flex-direction: row !important;
+      gap: var(--sp-2) !important;
+    }
+    #agg_table td.actions-cell .btn { flex: 1; min-height: var(--tap); }
+  }
+  /* Very narrow phones: 3 action buttons can't fit ≥100px each — stack. */
+  @media (max-width: 380px) {
+    #agg_table td.actions-cell > div { flex-direction: column !important; }
   }
 
-  /* Open Positions — card-grid design (replaces the dense table). */
-  #positions_grid {
+  /* Open + Closed Positions — card-grid design (replaces the dense table). */
+  #positions_grid, #closed_grid {
     display: grid; gap: 10px;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   }
   .pos-card {
-    border: 1px solid #e2e6ee; border-radius: 12px; padding: 12px 14px;
-    background: #fff; box-shadow: 0 1px 2px rgba(16,24,40,.04);
+    border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 14px;
+    background: var(--surface); box-shadow: 0 1px 2px rgba(16,24,40,.04);
   }
   .pos-card .pc-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
   .pos-card .pc-sym { font-size: 1.05rem; font-weight: 700; }
   .pos-card .pc-pnl { font-size: 1.05rem; font-weight: 700; text-align: right; white-space: nowrap; }
-  .pos-card .pc-meta { color: #6b7280; font-size: .82rem; margin: 6px 0; }
-  .pos-card .pc-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  .pos-card .pc-val { color: #4f5868; font-size: .85rem; }
+  .pos-card .pc-meta { color: var(--muted); font-size: .82rem; margin: 6px 0; }
+  .pos-card .pc-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .pos-card .pc-val { color: var(--flat); font-size: .85rem; }
 
-  /* iOS: bottom action buttons must clear the fixed mobile nav + home indicator.
-     The real fix is viewport-fit=cover (base.html) so env(safe-area-inset-bottom)
-     resolves; .main-content padding then accounts for it. Add extra clearance
-     + bigger tap targets here. */
-  @media (max-width: 768px) {
-    main.main-content { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important; }
-    .btn-sm { padding: .42rem .75rem; min-height: 42px; }
-    .pos-card .btn-sm { min-height: 44px; }
+  /* Mobile tap targets: Sell buttons + pagers ≥ 44px (shared .btn rule covers
+     most; pagers additionally stretch with the page label centered between). */
+  @media (max-width: 767.98px) {
+    .pos-card .btn-sm { min-height: var(--tap); }
+    .pager { gap: var(--sp-2); }
+    .pager .btn { min-height: var(--tap); flex: 1; }
+    .pager .small { flex: 0 0 auto; text-align: center; }
   }
 
   /* Sort toolbar — lives in the card body (not the collapse header) so it
      never crowds the tap-to-collapse target. */
   .sort-bar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 12px; }
-  .sort-bar label { color: #6b7280; font-size: .8rem; margin: 0; white-space: nowrap; }
+  .sort-bar label { color: var(--muted); font-size: .8rem; margin: 0; white-space: nowrap; }
   .sort-bar select { width: auto; min-width: 168px; }
   @media (max-width: 480px) { .sort-bar { justify-content: stretch; } .sort-bar select { flex: 1; min-width: 0; } }
 
   /* Gainers & Losers — bordered boxes so each column reads as a real panel
      instead of a cramped half-width list. */
-  .gl-box { background: #f7f8fa; border: 1px solid #e2e6ee; border-radius: 10px; padding: 12px; min-height: 132px; }
+  .gl-box { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 12px; min-height: 132px; }
   .gl-box .gl-title { font-weight: 700; font-size: .85rem; margin-bottom: 8px; }
-  .gl-box .glrow { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #eef0f5; font-size: .9rem; }
+  .gl-box .glrow { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: .9rem; }
   .gl-box .glrow:last-child { border-bottom: 0; }
   .gl-box .glrow .glsym { font-weight: 600; }
-  .gl-box .glrow .glmodel { color: #9aa1ad; font-size: .72rem; }
+  .gl-box .glrow .glmodel { color: var(--muted-2); font-size: .72rem; }
+
+  /* LIVE-trading warning stays visually distinct (real-money actions). */
+  .live-warning { border-left: 4px solid var(--loss); }
+
+  /* Executor output tail inside the rebalance modal. */
+  .exec-tail {
+    max-height: 240px; max-width: 100%; overflow: auto;
+    background: var(--surface-2); padding: 8px; font-size: 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Invest modal: qty inputs must not trigger iOS focus-zoom and stay tappable. */
+  .invest-qty { text-align: right; }
+  @media (max-width: 767.98px) {
+    .invest-qty { font-size: 16px; min-height: var(--tap); }
+    #rebalance-modal .modal-dialog, #investModal .modal-dialog {
+      margin: 0.5rem; max-height: calc(100dvh - 1rem);
+    }
+  }
 </style>
 
 <!-- Fyers broker account funds — plain-language. This is the WHOLE broker
      account (shared by all models), live from Fyers. Separate from the
      per-model cards below (those come from the internal ledger). -->
 <div class="card mb-3" id="fyers-funds-card">
-  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"
+  <div class="card-header expand-header d-flex justify-content-between align-items-center flex-wrap gap-2"
        data-bs-toggle="collapse" data-bs-target="#funds_body" aria-expanded="false" style="cursor:pointer">
     <span><i class="bi bi-bank2 text-primary me-2"></i>Fyers Account
       <span class="fw-bold ms-2" id="fyers_total_account">--</span>
@@ -145,7 +154,7 @@
     </div>
     <div class="collapse" id="agg_table_wrap">
     <div class="table-responsive">
-      <table class="table table-sm align-middle mb-0" id="agg_table">
+      <table class="table table-sm align-middle mb-0 table-cards" id="agg_table">
         <thead><tr>
           <th>Model</th>
           <th class="text-end" title="Original capital deposited">Allocated</th>
@@ -169,7 +178,7 @@
 </div>
 
 <div class="card" id="gl_card" style="display:none;">
-  <div class="card-header d-flex justify-content-between align-items-center"
+  <div class="card-header expand-header d-flex justify-content-between align-items-center"
        data-bs-toggle="collapse" data-bs-target="#gl_body" aria-expanded="false" style="cursor:pointer">
     <span><i class="bi bi-graph-up-arrow me-2"></i>Gainers &amp; Losers <span class="text-muted small">(today)</span>
       <span class="small ms-2" id="gl_teaser"></span></span>
@@ -196,7 +205,7 @@
 </div>
 
 <div class="card mt-3">
-  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"
+  <div class="card-header expand-header d-flex justify-content-between align-items-center flex-wrap gap-2"
        data-bs-toggle="collapse" data-bs-target="#open_body" aria-expanded="false" style="cursor:pointer">
     <span><i class="bi bi-briefcase me-2"></i>Open Positions — by Model
       <span class="text-muted small ms-2 d-none d-sm-inline">each model's own qty &amp; cost (live MTM)</span></span>
@@ -225,7 +234,7 @@
 </div>
 
 <div class="card mt-3">
-  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"
+  <div class="card-header expand-header d-flex justify-content-between align-items-center flex-wrap gap-2"
        data-bs-toggle="collapse" data-bs-target="#closed_body" aria-expanded="false" style="cursor:pointer">
     <span><i class="bi bi-check2-square me-2"></i>Closed Positions — by Model
       <span class="text-muted small ms-2 d-none d-sm-inline">realized P&amp;L from closed trades</span></span>
@@ -252,7 +261,7 @@
   </div>
 </div>
 
-<div class="alert alert-warning mt-3 py-2 small">
+<div class="alert alert-warning live-warning mt-3 py-2 small">
   <i class="bi bi-exclamation-triangle me-1"></i>
   <strong>LIVE trading active.</strong> Sell + Rebalance + Exit buttons place REAL Fyers orders. Confirm dialog required.
 </div>
@@ -872,7 +881,7 @@ async function rebalanceModel(model) {
     type = 'success';
     html = `<div class="mb-2"><strong>Signal:</strong> ${stateBadge(sigT)} &nbsp; <strong>Execute:</strong> ${stateBadge(exeT)}</div>
             <div class="small mt-2"><strong>Executor output (tail):</strong></div>
-            <pre class="small mt-1" style="max-height:240px;overflow:auto;background:#f8f9fa;padding:8px;">${(exeT.output || '').split('\n').slice(-25).join('\n')}</pre>`;
+            <pre class="small mt-1 exec-tail">${(exeT.output || '').split('\n').slice(-25).join('\n')}</pre>`;
   } else if (sigOk && !exeOk) {
     type = 'danger';
     html = `<div class="mb-2"><strong>Signal:</strong> ${stateBadge(sigT)} &nbsp; <strong>Execute:</strong> ${stateBadge(exeT)}</div>
@@ -984,7 +993,7 @@ document.addEventListener('click', async (e) => {
     const rows = (d.buys||[]).map((b,i) => `<tr>
         <td>${b.symbol}</td>
         <td class="text-end">₹${Number(b.ltp).toFixed(2)}</td>
-        <td class="text-end" style="width:7rem"><input type="number" class="form-control form-control-sm text-end invest-qty" data-symbol="${b.symbol}" data-ltp="${b.ltp}" data-max="${b.qty}" value="${b.qty}" min="0" max="${b.qty}" step="1"></td>
+        <td class="text-end" style="width:6.5rem"><input type="number" inputmode="numeric" class="form-control form-control-sm text-end invest-qty" data-symbol="${b.symbol}" data-ltp="${b.ltp}" data-max="${b.qty}" value="${b.qty}" min="0" max="${b.qty}" step="1"></td>
         <td class="text-end invest-amt" data-i="${i}">₹${Number(b.amount).toLocaleString('en-IN')}</td>
       </tr>`).join('');
     body.innerHTML = `
