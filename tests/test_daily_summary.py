@@ -4,7 +4,7 @@ Covers the message shape the gated models can't send themselves: on a
 non-rebalance day they notify_skip(telegram=False), so this single summary is
 the user's daily confirmation that every model evaluated + what it holds.
 """
-from tools.daily_summary import compose_summary
+from tools.daily_summary import compose_summary, _model_display_order, MODEL_ORDER
 
 
 def test_flat_and_held_models_render():
@@ -39,6 +39,25 @@ def test_no_pnl_omits_paren():
          "today_pnl": None},
     ])
     assert "today" not in body  # no "(today …)" clause when pnl unknown
+
+
+def test_retired_models_excluded_from_heartbeat():
+    """Retired models keep model_ledger rows when they have trade history
+    (ensure_models_seeded leaves them for forensics), so the heartbeat must
+    filter on the canonical RETIRED_MODELS set — one source of truth in
+    model_ledger_service — or orb/midcap reappear in the daily ping."""
+    from src.services.trading.model_ledger_service import RETIRED_MODELS
+    assert "orb_momentum_intraday" in RETIRED_MODELS
+    assert "midcap_narrow_60d_breakout" in RETIRED_MODELS
+
+    ledger_names = list(MODEL_ORDER) + list(RETIRED_MODELS) + ["some_future_model"]
+    names = _model_display_order(ledger_names)
+
+    for retired in RETIRED_MODELS:
+        assert retired not in names
+    # Live models + unknown-but-active extras stay, in canonical order first.
+    assert names[: len(MODEL_ORDER)] == list(MODEL_ORDER)
+    assert "some_future_model" in names
 
 
 def test_multi_holding_lists_all_names():

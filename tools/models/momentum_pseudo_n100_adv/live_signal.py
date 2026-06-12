@@ -69,8 +69,14 @@ def is_mid_month_check_day(today: datetime) -> bool:
 
 
 def _load_smallcap_set() -> set:
-    """Backtest excludes Nifty Smallcap 250 names (+2pp CAGR, DD unchanged).
-    Live must mirror. Returns empty set on file missing — fail-soft.
+    """Backtest excludes Nifty Smallcap 250 names. Live must mirror.
+    Returns empty set on file missing — fail-soft.
+
+    ⚠ 2026-06-13: the original "+2pp CAGR, DD unchanged" sweep finding behind
+    this exclusion is INVALIDATED — under PIT smallcap snapshots (net of
+    charges, next-open fills) the model's full-cycle CAGR collapses 77→13%
+    (the +2pp was survivorship bias). Filter kept for backtest/live parity
+    pending strategy-level review; see backtest.py module docstring.
 
     Returns:
         set[str]: plain NSE symbols (EQ series only) to subtract from the
@@ -123,9 +129,22 @@ def load_yearly_universes(path: str) -> Dict[str, List[str]]:
 
     Returns:
         Dict[str, List[str]]: {year_start_iso: [symbol, ...]} mapping.
+
+    Non-obvious logic:
+        Entries are normalized to plain symbol strings. A historical
+        refresh_universe bug wrote entries as {"symbol": s} dicts; accepting
+        both shapes here self-heals any already-written dict-format file
+        (downstream rank_universe needs hashable plain strings).
     """
     with open(path) as f:
-        return json.load(f)
+        raw = json.load(f)
+    normalized: Dict[str, List[str]] = {}
+    for key, entries in raw.items():
+        normalized[key] = [
+            str(e["symbol"]) if isinstance(e, dict) else str(e)
+            for e in (entries or [])
+        ]
+    return normalized
 
 
 def pick_universe_for(today: datetime,

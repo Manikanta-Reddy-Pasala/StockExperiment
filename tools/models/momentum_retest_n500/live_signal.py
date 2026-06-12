@@ -4,9 +4,12 @@ Uses the SHARED core `strategy.py` (rank_targets / is_retest / params) — the s
 logic the backtest uses — and the multi-holding ledger (multi_holding_service).
 
 Flow (runs daily; the strategy is monthly-select + daily-retest-entry, stateful):
-  - On the 1st trading day of the month: compute this month's TARGETS (top-K
-    momentum leaders) and EXITS (held names out of the top-RETAIN rank). Persist
-    the target "watch list" to disk.
+  - On the first cron run AFTER the month's first trading session has closed
+    (i.e. when the nightly-pulled panel's last bar IS that first session):
+    compute this month's TARGETS (top-K momentum leaders) and EXITS (held names
+    out of the top-RETAIN rank), ranking the first session's close — exactly
+    the bar backtest.py ranks at its monthly rebalance. Persist the target
+    "watch list" to disk.
   - Every day: for each watched target not yet held, if it is at a 20-EMA retest
     today, emit a BUY. Exits (from the monthly check) are emitted that day.
 
@@ -25,6 +28,7 @@ from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
 from tools.shared.universes import nifty500_symbols
 from tools.shared.index_membership import eligible_at
+from tools.shared.nse_calendar import is_first_trading_day_of_month as _is_month_first_session
 from tools.models.momentum_retest_n500 import strategy as S
 
 log = logging.getLogger("momentum_retest_n500")
@@ -44,11 +48,46 @@ def is_model_enabled() -> bool:
     return False
 
 
-def is_first_trading_day_of_month(dates, today_ts) -> bool:
-    """True if today is the first session on/after the 1st of its month."""
-    m_first = pd.Timestamp(today_ts.year, today_ts.month, 1)
-    fut = dates[dates >= m_first]
-    return len(fut) > 0 and fut[0].normalize() == pd.Timestamp(today_ts).normalize()
+def monthly_rotation_due(dates, di, watch_state=None) -> bool:
+    """Monthly-rotation gate: True on the first cron run AFTER the month's
+    first NSE trading session has CLOSED.
+
+    The OHLCV panel is filled by the nightly pull (~20:42), so at the 09:26
+    cron the panel's last bar is the PREVIOUS trading day. backtest.py rotates
+    by ranking the month-first-session CLOSE (rebal day d ranks at that day's
+    di), and this model ranks the panel's last bar — so for parity the gate
+    fires when the panel's LAST bar IS the month's first NSE trading session
+    (weekend/holiday-aware via tools.shared.nse_calendar), i.e. the morning
+    after that session, ranking exactly that session's close.
+
+    The OLD gate (`fut[0] == today`) required TODAY's bar to already exist in
+    the panel — never true on a 09:26 cron run — so monthly RANK_DROP exits
+    and the WATCH_FILE refresh only ever fired via manual --force.
+
+    Re-entry guard: when the monthly block runs, WATCH_FILE records the ranked
+    session date ("ranked_session"). If a later nightly pull fails and the
+    panel's last bar is STILL the first session next morning, the matching
+    stamp stops a second fire. (If the first session's bar itself arrives
+    late, the gate simply fires on the first morning the bar is present.)
+    """
+    if dates is None or len(dates) == 0:
+        return False
+    last_bar = pd.Timestamp(dates[di]).date()
+    if not _is_month_first_session(last_bar):
+        return False
+    if watch_state and watch_state.get("ranked_session") == last_bar.isoformat():
+        return False  # already rotated on this session (stale-data re-run)
+    return True
+
+
+def read_watch_state() -> dict:
+    """Load WATCH_FILE state ({} on missing/corrupt — fail-safe)."""
+    try:
+        if WATCH_FILE.exists():
+            return json.loads(WATCH_FILE.read_text())
+    except Exception as e:
+        log.warning(f"watch state read failed: {e}")
+    return {}
 
 
 def load_panel(symbols, days_back=420):
@@ -130,18 +169,27 @@ def main():
     rk = [s for s in rk if s.replace("NSE:", "").replace("-EQ", "") in elig500]
     log.info(f"PIT ranked {len(rk)} leaders; top-{S.K}: {[s.split(':')[1] for s in rk[:S.K]]}")
 
-    # Monthly check: refresh watch list + flag exits (held out of top-RETAIN)
-    if args.force or is_first_trading_day_of_month(dates, today):
+    # Monthly check: refresh watch list + flag exits (held out of top-RETAIN).
+    # Fires the morning AFTER the month's first session closes (panel's last
+    # bar == that session), ranking that session's close — backtest parity.
+    watch_state = read_watch_state()
+    if args.force or monthly_rotation_due(dates, di, watch_state):
         retset = set(rk[:S.RETAIN])
         for s in holds:
             if s not in retset:
                 sells.append({"symbol": s, "reason": "RANK_DROP"})
         watch = [s for s in rk[:S.K] if s not in holds]
-        WATCH_FILE.write_text(json.dumps({"month": today.strftime("%Y-%m"), "watch": watch}))
-        log.info(f"Monthly: {len(sells)} exits, watch={[w.split(':')[1] for w in watch]}")
+        # ranked_session = the panel bar this rotation ranked; the gate's dedup
+        # key (stops a re-fire if a failed nightly pull leaves the panel's last
+        # bar on the first session for another morning). For --force runs on a
+        # non-first-session bar the stamp never matches a first session, so it
+        # can't suppress the real cron rotation.
+        WATCH_FILE.write_text(json.dumps({"month": today.strftime("%Y-%m"), "watch": watch,
+                                          "ranked_session": last_day.isoformat()}))
+        log.info(f"Monthly (ranked {last_day} close): {len(sells)} exits, "
+                 f"watch={[w.split(':')[1] for w in watch]}")
     else:
-        w = json.loads(WATCH_FILE.read_text()) if WATCH_FILE.exists() else {"watch": []}
-        watch = [s for s in w.get("watch", []) if s not in holds]
+        watch = [s for s in watch_state.get("watch", []) if s not in holds]
 
     # Daily retest entry: buy watched targets at a 20-EMA pullback, up to K slots
     slots = S.K - len(holds)

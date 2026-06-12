@@ -1750,6 +1750,142 @@ def model_balance_sheet(model_name):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+def _is_real_broker_trade(t):
+    """A trade row that actually hit the broker (vs paper/signals-only):
+    real fyers_order_id, or a position adopted from Fyers."""
+    return bool((t.get("fyers_order_id") or "").strip()) or \
+        t.get("reason") == "LINK_FYERS_POSITION"
+
+
+def _trade_history_rollup(trades, product):
+    """Stamp net_pnl on each closed SELL row and return the summary dict.
+
+    Accounting rule (must match model_ledger_service.record_sell):
+      - A SELL row's stored ``pnl`` is ALREADY net of that sell's own charges
+        (record_sell: pnl = (proceeds - sell_charges) - qty*entry_px) but it
+        NEVER includes the BUY leg's charges.
+      - Per-exit net take-home = pnl - buy_leg_charges. Buy-leg charges come
+        from the ACTUAL stored buy row (model_trades.charges_inr, surfaced as
+        trade["charges"]), matched FIFO per symbol so scale-ins / partial
+        exits attribute pro-rata. Only when no buy row is visible in the
+        window (legacy/truncated history) do we fall back to approximating
+        the buy charges at the sell price. The sell's own charge is NOT
+        subtracted again here — that was the old double-subtraction bug.
+      - Summary consistency: total_charges counts only real broker trades
+        (so it reconciles with the dashboard/portfolio/global totals), and
+        net_pnl uses the SAME predicate — realized pnl of REAL sell rows
+        minus their matched buy-leg charges. Paper/signals-only rows still
+        appear in total_pnl / wins / losses (model performance stats) but
+        never mix into the charges-adjusted net.
+    """
+    from tools.live.broker_charges import compute_charges
+
+    def _approx_buy_chg(qty, price):
+        # Last-resort approximation (buy leg missing from window) — uses the
+        # SELL price as a proxy for the entry price.
+        try:
+            return compute_charges("BUY", int(qty or 0), float(price or 0),
+                                   product).get("total", 0.0)
+        except Exception:
+            return 0.0
+
+    # Chronological pre-pass: match each SELL to its BUY lot(s) per symbol.
+    # (get_trades returns rows newest-first.)
+    chron = sorted(trades,
+                   key=lambda x: ((x.get("trade_at") or ""), x.get("id") or 0))
+    open_lots = {}      # symbol -> [{qty, left, charges}, ...] oldest first
+    buy_chg_for = {}    # id(sell row) -> attributed buy-leg charges
+    for t in chron:
+        side = (t.get("side") or "").upper()
+        sym = t.get("symbol")
+        if side == "BUY":
+            q = int(t.get("qty") or 0)
+            open_lots.setdefault(sym, []).append(
+                {"qty": q, "left": q, "charges": float(t.get("charges") or 0.0)})
+        elif side == "SELL" and t.get("pnl") is not None:
+            need = int(t.get("qty") or 0)
+            buy_chg, matched = 0.0, 0
+            lots = open_lots.get(sym) or []
+            while need > 0 and lots:
+                lot = lots[0]
+                take = min(need, lot["left"])
+                if lot["qty"] > 0:
+                    buy_chg += lot["charges"] * (take / float(lot["qty"]))
+                lot["left"] -= take
+                need -= take
+                matched += take
+                if lot["left"] <= 0:
+                    lots.pop(0)
+            if matched == 0:
+                buy_chg = _approx_buy_chg(t.get("qty"), t.get("price"))
+            elif need > 0:
+                # History truncated mid-position: approximate the unmatched part.
+                buy_chg += _approx_buy_chg(need, t.get("price"))
+            buy_chg_for[id(t)] = buy_chg
+
+    # Summary roll-up
+    total_buys = total_sells = total_deposits = total_withdrawals = 0
+    total_buy_value = total_sell_value = 0.0
+    total_pnl = 0.0          # ALL sell rows (paper + real) — performance stat
+    total_pnl_real = 0.0     # real broker sells only — net_pnl numerator
+    real_buy_charges = 0.0   # buy-leg charges attributed to real sells
+    total_charges = 0.0      # all real-trade charges, both legs (reconciles w/ dashboard)
+    wins = losses = 0
+    for t in trades:
+        side = (t.get("side") or "").upper()
+        val = float(t.get("value") or 0)
+        pnl = t.get("pnl")
+        charge = float(t.get("charges") or 0.0)
+        real = _is_real_broker_trade(t)
+        if real:
+            total_charges += charge
+        if side == "BUY":
+            total_buys += 1
+            total_buy_value += val
+        elif side == "SELL":
+            total_sells += 1
+            total_sell_value += val
+            if pnl is not None:
+                pnl_f = float(pnl)
+                total_pnl += pnl_f
+                if pnl_f > 0:
+                    wins += 1
+                elif pnl_f < 0:
+                    losses += 1
+                buy_chg = buy_chg_for.get(id(t), 0.0)
+                # pnl already nets THIS sell's charges — subtract only the
+                # buy leg (stored charges, see docstring).
+                t["net_pnl"] = round(pnl_f - buy_chg, 2)
+                if real:
+                    total_pnl_real += pnl_f
+                    real_buy_charges += buy_chg
+        elif side == "DEPOSIT":
+            total_deposits += 1
+        elif side == "WITHDRAW":
+            total_withdrawals += 1
+
+    decided = wins + losses
+    win_rate_pct = round(100.0 * wins / decided, 1) if decided else 0.0
+    return {
+        "total_buys": total_buys,
+        "total_sells": total_sells,
+        "total_deposits": total_deposits,
+        "total_withdrawals": total_withdrawals,
+        "total_buy_value": round(total_buy_value, 2),
+        "total_sell_value": round(total_sell_value, 2),
+        "total_pnl": round(total_pnl, 2),
+        "total_pnl_real": round(total_pnl_real, 2),
+        "total_charges": round(total_charges, 2),
+        "buy_charges_real": round(real_buy_charges, 2),
+        # Net take-home of REAL broker round-trips: real sell pnl (already
+        # net of sell-leg charges) minus their matched buy-leg charges.
+        "net_pnl": round(total_pnl_real - real_buy_charges, 2),
+        "wins": wins,
+        "losses": losses,
+        "win_rate_pct": win_rate_pct,
+    }
+
+
 @admin_bp.route('/<model_name>/trade-history', methods=['GET'])
 def model_trade_history_full(model_name):
     """Per-model transaction list + summary roll-up.
@@ -1763,7 +1899,9 @@ def model_trade_history_full(model_name):
           total_buys, total_sells,
           total_deposits, total_withdrawals,
           total_buy_value, total_sell_value,
-          total_pnl, wins, losses, win_rate_pct
+          total_pnl, total_pnl_real, total_charges,
+          buy_charges_real, net_pnl,
+          wins, losses, win_rate_pct
         }
       }
 
@@ -1782,85 +1920,20 @@ def model_trade_history_full(model_name):
         # Trades come newest-first from service; UI wants chronological too,
         # but newest-first is fine for transaction-list display.
 
-        # Approx broker charges per leg — using THIS model's product (ORB intraday,
-        # the rest delivery). Stamped on every trade row + rolled into a
-        # net-of-charges P&L so the UI can show real take-home, not just gross.
-        from tools.live.broker_charges import compute_charges
+        # Charges accounting — see _trade_history_rollup docstring for the
+        # exact rule (stored sell pnl is already net of sell-leg charges; the
+        # buy leg's STORED charges are matched FIFO per symbol).
         from src.services.trading.model_ledger_service import product_for_model
         _product = product_for_model(model_name)
 
-        # Summary roll-up
-        total_buys = 0
-        total_sells = 0
-        total_deposits = 0
-        total_withdrawals = 0
-        total_buy_value = 0.0
-        total_sell_value = 0.0
-        total_pnl = 0.0
-        total_charges = 0.0
-        wins = 0
-        losses = 0
-        for t in trades:
-            side = (t.get("side") or "").upper()
-            val = float(t.get("value") or 0)
-            pnl = t.get("pnl")
-            # Per-leg approx charges — already stamped on the trade row by
-            # _trade_dict (stored column, or on-the-fly fallback). The per-row
-            # value is shown for every trade (info), but the model TOTAL counts
-            # only trades that really hit the broker (real fyers_order_id), so it
-            # reconciles with the dashboard/portfolio cards + the global total.
-            charge = float(t.get("charges") or 0.0)
-            if (t.get("fyers_order_id") or "").strip() or t.get("reason") == "LINK_FYERS_POSITION":
-                total_charges += charge
-            if side == "BUY":
-                total_buys += 1
-                total_buy_value += val
-            elif side == "SELL":
-                total_sells += 1
-                total_sell_value += val
-                if pnl is not None:
-                    pnl_f = float(pnl)
-                    total_pnl += pnl_f
-                    if pnl_f > 0:
-                        wins += 1
-                    elif pnl_f < 0:
-                        losses += 1
-                    # Net P&L for this exit ≈ gross pnl − (this sell's charges +
-                    # the buy leg's charges, approximated at the same value/product).
-                    try:
-                        buy_chg = compute_charges("BUY", int(t.get("qty") or 0),
-                                                  float(t.get("price") or 0),
-                                                  _product).get("total", 0.0)
-                    except Exception:
-                        buy_chg = 0.0
-                    t["net_pnl"] = round(pnl_f - charge - buy_chg, 2)
-            elif side == "DEPOSIT":
-                total_deposits += 1
-            elif side == "WITHDRAW":
-                total_withdrawals += 1
-
-        decided = wins + losses
-        win_rate_pct = round(100.0 * wins / decided, 1) if decided else 0.0
+        summary = _trade_history_rollup(trades, _product)
 
         return jsonify({
             "success": True,
             "model_name": model_name,
             "product": _product,
             "trades": trades,
-            "summary": {
-                "total_buys": total_buys,
-                "total_sells": total_sells,
-                "total_deposits": total_deposits,
-                "total_withdrawals": total_withdrawals,
-                "total_buy_value": round(total_buy_value, 2),
-                "total_sell_value": round(total_sell_value, 2),
-                "total_pnl": round(total_pnl, 2),
-                "total_charges": round(total_charges, 2),
-                "net_pnl": round(total_pnl - total_charges, 2),
-                "wins": wins,
-                "losses": losses,
-                "win_rate_pct": win_rate_pct,
-            },
+            "summary": summary,
         })
     except Exception as e:
         logger.error(f"trade-history error: {e}", exc_info=True)

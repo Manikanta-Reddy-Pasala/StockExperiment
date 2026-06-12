@@ -178,19 +178,20 @@ def rank_universe(stocks: List[Dict], today_ts: int,
             matches backtest LOOKBACK).
 
     Returns:
-        list[tuple]: (symbol, name, 30d_return_pct, current_price) sorted
+        list[tuple]: (symbol, name, lookback_return_pct, current_price) sorted
         descending by return.
     """
     rows = []
     for s in stocks:
         sym = s["symbol"]
         c_now = get_close_at(sym, today_ts)
-        # 30 TRADING days back (backtest parity), not 30 calendar days.
+        # lookback_days TRADING days back (backtest parity; 15 td for this
+        # model since 2026-05-27), not calendar days.
         c_past = get_close_trading_days_ago(sym, today_ts, lookback_days)
         if c_now > 0 and c_past > 0:  # need both endpoints to compute a return
-            ret = (c_now / c_past - 1) * 100  # 30d return in percentage points
+            ret = (c_now / c_past - 1) * 100  # 15-trading-day return in percentage points
             rows.append((sym, s.get("name", sym), ret, c_now))
-    rows.sort(key=lambda r: -r[2])  # best 30d return first
+    rows.sort(key=lambda r: -r[2])  # best lookback return first
     return rows
 
 
@@ -347,7 +348,7 @@ def emit_signals(top_picks: List[tuple], held: List[Dict],
             "signal": "ENTRY1",
             "price": float(price),
             "sl": 0.0, "target": 0.0,
-            "note": f"30d momentum rank-1 ({ret:+.2f}%)",
+            "note": f"15-trading-day momentum rank-1 ({ret:+.2f}%)",
         })
 
     return signals

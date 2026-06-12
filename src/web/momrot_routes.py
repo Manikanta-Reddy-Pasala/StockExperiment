@@ -195,10 +195,11 @@ def _portfolio_state() -> Dict:
 
     open_positions = []
     seen_syms = set()
+    row_by_sym: Dict[str, dict] = {}   # holding rows by symbol, for lot-merge below
     position_cost = 0.0
     market_value = 0.0
     unrealized_total = 0.0
-    today_pnl_total = 0.0   # Σ qty × (LTP − prev_close) over all broker lots
+    today_pnl_total = 0.0   # day MTM: settled lots qty×(LTP−prev_close) + today-bought lots qty×(LTP−buyAvg)
 
     # 1. Settled holdings (T+2+)
     for p in holdings:
@@ -219,7 +220,7 @@ def _portfolio_state() -> Dict:
         if _pc > 0:
             today_pnl_total += (ltp - _pc) * qty
         seen_syms.add(sym)
-        open_positions.append({
+        row = {
             "symbol": sym,
             "qty": int(qty),
             "entry_price": avg,
@@ -229,9 +230,21 @@ def _portfolio_state() -> Dict:
             "unrealized_pnl": pnl,
             "unrealized_pct": (ltp / avg - 1) * 100 if avg > 0 else 0,
             "source": "holding",
-        })
+        }
+        row_by_sym[sym] = row
+        open_positions.append(row)
 
     # 2. CNC positions (intraday-bought, pending T+1 settlement)
+    #
+    # OVERLAP MODEL (Fyers): holdings() = SETTLED shares only (qty + avg of the
+    # settled lot); positions() CNC netQty>0 = shares bought TODAY (qty + buyAvg
+    # of today's lot). The two APIs never report the same share twice — they are
+    # DISJOINT lots. So when a symbol appears in BOTH (e.g. HFCL: 203 settled +
+    # 502 bought today = 705 real shares) we must sum BOTH lots into every
+    # account-level total. The old `if sym in seen_syms: continue` silently
+    # dropped the today-lot's P&L/cost/value (sign-dependent error). Each share
+    # is counted exactly once: settled shares from holdings, today's shares
+    # from positions.
     for p in positions:
         sym_full = p.get("symbol") or ""
         sym = sym_full.replace("NSE:", "").replace("BSE:", "").replace("-EQ", "").replace("-B", "")
@@ -240,8 +253,6 @@ def _portfolio_state() -> Dict:
         net_qty = float(p.get("netQty") or 0)
         if net_qty <= 0:
             continue
-        if sym in seen_syms:
-            continue  # already counted as holding
         avg = float(p.get("buyAvg") or p.get("netAvg") or 0)
         stale_ltp = float(p.get("ltp") or 0)
         ltp = _resolve_ltp(sym, stale_ltp)
@@ -251,9 +262,27 @@ def _portfolio_state() -> Dict:
         position_cost += cost
         market_value += mv
         unrealized_total += pnl
-        _pc = fresh_pc.get(sym, 0.0)
-        if _pc > 0:
-            today_pnl_total += (ltp - _pc) * net_qty
+        # Day MTM for a lot bought TODAY is (LTP − buy price) — the holder did
+        # not own these shares at prev_close, so (LTP − prev_close) would
+        # wrongly attribute the pre-purchase move to the account. Matches the
+        # broker app's positions-tab day P&L.
+        today_pnl_total += pnl
+        if sym in seen_syms:
+            # Symbol also has a settled holdings lot: merge today's lot into the
+            # existing display row (totals above already counted both lots once).
+            row = row_by_sym.get(sym)
+            if row is not None:
+                row["qty"] = int(row["qty"] + net_qty)
+                row["cost"] += cost
+                row["market_value"] += mv
+                row["unrealized_pnl"] += pnl
+                row["live_price"] = ltp
+                row["entry_price"] = (row["cost"] / row["qty"]) if row["qty"] > 0 else 0.0
+                row["unrealized_pct"] = (
+                    (row["live_price"] / row["entry_price"] - 1) * 100 if row["entry_price"] > 0 else 0
+                )
+                row["source"] = "holding+position"   # settled + today's T+1-pending lot
+            continue
         seen_syms.add(sym)
         open_positions.append({
             "symbol": sym,
@@ -270,9 +299,10 @@ def _portfolio_state() -> Dict:
     # Account TOTAL value = cash + GROSS market value of every broker lot.
     # holdings() (settled) and CNC positions() (today, pre-settlement) are
     # DISJOINT lots — a symbol in BOTH (e.g. HFCL: 203 settled + 502 today) is
-    # 705 real shares, so the value sum must NOT dedup by symbol (the
-    # open_positions list above dedups for display; that under-counted the
-    # account total, e.g. showing 212k for a real ~308k account).
+    # 705 real shares, so the value sum must NOT dedup by symbol. (The P&L
+    # loops above now also count both lots — overlapping symbols merge into a
+    # single display row — so market_value should agree with holdings_value;
+    # this independent gross pass is kept as the authoritative account total.)
     holdings_value = 0.0
     for p in holdings:
         q = float(p.get("quantity") or 0)
@@ -326,7 +356,8 @@ def _portfolio_state() -> Dict:
         "account_total": account_total,          # cash + holdings_value (true total)
         # WHOLE-ACCOUNT P&L straight from Fyers (matches the broker app's
         # Holdings tab): total = live unrealized on all lots; today = day MTM
-        # (Σ qty × (LTP − prev_close)). Broker truth — the per-model figures
+        # (settled lots qty×(LTP−prev_close) + today-bought CNC lots
+        # qty×(LTP−buyAvg)). Broker truth — the per-model figures
         # (a subset) won't sum to this when the account holds untracked lots.
         "account_total_pnl": round(unrealized_total, 2),
         "account_today_pnl": round(today_pnl_total, 2),

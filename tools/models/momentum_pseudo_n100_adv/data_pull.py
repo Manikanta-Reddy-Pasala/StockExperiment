@@ -92,6 +92,61 @@ def pull_daily_ohlcv():
     )
 
 
+def _merge_snapshot_into_universes(out_file: str, universes_file: str,
+                                   anchor_key: str) -> bool:
+    """Merge a build_universe snapshot into yearly_universes.json (PLAIN
+    STRINGS only) under anchor_key. Split out of refresh_universe so the
+    format contract is unit-testable without the subprocess build.
+
+    Args:
+        out_file: Path to the build_universe.py snapshot JSON.
+        universes_file: Path to yearly_universes.json to merge into.
+        anchor_key: "YYYY-05-01" yearly key to add/replace.
+
+    Returns:
+        True if the merge was written; False if skipped (bad/partial build)
+        or on error.
+
+    Non-obvious logic:
+        - Entries are written as plain symbol strings, NEVER {"symbol": s}
+          dicts: live_signal.rank_universe needs hashable symbols
+          (`sym in _SMALLCAP_SET`, f"NSE:{sym}-EQ") and dict entries crash
+          every signal run with TypeError: unhashable type 'dict'.
+        - The snapshot reader tolerates both dict ({"stocks"/"symbols": ...})
+          and bare-list shapes, and both {"symbol": ...} dicts and plain
+          string entries.
+    """
+    import json
+    try:
+        snapshot = json.loads(Path(out_file).read_text())
+        # Accept dict-with-list-key or bare-list snapshot shapes.
+        if isinstance(snapshot, dict):
+            entries = snapshot.get("stocks") or snapshot.get("symbols") or []
+        else:
+            entries = snapshot
+        # Normalize each entry to a plain symbol string.
+        symbols = [e["symbol"] if isinstance(e, dict) else e for e in entries]
+        # Sanity floor: a healthy pseudo-N100 build has ~100 names.
+        if len(symbols) < 50:
+            log.warning(f"build_universe returned only {len(symbols)} — skipping merge")
+            return False
+        yearly = {}
+        # Preserve prior year keys — load existing file before adding this year's.
+        if Path(universes_file).exists():
+            yearly = json.loads(Path(universes_file).read_text())
+        # Add/replace only THIS YEAR'S anchor key (May 1); live_signal looks it
+        # up by date via pick_universe_for (latest key <= today).
+        # MUST be plain strings: live_signal consumes entries as hashable
+        # symbols (`sym in set`, f"NSE:{sym}-EQ"); dict entries crash ranking.
+        yearly[anchor_key] = [str(s) for s in symbols]
+        Path(universes_file).write_text(json.dumps(yearly, indent=2))
+        log.info(f"  merged {len(symbols)} symbols into yearly_universes.json as '{anchor_key}'")
+        return True
+    except Exception as e:
+        log.error(f"  yearly_universes.json merge failed: {e}", exc_info=True)
+        return False
+
+
 def refresh_universe():
     """Rebuild PIT universe via build_universe.py (top-100 by ADV) and
     MERGE the result into yearly_universes.json under today's date key.
@@ -115,7 +170,6 @@ def refresh_universe():
           and bare-list shapes, and both {"symbol": ...} dicts and plain
           string entries.
     """
-    import json
     log.info("=" * 80)
     log.info("momentum_pseudo_n100_adv yearly PIT universe refresh")
     log.info("=" * 80)
@@ -145,27 +199,4 @@ def refresh_universe():
         # Don't clobber a good yearly_universes.json with a failed build.
         log.error("build_universe failed — yearly_universes.json NOT updated")
         return
-    try:
-        snapshot = json.loads(Path(out_file).read_text())
-        # Accept dict-with-list-key or bare-list snapshot shapes.
-        if isinstance(snapshot, dict):
-            entries = snapshot.get("stocks") or snapshot.get("symbols") or []
-        else:
-            entries = snapshot
-        # Normalize each entry to a plain symbol string.
-        symbols = [e["symbol"] if isinstance(e, dict) else e for e in entries]
-        # Sanity floor: a healthy pseudo-N100 build has ~100 names.
-        if len(symbols) < 50:
-            log.warning(f"build_universe returned only {len(symbols)} — skipping merge")
-            return
-        yearly = {}
-        # Preserve prior year keys — load existing file before adding this year's.
-        if Path(UNIVERSES_FILE).exists():
-            yearly = json.loads(Path(UNIVERSES_FILE).read_text())
-        # Add/replace only THIS YEAR'S anchor key (May 1); live_signal looks it
-        # up by date via pick_universe_for (latest key <= today).
-        yearly[anchor_key] = [{"symbol": s} for s in symbols]
-        Path(UNIVERSES_FILE).write_text(json.dumps(yearly, indent=2))
-        log.info(f"  merged {len(symbols)} symbols into yearly_universes.json as '{anchor_key}'")
-    except Exception as e:
-        log.error(f"  yearly_universes.json merge failed: {e}", exc_info=True)
+    _merge_snapshot_into_universes(out_file, UNIVERSES_FILE, anchor_key)

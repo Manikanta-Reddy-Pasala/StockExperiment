@@ -80,6 +80,21 @@ def compose_summary(today_str: str, models: list) -> tuple:
     return title, body
 
 
+def _model_display_order(ledger_names) -> list:
+    """Canonical display order over the ledger's model names, with RETIRED
+    models excluded.
+
+    Retired models with trade history keep their model_ledger rows by design
+    (forensic safety — see ensure_models_seeded), so building the heartbeat
+    from raw ledger rows would resurrect e.g. orb_momentum_intraday /
+    midcap_narrow_60d_breakout in the daily ping. Filter on the canonical
+    RETIRED_MODELS set (single source of truth in model_ledger_service).
+    """
+    from src.services.trading.model_ledger_service import RETIRED_MODELS
+    names = list(MODEL_ORDER) + [m for m in ledger_names if m not in MODEL_ORDER]
+    return [n for n in names if n not in RETIRED_MODELS]
+
+
 def _gather(today: datetime) -> list:
     """Read each model's current holdings + today's action from the DB."""
     from src.models.database import get_database_manager
@@ -114,7 +129,7 @@ def _gather(today: datetime) -> list:
                     .order_by(Notification.created_at.asc()).all()):
             decision_by_model[n.model_name] = n.event_type  # last wins
 
-        names = list(MODEL_ORDER) + [m for m in ledgers if m not in MODEL_ORDER]
+        names = _model_display_order(ledgers)
         for name in names:
             if name not in ledgers:
                 continue
