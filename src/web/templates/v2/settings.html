@@ -259,7 +259,7 @@
                     Each model spends only its own cash. Deposits add to that model's pool; withdrawals pull from it. Profits + losses stay within the model. Other models are untouched.
                 </div>
                 <div class="table-responsive">
-                    <table class="table table-sm alloc-table table-cards mb-0">
+                    <table class="table table-sm alloc-table table-cards txn-collapsible mb-0">
                         <thead><tr>
                             <th class="col-model">Model</th>
                             <th class="text-end num" title="Total Deposited (principal in)">Deposited</th>
@@ -691,9 +691,9 @@ async function loadAllocations() {
           <span class="universe-tag">${meta.universe} · ${meta.kind}</span>
           <div class="text-muted" style="font-size:.65rem;font-family:monospace;">${m.model_name}</div>
         </td>
-        <td class="text-end num" data-label="Deposited">${fmtINR(m.allocated_capital)}</td>
-        <td class="text-end num" data-label="Cash">${fmtINR(m.cash)}</td>
-        <td class="col-position" data-label="Open Position"><div>${posHtml}</div></td>
+        <td class="text-end num txn-detail" data-label="Deposited">${fmtINR(m.allocated_capital)}</td>
+        <td class="text-end num txn-detail" data-label="Cash">${fmtINR(m.cash)}</td>
+        <td class="col-position txn-detail" data-label="Open Position"><div>${posHtml}</div></td>
         <td class="text-end num" data-label="NAV"><strong>${fmtINR(m.nav)}</strong></td>
         <td class="text-end num ${pnlCls}" data-label="P&amp;L">
           <span>${fmtINR(m.pnl_total)}
@@ -710,7 +710,7 @@ async function loadAllocations() {
             </span>
           </label>
         </td>
-        <td class="text-end col-actions" data-label="Actions">
+        <td class="text-end col-actions txn-detail" data-label="Actions">
           <div class="action-bar" role="group" aria-label="Capital actions for ${m.model_name}">
             <button class="btn btn-success" onclick="openCap('${m.model_name}','deposit')" title="Deposit cash" aria-label="Deposit"><i class="bi bi-plus-lg"></i></button>
             <button class="btn btn-warning" onclick="openCap('${m.model_name}','withdraw')" title="Withdraw cash" aria-label="Withdraw"><i class="bi bi-dash-lg"></i></button>
@@ -1097,6 +1097,15 @@ document.addEventListener('keydown', function(ev) {
 });
 window.addEventListener('resize', closeKebabMenu);
 window.addEventListener('scroll', closeKebabMenu, true);
+
+// Tap an allocation card (mobile) to expand/collapse its detail (Deposited /
+// Cash / Open Position / Actions). Ignore clicks on interactive controls so the
+// trade toggle, action buttons and kebab still work without toggling the card.
+document.getElementById('alloc_tbody').addEventListener('click', function(ev) {
+  if (ev.target.closest('button, a, input, label, .trade-toggle, .action-bar, .kebab-btn')) return;
+  const tr = ev.target.closest('tr');
+  if (tr && tr.querySelector('td.txn-detail')) tr.classList.toggle('expanded');
+});
 
 // ---- Delegated handler for menu items (data-action attrs) ---------------
 // Bound once on document so it survives re-renders of #alloc_tbody AND
