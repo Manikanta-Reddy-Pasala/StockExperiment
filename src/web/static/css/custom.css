@@ -81,8 +81,9 @@ Modern CSS for the Automated Trading System
     --light-muted: #64748b;
 
     /* Typography */
-    --font-family-sans-serif: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --font-family-mono: 'JetBrains Mono', 'Fira Code', monospace;
+    --font-family-sans-serif: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-display: 'Sora', 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-family-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
     
     /* Modern Shadows */
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -1632,3 +1633,122 @@ td.text-end, .metric-table td {
     }
 }
 
+
+/* ================================================================
+   v3 REDESIGN LAYER (2026-06-13) — premium fintech-terminal polish.
+   Presentation only. Appended last so it overrides earlier rules on
+   equal specificity without editing the fragile base blocks above.
+   ================================================================ */
+
+/* ---- Typography: display headings + tabular mono numerics ---- */
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6,
+.card-header, .navbar-brand, .offcanvas-title {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+}
+h1, .h1, h2, .h2 { font-weight: 700; letter-spacing: -0.02em; }
+.card-header { font-weight: 600; }
+
+/* Numbers everywhere read as a trading terminal: tabular mono. */
+.v, .num, .pnl-line, .pc-pnl, .fs-4, .fs-5,
+.metric-table .v, td.text-end, .headline,
+#bs_invested, #bs_cash, #bs_nav, #bs_return_pct, #bs_total_pnl,
+#virtual-capital, .stat-num {
+    font-family: var(--font-family-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+/* ---- Buttons: brand-cohesive, curvy, with depth ---- */
+.btn { border-radius: 12px; font-weight: 600; letter-spacing: 0.01em; }
+.btn-primary {
+    background: linear-gradient(135deg, #1ec07f 0%, #0f9460 100%);
+    color: #fff;
+    box-shadow: 0 6px 18px rgba(15, 148, 96, 0.30), inset 0 1px 0 rgba(255,255,255,0.18);
+}
+.btn-outline-primary {
+    border: 1.5px solid var(--accent);
+    color: var(--accent);
+    background: rgba(21, 163, 107, 0.06);
+}
+.btn-outline-primary:hover, .btn-outline-primary:active {
+    background: var(--accent); color: #fff; border-color: var(--accent);
+}
+@media (hover: hover) {
+    .btn-primary:hover { box-shadow: 0 10px 26px rgba(15, 148, 96, 0.40); transform: translateY(-2px); }
+}
+
+/* ---- Cards: gentle hover lift + staggered entrance on load ---- */
+@media (hover: hover) {
+    .card { transition: transform 0.22s cubic-bezier(.2,.7,.3,1), box-shadow 0.22s ease, background 0.2s ease; }
+    .card:hover { transform: translateY(-3px); box-shadow: 0 16px 40px rgba(31,38,71,0.16), 0 2px 6px rgba(31,38,71,0.08); }
+}
+@media (prefers-color-scheme: dark) {
+    @media (hover: hover) { .card:hover { box-shadow: 0 16px 44px rgba(0,0,0,0.5); } }
+}
+@media (prefers-reduced-motion: no-preference) {
+    main .card, main .row > [class*="col"] > .card {
+        animation: v3rise 0.5s cubic-bezier(.2,.7,.3,1) both;
+    }
+    main .row > [class*="col"]:nth-child(1) > .card { animation-delay: .02s; }
+    main .row > [class*="col"]:nth-child(2) > .card { animation-delay: .06s; }
+    main .row > [class*="col"]:nth-child(3) > .card { animation-delay: .10s; }
+    main .row > [class*="col"]:nth-child(4) > .card { animation-delay: .14s; }
+}
+@keyframes v3rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ---- Page header: display title + accent underline rule ---- */
+.main-content > .d-flex.border-bottom:first-of-type {
+    border-bottom: 0 !important;
+    position: relative;
+    padding-bottom: 14px !important;
+}
+.main-content h1.h2 { position: relative; }
+.main-content h1.h2::after {
+    content: ""; position: absolute; left: 0; bottom: -8px;
+    width: 44px; height: 3px; border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+}
+
+/* ---- Stat numbers (dashboard / history cards) ---- */
+.card-body .fs-4 { font-family: var(--font-family-mono); font-weight: 700; letter-spacing: -0.03em; }
+
+/* ---- Mobile bottom nav: floating frosted glass + active pill ---- */
+.mobile-bottom-nav {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: saturate(1.4) blur(18px);
+    backdrop-filter: saturate(1.4) blur(18px);
+    border-top: 1px solid var(--glass-border);
+    box-shadow: 0 -10px 30px rgba(0,0,0,0.10);
+}
+.mobile-bottom-nav .bn-item { position: relative; border-radius: 12px; }
+.mobile-bottom-nav .bn-item.active::before {
+    content: ""; position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
+    width: 42px; height: 30px; border-radius: 10px;
+    background: radial-gradient(60% 100% at 50% 0%, rgba(21,163,107,0.22), rgba(21,163,107,0.06));
+    z-index: 0;
+}
+.mobile-bottom-nav .bn-item svg, .mobile-bottom-nav .bn-label { position: relative; z-index: 1; }
+.mobile-bottom-nav .bn-item.active .bn-label { font-weight: 700; }
+
+/* ---- Inputs / selects: glassy, curvy ---- */
+.form-control, .form-select {
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-bg-2);
+}
+.form-control:focus, .form-select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(21,163,107,0.18);
+}
+
+/* ---- Badges/pills: a touch more refined ---- */
+.side-badge, .pill-live, .pill-observe, .pill-warn, .pill-disabled { border-radius: 999px; }
+
+/* ---- Mobile top navbar: glassy to match ---- */
+.navbar.d-md-none {
+    background: var(--glass-bg) !important;
+    -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--glass-border) !important;
+}
