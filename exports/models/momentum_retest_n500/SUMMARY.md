@@ -5,7 +5,7 @@ Monthly top-4 (K=4), 30d momentum, buy within 20% of 20-EMA, retain top-4 band.
 
 **Universe:** Top-120 by 20d ADV from N500 (minus Smallcap-250)
 
-Backtest window: **2021-01-01 → 2026-05-29** (₹10L capital; full ~5.4-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 recovery). 3-yr window also reported in notes: **2023-05-15 → 2026-05-12**. REALISM CONVENTION (2026-06-13): all figures are **net of real Fyers CNC charges, with next-open fills** (decide on bar d's close, fill at bar d+1's open) and PIT universes.
+Backtest window: **2021-03-01 → 2026-06-12** (₹10L capital; full ~5.3-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 recovery). 3-yr window also reported in notes: **2023-05-15 → 2026-05-12**. REALISM CONVENTION (2026-06-13): all figures are **net of real Fyers CNC charges, with next-open fills** (decide on bar d's close, fill at bar d+1's open) and PIT universes.
 
 ## Trade rules
 
@@ -21,13 +21,13 @@ Backtest window: **2021-01-01 → 2026-05-29** (₹10L capital; full ~5.4-year c
 
 | Metric | Value |
 |---|---|
-| Final NAV (₹10L start) | ₹11,292,990 |
-| Total return | +1029.3% |
-| CAGR (annualized) | +56.6% |
+| Final NAV (₹10L start) | ₹11,063,214 |
+| Total return | +1006.3% |
+| CAGR (annualized) | +57.6% |
 | Max drawdown | 34.0% |
-| Calmar | 1.66 |
-| Trades | 183 (110W / 72L) · 60% win |
-| Total charges (real Fyers CNC, deducted) | ₹386,643 |
+| Calmar | 1.69 |
+| Trades | 185 (112W / 72L) · 61% win |
+| Total charges (real Fyers CNC, deducted) | ₹399,840 |
 
 ## Year-by-year breakdown
 
@@ -38,19 +38,19 @@ Backtest window: **2021-01-01 → 2026-05-29** (₹10L capital; full ~5.4-year c
 | 2023 | +121.6% | 21.9% |
 | 2024 | +141.1% | 18.3% |
 | 2025 | +15.5% | 22.7% |
-| 2026 | +26.7% | 12.4% |
+| 2026 | +24.1% | 12.4% |
 
 ## Note
 
-Multi-holding K=4 (2026-05-31 re-tune, was K2). 2026-06-13 realism regen (net of charges, next-open fills, PIT-before-ADV universe fix): full-cycle 2021-01→2026-05 +56.6% CAGR / 34.0% DD / Calmar 1.66 / 183 trades (charges ₹386,643); 3-yr 2023-05→2026-05 +102.3% CAGR / 23.6% DD / Calmar 4.34. (Old flat-0.15%/side close-fill convention had shown +57.3%/38.8%/1.48 — the PIT-before-ADV fix was net-positive, the only model to IMPROVE under realism.) K2→K4 diversified the basket (per-year DD ≤33 every year); K-knee: K5/K6 decay. Wide 20% entry band keeps leaders that never pull back to the EMA.
+Multi-holding K=4 (2026-05-31 re-tune, was K2). 2026-06-13 realism regen (net of charges, next-open fills, PIT-before-ADV universe fix): full-cycle 2021-03→2026-06 +57.6% CAGR / 34.0% DD / Calmar 1.69 / 185 trades (charges ₹399,840); 3-yr 2023-05→2026-05 +102.3% CAGR / 23.6% DD / Calmar 4.34. (Old flat-0.15%/side close-fill convention had shown +57.3%/38.8%/1.48 — the PIT-before-ADV fix was net-positive, the only model to IMPROVE under realism.) K2→K4 diversified the basket (per-year DD ≤33 every year); K-knee: K5/K6 decay. Wide 20% entry band keeps leaders that never pull back to the EMA.
 
-**Open position at window end:** ADANIPOWER [large] qty 14808 entry ₹154.5 on 2026-04-02 (unrealized +1,315,987)
+**Open position at window end:** ADANIGREEN [large] qty 1791 entry ₹1291.0 on 2026-05-05 (unrealized +348,708)
 
-**Open position at window end:** ADANIGREEN [large] qty 1791 entry ₹1291.0 on 2026-05-05 (unrealized +330,260)
+**Open position at window end:** BHEL [mid] qty 6087 entry ₹379.9 on 2026-05-05 (unrealized -7,000)
 
-**Open position at window end:** BHEL [mid] qty 6087 entry ₹379.9 on 2026-05-05 (unrealized +224,306)
+**Open position at window end:** IDEA [mid] qty 209676 entry ₹14.0 on 2026-06-02 (unrealized +188,708)
 
-**Open position at window end:** ADANIENSOL [large] qty 1658 entry ₹1394.6 on 2026-05-05 (unrealized +196,805)
+**Open position at window end:** ADANIENT [large] qty 1017 entry ₹2885.0 on 2026-06-02 (unrealized +37,222)
 
 ---
 *Auto-generated from summary.json by tools/analysis/refresh_export_docs.py — do not hand-edit.*

@@ -1,4 +1,4 @@
-# momentum_pseudo_n100_adv — trade ledger (2021-01-01 → 2026-05-29)
+# momentum_pseudo_n100_adv — trade ledger (2021-03-01 → 2026-06-12)
 
 | # | Symbol | Cap | Entry date | Exit date | Entry ₹ | Exit ₹ | Qty | PnL ₹ | Return % | Reason |
 |---|---|---|---|---|---:|---:|---:|---:|---:|---|
@@ -53,5 +53,6 @@
 | 49 | SHRIRAMFIN | — | 2025-11-04 | 2026-03-04 | 792.45 | 1,042.30 | 9,693 | 2,421,796 | 31.53 | ROTATE |
 | 50 | ONGC | — | 2026-03-04 | 2026-03-17 | 287.00 | 260.65 | 35,125 | -925,544 | -9.18 | ATR_STOP |
 | 51 | ADANIPOWER | — | 2026-04-02 | 2026-05-05 | 154.50 | 227.97 | 59,126 | 4,343,987 | 47.55 | ROTATE |
+| 52 | ADANIGREEN | — | 2026-05-05 | 2026-06-02 | 1,291.00 | 1,445.00 | 10,417 | 1,604,218 | 11.93 | ROTATE |
 
-*51 trades. Auto-generated from trade_ledger.json.*
+*52 trades. Auto-generated from trade_ledger.json.*

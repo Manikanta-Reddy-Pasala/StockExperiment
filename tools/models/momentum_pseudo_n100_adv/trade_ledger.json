@@ -670,5 +670,18 @@
     "charges": 14021.5,
     "cap_after": 13465081.0,
     "exit_reason": "ROTATE"
+  },
+  {
+    "sym": "ADANIGREEN",
+    "entry_date": "2026-05-05",
+    "exit_date": "2026-06-02",
+    "qty": 10417,
+    "entry_px": 1291.0,
+    "exit_px": 1445.0,
+    "pnl": 1604218.0,
+    "ret_pct": 11.93,
+    "charges": 15653.97,
+    "cap_after": 15037653.0,
+    "exit_reason": "ROTATE"
   }
 ]

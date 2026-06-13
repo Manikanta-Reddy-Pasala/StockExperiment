@@ -2560,5 +2560,33 @@
     "cap_after": 10311962.0,
     "exit_reason": "ROTATE",
     "cap": "mid"
+  },
+  {
+    "sym": "ADANIPOWER",
+    "entry_date": "2026-04-02",
+    "exit_date": "2026-06-02",
+    "qty": 14808,
+    "entry_px": 154.5,
+    "exit_px": 230.0,
+    "pnl": 1118004.0,
+    "ret_pct": 48.87,
+    "charges": 3571.59,
+    "cap_after": 10939798.0,
+    "exit_reason": "ROTATE",
+    "cap": "large"
+  },
+  {
+    "sym": "ADANIENSOL",
+    "entry_date": "2026-05-05",
+    "exit_date": "2026-06-02",
+    "qty": 1658,
+    "entry_px": 1394.6,
+    "exit_px": 1494.2,
+    "pnl": 165137.0,
+    "ret_pct": 7.14,
+    "charges": 2608.4,
+    "cap_after": 10933376.0,
+    "exit_reason": "ROTATE",
+    "cap": "large"
   }
 ]

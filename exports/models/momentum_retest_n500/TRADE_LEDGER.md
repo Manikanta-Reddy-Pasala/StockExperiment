@@ -1,4 +1,4 @@
-# momentum_retest_n500 — trade ledger (2021-01-01 → 2026-05-29)
+# momentum_retest_n500 — trade ledger (2021-03-01 → 2026-06-12)
 
 | # | Symbol | Cap | Entry date | Exit date | Entry ₹ | Exit ₹ | Qty | PnL ₹ | Return % | Reason |
 |---|---|---|---|---|---:|---:|---:|---:|---:|---|
@@ -185,5 +185,7 @@
 | 181 | CGPOWER | large | 2026-03-04 | 2026-04-02 | 700.00 | 670.25 | 3,358 | -99,900 | -4.25 | ROTATE |
 | 182 | ONGC | large | 2026-03-04 | 2026-04-02 | 287.00 | 288.50 | 8,193 | 12,290 | 0.52 | ROTATE |
 | 183 | NATIONALUM | mid | 2026-04-02 | 2026-05-05 | 395.95 | 409.80 | 5,777 | 80,011 | 3.5 | ROTATE |
+| 184 | ADANIPOWER | large | 2026-04-02 | 2026-06-02 | 154.50 | 230.00 | 14,808 | 1,118,004 | 48.87 | ROTATE |
+| 185 | ADANIENSOL | large | 2026-05-05 | 2026-06-02 | 1,394.60 | 1,494.20 | 1,658 | 165,137 | 7.14 | ROTATE |
 
-*183 trades. Auto-generated from trade_ledger.json.*
+*185 trades. Auto-generated from trade_ledger.json.*

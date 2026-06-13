@@ -1,22 +1,22 @@
 {
   "model": "momentum_pseudo_n100_adv",
-  "start": "2021-01-01",
-  "end": "2026-05-29",
-  "years": 5.405,
+  "start": "2021-03-01",
+  "end": "2026-06-12",
+  "years": 5.281,
   "capital": 1000000.0,
-  "final_nav": 15369984.0,
-  "total_return_pct": 1437.0,
-  "cagr_pct": 65.79,
+  "final_nav": 14340569.0,
+  "total_return_pct": 1334.06,
+  "cagr_pct": 65.57,
   "max_dd_pct": 44.89,
-  "calmar": 1.47,
-  "trades": 51,
-  "wins": 37,
+  "calmar": 1.46,
+  "trades": 52,
+  "wins": 38,
   "losses": 14,
-  "win_rate_pct": 72.5,
+  "win_rate_pct": 73.1,
   "open_position": {
-    "symbol": "NSE:ADANIGREEN-EQ",
-    "qty": 10417,
-    "entry_px": 1291.0
+    "symbol": "NSE:HFCL-EQ",
+    "qty": 83443,
+    "entry_px": 180.0
   },
   "per_year": {
     "2021": {
@@ -40,11 +40,11 @@
       "dd_pct": 28.4
     },
     "2026": {
-      "ret_pct": 55.5,
-      "dd_pct": 14.6
+      "ret_pct": 45.1,
+      "dd_pct": 17.9
     }
   },
-  "charges_total": 380486.01,
+  "charges_total": 413998.11,
   "fill_at_next_open": true,
   "charges_model": "fyers_cnc"
 }

@@ -1,4 +1,4 @@
-# momentum_n100_top5_max1 — trade ledger (2021-01-01 → 2026-05-29)
+# momentum_n100_top5_max1 — trade ledger (2021-03-01 → 2026-06-12)
 
 | # | Symbol | Cap | Entry date | Exit date | Entry ₹ | Exit ₹ | Qty | PnL ₹ | Return % | Reason |
 |---|---|---|---|---|---:|---:|---:|---:|---:|---|
@@ -99,5 +99,6 @@
 | 95 | COALINDIA | — | 2026-03-17 | 2026-04-02 | 460.30 | 448.40 | 12,551 | -149,357 | -2.59 | ROTATE |
 | 96 | ADANIPOWER | — | 2026-04-02 | 2026-04-16 | 154.50 | 184.00 | 36,347 | 1,072,236 | 19.09 | ROTATE |
 | 97 | ADANIGREEN | — | 2026-04-16 | 2026-05-18 | 1,101.55 | 1,374.90 | 6,057 | 1,655,681 | 24.82 | ROTATE |
+| 98 | VEDL | — | 2026-05-18 | 2026-06-02 | 323.90 | 336.45 | 25,656 | 321,983 | 3.87 | ROTATE |
 
-*97 trades. Auto-generated from trade_ledger.json.*
+*98 trades. Auto-generated from trade_ledger.json.*

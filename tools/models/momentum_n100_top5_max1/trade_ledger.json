@@ -1259,5 +1259,18 @@
     "charges": 8677.63,
     "cap_after": 8319961.0,
     "exit_reason": "ROTATE"
+  },
+  {
+    "sym": "VEDL",
+    "entry_date": "2026-05-18",
+    "exit_date": "2026-06-02",
+    "qty": 25656,
+    "entry_px": 323.9,
+    "exit_px": 336.45,
+    "pnl": 321983.0,
+    "ret_pct": 3.87,
+    "charges": 8993.2,
+    "cap_after": 8623060.0,
+    "exit_reason": "ROTATE"
   }
 ]

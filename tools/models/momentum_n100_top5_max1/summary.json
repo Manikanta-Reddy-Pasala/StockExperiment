@@ -1,25 +1,25 @@
 {
   "model": "momentum_n100_top5_max1",
-  "start": "2021-01-01",
-  "end": "2026-05-29",
-  "years": 5.405,
+  "start": "2021-03-01",
+  "end": "2026-06-12",
+  "years": 5.281,
   "capital": 1000000.0,
-  "final_nav": 9046397.0,
-  "total_return_pct": 804.64,
-  "cagr_pct": 50.31,
+  "final_nav": 8366534.0,
+  "total_return_pct": 736.65,
+  "cagr_pct": 49.51,
   "max_dd_pct": 49.13,
-  "calmar": 1.02,
-  "trades": 97,
-  "total_charges_inr": 584929.94,
+  "calmar": 1.01,
+  "trades": 98,
+  "total_charges_inr": 604171.11,
   "fill_convention": "next_open",
   "charges_model": "fyers_cnc",
-  "wins": 53,
+  "wins": 54,
   "losses": 44,
-  "win_rate_pct": 54.6,
+  "win_rate_pct": 55.1,
   "open_position": {
-    "symbol": "NSE:VEDL-EQ",
-    "qty": 25656,
-    "entry_px": 323.9
+    "symbol": "NSE:ENRIN-EQ",
+    "qty": 2319,
+    "entry_px": 3713.1
   },
   "per_year": {
     "2021": {
@@ -43,7 +43,7 @@
       "dd_pct": 17.0
     },
     "2026": {
-      "ret_pct": 65.0,
+      "ret_pct": 52.6,
       "dd_pct": 14.6
     }
   }

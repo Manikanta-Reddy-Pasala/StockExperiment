@@ -1,15 +1,15 @@
 {
   "model": "n20_daily_large_only",
-  "start": "2021-01-01",
-  "end": "2026-05-29",
-  "years": 5.405,
+  "start": "2021-03-01",
+  "end": "2026-06-12",
+  "years": 5.281,
   "capital": 1000000.0,
-  "final_nav": 4357799.0,
-  "total_return_pct": 335.78,
-  "cagr_pct": 31.31,
+  "final_nav": 4334367.0,
+  "total_return_pct": 333.44,
+  "cagr_pct": 32.01,
   "max_dd_pct": 38.86,
   "max_dd_realized_pct": 32.3,
-  "calmar": 0.81,
+  "calmar": 0.82,
   "trades": 139,
   "wins": 80,
   "losses": 59,
@@ -41,7 +41,7 @@
       "dd_pct": 12.6
     },
     "2026": {
-      "ret_pct": 33.3,
+      "ret_pct": 32.6,
       "dd_pct": 30.9
     }
   },

@@ -46,8 +46,8 @@ from tools.shared.backtest_engine import run_rotation_backtest
 from tools.live.broker_charges import compute_charges
 from tools.models.emerging_momentum import strategy as S
 
-DEFAULT_START = date(2021, 1, 1)
-DEFAULT_END = date(2026, 5, 29)
+DEFAULT_START = date(2021, 3, 1)
+DEFAULT_END = date(2026, 6, 12)
 DEFAULT_CAP = 1_000_000.0
 
 # ── BACKTEST REALISM CONVENTION (2026-06-13, identical across all 5 models) ──
