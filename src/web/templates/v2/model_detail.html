@@ -145,7 +145,7 @@
       </div>
     </div>
     <div class="table-responsive txn-wrap">
-      <table class="table table-hover txn-table table-cards mb-0">
+      <table class="table table-hover txn-table table-cards txn-collapsible mb-0">
         <thead>
           <tr>
             <th>Date</th>
@@ -445,17 +445,17 @@ function renderTxn() {
     return `
       <tr>
         <td data-label="Date">${fmtDate(t.trade_at)}</td>
-        <td data-label="Model"><span class="model-tag">${modelLabel(t.model_name || MODEL_NAME)}</span></td>
+        <td data-label="Model" class="txn-detail"><span class="model-tag">${modelLabel(t.model_name || MODEL_NAME)}</span></td>
         <td data-label="Side"><span class="side-badge side-${side}">${side || '—'}</span></td>
         <td data-label="Symbol" class="${na(isCashflow)}"><code>${sym}</code></td>
-        <td class="text-end${na(isCashflow)}" data-label="Qty">${qty}</td>
-        <td class="text-end${na(isCashflow)}" data-label="Price">${px}</td>
+        <td class="text-end txn-detail${na(isCashflow)}" data-label="Qty">${qty}</td>
+        <td class="text-end txn-detail${na(isCashflow)}" data-label="Price">${px}</td>
         <td class="text-end" data-label="Value">${fmtINR(t.value)}</td>
-        <td class="text-end text-muted${na(!hasCharges)}" data-label="Charges">${hasCharges ? fmtINR(t.charges) : '—'}</td>
+        <td class="text-end text-muted txn-detail${na(!hasCharges)}" data-label="Charges">${hasCharges ? fmtINR(t.charges) : '—'}</td>
         <td class="text-end${na(pnlVal == null)}" data-label="P&L">${pnlCell}</td>
-        <td class="text-end${na(pnlVal == null)}" data-label="P&L %">${pnlPctCell}</td>
-        <td data-label="Reason" class="${na(!t.reason)}"><small class="text-muted">${t.reason || ''}</small></td>
-        <td data-label="Order ID" class="${na(!hasOrder)}"><small class="text-muted">${t.fyers_order_id || ''}</small></td>
+        <td class="text-end txn-detail${na(pnlVal == null)}" data-label="P&L %">${pnlPctCell}</td>
+        <td data-label="Reason" class="txn-detail ${na(!t.reason)}"><small class="text-muted">${t.reason || ''}</small></td>
+        <td data-label="Order ID" class="txn-detail ${na(!hasOrder)}"><small class="text-muted">${t.fyers_order_id || ''}</small></td>
       </tr>
     `;
   }).join('');
@@ -483,6 +483,11 @@ document.getElementById('txn_side_filter').addEventListener('click', (ev) => {
 });
 document.getElementById('txn_prev').addEventListener('click', () => { txnPage--; renderTxn(); });
 document.getElementById('txn_next').addEventListener('click', () => { txnPage++; renderTxn(); });
+// Tap a transaction card (mobile) to expand/collapse its full detail.
+document.getElementById('txn_body').addEventListener('click', (e) => {
+  const tr = e.target.closest('tr');
+  if (tr && tr.querySelector('td.txn-detail')) tr.classList.toggle('expanded');
+});
 
 async function loadAll() {
   await Promise.all([loadBalanceSheet(), loadTradeHistory()]);

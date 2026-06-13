@@ -1557,6 +1557,19 @@ td.text-end, .metric-table td {
        a DEPOSIT, P&L on a BUY) in card mode — desktop table keeps every column
        for alignment. JS marks the irrelevant cells with `na-cell`. */
     .table-cards td.na-cell { display: none !important; }
+
+    /* Collapsible transaction cards: each card shows a compact summary and
+       expands on tap to reveal the secondary fields (marked `txn-detail`).
+       Card mode only — the desktop table always shows every column. */
+    .table-cards.txn-collapsible tbody tr { cursor: pointer; }
+    .table-cards.txn-collapsible tbody tr:not(.expanded) td.txn-detail { display: none; }
+    .table-cards.txn-collapsible tbody tr > td:first-child { padding-right: 26px !important; position: relative; }
+    .table-cards.txn-collapsible tbody tr > td:first-child::after {
+        content: "\25BE";                 /* ▾ down triangle (font-independent) */
+        position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+        color: var(--muted); font-size: 0.9rem; line-height: 1; transition: transform 0.2s ease;
+    }
+    .table-cards.txn-collapsible tbody tr.expanded > td:first-child::after { transform: translateY(-50%) rotate(180deg); }
 }
 
 /* ----------------------------------------------------------------
