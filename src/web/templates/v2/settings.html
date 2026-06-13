@@ -321,8 +321,13 @@
     <!-- Rotation Rules — per-model -->
     <div class="col-12">
         <div class="card">
-            <div class="card-header"><i class="bi bi-arrow-repeat me-2"></i>Rotation Rules — All Models</div>
-            <div class="card-body">
+            <div class="card-header d-flex justify-content-between align-items-center fyers-header collapsed"
+                 role="button" data-bs-toggle="collapse" data-bs-target="#rotation-body"
+                 aria-expanded="false" aria-controls="rotation-body" style="cursor:pointer;">
+                <span><i class="bi bi-arrow-repeat me-2"></i>Rotation Rules — All Models</span>
+                <i class="bi bi-chevron-down fyers-chevron"></i>
+            </div>
+            <div class="card-body collapse" id="rotation-body">
                 <div class="table-responsive">
                     <table class="table table-sm align-middle table-cards rules-table mb-0">
                         <thead><tr>
@@ -348,8 +353,13 @@
     <!-- Strategy info — per-model -->
     <div class="col-12">
         <div class="card">
-            <div class="card-header"><i class="bi bi-info-circle me-2"></i>Strategy: Trading Models</div>
-            <div class="card-body">
+            <div class="card-header d-flex justify-content-between align-items-center fyers-header collapsed"
+                 role="button" data-bs-toggle="collapse" data-bs-target="#strategy-body"
+                 aria-expanded="false" aria-controls="strategy-body" style="cursor:pointer;">
+                <span><i class="bi bi-info-circle me-2"></i>Strategy: Trading Models</span>
+                <i class="bi bi-chevron-down fyers-chevron"></i>
+            </div>
+            <div class="card-body collapse" id="strategy-body">
                 <div class="row g-3" id="strategy_info_container"></div>
             </div>
         </div>
@@ -986,19 +996,23 @@ function renderStrategyInfo(models) {
     else if (rl.includes('daily') && !rl.includes('monthly')) { cad = 'DAILY'; col = '#dc3545'; }
     else if (rl.includes('daily')) { cad = 'MONTHLY + DAILY'; col = '#0d6efd'; }
     const stop = (meta.rules || {}).stop, tgt = (meta.rules || {}).target;
+    const sid = 'strat-' + m.model_name;
     return `<div class="col-lg-6"${disabledCls}>
       <div class="card h-100">
-        <div class="card-header small">
-          <i class="bi bi-graph-up me-1"></i><strong>${meta.title || m.model_name}</strong>${badge}
-          <span class="text-muted ms-2">${meta.kind}</span>
+        <div class="card-header small fyers-header collapsed d-flex justify-content-between align-items-center"
+             role="button" data-bs-toggle="collapse" data-bs-target="#${sid}"
+             aria-expanded="false" aria-controls="${sid}" style="cursor:pointer;">
+          <span><i class="bi bi-graph-up me-1"></i><strong>${meta.title || m.model_name}</strong>${badge}
+          <span class="text-muted ms-2">${meta.kind}</span></span>
+          <i class="bi bi-chevron-down fyers-chevron"></i>
         </div>
         <div class="card-body small">
-          <div class="mb-2 p-2 cadence-banner" style="border-left-color:${col};">
+          <div class="p-2 cadence-banner" style="border-left-color:${col};">
             <span class="badge" style="background:${col};"><i class="bi bi-arrow-repeat"></i> ${cad}</span>
             <div class="mt-1"><strong>Rebalance:</strong> ${reb}</div>
             ${(stop||tgt)?`<div class="text-muted" style="font-size:.72rem;">Stop: ${stop||'None'} · Target: ${tgt||'None'}</div>`:''}
           </div>
-          <ul class="mb-0">${rows}</ul>
+          <ul class="mb-0 mt-2 collapse" id="${sid}">${rows}</ul>
         </div>
       </div>
     </div>`;
