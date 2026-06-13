@@ -308,14 +308,17 @@ function renderCard(m, idx, ranking, status) {
   const isNearMiss = rank1 && rank1.name && rank1.name.includes('near-miss');
   let topPickHtml;
   if (m.multi) {
-    // Basket model: summarise the top-K target names, no single ★ rank-1.
+    // Basket model: show HELD basket and today's TARGETS as two SEPARATE lines
+    // (mixing them was confusing — held names ≠ today's fresh leaders).
+    const holds = (status && status.holdings) || [];
     const basket = top.slice(0, m.multi);
-    topPickHtml = basket.length
-      ? `<div class="mt-2 small top-pick">
-           <span class="badge bg-success me-1">Basket of ${m.multi}</span>
-           ${basket.map(r => `<span class="me-2"><strong>${r.symbol}</strong> <span class="${cls(r.ret_30d_pct)}">${fmtPct(r.ret_30d_pct)}</span></span>`).join('')}
-         </div>`
-      : '<div class="mt-2 small text-muted">No targets available</div>';
+    const heldLine = holds.length
+      ? `<div class="mt-2 small"><span class="badge badge-held me-1">HOLDING ${holds.length}/${m.multi}</span>${holds.map(h => `<span class="me-2"><strong>${h.sym.replace('NSE:','').replace('-EQ','')}</strong></span>`).join('')}</div>`
+      : '<div class="mt-2 small text-muted">No holdings yet</div>';
+    const tgtLine = basket.length
+      ? `<div class="mt-1 small top-pick"><span class="badge bg-success me-1">TARGET${basket.length>1?'S':''} ${basket.length}</span>${basket.map(r => `<span class="me-2"><strong>${r.symbol}</strong> <span class="${cls(r.ret_30d_pct)}">${fmtPct(r.ret_30d_pct)}</span></span>`).join('')}</div>`
+      : '<div class="mt-1 small text-muted">No fresh targets today</div>';
+    topPickHtml = heldLine + tgtLine;
   } else {
     topPickHtml = rank1
       ? `<div class="mt-2 small top-pick">
@@ -426,6 +429,16 @@ function renderCard(m, idx, ranking, status) {
       <div id="${collapseId}" class="collapse">
         ${heldBannerHtml}
         ${noteHtml}
+        ${(m.multi && ((status && status.holdings) || []).length) ? `
+        <div class="px-3 pt-2 pb-1 small fw-semibold text-muted"><i class="bi bi-box-seam me-1"></i>Current holdings (${status.holdings.length}/${m.multi}) — what you own now</div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead><tr><th>Symbol</th><th class="text-end">Qty</th><th class="text-end">Entry ₹</th><th>Since</th></tr></thead>
+            <tbody>${status.holdings.map(h => `<tr class="row-held"><td><strong>${h.sym.replace('NSE:','').replace('-EQ','')}</strong></td><td class="text-end">${(h.qty||0).toLocaleString('en-IN')}</td><td class="text-end">${fmtINR(h.entry_px)}</td><td class="small-mute">${h.entry_date||'—'}</td></tr>`).join('')}</tbody>
+          </table>
+        </div>
+        <div class="px-3 pt-3 pb-1 small fw-semibold text-muted border-top"><i class="bi bi-trophy me-1"></i>Today's ranked leaders — buy targets (not yet held)</div>
+        ` : ''}
         <div class="table-responsive">
           <table class="table table-sm align-middle mb-0 table-scroll-sticky">
             <thead>

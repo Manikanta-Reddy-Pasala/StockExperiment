@@ -2251,6 +2251,23 @@ def model_triggers_status(model_name):
                 "position_value": per_model.get("position_value"),
             }
 
+        # Multi-holding basket (K>1 models e.g. retest). The single-slot
+        # current_position is null for these; the real positions live in
+        # model_holdings. Surface them so Today's Picks can show the held
+        # basket SEPARATELY from today's ranked leaders.
+        holdings = []
+        try:
+            from src.services.trading.multi_holding_service import get_holdings
+            for h in (get_holdings(model_name) or []):
+                holdings.append({
+                    "sym": h.get("symbol"),
+                    "qty": h.get("qty"),
+                    "entry_px": h.get("entry_px"),
+                    "entry_date": h.get("entry_date"),
+                })
+        except Exception:
+            holdings = []
+
         return jsonify({
             "success": True,
             "model_name": model_name,
@@ -2263,6 +2280,7 @@ def model_triggers_status(model_name):
             "last_execution_at": last_execution_at,
             "last_order_id": last_order_id,
             "current_position": current_position,
+            "holdings": holdings,
             "nav": per_model.get("nav", 0),
             "invested": per_model.get("invested_amount", 0),
             "cash": per_model.get("cash", 0),
