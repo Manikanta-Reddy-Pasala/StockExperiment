@@ -26,15 +26,6 @@
   <div class="small text-muted toolbar-meta">Auto-refresh 30s</div>
 </div>
 
-<!-- Transaction side filter -->
-<div class="side-filter d-flex flex-wrap gap-2 mb-3" id="side_filter" role="group" aria-label="Filter by transaction type">
-  <button type="button" class="btn btn-sm btn-primary" data-side="ALL">All</button>
-  <button type="button" class="btn btn-sm btn-outline-success" data-side="BUY">Buy</button>
-  <button type="button" class="btn btn-sm btn-outline-danger" data-side="SELL">Sell</button>
-  <button type="button" class="btn btn-sm btn-outline-primary" data-side="DEPOSIT">Deposit</button>
-  <button type="button" class="btn btn-sm btn-outline-warning" data-side="WITHDRAW">Withdraw</button>
-</div>
-
 <div class="row g-3 mb-4">
   <div class="col-6 col-lg-3">
     <div class="card h-100"><div class="card-body py-3 text-center">
@@ -67,6 +58,16 @@
 
 <div class="card">
   <div class="card-header"><i class="bi bi-clock-history me-2"></i>Trades (Newest First)</div>
+  <!-- Transaction side filter — directly above the trades it filters -->
+  <div class="p-2 border-bottom">
+    <div class="side-filter" id="side_filter" role="group" aria-label="Filter by transaction type">
+      <button type="button" class="chip active" data-side="ALL">All</button>
+      <button type="button" class="chip" data-side="BUY">Buy</button>
+      <button type="button" class="chip" data-side="SELL">Sell</button>
+      <button type="button" class="chip" data-side="DEPOSIT">Deposit</button>
+      <button type="button" class="chip" data-side="WITHDRAW">Withdraw</button>
+    </div>
+  </div>
   <div class="table-responsive">
     <table class="table table-sm align-middle mb-0 table-cards">
       <thead><tr>
@@ -184,19 +185,27 @@ function renderTable() {
   const slice = rows.slice(start, start + PAGE_SIZE);
 
   const isCashflow = s => s === 'DEPOSIT' || s === 'WITHDRAW';
-  body.innerHTML = slice.map(t => `
+  // `na-cell` hides a field that doesn't apply to a transaction type in the
+  // mobile card view (desktop table keeps the column). Cashflows have no
+  // symbol/qty/price/charges/P&L; a BUY has no realized P&L.
+  const na = c => c ? ' na-cell' : '';
+  body.innerHTML = slice.map(t => {
+    const cf = isCashflow(t.side);
+    const hasPnl = t.pnl !== null && t.pnl !== undefined;
+    const hasChg = t.charges != null && t.charges !== 0;
+    return `
     <tr>
       <td data-label="When" class="small text-muted">${window.fmtIST ? window.fmtIST(t.trade_at) : (t.trade_at||'').replace('T',' ').slice(0,19)}</td>
       <td data-label="Side"><span class="side-badge side-${t.side}">${t.side}</span></td>
-      <td data-label="Symbol"><strong>${isCashflow(t.side) ? '—' : (t.symbol||'—')}</strong></td>
-      <td data-label="Qty" class="text-end">${isCashflow(t.side) ? '—' : (t.qty||0).toLocaleString('en-IN')}</td>
-      <td data-label="Price ₹" class="text-end">${isCashflow(t.side) ? '—' : fmtINR(t.price)}</td>
+      <td data-label="Symbol" class="${na(cf)}"><strong>${cf ? '—' : (t.symbol||'—')}</strong></td>
+      <td data-label="Qty" class="text-end${na(cf)}">${cf ? '—' : (t.qty||0).toLocaleString('en-IN')}</td>
+      <td data-label="Price ₹" class="text-end${na(cf)}">${cf ? '—' : fmtINR(t.price)}</td>
       <td data-label="Value ₹" class="text-end">${fmtINR(t.value)}</td>
-      <td data-label="Charges ₹" class="text-end text-muted">${t.charges ? fmtINR(t.charges) : '—'}</td>
-      <td data-label="P&L ₹" class="text-end ${cls(t.pnl)}">${t.pnl !== null && t.pnl !== undefined ? fmtINR(t.pnl) : '—'}${(t.net_pnl !== undefined) ? `<div class="small ${cls(t.net_pnl)}">net ${fmtINR(t.net_pnl)}</div>` : ''}</td>
+      <td data-label="Charges ₹" class="text-end text-muted${na(!hasChg)}">${hasChg ? fmtINR(t.charges) : '—'}</td>
+      <td data-label="P&L ₹" class="text-end ${cls(t.pnl)}${na(!hasPnl)}">${hasPnl ? fmtINR(t.pnl) : '—'}${(t.net_pnl !== undefined) ? `<div class="small ${cls(t.net_pnl)}">net ${fmtINR(t.net_pnl)}</div>` : ''}</td>
       <td data-label="Reason"><span class="badge bg-secondary">${t.reason||''}</span></td>
-    </tr>
-  `).join('');
+    </tr>`;
+  }).join('');
 
   // Pager
   if (pages > 1) {
@@ -216,12 +225,8 @@ document.getElementById('side_filter').addEventListener('click', (ev) => {
   if (!btn) return;
   sideFilter = btn.dataset.side;
   page = 1;
-  // active styling: chosen chip solid, others outline
-  document.querySelectorAll('#side_filter button[data-side]').forEach(b => {
-    const base = { ALL:'primary', BUY:'success', SELL:'danger', DEPOSIT:'primary', WITHDRAW:'warning' }[b.dataset.side];
-    const on = b.dataset.side === sideFilter;
-    b.className = `btn btn-sm btn${on ? '' : '-outline'}-${base}`;
-  });
+  document.querySelectorAll('#side_filter .chip').forEach(b =>
+    b.classList.toggle('active', b.dataset.side === sideFilter));
   renderTable();
 });
 

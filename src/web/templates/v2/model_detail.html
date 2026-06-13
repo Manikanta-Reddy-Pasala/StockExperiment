@@ -6,8 +6,8 @@
 <style>
   /* Screen-unique rules only. .pos/.neg/.neutral, side badges, pills,
      .table-cards and .table-scroll-sticky come from base.html + custom.css. */
-  .bs-card { border-radius: var(--r-md); border: 1px solid var(--border); }
-  .bs-card .card-header { background: var(--surface-2); border-bottom: 1px solid var(--border); }
+  /* inherit the global glass .card look (background/blur/radius from custom.css) */
+  .bs-card .card-header { background: var(--glass-bg-2); border-bottom: 1px solid var(--glass-border); }
   .metric-table td { padding: 8px 12px; }
   .metric-table .k { color: var(--muted); width: auto; max-width: 55%; }
   .metric-table .v { font-weight: 600; text-align: right; }
@@ -135,12 +135,14 @@
     <div class="d-flex gap-3 small text-muted" id="txn_summary">—</div>
   </div>
   <div class="card-body p-0">
-    <div class="side-filter d-flex flex-wrap gap-2 p-2 border-bottom" id="txn_side_filter" role="group" aria-label="Filter by transaction type">
-      <button type="button" class="btn btn-sm btn-primary" data-side="ALL">All</button>
-      <button type="button" class="btn btn-sm btn-outline-success" data-side="BUY">Buy</button>
-      <button type="button" class="btn btn-sm btn-outline-danger" data-side="SELL">Sell</button>
-      <button type="button" class="btn btn-sm btn-outline-primary" data-side="DEPOSIT">Deposit</button>
-      <button type="button" class="btn btn-sm btn-outline-warning" data-side="WITHDRAW">Withdraw</button>
+    <div class="p-2 border-bottom">
+      <div class="side-filter" id="txn_side_filter" role="group" aria-label="Filter by transaction type">
+        <button type="button" class="chip active" data-side="ALL">All</button>
+        <button type="button" class="chip" data-side="BUY">Buy</button>
+        <button type="button" class="chip" data-side="SELL">Sell</button>
+        <button type="button" class="chip" data-side="DEPOSIT">Deposit</button>
+        <button type="button" class="chip" data-side="WITHDRAW">Withdraw</button>
+      </div>
     </div>
     <div class="table-responsive txn-wrap">
       <table class="table table-hover txn-table table-cards mb-0">
@@ -475,11 +477,8 @@ document.getElementById('txn_side_filter').addEventListener('click', (ev) => {
   if (!btn) return;
   txnSide = btn.dataset.side;
   txnPage = 1;
-  document.querySelectorAll('#txn_side_filter button[data-side]').forEach(b => {
-    const base = { ALL: 'primary', BUY: 'success', SELL: 'danger', DEPOSIT: 'primary', WITHDRAW: 'warning' }[b.dataset.side];
-    const on = b.dataset.side === txnSide;
-    b.className = `btn btn-sm btn${on ? '' : '-outline'}-${base}`;
-  });
+  document.querySelectorAll('#txn_side_filter .chip').forEach(b =>
+    b.classList.toggle('active', b.dataset.side === txnSide));
   renderTxn();
 });
 document.getElementById('txn_prev').addEventListener('click', () => { txnPage--; renderTxn(); });

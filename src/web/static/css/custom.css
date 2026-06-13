@@ -35,8 +35,16 @@ Modern CSS for the Automated Trading System
     --held-bg: #fffbea;       --rank1: #ffd60a;
     /* Spacing scale (4pt) */
     --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
-    /* Radii */
-    --r-sm: 8px; --r-md: 12px; --r-lg: 16px;
+    /* Radii (2026-06-13: curvier boxes) */
+    --r-sm: 10px; --r-md: 16px; --r-lg: 22px;
+    /* Glassmorphism tokens (2026-06-13). Cards are a frosted, translucent
+       surface over the page gradient. Alpha kept high enough that text on the
+       glass stays readable (contrast audit). */
+    --glass-bg: rgba(255, 255, 255, 0.62);
+    --glass-bg-2: rgba(255, 255, 255, 0.45);
+    --glass-border: rgba(255, 255, 255, 0.55);
+    --glass-blur: 16px;
+    --glass-shadow: 0 8px 30px rgba(31, 38, 71, 0.10), 0 1px 2px rgba(31, 38, 71, 0.06);
     /* Type */
     --fs-body: 0.9375rem;     /* 15px body on mobile */
     --fs-num: 1rem;
@@ -106,12 +114,27 @@ Modern CSS for the Automated Trading System
 
 body {
     font-family: var(--font-family-sans-serif);
+    /* Soft page gradient gives the frosted-glass cards something to blur. */
     background: var(--bg);
+    background-image:
+        radial-gradient(1200px 600px at 12% -8%, rgba(21, 163, 107, 0.10), transparent 60%),
+        radial-gradient(1000px 700px at 100% 0%, rgba(42, 125, 225, 0.10), transparent 55%),
+        linear-gradient(160deg, #eef2f7 0%, var(--bg) 45%, #eaf2ee 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
     color: var(--text);
     line-height: 1.6;
     font-weight: 400;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+}
+@media (prefers-color-scheme: dark) {
+    body {
+        background-image:
+            radial-gradient(1200px 600px at 12% -8%, rgba(21, 163, 107, 0.14), transparent 60%),
+            radial-gradient(1000px 700px at 100% 0%, rgba(42, 125, 225, 0.14), transparent 55%),
+            linear-gradient(160deg, #0c1015 0%, var(--bg) 45%, #121a22 100%);
+    }
 }
 
 /* Modern Sidebar */
@@ -258,20 +281,24 @@ body {
     padding: var(--spacing-xl);
 }
 
-/* Cards — canonical recipe (§2.4). No hover lift, no gradient top bar,
-   no backdrop filters. Flat, quiet, dark-mode safe. */
+/* Cards — frosted glass + curvy (2026-06-13). Translucent surface blurs the
+   page gradient behind it; alpha kept high enough for readable text. Falls
+   back to a solid surface where backdrop-filter is unsupported. */
 .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--r-md);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, .05);
+    background: var(--surface);                 /* fallback (no backdrop-filter) */
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--glass-shadow);
     overflow: hidden;
     position: relative;
 }
 
 .card-header {
-    background: transparent;
-    border-bottom: 1px solid var(--border);
+    background: var(--glass-bg-2);
+    border-bottom: 1px solid var(--glass-border);
     font-weight: 600;
     padding: var(--sp-3) var(--sp-4);
     color: var(--text);
@@ -282,17 +309,17 @@ body {
     padding: var(--sp-4);
 }
 
-/* Modern Tables */
+/* Modern Tables — transparent inside the glass card so the frost shows
+   through; the card supplies the surface, radius and shadow. */
 .table {
-    background: var(--surface);
-    border-radius: var(--radius-lg);
+    background: transparent;
+    border-radius: 0;
     overflow: hidden;
-    box-shadow: var(--shadow-sm);
 }
 
 .table thead {
-    background: var(--surface-2);
-    border-bottom: 2px solid var(--border);
+    background: var(--glass-bg-2);
+    border-bottom: 2px solid var(--glass-border);
 }
 
 .table th {
@@ -303,13 +330,14 @@ body {
     letter-spacing: 0.5px;
     color: var(--text);
     font-size: 0.875rem;
-    background: var(--surface-2);
+    background: transparent;
 }
 
 .table td {
     padding: var(--spacing-lg);
     vertical-align: middle;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--glass-border);
+    background: transparent;
 }
 
 /* Row hover: background tint only, hover-capable devices only.
@@ -1176,6 +1204,11 @@ button:focus-visible, a:focus-visible, .form-control:focus-visible {
 @media (prefers-color-scheme: dark) {
     :root {
         --bg: #0f1318;          --surface: #171c23;   --surface-2: #1e242d;
+        /* Glass tokens — dark (more opaque so text stays readable on glass) */
+        --glass-bg: rgba(26, 32, 41, 0.62);
+        --glass-bg-2: rgba(26, 32, 41, 0.40);
+        --glass-border: rgba(255, 255, 255, 0.08);
+        --glass-shadow: 0 8px 30px rgba(0, 0, 0, 0.40), 0 1px 2px rgba(0, 0, 0, 0.30);
         /* Contrast pass 2 (2026-06-13): --muted 98a1ae→aab4c0 (~7.4:1 on
            --surface) and --muted-2 8b95a4→98a2b0 (~6.1:1). The previous
            values passed AA but still read as dim grey at the small label
@@ -1516,6 +1549,35 @@ td.text-end, .metric-table td {
     }
     /* Card mode must not live inside a sideways-scrolling container */
     .table-responsive:has(.table-cards) { overflow-x: visible; }
+    /* Drop fields that don't apply to a given row (e.g. Symbol/Qty/Price/P&L on
+       a DEPOSIT, P&L on a BUY) in card mode — desktop table keeps every column
+       for alignment. JS marks the irrelevant cells with `na-cell`. */
+    .table-cards td.na-cell { display: none !important; }
+}
+
+/* ----------------------------------------------------------------
+   Transaction-type filter — neutral segmented control (no rainbow
+   outline-button borders). Inactive chips are quiet; the active chip
+   is a raised surface pill. Used by Trade History + model-detail.
+   ---------------------------------------------------------------- */
+.side-filter {
+    display: inline-flex; flex-wrap: wrap; gap: 4px;
+    background: var(--surface-2); border-radius: 10px; padding: 4px;
+}
+.side-filter .chip {
+    border: 0; background: transparent; color: var(--muted);
+    font-size: 0.8rem; font-weight: 600; line-height: 1;
+    padding: 7px 14px; border-radius: 8px; cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.side-filter .chip:hover { color: var(--text); }
+.side-filter .chip.active {
+    background: var(--surface); color: var(--text);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+@media (max-width: 767.98px) {
+    .side-filter { display: flex; width: 100%; }
+    .side-filter .chip { flex: 1 1 auto; min-height: var(--tap); padding: 7px 6px; }
 }
 
 /* ----------------------------------------------------------------
