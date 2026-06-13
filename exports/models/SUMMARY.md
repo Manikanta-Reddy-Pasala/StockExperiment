@@ -10,7 +10,7 @@ All figures net of real Fyers CNC charges with next-open fills, ₹10L start, tr
 | [Liquid 100 Momentum](momentum_pseudo_n100_adv/SUMMARY.md) | LIVE | +66.5% | 44.9% | 1.48 | +1175.7% |
 | [Retest Momentum](momentum_retest_n500/SUMMARY.md) | DISABLED (₹0) | +58.7% | 34.0% | 1.73 | +1029.3% |
 | [Nifty 100 Momentum](momentum_n100_top5_max1/SUMMARY.md) | LIVE | +52.1% | 49.1% | 1.06 | +804.6% |
-| [Weekly Top-40](n40/SUMMARY.md) | LIVE | +28.4% | 43.9% | 0.65 | +271.1% |
+| [Weekly Top-40](n40/SUMMARY.md) | LIVE | +32.4% | 38.9% | 0.83 | +335.8% |
 
 **Caveats:**
 - `momentum_pseudo_n100_adv` = optimistic upper bound (ADV-selection bias, not real index).

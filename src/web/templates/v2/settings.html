@@ -29,9 +29,33 @@
     .alloc-table .action-bar .btn i { font-size: 0.85rem; }
   }
 
-  /* Trading switch — sized via CSS (desktop compact, mobile 44px-ish) */
-  .trade-switch { cursor: pointer; width: 2.5em; height: 1.3em; }
-  @media (max-width: 767.98px) { .trade-switch { width: 3.2em; height: 1.7em; } }
+  /* Trading toggle — switch + readable state pill, laid out in one row.
+     (Was a cramped switch with tiny stacked text — hard to read/tap.) */
+  .trade-toggle {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding-left: 0; cursor: pointer; min-height: var(--tap, 44px);
+  }
+  .trade-toggle .form-check-input.trade-switch {
+    float: none; margin: 0; cursor: pointer; width: 2.6em; height: 1.4em; flex: 0 0 auto;
+  }
+  .trade-toggle.is-off { cursor: not-allowed; }
+  .trade-toggle.is-off .trade-switch { cursor: not-allowed; }
+  .trade-state {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.3px;
+    padding: 2px 9px; border-radius: 10px; white-space: nowrap; min-width: 58px; text-align: center;
+  }
+  .trade-state.is-live    { background: #d4edda; color: #155724; }
+  .trade-state.is-observe { background: #cff4fc; color: #055160; }
+  .trade-state.is-off     { background: var(--surface-2); color: var(--muted); }
+  @media (prefers-color-scheme: dark) {
+    .trade-state.is-live    { background: #14391f; color: #6fdb94; }
+    .trade-state.is-observe { background: #0e3440; color: #6ed3ee; }
+  }
+  @media (max-width: 767.98px) { .trade-toggle .form-check-input.trade-switch { width: 3.0em; height: 1.6em; } }
+
+  /* Fyers Broker header: collapsible, chevron rotates with state */
+  .fyers-header .fyers-chevron { transition: transform 0.2s ease; }
+  .fyers-header:not(.collapsed) .fyers-chevron { transform: rotate(180deg); }
 
   /* B1 fix v2: kebab dropdown menu is detached to <body> on open (see JS
      at bottom). That escapes ANY clipping ancestor (.table-responsive,
@@ -139,14 +163,19 @@
 </style>
 
 <div class="row g-4">
-    <!-- Fyers Broker Credentials -->
+    <!-- Fyers Broker Credentials (collapsed by default — rarely edited) -->
     <div class="col-lg-6">
         <div class="card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="card-header d-flex justify-content-between align-items-center fyers-header collapsed"
+                 role="button" data-bs-toggle="collapse" data-bs-target="#fyers-body"
+                 aria-expanded="false" aria-controls="fyers-body" style="cursor:pointer;">
                 <span><i class="bi bi-shield-lock me-2"></i>Fyers Broker</span>
-                <span id="fyers-conn-badge" class="badge bg-secondary">Checking...</span>
+                <span class="d-flex align-items-center gap-2">
+                    <span id="fyers-conn-badge" class="badge bg-secondary">Checking...</span>
+                    <i class="bi bi-chevron-down fyers-chevron"></i>
+                </span>
             </div>
-            <div class="card-body">
+            <div class="card-body collapse" id="fyers-body">
                 <div class="mb-3">
                     <label class="form-label small">Client ID (App ID)</label>
                     <input type="text" class="form-control form-control-sm" id="fyers-client-id" placeholder="e.g. ABCD1234-100" readonly autocomplete="off">
@@ -544,18 +573,18 @@ const MODEL_META = {
     universe: 'Top-40 ADV ∩ N100 (PIT)', kind: 'equity',
     title: 'Weekly Top-40',
     rules: { top_n: 1, max_concurrent: 1, lookback: '30 trading days (~6 weeks)',
-             rebalance: 'WEEKLY (1st trading day of ISO week) rotate rank-1; DAILY −12% stop check', stop: '−12% from entry (daily)', target: 'None',
-             exit: 'Weekly rotation OR −12% from-entry stop' },
+             rebalance: 'WEEKLY (1st trading day of ISO week) rotate rank-1; DAILY −10% stop check', stop: '−10% from entry (daily)', target: 'None',
+             exit: 'Weekly rotation OR −10% from-entry stop' },
     strategy: [
       ['Ranker', '30-trading-day return descending'],
       ['Universe', 'Top-40 ADV ∩ PIT Nifty 100, close > 200d SMA (uptrend)'],
       ['Entry', 'Buy rank-1 on the weekly rebalance (1st trading day of each ISO week)'],
       ['Selection', 'Hold rank-1 only (RET1), max 1 concurrent'],
-      ['Stop', 'DAILY −12% from entry — sell if the held name\'s LOW pierces entry×0.88 (checked every trading day at 09:39, not just rebalance days)'],
-      ['Exit', 'Rotate when held is no longer rank-1 / leaves N100 / below 200d SMA, OR the −12% stop fires'],
-      ['Backtest 2021-03→2026-05 (PIT, +stop)', '+28.4% CAGR / 43.9% DD / Calmar 0.65 / 138 trades — net of charges (₹468k Fyers CNC), next-open fills (2026-06-13 realism regen; old close-fill zero-charge convention showed +48.1% / 37% / 1.30 — weekly churn compounds slippage+charges hardest)'],
-      ['Recent 2023-05→2026-05', '+48.6% CAGR / 30.9% DD / Calmar 1.58 — net of charges, next-open fills'],
-      ['Per-year (net)', '2021 −4 / 2022 +22 / 2023 +9 / 2024 +56 / 2025 +38 / 2026 +33 (DD ≤36% every yr)'],
+      ['Stop', 'DAILY −10% from entry — sell if the held name\'s LOW pierces entry×0.90 (checked every trading day at 09:39, not just rebalance days). Re-tuned from −12% on 2026-06-13.'],
+      ['Exit', 'Rotate when held is no longer rank-1 / leaves N100 / below 200d SMA, OR the −10% stop fires'],
+      ['Backtest 2021-03→2026-05 (PIT, +stop)', '+32.4% CAGR / 38.9% DD / Calmar 0.83 / 139 trades — net of charges (₹513k Fyers CNC), next-open fills. 2026-06-13: stop re-tuned −12%→−10% (the old −12% was a pre-realism local dip; −10% lifts CAGR 28.4→32.4 AND cuts DD 43.9→38.9). Forward-CAGR ≈ neutral — the lift sits in the 2021-22 bear, so it is a stale-param fix + DD reducer; leverage was tested and HURTS n40.'],
+      ['Recent 2023-05→2026-05', '+54.2% CAGR / 30.9% DD / Calmar 1.76 — net of charges, next-open fills'],
+      ['Per-year (net)', '2021 −4 / 2022 +40 / 2023 −1 / 2024 +56 / 2025 +55 / 2026 +33 (DD ≤31% every yr)'],
     ],
   },
   'momentum_retest_n500': {
@@ -656,13 +685,13 @@ async function loadAllocations() {
           <span class="pnl-pct">${fmtPct(m.return_pct)}</span></span>
         </td>
         <td class="text-center" data-label="Trading">
-          <label class="form-check form-switch d-inline-flex flex-column align-items-center mb-0" style="gap:2px;cursor:pointer;"
-               title="${m.enabled ? (m.signals_only ? 'OBSERVE — emits signals, places no real orders' : 'LIVE — places real orders') : 'Enable the model first to change its trading mode'}">
+          <label class="form-check form-switch trade-toggle mb-0 ${m.enabled ? '' : 'is-off'}"
+               title="${m.enabled ? (m.signals_only ? 'OBSERVE — emits signals, places no real orders. Toggle ON for LIVE.' : 'LIVE — places real orders. Toggle OFF for OBSERVE.') : 'Enable the model first to change its trading mode'}">
             <input class="form-check-input trade-switch" type="checkbox" role="switch"
               data-model="${m.model_name}"
               ${m.signals_only ? '' : 'checked'} ${m.enabled ? '' : 'disabled'}>
-            <span class="small ${m.signals_only ? 'text-info' : 'text-success'}" style="font-size:.65rem;">
-              ${m.enabled ? (m.signals_only ? 'Observe' : 'Live') : '—'}
+            <span class="trade-state ${!m.enabled ? 'is-off' : (m.signals_only ? 'is-observe' : 'is-live')}">
+              ${m.enabled ? (m.signals_only ? 'Observe' : 'Live') : 'Off'}
             </span>
           </label>
         </td>

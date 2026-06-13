@@ -10,7 +10,7 @@ Production: `77.42.45.12` · App: <https://stock.oneshell.in> · Bot: `@stocks_m
 
 ## Recent Changes (2026-06)
 
-- **ALL 5 backtests regenerated under the REALISM CONVENTION (2026-06-13): next-open fills + real Fyers CNC charges + PIT universe fixes.** New full-window numbers (net of charges): emerging **+105.3% / 38.6% DD / Calmar 2.73** (was 115.6 — normal charges haircut, ₹2.56M), n100 **+52.1% / 49.1% / 1.06** (was 59.9), retest **+58.7% / 34.0% / 1.73** (was 57.3 — PIT-before-ADV fix net-positive), n40 **+28.4% / 43.9% / 0.65** (was 48.1 — weekly churn × slippage+charges ₹468k), and pseudo under PIT+realism initially collapsed +77.4% → +12.7% (the old smallcap-250 exclusion used TODAY's list for every historical year = survivorship bias). **FIX (2026-06-13 "nosml"): dropped the smallcap exclusion entirely → pseudo +66.46% / 44.9% DD / Calmar 1.48 / 51 trades / 72.5% win** — walk-forward-validated (stitched OOS 2023→2026 +60.3% vs the old config's +23.8%, beats every fold; adversarially re-verified). Per-year net: 2021 +27 / 2022 −3 / 2023 +129 / 2024 +40 / 2025 +107 / 2026 +45. The exclusion had been deleting the ADV-rising midcap winners the model rides; EXCLUDE_SMALLCAP=False now in backtest + live (parity). pseudo is a HIGH-DD sleeve (~45%) — size accordingly in the blend. All older CAGR/DD figures below this entry are pre-realism (close fills, zero charges) — do not compare directly.
+- **ALL 5 backtests regenerated under the REALISM CONVENTION (2026-06-13): next-open fills + real Fyers CNC charges + PIT universe fixes.** New full-window numbers (net of charges): emerging **+105.3% / 38.6% DD / Calmar 2.73** (was 115.6 — normal charges haircut, ₹2.56M), n100 **+52.1% / 49.1% / 1.06** (was 59.9), retest **+58.7% / 34.0% / 1.73** (was 57.3 — PIT-before-ADV fix net-positive), n40 **+32.4% / 38.9% / 0.83** (2026-06-13 stop re-tune −12%→−10%, charges ₹513k; was +28.4%/43.9%/0.65 at stop-12% — the old −12% was a pre-realism local dip, −10% lifts CAGR AND cuts DD; forward-CAGR ≈ neutral so it is a stale-param fix + DD reducer, and leverage was tested + HURTS n40), and pseudo under PIT+realism initially collapsed +77.4% → +12.7% (the old smallcap-250 exclusion used TODAY's list for every historical year = survivorship bias). **FIX (2026-06-13 "nosml"): dropped the smallcap exclusion entirely → pseudo +66.46% / 44.9% DD / Calmar 1.48 / 51 trades / 72.5% win** — walk-forward-validated (stitched OOS 2023→2026 +60.3% vs the old config's +23.8%, beats every fold; adversarially re-verified). Per-year net: 2021 +27 / 2022 −3 / 2023 +129 / 2024 +40 / 2025 +107 / 2026 +45. The exclusion had been deleting the ADV-rising midcap winners the model rides; EXCLUDE_SMALLCAP=False now in backtest + live (parity). pseudo is a HIGH-DD sleeve (~45%) — size accordingly in the blend. All older CAGR/DD figures below this entry are pre-realism (close fills, zero charges) — do not compare directly.
 
 - **emerging → DISABLED the +30% partial profit-take (2026-06-10) — "let winners run".** `PROFIT_TAKE_PCT 0.30 → 0.0`. The half-bank at +30% capped the fat-tail years; removing it lets the full position ride under the 2.5×ATR-from-entry stop. Full-cycle 2021-03→2026-06: **CAGR 109→116% at the same 38% DD** (2023 +269→+358% as the runner rides), Calmar 2.88→3.05. Trade-off (in code + UI): the half-bank had *helped* the recent chop regime, so disabling gives some Calmar back there (2025 62→51, DD 18→25). Single constant drives backtest + live; revert to 0.30 if recent-regime DD proves worse. summary.json + Settings/Picks/Dashboard cards regenerated; SW v62.
 
@@ -356,7 +356,7 @@ point-in-time membership** (`eligible_at`) — no survivorship bias remains
 | `emerging_momentum` (**vol-adj momentum**, RET1, mid/small, **no profit-take**; window → 2026-06-10) | **+105.29%** | 38.57% | **2.73** | 68 | 63.2% | 2,555,014 | PIT N500−N100 |
 | `momentum_retest_n500` (K=4, 20% band) | +58.71% | 34.03% | 1.73 | 183 | 60.4% | 386,643 | PIT N500 −Smallcap (top-120 ADV; incl large+mid) |
 | `momentum_n100_top5_max1` (LB15 + mid-month + RET3) | +52.14% | 49.13% | 1.06 | 97 | 54.6% | 584,930 | PIT N100 |
-| `n40` (weekly, top-40 ADV ∩ N100) | +28.38% | 43.92%¹ | 0.65 | 138 | 58.0% | 468,281 | PIT N100 |
+| `n40` (weekly, top-40 ADV ∩ N100, −10% stop) | +32.41% | 38.86%¹ | 0.83 | 139 | 57.6% | 513,187 | PIT N100 |
 | `momentum_pseudo_n100_adv` (RET1, monthly, fixed May anchor) | **+12.73%** ⚠ | 59.42% | 0.21 | 49 | 53.1% | 110,268 | PIT N500 (ADV-biased) |
 | `midcap_narrow_60d_breakout` (40d-high + 2× vol) — RETIRED 2026-06-12 | +1.65% | 68.2%¹ | 0.02 | 16 | 37.5% | — (pre-realism) | PIT N500−N100 |
 
@@ -380,7 +380,7 @@ OPTIMISTIC ADV-ranked sibling (selection bias by design) vs the real-index `n100
 
 3-yr window (2023-05-15 → 2026-05-12, same net-of-charges next-open convention):
 emerging +138.9% / 27.4% DD / Calmar 5.07 · retest +102.3% / 23.6% / 4.34 ·
-n100 +80.5% / 20.7% / 3.88 · n40 +48.6% / 30.9% / 1.58 · pseudo +23.9% / 59.4% / 0.40.
+n100 +80.5% / 20.7% / 3.88 · n40 +54.2% / 30.9% / 1.76 · pseudo +23.9% / 59.4% / 0.40.
 
 **Two big corrections landed on 2026-05-31:** (a) the authoritative-membership rebuild
 exposed emerging's old +121% as a MIRAGE — the buggy Wayback N100 was *missing* the

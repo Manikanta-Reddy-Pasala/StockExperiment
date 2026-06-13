@@ -1,22 +1,22 @@
 {
   "model": "n20_daily_large_only",
   "start": "2021-03-01",
-  "end": "2026-05-31",
-  "years": 5.248,
+  "end": "2026-05-29",
+  "years": 5.243,
   "capital": 1000000.0,
-  "final_nav": 3711081.0,
-  "total_return_pct": 271.11,
-  "cagr_pct": 28.38,
-  "max_dd_pct": 43.92,
-  "max_dd_realized_pct": 37.91,
-  "calmar": 0.65,
-  "trades": 138,
+  "final_nav": 4357799.0,
+  "total_return_pct": 335.78,
+  "cagr_pct": 32.41,
+  "max_dd_pct": 38.86,
+  "max_dd_realized_pct": 32.3,
+  "calmar": 0.83,
+  "trades": 139,
   "wins": 80,
-  "losses": 58,
-  "win_rate_pct": 58.0,
+  "losses": 59,
+  "win_rate_pct": 57.6,
   "open_position": {
     "sym": "ADANIENT",
-    "qty": 1263,
+    "qty": 1483,
     "entry_px": 2846.0
   },
   "per_year": {
@@ -25,27 +25,27 @@
       "dd_pct": 27.5
     },
     "2022": {
-      "ret_pct": 22.1,
-      "dd_pct": 35.4
+      "ret_pct": 40.2,
+      "dd_pct": 29.6
     },
     "2023": {
-      "ret_pct": 9.0,
-      "dd_pct": 21.4
+      "ret_pct": -0.7,
+      "dd_pct": 26.8
     },
     "2024": {
-      "ret_pct": 55.6,
+      "ret_pct": 55.7,
       "dd_pct": 22.5
     },
     "2025": {
-      "ret_pct": 37.8,
-      "dd_pct": 21.9
+      "ret_pct": 54.6,
+      "dd_pct": 12.6
     },
     "2026": {
       "ret_pct": 33.3,
       "dd_pct": 30.9
     }
   },
-  "charges_total": 468280.8,
+  "charges_total": 513186.85,
   "fill_at_next_open": true,
   "charges_model": "fyers_cnc"
 }

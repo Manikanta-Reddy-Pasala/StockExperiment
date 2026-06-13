@@ -36,6 +36,10 @@
     /* Template-local extras on top of the shared .table-cards transform */
     .txn-table td[data-label="Date"] { font-weight: 600; }
     .txn-table td.empty-state { display: block; text-align: center; }
+    /* In card mode only, drop fields that don't apply to a given transaction
+       type (e.g. Symbol/Qty/Price/P&L on a DEPOSIT, P&L on a BUY) so each card
+       shows only relevant rows. Desktop table keeps every column for alignment. */
+    .txn-table.table-cards td.na-cell { display: none !important; }
     /* :has() fallback for older iOS — card mode must never sit in a
        sideways-scrolling container (scoped to the txn wrapper only, so the
        basket .table-scroll-sticky container keeps its scroll). */
@@ -392,20 +396,27 @@ async function loadTradeHistory() {
       const sym = isCashflow ? '<span class="text-muted">—</span>' : (t.symbol || '—');
       const qty = isCashflow ? '—' : fmtNum(t.qty);
       const px  = isCashflow ? '—' : fmtINR(t.price);
+      const hasCharges = t.charges != null && t.charges !== 0;
+      const hasOrder = !!t.fyers_order_id;
+      // `na-cell` hides a non-applicable field in the mobile card view (the
+      // desktop table keeps the column for alignment). Deposits/withdrawals
+      // are pure cashflows (no symbol/qty/price/charges/P&L); a BUY has no
+      // realized P&L. Only the relevant rows show per transaction type.
+      const na = (cond) => cond ? ' na-cell' : '';
       return `
         <tr>
           <td data-label="Date">${fmtDate(t.trade_at)}</td>
           <td data-label="Model"><span class="model-tag">${modelLabel(t.model_name || MODEL_NAME)}</span></td>
           <td data-label="Side"><span class="side-badge side-${side}">${side || '—'}</span></td>
-          <td data-label="Symbol"><code>${sym}</code></td>
-          <td class="text-end" data-label="Qty">${qty}</td>
-          <td class="text-end" data-label="Price">${px}</td>
+          <td data-label="Symbol" class="${na(isCashflow)}"><code>${sym}</code></td>
+          <td class="text-end${na(isCashflow)}" data-label="Qty">${qty}</td>
+          <td class="text-end${na(isCashflow)}" data-label="Price">${px}</td>
           <td class="text-end" data-label="Value">${fmtINR(t.value)}</td>
-          <td class="text-end text-muted" data-label="Charges">${(t.charges != null && t.charges !== 0) ? fmtINR(t.charges) : '—'}</td>
-          <td class="text-end" data-label="P&L">${pnlCell}</td>
-          <td class="text-end" data-label="P&L %">${pnlPctCell}</td>
-          <td data-label="Reason"><small class="text-muted">${t.reason || ''}</small></td>
-          <td data-label="Order ID"><small class="text-muted">${t.fyers_order_id || ''}</small></td>
+          <td class="text-end text-muted${na(!hasCharges)}" data-label="Charges">${hasCharges ? fmtINR(t.charges) : '—'}</td>
+          <td class="text-end${na(pnlVal == null)}" data-label="P&L">${pnlCell}</td>
+          <td class="text-end${na(pnlVal == null)}" data-label="P&L %">${pnlPctCell}</td>
+          <td data-label="Reason" class="${na(!t.reason)}"><small class="text-muted">${t.reason || ''}</small></td>
+          <td data-label="Order ID" class="${na(!hasOrder)}"><small class="text-muted">${t.fyers_order_id || ''}</small></td>
         </tr>
       `;
     }).join('');

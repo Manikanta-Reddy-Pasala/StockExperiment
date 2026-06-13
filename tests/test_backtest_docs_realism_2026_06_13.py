@@ -27,7 +27,7 @@ EXPECTED = {
     "momentum_n100_top5_max1": (52.14, 49.13, 1.06),
     "momentum_pseudo_n100_adv": (66.46, 44.89, 1.48),  # 2026-06-13 nosml rework
     "momentum_retest_n500": (58.71, 34.03, 1.73),
-    "n40": (28.38, 43.92, 0.65),
+    "n40": (32.41, 38.86, 0.83),  # 2026-06-13 stop re-tune 12%->10%
 }
 
 
@@ -67,7 +67,7 @@ def test_settings_cards_quote_new_net_numbers():
         "+52.1% CAGR",    # n100 full
         "+66.5% CAGR",    # pseudo full (nosml rework 2026-06-13)
         "+58.7% CAGR",    # retest full
-        "+28.4% CAGR",    # n40 full
+        "+32.4% CAGR",    # n40 full (2026-06-13 stop re-tune 12%->10%)
         "net of charges",
         "next-open fills",
     ):
@@ -84,14 +84,14 @@ def test_pseudo_nosml_flagged_in_settings():
 
 def test_readme_table_updated():
     md = (ROOT / "README.md").read_text()
-    for needle in ("+105.29%", "+58.71%", "+52.14%", "+28.38%", "+66.46%",
+    for needle in ("+105.29%", "+58.71%", "+52.14%", "+32.41%", "+66.46%",
                    "net of real Fyers CNC charges", "next-open fills"):
         assert needle in md, f"README.md missing: {needle}"
 
 
 def test_exports_index_regenerated():
     md = (ROOT / "exports" / "models" / "SUMMARY.md").read_text()
-    for needle in ("+105.3%", "+58.7%", "+52.1%", "+28.4%", "+66.5%",
+    for needle in ("+105.3%", "+58.7%", "+52.1%", "+32.4%", "+66.5%",
                    "net of real Fyers CNC charges"):
         assert needle in md, f"exports/models/SUMMARY.md missing: {needle}"
 

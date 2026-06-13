@@ -14,17 +14,19 @@ LOOKBACK = 30        # momentum window (TRADING days)
 ADV_WIN = 20         # ADV averaging window
 SMA_LONG = 200       # uptrend filter: close > 200d SMA
 RETAIN = 1           # exit band — top-1 weekly rotation
-# CURRENT headline (2026-06-13 realism regen — net of real Fyers CNC charges,
-# next-open fills): full 2021-03→2026-05 +28.4% CAGR / 43.9% DD / Calmar 0.65;
-# 3-yr 2023-05→2026-05 +48.6% / 30.9% / 1.58. Sweep numbers below are
-# pre-realism (close fills, zero charges).
-# From-entry FIXED-% hard stop (backtest-validated 2026-06-04 via n40 daily-MTM
-# stop sweep). n40 was the only momentum model without a stop. -12% won on BOTH
-# axes: full 2021-26 CAGR 41.1->48.1 / DD 41.4->37.1 / Calmar 0.99->1.30
-# (-10% ~equal: 46.4/35.6/1.30; smooth plateau, not a spike). SHARED with
-# backtest + live --stop-check via tools.shared.stops. Level = entry*(1-STOP_PCT),
-# checked daily on the LOW. Set STOP_PCT=0 to disable.
-STOP_PCT = 0.12
+# CURRENT headline (2026-06-13 realism regen w/ STOP=0.10 — net of real Fyers
+# CNC charges, next-open fills): full 2021-03→2026-05 +32.4% CAGR / 38.9% DD /
+# Calmar 0.83. From-entry FIXED-% hard stop, checked daily on the LOW
+# (entry*(1-STOP_PCT)). SHARED with backtest + live --stop-check via
+# tools.shared.stops. Set STOP_PCT=0 to disable.
+# 2026-06-13 RE-TUNE 0.12 -> 0.10: the old 0.12 was tuned PRE-realism (close-MTM,
+# zero charges, "−12% won both axes"). Under the realism convention 0.12 is a
+# local dip; a fresh realism stop-sweep (tools/research/n40_cagr.py) shows the
+# in-sample optimum is ~8-10% — 0.10 lifts full-window CAGR 28.4->32.4 AND cuts
+# DD 43.9->38.9 (Calmar 0.65->0.83), a plateau (8/10/15 all beat 12). Anchored
+# WF: the lift is concentrated in the 2021-22 bear so forward (2023-26 OOS) CAGR
+# is ~neutral — 0.10 is a stale-param fix + DD reducer, not a forward-CAGR boost.
+STOP_PCT = 0.10
 
 # Partial profit-take: book HALF once price closes >= entry*(1+PCT), rest rides
 # under the from-entry stop. Default OFF (0.0) — n40 is large-cap (top-40 ADV ∩

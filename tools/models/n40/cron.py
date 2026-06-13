@@ -210,7 +210,7 @@ def register_trading_jobs(schedule):
     # 09:33 (staggered off n100 09:30 / pseudo 09:31 / midcap 09:32) — one
     # scheduler thread runs these serially, so each model gets its own minute.
     schedule.every().day.at("09:33").do(execute_orders)
-    # 09:39 DAILY from-entry -12% hard-stop check (staggered after the 09:33
+    # 09:39 DAILY from-entry -10% hard-stop check (staggered after the 09:33
     # execute and off n100's 09:37). Runs every trading day; fires a STOP_HIT
     # SELL only if the held name's low pierced entry*(1-STOP_PCT).
     schedule.every().day.at("09:39").do(stop_check)

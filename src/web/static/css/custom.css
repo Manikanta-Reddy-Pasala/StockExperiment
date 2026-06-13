@@ -943,6 +943,16 @@ body {
         font-size: 0.8rem !important;
         white-space: nowrap;
     }
+    /* 2-column label/value metric tables (Balance Sheet, single Open Position)
+       must NOT inherit the nowrap above — a long label OR the colspan=2
+       reconciliation note would force the table wider than its card, and since
+       the card clips overflow-x the value (.v) column gets pushed off-screen
+       ("no values seen" on mobile). Let every cell wrap; keep only the number
+       column (.v) on one line. EXCLUDE the wide horizontally-scrolling basket
+       table (.table-scroll-sticky) which is meant to scroll, not wrap. */
+    .metric-table:not(.table-scroll-sticky) { width: 100%; }
+    .metric-table:not(.table-scroll-sticky) td { white-space: normal; word-break: break-word; }
+    .metric-table:not(.table-scroll-sticky) td.v { white-space: nowrap; }
     /* Sticky thead on scroll within .table-responsive */
     .table-responsive thead th {
         position: sticky; top: 0; background: var(--surface-2);
