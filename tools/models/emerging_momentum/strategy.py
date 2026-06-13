@@ -44,8 +44,15 @@ ROOT = Path(__file__).resolve().parents[3]
 # lb15/ret3 ("Config 1", tuned on the pre-rebuild buggy universe) — full-cycle
 # 2021-03→2026-05 ≈ +65.6% vs +45.6% CAGR. Longer 30d momentum + tighter retain
 # (hold while in top-2) ride the clean mid/small winners harder.
-POOL = 100           # universe pool = top-100 by 20d ADV from (N500 minus N100)
-TOPN = 100           # alias for POOL (display/compat with n100-style naming)
+# 2026-06-13 re-tune POOL 100 -> 80 (tools/research/emerging_improve.py): narrowing
+# to the top-80 by 20d ADV drops the lower-liquidity / jumpier mid-small tail that
+# diluted compounding + inflated DD. Beats pool-100 on ALL windows (full
+# +110->+135 CAGR / 38.6->35.2 DD / Calmar 2.86->3.83; 3y +139->+171/5.07->6.11;
+# since-Mar-2025 +46->+56/1.69->2.01), WF OOS both-axes win, PLATEAU-confirmed
+# (pool 80 ~= 85, smooth shoulder — not a spike). (VOL_WIN 90 tested too and
+# REJECTED: in-sample spike, fails the plateau check.)
+POOL = 80            # universe pool = top-80 by 20d ADV from (N500 minus N100)
+TOPN = 80            # alias for POOL (display/compat with n100-style naming)
 RETAIN = 1           # top-1 rotation (2026-05-31: RET1 + vol-adj beats RET2, +111% vs +95%)
 LOOKBACK = 30        # momentum ranking window (TRADING days). 2026-05-31 re-tune.
 MAX_PRICE = 3000.0   # skip names priced above this at entry

@@ -6,7 +6,7 @@ All figures net of real Fyers CNC charges with next-open fills, ₹10L start, tr
 
 | Model | Status | CAGR | maxDD | Calmar | Total |
 |---|---|---|---|---|---|
-| [Emerging Momentum](emerging_momentum/SUMMARY.md) | LIVE | +105.3% | 38.6% | 2.73 | +4346.3% |
+| [Emerging Momentum](emerging_momentum/SUMMARY.md) | LIVE | +134.7% | 35.2% | 3.83 | +8664.7% |
 | [Liquid 100 Momentum](momentum_pseudo_n100_adv/SUMMARY.md) | LIVE | +66.5% | 44.9% | 1.48 | +1175.7% |
 | [Retest Momentum](momentum_retest_n500/SUMMARY.md) | DISABLED (₹0) | +58.7% | 34.0% | 1.73 | +1029.3% |
 | [Nifty 100 Momentum](momentum_n100_top5_max1/SUMMARY.md) | LIVE | +52.1% | 49.1% | 1.06 | +804.6% |

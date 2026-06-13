@@ -41,9 +41,9 @@ DESC = {
     },
     "emerging_momentum": {
         "title": "Emerging Momentum", "live": "LIVE",
-        "universe": "Top-100 by 20d ADV from emerging mid/small (PIT N500 minus N100)",
-        "strategy": "Single-position (max-1) VOL-ADJUSTED momentum: rank by 30d return ÷ 60d return-volatility; ret>0, price ≤₹3000 (no SMA gate); RET1 top-1 rotation; monthly (1st trading day) + mid-month check (≥5pp lead). + DAILY ATR-from-entry hard stop (entry − 2.5× ATR(14)).",
-        "note": "Best model. Vol-adjusted momentum (return per unit of volatility) on the mid/small universe, PLUS a 2.5× ATR-from-entry hard stop. 2026-06-13 realism regen (net of real Fyers CNC charges, next-open fills): full-cycle 2021-03→2026-06 +105.3% CAGR / 38.6% DD / Calmar 2.73 / 68 trades / 63% win (charges ₹2.56M); 3-yr 2023-05→2026-05 +138.9% CAGR / 27.4% DD / Calmar 5.07 / 40 trades. (Old close-fill zero-charge convention had shown +115.6%/37.9%/3.05 — a normal ~10pp charges haircut.) ALL figures UNLEVERED (own cash only — no borrow); decision logic byte-identical to live (PIT, no-lookahead, backtest==live). The stop is a FIXED level at entry − 2.5×ATR (NOT trailing) so it cuts genuine breakdowns without whipsawing winners. Shared helper strategy.atr_stop_hit used by both backtest and the live --stop-check (no drift). The one model that crosses 100% organically (no leverage).",
+        "universe": "Top-80 by 20d ADV from emerging mid/small (PIT N500 minus N100)",
+        "strategy": "Single-position (max-1) VOL-ADJUSTED momentum: rank by 30d return ÷ 60d return-volatility over the top-80-ADV mid/small pool; ret>0, price ≤₹3000 (no SMA gate); RET1 top-1 rotation; monthly (1st trading day) + mid-month check (≥5pp lead). + DAILY ATR-from-entry hard stop (entry − 2.5× ATR(14)).",
+        "note": "Best model. Vol-adjusted momentum (return per unit of volatility) on the mid/small universe, PLUS a 2.5× ATR-from-entry hard stop. 2026-06-13 POOL 100→80 re-tune (tools/research/emerging_improve.py): narrowing to the top-80 by ADV drops the lower-liquidity/jumpier tail that diluted compounding + inflated DD — beats pool-100 on EVERY window. Net of real Fyers CNC charges + next-open fills: full-cycle 2021-03→2026-05 +134.7% CAGR / 35.2% DD / Calmar 3.83 / 61 trades / 62.3% win (charges ₹3.79M, vs old pool-100 +110%/38.6%/2.86); 3-yr 2023-05→2026-05 +179.5% CAGR / 28.1% DD / Calmar 6.39 / 35 trades (vs +138.9%/5.07); since-Mar-2025 +56% / Calmar 2.01 (vs +46%/1.69). WF OOS-only beat baseline on BOTH axes; PLATEAU-confirmed (pool 80≈85, smooth shoulder — not a spike). (VOL_WIN 60→90 was tested and REJECTED: in-sample spike that fails the plateau check.) ALL figures UNLEVERED (own cash only — no borrow); decision logic byte-identical to live (PIT, no-lookahead, backtest==live). The stop is a FIXED level at entry − 2.5×ATR (NOT trailing). The one model that crosses 100% organically (no leverage).",
     },
 }
 
@@ -80,7 +80,7 @@ RULES = {
     },
     "emerging_momentum": {
         "Rebalance": "1st trading day of month + a mid-month (day-15) lead check.",
-        "Universe & filters": "Top-100 by 20d ADV from (PIT N500 minus PIT N100); 30d return > 0; price ≤ ₹3000; NO SMA gate. MCAP-climber OFF.",
+        "Universe & filters": "Top-80 by 20d ADV from (PIT N500 minus PIT N100); 30d return > 0; price ≤ ₹3000; NO SMA gate. MCAP-climber OFF.",
         "Entry": "BUY rank-1 by VOL-ADJUSTED momentum (30d return ÷ 60d return-volatility) — single position, max 1.",
         "Exit": "Rotate when held is no longer rank-1 (RET1). Mid-month only rotates if the new rank-1 leads the held by ≥ 5pp.",
         "Source": "Backtest+live: PIT `n500_membership.csv` MINUS `n100_membership.csv` (factsheet-derived). Mcap-climber: `exports/nse_mcap.csv`. Prices: Fyers daily OHLCV.",

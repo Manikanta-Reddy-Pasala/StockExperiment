@@ -1,53 +1,53 @@
 {
   "model": "emerging_momentum",
   "start": "2021-03-01",
-  "end": "2026-06-10",
-  "years": 5.276,
+  "end": "2026-05-29",
+  "years": 5.243,
   "capital": 1000000.0,
-  "final_nav": 44462575.0,
-  "total_return_pct": 4346.26,
-  "cagr_pct": 105.29,
-  "max_dd_pct": 38.57,
-  "calmar": 2.73,
-  "trades": 68,
-  "wins": 43,
-  "losses": 25,
-  "win_rate_pct": 63.2,
+  "final_nav": 87647024.0,
+  "total_return_pct": 8664.7,
+  "cagr_pct": 134.71,
+  "max_dd_pct": 35.17,
+  "calmar": 3.83,
+  "trades": 61,
+  "wins": 38,
+  "losses": 23,
+  "win_rate_pct": 62.3,
   "open_position": {
-    "sym": "HFCL",
-    "qty": 262921,
-    "entry_px": 180.0,
-    "entry_date": "2026-06-02",
-    "last_px": 169.11
+    "sym": "BHEL",
+    "qty": 210310,
+    "entry_px": 379.9,
+    "entry_date": "2026-05-05",
+    "last_px": 416.75
   },
   "atr_stop_mult": 2.5,
   "per_year": {
     "2021": {
-      "ret_pct": 13.6,
-      "dd_pct": 38.6
+      "ret_pct": 12.6,
+      "dd_pct": 35.2
     },
     "2022": {
-      "ret_pct": 173.7,
-      "dd_pct": 22.1
+      "ret_pct": 227.0,
+      "dd_pct": 28.4
     },
     "2023": {
-      "ret_pct": 336.4,
-      "dd_pct": 26.9
+      "ret_pct": 557.2,
+      "dd_pct": 19.5
     },
     "2024": {
-      "ret_pct": 140.6,
+      "ret_pct": 157.5,
       "dd_pct": 26.1
     },
     "2025": {
-      "ret_pct": 35.9,
-      "dd_pct": 11.1
+      "ret_pct": 19.3,
+      "dd_pct": 24.9
     },
     "2026": {
-      "ret_pct": 3.4,
-      "dd_pct": 27.4
+      "ret_pct": 20.2,
+      "dd_pct": 28.1
     }
   },
-  "charges_total": 2555014.45,
+  "charges_total": 3794454.21,
   "fill_at_next_open": true,
   "charges_model": "fyers_cnc"
 }
