@@ -978,9 +978,12 @@ body {
        ("no values seen" on mobile). Let every cell wrap; keep only the number
        column (.v) on one line. EXCLUDE the wide horizontally-scrolling basket
        table (.table-scroll-sticky) which is meant to scroll, not wrap. */
-    .metric-table:not(.table-scroll-sticky) { width: 100%; }
-    .metric-table:not(.table-scroll-sticky) td { white-space: normal; word-break: break-word; }
-    .metric-table:not(.table-scroll-sticky) td.v { white-space: nowrap; }
+    .metric-table:not(.table-scroll-sticky) { width: 100%; table-layout: fixed; }
+    .metric-table:not(.table-scroll-sticky) td { white-space: normal; overflow-wrap: break-word; }
+    /* Fixed split so the value column can't starve the label column (which made
+       labels break mid-word). Labels wrap at spaces; numbers stay intact. */
+    .metric-table:not(.table-scroll-sticky) td.k { width: 55%; }
+    .metric-table:not(.table-scroll-sticky) td.v { width: 45%; }
     /* Sticky thead on scroll within .table-responsive */
     .table-responsive thead th {
         position: sticky; top: 0; background: var(--surface-2);
