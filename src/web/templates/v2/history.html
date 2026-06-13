@@ -26,6 +26,15 @@
   <div class="small text-muted toolbar-meta">Auto-refresh 30s</div>
 </div>
 
+<!-- Transaction side filter -->
+<div class="side-filter d-flex flex-wrap gap-2 mb-3" id="side_filter" role="group" aria-label="Filter by transaction type">
+  <button type="button" class="btn btn-sm btn-primary" data-side="ALL">All</button>
+  <button type="button" class="btn btn-sm btn-outline-success" data-side="BUY">Buy</button>
+  <button type="button" class="btn btn-sm btn-outline-danger" data-side="SELL">Sell</button>
+  <button type="button" class="btn btn-sm btn-outline-primary" data-side="DEPOSIT">Deposit</button>
+  <button type="button" class="btn btn-sm btn-outline-warning" data-side="WITHDRAW">Withdraw</button>
+</div>
+
 <div class="row g-3 mb-4">
   <div class="col-6 col-lg-3">
     <div class="card h-100"><div class="card-body py-3 text-center">
@@ -70,6 +79,11 @@
       <tbody id="hist"><tr><td colspan="9" class="text-center text-muted py-3">Loading…</td></tr></tbody>
     </table>
   </div>
+  <div class="card-footer d-flex justify-content-between align-items-center gap-2" id="pager" style="display:none;">
+    <button type="button" class="btn btn-sm btn-outline-secondary" id="prev_pg"><i class="bi bi-chevron-left"></i> Prev</button>
+    <span class="small text-muted text-center flex-grow-1" id="pg_info">—</span>
+    <button type="button" class="btn btn-sm btn-outline-secondary" id="next_pg">Next <i class="bi bi-chevron-right"></i></button>
+  </div>
 </div>
 {% endblock %}
 
@@ -106,20 +120,28 @@ async function loadModels() {
   } catch(e) { console.error(e); }
 }
 
+let allTrades = [];      // full fetched history for the selected model (newest first)
+let sideFilter = 'ALL';  // ALL | BUY | SELL | DEPOSIT | WITHDRAW
+let page = 1;
+const PAGE_SIZE = 25;
+
 async function load() {
   const model = document.getElementById('model_sel').value;
   if (!model) {
+    allTrades = [];
     document.getElementById('hist').innerHTML =
       '<tr><td colspan="9" class="text-center text-muted py-3">No enabled model selected</td></tr>';
+    document.getElementById('pager').style.display = 'none';
     return;
   }
   try {
     const r = await fetch(`/admin/${model}/trade-history`);
     const d = await r.json();
     if (!d.success) return;
-    const trades = d.trades || [];
+    allTrades = d.trades || [];
 
-    const closed = trades.filter(t => t.side === 'SELL');
+    // Stats reflect the WHOLE history (independent of the side filter / page).
+    const closed = allTrades.filter(t => t.side === 'SELL');
     document.getElementById('n_trades').textContent = closed.length;
     const wins = closed.filter(t => (t.pnl||0) > 0).length;
     const losses = closed.filter(t => (t.pnl||0) < 0).length;
@@ -131,7 +153,6 @@ async function load() {
     document.getElementById('realized').className = 'fs-4 fw-bold ' + cls(total);
     const best = closed.reduce((b,t)=>Math.max(b, t.pnl||0), 0);
     document.getElementById('best').textContent = fmtINR(best);
-    // Charges + net-of-charges P&L from the server summary (approx, Fyers rates).
     const sum = d.summary || {};
     document.getElementById('charges').textContent = fmtINR(sum.total_charges || 0);
     const net = (sum.net_pnl !== undefined) ? sum.net_pnl : (total - (sum.total_charges||0));
@@ -139,31 +160,80 @@ async function load() {
     netEl.textContent = fmtINR(net);
     netEl.className = 'fw-semibold ' + cls(net);
 
-    const body = document.getElementById('hist');
-    if (trades.length === 0) {
-      body.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">No trades yet for this model</td></tr>';
-    } else {
-      body.innerHTML = trades.map(t => `
-        <tr>
-          <td data-label="When" class="small text-muted">${window.fmtIST ? window.fmtIST(t.trade_at) : (t.trade_at||'').replace('T',' ').slice(0,19)}</td>
-          <td data-label="Side"><span class="side-badge side-${t.side==='BUY'?'BUY':'SELL'}">${t.side}</span></td>
-          <td data-label="Symbol"><strong>${t.symbol}</strong></td>
-          <td data-label="Qty" class="text-end">${(t.qty||0).toLocaleString('en-IN')}</td>
-          <td data-label="Price ₹" class="text-end">${fmtINR(t.price)}</td>
-          <td data-label="Value ₹" class="text-end">${fmtINR(t.value)}</td>
-          <td data-label="Charges ₹" class="text-end text-muted">${t.charges ? fmtINR(t.charges) : '—'}</td>
-          <td data-label="P&L ₹" class="text-end ${cls(t.pnl)}">${t.pnl !== null && t.pnl !== undefined ? fmtINR(t.pnl) : '—'}${(t.net_pnl !== undefined) ? `<div class="small ${cls(t.net_pnl)}">net ${fmtINR(t.net_pnl)}</div>` : ''}</td>
-          <td data-label="Reason"><span class="badge bg-secondary">${t.reason||''}</span></td>
-        </tr>
-      `).join('');
-    }
+    renderTable();
   } catch(e) { console.error(e); }
 }
+
+function filteredTrades() {
+  return sideFilter === 'ALL' ? allTrades : allTrades.filter(t => t.side === sideFilter);
+}
+
+function renderTable() {
+  const body = document.getElementById('hist');
+  const pager = document.getElementById('pager');
+  const rows = filteredTrades();
+  if (rows.length === 0) {
+    body.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-3">No ${sideFilter==='ALL'?'' : sideFilter.toLowerCase()+' '}transactions for this model</td></tr>`;
+    pager.style.display = 'none';
+    return;
+  }
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  if (page > pages) page = pages;
+  if (page < 1) page = 1;
+  const start = (page - 1) * PAGE_SIZE;
+  const slice = rows.slice(start, start + PAGE_SIZE);
+
+  const isCashflow = s => s === 'DEPOSIT' || s === 'WITHDRAW';
+  body.innerHTML = slice.map(t => `
+    <tr>
+      <td data-label="When" class="small text-muted">${window.fmtIST ? window.fmtIST(t.trade_at) : (t.trade_at||'').replace('T',' ').slice(0,19)}</td>
+      <td data-label="Side"><span class="side-badge side-${t.side}">${t.side}</span></td>
+      <td data-label="Symbol"><strong>${isCashflow(t.side) ? '—' : (t.symbol||'—')}</strong></td>
+      <td data-label="Qty" class="text-end">${isCashflow(t.side) ? '—' : (t.qty||0).toLocaleString('en-IN')}</td>
+      <td data-label="Price ₹" class="text-end">${isCashflow(t.side) ? '—' : fmtINR(t.price)}</td>
+      <td data-label="Value ₹" class="text-end">${fmtINR(t.value)}</td>
+      <td data-label="Charges ₹" class="text-end text-muted">${t.charges ? fmtINR(t.charges) : '—'}</td>
+      <td data-label="P&L ₹" class="text-end ${cls(t.pnl)}">${t.pnl !== null && t.pnl !== undefined ? fmtINR(t.pnl) : '—'}${(t.net_pnl !== undefined) ? `<div class="small ${cls(t.net_pnl)}">net ${fmtINR(t.net_pnl)}</div>` : ''}</td>
+      <td data-label="Reason"><span class="badge bg-secondary">${t.reason||''}</span></td>
+    </tr>
+  `).join('');
+
+  // Pager
+  if (pages > 1) {
+    pager.style.display = 'flex';
+    document.getElementById('pg_info').textContent =
+      `Page ${page} of ${pages} · ${rows.length} ${sideFilter==='ALL'?'transactions':sideFilter.toLowerCase()+'s'}`;
+    document.getElementById('prev_pg').disabled = page <= 1;
+    document.getElementById('next_pg').disabled = page >= pages;
+  } else {
+    pager.style.display = 'none';
+  }
+}
+
+// Side filter chips
+document.getElementById('side_filter').addEventListener('click', (ev) => {
+  const btn = ev.target.closest('button[data-side]');
+  if (!btn) return;
+  sideFilter = btn.dataset.side;
+  page = 1;
+  // active styling: chosen chip solid, others outline
+  document.querySelectorAll('#side_filter button[data-side]').forEach(b => {
+    const base = { ALL:'primary', BUY:'success', SELL:'danger', DEPOSIT:'primary', WITHDRAW:'warning' }[b.dataset.side];
+    const on = b.dataset.side === sideFilter;
+    b.className = `btn btn-sm btn${on ? '' : '-outline'}-${base}`;
+  });
+  renderTable();
+});
+
+document.getElementById('prev_pg').addEventListener('click', () => { page--; renderTable(); window.scrollTo({top:0,behavior:'smooth'}); });
+document.getElementById('next_pg').addEventListener('click', () => { page++; renderTable(); window.scrollTo({top:0,behavior:'smooth'}); });
 
 (async () => {
   await loadModels();
   load();
 })();
+// On model change, reset to page 1 (handler is inline onchange="load()"; reset here too)
+document.getElementById('model_sel').addEventListener('change', () => { page = 1; });
 setInterval(load, 30000);
 </script>
 {% endblock %}

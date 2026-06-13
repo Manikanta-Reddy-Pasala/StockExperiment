@@ -135,6 +135,13 @@
     <div class="d-flex gap-3 small text-muted" id="txn_summary">—</div>
   </div>
   <div class="card-body p-0">
+    <div class="side-filter d-flex flex-wrap gap-2 p-2 border-bottom" id="txn_side_filter" role="group" aria-label="Filter by transaction type">
+      <button type="button" class="btn btn-sm btn-primary" data-side="ALL">All</button>
+      <button type="button" class="btn btn-sm btn-outline-success" data-side="BUY">Buy</button>
+      <button type="button" class="btn btn-sm btn-outline-danger" data-side="SELL">Sell</button>
+      <button type="button" class="btn btn-sm btn-outline-primary" data-side="DEPOSIT">Deposit</button>
+      <button type="button" class="btn btn-sm btn-outline-warning" data-side="WITHDRAW">Withdraw</button>
+    </div>
     <div class="table-responsive txn-wrap">
       <table class="table table-hover txn-table table-cards mb-0">
         <thead>
@@ -158,11 +165,20 @@
         </tbody>
       </table>
     </div>
+    <div class="d-flex justify-content-between align-items-center gap-2 p-2 border-top" id="txn_pager" style="display:none;">
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="txn_prev"><i class="bi bi-chevron-left"></i> Prev</button>
+      <span class="small text-muted text-center flex-grow-1" id="txn_pg_info">—</span>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="txn_next">Next <i class="bi bi-chevron-right"></i></button>
+    </div>
   </div>
 </div>
 
 <script>
 const MODEL_NAME = {{ model_name | tojson }};
+let txnAll = [];          // full transaction history (newest first)
+let txnSide = 'ALL';      // ALL | BUY | SELL | DEPOSIT | WITHDRAW
+let txnPage = 1;
+const TXN_PAGE_SIZE = 25;
 
 function fmtINR(v) {
   if (v == null || v === '' || Number.isNaN(Number(v))) return '—';
@@ -368,65 +384,106 @@ async function loadTradeHistory() {
       <span>Win rate: <strong>${fmtPct(sum.win_rate_pct)}</strong></span>
     `;
 
-    const body = document.getElementById('txn_body');
-    if (!trades.length) {
-      body.innerHTML =
-        '<tr><td colspan="12" class="empty-state">No trades yet for this model.</td></tr>';
-      return;
-    }
-
-    const rows = trades.map(t => {
-      const side = (t.side || '').toUpperCase();
-      const pnlVal = t.pnl;
-      const pnlCell = pnlVal == null
-        ? '<span class="text-muted">—</span>'
-        : `<span class="${cls(pnlVal)}">${fmtINR(pnlVal)}</span>`;
-      // P&L % on a SELL = realized pnl / cost basis, where cost = value - pnl
-      // (value = sell proceeds = qty×sell_px; cost = qty×buy_px). BUY/cashflow
-      // rows have no pnl → blank.
-      let pnlPctCell = '<span class="text-muted">—</span>';
-      if (pnlVal != null) {
-        const cost = Number(t.value || 0) - Number(pnlVal);
-        if (cost > 0) {
-          const pct = (Number(pnlVal) / cost) * 100;
-          pnlPctCell = `<span class="${cls(pnlVal)}">${fmtPct(pct)}</span>`;
-        }
-      }
-      const isCashflow = side === 'DEPOSIT' || side === 'WITHDRAW';
-      const sym = isCashflow ? '<span class="text-muted">—</span>' : (t.symbol || '—');
-      const qty = isCashflow ? '—' : fmtNum(t.qty);
-      const px  = isCashflow ? '—' : fmtINR(t.price);
-      const hasCharges = t.charges != null && t.charges !== 0;
-      const hasOrder = !!t.fyers_order_id;
-      // `na-cell` hides a non-applicable field in the mobile card view (the
-      // desktop table keeps the column for alignment). Deposits/withdrawals
-      // are pure cashflows (no symbol/qty/price/charges/P&L); a BUY has no
-      // realized P&L. Only the relevant rows show per transaction type.
-      const na = (cond) => cond ? ' na-cell' : '';
-      return `
-        <tr>
-          <td data-label="Date">${fmtDate(t.trade_at)}</td>
-          <td data-label="Model"><span class="model-tag">${modelLabel(t.model_name || MODEL_NAME)}</span></td>
-          <td data-label="Side"><span class="side-badge side-${side}">${side || '—'}</span></td>
-          <td data-label="Symbol" class="${na(isCashflow)}"><code>${sym}</code></td>
-          <td class="text-end${na(isCashflow)}" data-label="Qty">${qty}</td>
-          <td class="text-end${na(isCashflow)}" data-label="Price">${px}</td>
-          <td class="text-end" data-label="Value">${fmtINR(t.value)}</td>
-          <td class="text-end text-muted${na(!hasCharges)}" data-label="Charges">${hasCharges ? fmtINR(t.charges) : '—'}</td>
-          <td class="text-end${na(pnlVal == null)}" data-label="P&L">${pnlCell}</td>
-          <td class="text-end${na(pnlVal == null)}" data-label="P&L %">${pnlPctCell}</td>
-          <td data-label="Reason" class="${na(!t.reason)}"><small class="text-muted">${t.reason || ''}</small></td>
-          <td data-label="Order ID" class="${na(!hasOrder)}"><small class="text-muted">${t.fyers_order_id || ''}</small></td>
-        </tr>
-      `;
-    }).join('');
-    body.innerHTML = rows;
+    txnAll = trades;
+    renderTxn();
   } catch (e) {
     console.error('trade-history load failed', e);
     document.getElementById('txn_body').innerHTML =
       `<tr><td colspan="12" class="empty-state text-danger">Error: ${e.message || e}</td></tr>`;
   }
 }
+
+function txnFiltered() {
+  return txnSide === 'ALL'
+    ? txnAll
+    : txnAll.filter(t => (t.side || '').toUpperCase() === txnSide);
+}
+
+function renderTxn() {
+  const body = document.getElementById('txn_body');
+  const pager = document.getElementById('txn_pager');
+  const rows = txnFiltered();
+  if (rows.length === 0) {
+    const what = txnSide === 'ALL' ? '' : txnSide.toLowerCase() + ' ';
+    body.innerHTML = `<tr><td colspan="12" class="empty-state">No ${what}transactions for this model.</td></tr>`;
+    pager.style.display = 'none';
+    return;
+  }
+  const pages = Math.max(1, Math.ceil(rows.length / TXN_PAGE_SIZE));
+  if (txnPage > pages) txnPage = pages;
+  if (txnPage < 1) txnPage = 1;
+  const start = (txnPage - 1) * TXN_PAGE_SIZE;
+  const slice = rows.slice(start, start + TXN_PAGE_SIZE);
+
+  body.innerHTML = slice.map(t => {
+    const side = (t.side || '').toUpperCase();
+    const pnlVal = t.pnl;
+    const pnlCell = pnlVal == null
+      ? '<span class="text-muted">—</span>'
+      : `<span class="${cls(pnlVal)}">${fmtINR(pnlVal)}</span>`;
+    // P&L % on a SELL = realized pnl / cost basis (cost = value − pnl).
+    // BUY/cashflow rows have no pnl → blank.
+    let pnlPctCell = '<span class="text-muted">—</span>';
+    if (pnlVal != null) {
+      const cost = Number(t.value || 0) - Number(pnlVal);
+      if (cost > 0) {
+        const pct = (Number(pnlVal) / cost) * 100;
+        pnlPctCell = `<span class="${cls(pnlVal)}">${fmtPct(pct)}</span>`;
+      }
+    }
+    const isCashflow = side === 'DEPOSIT' || side === 'WITHDRAW';
+    const sym = isCashflow ? '<span class="text-muted">—</span>' : (t.symbol || '—');
+    const qty = isCashflow ? '—' : fmtNum(t.qty);
+    const px  = isCashflow ? '—' : fmtINR(t.price);
+    const hasCharges = t.charges != null && t.charges !== 0;
+    const hasOrder = !!t.fyers_order_id;
+    // `na-cell` hides a non-applicable field in the mobile card view (the
+    // desktop table keeps the column for alignment).
+    const na = (cond) => cond ? ' na-cell' : '';
+    return `
+      <tr>
+        <td data-label="Date">${fmtDate(t.trade_at)}</td>
+        <td data-label="Model"><span class="model-tag">${modelLabel(t.model_name || MODEL_NAME)}</span></td>
+        <td data-label="Side"><span class="side-badge side-${side}">${side || '—'}</span></td>
+        <td data-label="Symbol" class="${na(isCashflow)}"><code>${sym}</code></td>
+        <td class="text-end${na(isCashflow)}" data-label="Qty">${qty}</td>
+        <td class="text-end${na(isCashflow)}" data-label="Price">${px}</td>
+        <td class="text-end" data-label="Value">${fmtINR(t.value)}</td>
+        <td class="text-end text-muted${na(!hasCharges)}" data-label="Charges">${hasCharges ? fmtINR(t.charges) : '—'}</td>
+        <td class="text-end${na(pnlVal == null)}" data-label="P&L">${pnlCell}</td>
+        <td class="text-end${na(pnlVal == null)}" data-label="P&L %">${pnlPctCell}</td>
+        <td data-label="Reason" class="${na(!t.reason)}"><small class="text-muted">${t.reason || ''}</small></td>
+        <td data-label="Order ID" class="${na(!hasOrder)}"><small class="text-muted">${t.fyers_order_id || ''}</small></td>
+      </tr>
+    `;
+  }).join('');
+
+  if (pages > 1) {
+    pager.style.display = 'flex';
+    document.getElementById('txn_pg_info').textContent =
+      `Page ${txnPage} of ${pages} · ${rows.length} ${txnSide === 'ALL' ? 'transactions' : txnSide.toLowerCase() + 's'}`;
+    document.getElementById('txn_prev').disabled = txnPage <= 1;
+    document.getElementById('txn_next').disabled = txnPage >= pages;
+  } else {
+    pager.style.display = 'none';
+  }
+}
+
+// Side filter chips
+document.getElementById('txn_side_filter').addEventListener('click', (ev) => {
+  const btn = ev.target.closest('button[data-side]');
+  if (!btn) return;
+  txnSide = btn.dataset.side;
+  txnPage = 1;
+  document.querySelectorAll('#txn_side_filter button[data-side]').forEach(b => {
+    const base = { ALL: 'primary', BUY: 'success', SELL: 'danger', DEPOSIT: 'primary', WITHDRAW: 'warning' }[b.dataset.side];
+    const on = b.dataset.side === txnSide;
+    b.className = `btn btn-sm btn${on ? '' : '-outline'}-${base}`;
+  });
+  renderTxn();
+});
+document.getElementById('txn_prev').addEventListener('click', () => { txnPage--; renderTxn(); });
+document.getElementById('txn_next').addEventListener('click', () => { txnPage++; renderTxn(); });
 
 async function loadAll() {
   await Promise.all([loadBalanceSheet(), loadTradeHistory()]);
