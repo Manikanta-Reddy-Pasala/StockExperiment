@@ -220,11 +220,16 @@
         </div>
     </div>
 
-    <!-- Capital (live from Fyers) -->
+    <!-- Capital (live from Fyers) — collapsed by default -->
     <div class="col-lg-6">
         <div class="card h-100">
-            <div class="card-header"><i class="bi bi-piggy-bank me-2"></i>Capital (Live from Fyers)</div>
-            <div class="card-body">
+            <div class="card-header d-flex justify-content-between align-items-center fyers-header collapsed"
+                 role="button" data-bs-toggle="collapse" data-bs-target="#capital-body"
+                 aria-expanded="false" aria-controls="capital-body" style="cursor:pointer;">
+                <span><i class="bi bi-piggy-bank me-2"></i>Capital (Live from Fyers)</span>
+                <i class="bi bi-chevron-down fyers-chevron"></i>
+            </div>
+            <div class="card-body collapse" id="capital-body">
                 <div class="mb-3">
                     <label class="form-label small">Available Cash + Holdings Value</label>
                     <div class="input-group">
