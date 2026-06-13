@@ -1,16 +1,16 @@
 # Model Backtests — Index
 
-Backtest window: **2021-03-01 → 2026-05-31** (emerging → 2026-06-10; full ~5.2-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 recovery). 3-yr window also reported in notes: **2023-05-15 → 2026-05-12**. REALISM CONVENTION (2026-06-13): all figures are **net of real Fyers CNC charges, with next-open fills** (decide on bar d's close, fill at bar d+1's open) and PIT universes.
+Backtest window: **2021-01-01 → 2026-05-29** (₹10L capital; full ~5.4-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 recovery). 3-yr window also reported in notes: **2023-05-15 → 2026-05-12**. REALISM CONVENTION (2026-06-13): all figures are **net of real Fyers CNC charges, with next-open fills** (decide on bar d's close, fill at bar d+1's open) and PIT universes.
 
 All figures net of real Fyers CNC charges with next-open fills, ₹10L start, true point-in-time universes.
 
 | Model | Status | CAGR | maxDD | Calmar | Total |
 |---|---|---|---|---|---|
-| [Emerging Momentum](emerging_momentum/SUMMARY.md) | LIVE | +134.7% | 35.2% | 3.83 | +8664.7% |
-| [Liquid 100 Momentum](momentum_pseudo_n100_adv/SUMMARY.md) | LIVE | +66.5% | 44.9% | 1.48 | +1175.7% |
-| [Retest Momentum](momentum_retest_n500/SUMMARY.md) | DISABLED (₹0) | +58.7% | 34.0% | 1.73 | +1029.3% |
-| [Nifty 100 Momentum](momentum_n100_top5_max1/SUMMARY.md) | LIVE | +52.1% | 49.1% | 1.06 | +804.6% |
-| [Weekly Top-40](n40/SUMMARY.md) | LIVE | +32.4% | 38.9% | 0.83 | +335.8% |
+| [Emerging Momentum](emerging_momentum/SUMMARY.md) | LIVE | +127.2% | 35.3% | 3.6 | +8337.7% |
+| [Liquid 100 Momentum](momentum_pseudo_n100_adv/SUMMARY.md) | LIVE | +65.8% | 44.9% | 1.47 | +1437.0% |
+| [Retest Momentum](momentum_retest_n500/SUMMARY.md) | DISABLED (₹0) | +56.6% | 34.0% | 1.66 | +1029.3% |
+| [Nifty 100 Momentum](momentum_n100_top5_max1/SUMMARY.md) | LIVE | +50.3% | 49.1% | 1.02 | +804.6% |
+| [Weekly Top-40](n40/SUMMARY.md) | LIVE | +31.3% | 38.9% | 0.81 | +335.8% |
 
 **Caveats:**
 - `momentum_pseudo_n100_adv` = optimistic upper bound (ADV-selection bias, not real index).

@@ -1,21 +1,21 @@
 {
   "model": "emerging_momentum",
-  "start": "2021-03-01",
+  "start": "2021-01-01",
   "end": "2026-05-29",
-  "years": 5.243,
+  "years": 5.405,
   "capital": 1000000.0,
-  "final_nav": 87647024.0,
-  "total_return_pct": 8664.7,
-  "cagr_pct": 134.71,
-  "max_dd_pct": 35.17,
-  "calmar": 3.83,
-  "trades": 61,
-  "wins": 38,
-  "losses": 23,
-  "win_rate_pct": 62.3,
+  "final_nav": 84377043.0,
+  "total_return_pct": 8337.7,
+  "cagr_pct": 127.2,
+  "max_dd_pct": 35.31,
+  "calmar": 3.6,
+  "trades": 64,
+  "wins": 39,
+  "losses": 25,
+  "win_rate_pct": 60.9,
   "open_position": {
     "sym": "BHEL",
-    "qty": 210310,
+    "qty": 202464,
     "entry_px": 379.9,
     "entry_date": "2026-05-05",
     "last_px": 416.75
@@ -23,8 +23,8 @@
   "atr_stop_mult": 2.5,
   "per_year": {
     "2021": {
-      "ret_pct": 12.6,
-      "dd_pct": 35.2
+      "ret_pct": 8.4,
+      "dd_pct": 35.3
     },
     "2022": {
       "ret_pct": 227.0,
@@ -47,7 +47,7 @@
       "dd_pct": 28.1
     }
   },
-  "charges_total": 3794454.21,
+  "charges_total": 3660194.28,
   "fill_at_next_open": true,
   "charges_model": "fyers_cnc"
 }

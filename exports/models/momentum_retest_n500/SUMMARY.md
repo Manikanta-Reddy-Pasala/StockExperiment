@@ -5,7 +5,7 @@ Monthly top-4 (K=4), 30d momentum, buy within 20% of 20-EMA, retain top-4 band.
 
 **Universe:** Top-120 by 20d ADV from N500 (minus Smallcap-250)
 
-Backtest window: **2021-03-01 → 2026-05-31** (emerging → 2026-06-10; full ~5.2-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 recovery). 3-yr window also reported in notes: **2023-05-15 → 2026-05-12**. REALISM CONVENTION (2026-06-13): all figures are **net of real Fyers CNC charges, with next-open fills** (decide on bar d's close, fill at bar d+1's open) and PIT universes.
+Backtest window: **2021-01-01 → 2026-05-29** (₹10L capital; full ~5.4-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 recovery). 3-yr window also reported in notes: **2023-05-15 → 2026-05-12**. REALISM CONVENTION (2026-06-13): all figures are **net of real Fyers CNC charges, with next-open fills** (decide on bar d's close, fill at bar d+1's open) and PIT universes.
 
 ## Trade rules
 
@@ -23,9 +23,9 @@ Backtest window: **2021-03-01 → 2026-05-31** (emerging → 2026-06-10; full ~5
 |---|---|
 | Final NAV (₹10L start) | ₹11,292,990 |
 | Total return | +1029.3% |
-| CAGR (annualized) | +58.7% |
+| CAGR (annualized) | +56.6% |
 | Max drawdown | 34.0% |
-| Calmar | 1.73 |
+| Calmar | 1.66 |
 | Trades | 183 (110W / 72L) · 60% win |
 | Total charges (real Fyers CNC, deducted) | ₹386,643 |
 
@@ -42,7 +42,7 @@ Backtest window: **2021-03-01 → 2026-05-31** (emerging → 2026-06-10; full ~5
 
 ## Note
 
-Multi-holding K=4 (2026-05-31 re-tune, was K2). 2026-06-13 realism regen (net of charges, next-open fills, PIT-before-ADV universe fix): full-cycle 2021-03→2026-05 +58.7% CAGR / 34.0% DD / Calmar 1.73 / 183 trades (charges ₹386,643); 3-yr 2023-05→2026-05 +102.3% CAGR / 23.6% DD / Calmar 4.34. (Old flat-0.15%/side close-fill convention had shown +57.3%/38.8%/1.48 — the PIT-before-ADV fix was net-positive, the only model to IMPROVE under realism.) K2→K4 diversified the basket (per-year DD ≤33 every year); K-knee: K5/K6 decay. Wide 20% entry band keeps leaders that never pull back to the EMA.
+Multi-holding K=4 (2026-05-31 re-tune, was K2). 2026-06-13 realism regen (net of charges, next-open fills, PIT-before-ADV universe fix): full-cycle 2021-01→2026-05 +56.6% CAGR / 34.0% DD / Calmar 1.66 / 183 trades (charges ₹386,643); 3-yr 2023-05→2026-05 +102.3% CAGR / 23.6% DD / Calmar 4.34. (Old flat-0.15%/side close-fill convention had shown +57.3%/38.8%/1.48 — the PIT-before-ADV fix was net-positive, the only model to IMPROVE under realism.) K2→K4 diversified the basket (per-year DD ≤33 every year); K-knee: K5/K6 decay. Wide 20% entry band keeps leaders that never pull back to the EMA.
 
 **Open position at window end:** ADANIPOWER [large] qty 14808 entry ₹154.5 on 2026-04-02 (unrealized +1,315,987)
 

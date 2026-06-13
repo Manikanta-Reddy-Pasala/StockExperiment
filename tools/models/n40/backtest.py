@@ -60,7 +60,7 @@ from tools.live.broker_charges import compute_charges
 from tools.models.n40.strategy import (  # noqa: E402  shared w/ live
     UNIV_SIZE, LOOKBACK, ADV_WIN, SMA_LONG, RETAIN, STOP_PCT, PROFIT_TAKE_PCT)
 N100_CSV  = str(ROOT / "src" / "data" / "symbols" / "nifty100.csv")
-DEFAULT_START = date(2021, 3, 1)
+DEFAULT_START = date(2021, 1, 1)
 DEFAULT_END   = date(2026, 5, 29)
 DEFAULT_CAP   = 1_000_000.0
 

@@ -23,11 +23,11 @@ MODELS = [
 
 # cagr_pct / max_dd_pct / calmar straight from the regenerated summary.json
 EXPECTED = {
-    "emerging_momentum": (134.71, 35.17, 3.83),  # 2026-06-13 POOL 100->80
-    "momentum_n100_top5_max1": (52.14, 49.13, 1.06),
-    "momentum_pseudo_n100_adv": (66.46, 44.89, 1.48),  # 2026-06-13 nosml rework
-    "momentum_retest_n500": (58.71, 34.03, 1.73),
-    "n40": (32.41, 38.86, 0.83),  # 2026-06-13 stop re-tune 12%->10%
+    "emerging_momentum": (127.20, 35.31, 3.60),  # 2026-06-13 POOL 100->80
+    "momentum_n100_top5_max1": (50.31, 49.13, 1.02),
+    "momentum_pseudo_n100_adv": (65.79, 44.89, 1.47),  # 2026-06-13 nosml rework
+    "momentum_retest_n500": (56.60, 34.03, 1.66),
+    "n40": (31.31, 38.86, 0.81),  # 2026-06-13 stop re-tune 12%->10%
 }
 
 
@@ -63,11 +63,11 @@ def test_exports_summary_json_in_sync_with_tools():
 def test_settings_cards_quote_new_net_numbers():
     html = (ROOT / "src" / "web" / "templates" / "v2" / "settings.html").read_text()
     for needle in (
-        "+134.7% CAGR",   # emerging full (2026-06-13 pool 100->80)
-        "+52.1% CAGR",    # n100 full
-        "+66.5% CAGR",    # pseudo full (nosml rework 2026-06-13)
-        "+58.7% CAGR",    # retest full
-        "+32.4% CAGR",    # n40 full (2026-06-13 stop re-tune 12%->10%)
+        "+127.2% CAGR",   # emerging full (2026-06-13 pool 100->80)
+        "+50.3% CAGR",    # n100 full
+        "+65.8% CAGR",    # pseudo full (nosml rework 2026-06-13)
+        "+56.6% CAGR",    # retest full
+        "+31.3% CAGR",    # n40 full (2026-06-13 stop re-tune 12%->10%)
         "net of charges",
         "next-open fills",
     ):
@@ -84,14 +84,14 @@ def test_pseudo_nosml_flagged_in_settings():
 
 def test_readme_table_updated():
     md = (ROOT / "README.md").read_text()
-    for needle in ("+134.71%", "+58.71%", "+52.14%", "+32.41%", "+66.46%",
+    for needle in ("+127.20%", "+56.60%", "+50.31%", "+31.31%", "+65.79%",
                    "net of real Fyers CNC charges", "next-open fills"):
         assert needle in md, f"README.md missing: {needle}"
 
 
 def test_exports_index_regenerated():
     md = (ROOT / "exports" / "models" / "SUMMARY.md").read_text()
-    for needle in ("+134.7%", "+58.7%", "+52.1%", "+32.4%", "+66.5%",
+    for needle in ("+127.2%", "+56.6%", "+50.3%", "+31.3%", "+65.8%",
                    "net of real Fyers CNC charges"):
         assert needle in md, f"exports/models/SUMMARY.md missing: {needle}"
 

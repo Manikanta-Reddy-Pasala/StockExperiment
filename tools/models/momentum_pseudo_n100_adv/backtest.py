@@ -182,7 +182,7 @@ def smallcap_at(d):
     return _SML_SNAPS[chosen]
 
 
-DEFAULT_START = date(2021, 3, 1)
+DEFAULT_START = date(2021, 1, 1)
 DEFAULT_END   = date(2026, 5, 29)
 DEFAULT_CAP   = 1_000_000.0
 

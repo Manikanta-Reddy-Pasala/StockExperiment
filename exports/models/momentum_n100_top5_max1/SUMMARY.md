@@ -5,7 +5,7 @@ Monthly rotation + mid-month check, single position (max 1), 15-trading-day retu
 
 **Universe:** Real NSE Nifty 100 (PIT membership)
 
-Backtest window: **2021-03-01 → 2026-05-31** (emerging → 2026-06-10; full ~5.2-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 recovery). 3-yr window also reported in notes: **2023-05-15 → 2026-05-12**. REALISM CONVENTION (2026-06-13): all figures are **net of real Fyers CNC charges, with next-open fills** (decide on bar d's close, fill at bar d+1's open) and PIT universes.
+Backtest window: **2021-01-01 → 2026-05-29** (₹10L capital; full ~5.4-year cycle: 2021 bull, 2022 correction, 2023-24 bull, 2025 chop, 2026 recovery). 3-yr window also reported in notes: **2023-05-15 → 2026-05-12**. REALISM CONVENTION (2026-06-13): all figures are **net of real Fyers CNC charges, with next-open fills** (decide on bar d's close, fill at bar d+1's open) and PIT universes.
 
 ## Trade rules
 
@@ -23,9 +23,9 @@ Backtest window: **2021-03-01 → 2026-05-31** (emerging → 2026-06-10; full ~5
 |---|---|
 | Final NAV (₹10L start) | ₹9,046,397 |
 | Total return | +804.6% |
-| CAGR (annualized) | +52.1% |
+| CAGR (annualized) | +50.3% |
 | Max drawdown | 49.1% |
-| Calmar | 1.06 |
+| Calmar | 1.02 |
 | Trades | 97 (53W / 44L) · 55% win |
 | Total charges (real Fyers CNC, deducted) | ₹584,930 |
 
@@ -42,7 +42,7 @@ Backtest window: **2021-03-01 → 2026-05-31** (emerging → 2026-06-10; full ~5
 
 ## Note
 
-True-index version — the trustworthy-clean momentum benchmark. 2026-06-13 realism regen (net of charges, next-open fills): full-cycle 2021-03→2026-05 +52.1% CAGR / 49.1% DD / Calmar 1.06 / 97 trades (charges ₹584,930); 3-yr 2023-05→2026-05 +80.5% CAGR / 20.7% DD / Calmar 3.88. (Old close-fill zero-charge convention had shown +59.9%/46.4%/1.29 — a normal ~8pp charges+slippage haircut.) From-entry fixed −12% hard stop (2026-06-02): entry×(1−0.12), checked daily on the low; shared backtest+live helper tools.shared.stops (no drift). Fixed-% fits these large-caps (uniform vol). DD is DAILY-MTM (stricter than the old rebal-snapshot basis).
+True-index version — the trustworthy-clean momentum benchmark. 2026-06-13 realism regen (net of charges, next-open fills): full-cycle 2021-01→2026-05 +50.3% CAGR / 49.1% DD / Calmar 1.02 / 97 trades (charges ₹584,930); 3-yr 2023-05→2026-05 +80.5% CAGR / 20.7% DD / Calmar 3.88. (Old close-fill zero-charge convention had shown +59.9%/46.4%/1.29 — a normal ~8pp charges+slippage haircut.) From-entry fixed −12% hard stop (2026-06-02): entry×(1−0.12), checked daily on the low; shared backtest+live helper tools.shared.stops (no drift). Fixed-% fits these large-caps (uniform vol). DD is DAILY-MTM (stricter than the old rebal-snapshot basis).
 
 **Open position at window end:** NSE:VEDL-EQ qty 25656 entry ₹323.9 on ? (unrealized +0)
 
